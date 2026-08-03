@@ -1,3 +1,6 @@
+.gradle/
+**/build/
+
 # Compiled class file
 *.class
 
@@ -29,3 +32,5 @@ replay_pid*
 
 # macOS
 .DS_Store
+
+!**/gradle/wrapper/gradle-wrapper.jar
