@@ -9,7 +9,7 @@
 | Java | 25 LTS | Eclipse Temurin 권장 |
 | Spring Boot | 4.1.0 | `backend/build.gradle.kts` 기준 |
 | Gradle | 9.5.1 | 별도 설치 없이 Gradle Wrapper 사용 |
-| 개발 DB | H2 | 운영 DB는 추후 결정 |
+| 개발 DB | PostgreSQL | 접속 정보는 환경변수로 관리 |
 | IDE | IntelliJ IDEA 권장 | Project SDK와 Gradle JVM을 Java 25로 설정 |
 
 - Java 패치 버전은 `25.0.x` 범위에서 최신 안정 버전을 사용한다.
@@ -18,8 +18,21 @@
 
 ### 백엔드 실행
 
+PostgreSQL 데이터베이스를 준비하고 다음 환경변수를 설정한다.
+
+| 환경변수 | 예시 | 설명 |
+| --- | --- | --- |
+| `DB_URL` | `jdbc:postgresql://localhost:5432/oneuldo` | PostgreSQL JDBC URL |
+| `DB_USERNAME` | `oneuldo` | 데이터베이스 사용자 이름 |
+| `DB_PASSWORD` | 로컬에서 설정 | 데이터베이스 비밀번호 |
+
+실제 접속 정보는 `.env`나 저장소 파일에 기록하지 않는다.
+
 ```bash
 cd backend
+export DB_URL=jdbc:postgresql://localhost:5432/oneuldo
+export DB_USERNAME=oneuldo
+export DB_PASSWORD='로컬-비밀번호'
 ./gradlew bootRun
 ```
 
@@ -224,6 +237,9 @@ spring.datasource.url=${DB_URL}
 spring.datasource.username=${DB_USERNAME}
 spring.datasource.password=${DB_PASSWORD}
 ```
+
+- 개발 환경은 PostgreSQL을 사용한다.
+- H2는 외부 데이터베이스 없이 테스트를 실행하기 위한 테스트 런타임에서만 사용한다.
 
 - 저장소에는 실제 값 대신 필요한 환경변수 이름과 설정 방법만 문서화한다.
 - 민감정보를 실수로 Push했다면 파일만 삭제하지 말고 즉시 해당 키를 폐기하고 재발급한다.
