@@ -1,0 +1,42 @@
+package oneuldo.member.controller;
+
+import lombok.RequiredArgsConstructor;
+import oneuldo.member.domain.Member;
+import oneuldo.member.dto.MemberResponse;
+import oneuldo.member.dto.MemberSignUpRequest;
+import oneuldo.member.dto.MemberUpdateRequest;
+import oneuldo.member.service.MemberService;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/api/members")
+@RequiredArgsConstructor
+public class MemberController {
+
+    private final MemberService memberService;
+
+    @PostMapping
+    public MemberResponse register(@RequestBody MemberSignUpRequest request) {
+        return memberService.register(request);
+    }
+
+    @GetMapping("/{id}")
+    public MemberResponse findMember(@PathVariable Long id) {
+        return memberService.findMember(id);
+    }
+
+    @PatchMapping("/{id}")
+    public MemberResponse modifyMember(@PathVariable Long id,
+                                       @RequestBody MemberUpdateRequest request) {
+        return memberService.modifyMember(id, request);
+    }
+
+    @DeleteMapping("/{id}")
+    public void deleteMember(@PathVariable Long id) {
+        memberService.deleteMember(id);
+    }
+
+
+
+
+}
