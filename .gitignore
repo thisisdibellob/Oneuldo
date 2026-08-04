@@ -1,5 +1,6 @@
 .gradle/
 **/build/
+out/
 
 # Compiled class file
 *.class
@@ -32,5 +33,34 @@ replay_pid*
 
 # macOS
 .DS_Store
+
+# Windows
+Thumbs.db
+Desktop.ini
+
+# Spring local configuration
+**/src/main/resources/application-local.properties
+**/src/main/resources/application-local.yml
+**/src/main/resources/application-local.yaml
+
+# Local environment variables
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# React / Node.js dependencies and build outputs
+node_modules/
+dist/
+coverage/
+.vite/
+.parcel-cache/
+.npm/
+.pnpm-store/
+
+# Frontend tooling caches
+.eslintcache
+.stylelintcache
+*.tsbuildinfo
 
 !**/gradle/wrapper/gradle-wrapper.jar
