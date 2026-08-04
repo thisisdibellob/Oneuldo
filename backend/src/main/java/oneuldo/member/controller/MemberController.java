@@ -1,7 +1,7 @@
 package oneuldo.member.controller;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import oneuldo.member.domain.Member;
 import oneuldo.member.dto.MemberResponse;
 import oneuldo.member.dto.MemberSignUpRequest;
 import oneuldo.member.dto.MemberUpdateRequest;
@@ -16,7 +16,7 @@ public class MemberController {
     private final MemberService memberService;
 
     @PostMapping
-    public MemberResponse register(@RequestBody MemberSignUpRequest request) {
+    public MemberResponse register(@Valid @RequestBody MemberSignUpRequest request) {
         return memberService.register(request);
     }
 
@@ -27,7 +27,7 @@ public class MemberController {
 
     @PatchMapping("/{id}")
     public MemberResponse modifyMember(@PathVariable Long id,
-                                       @RequestBody MemberUpdateRequest request) {
+                                       @Valid @RequestBody MemberUpdateRequest request) {
         return memberService.modifyMember(id, request);
     }
 

@@ -1,6 +1,7 @@
 package oneuldo.auth.controller;
 
 import jakarta.servlet.http.HttpSession;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import oneuldo.auth.dto.LoginRequest;
 import oneuldo.auth.dto.LoginResponse;
@@ -16,7 +17,7 @@ public class AuthController {
     private final AuthService authService;
 
     @PostMapping("/login")
-    public LoginResponse login(@RequestBody LoginRequest request,
+    public LoginResponse login(@Valid @RequestBody LoginRequest request,
                                HttpSession session) {
         return authService.login(request, session);
     }
