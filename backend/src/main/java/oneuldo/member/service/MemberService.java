@@ -1,26 +1,107 @@
 package oneuldo.member.service;
 
+
+import lombok.RequiredArgsConstructor;
+import oneuldo.member.domain.Member;
+import oneuldo.member.domain.MemberRole;
 import oneuldo.member.dto.MemberResponse;
 import oneuldo.member.dto.MemberSignUpRequest;
 import oneuldo.member.dto.MemberUpdateRequest;
+import oneuldo.member.repository.MemberRepository;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Locale;
+import java.util.Objects;
+import java.util.UUID;
 
 @Service
+@RequiredArgsConstructor
 public class MemberService {
+
+    private final MemberRepository memberRepository;
+    private final PasswordEncoder passwordEncoder;
 
     public MemberResponse register(MemberSignUpRequest request) {
 
+        // 비밀번호 확인
+        if (!Objects.equals(
+                request.getPassword(),
+                request.getPasswordConfirm()
+        )) {
+            throw new IllegalArgumentException("비밀번호가 일치하지 않습니다.");
+        }
+
+        // 이메일 확인
+        String email = request.getEmail()
+                .trim()
+                .toLowerCase(Locale.ROOT);
+
+        if (memberRepository.existsByEmail(email)) {
+            throw new IllegalArgumentException("이미 사용 중인 이메일입니다.");
+        }
+
+        // 비밀번호 암호화
+        String encodedPassword = passwordEncoder.encode(request.getPassword());
+
+        // 새 Member 객체 생성
+        Member newMember = new Member(
+                request.getLoginId(),
+                encodedPassword,
+                request.getName(),
+                email,
+                MemberRole.PARENT,
+                request.getBirthDate()
+        );
+
+        // DB에 저장
+        Member savedMember = memberRepository.save(newMember);
+
+        // MemberResponse 생성 후 반환
+        return MemberResponse.from(savedMember);
     }
 
-    public MemberResponse findMember(Long id) {
+    @Transactional(readOnly = true)
+    public MemberResponse findMember(UUID id) {
 
+        Member findMember = memberRepository.findById(id)
+                .orElseThrow(() ->
+                        new IllegalArgumentException("회원을 찾을 수 없습니다.")
+                );
+
+        return MemberResponse.from(findMember);
     }
 
-    public MemberResponse modifyMember(Long id, MemberUpdateRequest request) {
+    @Transactional
+    public MemberResponse modifyMember(UUID id, MemberUpdateRequest request) {
+        Member member = memberRepository.findById(id)
+                .orElseThrow(() ->
+                        new IllegalArgumentException(
+                                "회원을 찾을 수 없습니다."
+                        )
+                );
 
+        member.updateProfile(
+                request.getName(),
+                request.getBirthDate()
+        );
+
+        // save 할 필요가 없음. @Transactional 안이면 JPA가 감지해서 알아서 저장해줌
+
+        return MemberResponse.from(member);
     }
 
-    public void deleteMember(Long id) {
+    public void deleteMember(UUID id) {
+        Member member = memberRepository.findById(id)
+                .orElseThrow(() ->
+                        new IllegalArgumentException(
+                                "회원을 찾을 수 없습니다."
+                        )
+                );
 
+        memberRepository.delete(member);
     }
+
+
 }

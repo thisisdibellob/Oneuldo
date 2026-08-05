@@ -5,10 +5,15 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Past;
 import jakarta.validation.constraints.Size;
+import lombok.Getter;
 
 import java.time.LocalDate;
 
+@Getter
 public class MemberSignUpRequest {
+
+    @NotBlank(message = "{member.loginId.required}")
+    String LoginId;
 
     @NotBlank(message = "{member.name.required}")
     String name;
