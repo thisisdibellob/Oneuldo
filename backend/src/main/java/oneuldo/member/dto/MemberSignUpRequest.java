@@ -13,7 +13,7 @@ import java.time.LocalDate;
 public class MemberSignUpRequest {
 
     @NotBlank(message = "{member.loginId.required}")
-    String LoginId;
+    String loginId;
 
     @NotBlank(message = "{member.name.required}")
     String name;

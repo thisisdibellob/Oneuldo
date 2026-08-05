@@ -7,6 +7,8 @@ import oneuldo.member.domain.MemberRole;
 import oneuldo.member.dto.MemberResponse;
 import oneuldo.member.dto.MemberSignUpRequest;
 import oneuldo.member.dto.MemberUpdateRequest;
+import oneuldo.global.exception.DuplicateMemberException;
+import oneuldo.global.exception.MemberNotFoundException;
 import oneuldo.member.repository.MemberRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -23,6 +25,7 @@ public class MemberService {
     private final MemberRepository memberRepository;
     private final PasswordEncoder passwordEncoder;
 
+    @Transactional
     public MemberResponse register(MemberSignUpRequest request) {
 
         // 비밀번호 확인
@@ -39,7 +42,18 @@ public class MemberService {
                 .toLowerCase(Locale.ROOT);
 
         if (memberRepository.existsByEmail(email)) {
-            throw new IllegalArgumentException("이미 사용 중인 이메일입니다.");
+            throw new DuplicateMemberException("이미 사용 중인 이메일입니다.");
+        }
+
+        // 아이디 확인
+        String loginId = request.getLoginId()
+                .trim()
+                .toLowerCase(Locale.ROOT);
+
+        if (memberRepository.existsByLoginId(loginId)) {
+            throw new DuplicateMemberException(
+                    "이미 사용 중인 아이디입니다."
+            );
         }
 
         // 비밀번호 암호화
@@ -47,7 +61,7 @@ public class MemberService {
 
         // 새 Member 객체 생성
         Member newMember = new Member(
-                request.getLoginId(),
+                loginId,
                 encodedPassword,
                 request.getName(),
                 email,
@@ -66,9 +80,7 @@ public class MemberService {
     public MemberResponse findMember(UUID id) {
 
         Member findMember = memberRepository.findById(id)
-                .orElseThrow(() ->
-                        new IllegalArgumentException("회원을 찾을 수 없습니다.")
-                );
+                .orElseThrow(MemberNotFoundException::new);
 
         return MemberResponse.from(findMember);
     }
@@ -76,11 +88,7 @@ public class MemberService {
     @Transactional
     public MemberResponse modifyMember(UUID id, MemberUpdateRequest request) {
         Member member = memberRepository.findById(id)
-                .orElseThrow(() ->
-                        new IllegalArgumentException(
-                                "회원을 찾을 수 없습니다."
-                        )
-                );
+                .orElseThrow(MemberNotFoundException::new);
 
         member.updateProfile(
                 request.getName(),
@@ -92,13 +100,10 @@ public class MemberService {
         return MemberResponse.from(member);
     }
 
+    @Transactional
     public void deleteMember(UUID id) {
         Member member = memberRepository.findById(id)
-                .orElseThrow(() ->
-                        new IllegalArgumentException(
-                                "회원을 찾을 수 없습니다."
-                        )
-                );
+                .orElseThrow(MemberNotFoundException::new);
 
         memberRepository.delete(member);
     }

@@ -6,6 +6,9 @@ import oneuldo.member.dto.MemberResponse;
 import oneuldo.member.dto.MemberSignUpRequest;
 import oneuldo.member.dto.MemberUpdateRequest;
 import oneuldo.member.service.MemberService;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
@@ -22,20 +25,27 @@ public class MemberController {
         return memberService.register(request);
     }
 
-    @GetMapping("/{id}")
-    public MemberResponse findMember(@PathVariable UUID id) {
-        return memberService.findMember(id);
+    @GetMapping("/me")
+    public MemberResponse findMe(@AuthenticationPrincipal Jwt jwt) {
+        return memberService.findMember(getMemberId(jwt));
     }
 
-    @PatchMapping("/{id}")
-    public MemberResponse modifyMember(@PathVariable UUID id,
-                                       @Valid @RequestBody MemberUpdateRequest request) {
-        return memberService.modifyMember(id, request);
+    @PatchMapping("/me")
+    public MemberResponse modifyMe(
+            @AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody MemberUpdateRequest request
+    ) {
+        return memberService.modifyMember(getMemberId(jwt), request);
     }
 
-    @DeleteMapping("/{id}")
-    public void deleteMember(@PathVariable UUID id) {
-        memberService.deleteMember(id);
+    @DeleteMapping("/me")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteMe(@AuthenticationPrincipal Jwt jwt) {
+        memberService.deleteMember(getMemberId(jwt));
+    }
+
+    private UUID getMemberId(Jwt jwt) {
+        return UUID.fromString(jwt.getSubject());
     }
 
 

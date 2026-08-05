@@ -1,5 +1,6 @@
 package oneuldo.member.dto;
 
+import lombok.Getter;
 import oneuldo.member.domain.Member;
 import oneuldo.member.domain.MemberRole;
 
@@ -7,6 +8,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+@Getter
 public class MemberResponse {
     UUID id;
     String name;

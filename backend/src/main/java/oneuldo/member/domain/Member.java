@@ -1,9 +1,6 @@
 package oneuldo.member.domain;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
+import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDate;
@@ -23,7 +20,10 @@ public class Member {
     private String password;
     private String name;
     private String email;
+
+    @Enumerated(EnumType.STRING)
     private MemberRole role;
+
     private LocalDate birthDate;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
