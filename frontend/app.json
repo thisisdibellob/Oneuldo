@@ -1,0 +1,34 @@
+{
+  "expo": {
+    "name": "오늘도",
+    "slug": "onuldo",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/source/Logo.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#FFFFFF",
+      "resizeMode": "contain",
+      "image": "./assets/images/source/Logo.png"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.onuldo.app"
+    },
+    "android": {
+      "package": "com.onuldo.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#D3FFE5",
+        "foregroundImage": "./assets/images/source/Logo.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/images/source/Logo.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-font"
+    ]
+  }
+}
