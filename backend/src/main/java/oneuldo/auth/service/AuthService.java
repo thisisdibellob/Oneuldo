@@ -26,7 +26,7 @@ public class AuthService {
     public LoginResponse login(LoginRequest request) {
 
         // 이메일 검증
-        String email = request.getEmail()
+        String email = request.email()
                 .trim()
                 .toLowerCase(Locale.ROOT);
 
@@ -35,7 +35,7 @@ public class AuthService {
 
         // 비밀번호 검증
         if (!passwordEncoder.matches(
-                request.getPassword(),
+                request.password(),
                 member.getPassword()
         )) {
             throw new InvalidCredentialsException();
@@ -61,29 +61,22 @@ public class AuthService {
         );
     }
 
-    public void logout(UUID memberId, LogoutRequest request) {
-        refreshTokenService.revoke(memberId, request.getRefreshToken());
+    public void logout(UUID memberId) {
+        refreshTokenService.delete(memberId);
     }
 
     @Transactional
-    public TokenResponse refresh(
-            TokenRefreshRequest request
-    ) {
-        String oldRefreshToken = request.getRefreshToken();
+    public TokenResponse refresh(TokenRefreshRequest request) {
+        String oldRefreshToken = request.refreshToken();
 
-        UUID memberId =
-                refreshTokenService.validateAndGetMemberId(
-                        oldRefreshToken
-                );
+        UUID memberId = refreshTokenService.validateAndGetMemberId(oldRefreshToken);
 
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(InvalidTokenException::new);
 
-        String newAccessToken =
-                jwtTokenProvider.createAccessToken(member);
+        String newAccessToken = jwtTokenProvider.createAccessToken(member);
 
-        String newRefreshToken =
-                jwtTokenProvider.createRefreshToken(member);
+        String newRefreshToken = jwtTokenProvider.createRefreshToken(member);
 
         refreshTokenService.save(
                 memberId,

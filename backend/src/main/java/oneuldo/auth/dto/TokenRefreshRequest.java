@@ -1,11 +1,9 @@
 package oneuldo.auth.dto;
 
 import jakarta.validation.constraints.NotBlank;
-import lombok.Getter;
 
-@Getter
-public class TokenRefreshRequest {
-
-    @NotBlank
-    private String refreshToken;
+public record TokenRefreshRequest (
+        @NotBlank
+        String refreshToken
+) {
 }

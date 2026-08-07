@@ -80,13 +80,10 @@ public class RefreshTokenService {
     }
 
     @Transactional(readOnly = true)
-    public UUID validateAndGetMemberId(
-            String rawRefreshToken
-    ) {
+    public UUID validateAndGetMemberId(String rawRefreshToken) {
         Jwt jwt = jwtTokenProvider.decode(rawRefreshToken);
 
-        String tokenType =
-                jwt.getClaimAsString("token_type");
+        String tokenType = jwt.getClaimAsString("token_type");
 
         if (!"refresh".equals(tokenType)) {
             throw new InvalidTokenException();
@@ -100,8 +97,7 @@ public class RefreshTokenService {
             throw new InvalidTokenException();
         }
 
-        RefreshToken savedToken =
-                refreshTokenRepository.findById(memberId)
+        RefreshToken savedToken = refreshTokenRepository.findById(memberId)
                         .orElseThrow(InvalidTokenException::new);
 
         if (savedToken.getExpiresAt().isBefore(Instant.now())) {

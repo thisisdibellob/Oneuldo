@@ -30,14 +30,14 @@ public class MemberService {
 
         // 비밀번호 확인
         if (!Objects.equals(
-                request.getPassword(),
-                request.getPasswordConfirm()
+                request.password(),
+                request.passwordConfirm()
         )) {
             throw new IllegalArgumentException("비밀번호가 일치하지 않습니다.");
         }
 
         // 이메일 확인
-        String email = request.getEmail()
+        String email = request.email()
                 .trim()
                 .toLowerCase(Locale.ROOT);
 
@@ -46,7 +46,7 @@ public class MemberService {
         }
 
         // 아이디 확인
-        String loginId = request.getLoginId()
+        String loginId = request.loginId()
                 .trim()
                 .toLowerCase(Locale.ROOT);
 
@@ -57,16 +57,16 @@ public class MemberService {
         }
 
         // 비밀번호 암호화
-        String encodedPassword = passwordEncoder.encode(request.getPassword());
+        String encodedPassword = passwordEncoder.encode(request.password());
 
         // 새 Member 객체 생성
         Member newMember = new Member(
                 loginId,
                 encodedPassword,
-                request.getName(),
+                request.name(),
                 email,
                 MemberRole.PARENT,
-                request.getBirthDate()
+                request.birthDate()
         );
 
         // DB에 저장
@@ -91,8 +91,8 @@ public class MemberService {
                 .orElseThrow(MemberNotFoundException::new);
 
         member.updateProfile(
-                request.getName(),
-                request.getBirthDate()
+                request.name(),
+                request.birthDate()
         );
 
         // save 할 필요가 없음. @Transactional 안이면 JPA가 감지해서 알아서 저장해줌

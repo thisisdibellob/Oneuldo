@@ -5,35 +5,29 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Past;
 import jakarta.validation.constraints.Size;
-import lombok.Getter;
-
 import java.time.LocalDate;
 
-@Getter
-public class MemberSignUpRequest {
+public record MemberSignUpRequest (
 
     @NotBlank(message = "{member.loginId.required}")
-    String loginId;
+    String loginId,
 
     @NotBlank(message = "{member.name.required}")
-    String name;
+    String name,
 
     @NotBlank(message = "{member.email.required}")
     @Email(message = "{member.email.invalid}")
-    String email;
+    String email,
 
     @NotBlank(message = "{member.password.required}")
     @Size(min = 8, message = "{member.password.size}")
-    String password;
+    String password,
 
     @NotBlank(message = "{member.passwordConfirm.required}")
-    String passwordConfirm;
+    String passwordConfirm,
 
     @NotNull(message = "{member.birthDate.required}")
     @Past(message = "{member.birthDate.past}")
-    LocalDate birthDate;
-
-
-
-
+    LocalDate birthDate
+) {
 }

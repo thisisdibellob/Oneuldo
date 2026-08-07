@@ -25,17 +25,15 @@ public class AuthController {
 
     @PostMapping("/logout")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void logout(@AuthenticationPrincipal Jwt jwt,
-                       @Valid @RequestBody LogoutRequest request) {
+    public void logout(@AuthenticationPrincipal Jwt jwt) {
+        if (jwt.getSubject() == null) return;
 
         UUID memberId = UUID.fromString(jwt.getSubject());
-        authService.logout(memberId, request);
+        authService.logout(memberId);
     }
 
     @PostMapping("/refresh")
-    public TokenResponse refresh(
-            @Valid @RequestBody TokenRefreshRequest request
-    ) {
+    public TokenResponse refresh(@Valid @RequestBody TokenRefreshRequest request) {
         return authService.refresh(request);
     }
 
