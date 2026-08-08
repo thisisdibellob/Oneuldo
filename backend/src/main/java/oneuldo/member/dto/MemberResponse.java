@@ -3,8 +3,9 @@ package oneuldo.member.dto;
 import oneuldo.member.domain.Member;
 import oneuldo.member.domain.MemberRole;
 
+// UTC 기준 생성일·수정일을 응답에 사용합니다.
+import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.UUID;
 
 public record MemberResponse (
@@ -13,8 +14,8 @@ public record MemberResponse (
     String email,
     MemberRole role,
     LocalDate birthDate,
-    LocalDateTime createdAt,
-    LocalDateTime updatedAt
+    Instant createdAt,
+    Instant updatedAt
 ) {
 
     public static MemberResponse from(Member member) {

@@ -1,16 +1,17 @@
 package oneuldo.member.domain;
+// 모든 Entity가 공통으로 사용하는 생성일·수정일 기능을 가져옵니다.
+import oneuldo.global.entity.BaseTimeEntity;
 
 import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class Member {
+public class Member extends BaseTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -29,8 +30,6 @@ public class Member {
     private MemberRole role;
 
     private LocalDate birthDate;
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
 
     public Member(
             String loginId,
@@ -45,8 +44,6 @@ public class Member {
         this.email = email;
         this.role = role;
         this.birthDate = birthDate;
-        this.createdAt = LocalDateTime.now();
-        this.updatedAt = LocalDateTime.now();
     }
 
     public void updateProfile(
@@ -60,7 +57,5 @@ public class Member {
         if (birthDate != null) {
             this.birthDate = birthDate;
         }
-
-        this.updatedAt = LocalDateTime.now();
     }
 }
