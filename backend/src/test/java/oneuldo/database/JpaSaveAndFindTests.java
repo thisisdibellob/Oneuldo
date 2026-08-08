@@ -31,5 +31,8 @@ class JpaSaveAndFindTests {
 
         assertNotNull(found.getId());
         assertEquals("JPA 연결 확인", found.getName());
+
+        assertNotNull(found.getCreatedAt());
+        assertNotNull(found.getUpdatedAt());
     }
 }

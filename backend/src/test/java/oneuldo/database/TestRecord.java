@@ -1,5 +1,6 @@
 package oneuldo.database;
 
+import oneuldo.global.entity.BaseTimeEntity;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -8,7 +9,7 @@ import jakarta.persistence.Table;
 
 @Entity //DB 테이블과 연결
 @Table(name = "test_record") //DB 테이블 이름 지정
-public class TestRecord {
+public class TestRecord extends BaseTimeEntity { //BaseTimeEntity 상속
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY) //기본키 자동 생성
     private Long id; //기본키 지정
