@@ -49,7 +49,7 @@ DB에는 변경과 검증이 쉬운 영문 코드를 저장하고, 한글 명칭
 ## 3. 테이블 관계 요약
 
 ```text
-users
+member
   └─ quest_sessions
        ├─ quest_events
        ├─ quest_session_metrics
@@ -68,19 +68,23 @@ quests
 
 ## 4. 사용자 및 퀘스트 데이터
 
-### 4.1 `users`
+### 4.1 `member`
 
-서비스 사용자 기본 정보를 저장한다. 로그인과 보호자 관계가 확정되기 전까지 최소 정보만 둔다.
+서비스 회원의 로그인 정보와 기본 프로필을 저장한다.
 
 | 컬럼 | 타입 | 필수 | 설명 |
 | --- | --- | --- | --- |
 | `id` | UUID | Y | 사용자 식별자 |
-| `display_name` | VARCHAR(50) | Y | 화면에 표시할 이름 |
-| `status` | VARCHAR(20) | Y | `ACTIVE`, `INACTIVE`, `DELETED` |
+| `login_id` | VARCHAR(255) | Y | 중복되지 않는 로그인 아이디 |
+| `password` | VARCHAR(255) | Y | BCrypt로 암호화한 비밀번호 |
+| `name` | VARCHAR(255) | Y | 회원 이름 |
+| `email` | VARCHAR(255) | Y | 중복되지 않는 로그인 이메일 |
+| `role` | VARCHAR(255) | Y | `PARENT`, `CHILD`, `ADMIN` |
+| `birth_date` | DATE | Y | 회원 생년월일 |
 | `created_at` | TIMESTAMPTZ | Y | 생성 시각 |
 | `updated_at` | TIMESTAMPTZ | Y | 마지막 수정 시각 |
 
-민감한 진단 정보는 초기 테이블에 저장하지 않는다.
+아이디와 이메일은 각각 고유해야 하며 민감한 진단 정보는 저장하지 않는다.
 
 ### 4.2 `quest_categories`
 
@@ -200,7 +204,7 @@ quests
 | 컬럼 | 타입 | 필수 | 설명 |
 | --- | --- | --- | --- |
 | `id` | UUID | Y | 수행 세션 식별자 |
-| `user_id` | UUID | Y | 사용자 FK |
+| `member_id` | UUID | Y | 사용자 FK |
 | `quest_id` | UUID | Y | 수행한 퀘스트 FK |
 | `quest_difficulty` | VARCHAR(20) | Y | 수행 당시 난이도 스냅샷 |
 | `status` | VARCHAR(20) | Y | `IN_PROGRESS`, `COMPLETED`, `ABANDONED` |
@@ -264,7 +268,7 @@ quests
 | 컬럼 | 타입 | 필수 | 설명 |
 | --- | --- | --- | --- |
 | `id` | UUID | Y | 레벨 정보 식별자 |
-| `user_id` | UUID | Y | 사용자 FK |
+| `member_id` | UUID | Y | 사용자 FK |
 | `subcategory_id` | UUID | Y | 세부 카테고리 FK |
 | `current_difficulty` | VARCHAR(20) | Y | 현재 적용 난이도 |
 | `recommended_difficulty` | VARCHAR(20) | Y | 최근 계산된 추천 난이도 |
@@ -282,7 +286,7 @@ quests
 | --- | --- | --- | --- |
 | `id` | BIGINT | Y | 순차 이력 식별자 |
 | `session_id` | UUID | Y | 판정을 발생시킨 수행 세션 FK |
-| `user_id` | UUID | Y | 사용자 FK |
+| `member_id` | UUID | Y | 사용자 FK |
 | `subcategory_id` | UUID | Y | 세부 카테고리 FK |
 | `previous_difficulty` | VARCHAR(20) | Y | 판정 전 난이도 |
 | `recommended_difficulty` | VARCHAR(20) | Y | 판정 결과 난이도 |
@@ -298,12 +302,12 @@ quests
 
 | 테이블 | 인덱스 컬럼 | 목적 |
 | --- | --- | --- |
-| `quest_sessions` | `(user_id, started_at DESC)` | 사용자 수행 이력 조회 |
-| `quest_sessions` | `(user_id, quest_id, completed_at DESC)` | 퀘스트별 최근 수행 조회 |
+| `quest_sessions` | `(member_id, started_at DESC)` | 사용자 수행 이력 조회 |
+| `quest_sessions` | `(member_id, quest_id, completed_at DESC)` | 퀘스트별 최근 수행 조회 |
 | `quest_events` | `(session_id, created_at)` | 세션 이벤트 순서 조회 |
 | `quests` | `(subcategory_id, difficulty, active)` | 카테고리·난이도별 퀘스트 조회 |
-| `user_category_levels` | `(user_id, subcategory_id)` UNIQUE | 사용자별 현재 추천 조회 |
-| `difficulty_adjustment_history` | `(user_id, subcategory_id, created_at DESC)` | 난이도 변경 이력 조회 |
+| `user_category_levels` | `(member_id, subcategory_id)` UNIQUE | 사용자별 현재 추천 조회 |
+| `difficulty_adjustment_history` | `(member_id, subcategory_id, created_at DESC)` | 난이도 변경 이력 조회 |
 
 ## 8. 데이터 처리 흐름
 

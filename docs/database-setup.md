@@ -82,6 +82,14 @@ Docker를 실행할 때 사용한 것과 같은 비밀번호를 설정한다.
 export DB_PASSWORD='Docker 실행 시 사용한 것과 같은 비밀번호'
 ```
 
+JWT 토큰 서명에 사용할 로컬 비밀키를 생성해 환경변수로 설정한다.
+
+```bash
+export JWT_SECRET="$(openssl rand -base64 32)"
+```
+
+`JWT_SECRET`는 터미널에만 유지하고 설정 파일이나 Git에 기록하지 않는다.
+
 `local` 프로필로 애플리케이션을 실행한다.
 
 ```bash
@@ -137,6 +145,7 @@ docker-compose start
 다음 정보는 Git에 커밋하지 않는다.
 
 - 실제 DB 비밀번호
+- `JWT_SECRET`
 - `.env`
 - `application-local.properties`
 - API Key와 인증 토큰
