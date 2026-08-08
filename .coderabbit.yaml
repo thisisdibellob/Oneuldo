@@ -1,0 +1,24 @@
+language: "ko-KR"
+tone_instructions: "친절하고 건설적인 어조로 리뷰해 주세요."
+
+reviews:
+  profile: "chill" # 리뷰 강도
+
+  request_tools:
+    ast-grep:
+      essential_rules: true
+
+  auto_review:
+    enabled: true
+    drafts: false # Draft PR은 자동 리뷰 제외
+
+  # 검사에서 제외할 파일 패턴 설정
+  path_filters:
+    - "!**/node_modules/**"
+    - "!**/dist/**"
+    - "!**/*.min.js"
+    - "!**/vendor/**"
+
+chat:
+  auto_reply: true
+
