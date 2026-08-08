@@ -21,6 +21,7 @@ export const icons = {
   game: require('../assets/images/source/Icon/Game 2.png'),
   ai: require('../assets/images/source/Icon/AI.png'),
   user: require('../assets/images/source/Icon/User_F.png'),
+  userMale: require('../assets/images/source/Icon/User_M 2.png'),
   bus: require('../assets/images/source/Icon/Bus.png'),
   busAlt: require('../assets/images/source/Icon/Bus 2.png'),
   metro: require('../assets/images/source/Icon/Metro 2.png'),

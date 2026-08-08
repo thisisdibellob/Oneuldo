@@ -10,6 +10,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { FloatingNav } from '../components/FloatingNav';
 import { colors } from '../theme';
 import { AiScreen } from './AiScreen';
+import { GamePrototypeScreen } from './GamePrototypeScreen';
 import { GameScreen } from './GameScreen';
 import { HomeScreen } from './HomeScreen';
 import { ProfileScreen } from './ProfileScreen';
@@ -19,11 +20,14 @@ import { QuestScreen } from './QuestScreen';
 export function AppShell() {
   const [tab, setTab] = useState(0);
   const [practice, setPractice] = useState(false);
+  const [gamePlaying, setGamePlaying] = useState(false);
   const [reduceMotion, setReduceMotion] = useState(false);
   const screenProgress = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    AccessibilityInfo.isReduceMotionEnabled().then(setReduceMotion);
+    AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
+      if (enabled) setReduceMotion(true);
+    });
   }, []);
 
   useEffect(() => {
@@ -37,7 +41,7 @@ export function AppShell() {
       toValue: 1,
       useNativeDriver: true,
     }).start();
-  }, [practice, reduceMotion, screenProgress, tab]);
+  }, [gamePlaying, practice, reduceMotion, screenProgress, tab]);
 
   const beginTransition = () => {
     if (!reduceMotion) screenProgress.setValue(0);
@@ -57,6 +61,16 @@ export function AppShell() {
   const closePractice = () => {
     beginTransition();
     setPractice(false);
+  };
+
+  const openGame = () => {
+    beginTransition();
+    setGamePlaying(true);
+  };
+
+  const closeGame = () => {
+    beginTransition();
+    setGamePlaying(false);
   };
 
   const animatedStyle = {
@@ -81,6 +95,16 @@ export function AppShell() {
     );
   }
 
+  if (gamePlaying) {
+    return (
+      <SafeAreaView edges={[]} style={styles.gameSafe}>
+        <Animated.View style={[styles.body, animatedStyle]}>
+          <GamePrototypeScreen onExit={closeGame} />
+        </Animated.View>
+      </SafeAreaView>
+    );
+  }
+
   const screens = [
     <HomeScreen
       key="home"
@@ -90,7 +114,7 @@ export function AppShell() {
       }}
     />,
     <QuestScreen key="quest" onPractice={openPractice} />,
-    <GameScreen key="game" />,
+    <GameScreen key="game" onEnter={openGame} />,
     <AiScreen key="ai" />,
     <ProfileScreen key="profile" />,
   ];
@@ -105,5 +129,6 @@ export function AppShell() {
 
 const styles = StyleSheet.create({
   safe: { backgroundColor: colors.white, flex: 1 },
+  gameSafe: { backgroundColor: '#CAD3C3', flex: 1 },
   body: { flex: 1 },
 });

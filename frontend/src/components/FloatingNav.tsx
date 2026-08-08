@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { BlurView } from 'expo-blur';
+import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import {
   AccessibilityInfo,
   Animated,
@@ -11,7 +12,7 @@ import {
 } from 'react-native';
 
 import { icons } from '../assets';
-import { colors, fonts, shadow } from '../theme';
+import { colors, fonts } from '../theme';
 
 export const navItems = [
   { label: '홈', icon: icons.home },
@@ -41,15 +42,27 @@ export function FloatingNav({
       ))}
     </View>
   );
+  const useLiquidGlass = Platform.OS === 'ios' && isLiquidGlassAvailable();
 
   return (
     <View pointerEvents="box-none" style={styles.outer}>
       <View style={styles.bar}>
-        {Platform.OS === 'web' ? (
-          <View style={styles.webGlass}>{content}</View>
-        ) : (
-          <BlurView intensity={76} tint="light" style={styles.glass}>{content}</BlurView>
-        )}
+        <View pointerEvents="none" style={styles.surfaceClip}>
+          {useLiquidGlass ? (
+            <GlassView
+              colorScheme="light"
+              glassEffectStyle="regular"
+              style={styles.surface}
+              tintColor="rgba(255,255,255,0.56)"
+            />
+          ) : Platform.OS === 'web' ? (
+            <View style={[styles.surface, styles.webGlass]} />
+          ) : (
+            <BlurView intensity={76} tint="light" style={[styles.surface, styles.fallbackGlass]} />
+          )}
+          <View style={styles.surfaceBorder} />
+        </View>
+        {content}
       </View>
     </View>
   );
@@ -89,11 +102,11 @@ function NavItem({
 
   const scale = progress.interpolate({
     inputRange: [0, 1],
-    outputRange: [0.72, 1],
+    outputRange: [0.78, 1],
   });
   const translateY = progress.interpolate({
     inputRange: [0, 1],
-    outputRange: [8, 0],
+    outputRange: [0, -12],
   });
   const opacity = progress.interpolate({
     inputRange: [0, 1],
@@ -129,19 +142,34 @@ function NavItem({
 const styles = StyleSheet.create({
   outer: { alignItems: 'center', bottom: 16, left: 25, pointerEvents: 'box-none', position: 'absolute', right: 25 },
   bar: {
+    backgroundColor: 'rgba(255,255,255,0.01)',
+    borderRadius: 31,
+    boxShadow: '0 0 8px rgba(0,0,0,0.04), 0 8px 40px rgba(0,0,0,0.08)',
+    height: 62,
+    maxWidth: 430,
+    overflow: 'visible',
+    position: 'relative',
+    width: '100%',
+  },
+  surfaceClip: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 31,
+    overflow: 'hidden',
+  },
+  surface: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  fallbackGlass: { backgroundColor: 'rgba(255,255,255,0.72)' },
+  webGlass: { backgroundColor: 'rgba(255,255,255,0.88)' },
+  surfaceBorder: {
+    ...StyleSheet.absoluteFillObject,
     borderColor: 'rgba(255,255,255,0.96)',
     borderRadius: 31,
     borderWidth: 1,
-    maxWidth: 430,
-    overflow: 'hidden',
-    width: '100%',
-    ...shadow,
   },
-  glass: { backgroundColor: 'rgba(255,255,255,0.72)' },
-  webGlass: { backgroundColor: 'rgba(255,255,255,0.94)' },
-  row: { flexDirection: 'row', height: 62 },
+  row: { flexDirection: 'row', height: 62, overflow: 'visible' },
   item: { alignItems: 'center', flex: 1, justifyContent: 'flex-end', paddingBottom: 7 },
-  iconStage: { alignItems: 'center', height: 43, justifyContent: 'flex-end', width: 58 },
+  iconStage: { alignItems: 'center', height: 43, justifyContent: 'flex-end', overflow: 'visible', width: 58 },
   icon: { bottom: -5, height: 58, position: 'absolute', width: 58 },
   label: { color: colors.text, fontFamily: fonts.handwriting, fontSize: 11, lineHeight: 12 },
   pressed: { opacity: 0.64 },
