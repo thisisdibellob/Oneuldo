@@ -1,0 +1,18 @@
+services:
+  postgres:
+    image: postgres:17-alpine #PostgreSQL 17
+    container_name: oneuldo-postgres # Oneuldo PostgreSQL Container Name
+
+    environment:
+      POSTGRES_DB: oneuldo
+      POSTGRES_USER: oneuldo
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+
+    ports:
+      - "5433:5432" # Expose PostgreSQL port to host machine
+
+    volumes:
+      - oneuldo-postgres-data:/var/lib/postgresql/data
+
+volumes:
+  oneuldo-postgres-data:
