@@ -1,0 +1,14 @@
+# 개발자 pc에서만 사용하는 로컬 DB 설정
+
+# 로컬 개발용 PostgreSQL 연결 주소입니다.
+# 환경변수가 있으면 그 값을 사용하고, 없으면 콜론 뒤의 기본값을 사용합니다.
+spring.datasource.url=${DB_URL:jdbc:postgresql://localhost:5433/oneuldo}
+
+# 로컬 PostgreSQL 사용자 이름입니다.
+spring.datasource.username=${DB_USERNAME:oneuldo}
+
+# 비밀번호는 기본값을 작성하지 않고 반드시 환경변수로 입력합니다.
+spring.datasource.password=${DB_PASSWORD}
+
+# PostgreSQL JDBC 드라이버를 사용합니다.
+spring.datasource.driver-class-name=org.postgresql.Driver
