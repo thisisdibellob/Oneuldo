@@ -2,6 +2,7 @@ package oneuldo.member.service;
 
 
 import lombok.RequiredArgsConstructor;
+import oneuldo.auth.service.RefreshTokenService;
 import oneuldo.member.domain.Member;
 import oneuldo.member.domain.MemberRole;
 import oneuldo.member.dto.MemberResponse;
@@ -24,6 +25,7 @@ public class MemberService {
 
     private final MemberRepository memberRepository;
     private final PasswordEncoder passwordEncoder;
+    private final RefreshTokenService refreshTokenService;
 
     @Transactional
     public MemberResponse register(MemberSignUpRequest request) {
@@ -106,6 +108,7 @@ public class MemberService {
                 .orElseThrow(MemberNotFoundException::new);
 
         memberRepository.delete(member);
+        refreshTokenService.delete(id);
     }
 
 

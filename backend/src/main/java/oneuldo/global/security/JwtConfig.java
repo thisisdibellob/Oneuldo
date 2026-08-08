@@ -26,6 +26,12 @@ public class JwtConfig {
         byte[] keyBytes = Base64.getDecoder()
                 .decode(encodedSecret);
 
+        if (keyBytes.length < 32) {
+            throw new IllegalStateException(
+                    "JWT secret은 최소 32 bytes."
+            );
+        }
+
         return new SecretKeySpec(
                 keyBytes,
                 "HmacSHA256"
