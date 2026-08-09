@@ -65,7 +65,7 @@ export function HomeScreen({ onQuest }: { onQuest: () => void }) {
         </View>
         <View style={styles.segment}>
           <PressScale onPress={() => setListType('todo')} style={[styles.segmentButton, listType === 'todo' && styles.segmentSelected]}>
-            <Text style={[styles.segmentText, listType === 'todo' && styles.segmentSelectedText]}>To Do</Text>
+            <Text style={[styles.segmentText, listType === 'todo' && styles.segmentSelectedText]}>할 일</Text>
           </PressScale>
           <PressScale onPress={() => setListType('quest')} style={[styles.segmentButton, listType === 'quest' && styles.segmentSelected]}>
             <Text style={[styles.segmentText, listType === 'quest' && styles.segmentSelectedText]}>퀘스트</Text>
@@ -123,7 +123,7 @@ const styles = StyleSheet.create({
   streak: { color: colors.mint, fontFamily: fonts.semibold, fontSize: 12, marginTop: 12 },
   greeting: { color: colors.ink, fontFamily: fonts.laundryBold, fontSize: 24, letterSpacing: -0.8, lineHeight: 32, marginTop: 4 },
   listArea: { marginTop: 27, paddingTop: 20, position: 'relative' },
-  listCard: { backgroundColor: colors.white, borderColor: '#EEEEEE', borderRadius: 20, borderWidth: 1.5, minHeight: 166, paddingBottom: 13, paddingHorizontal: 20, paddingTop: 51, shadowColor: '#000', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.05, shadowRadius: 12, elevation: 2 },
+  listCard: { backgroundColor: colors.white, borderColor: '#EEEEEE', borderRadius: 20, borderWidth: 1.5, minHeight: 166, paddingBottom: 13, paddingHorizontal: 20, paddingTop: 49, shadowColor: '#000', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.05, shadowRadius: 12, elevation: 2 },
   segment: { alignSelf: 'center', backgroundColor: colors.white, borderColor: '#EEEEEE', borderRadius: 100, borderWidth: 2, flexDirection: 'row', height: 48, overflow: 'hidden', padding: 4, position: 'absolute', top: 0, width: 245, zIndex: 3 },
   segmentButton: { alignItems: 'center', borderRadius: 100, flex: 1, justifyContent: 'center' },
   segmentSelected: { backgroundColor: '#34BFFF' },
@@ -133,16 +133,16 @@ const styles = StyleSheet.create({
   checkItem: { alignItems: 'center', flexBasis: '50%', flexDirection: 'row', height: 22 },
   checkCircle: { backgroundColor: '#EEEEEE', borderRadius: 10, height: 20, marginRight: 8, width: 20 },
   checkCircleDone: { backgroundColor: '#34BFFF' },
-  checkText: { color: '#555555', flex: 1, fontFamily: fonts.handwriting, fontSize: 15, lineHeight: 20 },
+  checkText: { color: '#555555', flex: 1, fontFamily: fonts.handwriting, fontSize: 16, lineHeight: 21 },
   checkTextDone: { color: '#AAAAAA', textDecorationLine: 'line-through' },
   sectionTitle: { color: colors.ink, fontFamily: fonts.bold, fontSize: 18, letterSpacing: -0.45, marginBottom: 8, marginTop: 24 },
   edgeScroll: { marginHorizontal: -20 },
   horizontalContent: { gap: 9, paddingHorizontal: 20 },
   practiceCard: { borderRadius: 20, height: 180, overflow: 'hidden', paddingBottom: 17, paddingHorizontal: 13, width: 140 },
   practiceIcon: { alignSelf: 'center', height: 100, width: 108 },
-  practiceCategory: { color: '#77A785', fontFamily: fonts.semibold, fontSize: 12, lineHeight: 16 },
-  practiceTitle: { color: '#222222', fontFamily: fonts.bold, fontSize: 16, letterSpacing: -0.4, lineHeight: 20, marginTop: 4 },
-  practiceXp: { color: '#555555', fontFamily: fonts.handwriting, fontSize: 13, lineHeight: 16, marginTop: 3 },
+  practiceCategory: { color: '#77A785', fontFamily: fonts.semibold, fontSize: 13, lineHeight: 17 },
+  practiceTitle: { color: '#222222', fontFamily: fonts.bold, fontSize: 17, letterSpacing: -0.4, lineHeight: 21, marginTop: 4 },
+  practiceXp: { color: '#555555', fontFamily: fonts.handwriting, fontSize: 14, lineHeight: 17, marginTop: 3 },
   newsCard: { height: 224, width: 140 },
   newsImage: { borderRadius: 20, height: 144, width: 140 },
   newsTitle: { color: '#222222', fontFamily: fonts.bold, fontSize: 16, letterSpacing: -0.4, lineHeight: 20, marginLeft: 4, marginTop: 10 },

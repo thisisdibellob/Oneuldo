@@ -798,7 +798,7 @@ export function GamePrototypeScreen({ onExit }: { onExit: () => void }) {
         style={styles.exitButton}
         testID="game-exit"
       >
-        <Ionicons color={colors.white} name="close" size={27} />
+        <Ionicons color="rgba(72,78,74,0.64)" name="close" size={27} />
       </PressScale>
 
       <PressScale
@@ -811,7 +811,7 @@ export function GamePrototypeScreen({ onExit }: { onExit: () => void }) {
         }}
         style={styles.controlModeButton}
       >
-        <Ionicons color={colors.white} name="options" size={23} />
+        <Ionicons color="rgba(72,78,74,0.64)" name="options" size={23} />
       </PressScale>
 
       {controlMenuOpen ? (
@@ -1382,38 +1382,38 @@ const styles = StyleSheet.create({
   playerImage: { height: 18, width: 18 },
   exitButton: {
     alignItems: 'center',
-    backgroundColor: 'rgba(12,18,14,0.08)',
-    borderColor: 'rgba(255,255,255,0.34)',
+    backgroundColor: 'transparent',
+    borderColor: 'transparent',
     borderRadius: 20,
-    borderWidth: 1,
-    elevation: 3,
+    borderWidth: 0,
+    elevation: 0,
     height: 44,
     justifyContent: 'center',
     left: 16,
     position: 'absolute',
-    shadowColor: '#000000',
-    shadowOffset: { height: 2, width: 0 },
-    shadowOpacity: 0.2,
-    shadowRadius: 7,
+    shadowColor: 'transparent',
+    shadowOffset: { height: 0, width: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
     top: 16,
     width: 44,
     zIndex: 20,
   },
   controlModeButton: {
     alignItems: 'center',
-    backgroundColor: 'rgba(12,18,14,0.08)',
-    borderColor: 'rgba(255,255,255,0.34)',
+    backgroundColor: 'transparent',
+    borderColor: 'transparent',
     borderRadius: 20,
-    borderWidth: 1,
-    elevation: 3,
+    borderWidth: 0,
+    elevation: 0,
     height: 44,
     justifyContent: 'center',
     position: 'absolute',
     right: 16,
-    shadowColor: '#000000',
-    shadowOffset: { height: 2, width: 0 },
-    shadowOpacity: 0.2,
-    shadowRadius: 7,
+    shadowColor: 'transparent',
+    shadowOffset: { height: 0, width: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
     top: 16,
     width: 44,
     zIndex: 26,

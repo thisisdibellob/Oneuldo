@@ -22,7 +22,7 @@ export function AppShell() {
   const [practice, setPractice] = useState(false);
   const [gamePlaying, setGamePlaying] = useState(false);
   const [reduceMotion, setReduceMotion] = useState(false);
-  const screenProgress = useRef(new Animated.Value(1)).current;
+  const screenProgress = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
@@ -36,7 +36,7 @@ export function AppShell() {
       return;
     }
     Animated.timing(screenProgress, {
-      duration: 240,
+      duration: 280,
       easing: Easing.out(Easing.cubic),
       toValue: 1,
       useNativeDriver: true,
@@ -79,7 +79,13 @@ export function AppShell() {
       {
         translateY: screenProgress.interpolate({
           inputRange: [0, 1],
-          outputRange: [9, 0],
+          outputRange: [6, 0],
+        }),
+      },
+      {
+        scale: screenProgress.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0.996, 1],
         }),
       },
     ],
