@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
   Animated,
+  Alert,
   Easing,
   StyleSheet,
 } from 'react-native';
@@ -16,8 +17,21 @@ import { HomeScreen } from './HomeScreen';
 import { ProfileScreen } from './ProfileScreen';
 import { QuestPracticeScreen } from './QuestPracticeScreen';
 import { QuestScreen } from './QuestScreen';
+import { getQuest, QuestSummary } from '../api/quest';
 
-export function AppShell() {
+type AppShellProps = {
+  quests: QuestSummary[];
+  questsLoading: boolean;
+  questsError: string | null;
+};
+
+export function AppShell({
+  quests,
+  questsLoading,
+  questsError,
+}: AppShellProps) {
+  const [selectedQuest, setSelectedQuest] = useState<QuestSummary | null>(null);
+
   const [tab, setTab] = useState(0);
   const [practice, setPractice] = useState(false);
   const [gamePlaying, setGamePlaying] = useState(false);
@@ -61,6 +75,20 @@ export function AppShell() {
   const closePractice = () => {
     beginTransition();
     setPractice(false);
+    setSelectedQuest(null);
+  };
+
+  const openQuest = async (uuid: string) => {
+    try {
+      const quest = await getQuest(uuid);
+      setSelectedQuest(quest);
+      openPractice();
+    } catch (error) {
+      Alert.alert(
+        '퀘스트를 열 수 없어요',
+        error instanceof Error ? error.message : '잠시 후 다시 시도해 주세요.',
+      );
+    }
   };
 
   const openGame = () => {
@@ -89,7 +117,7 @@ export function AppShell() {
     return (
       <SafeAreaView edges={['top', 'bottom']} style={styles.safe}>
         <Animated.View style={[styles.body, animatedStyle]}>
-          <QuestPracticeScreen onBack={closePractice} />
+          <QuestPracticeScreen onBack={closePractice} quest={selectedQuest} />
         </Animated.View>
       </SafeAreaView>
     );
@@ -107,11 +135,11 @@ export function AppShell() {
 
   const screens = [
     <HomeScreen
+      error={questsError}
       key="home"
-      onQuest={() => {
-        setTab(1);
-        openPractice();
-      }}
+      loading={questsLoading}
+      onQuest={openQuest}
+      practices={quests}
     />,
     <QuestScreen key="quest" onPractice={openPractice} />,
     <GameScreen key="game" onEnter={openGame} />,
