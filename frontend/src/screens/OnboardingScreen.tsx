@@ -27,13 +27,15 @@ import { colors, fonts } from '../theme';
 type LoginStep = 'welcome' | 'credentials';
 type FocusedField = 'id' | 'password' | null;
 
-export function OnboardingScreen({ onEnter }: { onEnter: () => void }) {
+export function OnboardingScreen({ active = true, onEnter }: { active?: boolean; onEnter: () => void }) {
   const { height } = useWindowDimensions();
   const [step, setStep] = useState<LoginStep>('welcome');
-  const [direction, setDirection] = useState(1);
   const [gradientEnabled, setGradientEnabled] = useState(true);
   const [reduceMotion, setReduceMotion] = useState(false);
-  const screenProgress = useRef(new Animated.Value(0)).current;
+  const screenOpacity = useRef(new Animated.Value(0.78)).current;
+  const screenTranslateY = useRef(new Animated.Value(18)).current;
+  const screenScale = useRef(new Animated.Value(0.992)).current;
+  const transitioning = useRef(false);
   const compact = height < 720;
 
   useEffect(() => {
@@ -42,70 +44,109 @@ export function OnboardingScreen({ onEnter }: { onEnter: () => void }) {
 
   useEffect(() => {
     if (reduceMotion) {
-      screenProgress.setValue(1);
+      screenOpacity.stopAnimation();
+      screenTranslateY.stopAnimation();
+      screenScale.stopAnimation();
+      screenOpacity.setValue(1);
+      screenTranslateY.setValue(0);
+      screenScale.setValue(1);
       return;
     }
-    Animated.spring(screenProgress, {
-      damping: 20,
-      mass: 0.8,
-      stiffness: 130,
-      toValue: 1,
-      useNativeDriver: true,
-    }).start();
-  }, [reduceMotion, screenProgress]);
+    const animation = Animated.parallel([
+      Animated.timing(screenOpacity, {
+        duration: 520,
+        easing: Easing.bezier(0.16, 1, 0.3, 1),
+        toValue: 1,
+        useNativeDriver: true,
+      }),
+      Animated.timing(screenTranslateY, {
+        duration: 560,
+        easing: Easing.bezier(0.16, 1, 0.3, 1),
+        toValue: 0,
+        useNativeDriver: true,
+      }),
+      Animated.timing(screenScale, {
+        duration: 560,
+        easing: Easing.bezier(0.16, 1, 0.3, 1),
+        toValue: 1,
+        useNativeDriver: true,
+      }),
+    ]);
+    animation.start();
+    return () => animation.stop();
+  }, [reduceMotion, screenOpacity, screenScale, screenTranslateY]);
 
   const changeStep = (next: LoginStep, nextDirection: number) => {
-    if (step === next) return;
+    if (step === next || transitioning.current) return;
     if (reduceMotion) {
       setStep(next);
       return;
     }
-    Animated.timing(screenProgress, {
-      duration: 135,
-      easing: Easing.in(Easing.quad),
-      toValue: 0,
-      useNativeDriver: true,
-    }).start(() => {
-      setDirection(nextDirection);
-      setStep(next);
-      screenProgress.setValue(0);
-      Animated.spring(screenProgress, {
-        damping: 20,
-        mass: 0.72,
-        stiffness: 150,
-        toValue: 1,
+    transitioning.current = true;
+    Animated.parallel([
+      Animated.timing(screenOpacity, {
+        duration: 190,
+        easing: Easing.in(Easing.cubic),
+        toValue: 0.14,
         useNativeDriver: true,
-      }).start();
+      }),
+      Animated.timing(screenTranslateY, {
+        duration: 210,
+        easing: Easing.inOut(Easing.cubic),
+        toValue: nextDirection * -10,
+        useNativeDriver: true,
+      }),
+      Animated.timing(screenScale, {
+        duration: 210,
+        easing: Easing.inOut(Easing.cubic),
+        toValue: 0.995,
+        useNativeDriver: true,
+      }),
+    ]).start(({ finished }) => {
+      if (!finished) {
+        transitioning.current = false;
+        return;
+      }
+      setStep(next);
+      screenOpacity.setValue(0.14);
+      screenTranslateY.setValue(nextDirection * 20);
+      screenScale.setValue(0.992);
+      Animated.parallel([
+        Animated.timing(screenOpacity, {
+          duration: 390,
+          easing: Easing.bezier(0.16, 1, 0.3, 1),
+          toValue: 1,
+          useNativeDriver: true,
+        }),
+        Animated.timing(screenTranslateY, {
+          duration: 430,
+          easing: Easing.bezier(0.16, 1, 0.3, 1),
+          toValue: 0,
+          useNativeDriver: true,
+        }),
+        Animated.timing(screenScale, {
+          duration: 430,
+          easing: Easing.bezier(0.16, 1, 0.3, 1),
+          toValue: 1,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        transitioning.current = false;
+      });
     });
   };
 
   const animatedScreen = {
-    opacity: screenProgress,
+    opacity: screenOpacity,
     transform: [
-      {
-        translateX: screenProgress.interpolate({
-          inputRange: [0, 1],
-          outputRange: [direction * 16, 0],
-        }),
-      },
-      {
-        translateY: screenProgress.interpolate({
-          inputRange: [0, 1],
-          outputRange: [7, 0],
-        }),
-      },
-      {
-        scale: screenProgress.interpolate({
-          inputRange: [0, 1],
-          outputRange: [0.992, 1],
-        }),
-      },
+      { translateY: screenTranslateY },
+      { scale: screenScale },
     ],
   };
 
   return (
     <SafeAreaView edges={['top', 'bottom']} style={styles.safe}>
-      <AnimatedBackground enabled={gradientEnabled} />
+      <AnimatedBackground enabled={gradientEnabled} motionEnabled={active} />
       <Animated.View style={[styles.screenFrame, animatedScreen]}>
         {step === 'welcome' ? (
           <WelcomeScreen compact={compact} onEnter={onEnter} onOpenCredentials={() => changeStep('credentials', 1)} />
@@ -127,7 +168,7 @@ export function OnboardingScreen({ onEnter }: { onEnter: () => void }) {
   );
 }
 
-function AnimatedBackground({ enabled }: { enabled: boolean }) {
+function AnimatedBackground({ enabled, motionEnabled }: { enabled: boolean; motionEnabled: boolean }) {
   const drift = useRef(new Animated.Value(0)).current;
   const breathe = useRef(new Animated.Value(0)).current;
   const visibility = useRef(new Animated.Value(enabled ? 1 : 0)).current;
@@ -147,6 +188,7 @@ function AnimatedBackground({ enabled }: { enabled: boolean }) {
   }, [enabled, reduceMotion, visibility]);
 
   useEffect(() => {
+    if (!motionEnabled) return;
     if (reduceMotion) {
       drift.setValue(0.35);
       breathe.setValue(0.3);
@@ -166,7 +208,7 @@ function AnimatedBackground({ enabled }: { enabled: boolean }) {
     );
     animation.start();
     return () => animation.stop();
-  }, [breathe, drift, reduceMotion]);
+  }, [breathe, drift, motionEnabled, reduceMotion]);
 
   const upperTransform = {
     transform: [
@@ -233,7 +275,7 @@ function CredentialsScreen({ compact, onBack, onEnter }: { compact: boolean; onB
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.credentials}>
       <View style={styles.loginHeader}>
         <PressScale accessibilityLabel="로그인 첫 화면으로 돌아가기" accessibilityRole="button" hitSlop={8} onPress={onBack}>
-          <GlassSurface interactive radius={23} style={styles.backSurface}>
+          <GlassSurface contentStyle={styles.backContent} interactive radius={23} style={styles.backSurface}>
             <Ionicons color={colors.ink} name="chevron-back" size={32} />
           </GlassSurface>
         </PressScale>
@@ -308,12 +350,14 @@ function CredentialsScreen({ compact, onBack, onEnter }: { compact: boolean; onB
 
 function GlassSurface({
   children,
+  contentStyle,
   interactive = false,
   muted = false,
   radius = 30,
   style,
 }: {
   children: ReactNode;
+  contentStyle?: StyleProp<ViewStyle>;
   interactive?: boolean;
   muted?: boolean;
   radius?: number;
@@ -350,7 +394,7 @@ function GlassSurface({
         <View style={[styles.glassInnerRefraction, { borderRadius: Math.max(0, radius - 2) }]} />
         <View style={styles.glassShine} />
       </View>
-      <View style={styles.glassContent}>{children}</View>
+      <View style={[styles.glassContent, contentStyle]}>{children}</View>
     </View>
   );
 }
@@ -417,6 +461,7 @@ const styles = StyleSheet.create({
   credentials: { flex: 1, paddingBottom: 38, paddingHorizontal: 17 },
   loginHeader: { alignItems: 'center', flexDirection: 'row', height: 82, justifyContent: 'space-between' },
   backSurface: { height: 46, width: 46 },
+  backContent: { paddingHorizontal: 0 },
   loginTitle: { color: colors.ink, fontFamily: fonts.bold, fontSize: 19, letterSpacing: -0.3 },
   headerBalance: { height: 46, width: 46 },
   fieldsArea: { flex: 1, gap: 19, justifyContent: 'center', paddingBottom: 64 },

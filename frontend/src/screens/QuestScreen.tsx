@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { icons } from '../assets';
 import { PressScale } from '../components/PressScale';
-import { BrandHeader } from '../components/ui';
+import { StickyBrandHeader } from '../components/ui';
 import { colors, fonts } from '../theme';
 
 type CalendarCell = {
@@ -42,8 +42,8 @@ export function QuestScreen({ onPractice }: { onPractice: () => void }) {
     : quests.filter((item) => item.category === selected || (selected === '생활 훈련' && item.category === '일상생활'));
 
   return (
-    <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-      <BrandHeader />
+    <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} stickyHeaderIndices={[0]}>
+      <StickyBrandHeader horizontalPadding={18} />
       <View style={styles.monthHeader}>
         <Text style={styles.month}>8월</Text>
         <View style={styles.streak}>

@@ -27,6 +27,26 @@ export function BrandHeader({ right }: { right?: ReactNode }) {
   );
 }
 
+export function StickyBrandHeader({
+  horizontalPadding = 20,
+  right,
+}: {
+  horizontalPadding?: number;
+  right?: ReactNode;
+}) {
+  return (
+    <View
+      collapsable={false}
+      style={[
+        styles.stickyHeader,
+        { marginHorizontal: -horizontalPadding, paddingHorizontal: horizontalPadding },
+      ]}
+    >
+      <BrandHeader right={right} />
+    </View>
+  );
+}
+
 export function Card({
   children,
   style,
@@ -70,6 +90,12 @@ const styles = StyleSheet.create({
   headerRight: { alignItems: 'center', flexDirection: 'row', gap: 13 },
   bell: { height: 28, width: 28 },
   profileCircle: { backgroundColor: '#D9D9D9', borderRadius: 18, height: 36, width: 36 },
+  stickyHeader: {
+    backgroundColor: 'rgba(255,255,255,0.96)',
+    borderBottomColor: 'rgba(0,0,0,0.045)',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    zIndex: 20,
+  },
   card: { backgroundColor: colors.white, borderRadius: 20 },
   iconTile: { alignItems: 'center', borderRadius: 18, justifyContent: 'center' },
   profileBar: {

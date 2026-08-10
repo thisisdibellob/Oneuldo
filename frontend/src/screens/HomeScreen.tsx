@@ -10,7 +10,7 @@ import {
 
 import { icons, images } from '../assets';
 import { PressScale } from '../components/PressScale';
-import { BrandHeader } from '../components/ui';
+import { StickyBrandHeader } from '../components/ui';
 import { colors, fonts } from '../theme';
 
 const todoItems = ['떡볶이 먹기', '레몬즙 구매', '청년미래적금 넣기', '신나게 춤추기', '4시에 친구 만나기', '삼겹살 구매하기'];
@@ -41,8 +41,8 @@ export function HomeScreen({ onQuest }: { onQuest: () => void }) {
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-      <BrandHeader />
+    <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} stickyHeaderIndices={[0]}>
+      <StickyBrandHeader horizontalPadding={20} />
       <Text style={styles.streak}>연속 학습 117일!</Text>
       <Text style={styles.greeting}>진욱님,{'\n'}오늘도 함께 해 볼까요?</Text>
 
@@ -123,11 +123,11 @@ const styles = StyleSheet.create({
   streak: { color: colors.mint, fontFamily: fonts.semibold, fontSize: 12, marginTop: 12 },
   greeting: { color: colors.ink, fontFamily: fonts.laundryBold, fontSize: 24, letterSpacing: -0.8, lineHeight: 32, marginTop: 4 },
   listArea: { marginTop: 27, paddingTop: 20, position: 'relative' },
-  listCard: { backgroundColor: colors.white, borderColor: '#EEEEEE', borderRadius: 20, borderWidth: 1.5, minHeight: 166, paddingBottom: 13, paddingHorizontal: 20, paddingTop: 49, shadowColor: '#000', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.05, shadowRadius: 12, elevation: 2 },
+  listCard: { backgroundColor: colors.white, borderColor: '#EEEEEE', borderRadius: 20, borderWidth: 1.5, minHeight: 166, paddingBottom: 13, paddingHorizontal: 20, paddingTop: 47, shadowColor: '#000', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.05, shadowRadius: 12, elevation: 2 },
   segment: { alignSelf: 'center', backgroundColor: colors.white, borderColor: '#EEEEEE', borderRadius: 100, borderWidth: 2, flexDirection: 'row', height: 48, overflow: 'hidden', padding: 4, position: 'absolute', top: 0, width: 245, zIndex: 3 },
   segmentButton: { alignItems: 'center', borderRadius: 100, flex: 1, justifyContent: 'center' },
   segmentSelected: { backgroundColor: '#34BFFF' },
-  segmentText: { color: '#AAAAAA', fontFamily: fonts.laundry, fontSize: 15 },
+  segmentText: { color: '#AAAAAA', fontFamily: fonts.laundry, fontSize: 16 },
   segmentSelectedText: { color: colors.white },
   checkGrid: { flexDirection: 'row', flexWrap: 'wrap', rowGap: 14 },
   checkItem: { alignItems: 'center', flexBasis: '50%', flexDirection: 'row', height: 22 },
@@ -138,7 +138,7 @@ const styles = StyleSheet.create({
   sectionTitle: { color: colors.ink, fontFamily: fonts.bold, fontSize: 18, letterSpacing: -0.45, marginBottom: 8, marginTop: 24 },
   edgeScroll: { marginHorizontal: -20 },
   horizontalContent: { gap: 9, paddingHorizontal: 20 },
-  practiceCard: { borderRadius: 20, height: 180, overflow: 'hidden', paddingBottom: 17, paddingHorizontal: 13, width: 140 },
+  practiceCard: { borderRadius: 20, height: 180, overflow: 'hidden', paddingBottom: 17, paddingHorizontal: 13, paddingTop: 2, width: 140 },
   practiceIcon: { alignSelf: 'center', height: 100, width: 108 },
   practiceCategory: { color: '#77A785', fontFamily: fonts.semibold, fontSize: 13, lineHeight: 17 },
   practiceTitle: { color: '#222222', fontFamily: fonts.bold, fontSize: 17, letterSpacing: -0.4, lineHeight: 21, marginTop: 4 },

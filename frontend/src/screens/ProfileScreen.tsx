@@ -177,7 +177,7 @@ const styles = StyleSheet.create({
   menuGrid: { flexDirection: 'row', flexWrap: 'wrap', rowGap: 19 },
   menu: { alignItems: 'center', flexBasis: '25%' },
   menuIcon: { height: 56, width: 56 },
-  menuLabel: { color: '#181725', fontFamily: fonts.handwriting, fontSize: 17, lineHeight: 21, marginTop: 3, textAlign: 'center' },
+  menuLabel: { color: '#181725', fontFamily: fonts.handwriting, fontSize: 15, lineHeight: 19, marginTop: 3, textAlign: 'center' },
   pageDots: { flexDirection: 'row', justifyContent: 'space-between', marginHorizontal: 20, marginTop: 46 },
   pageDot: { backgroundColor: '#E6E6E6', borderRadius: 2, height: 3, width: 3 },
   pageDotActive: { backgroundColor: '#D0D0D0', borderRadius: 2, height: 3, width: 3 },

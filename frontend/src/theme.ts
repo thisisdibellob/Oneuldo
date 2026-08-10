@@ -27,6 +27,7 @@ export const fonts = {
   laundry: 'LaundryGothic',
   laundryBold: 'LaundryGothic-Bold',
   handwriting: 'KyoboHandwriting',
+  gameHud: 'Griun-InaDoongdoong',
 };
 
 export const shadow = Platform.select({

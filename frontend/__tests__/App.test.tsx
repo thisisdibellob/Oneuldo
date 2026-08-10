@@ -50,6 +50,8 @@ it('게임을 나갈 때 오디오를 안전하게 멈춘다', async () => {
   await act(async () => {
     await Promise.resolve();
   });
+  fireEvent.press(screen.getByRole('button', { name: '휴대폰 열기' }));
+  fireEvent.press(screen.getByRole('button', { name: '게임 나가기' }));
   fireEvent.press(screen.getByTestId('game-exit'));
 
   expect(onExit).toHaveBeenCalledTimes(1);
@@ -142,8 +144,11 @@ describe('오늘도 앱', () => {
     fireEvent.press(screen.getByRole('tab', { name: '게임 탭' }));
     fireEvent.press(screen.getByRole('button', { name: '오늘도 마을 들어가기' }));
 
-    fireEvent.press(screen.getByRole('button', { name: '조작 방식 선택' }));
+    fireEvent.press(screen.getByRole('button', { name: '설정 열기' }));
     fireEvent.press(screen.getByText('터치 이동'));
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 220));
+    });
     expect(screen.queryByLabelText('이동 조이스틱')).toBeNull();
 
     const village = screen.getByLabelText('쿼터뷰 마을');
@@ -170,8 +175,11 @@ describe('오늘도 앱', () => {
     await act(async () => {
       await Promise.resolve();
     });
-    fireEvent.press(screen.getByRole('button', { name: '조작 방식 선택' }));
+    fireEvent.press(screen.getByRole('button', { name: '설정 열기' }));
     fireEvent.press(screen.getByText('터치 이동'));
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 220));
+    });
 
     const village = screen.getByLabelText('쿼터뷰 마을');
     fireEvent(village, 'layout', {
