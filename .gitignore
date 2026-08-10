@@ -65,3 +65,6 @@ coverage/
 *.tsbuildinfo
 
 !**/gradle/wrapper/gradle-wrapper.jar
+
+# 중요 정보
+/backend/local.properties
