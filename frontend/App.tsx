@@ -1,15 +1,38 @@
-import { useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, ActivityIndicator, Animated, Easing, StyleSheet, Text, View } from 'react-native';
+
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { useFonts } from 'expo-font';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { getQuests, QuestSummary } from './src/api/quest';
 import { AppShell } from './src/screens/AppShell';
 import { OnboardingScreen } from './src/screens/OnboardingScreen';
 import { colors, fonts } from './src/theme';
 
 export default function App() {
   const [entered, setEntered] = useState(false);
+
+  // 퀘스트 정보 받아오기
+  const [quests, setQuests] = useState<QuestSummary[]>([]);
+  const [questsLoading, setQuestsLoading] = useState(true);
+  const [questsError, setQuestsError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadQuests = async () => {
+      try {
+        const data = await getQuests();
+        setQuests(data);
+      } catch (error) {
+        setQuestsError(error instanceof Error ? error.message : '퀘스트를 불러오지 못했습니다.');
+      } finally {
+        setQuestsLoading(false);
+      }
+    };
+
+    void loadQuests();
+  }, []);
+
   const [showOnboarding, setShowOnboarding] = useState(true);
   const [reduceMotion, setReduceMotion] = useState(false);
   const entryProgress = useRef(new Animated.Value(0)).current;
@@ -60,48 +83,15 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <StatusBar style="dark" />
-      <View style={styles.app}>
-        {entered ? (
-          <View style={styles.layer}>
-            <AppShell />
-          </View>
-        ) : null}
-        {showOnboarding ? (
-          <Animated.View
-            accessibilityElementsHidden={entered}
-            importantForAccessibility={entered ? 'no-hide-descendants' : 'auto'}
-            needsOffscreenAlphaCompositing={entered}
-            pointerEvents={entered ? 'none' : 'auto'}
-            renderToHardwareTextureAndroid={entered}
-            shouldRasterizeIOS={entered}
-            style={[
-              styles.layer,
-              {
-                opacity: entryProgress.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [1, 0],
-                }),
-                transform: [
-                  {
-                    translateY: entryProgress.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [0, -14],
-                    }),
-                  },
-                  {
-                    scale: entryProgress.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [1, 0.995],
-                    }),
-                  },
-                ],
-              },
-            ]}
-          >
-            <OnboardingScreen active={!entered} onEnter={enterApp} />
-          </Animated.View>
-        ) : null}
-      </View>
+      {entered ? (
+        <AppShell
+          quests={quests}
+          questsError={questsError}
+          questsLoading={questsLoading}
+        />
+      ) : (
+        <OnboardingScreen onEnter={() => setEntered(true)} />
+      )}
     </SafeAreaProvider>
   );
 }

@@ -9,17 +9,20 @@ import {
 } from 'react-native';
 
 import { icons, images } from '../assets';
+import { QuestSummary } from '../api/quest';
 import { PressScale } from '../components/PressScale';
 import { StickyBrandHeader } from '../components/ui';
 import { colors, fonts } from '../theme';
 
 const todoItems = ['떡볶이 먹기', '레몬즙 구매', '청년미래적금 넣기', '신나게 춤추기', '4시에 친구 만나기', '삼겹살 구매하기'];
 const questItems = ['혼자 버스 타기', '마트에서 장보기', '카페에서 주문하기', '도움 요청 연습', '용돈 계획 세우기', '오늘의 대화 연습'];
-const practices = [
-  { background: '#E8F7FF', category: '대중교통', icon: icons.bus, title: '혼자 버스 타기', xp: '20XP' },
-  { background: '#FFF3DC', category: '일상생활', icon: icons.mart, title: '마트에서 장보기', xp: '30XP' },
-  { background: '#EAFBEF', category: '경제생활', icon: icons.money, title: '용돈 계획 세우기', xp: '이미 연습함' },
-];
+const practiceDesign: Record<string, { background: string; icon: ImageSourcePropType }> = {
+  PUBLIC_TRANSPORT: { background: '#E8F7FF', icon: icons.bus },
+  DAILY_LIFE: { background: '#FFF3DC', icon: icons.mart },
+  ECONOMIC_LIFE: { background: '#EAFBEF', icon: icons.money },
+  SAFETY: { background: '#FFEAF0', icon: icons.sos },
+};
+const defaultPracticeDesign = { background: '#F2F2F2', icon: icons.quest };
 const news = [
   { image: images.newsCity, title: '하늘이 보고 싶어\n도심 전경 모음집', source: 'Picstudio' },
   { image: images.newsClassroom, title: '외국어가 배우고 싶은\n당신을 위해', source: '서울교육지원청' },
@@ -27,7 +30,14 @@ const news = [
   { image: images.newsSeed, title: '한그루의 씨앗 심기\n왜 중요할까요?', source: '라떼는 말이야' },
 ];
 
-export function HomeScreen({ onQuest }: { onQuest: () => void }) {
+type HomeScreenProps = {
+  practices: QuestSummary[];
+  loading: boolean;
+  error: string | null;
+  onQuest: (uuid: string) => void;
+};
+
+export function HomeScreen({ practices, loading, error, onQuest }: HomeScreenProps) {
   const [listType, setListType] = useState<'todo' | 'quest'>('todo');
   const [todoChecked, setTodoChecked] = useState<boolean[]>(Array(6).fill(false));
   const [questChecked, setQuestChecked] = useState<boolean[]>(Array(6).fill(false));
@@ -74,9 +84,13 @@ export function HomeScreen({ onQuest }: { onQuest: () => void }) {
       </View>
 
       <Text style={styles.sectionTitle}>오늘의 연습</Text>
-      <ScrollView contentContainerStyle={styles.horizontalContent} horizontal showsHorizontalScrollIndicator={false} style={styles.edgeScroll}>
-        {practices.map((item) => <PracticeCard key={item.title} {...item} onPress={onQuest} />)}
-      </ScrollView>
+      {loading ? <Text style={styles.practiceStatus}>연습을 불러오는 중이에요.</Text> : null}
+      {!loading && error ? <Text style={styles.practiceError}>{error}</Text> : null}
+      {!loading && !error ? (
+        <ScrollView contentContainerStyle={styles.horizontalContent} horizontal showsHorizontalScrollIndicator={false} style={styles.edgeScroll}>
+          {practices.map((quest) => <PracticeCard key={quest.id} onPress={onQuest} quest={quest} />)}
+        </ScrollView>
+      ) : null}
 
       <Text style={styles.sectionTitle}>새로운 소식</Text>
       <ScrollView contentContainerStyle={styles.horizontalContent} horizontal showsHorizontalScrollIndicator={false} style={styles.edgeScroll}>
@@ -94,26 +108,20 @@ export function HomeScreen({ onQuest }: { onQuest: () => void }) {
 }
 
 function PracticeCard({
-  background,
-  category,
-  icon,
-  title,
-  xp,
+  quest,
   onPress,
 }: {
-  background: string;
-  category: string;
-  icon: ImageSourcePropType;
-  title: string;
-  xp: string;
-  onPress: () => void;
+  quest: QuestSummary;
+  onPress: (uuid: string) => void;
 }) {
+  const design = practiceDesign[quest.categoryCode] ?? defaultPracticeDesign;
+
   return (
-    <PressScale onPress={onPress} style={[styles.practiceCard, { backgroundColor: background }]}>
-      <Image resizeMode="contain" source={icon} style={styles.practiceIcon} />
-      <Text style={styles.practiceCategory}>{category}</Text>
-      <Text style={styles.practiceTitle}>{title}</Text>
-      <Text style={styles.practiceXp}>{xp}</Text>
+    <PressScale onPress={() => onPress(quest.id)} style={[styles.practiceCard, { backgroundColor: design.background }]}>
+      <Image resizeMode="contain" source={design.icon} style={styles.practiceIcon} />
+      <Text style={styles.practiceCategory}>{quest.categoryName}</Text>
+      <Text style={styles.practiceTitle}>{quest.title}</Text>
+      <Text style={styles.practiceXp}>{quest.rewardPoints}XP</Text>
     </PressScale>
   );
 }
@@ -140,9 +148,11 @@ const styles = StyleSheet.create({
   horizontalContent: { gap: 9, paddingHorizontal: 20 },
   practiceCard: { borderRadius: 20, height: 180, overflow: 'hidden', paddingBottom: 17, paddingHorizontal: 13, paddingTop: 2, width: 140 },
   practiceIcon: { alignSelf: 'center', height: 100, width: 108 },
-  practiceCategory: { color: '#77A785', fontFamily: fonts.semibold, fontSize: 13, lineHeight: 17 },
-  practiceTitle: { color: '#222222', fontFamily: fonts.bold, fontSize: 17, letterSpacing: -0.4, lineHeight: 21, marginTop: 4 },
-  practiceXp: { color: '#555555', fontFamily: fonts.handwriting, fontSize: 14, lineHeight: 17, marginTop: 3 },
+  practiceCategory: { color: '#77A785', fontFamily: fonts.semibold, fontSize: 12, lineHeight: 16 },
+  practiceTitle: { color: '#222222', fontFamily: fonts.bold, fontSize: 16, letterSpacing: -0.4, lineHeight: 20, marginTop: 4 },
+  practiceXp: { color: '#555555', fontFamily: fonts.handwriting, fontSize: 13, lineHeight: 16, marginTop: 3 },
+  practiceStatus: { color: '#777777', fontFamily: fonts.regular, fontSize: 14, paddingVertical: 24 },
+  practiceError: { color: '#D24A4A', fontFamily: fonts.medium, fontSize: 14, paddingVertical: 24 },
   newsCard: { height: 224, width: 140 },
   newsImage: { borderRadius: 20, height: 144, width: 140 },
   newsTitle: { color: '#222222', fontFamily: fonts.bold, fontSize: 16, letterSpacing: -0.4, lineHeight: 20, marginLeft: 4, marginTop: 10 },

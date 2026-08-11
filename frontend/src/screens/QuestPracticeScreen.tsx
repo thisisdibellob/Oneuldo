@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
+import { QuestSummary } from '../api/quest';
 import { PressScale } from '../components/PressScale';
 import { colors, fonts } from '../theme';
 
@@ -26,7 +27,13 @@ const questions = [
   },
 ];
 
-export function QuestPracticeScreen({ onBack }: { onBack: () => void }) {
+export function QuestPracticeScreen({
+  onBack,
+  quest,
+}: {
+  onBack: () => void;
+  quest?: QuestSummary | null;
+}) {
   const { height } = useWindowDimensions();
   const compact = height < 760;
   const [questionIndex, setQuestionIndex] = useState(0);
@@ -67,7 +74,7 @@ export function QuestPracticeScreen({ onBack }: { onBack: () => void }) {
         ? '결과 보기'
         : '다음으로';
 
-  if (showResult) return <QuestResult correctCount={correctCount} onBack={onBack} />;
+  if (showResult) return <QuestResult correctCount={correctCount} onBack={onBack} quest={quest} />;
 
   return (
     <View style={styles.root}>
@@ -82,7 +89,7 @@ export function QuestPracticeScreen({ onBack }: { onBack: () => void }) {
           <Text style={styles.step}>{questionIndex + 1}/{questions.length}</Text>
         </View>
 
-        <Text style={styles.title}>어떻게 말하면 좋을까요?</Text>
+        <Text style={styles.title}>{quest ? `${quest.title} 연습` : '어떻게 말하면 좋을까요?'}</Text>
         <View style={[styles.scene, compact && styles.sceneCompact]}>
           <View style={styles.person}>
             <View style={styles.personHead} />
@@ -138,7 +145,15 @@ export function QuestPracticeScreen({ onBack }: { onBack: () => void }) {
   );
 }
 
-function QuestResult({ correctCount, onBack }: { correctCount: number; onBack: () => void }) {
+function QuestResult({
+  correctCount,
+  onBack,
+  quest,
+}: {
+  correctCount: number;
+  onBack: () => void;
+  quest?: QuestSummary | null;
+}) {
   const iconProgress = useRef(new Animated.Value(0)).current;
   const copyProgress = useRef(new Animated.Value(0)).current;
   const summaryProgress = useRef(new Animated.Value(0)).current;
@@ -246,7 +261,7 @@ function QuestResult({ correctCount, onBack }: { correctCount: number; onBack: (
             <Ionicons color={colors.white} name="checkmark" size={42} />
           </Animated.View>
           <Animated.View style={copyStyle}>
-            <Text style={styles.resultTitle}>대화 연습을 마쳤어요!</Text>
+            <Text style={styles.resultTitle}>{quest ? `${quest.title} 연습을 마쳤어요!` : '대화 연습을 마쳤어요!'}</Text>
             <Text style={styles.resultDescription}>
               {correctCount}개의 상황에서 알맞은 말을 골랐어요.
             </Text>
@@ -266,7 +281,7 @@ function QuestResult({ correctCount, onBack }: { correctCount: number; onBack: (
                 <Ionicons color="#F2AE00" name="star" size={20} />
               </View>
               <Text style={styles.resultSummaryLabel}>받은 경험치</Text>
-              <Text style={styles.resultXp}>+20 XP</Text>
+              <Text style={styles.resultXp}>+{quest?.rewardPoints ?? 20} XP</Text>
             </View>
           </Animated.View>
         </View>
