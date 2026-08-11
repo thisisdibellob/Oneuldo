@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 
 import { icons } from '../assets';
+import { GameHud } from '../components/game/GameHud';
 import { PressScale } from '../components/PressScale';
 import { colors, fonts } from '../theme';
 
@@ -25,6 +26,8 @@ const PLAYER_RADIUS = 22;
 const PLAYER_SIZE = 54;
 const MOVE_SPEED = 190;
 const RUN_SPEED_MULTIPLIER = 1.55;
+const BACKGROUND_MUSIC_VOLUME = 0.18;
+const BACKGROUND_MUSIC_DUCKED_VOLUME = 0.1;
 const ACCESSIBILITY_STEP = 58;
 const JOYSTICK_RADIUS = 34;
 const JOYSTICK_SIZE = 110;
@@ -160,7 +163,7 @@ export function GamePrototypeScreen({ onExit }: { onExit: () => void }) {
   const [npcNearby, setNpcNearby] = useState(false);
   const [audioModeReady, setAudioModeReady] = useState(false);
   const [controlMode, setControlMode] = useState<ControlMode>('joystick');
-  const [controlMenuOpen, setControlMenuOpen] = useState(false);
+  const [hudMenuOpen, setHudMenuOpen] = useState(false);
   const [runEnabled, setRunEnabled] = useState(false);
   const [tapTargetMarker, setTapTargetMarker] = useState<Point | null>(null);
   const [joystickActive, setJoystickActive] = useState(false);
@@ -176,7 +179,7 @@ export function GamePrototypeScreen({ onExit }: { onExit: () => void }) {
   const [showWrongFeedback, setShowWrongFeedback] = useState(false);
   const currentDialogue = dialogueIndex === null ? '' : dialogueLines[dialogueIndex];
   controlsLockedRef.current =
-    dialoguePanelMounted || quizPanelMounted || dialogueIndex !== null || quizStep !== null || controlMenuOpen;
+    dialoguePanelMounted || quizPanelMounted || dialogueIndex !== null || quizStep !== null || hudMenuOpen;
 
   const updateCamera = useCallback(
     (point: Point) => {
@@ -247,6 +250,20 @@ export function GamePrototypeScreen({ onExit }: { onExit: () => void }) {
     }
     onExit();
   }, [backgroundMusic, backgroundMusicStatus.isLoaded, onExit, stopMovement]);
+
+  const handleEmergencyExit = useCallback(() => {
+    stopMovement();
+    speedMultiplier.current = 1;
+    setRunEnabled(false);
+    playerPoint.current = { ...INITIAL_PLAYER_POINT };
+    updateCamera(playerPoint.current);
+    updateNpcProximity(playerPoint.current);
+  }, [stopMovement, updateCamera, updateNpcProximity]);
+
+  const handleHudMenuVisibilityChange = useCallback((open: boolean) => {
+    if (open) stopMovement();
+    setHudMenuOpen(open);
+  }, [stopMovement]);
 
   const runMovement = useCallback(
     (timestamp: number) => {
@@ -382,13 +399,15 @@ export function GamePrototypeScreen({ onExit }: { onExit: () => void }) {
   useEffect(() => {
     if (!audioModeReady || !backgroundMusicStatus.isLoaded) return;
     backgroundMusic.loop = true;
-    backgroundMusic.volume = 0.22;
+    backgroundMusic.volume = BACKGROUND_MUSIC_VOLUME;
     backgroundMusic.play();
   }, [audioModeReady, backgroundMusic, backgroundMusicStatus.isLoaded]);
 
   useEffect(() => {
     if (!backgroundMusicStatus.isLoaded) return;
-    backgroundMusic.volume = dialoguePanelMounted || quizPanelMounted ? 0.12 : 0.22;
+    backgroundMusic.volume = dialoguePanelMounted || quizPanelMounted
+      ? BACKGROUND_MUSIC_DUCKED_VOLUME
+      : BACKGROUND_MUSIC_VOLUME;
   }, [backgroundMusic, backgroundMusicStatus.isLoaded, dialoguePanelMounted, quizPanelMounted]);
 
   useEffect(() => {
@@ -663,7 +682,6 @@ export function GamePrototypeScreen({ onExit }: { onExit: () => void }) {
     speedMultiplier.current = 1;
     setRunEnabled(false);
     setControlMode(mode);
-    setControlMenuOpen(false);
   };
 
   const handleInteraction = () => {
@@ -787,65 +805,6 @@ export function GamePrototypeScreen({ onExit }: { onExit: () => void }) {
         </View>
       </View>
 
-      <PressScale
-        accessibilityLabel="게임 나가기"
-        accessibilityRole="button"
-        hitSlop={10}
-        onPress={(event) => {
-          event?.stopPropagation?.();
-          handleExit();
-        }}
-        style={styles.exitButton}
-        testID="game-exit"
-      >
-        <Ionicons color={colors.white} name="close" size={27} />
-      </PressScale>
-
-      <PressScale
-        accessibilityLabel="조작 방식 선택"
-        accessibilityRole="button"
-        onPress={(event) => {
-          event?.stopPropagation?.();
-          stopMovement();
-          setControlMenuOpen((open) => !open);
-        }}
-        style={styles.controlModeButton}
-      >
-        <Ionicons color={colors.white} name="options" size={23} />
-      </PressScale>
-
-      {controlMenuOpen ? (
-        <View style={styles.controlMenu}>
-          <Text style={styles.controlMenuTitle}>조작 방식</Text>
-          <PressScale
-            accessibilityRole="radio"
-            accessibilityState={{ checked: controlMode === 'joystick' }}
-            onPress={(event) => {
-              event?.stopPropagation?.();
-              selectControlMode('joystick');
-            }}
-            style={[styles.controlOption, controlMode === 'joystick' && styles.controlOptionSelected]}
-          >
-            <Ionicons color="#3D5146" name="game-controller" size={20} />
-            <Text style={styles.controlOptionText}>슬라이드 패드</Text>
-            {controlMode === 'joystick' ? <Ionicons color={colors.mint} name="checkmark" size={21} /> : null}
-          </PressScale>
-          <PressScale
-            accessibilityRole="radio"
-            accessibilityState={{ checked: controlMode === 'touch' }}
-            onPress={(event) => {
-              event?.stopPropagation?.();
-              selectControlMode('touch');
-            }}
-            style={[styles.controlOption, controlMode === 'touch' && styles.controlOptionSelected]}
-          >
-            <Ionicons color="#3D5146" name="hand-left" size={20} />
-            <Text style={styles.controlOptionText}>터치 이동</Text>
-            {controlMode === 'touch' ? <Ionicons color={colors.mint} name="checkmark" size={21} /> : null}
-          </PressScale>
-        </View>
-      ) : null}
-
       {controlMode === 'joystick' ? (
       <View
         accessibilityActions={[
@@ -929,6 +888,14 @@ export function GamePrototypeScreen({ onExit }: { onExit: () => void }) {
         </PressScale>
       </View>
       ) : null}
+
+      <GameHud
+        controlMode={controlMode}
+        onControlModeChange={selectControlMode}
+        onEmergencyExit={handleEmergencyExit}
+        onExit={handleExit}
+        onMenuVisibilityChange={handleHudMenuVisibilityChange}
+      />
 
       {dialoguePanelMounted ? (
         <Animated.View
@@ -1380,82 +1347,8 @@ const styles = StyleSheet.create({
     width: 22,
   },
   playerImage: { height: 18, width: 18 },
-  exitButton: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(12,18,14,0.08)',
-    borderColor: 'rgba(255,255,255,0.34)',
-    borderRadius: 20,
-    borderWidth: 1,
-    elevation: 3,
-    height: 44,
-    justifyContent: 'center',
-    left: 16,
-    position: 'absolute',
-    shadowColor: '#000000',
-    shadowOffset: { height: 2, width: 0 },
-    shadowOpacity: 0.2,
-    shadowRadius: 7,
-    top: 16,
-    width: 44,
-    zIndex: 20,
-  },
-  controlModeButton: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(12,18,14,0.08)',
-    borderColor: 'rgba(255,255,255,0.34)',
-    borderRadius: 20,
-    borderWidth: 1,
-    elevation: 3,
-    height: 44,
-    justifyContent: 'center',
-    position: 'absolute',
-    right: 16,
-    shadowColor: '#000000',
-    shadowOffset: { height: 2, width: 0 },
-    shadowOpacity: 0.2,
-    shadowRadius: 7,
-    top: 16,
-    width: 44,
-    zIndex: 26,
-  },
-  controlMenu: {
-    backgroundColor: 'rgba(255,255,255,0.97)',
-    borderColor: 'rgba(34,47,39,0.14)',
-    borderRadius: 18,
-    borderWidth: 1,
-    padding: 12,
-    position: 'absolute',
-    right: 16,
-    top: 68,
-    width: 224,
-    zIndex: 26,
-  },
-  controlMenuTitle: {
-    color: colors.ink,
-    fontFamily: fonts.bold,
-    fontSize: 14,
-    marginBottom: 8,
-    paddingHorizontal: 4,
-  },
-  controlOption: {
-    alignItems: 'center',
-    borderColor: 'transparent',
-    borderRadius: 13,
-    borderWidth: 2,
-    flexDirection: 'row',
-    minHeight: 48,
-    paddingHorizontal: 11,
-  },
-  controlOptionSelected: { backgroundColor: '#ECF8F1', borderColor: '#B9E8CE' },
-  controlOptionText: {
-    color: '#35433B',
-    flex: 1,
-    fontFamily: fonts.semibold,
-    fontSize: 14,
-    marginLeft: 9,
-  },
   joystickZone: {
-    bottom: 0,
+    bottom: 104,
     height: JOYSTICK_ZONE_HEIGHT,
     left: 0,
     position: 'absolute',
@@ -1494,7 +1387,7 @@ const styles = StyleSheet.create({
     width: 48,
   },
   actionCluster: {
-    bottom: 26,
+    bottom: 142,
     height: 112,
     position: 'absolute',
     right: 18,

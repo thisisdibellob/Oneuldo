@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { useFonts } from 'expo-font';
@@ -32,6 +33,10 @@ export default function App() {
     void loadQuests();
   }, []);
 
+  const [showOnboarding, setShowOnboarding] = useState(true);
+  const [reduceMotion, setReduceMotion] = useState(false);
+  const entryProgress = useRef(new Animated.Value(0)).current;
+  const entering = useRef(false);
   const [loaded, error] = useFonts({
     Pretendard: require('./assets/fonts/Pretendard-Regular.otf'),
     'Pretendard-Medium': require('./assets/fonts/Pretendard-Medium.otf'),
@@ -41,7 +46,30 @@ export default function App() {
     LaundryGothic: require('./assets/fonts/LaundryGothic-Regular.otf'),
     'LaundryGothic-Bold': require('./assets/fonts/LaundryGothic-Bold.otf'),
     KyoboHandwriting: require('./assets/fonts/KyoboHandwriting2019.otf'),
+    'Griun-InaDoongdoong': require('./assets/fonts/Griun_InaDoongdoong-Rg.ttf'),
   });
+
+  useEffect(() => {
+    AccessibilityInfo.isReduceMotionEnabled().then(setReduceMotion);
+  }, []);
+
+  const enterApp = () => {
+    if (entering.current) return;
+    entering.current = true;
+    setEntered(true);
+    if (reduceMotion) {
+      entryProgress.setValue(1);
+      setShowOnboarding(false);
+      return;
+    }
+    entryProgress.setValue(0);
+    Animated.timing(entryProgress, {
+      duration: 620,
+      easing: Easing.bezier(0.16, 1, 0.3, 1),
+      toValue: 1,
+      useNativeDriver: true,
+    }).start(() => setShowOnboarding(false));
+  };
 
   if (!loaded && !error) {
     return (
@@ -69,6 +97,8 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
+  app: { backgroundColor: colors.white, flex: 1 },
+  layer: { ...StyleSheet.absoluteFillObject },
   loading: { alignItems: 'center', backgroundColor: colors.white, flex: 1, justifyContent: 'center' },
   loadingText: { color: colors.sage, fontFamily: fonts.regular, fontSize: 13, marginTop: 14 },
 });

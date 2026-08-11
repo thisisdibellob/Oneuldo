@@ -36,7 +36,8 @@ export function AppShell({
   const [practice, setPractice] = useState(false);
   const [gamePlaying, setGamePlaying] = useState(false);
   const [reduceMotion, setReduceMotion] = useState(false);
-  const screenProgress = useRef(new Animated.Value(1)).current;
+  const screenProgress = useRef(new Animated.Value(0)).current;
+  const firstAppearance = useRef(true);
 
   useEffect(() => {
     AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
@@ -49,12 +50,15 @@ export function AppShell({
       screenProgress.setValue(1);
       return;
     }
+    const isFirstAppearance = firstAppearance.current;
     Animated.timing(screenProgress, {
-      duration: 240,
+      duration: isFirstAppearance ? 520 : 280,
       easing: Easing.out(Easing.cubic),
       toValue: 1,
       useNativeDriver: true,
-    }).start();
+    }).start(() => {
+      firstAppearance.current = false;
+    });
   }, [gamePlaying, practice, reduceMotion, screenProgress, tab]);
 
   const beginTransition = () => {
@@ -107,7 +111,13 @@ export function AppShell({
       {
         translateY: screenProgress.interpolate({
           inputRange: [0, 1],
-          outputRange: [9, 0],
+          outputRange: [12, 0],
+        }),
+      },
+      {
+        scale: screenProgress.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0.996, 1],
         }),
       },
     ],
