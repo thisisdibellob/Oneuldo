@@ -1,6 +1,6 @@
 
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import {useEffect, useRef, useState} from 'react';
+import {AccessibilityInfo, ActivityIndicator, Animated, Easing, StyleSheet, Text, View} from 'react-native';
 import { useFonts } from 'expo-font';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
