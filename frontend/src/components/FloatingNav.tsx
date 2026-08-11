@@ -171,6 +171,6 @@ const styles = StyleSheet.create({
   item: { alignItems: 'center', flex: 1, justifyContent: 'flex-end', paddingBottom: 7 },
   iconStage: { alignItems: 'center', height: 43, justifyContent: 'flex-end', overflow: 'visible', width: 58 },
   icon: { bottom: -5, height: 58, position: 'absolute', width: 58 },
-  label: { color: colors.text, fontFamily: fonts.handwriting, fontSize: 11, lineHeight: 12 },
+  label: { color: colors.text, fontFamily: fonts.handwriting, fontSize: 12, lineHeight: 13 },
   pressed: { opacity: 0.64 },
 });

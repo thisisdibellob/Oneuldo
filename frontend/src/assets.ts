@@ -47,4 +47,11 @@ export const icons = {
   spaceship: require('../assets/images/source/Icon/SpaceShip.png'),
   santa: require('../assets/images/source/Icon/Christmas_Santa.png'),
   tree: require('../assets/images/source/Icon/Christmas_Tree.png'),
+  gameSettings: require('../assets/images/game/G_settings.png'),
+  gameBag: require('../assets/images/game/G_bag.png'),
+  gameCoin: require('../assets/images/game/G_money2.png'),
+  gameCoinWon: require('../assets/images/game/G_coin_won.png'),
+  gameDiary: require('../assets/images/game/G_diary.png'),
+  gameMoney: require('../assets/images/game/G_money.png'),
+  gamePhone: require('../assets/images/game/G_phone.png'),
 } satisfies Record<string, ImageSourcePropType>;

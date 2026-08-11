@@ -3,7 +3,7 @@ import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { icons, images } from '../assets';
 import { PressScale } from '../components/PressScale';
-import { BrandHeader } from '../components/ui';
+import { StickyBrandHeader } from '../components/ui';
 import { cardShadow, colors, fonts } from '../theme';
 
 const places = [
@@ -14,8 +14,8 @@ const places = [
 
 export function GameScreen({ onEnter }: { onEnter: () => void }) {
   return (
-    <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-      <BrandHeader />
+    <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} stickyHeaderIndices={[0]}>
+      <StickyBrandHeader horizontalPadding={20} />
 
       <Text style={styles.eyebrow}>게임</Text>
       <Text style={styles.title}>오늘도 마을을 걸어볼까요?</Text>
