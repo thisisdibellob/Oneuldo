@@ -92,7 +92,7 @@ describe('오늘도 앱', () => {
     expect(screen.getByLabelText('내 캐릭터')).toBeTruthy();
 
     expect(screen.getByLabelText('안내원 민수')).toBeTruthy();
-    const inactiveInteraction = screen.getByRole('button', { name: '대화할 대상이 없습니다' });
+    const inactiveInteraction = screen.getByRole('button', { name: '상호작용할 대상이 없습니다' });
     expect(inactiveInteraction.props.accessibilityState.disabled).toBe(true);
 
     fireEvent.press(screen.getByRole('button', { name: '달리기 켜기' }));
@@ -192,6 +192,61 @@ describe('오늘도 앱', () => {
 
     fireEvent(village, 'pressOut', touch);
     expect(screen.queryByTestId('touch-target-marker')).toBeNull();
+  });
+
+  it('마트 안을 이동하며 목록대로 장을 보고 계산을 마친다', async () => {
+    const screen = render(<App />);
+    fireEvent.press(screen.getByRole('button', { name: 'Google로 시작하기' }));
+    fireEvent.press(screen.getByRole('tab', { name: '게임 탭' }));
+    fireEvent.press(screen.getByRole('button', { name: '마을에서 마트 장보기 시작' }));
+
+    const joystick = screen.getByLabelText('이동 조이스틱');
+    for (let step = 0; step < 5; step += 1) {
+      fireEvent(joystick, 'accessibilityAction', { nativeEvent: { actionName: 'moveRight' } });
+    }
+    for (let step = 0; step < 6; step += 1) {
+      fireEvent(joystick, 'accessibilityAction', { nativeEvent: { actionName: 'moveUp' } });
+    }
+    fireEvent.press(screen.getByRole('button', { name: '하늘마트 들어가기' }));
+
+    expect(screen.getByText('안녕하세요. 오늘 저녁에 필요한 물건을 같이 골라볼까요?')).toBeTruthy();
+    fireEvent.press(screen.getByText('다음'));
+    fireEvent.press(screen.getByText('장보기 시작'));
+    const marketMap = screen.getByLabelText('하늘마트 내부 월드');
+    const moveInsideMarket = (actionName: string, steps: number) => {
+      for (let step = 0; step < steps; step += 1) {
+        fireEvent(marketMap, 'accessibilityAction', { nativeEvent: { actionName } });
+      }
+    };
+
+    moveInsideMarket('moveUp', 8);
+    moveInsideMarket('moveLeft', 2);
+    fireEvent.press(await screen.findByRole('button', { name: '냉장 식품 살펴보기' }));
+    fireEvent.press(screen.getByRole('button', { name: '흰 우유 담기' }));
+    fireEvent.press(screen.getAllByRole('button', { name: '진열대 닫기' })[0]);
+
+    moveInsideMarket('moveRight', 4);
+    fireEvent.press(await screen.findByRole('button', { name: '과일 살펴보기' }));
+    fireEvent.press(screen.getByRole('button', { name: '사과 담기' }));
+    fireEvent.press(screen.getByLabelText('사과 한 개 더 담기'));
+    fireEvent.press(screen.getAllByRole('button', { name: '진열대 닫기' })[0]);
+
+    moveInsideMarket('moveLeft', 4);
+    moveInsideMarket('moveDown', 5);
+    fireEvent.press(await screen.findByRole('button', { name: '간편 식품 살펴보기' }));
+    fireEvent.press(screen.getByRole('button', { name: '순한 카레 담기' }));
+    fireEvent.press(screen.getAllByRole('button', { name: '진열대 닫기' })[0]);
+
+    fireEvent.press(screen.getByRole('button', { name: '장바구니 4개' }));
+    expect(screen.getByText('7,400원')).toBeTruthy();
+    fireEvent.press(screen.getByText('가방 닫기'));
+    moveInsideMarket('moveRight', 2);
+    moveInsideMarket('moveUp', 8);
+    fireEvent.press(await screen.findByRole('button', { name: '계산대에서 계산하기' }));
+    fireEvent.press(screen.getByText('목록 확인'));
+
+    expect(screen.getByText('목록에 맞게 장보기를 마쳤어요!')).toBeTruthy();
+    expect(screen.getByText('+30')).toBeTruthy();
   });
 
   it('AI 입력 표시 뒤 답변을 추가하고 여러 대화를 누적한다', async () => {

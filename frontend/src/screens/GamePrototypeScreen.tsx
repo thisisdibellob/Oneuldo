@@ -18,10 +18,18 @@ import {
 import { icons } from '../assets';
 import { GameHud } from '../components/game/GameHud';
 import { PressScale } from '../components/PressScale';
+import { MarketCategoryId, marketCategories, marketProducts } from '../game/scenarios';
 import { colors, fonts } from '../theme';
+import {
+  MarketInteractionRequest,
+  MarketSimulationScreen,
+  MarketStationId,
+} from './MarketSimulationScreen';
 
-const WORLD_WIDTH = 1000;
-const WORLD_HEIGHT = 900;
+const VILLAGE_WORLD_WIDTH = 1000;
+const VILLAGE_WORLD_HEIGHT = 900;
+const MARKET_WORLD_WIDTH = 900;
+const MARKET_WORLD_HEIGHT = 1000;
 const PLAYER_RADIUS = 22;
 const PLAYER_SIZE = 54;
 const MOVE_SPEED = 190;
@@ -37,12 +45,39 @@ const DIALOGUE_READ_DELAY = 360;
 const INTERACTION_DISTANCE = 116;
 const NPC_POINT = { x: 610, y: 520 };
 const INITIAL_PLAYER_POINT = { x: 480, y: 700 };
+const MARKET_ENTRANCE_POINT = { x: 775, y: 346 };
+const MARKET_RETURN_POINT = { x: 775, y: 404 };
+const MARKET_INTERACTION_DISTANCE = 92;
+const MARKET_STATION_INTERACTION_DISTANCE = 105;
+const MARKET_PLAYER_POINT = { x: 450, y: 820 };
+const MARKET_EXIT_POINT = { x: 450, y: 950 };
 
-const obstacles = [
+const MARKET_STATIONS: Record<MarketStationId | 'exit', Point> = {
+  checkout: { x: 450, y: 250 },
+  fresh: { x: 350, y: 400 },
+  produce: { x: 550, y: 400 },
+  meal: { x: 350, y: 680 },
+  drink: { x: 550, y: 680 },
+  exit: MARKET_EXIT_POINT,
+};
+
+const MARKET_SHELVES: Record<MarketCategoryId, Rect> = {
+  fresh: { height: 128, width: 220, x: 90, y: 310 },
+  produce: { height: 128, width: 220, x: 590, y: 310 },
+  meal: { height: 128, width: 220, x: 90, y: 590 },
+  drink: { height: 128, width: 220, x: 590, y: 590 },
+};
+
+const villageObstacles = [
   { x: 112, y: 116, width: 238, height: 184 },
   { x: 660, y: 122, width: 230, height: 190 },
   { x: 406, y: 330, width: 150, height: 105 },
   { x: 120, y: 548, width: 184, height: 110 },
+];
+
+const marketObstacles: Rect[] = [
+  { height: 105, width: 250, x: 325, y: 92 },
+  ...Object.values(MARKET_SHELVES),
 ];
 
 const quizAnswers = [
@@ -57,10 +92,20 @@ const dialogueLines = [
 ];
 
 type Point = { x: number; y: number };
+type Rect = { height: number; width: number; x: number; y: number };
 type QuizStep = 'question' | 'result' | null;
 type ControlMode = 'joystick' | 'touch';
+type WorldMapId = 'village' | 'market';
+type NearbyMarketStation = MarketStationId | 'exit' | null;
 
-function isBlocked(point: Point) {
+function getWorldBounds(worldMap: WorldMapId) {
+  return worldMap === 'market'
+    ? { height: MARKET_WORLD_HEIGHT, width: MARKET_WORLD_WIDTH }
+    : { height: VILLAGE_WORLD_HEIGHT, width: VILLAGE_WORLD_WIDTH };
+}
+
+function isBlocked(point: Point, worldMap: WorldMapId) {
+  const obstacles = worldMap === 'market' ? marketObstacles : villageObstacles;
   return obstacles.some(
     (obstacle) =>
       point.x + PLAYER_RADIUS > obstacle.x &&
@@ -70,22 +115,23 @@ function isBlocked(point: Point) {
   );
 }
 
-function clampPoint(point: Point): Point {
+function clampPoint(point: Point, worldMap: WorldMapId): Point {
+  const { height, width } = getWorldBounds(worldMap);
   return {
-    x: Math.max(PLAYER_RADIUS, Math.min(point.x, WORLD_WIDTH - PLAYER_RADIUS)),
-    y: Math.max(PLAYER_RADIUS, Math.min(point.y, WORLD_HEIGHT - PLAYER_RADIUS)),
+    x: Math.max(PLAYER_RADIUS, Math.min(point.x, width - PLAYER_RADIUS)),
+    y: Math.max(PLAYER_RADIUS, Math.min(point.y, height - PLAYER_RADIUS)),
   };
 }
 
-function findReachableTarget(current: Point, desired: Point): Point {
-  const clamped = clampPoint(desired);
+function findReachableTarget(current: Point, desired: Point, worldMap: WorldMapId): Point {
+  const clamped = clampPoint(desired, worldMap);
   for (let step = 12; step >= 0; step -= 1) {
     const ratio = step / 12;
     const candidate = {
       x: current.x + (clamped.x - current.x) * ratio,
       y: current.y + (clamped.y - current.y) * ratio,
     };
-    if (!isBlocked(candidate)) return candidate;
+    if (!isBlocked(candidate, worldMap)) return candidate;
   }
   return current;
 }
@@ -115,7 +161,110 @@ function IsoBuilding({
   );
 }
 
-export function GamePrototypeScreen({ onExit }: { onExit: () => void }) {
+function MarketWorldLayer({
+  controlMode,
+  nearbyStation,
+  onStationPress,
+  tapTargetMarker,
+}: {
+  controlMode: ControlMode;
+  nearbyStation: NearbyMarketStation;
+  onStationPress: (event: GestureResponderEvent, station: MarketStationId | 'exit') => void;
+  tapTargetMarker: Point | null;
+}) {
+  return (
+    <>
+      <View style={styles.marketFloor} />
+      <View style={styles.marketBackWall}>
+        <View style={styles.marketWallStripe} />
+        <View style={styles.marketLogo}>
+          <Ionicons color="#FFFFFF" name="basket" size={18} />
+          <Text style={styles.marketLogoText}>하늘마트</Text>
+        </View>
+      </View>
+      {[0, 1, 2, 3, 4, 5, 6].map((row) => (
+        <View key={`row-${row}`} style={[styles.marketFloorRow, { top: 150 + row * 120 }]} />
+      ))}
+      {[0, 1, 2, 3, 4, 5].map((column) => (
+        <View key={`column-${column}`} style={[styles.marketFloorColumn, { left: 70 + column * 150 }]} />
+      ))}
+      <View style={[styles.marketAisle, styles.marketAisleMain]} />
+      <View style={[styles.marketAisle, styles.marketAisleTop]} />
+      <View style={[styles.marketAisle, styles.marketAisleBottom]} />
+
+      {tapTargetMarker && controlMode === 'touch' ? (
+        <View
+          pointerEvents="none"
+          style={[styles.tapTargetMarker, { left: tapTargetMarker.x - 12, top: tapTargetMarker.y - 12 }]}
+          testID="touch-target-marker"
+        />
+      ) : null}
+
+      <PressScale
+        accessibilityLabel={controlMode === 'touch' ? '계산대로 이동' : '계산대'}
+        accessibilityRole={controlMode === 'touch' ? 'button' : undefined}
+        disabled={controlMode !== 'touch'}
+        onPress={(event) => onStationPress(event, 'checkout')}
+        scaleTo={0.98}
+        style={[styles.marketCounter, nearbyStation === 'checkout' && styles.marketObjectActive]}
+      >
+        <View style={styles.marketRegister} />
+        <Text style={styles.marketCounterText}>계산대</Text>
+      </PressScale>
+
+      {marketCategories.map((category) => {
+        const shelf = MARKET_SHELVES[category.id];
+        const products = marketProducts.filter((product) => product.categoryId === category.id);
+        return (
+          <PressScale
+            accessibilityLabel={controlMode === 'touch' ? `${category.label} 진열대로 이동` : `${category.label} 진열대`}
+            accessibilityRole={controlMode === 'touch' ? 'button' : undefined}
+            disabled={controlMode !== 'touch'}
+            key={category.id}
+            onPress={(event) => onStationPress(event, category.id)}
+            scaleTo={0.98}
+            style={[
+              styles.marketShelf,
+              { height: shelf.height, left: shelf.x, top: shelf.y, width: shelf.width },
+              nearbyStation === category.id && styles.marketObjectActive,
+            ]}
+          >
+            <View style={[styles.marketShelfLabel, { backgroundColor: category.color }]}>
+              <Ionicons color="#FFFFFF" name={category.icon as 'leaf' | 'fish' | 'fast-food' | 'water'} size={15} />
+              <Text style={styles.marketShelfLabelText}>{category.label}</Text>
+            </View>
+            <View style={styles.marketShelfProducts}>
+              {products.slice(0, 4).map((product) => (
+                <View key={product.id} style={[styles.marketProductBox, { backgroundColor: product.packageColor }]}>
+                  <View style={[styles.marketProductBand, { backgroundColor: product.color }]} />
+                </View>
+              ))}
+            </View>
+            <View style={styles.marketShelfBoard} />
+          </PressScale>
+        );
+      })}
+
+      <PressScale
+        accessibilityLabel={controlMode === 'touch' ? '마트 출구로 이동' : '마트 출구'}
+        accessibilityRole={controlMode === 'touch' ? 'button' : undefined}
+        disabled={controlMode !== 'touch'}
+        onPress={(event) => onStationPress(event, 'exit')}
+        scaleTo={0.98}
+        style={[styles.marketExit, nearbyStation === 'exit' && styles.marketObjectActive]}
+      >
+        <Ionicons color="#627269" name="exit-outline" size={20} />
+        <Text style={styles.marketExitText}>마을로 나가기</Text>
+      </PressScale>
+    </>
+  );
+}
+
+type GamePrototypeScreenProps = {
+  onExit: () => void;
+};
+
+export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
   const backgroundMusic = useAudioPlayer(require('../../assets/audio/maple-square.mp3'), {
     downloadFirst: true,
     keepAudioSessionActive: true,
@@ -143,24 +292,35 @@ export function GamePrototypeScreen({ onExit }: { onExit: () => void }) {
   const quizPanelProgress = useRef(new Animated.Value(0)).current;
   const resultCelebration = useRef(new Animated.Value(0)).current;
   const playerPoint = useRef<Point>({ ...INITIAL_PLAYER_POINT });
+  const worldMapRef = useRef<WorldMapId>('village');
   const viewport = useRef({ width: 0, height: 0 });
   const viewportOrigin = useRef({ x: 0, y: 0 });
   const direction = useRef<Point>({ x: 0, y: 0 });
   const speedMultiplier = useRef(1);
   const tapTarget = useRef<Point | null>(null);
   const pendingNpcInteraction = useRef(false);
+  const pendingMarketInteraction = useRef(false);
+  const pendingMarketStationInteraction = useRef<NearbyMarketStation>(null);
   const joystickEngaged = useRef(false);
   const touchHoldActivated = useRef(false);
   const clearSoundTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const animationFrame = useRef<number | null>(null);
   const previousFrame = useRef<number | null>(null);
   const nearbyRef = useRef(false);
+  const marketNearbyRef = useRef(false);
+  const marketStationNearbyRef = useRef<NearbyMarketStation>(null);
   const controlsLockedRef = useRef(false);
   const joystickZoneSize = useRef({ width: 220, height: JOYSTICK_ZONE_HEIGHT });
   const dialogueReadyAt = useRef(Number.POSITIVE_INFINITY);
   const startDialogueRef = useRef<() => void>(() => undefined);
 
   const [npcNearby, setNpcNearby] = useState(false);
+  const [marketNearby, setMarketNearby] = useState(false);
+  const [marketStationNearby, setMarketStationNearby] = useState<NearbyMarketStation>(null);
+  const [marketScenarioLocked, setMarketScenarioLocked] = useState(false);
+  const [marketInteractionRequest, setMarketInteractionRequest] =
+    useState<MarketInteractionRequest | null>(null);
+  const [worldMap, setWorldMap] = useState<WorldMapId>('village');
   const [audioModeReady, setAudioModeReady] = useState(false);
   const [controlMode, setControlMode] = useState<ControlMode>('joystick');
   const [hudMenuOpen, setHudMenuOpen] = useState(false);
@@ -179,7 +339,12 @@ export function GamePrototypeScreen({ onExit }: { onExit: () => void }) {
   const [showWrongFeedback, setShowWrongFeedback] = useState(false);
   const currentDialogue = dialogueIndex === null ? '' : dialogueLines[dialogueIndex];
   controlsLockedRef.current =
-    dialoguePanelMounted || quizPanelMounted || dialogueIndex !== null || quizStep !== null || hudMenuOpen;
+    dialoguePanelMounted ||
+    quizPanelMounted ||
+    dialogueIndex !== null ||
+    quizStep !== null ||
+    hudMenuOpen ||
+    marketScenarioLocked;
 
   const updateCamera = useCallback(
     (point: Point) => {
@@ -192,10 +357,49 @@ export function GamePrototypeScreen({ onExit }: { onExit: () => void }) {
   );
 
   const updateNpcProximity = useCallback((point: Point) => {
+    if (worldMapRef.current === 'market') {
+      if (nearbyRef.current) {
+        nearbyRef.current = false;
+        setNpcNearby(false);
+      }
+      if (marketNearbyRef.current) {
+        marketNearbyRef.current = false;
+        setMarketNearby(false);
+      }
+      let closest: NearbyMarketStation = null;
+      let closestDistance = Number.POSITIVE_INFINITY;
+      (Object.entries(MARKET_STATIONS) as Array<[MarketStationId | 'exit', Point]>).forEach(
+        ([station, stationPoint]) => {
+          const distance = Math.hypot(point.x - stationPoint.x, point.y - stationPoint.y);
+          if (distance <= MARKET_STATION_INTERACTION_DISTANCE && distance < closestDistance) {
+            closest = station;
+            closestDistance = distance;
+          }
+        },
+      );
+      if (closest !== marketStationNearbyRef.current) {
+        marketStationNearbyRef.current = closest;
+        setMarketStationNearby(closest);
+      }
+      return;
+    }
+
+    if (marketStationNearbyRef.current) {
+      marketStationNearbyRef.current = null;
+      setMarketStationNearby(null);
+    }
     const nearby = Math.hypot(point.x - NPC_POINT.x, point.y - NPC_POINT.y) <= INTERACTION_DISTANCE;
     if (nearby !== nearbyRef.current) {
       nearbyRef.current = nearby;
       setNpcNearby(nearby);
+    }
+
+    const nearMarket =
+      Math.hypot(point.x - MARKET_ENTRANCE_POINT.x, point.y - MARKET_ENTRANCE_POINT.y) <=
+      MARKET_INTERACTION_DISTANCE;
+    if (nearMarket !== marketNearbyRef.current) {
+      marketNearbyRef.current = nearMarket;
+      setMarketNearby(nearMarket);
     }
   }, []);
 
@@ -203,12 +407,13 @@ export function GamePrototypeScreen({ onExit }: { onExit: () => void }) {
     (dx: number, dy: number) => {
       const current = playerPoint.current;
       let next = current;
+      const activeMap = worldMapRef.current;
 
-      const xCandidate = clampPoint({ x: current.x + dx, y: current.y });
-      if (!isBlocked(xCandidate)) next = xCandidate;
+      const xCandidate = clampPoint({ x: current.x + dx, y: current.y }, activeMap);
+      if (!isBlocked(xCandidate, activeMap)) next = xCandidate;
 
-      const yCandidate = clampPoint({ x: next.x, y: next.y + dy });
-      if (!isBlocked(yCandidate)) next = yCandidate;
+      const yCandidate = clampPoint({ x: next.x, y: next.y + dy }, activeMap);
+      if (!isBlocked(yCandidate, activeMap)) next = yCandidate;
 
       playerPoint.current = next;
       updateCamera(next);
@@ -223,6 +428,8 @@ export function GamePrototypeScreen({ onExit }: { onExit: () => void }) {
     joystickEngaged.current = false;
     tapTarget.current = null;
     pendingNpcInteraction.current = false;
+    pendingMarketInteraction.current = false;
+    pendingMarketStationInteraction.current = null;
     previousFrame.current = null;
     setJoystickActive(false);
     setTapTargetMarker(null);
@@ -251,11 +458,39 @@ export function GamePrototypeScreen({ onExit }: { onExit: () => void }) {
     onExit();
   }, [backgroundMusic, backgroundMusicStatus.isLoaded, onExit, stopMovement]);
 
+  const handleEnterMarket = useCallback(() => {
+    if (!marketNearbyRef.current) return;
+    stopMovement();
+    speedMultiplier.current = 1;
+    setRunEnabled(false);
+    setMarketScenarioLocked(true);
+    worldMapRef.current = 'market';
+    setWorldMap('market');
+    playerPoint.current = { ...MARKET_PLAYER_POINT };
+    updateCamera(playerPoint.current);
+    updateNpcProximity(playerPoint.current);
+  }, [stopMovement, updateCamera, updateNpcProximity]);
+
+  const handleLeaveMarket = useCallback(() => {
+    stopMovement();
+    speedMultiplier.current = 1;
+    setRunEnabled(false);
+    setMarketScenarioLocked(false);
+    setMarketInteractionRequest(null);
+    worldMapRef.current = 'village';
+    setWorldMap('village');
+    playerPoint.current = { ...MARKET_RETURN_POINT };
+    updateCamera(playerPoint.current);
+    updateNpcProximity(playerPoint.current);
+  }, [stopMovement, updateCamera, updateNpcProximity]);
+
   const handleEmergencyExit = useCallback(() => {
     stopMovement();
     speedMultiplier.current = 1;
     setRunEnabled(false);
-    playerPoint.current = { ...INITIAL_PLAYER_POINT };
+    playerPoint.current = {
+      ...(worldMapRef.current === 'market' ? MARKET_PLAYER_POINT : INITIAL_PLAYER_POINT),
+    };
     updateCamera(playerPoint.current);
     updateNpcProximity(playerPoint.current);
   }, [stopMovement, updateCamera, updateNpcProximity]);
@@ -277,16 +512,39 @@ export function GamePrototypeScreen({ onExit }: { onExit: () => void }) {
         const dx = target.x - current.x;
         const dy = target.y - current.y;
         const distance = Math.hypot(dx, dy);
-        const interactionReached = pendingNpcInteraction.current && nearbyRef.current;
+        const npcInteractionReached = pendingNpcInteraction.current && nearbyRef.current;
+        const marketInteractionReached =
+          pendingMarketInteraction.current && marketNearbyRef.current;
+        const pendingStation = pendingMarketStationInteraction.current;
+        const marketStationInteractionReached =
+          pendingStation !== null && marketStationNearbyRef.current === pendingStation;
 
-        if (distance <= 3 || interactionReached) {
+        if (
+          distance <= 3 ||
+          npcInteractionReached ||
+          marketInteractionReached ||
+          marketStationInteractionReached
+        ) {
           const shouldTalk = pendingNpcInteraction.current && nearbyRef.current;
+          const shouldEnterMarket =
+            pendingMarketInteraction.current && marketNearbyRef.current;
+          const stationToUse = marketStationInteractionReached ? pendingStation : null;
           tapTarget.current = null;
           pendingNpcInteraction.current = false;
+          pendingMarketInteraction.current = false;
+          pendingMarketStationInteraction.current = null;
           previousFrame.current = null;
           animationFrame.current = null;
           setTapTargetMarker(null);
           if (shouldTalk) startDialogueRef.current();
+          if (shouldEnterMarket) handleEnterMarket();
+          if (stationToUse === 'exit') handleLeaveMarket();
+          else if (stationToUse) {
+            setMarketInteractionRequest((currentRequest) => ({
+              id: (currentRequest?.id ?? 0) + 1,
+              station: stationToUse,
+            }));
+          }
           return;
         }
 
@@ -296,6 +554,8 @@ export function GamePrototypeScreen({ onExit }: { onExit: () => void }) {
         if (step > 0 && moved < 0.05) {
           tapTarget.current = null;
           pendingNpcInteraction.current = false;
+          pendingMarketInteraction.current = false;
+          pendingMarketStationInteraction.current = null;
           previousFrame.current = null;
           animationFrame.current = null;
           setTapTargetMarker(null);
@@ -316,7 +576,7 @@ export function GamePrototypeScreen({ onExit }: { onExit: () => void }) {
         animationFrame.current = null;
       }
     },
-    [movePlayer],
+    [handleEnterMarket, handleLeaveMarket, movePlayer],
   );
 
   const beginMovement = useCallback(() => {
@@ -362,6 +622,10 @@ export function GamePrototypeScreen({ onExit }: { onExit: () => void }) {
     },
     [],
   );
+
+  useEffect(() => {
+    updateNpcProximity(playerPoint.current);
+  }, [updateNpcProximity]);
 
   useEffect(() => {
     if (dialogueIndex === null) return undefined;
@@ -559,6 +823,7 @@ export function GamePrototypeScreen({ onExit }: { onExit: () => void }) {
       viewportOrigin.current = { x, y };
     });
     updateCamera(playerPoint.current);
+    updateNpcProximity(playerPoint.current);
   };
 
   const handleJoystickZoneLayout = (event: LayoutChangeEvent) => {
@@ -595,13 +860,20 @@ export function GamePrototypeScreen({ onExit }: { onExit: () => void }) {
   };
   startDialogueRef.current = beginDialogue;
 
-  const startTapMovement = (desired: Point, talkWhenNear = false) => {
+  const startTapMovement = (
+    desired: Point,
+    talkWhenNear = false,
+    enterMarketWhenNear = false,
+    marketStationWhenNear: NearbyMarketStation = null,
+  ) => {
     if (controlsLockedRef.current) return;
     stopMovement();
-    const target = findReachableTarget(playerPoint.current, desired);
+    const target = findReachableTarget(playerPoint.current, desired, worldMapRef.current);
     if (Math.hypot(target.x - playerPoint.current.x, target.y - playerPoint.current.y) < 2) return;
     tapTarget.current = target;
     pendingNpcInteraction.current = talkWhenNear;
+    pendingMarketInteraction.current = enterMarketWhenNear;
+    pendingMarketStationInteraction.current = marketStationWhenNear;
     setTapTargetMarker(target);
     beginMovement();
   };
@@ -677,6 +949,62 @@ export function GamePrototypeScreen({ onExit }: { onExit: () => void }) {
     );
   };
 
+  const handleMarketPress = (event: GestureResponderEvent) => {
+    event?.stopPropagation?.();
+    if (controlMode !== 'touch' || controlsLockedRef.current) return;
+    if (marketNearbyRef.current) {
+      handleEnterMarket();
+      return;
+    }
+
+    const current = playerPoint.current;
+    const dx = current.x - MARKET_ENTRANCE_POINT.x;
+    const dy = current.y - MARKET_ENTRANCE_POINT.y;
+    const distance = Math.max(Math.hypot(dx, dy), 1);
+    const approachDistance = MARKET_INTERACTION_DISTANCE - 18;
+    startTapMovement(
+      {
+        x: MARKET_ENTRANCE_POINT.x + (dx / distance) * approachDistance,
+        y: MARKET_ENTRANCE_POINT.y + (dy / distance) * approachDistance,
+      },
+      false,
+      true,
+    );
+  };
+
+  const handleMarketStationPress = (
+    event: GestureResponderEvent,
+    station: MarketStationId | 'exit',
+  ) => {
+    event?.stopPropagation?.();
+    if (controlMode !== 'touch' || controlsLockedRef.current) return;
+    if (marketStationNearbyRef.current === station) {
+      if (station === 'exit') handleLeaveMarket();
+      else {
+        setMarketInteractionRequest((currentRequest) => ({
+          id: (currentRequest?.id ?? 0) + 1,
+          station,
+        }));
+      }
+      return;
+    }
+    const stationPoint = MARKET_STATIONS[station];
+    const current = playerPoint.current;
+    const dx = current.x - stationPoint.x;
+    const dy = current.y - stationPoint.y;
+    const distance = Math.max(Math.hypot(dx, dy), 1);
+    const approachDistance = MARKET_STATION_INTERACTION_DISTANCE - 18;
+    startTapMovement(
+      {
+        x: stationPoint.x + (dx / distance) * approachDistance,
+        y: stationPoint.y + (dy / distance) * approachDistance,
+      },
+      false,
+      false,
+      station,
+    );
+  };
+
   const selectControlMode = (mode: ControlMode) => {
     stopMovement();
     speedMultiplier.current = 1;
@@ -685,7 +1013,23 @@ export function GamePrototypeScreen({ onExit }: { onExit: () => void }) {
   };
 
   const handleInteraction = () => {
+    if (worldMapRef.current === 'market') {
+      if (!marketStationNearbyRef.current) return;
+      if (marketStationNearbyRef.current === 'exit') {
+        handleLeaveMarket();
+        return;
+      }
+      setMarketInteractionRequest((current) => ({
+        id: (current?.id ?? 0) + 1,
+        station: marketStationNearbyRef.current as MarketStationId,
+      }));
+      return;
+    }
     if (quizStep) return;
+    if (dialogueIndex === null && marketNearby) {
+      handleEnterMarket();
+      return;
+    }
     if (dialogueIndex === null) {
       beginDialogue();
       return;
@@ -723,6 +1067,59 @@ export function GamePrototypeScreen({ onExit }: { onExit: () => void }) {
     setShowWrongFeedback(true);
   };
 
+  const marketStationCategory =
+    marketStationNearby && marketStationNearby !== 'checkout' && marketStationNearby !== 'exit'
+      ? marketCategories.find(({ id }) => id === marketStationNearby)
+      : null;
+  const interactionAvailable =
+    worldMap === 'market'
+      ? marketStationNearby !== null && !marketScenarioLocked
+      : marketNearby || npcNearby || dialogueIndex !== null;
+  const interactionLabel =
+    worldMap === 'market'
+      ? marketStationNearby === 'checkout'
+        ? '계산대에서 계산하기'
+        : marketStationNearby === 'exit'
+          ? '마트에서 마을로 나가기'
+          : marketStationCategory
+            ? `${marketStationCategory.label} 살펴보기`
+            : '가까이 가면 상호작용할 수 있어요'
+      : dialogueIndex !== null
+      ? '대화 계속하기'
+      : marketNearby
+        ? '하늘마트 들어가기'
+        : npcNearby
+          ? '민수와 대화하기'
+          : '상호작용할 대상이 없습니다';
+  const interactionIcon =
+    worldMap === 'market'
+      ? marketStationNearby === 'checkout'
+        ? 'card-outline'
+        : marketStationNearby === 'exit'
+          ? 'exit-outline'
+          : 'search'
+      : dialogueIndex !== null
+        ? 'play'
+        : marketNearby
+          ? 'storefront'
+          : 'chatbubble';
+  const interactionActionText =
+    worldMap === 'market'
+      ? marketStationNearby === 'checkout'
+        ? '계산'
+        : marketStationNearby === 'exit'
+          ? '나가기'
+          : marketStationNearby
+            ? '보기'
+            : '행동'
+      : dialogueIndex !== null
+        ? '다음'
+        : marketNearby
+          ? '입장'
+          : npcNearby
+            ? '대화'
+            : '행동';
+
   return (
     <Pressable
       accessibilityActions={[
@@ -731,7 +1128,7 @@ export function GamePrototypeScreen({ onExit }: { onExit: () => void }) {
         { label: '왼쪽으로 이동', name: 'moveLeft' },
         { label: '오른쪽으로 이동', name: 'moveRight' },
       ]}
-      accessibilityLabel="쿼터뷰 마을"
+      accessibilityLabel={worldMap === 'market' ? '하늘마트 내부 월드' : '쿼터뷰 마을'}
       delayLongPress={260}
       onAccessibilityAction={(event) => handleAccessibilityMove(event.nativeEvent.actionName)}
       onLayout={handleViewportLayout}
@@ -746,8 +1143,17 @@ export function GamePrototypeScreen({ onExit }: { onExit: () => void }) {
 
       <Animated.View
         pointerEvents={quizPanelMounted ? 'none' : 'auto'}
-        style={[styles.world, { transform: camera.getTranslateTransform() }]}
+        style={[
+          styles.world,
+          {
+            height: worldMap === 'market' ? MARKET_WORLD_HEIGHT : VILLAGE_WORLD_HEIGHT,
+            transform: camera.getTranslateTransform(),
+            width: worldMap === 'market' ? MARKET_WORLD_WIDTH : VILLAGE_WORLD_WIDTH,
+          },
+        ]}
       >
+        {worldMap === 'village' ? (
+        <>
         <View style={styles.ground} />
         <View style={[styles.road, styles.roadMain]} />
         <View style={[styles.road, styles.roadBranch]} />
@@ -763,7 +1169,34 @@ export function GamePrototypeScreen({ onExit }: { onExit: () => void }) {
         ) : null}
 
         <IsoBuilding color="#C99C78" height={184} label="집" width={238} x={112} y={116} />
-        <IsoBuilding color="#9AAE98" height={190} label="가게" width={230} x={660} y={122} />
+        <IsoBuilding color="#9AAE98" height={190} label="하늘마트" width={230} x={660} y={122} />
+
+        <PressScale
+          accessibilityHint={
+            controlMode === 'touch' ? '누르면 마트 입구까지 이동한 뒤 장보기를 시작합니다' : undefined
+          }
+          accessibilityLabel={
+            controlMode === 'touch' ? '하늘마트로 이동해 들어가기' : '하늘마트 입구'
+          }
+          accessibilityRole={controlMode === 'touch' ? 'button' : undefined}
+          disabled={controlMode !== 'touch' || controlsLockedRef.current}
+          onPress={handleMarketPress}
+          scaleTo={0.95}
+          style={[styles.marketEntrance, marketNearby && styles.marketEntranceActive]}
+        >
+          <View style={styles.marketEntranceIcon}>
+            <Ionicons color={marketNearby ? colors.white : '#4E6758'} name="storefront" size={16} />
+          </View>
+          <View>
+            <Text style={[styles.marketEntranceTitle, marketNearby && styles.marketEntranceTextActive]}>
+              하늘마트
+            </Text>
+            <Text style={[styles.marketEntranceHint, marketNearby && styles.marketEntranceTextActive]}>
+              {marketNearby ? '들어가기' : '입구'}
+            </Text>
+          </View>
+          {marketNearby ? <Ionicons color={colors.white} name="chevron-forward" size={16} /> : null}
+        </PressScale>
 
         <View style={[styles.obstacleBlock, styles.centerPlanter]}>
           <View style={styles.plantCircle} />
@@ -793,6 +1226,15 @@ export function GamePrototypeScreen({ onExit }: { onExit: () => void }) {
           </View>
           <Text style={styles.npcName}>민수</Text>
         </PressScale>
+        </>
+        ) : (
+          <MarketWorldLayer
+            controlMode={controlMode}
+            nearbyStation={marketStationNearby}
+            onStationPress={handleMarketStationPress}
+            tapTargetMarker={tapTargetMarker}
+          />
+        )}
       </Animated.View>
 
       <View accessibilityLabel="내 캐릭터" pointerEvents="none" style={styles.player}>
@@ -802,6 +1244,40 @@ export function GamePrototypeScreen({ onExit }: { onExit: () => void }) {
           <View style={styles.playerMarker}>
             <Image accessibilityIgnoresInvertColors resizeMode="contain" source={icons.user} style={styles.playerImage} />
           </View>
+        </View>
+      </View>
+
+      <View
+        pointerEvents="none"
+        style={[
+          styles.destinationGuide,
+          (worldMap === 'market' ? marketStationNearby !== null : marketNearby) &&
+            styles.destinationGuideArrived,
+          marketScenarioLocked && styles.destinationGuideHidden,
+        ]}
+      >
+        <View style={styles.destinationGuideIcon}>
+          <Ionicons
+            color={colors.white}
+            name={(worldMap === 'market' ? marketStationNearby !== null : marketNearby) ? 'checkmark' : 'navigate'}
+            size={15}
+          />
+        </View>
+        <View>
+          <Text style={styles.destinationGuideEyebrow}>현재 목표</Text>
+          <Text style={styles.destinationGuideText}>
+            {worldMap === 'market'
+              ? marketStationNearby === 'checkout'
+                ? '계산대에 도착했어요'
+                : marketStationNearby === 'exit'
+                  ? '마트 출구에 도착했어요'
+                  : marketStationCategory
+                    ? `${marketStationCategory.label} 진열대에 도착했어요`
+                    : '진열대를 돌아보며 목록을 채우세요'
+              : marketNearby
+                ? '하늘마트 입구에 도착했어요'
+                : '하늘마트 입구로 이동하세요'}
+          </Text>
         </View>
       </View>
 
@@ -844,16 +1320,10 @@ export function GamePrototypeScreen({ onExit }: { onExit: () => void }) {
       {controlMode === 'joystick' ? (
       <View style={styles.actionCluster}>
         <PressScale
-          accessibilityLabel={
-            dialogueIndex !== null
-              ? '대화 계속하기'
-              : npcNearby
-                ? '민수와 대화하기'
-                : '대화할 대상이 없습니다'
-          }
+          accessibilityLabel={interactionLabel}
           accessibilityRole="button"
-          accessibilityState={{ disabled: (!npcNearby && dialogueIndex === null) || quizPanelMounted }}
-          disabled={(!npcNearby && dialogueIndex === null) || quizPanelMounted}
+          accessibilityState={{ disabled: !interactionAvailable || quizPanelMounted }}
+          disabled={!interactionAvailable || quizPanelMounted}
           onPress={(event) => {
             event?.stopPropagation?.();
             handleInteraction();
@@ -862,10 +1332,11 @@ export function GamePrototypeScreen({ onExit }: { onExit: () => void }) {
           style={[
             styles.actionButton,
             styles.interactionButton,
-            !npcNearby && dialogueIndex === null && styles.actionButtonDisabled,
+            !interactionAvailable && styles.actionButtonDisabled,
           ]}
         >
-          <Ionicons color={colors.white} name={dialogueIndex !== null ? 'play' : 'chatbubble'} size={25} />
+          <Ionicons color={colors.white} name={interactionIcon} size={23} />
+          <Text style={styles.interactionActionText}>{interactionActionText}</Text>
         </PressScale>
         <PressScale
           accessibilityHint="한 번 누르면 달리기를 켜고 다시 누르면 끕니다"
@@ -896,6 +1367,15 @@ export function GamePrototypeScreen({ onExit }: { onExit: () => void }) {
         onExit={handleExit}
         onMenuVisibilityChange={handleHudMenuVisibilityChange}
       />
+
+      {worldMap === 'market' ? (
+        <MarketSimulationScreen
+          embedded
+          interactionRequest={marketInteractionRequest}
+          onExit={handleLeaveMarket}
+          onLockChange={setMarketScenarioLocked}
+        />
+      ) : null}
 
       {dialoguePanelMounted ? (
         <Animated.View
@@ -1120,12 +1600,155 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   world: {
-    height: WORLD_HEIGHT,
     left: 0,
     position: 'absolute',
     top: 0,
-    width: WORLD_WIDTH,
   },
+  marketFloor: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#DED6C8',
+    borderColor: '#B8AB98',
+    borderWidth: 12,
+  },
+  marketBackWall: {
+    backgroundColor: '#F3E6D6',
+    borderBottomColor: '#CFBBA6',
+    borderBottomWidth: 4,
+    height: 120,
+    left: 0,
+    position: 'absolute',
+    top: 0,
+    width: MARKET_WORLD_WIDTH,
+  },
+  marketWallStripe: {
+    backgroundColor: '#D4775B',
+    bottom: 11,
+    height: 7,
+    left: 0,
+    opacity: 0.8,
+    position: 'absolute',
+    right: 0,
+  },
+  marketLogo: {
+    alignItems: 'center',
+    alignSelf: 'center',
+    backgroundColor: '#C95D46',
+    borderRadius: 9,
+    flexDirection: 'row',
+    gap: 7,
+    marginTop: 30,
+    paddingHorizontal: 15,
+    paddingVertical: 9,
+  },
+  marketLogoText: { color: '#FFFFFF', fontFamily: fonts.bold, fontSize: 13 },
+  marketFloorRow: {
+    backgroundColor: 'rgba(255,255,255,0.45)',
+    height: 1,
+    left: 0,
+    position: 'absolute',
+    right: 0,
+  },
+  marketFloorColumn: {
+    backgroundColor: 'rgba(255,255,255,0.38)',
+    bottom: 0,
+    position: 'absolute',
+    top: 0,
+    transform: [{ rotate: '8deg' }],
+    width: 1,
+  },
+  marketAisle: {
+    backgroundColor: 'rgba(250,244,230,0.54)',
+    borderColor: 'rgba(145,125,99,0.16)',
+    borderRadius: 26,
+    borderWidth: 2,
+    position: 'absolute',
+  },
+  marketAisleMain: { height: 720, left: 365, top: 205, width: 170 },
+  marketAisleTop: { height: 100, left: 245, top: 350, width: 410 },
+  marketAisleBottom: { height: 100, left: 245, top: 630, width: 410 },
+  marketCounter: {
+    alignItems: 'center',
+    backgroundColor: '#A97C59',
+    borderColor: '#77563F',
+    borderRadius: 12,
+    borderWidth: 2,
+    height: 105,
+    justifyContent: 'center',
+    left: 325,
+    position: 'absolute',
+    top: 92,
+    width: 250,
+    zIndex: 5,
+  },
+  marketRegister: {
+    backgroundColor: '#52605C',
+    borderColor: '#36403D',
+    borderRadius: 4,
+    borderWidth: 2,
+    height: 25,
+    marginBottom: 9,
+    width: 42,
+  },
+  marketCounterText: { color: '#FFF4DE', fontFamily: fonts.bold, fontSize: 15 },
+  marketShelf: {
+    backgroundColor: '#9B7456',
+    borderColor: '#6F503B',
+    borderRadius: 12,
+    borderWidth: 2,
+    paddingHorizontal: 14,
+    paddingTop: 16,
+    position: 'absolute',
+    zIndex: 5,
+  },
+  marketObjectActive: {
+    borderColor: '#F3CE62',
+    borderWidth: 4,
+    shadowColor: '#5C482D',
+    shadowOffset: { height: 4, width: 0 },
+    shadowOpacity: 0.22,
+    shadowRadius: 7,
+  },
+  marketShelfLabel: {
+    alignItems: 'center',
+    borderRadius: 9,
+    flexDirection: 'row',
+    gap: 5,
+    left: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    position: 'absolute',
+    top: -11,
+    zIndex: 3,
+  },
+  marketShelfLabelText: { color: '#FFFFFF', fontFamily: fonts.semibold, fontSize: 10 },
+  marketShelfProducts: { flexDirection: 'row', gap: 7, justifyContent: 'center', marginTop: 9 },
+  marketProductBox: {
+    borderColor: 'rgba(66,48,35,0.2)',
+    borderRadius: 4,
+    borderWidth: 1,
+    height: 45,
+    overflow: 'hidden',
+    width: 38,
+  },
+  marketProductBand: { height: 9, marginTop: 8, width: '100%' },
+  marketShelfBoard: { backgroundColor: '#735038', height: 8, marginHorizontal: -4, marginTop: 8 },
+  marketExit: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.76)',
+    borderColor: '#B9B0A2',
+    borderRadius: 16,
+    borderStyle: 'dashed',
+    borderWidth: 2,
+    flexDirection: 'row',
+    gap: 7,
+    height: 58,
+    justifyContent: 'center',
+    left: 375,
+    position: 'absolute',
+    top: 900,
+    width: 150,
+  },
+  marketExitText: { color: '#647168', fontFamily: fonts.bold, fontSize: 13 },
   ground: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: '#DDE4D5',
@@ -1210,6 +1833,51 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 46,
   },
+  marketEntrance: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.92)',
+    borderColor: 'rgba(69,92,77,0.24)',
+    borderRadius: 16,
+    borderWidth: 1.5,
+    flexDirection: 'row',
+    gap: 8,
+    height: 54,
+    justifyContent: 'center',
+    left: MARKET_ENTRANCE_POINT.x - 62,
+    paddingHorizontal: 12,
+    position: 'absolute',
+    top: MARKET_ENTRANCE_POINT.y - 28,
+    width: 124,
+    zIndex: 7,
+  },
+  marketEntranceActive: {
+    backgroundColor: '#3E8063',
+    borderColor: 'rgba(255,255,255,0.9)',
+    shadowColor: '#1A3528',
+    shadowOffset: { height: 4, width: 0 },
+    shadowOpacity: 0.2,
+    shadowRadius: 9,
+  },
+  marketEntranceIcon: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(99,132,111,0.12)',
+    borderRadius: 11,
+    height: 30,
+    justifyContent: 'center',
+    width: 30,
+  },
+  marketEntranceTitle: {
+    color: '#294237',
+    fontFamily: fonts.bold,
+    fontSize: 12,
+  },
+  marketEntranceHint: {
+    color: '#708078',
+    fontFamily: fonts.medium,
+    fontSize: 10,
+    marginTop: 1,
+  },
+  marketEntranceTextActive: { color: colors.white },
   obstacleBlock: {
     backgroundColor: '#AAB79B',
     borderColor: '#89947E',
@@ -1347,6 +2015,43 @@ const styles = StyleSheet.create({
     width: 22,
   },
   playerImage: { height: 18, width: 18 },
+  destinationGuide: {
+    alignItems: 'center',
+    alignSelf: 'center',
+    backgroundColor: 'rgba(31,44,36,0.84)',
+    borderColor: 'rgba(255,255,255,0.18)',
+    borderRadius: 16,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 9,
+    minHeight: 48,
+    paddingHorizontal: 13,
+    paddingVertical: 8,
+    position: 'absolute',
+    top: 92,
+    zIndex: 21,
+  },
+  destinationGuideArrived: { backgroundColor: 'rgba(47,126,90,0.92)' },
+  destinationGuideHidden: { opacity: 0 },
+  destinationGuideIcon: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    borderRadius: 12,
+    height: 28,
+    justifyContent: 'center',
+    width: 28,
+  },
+  destinationGuideEyebrow: {
+    color: 'rgba(255,255,255,0.68)',
+    fontFamily: fonts.medium,
+    fontSize: 9,
+  },
+  destinationGuideText: {
+    color: colors.white,
+    fontFamily: fonts.bold,
+    fontSize: 12,
+    marginTop: 1,
+  },
   joystickZone: {
     bottom: 104,
     height: JOYSTICK_ZONE_HEIGHT,
@@ -1402,16 +2107,31 @@ const styles = StyleSheet.create({
     position: 'absolute',
   },
   interactionButton: {
-    backgroundColor: colors.mint,
-    borderRadius: 34,
+    backgroundColor: '#2E8061',
+    borderColor: '#F8EDCF',
+    borderRadius: 32,
+    borderWidth: 3,
     bottom: 0,
-    height: 68,
+    height: 64,
     right: 0,
-    width: 68,
+    shadowColor: '#20352B',
+    shadowOffset: { height: 4, width: 0 },
+    shadowOpacity: 0.28,
+    shadowRadius: 6,
+    width: 64,
+  },
+  interactionActionText: {
+    color: colors.white,
+    fontFamily: fonts.bold,
+    fontSize: 9,
+    letterSpacing: -0.1,
+    marginTop: 1,
   },
   runButton: {
-    backgroundColor: 'rgba(255,255,255,0.72)',
+    backgroundColor: 'rgba(255,250,236,0.88)',
+    borderColor: 'rgba(75,64,46,0.28)',
     borderRadius: 26,
+    borderWidth: 2,
     height: 52,
     left: 0,
     top: 0,
