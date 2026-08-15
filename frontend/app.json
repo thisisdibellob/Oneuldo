@@ -1,10 +1,11 @@
 {
   "expo": {
     "name": "오늘도",
-    "slug": "onuldo",
+    "slug": "oneuldo",
+    "scheme": "oneuldo",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/source/Logo.png",
+    "icon": "./assets/images/app-icon.png",
     "userInterfaceStyle": "light",
     "splash": {
       "backgroundColor": "#FFFFFF",
@@ -13,22 +14,25 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.onuldo.app"
+      "bundleIdentifier": "com.oneuldo.app"
     },
     "android": {
-      "package": "com.onuldo.app",
+      "package": "com.oneuldo.app",
       "adaptiveIcon": {
         "backgroundColor": "#D3FFE5",
-        "foregroundImage": "./assets/images/source/Logo.png"
+        "foregroundImage": "./assets/images/app-icon.png"
       },
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "favicon": "./assets/images/source/Logo.png",
+      "favicon": "./assets/images/app-icon.png",
       "bundler": "metro"
     },
     "plugins": [
-      "expo-font"
+      "expo-font",
+      "expo-dev-client",
+      "expo-asset",
+      "./plugins/with-qwen-model"
     ]
   }
 }

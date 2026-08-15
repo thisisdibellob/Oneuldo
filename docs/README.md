@@ -2,7 +2,7 @@
 
 <img width="4096" height="2304" alt="git장표" src="이미지링크" />
 
-# 🕹️ 오늘도 (Onuldo)
+# 🕹️ 오늘도 (Oneuldo)
 
 > 자폐 아동의 사회적 자립을 위한 기능성 게임 서비스
 
@@ -28,6 +28,18 @@
 
 ## CI/CD
 <img width="914" height="786" alt="image" src="이미지 링크" />
+
+
+## 관련 문서
+
+- [서비스 기획 요약](./product-plan.md)
+- [AI 활용 및 온디바이스 시스템 설계](./ai-system-design.md)
+- [AI 페이즈별 구현 계획](./ai-implementation-roadmap.md)
+- [Qwen 온디바이스 모델 설치](./qwen-model-setup.md)
+- [Expo Development Build 가이드](./development-build.md)
+- [데이터베이스 실행 가이드](./database-setup.md)
+- [데이터베이스 스키마](./database-schema.md)
+- [퀘스트 데이터 파이프라인](./quest-data-pipeline.md)
 
 
 ## 👥 팀원

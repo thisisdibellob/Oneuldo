@@ -64,7 +64,17 @@ coverage/
 .stylelintcache
 *.tsbuildinfo
 
+# Expo prebuild output (generated from app.json and config plugins)
+/frontend/android/
+/frontend/ios/
+
+# Local on-device LLM binaries (restored with pnpm model:qwen:download)
+/frontend/models/qwen3.5-0.8b-mnn/
+
 !**/gradle/wrapper/gradle-wrapper.jar
 
 # 중요 정보
 /backend/local.properties
+# Project-local development tools
+/.tools/
+/.pnpm/
