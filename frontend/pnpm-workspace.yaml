@@ -1,3 +1,5 @@
 allowBuilds:
   unrs-resolver: true
+# Expo Metro가 웹 의존성을 일반 node_modules 경로에서 찾도록 배치합니다.
+nodeLinker: hoisted
 virtualStoreDir: ../.pnpm

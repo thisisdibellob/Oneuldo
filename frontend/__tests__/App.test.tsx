@@ -3,6 +3,70 @@ import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import App from '../App';
 import { GamePrototypeScreen } from '../src/screens/GamePrototypeScreen';
 
+jest.mock('../src/api/quest', () => {
+  class QuestApiError extends Error {}
+  const summary = {
+    categoryCode: 'PUBLIC_TRANSPORT',
+    categoryName: '대중교통',
+    difficulty: 'EASY',
+    id: 'quest-1',
+    rewardPoints: 20,
+    summary: '목적지까지 가는 버스를 찾아봐요.',
+    title: '혼자 버스 타기',
+  };
+  return {
+    QuestApiError,
+    abandonQuestSession: jest.fn(async () => ({ status: 'ABANDONED' })),
+    completeQuestSession: jest.fn(async () => ({ status: 'COMPLETED' })),
+    getQuest: jest.fn(async () => summary),
+    getQuestDetail: jest.fn(async () => ({
+      ...summary,
+      code: 'TAKE_BUS_ALONE',
+      goal: '혼자 버스를 이용한다.',
+      steps: [
+        {
+          choices: [
+            { choiceOrder: 1, correct: true, feedback: '좋아요!', id: 'choice-1', label: '목적지가 적힌 노선의 버스 번호를 확인한다.' },
+            { choiceOrder: 2, correct: false, feedback: '다시 확인해요.', id: 'choice-2', label: '아무 버스나 탄다.' },
+          ],
+          hint: '목적지를 확인해요.',
+          id: 'step-1',
+          instruction: '버스 번호를 찾아보세요.',
+          situation: '정류장 안내판이 있습니다.',
+          stepOrder: 1,
+        },
+        {
+          choices: [{ choiceOrder: 1, correct: true, feedback: '맞아요!', id: 'choice-3', label: '버스 앞 번호와 확인한 번호를 비교한다.' }],
+          hint: null,
+          id: 'step-2',
+          instruction: '버스를 확인하세요.',
+          situation: '버스가 도착했습니다.',
+          stepOrder: 2,
+        },
+        {
+          choices: [{ choiceOrder: 1, correct: true, feedback: '잘했어요!', id: 'choice-4', label: '교통카드를 단말기에 댄다.' }],
+          hint: null,
+          id: 'step-3',
+          instruction: '교통카드를 사용하세요.',
+          situation: '단말기가 있습니다.',
+          stepOrder: 3,
+        },
+        {
+          choices: [{ choiceOrder: 1, correct: true, feedback: '좋아요!', id: 'choice-5', label: '하차 버튼을 누르고 버스가 멈출 때까지 기다린다.' }],
+          hint: null,
+          id: 'step-4',
+          instruction: '목적지에서 내리세요.',
+          situation: '목적지에 도착합니다.',
+          stepOrder: 4,
+        },
+      ],
+    })),
+    getQuests: jest.fn(async () => [summary]),
+    recordQuestEvent: jest.fn(async () => ({ correct: true })),
+    startQuestSession: jest.fn(async () => ({ id: 'session-1', status: 'IN_PROGRESS' })),
+  };
+});
+
 jest.mock('expo-font', () => ({
   isLoaded: () => true,
   loadAsync: () => Promise.resolve(),
@@ -216,22 +280,30 @@ describe('오늘도 앱', () => {
     );
   });
 
-  it('퀘스트를 끝내면 결과와 XP를 확인한 뒤 목록으로 돌아온다', () => {
+  it('퀘스트를 끝내면 결과와 XP를 확인한 뒤 목록으로 돌아온다', async () => {
     const screen = render(<App />);
     fireEvent.press(screen.getByRole('button', { name: 'Google로 시작하기' }));
     fireEvent.press(screen.getByRole('tab', { name: '퀘스트 탭' }));
+    await waitFor(() => expect(screen.getByText('혼자 버스 타기')).toBeTruthy());
     fireEvent.press(screen.getByText('혼자 버스 타기'));
 
-    fireEvent.press(screen.getByText('공공 도서관 가나요?'));
+    await waitFor(() => expect(screen.getByText('목적지가 적힌 노선의 버스 번호를 확인한다.')).toBeTruthy());
+    fireEvent.press(screen.getByText('목적지가 적힌 노선의 버스 번호를 확인한다.'));
     fireEvent.press(screen.getByRole('button', { name: '정답 확인' }));
-    expect(screen.getByText('좋아요! 상대방이 이해하기 쉬운 말이에요.')).toBeTruthy();
+    expect(screen.getByText('좋아요!')).toBeTruthy();
     fireEvent.press(screen.getByRole('button', { name: '다음으로' }));
 
-    fireEvent.press(screen.getByText('드림 시네마 있어요!'));
+    fireEvent.press(screen.getByText('버스 앞 번호와 확인한 번호를 비교한다.'));
+    fireEvent.press(screen.getByRole('button', { name: '정답 확인' }));
+    fireEvent.press(screen.getByRole('button', { name: '다음으로' }));
+    fireEvent.press(screen.getByText('교통카드를 단말기에 댄다.'));
+    fireEvent.press(screen.getByRole('button', { name: '정답 확인' }));
+    fireEvent.press(screen.getByRole('button', { name: '다음으로' }));
+    fireEvent.press(screen.getByText('하차 버튼을 누르고 버스가 멈출 때까지 기다린다.'));
     fireEvent.press(screen.getByRole('button', { name: '정답 확인' }));
     fireEvent.press(screen.getByRole('button', { name: '결과 보기' }));
 
-    expect(screen.getByText('대화 연습을 마쳤어요!')).toBeTruthy();
+    expect(screen.getByText('혼자 버스 타기 연습을 마쳤어요!')).toBeTruthy();
     expect(screen.getByText('+20 XP')).toBeTruthy();
     fireEvent.press(screen.getByRole('button', { name: '퀘스트 목록으로' }));
     expect(screen.getByText('추천 퀘스트')).toBeTruthy();

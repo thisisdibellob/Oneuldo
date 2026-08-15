@@ -3,6 +3,7 @@ import { Image, ImageSourcePropType, Pressable, ScrollView, StyleSheet, Text, Vi
 import { Ionicons } from '@expo/vector-icons';
 
 import { icons } from '../assets';
+import { QuestSummary } from '../api/quest';
 import { PressScale } from '../components/PressScale';
 import { StickyBrandHeader } from '../components/ui';
 import { colors, fonts } from '../theme';
@@ -28,18 +29,28 @@ const weeks: CalendarCell[][] = [
   [{ day: '30' }, { day: '31', event: '월간 목표 확인', eventColor: '#FFF0B7' }, { day: '1', muted: true }, { day: '2', muted: true }, { day: '3', muted: true }, { day: '4', muted: true }, { day: '5', muted: true }],
 ];
 const categories = ['전체', '대중교통', '생활 훈련', '경제생활', '안전'];
-const quests = [
-  { category: '대중교통', color: '#57ABD8', icon: icons.bus, title: '혼자 버스 타기', description: '목적지까지 가는 버스를 찾고,\n안전하게 이용해봐요!' },
-  { category: '일상생활', color: '#EFAC2B', icon: icons.cashier, title: '카페에서 주문하기', description: '원하는 메뉴를 고르고,\n직원에게 또박또박 말해봐요.' },
-  { category: '경제생활', color: '#33BB5B', icon: icons.money, title: '마트에서 장보기', description: '예산 안에서 필요한 물건을\n직접 골라 계산해요.' },
-  { category: '안전', color: '#E04173', icon: icons.sos, title: '도움을 요청하는 법', description: '곤란한 상황에서 믿을 수 있는\n사람들에게 도움을 요청해요.' },
-];
+const categoryVisuals: Record<string, { color: string; icon: ImageSourcePropType }> = {
+  ECONOMIC_LIFE: { color: '#33BB5B', icon: icons.money },
+  PUBLIC_TRANSPORT: { color: '#57ABD8', icon: icons.bus },
+  DAILY_LIFE: { color: '#EFAC2B', icon: icons.cashier },
+  SAFETY: { color: '#E04173', icon: icons.sos },
+};
 
-export function QuestScreen({ onPractice }: { onPractice: () => void }) {
+export function QuestScreen({
+  error,
+  loading,
+  onQuest,
+  quests,
+}: {
+  error: string | null;
+  loading: boolean;
+  onQuest: (uuid: string) => void;
+  quests: QuestSummary[];
+}) {
   const [selected, setSelected] = useState('전체');
   const visible = selected === '전체'
     ? quests
-    : quests.filter((item) => item.category === selected || (selected === '생활 훈련' && item.category === '일상생활'));
+    : quests.filter((item) => item.categoryName === selected);
 
   return (
     <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} stickyHeaderIndices={[0]}>
@@ -95,7 +106,10 @@ export function QuestScreen({ onPractice }: { onPractice: () => void }) {
       </ScrollView>
 
       <View style={styles.questList}>
-        {visible.map((quest) => <QuestCard key={quest.title} {...quest} onPress={onPractice} />)}
+        {loading ? <Text style={styles.questState}>퀘스트를 불러오고 있어요.</Text> : null}
+        {error ? <Text style={styles.questState}>{error}</Text> : null}
+        {!loading && !error && visible.length === 0 ? <Text style={styles.questState}>표시할 퀘스트가 없어요.</Text> : null}
+        {visible.map((quest) => <QuestCard key={quest.id} onPress={() => onQuest(quest.id)} quest={quest} />)}
       </View>
       <View style={styles.bottomSpace} />
     </ScrollView>
@@ -112,18 +126,19 @@ function Stat({ background, color, icon, label, value }: { background: string; c
   );
 }
 
-function QuestCard({ category, color, icon, title, description, onPress }: { category: string; color: string; icon: ImageSourcePropType; title: string; description: string; onPress: () => void }) {
+function QuestCard({ quest, onPress }: { quest: QuestSummary; onPress: () => void }) {
+  const visual = categoryVisuals[quest.categoryCode] ?? categoryVisuals.DAILY_LIFE;
   return (
     <PressScale onPress={onPress} style={styles.questCard}>
-      <Image resizeMode="contain" source={icon} style={styles.questIcon} />
+      <Image resizeMode="contain" source={visual.icon} style={styles.questIcon} />
       <View style={styles.questCopy}>
-        <Text style={[styles.questCategory, { color }]}>{category}</Text>
-        <Text style={styles.questTitle}>{title}</Text>
-        <Text style={styles.questDescription}>{description}</Text>
+        <Text style={[styles.questCategory, { color: visual.color }]}>{quest.categoryName}</Text>
+        <Text style={styles.questTitle}>{quest.title}</Text>
+        <Text style={styles.questDescription}>{quest.summary}</Text>
       </View>
       <View style={styles.questProgress}>
-        <View style={[styles.xpPill, { backgroundColor: color }]}><Text style={styles.xpText}>+20 XP</Text></View>
-        <Text style={[styles.stepText, { color }]}>2/4</Text>
+        <View style={[styles.xpPill, { backgroundColor: visual.color }]}><Text style={styles.xpText}>+{quest.rewardPoints} XP</Text></View>
+        <Text style={[styles.stepText, { color: visual.color }]}>연습</Text>
       </View>
     </PressScale>
   );
@@ -161,6 +176,7 @@ const styles = StyleSheet.create({
   filterText: { color: '#999999', fontFamily: fonts.semibold, fontSize: 14, lineHeight: 18 },
   filterTextSelected: { color: colors.white },
   questList: { gap: 10, marginTop: 14 },
+  questState: { color: '#777777', fontFamily: fonts.medium, paddingVertical: 20, textAlign: 'center' },
   questCard: { alignItems: 'center', backgroundColor: colors.white, borderRadius: 18, flexDirection: 'row', minHeight: 120, padding: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.06, shadowRadius: 12, elevation: 3 },
   questIcon: { height: 72, width: 72 },
   questCopy: { flex: 1, marginLeft: 10 },

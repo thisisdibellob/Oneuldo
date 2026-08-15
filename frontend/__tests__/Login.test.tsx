@@ -2,6 +2,14 @@ import { fireEvent, render, waitFor } from '@testing-library/react-native';
 
 import App from '../App';
 
+jest.mock('../src/api/auth', () => ({
+  login: jest.fn(async () => ({ accessToken: 'test-access-token' })),
+}));
+
+jest.mock('../src/api/quest', () => ({
+  getQuests: jest.fn(async () => []),
+}));
+
 jest.mock('expo-font', () => ({
   isLoaded: () => true,
   loadAsync: () => Promise.resolve(),
@@ -50,7 +58,7 @@ describe('로그인 화면', () => {
     await waitFor(() => expect(screen.getByText('로그인')).toBeTruthy());
     expect(screen.getByRole('button', { name: '로그인 첫 화면으로 돌아가기' })).toBeTruthy();
 
-    fireEvent.changeText(screen.getByLabelText('아이디'), 'LeeMian_Apartment20');
+    fireEvent.changeText(screen.getByLabelText('이메일'), 'child@example.com');
     fireEvent.changeText(screen.getByLabelText('비밀번호'), 'onuldo-password');
     expect(screen.getByLabelText('비밀번호').props.secureTextEntry).toBe(true);
 
@@ -58,6 +66,6 @@ describe('로그인 화면', () => {
     expect(screen.getByLabelText('비밀번호').props.secureTextEntry).toBe(false);
 
     fireEvent.press(screen.getByRole('button', { name: '시작하기' }));
-    expect(screen.getByText('오늘도 함께 해 볼까요?', { exact: false })).toBeTruthy();
+    await waitFor(() => expect(screen.getByText('오늘도 함께 해 볼까요?', { exact: false })).toBeTruthy());
   });
 });

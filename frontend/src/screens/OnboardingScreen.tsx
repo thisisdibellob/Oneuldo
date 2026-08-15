@@ -21,13 +21,14 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { images } from '../assets';
+import { login } from '../api/auth';
 import { PressScale } from '../components/PressScale';
 import { colors, fonts } from '../theme';
 
 type LoginStep = 'welcome' | 'credentials';
 type FocusedField = 'id' | 'password' | null;
 
-export function OnboardingScreen({ active = true, onEnter }: { active?: boolean; onEnter: () => void }) {
+export function OnboardingScreen({ active = true, onEnter }: { active?: boolean; onEnter: (accessToken?: string) => void }) {
   const { height } = useWindowDimensions();
   const [step, setStep] = useState<LoginStep>('welcome');
   const [gradientEnabled, setGradientEnabled] = useState(true);
@@ -149,7 +150,7 @@ export function OnboardingScreen({ active = true, onEnter }: { active?: boolean;
       <AnimatedBackground enabled={gradientEnabled} motionEnabled={active} />
       <Animated.View style={[styles.screenFrame, animatedScreen]}>
         {step === 'welcome' ? (
-          <WelcomeScreen compact={compact} onEnter={onEnter} onOpenCredentials={() => changeStep('credentials', 1)} />
+          <WelcomeScreen compact={compact} onEnter={() => onEnter()} onOpenCredentials={() => changeStep('credentials', 1)} />
         ) : (
           <CredentialsScreen compact={compact} onBack={() => changeStep('welcome', -1)} onEnter={onEnter} />
         )}
@@ -265,11 +266,31 @@ function WelcomeScreen({ compact, onEnter, onOpenCredentials }: { compact: boole
   );
 }
 
-function CredentialsScreen({ compact, onBack, onEnter }: { compact: boolean; onBack: () => void; onEnter: () => void }) {
+function CredentialsScreen({ compact, onBack, onEnter }: { compact: boolean; onBack: () => void; onEnter: (accessToken?: string) => void }) {
   const [id, setId] = useState('');
   const [password, setPassword] = useState('');
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [focused, setFocused] = useState<FocusedField>(null);
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleLogin = async () => {
+    if (!id.trim() || !password) {
+      setLoginError('이메일과 비밀번호를 입력해 주세요.');
+      return;
+    }
+
+    setSubmitting(true);
+    setLoginError(null);
+    try {
+      const response = await login(id.trim(), password);
+      onEnter(response.accessToken);
+    } catch (error) {
+      setLoginError(error instanceof Error ? error.message : '로그인하지 못했습니다.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.credentials}>
@@ -287,13 +308,13 @@ function CredentialsScreen({ compact, onBack, onEnter }: { compact: boolean; onB
         <GlassSurface radius={30} style={[styles.inputSurface, focused === 'id' && styles.inputSurfaceFocused]}>
           <Ionicons color={focused === 'id' ? colors.mint : '#929292'} name="person-outline" size={23} />
           <TextInput
-            accessibilityLabel="아이디"
+            accessibilityLabel="이메일"
             autoCapitalize="none"
             autoCorrect={false}
             onBlur={() => setFocused(null)}
             onChangeText={setId}
             onFocus={() => setFocused('id')}
-            placeholder="아이디"
+            placeholder="이메일"
             placeholderTextColor="#9A9A9A"
             returnKeyType="next"
             style={styles.input}
@@ -310,7 +331,7 @@ function CredentialsScreen({ compact, onBack, onEnter }: { compact: boolean; onB
             onBlur={() => setFocused(null)}
             onChangeText={setPassword}
             onFocus={() => setFocused('password')}
-            onSubmitEditing={onEnter}
+            onSubmitEditing={() => void handleLogin()}
             placeholder="비밀번호"
             placeholderTextColor="#9A9A9A"
             returnKeyType="done"
@@ -331,16 +352,18 @@ function CredentialsScreen({ compact, onBack, onEnter }: { compact: boolean; onB
         </GlassSurface>
       </View>
 
+      {loginError ? <Text style={styles.loginError}>{loginError}</Text> : null}
+
       <View style={[styles.credentialActions, compact && styles.credentialActionsCompact]}>
         <PressScale accessibilityRole="button" onPress={() => undefined}>
           <GlassSurface interactive muted radius={24} style={styles.secondaryActionSurface}>
             <Text style={styles.secondaryActionLabel}>회원가입</Text>
           </GlassSurface>
         </PressScale>
-        <PressScale accessibilityRole="button" onPress={onEnter} style={styles.primaryAction}>
+        <PressScale accessibilityRole="button" disabled={submitting} onPress={() => void handleLogin()} style={[styles.primaryAction, submitting && styles.loginSubmitting]}>
           <LinearGradient colors={['#00C795', '#00B983']} end={{ x: 1, y: 1 }} start={{ x: 0, y: 0 }} style={styles.primaryGradient}>
             <View pointerEvents="none" style={styles.primaryHighlight} />
-            <Text style={styles.primaryActionLabel}>시작하기</Text>
+            <Text style={styles.primaryActionLabel}>{submitting ? '로그인 중...' : '시작하기'}</Text>
           </LinearGradient>
         </PressScale>
       </View>
@@ -411,6 +434,8 @@ function SolidLoginButton({ backgroundColor, label, mark, onPress, textColor }: 
 
 const styles = StyleSheet.create({
   safe: { backgroundColor: colors.white, flex: 1 },
+  loginError: { color: '#C83D3D', fontFamily: fonts.medium, marginHorizontal: 28, marginTop: 10, textAlign: 'center' },
+  loginSubmitting: { opacity: 0.6 },
   backgroundBase: { backgroundColor: '#FFFFFF' },
   screenFrame: { alignSelf: 'center', flex: 1, maxWidth: 480, width: '100%' },
   gradientToggle: { height: 46, opacity: 0.01, position: 'absolute', right: 17, top: 18, width: 46, zIndex: 40 },

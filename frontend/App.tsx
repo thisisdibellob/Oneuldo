@@ -20,6 +20,7 @@ import { colors, fonts } from './src/theme';
 
 export default function App() {
   const [entered, setEntered] = useState(false);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
 
   // 퀘스트 정보 받아오기
   const [quests, setQuests] = useState<QuestSummary[]>([]);
@@ -61,9 +62,10 @@ export default function App() {
     AccessibilityInfo.isReduceMotionEnabled().then(setReduceMotion);
   }, []);
 
-  const enterApp = () => {
+  const enterApp = (token?: string) => {
     if (entering.current) return;
     entering.current = true;
+    setAccessToken(token ?? null);
     setEntered(true);
     if (reduceMotion) {
       entryProgress.setValue(1);
@@ -93,12 +95,13 @@ export default function App() {
       <StatusBar style="dark" />
       {entered ? (
         <AppShell
+          accessToken={accessToken}
           quests={quests}
           questsError={questsError}
           questsLoading={questsLoading}
         />
       ) : (
-        <OnboardingScreen onEnter={() => setEntered(true)} />
+        <OnboardingScreen onEnter={enterApp} />
       )}
     </SafeAreaProvider>
   );

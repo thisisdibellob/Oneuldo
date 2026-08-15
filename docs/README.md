@@ -35,6 +35,7 @@
 - [서비스 기획 요약](./product-plan.md)
 - [AI 활용 및 온디바이스 시스템 설계](./ai-system-design.md)
 - [AI 페이즈별 구현 계획](./ai-implementation-roadmap.md)
+- [Phase 1 구현 변경 요약](./phase1-implementation-summary.md)
 - [Qwen 온디바이스 모델 설치](./qwen-model-setup.md)
 - [Expo Development Build 가이드](./development-build.md)
 - [데이터베이스 실행 가이드](./database-setup.md)

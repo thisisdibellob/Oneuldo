@@ -17,20 +17,22 @@ import { HomeScreen } from './HomeScreen';
 import { ProfileScreen } from './ProfileScreen';
 import { QuestPracticeScreen } from './QuestPracticeScreen';
 import { QuestScreen } from './QuestScreen';
-import { getQuest, QuestSummary } from '../api/quest';
+import { getQuestDetail, QuestDetail, QuestSummary } from '../api/quest';
 
 type AppShellProps = {
+  accessToken: string | null;
   quests: QuestSummary[];
   questsLoading: boolean;
   questsError: string | null;
 };
 
 export function AppShell({
+  accessToken,
   quests,
   questsLoading,
   questsError,
 }: AppShellProps) {
-  const [selectedQuest, setSelectedQuest] = useState<QuestSummary | null>(null);
+  const [selectedQuest, setSelectedQuest] = useState<QuestDetail | null>(null);
 
   const [tab, setTab] = useState(0);
   const [practice, setPractice] = useState(false);
@@ -84,7 +86,7 @@ export function AppShell({
 
   const openQuest = async (uuid: string) => {
     try {
-      const quest = await getQuest(uuid);
+      const quest = await getQuestDetail(uuid);
       setSelectedQuest(quest);
       openPractice();
     } catch (error) {
@@ -127,7 +129,7 @@ export function AppShell({
     return (
       <SafeAreaView edges={['top', 'bottom']} style={styles.safe}>
         <Animated.View style={[styles.body, animatedStyle]}>
-          <QuestPracticeScreen onBack={closePractice} quest={selectedQuest} />
+          <QuestPracticeScreen accessToken={accessToken} onBack={closePractice} quest={selectedQuest} />
         </Animated.View>
       </SafeAreaView>
     );
@@ -151,7 +153,13 @@ export function AppShell({
       onQuest={openQuest}
       practices={quests}
     />,
-    <QuestScreen key="quest" onPractice={openPractice} />,
+    <QuestScreen
+      error={questsError}
+      key="quest"
+      loading={questsLoading}
+      onQuest={openQuest}
+      quests={quests}
+    />,
     <GameScreen key="game" onEnter={openGame} />,
     <AiScreen key="ai" />,
     <ProfileScreen key="profile" />,

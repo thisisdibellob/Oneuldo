@@ -137,6 +137,8 @@ cd backend
 
 ## 7. 앞으로 해야 할 작업
 
+> 2026-08-15 업데이트: 퀘스트 상세·단계·선택지와 수행 세션·이벤트 API 및 프론트 연동은 Phase 1에서 구현을 완료했다. 아래 항목은 초기 문서 작성 당시의 작업 목록이며 최신 AI 진행 상태는 `ai-implementation-roadmap.md`를 기준으로 한다.
+
 ### 백엔드 API
 
 - [ ] `QuestController` 작성

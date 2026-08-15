@@ -11,11 +11,16 @@ import org.springframework.transaction.annotation.Transactional;
 
 import oneuldo.quest.domain.Quest;
 import oneuldo.quest.domain.QuestCategory;
+import oneuldo.quest.domain.QuestChoice;
 import oneuldo.quest.domain.QuestDifficulty;
+import oneuldo.quest.domain.QuestStep;
 import oneuldo.quest.domain.QuestSubcategory;
+import oneuldo.quest.dto.QuestDetailResponse;
 import oneuldo.quest.dto.QuestSummaryResponse;
 import oneuldo.quest.repository.QuestCategoryRepository;
+import oneuldo.quest.repository.QuestChoiceRepository;
 import oneuldo.quest.repository.QuestRepository;
+import oneuldo.quest.repository.QuestStepRepository;
 import oneuldo.quest.repository.QuestSubcategoryRepository;
 
 // 실제 Spring 환경과 테스트용 H2 DB를 실행함
@@ -27,6 +32,8 @@ class QuestServiceTest {
     private final QuestCategoryRepository categoryRepository;
     private final QuestSubcategoryRepository subcategoryRepository;
     private final QuestRepository questRepository;
+    private final QuestStepRepository stepRepository;
+    private final QuestChoiceRepository choiceRepository;
     private final QuestService questService;
 
     // 테스트에 필요한 Repository와 Service를 주입함
@@ -35,11 +42,15 @@ class QuestServiceTest {
             QuestCategoryRepository categoryRepository,
             QuestSubcategoryRepository subcategoryRepository,
             QuestRepository questRepository,
+            QuestStepRepository stepRepository,
+            QuestChoiceRepository choiceRepository,
             QuestService questService
     ) {
         this.categoryRepository = categoryRepository;
         this.subcategoryRepository = subcategoryRepository;
         this.questRepository = questRepository;
+        this.stepRepository = stepRepository;
+        this.choiceRepository = choiceRepository;
         this.questService = questService;
     }
 
@@ -112,5 +123,48 @@ class QuestServiceTest {
         assertEquals("혼자 버스 타기", response.title());
         assertEquals("EASY", response.difficulty());
         assertEquals(20, response.rewardPoints());
+    }
+
+    @Test
+    void 퀘스트_상세는_단계와_선택지를_정해진_순서로_반환한다() {
+        QuestCategory category = categoryRepository.save(
+                new QuestCategory("LIFE", "생활", 1, true)
+        );
+        QuestSubcategory subcategory = subcategoryRepository.save(new QuestSubcategory(
+                category,
+                "PUBLIC_TRANSPORT",
+                "대중교통",
+                QuestDifficulty.VERY_EASY,
+                QuestDifficulty.VERY_HARD,
+                1,
+                true
+        ));
+        Quest quest = questRepository.save(new Quest(
+                subcategory,
+                "TAKE_BUS_ALONE",
+                "혼자 버스 타기",
+                "버스를 이용해요.",
+                "버스 번호를 확인한다.",
+                QuestDifficulty.EASY,
+                20,
+                true
+        ));
+
+        QuestStep second = stepRepository.save(new QuestStep(
+                quest, 2, "두 번째 단계", "두 번째 상황", null
+        ));
+        QuestStep first = stepRepository.save(new QuestStep(
+                quest, 1, "첫 번째 단계", "첫 번째 상황", "첫 번째 힌트"
+        ));
+        choiceRepository.save(new QuestChoice(first, 2, "두 번째 선택", false, "다시 확인해요."));
+        choiceRepository.save(new QuestChoice(first, 1, "첫 번째 선택", true, "좋아요!"));
+        choiceRepository.save(new QuestChoice(second, 1, "다음 단계 선택", true, "잘했어요!"));
+
+        QuestDetailResponse response = questService.findQuestDetail(quest.getId());
+
+        assertEquals(2, response.steps().size());
+        assertEquals(1, response.steps().getFirst().stepOrder());
+        assertEquals("첫 번째 선택", response.steps().getFirst().choices().getFirst().label());
+        assertEquals(2, response.steps().getFirst().choices().get(1).choiceOrder());
     }
 }

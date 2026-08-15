@@ -78,21 +78,21 @@ AI가 참고할 단계별 수행 데이터를 먼저 정확히 수집한다. 현
 
 ### 백엔드 작업
 
-- [ ] `quest_steps`, `quest_choices` 마이그레이션과 초기 데이터를 추가한다.
-- [ ] `quest_sessions`, `quest_events` 마이그레이션을 추가한다.
-- [ ] 각 테이블의 Entity, Repository, Service, DTO를 구현한다.
-- [ ] 퀘스트 상세 조회 API에 단계와 선택지를 포함한다.
-- [ ] 세션 시작·완료·중단 API를 구현한다.
-- [ ] 선택 이벤트 기록 API를 구현한다.
-- [ ] 정답 여부는 서버의 `quest_choices.correct`를 기준으로 계산한다.
-- [ ] 인증된 사용자가 자신의 세션만 기록·조회하도록 권한을 검사한다.
+- [x] `quest_steps`, `quest_choices` 마이그레이션과 초기 데이터를 추가한다.
+- [x] `quest_sessions`, `quest_events` 마이그레이션을 추가한다.
+- [x] 각 테이블의 Entity, Repository, Service, DTO를 구현한다.
+- [x] 퀘스트 상세 조회 API에 단계와 선택지를 포함한다.
+- [x] 세션 시작·완료·중단 API를 구현한다.
+- [x] 선택 이벤트 기록 API를 구현한다.
+- [x] 정답 여부는 서버의 `quest_choices.correct`를 기준으로 계산한다.
+- [x] 인증된 사용자가 자신의 세션만 기록·조회하도록 권한을 검사한다.
 
 ### 프론트엔드 작업
 
-- [ ] `frontend/src/api/quest.ts`를 퀘스트 상세·세션 API까지 확장한다.
-- [ ] `QuestPracticeScreen`의 하드코딩된 단계를 API 데이터로 교체한다.
-- [ ] 단계 시작 시간, 선택 시간, 시도 횟수와 힌트 사용 여부를 수집한다.
-- [ ] 네트워크 실패 시 현재 퀘스트가 중단되지 않도록 이벤트 임시 큐를 둔다.
+- [x] `frontend/src/api/quest.ts`를 퀘스트 상세·세션 API까지 확장한다.
+- [x] `QuestPracticeScreen`의 하드코딩된 단계를 API 데이터로 교체한다.
+- [x] 단계 시작 시간, 선택 시간, 시도 횟수와 힌트 사용 여부를 수집한다.
+- [x] 네트워크 실패 시 현재 퀘스트가 중단되지 않도록 이벤트 임시 큐를 둔다.
 
 ### 테스트
 

@@ -2,6 +2,7 @@ package oneuldo.global.security;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -33,9 +34,11 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .cors(Customizer.withDefaults())
                 .authorizeHttpRequests(auth -> auth
-                        // 임시
-                        .requestMatchers("/api/quest/**").permitAll()
-                        // 얘도 임시
+                        // 수행 기록은 로그인한 사용자만 접근한다.
+                        .requestMatchers("/api/quest/sessions/**").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/quest/*/sessions").authenticated()
+                        // 퀘스트 정의 데이터는 로그인 전에도 조회할 수 있다.
+                        .requestMatchers(HttpMethod.GET, "/api/quest/**").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
                         .anyRequest().authenticated()
                 )
