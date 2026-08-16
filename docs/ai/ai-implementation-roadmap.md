@@ -115,12 +115,14 @@ Expo Go가 아닌 오늘도 Development Build에서 MNN과 Qwen 모델을 호출
 
 ### 네이티브 작업
 
-- [ ] MNN Android 라이브러리와 필요한 C++ 의존성을 프로젝트에 연결한다.
-- [ ] Expo config plugin 또는 Expo Module 형태로 네이티브 모듈을 구성한다.
-- [ ] 모델 초기화, 생성, 취소, 해제 API를 Kotlin/Java 계층에 노출한다.
-- [ ] 추론은 UI 스레드 밖에서 실행한다.
-- [ ] 모델 중복 로딩과 동시에 여러 생성 요청이 실행되지 않도록 상태를 관리한다.
-- [ ] 앱 종료와 백그라운드 전환 시 메모리 해제 정책을 구현한다.
+- [x] MNN Android 라이브러리와 필요한 C++ 의존성을 프로젝트에 연결한다.
+- [x] Expo config plugin 또는 Expo Module 형태로 네이티브 모듈을 구성한다.
+- [x] 모델 초기화, 생성, 취소, 해제 API를 Kotlin/Java 계층에 노출한다.
+- [x] 추론은 UI 스레드 밖에서 실행한다.
+- [x] 모델 중복 로딩과 동시에 여러 생성 요청이 실행되지 않도록 상태를 관리한다.
+- [x] 앱 종료와 백그라운드 전환 시 메모리 해제 정책을 구현한다.
+
+> 구현과 MuMu Player `x86_64` 통합 검증은 2026-08-16 완료했다. 실제 `arm64-v8a` Android 기기의 실행·성능·메모리 검증은 기기 연결 후 마무리한다. 상세 내용은 [Phase 2 구현 변경 요약](./phase2-implementation-summary.md)에 기록한다.
 
 ### TypeScript 인터페이스
 

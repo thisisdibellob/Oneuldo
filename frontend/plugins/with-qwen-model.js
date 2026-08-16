@@ -1,4 +1,5 @@
 const { withDangerousMod } = require('expo/config-plugins');
+const { createHash } = require('node:crypto');
 const {
   copyFile,
   mkdir,
@@ -50,6 +51,11 @@ async function copyQwenModelAssets(projectRoot, platformProjectRoot) {
       );
     }
 
+    const digest = createHash('sha256').update(await readFile(sourcePath)).digest('hex');
+    if (digest !== file.sha256) {
+      throw new Error(`Qwen model file checksum mismatch: ${file.name}`);
+    }
+
     files.push({ sourcePath, destinationPath: path.join(destinationDirectory, file.name) });
   }
 
@@ -59,6 +65,7 @@ async function copyQwenModelAssets(projectRoot, platformProjectRoot) {
   for (const file of files) {
     await copyFile(file.sourcePath, file.destinationPath);
   }
+  await copyFile(manifestPath, path.join(destinationDirectory, 'model-manifest.json'));
 
   console.log(
     `[with-qwen-model] Copied ${files.length} files to ${destinationDirectory}`,

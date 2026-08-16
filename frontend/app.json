@@ -32,7 +32,8 @@
       "expo-font",
       "expo-dev-client",
       "expo-asset",
-      "./plugins/with-qwen-model"
+      "./plugins/with-qwen-model",
+      "./plugins/with-mnn-runtime"
     ]
   }
 }
