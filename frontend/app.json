@@ -32,8 +32,8 @@
       "expo-font",
       "expo-dev-client",
       "expo-asset",
-      "./plugins/with-qwen-model",
-      "./plugins/with-mnn-runtime"
+      "./plugins/with-bllossom-model",
+      "./plugins/with-llama-runtime"
     ]
   }
 }

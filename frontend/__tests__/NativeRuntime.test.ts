@@ -1,4 +1,4 @@
-jest.mock('oneuldo-mnn-runtime', () => ({
+jest.mock('oneuldo-llama-runtime', () => ({
   __esModule: true,
   default: null,
 }));
@@ -54,7 +54,7 @@ describe('native runtime adapter', () => {
       supported: true,
       platform: 'android' as const,
       state: 'uninitialized' as const,
-      runtimeVersion: '3.6.1',
+      runtimeVersion: 'llama.cpp-b10455',
       abi: 'x86_64',
       modelPath: null,
       initializationMs: null,
@@ -83,10 +83,10 @@ describe('native runtime adapter', () => {
     const expected = {
       supported: true as const,
       ready: true as const,
-      modelPath: '/data/user/0/com.oneuldo.app/no_backup/models/qwen3.5-0.8b-mnn',
-      revision: '3208b55b2e3c948016c9d380a697be881a1f12f8',
-      fileCount: 6,
-      totalBytes: 484349697,
+      modelPath: '/data/user/0/com.oneuldo.app/no_backup/models/bllossom-3b-q4-k-m/llama-3.2-Korean-Bllossom-3B-gguf-Q4_K_M.gguf',
+      revision: 'c07b7a0f2688d1212612b653a752a0dfe4e18bae',
+      fileCount: 1,
+      totalBytes: 2019377664,
       reused: false,
     };
     const nativeModule = createNativeModule();
@@ -111,9 +111,9 @@ describe('native runtime adapter', () => {
       supported: true,
       platform: 'android' as const,
       state: 'ready' as const,
-      runtimeVersion: '3.6.1',
+      runtimeVersion: 'llama.cpp-b10455',
       abi: 'x86_64',
-      modelPath: '/data/user/0/com.oneuldo.app/no_backup/models/qwen3.5-0.8b-mnn',
+      modelPath: '/data/user/0/com.oneuldo.app/no_backup/models/bllossom-3b-q4-k-m/llama-3.2-Korean-Bllossom-3B-gguf-Q4_K_M.gguf',
       initializationMs: 1820,
       alreadyInitialized: false,
       errorCode: null,

@@ -9,7 +9,7 @@ import type {
   NativeRuntimeStatus,
   ReleaseResult,
   RuntimeErrorCode,
-} from 'oneuldo-mnn-runtime';
+} from 'oneuldo-llama-runtime';
 
 export type {
   CancellationResult,

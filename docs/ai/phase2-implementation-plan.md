@@ -1,4 +1,6 @@
-# Phase 2 MNN 네이티브 런타임 구현 계획
+# Phase 2 MNN 네이티브 런타임 구현 계획 (이전 구현 기록)
+
+> 이 문서는 2026-08-16 당시 Qwen/MNN 구현 기록이다. 현재 런타임은 Bllossom GGUF/llama.cpp로 교체되었으며, 최신 구조는 [Bllossom 전환 설계](./bllossom-3b-on-device-migration-plan.md)를 따른다.
 
 ## 1. 문서 목적
 

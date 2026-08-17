@@ -1,12 +1,12 @@
 # Expo Development Build 가이드
 
-오늘도 앱은 MNN과 같은 네이티브 라이브러리를 사용할 수 있도록 Expo Go 대신 Development Build를 기본 모바일 개발 환경으로 사용한다.
+오늘도 앱은 llama.cpp 같은 네이티브 라이브러리를 사용할 수 있도록 Expo Go 대신 Development Build를 기본 모바일 개발 환경으로 사용한다.
 
 ## Expo Go와의 차이
 
 - `pnpm start`: 오늘도 전용 Development Client를 대상으로 Metro를 실행한다.
 - `pnpm start:go`: 네이티브 기능이 필요 없는 화면을 Expo Go에서 임시로 확인한다.
-- MNN 등 C++·Kotlin·Swift 코드가 필요한 기능은 Development Client에서만 동작한다.
+- llama.cpp 등 C++·Kotlin·Swift 코드가 필요한 기능은 Development Client에서만 동작한다.
 
 ## 최초 Android 개발 빌드
 
@@ -54,7 +54,7 @@ pnpm start
 
 다음 변경이 있으면 Development Client를 다시 빌드한다.
 
-- MNN과 같은 네이티브 라이브러리 추가 또는 업데이트
+- llama.cpp 같은 네이티브 라이브러리 추가 또는 업데이트
 - Kotlin·Java·Swift·Objective-C·C++ 코드 변경
 - Expo config plugin 추가 또는 변경
 - `app.json`의 네이티브 설정 변경

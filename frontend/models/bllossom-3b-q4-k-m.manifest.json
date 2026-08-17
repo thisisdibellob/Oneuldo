@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "modelId": "Bllossom/llama-3.2-Korean-Bllossom-3B-gguf-Q4_K_M",
+  "revision": "c07b7a0f2688d1212612b653a752a0dfe4e18bae",
+  "license": "llama3.2",
+  "format": "gguf",
+  "quantization": "Q4_K_M",
+  "runtime": "llama.cpp-b10455",
+  "targetDirectory": "models/bllossom-3b-q4-k-m",
+  "file": {
+    "name": "llama-3.2-Korean-Bllossom-3B-gguf-Q4_K_M.gguf",
+    "size": 2019377664,
+    "sha256": "389f380bbfbe77d9171937b3d166a26ccc3e04201f3d9fb0ca1b5e01b6787621",
+    "url": "https://huggingface.co/Bllossom/llama-3.2-Korean-Bllossom-3B-gguf-Q4_K_M/resolve/c07b7a0f2688d1212612b653a752a0dfe4e18bae/llama-3.2-Korean-Bllossom-3B-gguf-Q4_K_M.gguf?download=true"
+  }
+}

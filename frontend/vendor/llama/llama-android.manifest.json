@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "project": "ggml-org/llama.cpp",
+  "version": "b10455",
+  "commit": "37a215c9e909822fb8ebb72b5bd37623b0b9611f",
+  "source": "https://github.com/ggml-org/llama.cpp.git",
+  "abis": ["arm64-v8a", "x86_64"],
+  "library": "liboneuldo_llama_runtime.so",
+  "artifacts": {
+    "arm64-v8a": {
+      "size": 51819112,
+      "sha256": "05b2d9168ece0a954c9fb02cc21ab7cdc30a1f75a77ea50bfd20af7180e6f07e"
+    },
+    "x86_64": {
+      "size": 50734912,
+      "sha256": "c5eae76c8e38eae9b0bcd7b5a4222db9499743aad8627913ab2a1cab21973608"
+    }
+  }
+}

@@ -13,10 +13,7 @@
     "prebuild": "expo prebuild",
     "web": "expo start --web",
     "build:web": "expo export --platform web",
-    "model:qwen:download": "node scripts/download-qwen-model.mjs",
-    "model:qwen:verify": "node scripts/download-qwen-model.mjs --verify",
-    "mnn:android:build": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-mnn-android.ps1",
-    "eas-build-post-install": "node scripts/download-qwen-model.mjs",
+    "llama:android:build": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-llama-android.ps1",
     "typecheck": "tsc --noEmit",
     "test": "cross-env NODE_PATH=./node_modules jest --runInBand"
   },
@@ -34,7 +31,7 @@
     "expo-linear-gradient": "~15.0.8",
     "expo-status-bar": "~3.0.9",
     "expo-system-ui": "~6.0.9",
-    "oneuldo-mnn-runtime": "file:./modules/oneuldo-mnn-runtime",
+    "oneuldo-llama-runtime": "file:./modules/oneuldo-llama-runtime",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-native": "0.81.5",
@@ -57,7 +54,7 @@
   "jest": {
     "preset": "jest-expo",
     "moduleNameMapper": {
-      "^oneuldo-mnn-runtime$": "<rootDir>/modules/oneuldo-mnn-runtime/index.ts"
+      "^oneuldo-llama-runtime$": "<rootDir>/modules/oneuldo-llama-runtime/index.ts"
     },
     "testPathIgnorePatterns": [
       "/node_modules/",

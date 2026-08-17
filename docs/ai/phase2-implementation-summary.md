@@ -1,4 +1,6 @@
-# Phase 2 구현 변경 요약
+# Phase 2 구현 변경 요약 (이전 Qwen/MNN 구현 기록)
+
+> 아래 내용은 2026-08-16 검증한 이전 구현을 보존한 기록이다. 현재 앱은 Bllossom GGUF/llama.cpp 구조로 교체되었다. 최신 실행 방법은 [Bllossom 모델 가이드](../bllossom-model-setup.md)를 참고한다.
 
 ## 1. 문서 목적
 

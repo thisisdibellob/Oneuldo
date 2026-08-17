@@ -68,8 +68,9 @@ coverage/
 /frontend/android/
 /frontend/ios/
 
-# Local on-device LLM binaries (restored with pnpm model:qwen:download)
-/frontend/models/qwen3.5-0.8b-mnn/
+# Local on-device LLM binaries are never committed.
+/frontend/models/*.gguf
+/frontend/models/bllossom-3b-q4-k-m/
 
 !**/gradle/wrapper/gradle-wrapper.jar
 

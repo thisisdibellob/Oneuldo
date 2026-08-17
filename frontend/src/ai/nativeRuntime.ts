@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import OneuldoMnnRuntimeModule from 'oneuldo-mnn-runtime';
+import OneuldoLlamaRuntimeModule from 'oneuldo-llama-runtime';
 
 import type {
   CancellationResult,
@@ -17,6 +17,8 @@ const runtimeErrorCodes = new Set<RuntimeErrorCode>([
   'UNSUPPORTED',
   'MODEL_MISSING',
   'MODEL_CORRUPTED',
+  'NETWORK_UNAVAILABLE',
+  'MODEL_DOWNLOAD_FAILED',
   'INSUFFICIENT_STORAGE',
   'INITIALIZATION_FAILED',
   'NOT_INITIALIZED',
@@ -79,7 +81,7 @@ export async function queryNativeRuntimeStatus(
 }
 
 export function getNativeRuntimeStatus(): Promise<NativeRuntimeStatus> {
-  return queryNativeRuntimeStatus(OneuldoMnnRuntimeModule, Platform.OS);
+  return queryNativeRuntimeStatus(OneuldoLlamaRuntimeModule, Platform.OS);
 }
 
 const unsupportedModelPreparation = (): ModelPreparationResult => ({
@@ -104,7 +106,7 @@ export async function queryNativeModelPreparation(
 }
 
 export function prepareNativeModel(): Promise<ModelPreparationResult> {
-  return queryNativeModelPreparation(OneuldoMnnRuntimeModule, Platform.OS);
+  return queryNativeModelPreparation(OneuldoLlamaRuntimeModule, Platform.OS);
 }
 
 export async function queryNativeModelInitialization(
@@ -119,7 +121,7 @@ export async function queryNativeModelInitialization(
 }
 
 export function initializeNativeModel(): Promise<NativeRuntimeStatus> {
-  return queryNativeModelInitialization(OneuldoMnnRuntimeModule, Platform.OS);
+  return queryNativeModelInitialization(OneuldoLlamaRuntimeModule, Platform.OS);
 }
 
 export async function queryNativeTextGeneration(
@@ -154,7 +156,7 @@ export async function queryNativeTextGeneration(
 }
 
 export function generateNativeText(request: GenerateRequest): Promise<GenerateResult> {
-  return queryNativeTextGeneration(OneuldoMnnRuntimeModule, Platform.OS, request);
+  return queryNativeTextGeneration(OneuldoLlamaRuntimeModule, Platform.OS, request);
 }
 
 export async function queryNativeGenerationCancellation(
@@ -173,7 +175,7 @@ export async function queryNativeGenerationCancellation(
 }
 
 export function cancelNativeGeneration(requestId: string): Promise<CancellationResult> {
-  return queryNativeGenerationCancellation(OneuldoMnnRuntimeModule, Platform.OS, requestId);
+  return queryNativeGenerationCancellation(OneuldoLlamaRuntimeModule, Platform.OS, requestId);
 }
 
 export async function queryNativeModelRelease(
@@ -191,5 +193,5 @@ export async function queryNativeModelRelease(
 }
 
 export function releaseNativeModel(): Promise<ReleaseResult> {
-  return queryNativeModelRelease(OneuldoMnnRuntimeModule, Platform.OS);
+  return queryNativeModelRelease(OneuldoLlamaRuntimeModule, Platform.OS);
 }
