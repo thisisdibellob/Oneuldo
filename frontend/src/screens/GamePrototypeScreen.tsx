@@ -3,6 +3,7 @@ import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-au
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  AccessibilityInfo,
   Animated,
   Easing,
   GestureResponderEvent,
@@ -16,9 +17,11 @@ import {
 } from 'react-native';
 
 import { icons } from '../assets';
-import { GameHud } from '../components/game/GameHud';
+import { GameHud, type DailyQuestItem } from '../components/game/GameHud';
+import { MODULAR_CHARACTER_CANVAS, ModularCharacter } from '../components/game/ModularCharacter';
 import { PressScale } from '../components/PressScale';
-import { MarketCategoryId, marketCategories, marketProducts } from '../game/scenarios';
+import { marketGameArt, playerGameArt } from '../game/gameAssets';
+import { MarketCategoryId, marketCategories } from '../game/scenarios';
 import { colors, fonts } from '../theme';
 import {
   MarketInteractionRequest,
@@ -31,7 +34,10 @@ const VILLAGE_WORLD_HEIGHT = 900;
 const MARKET_WORLD_WIDTH = 900;
 const MARKET_WORLD_HEIGHT = 1000;
 const PLAYER_RADIUS = 22;
-const PLAYER_SIZE = 54;
+const PLAYER_ART_SCALE = 0.5;
+const PLAYER_ART_HEIGHT = MODULAR_CHARACTER_CANVAS.height * PLAYER_ART_SCALE;
+const PLAYER_ART_WIDTH = MODULAR_CHARACTER_CANVAS.width * PLAYER_ART_SCALE;
+const PLAYER_ART_PIVOT_Y = MODULAR_CHARACTER_CANVAS.pivotY * PLAYER_ART_SCALE;
 const MOVE_SPEED = 190;
 const RUN_SPEED_MULTIPLIER = 1.55;
 const BACKGROUND_MUSIC_VOLUME = 0.18;
@@ -80,16 +86,78 @@ const marketObstacles: Rect[] = [
   ...Object.values(MARKET_SHELVES),
 ];
 
-const quizAnswers = [
-  '초록불인지 확인해요',
-  '차가 오기 전에 빨리 건너요',
-  '친구가 먼저 가면 따라가요',
-];
+type DailyConversationChoice = 'fun' | 'tired';
+type DialogueStep =
+  | { kind: 'line'; text: string }
+  | {
+      kind: 'choice';
+      options: readonly { id: DailyConversationChoice; label: string }[];
+      text: string;
+    }
+  | { kind: 'response'; responses: Record<DailyConversationChoice, string> };
 
-const dialogueLines = [
-  '안녕하세요. 여기는 오늘도 마을이에요.',
-  '길을 건널 때 무엇을 먼저 확인하는지 같이 알아볼까요?',
-];
+const quizAnswers = ['초록불인지 확인해요', '차가 오기 전에 빨리 건너요'];
+
+const dialogueSteps = [
+  { kind: 'line', text: '어, 왔구나! 오늘도 만나서 반가워.' },
+  { kind: 'line', text: '나는 마을을 한 바퀴 걷고 있었어.' },
+  {
+    kind: 'choice',
+    options: [
+      { id: 'fun', label: '재미있는 일이 있었어' },
+      { id: 'tired', label: '조금 피곤한 하루였어' },
+    ],
+    text: '너는 오늘 하루 어땠어?',
+  },
+  {
+    kind: 'response',
+    responses: {
+      fun: '정말? 잘됐다! 무슨 일이었는지 다음에 꼭 들려줘.',
+      tired: '그랬구나. 오늘도 수고했어. 우리 천천히 걸어가자.',
+    },
+  },
+  { kind: 'line', text: '그럼 우리 같이 조금 걸을까?' },
+  { kind: 'line', text: '좋아! 저기 횡단보도까지 가 보자.' },
+  { kind: 'line', text: '가는 길에 안전하게 건너는 방법도 같이 떠올려 보자.' },
+] as const satisfies readonly DialogueStep[];
+
+function resolveDialogueText(
+  step: DialogueStep | undefined,
+  selectedChoice: DailyConversationChoice | null,
+) {
+  if (!step) return '';
+  if (step.kind !== 'response') return step.text;
+  return selectedChoice ? step.responses[selectedChoice] : '';
+}
+
+const DAILY_QUEST_DEFINITIONS = [
+  {
+    description: '안내원 민수와 대화를 시작해요.',
+    id: 'greet-minsu',
+    rewardXp: 5,
+    title: '민수에게 인사하기',
+  },
+  {
+    description: '횡단보도 안전 문제를 맞혀요.',
+    id: 'safety-quiz',
+    rewardXp: 10,
+    title: '안전 퀴즈 풀기',
+  },
+  {
+    description: '마트 입구로 가서 안으로 들어가요.',
+    id: 'visit-market',
+    rewardXp: 10,
+    title: '하늘마트 방문하기',
+  },
+  {
+    description: '목록에 있는 물건을 모두 준비해요.',
+    id: 'market-list',
+    rewardXp: 30,
+    title: '장보기 목록 완성하기',
+  },
+] as const satisfies readonly Omit<DailyQuestItem, 'completed'>[];
+
+type DailyQuestId = (typeof DAILY_QUEST_DEFINITIONS)[number]['id'];
 
 type Point = { x: number; y: number };
 type Rect = { height: number; width: number; x: number; y: number };
@@ -161,6 +229,113 @@ function IsoBuilding({
   );
 }
 
+function MarketProximityCloud({ visible }: { visible: boolean }) {
+  const [mounted, setMounted] = useState(visible);
+  const [reduceMotion, setReduceMotion] = useState(false);
+  const visibility = useRef(new Animated.Value(visible ? 1 : 0)).current;
+  const drift = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    let active = true;
+    AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
+      if (active) setReduceMotion(enabled);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let driftAnimation: Animated.CompositeAnimation | null = null;
+    visibility.stopAnimation();
+    drift.stopAnimation();
+
+    if (visible) {
+      setMounted(true);
+      if (reduceMotion) {
+        visibility.setValue(1);
+      } else {
+        Animated.spring(visibility, {
+          damping: 18,
+          mass: 0.72,
+          stiffness: 190,
+          toValue: 1,
+          useNativeDriver: true,
+        }).start();
+        drift.setValue(0);
+        driftAnimation = Animated.loop(
+          Animated.sequence([
+            Animated.timing(drift, {
+              duration: 1300,
+              easing: Easing.inOut(Easing.sin),
+              toValue: 1,
+              useNativeDriver: true,
+            }),
+            Animated.timing(drift, {
+              duration: 1300,
+              easing: Easing.inOut(Easing.sin),
+              toValue: 0,
+              useNativeDriver: true,
+            }),
+          ]),
+        );
+        driftAnimation.start();
+      }
+    } else {
+      drift.setValue(0);
+      Animated.timing(visibility, {
+        duration: reduceMotion ? 100 : 150,
+        easing: Easing.in(Easing.cubic),
+        toValue: 0,
+        useNativeDriver: true,
+      }).start(({ finished }) => {
+        if (finished) setMounted(false);
+      });
+    }
+
+    return () => {
+      driftAnimation?.stop();
+    };
+  }, [drift, reduceMotion, visibility, visible]);
+
+  if (!mounted) return null;
+
+  const revealY = visibility.interpolate({ inputRange: [0, 1], outputRange: [7, 0] });
+  const floatingY = drift.interpolate({ inputRange: [0, 1], outputRange: [0, -3] });
+
+  return (
+    <Animated.View
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      pointerEvents="none"
+      style={[
+        styles.marketCloudRoot,
+        {
+          opacity: visibility,
+          transform: [
+            { translateY: Animated.add(revealY, floatingY) },
+            {
+              scale: visibility.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1] }),
+            },
+          ],
+        },
+      ]}
+      testID="market-proximity-cloud"
+    >
+      <View style={[styles.marketCloudBubble, styles.marketCloudBubbleLeft]} />
+      <View style={[styles.marketCloudBubble, styles.marketCloudBubbleRight]} />
+      <View style={styles.marketCloudTail} />
+      <View style={styles.marketCloudBody}>
+        <View style={styles.marketCloudIcon}>
+          <Ionicons color="#4E6758" name="storefront" size={18} />
+        </View>
+        <Text style={styles.marketCloudText}>하늘마트</Text>
+        <Ionicons color="#567466" name="chevron-forward" size={17} />
+      </View>
+    </Animated.View>
+  );
+}
+
 function MarketWorldLayer({
   controlMode,
   nearbyStation,
@@ -174,23 +349,12 @@ function MarketWorldLayer({
 }) {
   return (
     <>
-      <View style={styles.marketFloor} />
-      <View style={styles.marketBackWall}>
-        <View style={styles.marketWallStripe} />
-        <View style={styles.marketLogo}>
-          <Ionicons color="#FFFFFF" name="basket" size={18} />
-          <Text style={styles.marketLogoText}>하늘마트</Text>
-        </View>
-      </View>
-      {[0, 1, 2, 3, 4, 5, 6].map((row) => (
-        <View key={`row-${row}`} style={[styles.marketFloorRow, { top: 150 + row * 120 }]} />
-      ))}
-      {[0, 1, 2, 3, 4, 5].map((column) => (
-        <View key={`column-${column}`} style={[styles.marketFloorColumn, { left: 70 + column * 150 }]} />
-      ))}
-      <View style={[styles.marketAisle, styles.marketAisleMain]} />
-      <View style={[styles.marketAisle, styles.marketAisleTop]} />
-      <View style={[styles.marketAisle, styles.marketAisleBottom]} />
+      <Image
+        accessibilityIgnoresInvertColors
+        resizeMode="stretch"
+        source={marketGameArt.base}
+        style={styles.marketArtBase}
+      />
 
       {tapTargetMarker && controlMode === 'touch' ? (
         <View
@@ -206,15 +370,28 @@ function MarketWorldLayer({
         disabled={controlMode !== 'touch'}
         onPress={(event) => onStationPress(event, 'checkout')}
         scaleTo={0.98}
-        style={[styles.marketCounter, nearbyStation === 'checkout' && styles.marketObjectActive]}
+        style={[
+          styles.marketCounter,
+          styles.marketCounterIllustrated,
+          nearbyStation === 'checkout' && styles.marketObjectActive,
+        ]}
       >
-        <View style={styles.marketRegister} />
-        <Text style={styles.marketCounterText}>계산대</Text>
+        <Image
+          accessibilityIgnoresInvertColors
+          resizeMode="contain"
+          source={marketGameArt.checkout}
+          style={styles.marketCounterArt}
+        />
+        {nearbyStation === 'checkout' ? (
+          <View pointerEvents="none" style={styles.marketCounterNameplate}>
+            <Ionicons color="#3F725B" name="card-outline" size={14} />
+            <Text style={styles.marketCounterText}>계산대</Text>
+          </View>
+        ) : null}
       </PressScale>
 
       {marketCategories.map((category) => {
         const shelf = MARKET_SHELVES[category.id];
-        const products = marketProducts.filter((product) => product.categoryId === category.id);
         return (
           <PressScale
             accessibilityLabel={controlMode === 'touch' ? `${category.label} 진열대로 이동` : `${category.label} 진열대`}
@@ -225,22 +402,23 @@ function MarketWorldLayer({
             scaleTo={0.98}
             style={[
               styles.marketShelf,
+              styles.marketShelfIllustrated,
               { height: shelf.height, left: shelf.x, top: shelf.y, width: shelf.width },
               nearbyStation === category.id && styles.marketObjectActive,
             ]}
           >
-            <View style={[styles.marketShelfLabel, { backgroundColor: category.color }]}>
-              <Ionicons color="#FFFFFF" name={category.icon as 'leaf' | 'fish' | 'fast-food' | 'water'} size={15} />
-              <Text style={styles.marketShelfLabelText}>{category.label}</Text>
-            </View>
-            <View style={styles.marketShelfProducts}>
-              {products.slice(0, 4).map((product) => (
-                <View key={product.id} style={[styles.marketProductBox, { backgroundColor: product.packageColor }]}>
-                  <View style={[styles.marketProductBand, { backgroundColor: product.color }]} />
-                </View>
-              ))}
-            </View>
-            <View style={styles.marketShelfBoard} />
+            <Image
+              accessibilityIgnoresInvertColors
+              resizeMode="contain"
+              source={marketGameArt.shelves[category.id]}
+              style={styles.marketShelfArt}
+            />
+            {nearbyStation === category.id ? (
+              <View pointerEvents="none" style={[styles.marketShelfLabel, { backgroundColor: category.color }]}>
+                <Ionicons color="#FFFFFF" name={category.icon as 'leaf' | 'fish' | 'fast-food' | 'water'} size={15} />
+                <Text style={styles.marketShelfLabelText}>{category.label}</Text>
+              </View>
+            ) : null}
           </PressScale>
         );
       })}
@@ -251,10 +429,18 @@ function MarketWorldLayer({
         disabled={controlMode !== 'touch'}
         onPress={(event) => onStationPress(event, 'exit')}
         scaleTo={0.98}
-        style={[styles.marketExit, nearbyStation === 'exit' && styles.marketObjectActive]}
+        style={[
+          styles.marketExit,
+          nearbyStation !== 'exit' && styles.marketExitInactive,
+          nearbyStation === 'exit' && styles.marketObjectActive,
+        ]}
       >
-        <Ionicons color="#627269" name="exit-outline" size={20} />
-        <Text style={styles.marketExitText}>마을로 나가기</Text>
+        {nearbyStation === 'exit' ? (
+          <>
+            <Ionicons color="#627269" name="exit-outline" size={20} />
+            <Text style={styles.marketExitText}>마을로 나가기</Text>
+          </>
+        ) : null}
       </PressScale>
     </>
   );
@@ -289,7 +475,10 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
   const camera = useRef(new Animated.ValueXY()).current;
   const joystickKnob = useRef(new Animated.ValueXY()).current;
   const dialoguePanelProgress = useRef(new Animated.Value(0)).current;
+  const dailyChoiceProgress = useRef(new Animated.Value(0)).current;
   const quizPanelProgress = useRef(new Animated.Value(0)).current;
+  const speakerTagFloat = useRef(new Animated.Value(0)).current;
+  const dialogueArrowFloat = useRef(new Animated.Value(0)).current;
   const resultCelebration = useRef(new Animated.Value(0)).current;
   const playerPoint = useRef<Point>({ ...INITIAL_PLAYER_POINT });
   const worldMapRef = useRef<WorldMapId>('village');
@@ -322,6 +511,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
     useState<MarketInteractionRequest | null>(null);
   const [worldMap, setWorldMap] = useState<WorldMapId>('village');
   const [audioModeReady, setAudioModeReady] = useState(false);
+  const [reduceMotionEnabled, setReduceMotionEnabled] = useState(false);
   const [controlMode, setControlMode] = useState<ControlMode>('joystick');
   const [hudMenuOpen, setHudMenuOpen] = useState(false);
   const [runEnabled, setRunEnabled] = useState(false);
@@ -332,12 +522,30 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
   const [renderedDialogueIndex, setRenderedDialogueIndex] = useState(0);
   const [dialoguePanelMounted, setDialoguePanelMounted] = useState(false);
   const [visibleDialogueCharacters, setVisibleDialogueCharacters] = useState(0);
+  const [selectedDailyChoice, setSelectedDailyChoice] =
+    useState<DailyConversationChoice | null>(null);
   const [quizStep, setQuizStep] = useState<QuizStep>(null);
   const [renderedQuizStep, setRenderedQuizStep] = useState<Exclude<QuizStep, null>>('question');
   const [quizPanelMounted, setQuizPanelMounted] = useState(false);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [showWrongFeedback, setShowWrongFeedback] = useState(false);
-  const currentDialogue = dialogueIndex === null ? '' : dialogueLines[dialogueIndex];
+  const [completedDailyQuestIds, setCompletedDailyQuestIds] = useState<DailyQuestId[]>([]);
+  const completeDailyQuest = useCallback((questId: DailyQuestId) => {
+    setCompletedDailyQuestIds((currentIds) =>
+      currentIds.includes(questId) ? currentIds : [...currentIds, questId],
+    );
+  }, []);
+  const dailyQuests: DailyQuestItem[] = DAILY_QUEST_DEFINITIONS.map((quest) => ({
+    ...quest,
+    completed: completedDailyQuestIds.includes(quest.id),
+  }));
+  const currentDialogueStep = dialogueIndex === null ? undefined : dialogueSteps[dialogueIndex];
+  const currentDialogue = resolveDialogueText(currentDialogueStep, selectedDailyChoice);
+  const renderedDialogueStep = dialogueSteps[renderedDialogueIndex];
+  const renderedDialogue = resolveDialogueText(renderedDialogueStep, selectedDailyChoice);
+  const dailyChoiceVisible =
+    currentDialogueStep?.kind === 'choice' &&
+    visibleDialogueCharacters >= currentDialogue.length;
   controlsLockedRef.current =
     dialoguePanelMounted ||
     quizPanelMounted ||
@@ -345,6 +553,21 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
     quizStep !== null ||
     hudMenuOpen ||
     marketScenarioLocked;
+
+  useEffect(() => {
+    let active = true;
+    AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
+      if (active) setReduceMotionEnabled(enabled);
+    });
+    const subscription = AccessibilityInfo.addEventListener(
+      'reduceMotionChanged',
+      setReduceMotionEnabled,
+    );
+    return () => {
+      active = false;
+      subscription.remove();
+    };
+  }, []);
 
   const updateCamera = useCallback(
     (point: Point) => {
@@ -394,9 +617,14 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
       setNpcNearby(nearby);
     }
 
-    const nearMarket =
-      Math.hypot(point.x - MARKET_ENTRANCE_POINT.x, point.y - MARKET_ENTRANCE_POINT.y) <=
-      MARKET_INTERACTION_DISTANCE;
+    const marketDistance = Math.hypot(
+      point.x - MARKET_ENTRANCE_POINT.x,
+      point.y - MARKET_ENTRANCE_POINT.y,
+    );
+    const marketProximityLimit = marketNearbyRef.current
+      ? MARKET_INTERACTION_DISTANCE * 1.18
+      : MARKET_INTERACTION_DISTANCE;
+    const nearMarket = marketDistance <= marketProximityLimit;
     if (nearMarket !== marketNearbyRef.current) {
       marketNearbyRef.current = nearMarket;
       setMarketNearby(nearMarket);
@@ -466,10 +694,11 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
     setMarketScenarioLocked(true);
     worldMapRef.current = 'market';
     setWorldMap('market');
+    completeDailyQuest('visit-market');
     playerPoint.current = { ...MARKET_PLAYER_POINT };
     updateCamera(playerPoint.current);
     updateNpcProximity(playerPoint.current);
-  }, [stopMovement, updateCamera, updateNpcProximity]);
+  }, [completeDailyQuest, stopMovement, updateCamera, updateNpcProximity]);
 
   const handleLeaveMarket = useCallback(() => {
     stopMovement();
@@ -643,6 +872,29 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
   }, [currentDialogue, dialogueIndex, visibleDialogueCharacters]);
 
   useEffect(() => {
+    dailyChoiceProgress.stopAnimation();
+    if (!dailyChoiceVisible) {
+      dailyChoiceProgress.setValue(0);
+      return undefined;
+    }
+
+    if (reduceMotionEnabled) {
+      dailyChoiceProgress.setValue(1);
+      return undefined;
+    }
+
+    dailyChoiceProgress.setValue(0);
+    const animation = Animated.timing(dailyChoiceProgress, {
+      duration: 200,
+      easing: Easing.out(Easing.cubic),
+      toValue: 1,
+      useNativeDriver: true,
+    });
+    animation.start();
+    return () => animation.stop();
+  }, [dailyChoiceProgress, dailyChoiceVisible, reduceMotionEnabled]);
+
+  useEffect(() => {
     let mounted = true;
     void setAudioModeAsync({
       allowsRecording: false,
@@ -751,13 +1003,17 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
       return;
     }
     resultCelebration.setValue(0);
+    if (reduceMotionEnabled) {
+      resultCelebration.setValue(1);
+      return;
+    }
     Animated.timing(resultCelebration, {
       duration: 520,
       easing: Easing.out(Easing.cubic),
       toValue: 1,
       useNativeDriver: true,
     }).start();
-  }, [quizStep, resultCelebration]);
+  }, [quizStep, reduceMotionEnabled, resultCelebration]);
 
   useEffect(() => {
     dialoguePanelProgress.stopAnimation();
@@ -765,6 +1021,10 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
       setRenderedDialogueIndex(dialogueIndex);
       setDialoguePanelMounted(true);
       dialoguePanelProgress.setValue(0);
+      if (reduceMotionEnabled) {
+        dialoguePanelProgress.setValue(1);
+        return;
+      }
       Animated.spring(dialoguePanelProgress, {
         damping: 16,
         mass: 0.72,
@@ -776,6 +1036,11 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
     }
 
     if (dialoguePanelMounted) {
+      if (reduceMotionEnabled) {
+        dialoguePanelProgress.setValue(0);
+        setDialoguePanelMounted(false);
+        return;
+      }
       Animated.timing(dialoguePanelProgress, {
         duration: 170,
         easing: Easing.in(Easing.cubic),
@@ -785,7 +1050,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
         if (finished) setDialoguePanelMounted(false);
       });
     }
-  }, [dialogueIndex, dialoguePanelProgress]);
+  }, [dialogueIndex, dialoguePanelProgress, reduceMotionEnabled]);
 
   useEffect(() => {
     quizPanelProgress.stopAnimation();
@@ -794,6 +1059,10 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
       if (!quizPanelMounted) {
         setQuizPanelMounted(true);
         quizPanelProgress.setValue(0);
+        if (reduceMotionEnabled) {
+          quizPanelProgress.setValue(1);
+          return;
+        }
         Animated.spring(quizPanelProgress, {
           damping: 18,
           mass: 0.78,
@@ -806,6 +1075,11 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
     }
 
     if (quizPanelMounted) {
+      if (reduceMotionEnabled) {
+        quizPanelProgress.setValue(0);
+        setQuizPanelMounted(false);
+        return;
+      }
       Animated.timing(quizPanelProgress, {
         duration: 190,
         easing: Easing.in(Easing.cubic),
@@ -815,7 +1089,79 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
         if (finished) setQuizPanelMounted(false);
       });
     }
-  }, [quizPanelProgress, quizStep]);
+  }, [quizPanelProgress, quizStep, reduceMotionEnabled]);
+
+  useEffect(() => {
+    speakerTagFloat.stopAnimation();
+    speakerTagFloat.setValue(0);
+
+    if (reduceMotionEnabled || (!dialoguePanelMounted && !quizPanelMounted)) {
+      return undefined;
+    }
+
+    const floatingAnimation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(speakerTagFloat, {
+          duration: 550,
+          easing: Easing.inOut(Easing.sin),
+          toValue: -2.25,
+          useNativeDriver: true,
+        }),
+        Animated.timing(speakerTagFloat, {
+          duration: 1100,
+          easing: Easing.inOut(Easing.sin),
+          toValue: 2.25,
+          useNativeDriver: true,
+        }),
+        Animated.timing(speakerTagFloat, {
+          duration: 550,
+          easing: Easing.inOut(Easing.sin),
+          toValue: 0,
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+
+    floatingAnimation.start();
+    return () => {
+      floatingAnimation.stop();
+      speakerTagFloat.stopAnimation();
+      speakerTagFloat.setValue(0);
+    };
+  }, [dialoguePanelMounted, quizPanelMounted, reduceMotionEnabled, speakerTagFloat]);
+
+  useEffect(() => {
+    dialogueArrowFloat.stopAnimation();
+    dialogueArrowFloat.setValue(0);
+
+    if (reduceMotionEnabled || (!dialoguePanelMounted && !quizPanelMounted)) {
+      return undefined;
+    }
+
+    const arrowAnimation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(dialogueArrowFloat, {
+          duration: 800,
+          easing: Easing.inOut(Easing.sin),
+          toValue: 1.75,
+          useNativeDriver: true,
+        }),
+        Animated.timing(dialogueArrowFloat, {
+          duration: 800,
+          easing: Easing.inOut(Easing.sin),
+          toValue: 0,
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+
+    arrowAnimation.start();
+    return () => {
+      arrowAnimation.stop();
+      dialogueArrowFloat.stopAnimation();
+      dialogueArrowFloat.setValue(0);
+    };
+  }, [dialogueArrowFloat, dialoguePanelMounted, quizPanelMounted, reduceMotionEnabled]);
 
   const handleViewportLayout = (event: LayoutChangeEvent) => {
     viewport.current = event.nativeEvent.layout;
@@ -851,11 +1197,13 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
 
   const beginDialogue = () => {
     if (!nearbyRef.current) return;
+    completeDailyQuest('greet-minsu');
     stopMovement();
     speedMultiplier.current = 1;
     setRunEnabled(false);
     dialogueReadyAt.current = Number.POSITIVE_INFINITY;
     setVisibleDialogueCharacters(0);
+    setSelectedDailyChoice(null);
     setDialogueIndex(0);
   };
   startDialogueRef.current = beginDialogue;
@@ -1041,8 +1389,10 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
       return;
     }
 
+    if (currentDialogueStep?.kind === 'choice') return;
+
     if (Date.now() < dialogueReadyAt.current) return;
-    if (dialogueIndex < dialogueLines.length - 1) {
+    if (dialogueIndex < dialogueSteps.length - 1) {
       dialogueReadyAt.current = Number.POSITIVE_INFINITY;
       setVisibleDialogueCharacters(0);
       setDialogueIndex((index) => (index === null ? 0 : index + 1));
@@ -1051,16 +1401,27 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
     openQuiz();
   };
 
+  const handleDailyChoicePress = (choice: DailyConversationChoice) => {
+    if (!dailyChoiceVisible || currentDialogueStep?.kind !== 'choice' || dialogueIndex === null) {
+      return;
+    }
+    setSelectedDailyChoice(choice);
+    dialogueReadyAt.current = Number.POSITIVE_INFINITY;
+    setVisibleDialogueCharacters(0);
+    setDialogueIndex(dialogueIndex + 1);
+  };
+
   const closeQuiz = () => {
     setQuizStep(null);
     setSelectedAnswer(null);
     setShowWrongFeedback(false);
   };
 
-  const checkAnswer = () => {
-    if (selectedAnswer === null) return;
-    if (selectedAnswer === 0) {
+  const handleQuizAnswerPress = (index: number) => {
+    setSelectedAnswer(index);
+    if (index === 0) {
       setShowWrongFeedback(false);
+      completeDailyQuest('safety-quiz');
       setQuizStep('result');
       return;
     }
@@ -1120,6 +1481,11 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
             ? '대화'
             : '행동';
 
+  const joystickControlsVisible =
+    controlMode === 'joystick' &&
+    !dialoguePanelMounted &&
+    !quizPanelMounted &&
+    !marketScenarioLocked;
   return (
     <Pressable
       accessibilityActions={[
@@ -1172,30 +1538,19 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
         <IsoBuilding color="#9AAE98" height={190} label="하늘마트" width={230} x={660} y={122} />
 
         <PressScale
-          accessibilityHint={
-            controlMode === 'touch' ? '누르면 마트 입구까지 이동한 뒤 장보기를 시작합니다' : undefined
-          }
+          accessibilityElementsHidden={!marketNearby}
+          accessibilityHint={marketNearby && controlMode === 'touch' ? '누르면 하늘마트에 들어갑니다' : undefined}
           accessibilityLabel={
             controlMode === 'touch' ? '하늘마트로 이동해 들어가기' : '하늘마트 입구'
           }
-          accessibilityRole={controlMode === 'touch' ? 'button' : undefined}
-          disabled={controlMode !== 'touch' || controlsLockedRef.current}
+          accessibilityRole={marketNearby && controlMode === 'touch' ? 'button' : undefined}
+          disabled={controlMode !== 'touch' || !marketNearby || controlsLockedRef.current}
+          importantForAccessibility={marketNearby ? 'auto' : 'no-hide-descendants'}
           onPress={handleMarketPress}
-          scaleTo={0.95}
-          style={[styles.marketEntrance, marketNearby && styles.marketEntranceActive]}
+          scaleTo={0.96}
+          style={styles.marketEntrance}
         >
-          <View style={styles.marketEntranceIcon}>
-            <Ionicons color={marketNearby ? colors.white : '#4E6758'} name="storefront" size={16} />
-          </View>
-          <View>
-            <Text style={[styles.marketEntranceTitle, marketNearby && styles.marketEntranceTextActive]}>
-              하늘마트
-            </Text>
-            <Text style={[styles.marketEntranceHint, marketNearby && styles.marketEntranceTextActive]}>
-              {marketNearby ? '들어가기' : '입구'}
-            </Text>
-          </View>
-          {marketNearby ? <Ionicons color={colors.white} name="chevron-forward" size={16} /> : null}
+          <MarketProximityCloud visible={marketNearby} />
         </PressScale>
 
         <View style={[styles.obstacleBlock, styles.centerPlanter]}>
@@ -1238,50 +1593,14 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
       </Animated.View>
 
       <View accessibilityLabel="내 캐릭터" pointerEvents="none" style={styles.player}>
-        <View style={styles.characterShadow} />
-        <View style={styles.playerBody}>
-          <View style={styles.playerHead} />
-          <View style={styles.playerMarker}>
-            <Image accessibilityIgnoresInvertColors resizeMode="contain" source={icons.user} style={styles.playerImage} />
-          </View>
-        </View>
+        <ModularCharacter
+          layers={[{ id: 'approved-full-body', slot: 'bodySkin', source: playerGameArt.blueBobFrontIdle }]}
+          scale={PLAYER_ART_SCALE}
+        />
       </View>
 
-      <View
-        pointerEvents="none"
-        style={[
-          styles.destinationGuide,
-          (worldMap === 'market' ? marketStationNearby !== null : marketNearby) &&
-            styles.destinationGuideArrived,
-          marketScenarioLocked && styles.destinationGuideHidden,
-        ]}
-      >
-        <View style={styles.destinationGuideIcon}>
-          <Ionicons
-            color={colors.white}
-            name={(worldMap === 'market' ? marketStationNearby !== null : marketNearby) ? 'checkmark' : 'navigate'}
-            size={15}
-          />
-        </View>
-        <View>
-          <Text style={styles.destinationGuideEyebrow}>현재 목표</Text>
-          <Text style={styles.destinationGuideText}>
-            {worldMap === 'market'
-              ? marketStationNearby === 'checkout'
-                ? '계산대에 도착했어요'
-                : marketStationNearby === 'exit'
-                  ? '마트 출구에 도착했어요'
-                  : marketStationCategory
-                    ? `${marketStationCategory.label} 진열대에 도착했어요`
-                    : '진열대를 돌아보며 목록을 채우세요'
-              : marketNearby
-                ? '하늘마트 입구에 도착했어요'
-                : '하늘마트 입구로 이동하세요'}
-          </Text>
-        </View>
-      </View>
 
-      {controlMode === 'joystick' ? (
+      {joystickControlsVisible ? (
       <View
         accessibilityActions={[
           { label: '위로 이동', name: 'moveUp' },
@@ -1294,7 +1613,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
         accessibilityState={{ disabled: dialoguePanelMounted || quizPanelMounted }}
         onLayout={handleJoystickZoneLayout}
         onAccessibilityAction={(event) => handleAccessibilityMove(event.nativeEvent.actionName)}
-        style={styles.joystickZone}
+        style={[styles.joystickZone, worldMap === 'market' && styles.marketJoystickZone]}
         {...joystickResponder.panHandlers}
       >
         <Animated.View
@@ -1317,8 +1636,8 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
       </View>
       ) : null}
 
-      {controlMode === 'joystick' ? (
-      <View style={styles.actionCluster}>
+      {joystickControlsVisible ? (
+      <View style={[styles.actionCluster, worldMap === 'market' && styles.marketActionCluster]}>
         <PressScale
           accessibilityLabel={interactionLabel}
           accessibilityRole="button"
@@ -1362,6 +1681,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
 
       <GameHud
         controlMode={controlMode}
+        dailyQuests={dailyQuests}
         onControlModeChange={selectControlMode}
         onEmergencyExit={handleEmergencyExit}
         onExit={handleExit}
@@ -1374,53 +1694,115 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
           interactionRequest={marketInteractionRequest}
           onExit={handleLeaveMarket}
           onLockChange={setMarketScenarioLocked}
+          onMissionComplete={() => completeDailyQuest('market-list')}
         />
       ) : null}
 
       {dialoguePanelMounted ? (
-        <Animated.View
-          pointerEvents={dialogueIndex !== null ? 'auto' : 'none'}
-          style={[
-            styles.dialogueBox,
-            {
-              opacity: dialoguePanelProgress,
-              transform: [
-                {
-                  translateY: dialoguePanelProgress.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [20, 0],
-                  }),
-                },
-                {
-                  scale: dialoguePanelProgress.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [0.98, 1],
-                  }),
-                },
-              ],
-            },
-          ]}
-        >
-          <Pressable
-            accessibilityLabel={controlMode === 'touch' ? '대화 계속하기' : '대화 내용'}
-            accessibilityLiveRegion="polite"
-            accessibilityRole={controlMode === 'touch' ? 'button' : undefined}
-            onPress={(event) => {
-              event?.stopPropagation?.();
-              handleInteraction();
-            }}
-            style={styles.dialoguePressArea}
+        <>
+          <Animated.View
+            pointerEvents="none"
+            style={[styles.dialogueDim, { opacity: dialoguePanelProgress }]}
+          />
+          <Animated.View
+            pointerEvents={dialogueIndex !== null ? 'auto' : 'none'}
+            style={[
+              styles.dialogueBox,
+              currentDialogueStep?.kind === 'choice' && styles.dialogueChoiceBox,
+              {
+                opacity: dialoguePanelProgress,
+                transform: [
+                  {
+                    translateY: dialoguePanelProgress.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [18, 0],
+                    }),
+                  },
+                  {
+                    scale: dialoguePanelProgress.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.985, 1],
+                    }),
+                  },
+                ],
+              },
+            ]}
           >
-            <Text style={styles.dialogueSpeaker}>민수</Text>
-            <Text style={styles.dialogueText}>
-              {dialogueLines[renderedDialogueIndex].slice(0, visibleDialogueCharacters)}
-            </Text>
-            <View style={styles.dialogueProgress}>
-              <View style={[styles.dialogueDot, styles.dialogueDotActive]} />
-              <View style={[styles.dialogueDot, renderedDialogueIndex > 0 && styles.dialogueDotActive]} />
-            </View>
-          </Pressable>
-        </Animated.View>
+            <Pressable
+              accessibilityLabel={dailyChoiceVisible ? '일상 선택지를 선택해 주세요' : '대화 계속하기'}
+              accessibilityLiveRegion="polite"
+              accessibilityRole="button"
+              accessibilityState={{ disabled: dailyChoiceVisible }}
+              disabled={dailyChoiceVisible}
+              onPress={(event) => {
+                event?.stopPropagation?.();
+                handleInteraction();
+              }}
+              style={styles.dialoguePressArea}
+            >
+              <Animated.View
+                pointerEvents="none"
+                style={[
+                  styles.dialogueSpeakerTag,
+                  {
+                    transform: [{ rotate: '-4deg' }, { translateY: speakerTagFloat }],
+                  },
+                ]}
+              >
+                <Text style={styles.dialogueSpeaker}>민수</Text>
+              </Animated.View>
+              <Text style={styles.dialogueText}>
+                {renderedDialogue.slice(0, visibleDialogueCharacters)}
+              </Text>
+              {!dailyChoiceVisible ? (
+                <Animated.View
+                  pointerEvents="none"
+                  style={[
+                    styles.dialogueAdvanceIndicator,
+                    { transform: [{ translateY: dialogueArrowFloat }] },
+                  ]}
+                />
+              ) : null}
+            </Pressable>
+          </Animated.View>
+          {dailyChoiceVisible && currentDialogueStep?.kind === 'choice' ? (
+            <Animated.View
+              accessibilityLabel="오늘 하루 선택지"
+              accessibilityRole="radiogroup"
+              style={[
+                styles.dialogueChoices,
+                {
+                  opacity: dailyChoiceProgress,
+                  transform: [
+                    {
+                      translateY: dailyChoiceProgress.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [10, 0],
+                      }),
+                    },
+                  ],
+                },
+              ]}
+            >
+              {currentDialogueStep.options.map((option) => (
+                <PressScale
+                  accessibilityRole="radio"
+                  accessibilityState={{ checked: selectedDailyChoice === option.id }}
+                  key={option.id}
+                  onPress={(event) => {
+                    event?.stopPropagation?.();
+                    handleDailyChoicePress(option.id);
+                  }}
+                  style={styles.quizAnswer}
+                >
+                  <Text numberOfLines={1} style={styles.quizAnswerText}>
+                    {option.label}
+                  </Text>
+                </PressScale>
+              ))}
+            </Animated.View>
+          ) : null}
+        </>
       ) : null}
 
       {quizPanelMounted ? (
@@ -1429,13 +1811,14 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
           <Animated.View
             style={[
               styles.quizSheet,
+              renderedQuizStep === 'question' ? styles.quizChoiceStage : styles.quizResultSheet,
               {
                 opacity: quizPanelProgress,
                 transform: [
                   {
                     translateY: quizPanelProgress.interpolate({
                       inputRange: [0, 1],
-                      outputRange: [54, 0],
+                      outputRange: renderedQuizStep === 'question' ? [127, 0] : [54, 0],
                     }),
                   },
                   {
@@ -1450,23 +1833,55 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
           >
             {renderedQuizStep === 'question' ? (
               <>
-                <View style={styles.quizHeader}>
-                  <View style={styles.quizNpcAvatar}>
-                    <View style={styles.npcHead} />
-                  </View>
-                  <View style={styles.quizHeaderCopy}>
-                    <Text style={styles.quizNpcName}>안내원 민수</Text>
-                    <Text style={styles.quizIntro}>안전 퀴즈를 풀어볼까요?</Text>
-                  </View>
-                  <PressScale accessibilityLabel="퀴즈 닫기" hitSlop={10} onPress={closeQuiz}>
-                    <Ionicons color="#777777" name="close" size={26} />
-                  </PressScale>
+                <View style={styles.quizDialogueCard}>
+                  <Animated.View
+                    pointerEvents="none"
+                    style={[
+                      styles.dialogueSpeakerTag,
+                      {
+                        transform: [{ rotate: '-4deg' }, { translateY: speakerTagFloat }],
+                      },
+                    ]}
+                  >
+                    <Text style={styles.dialogueSpeaker}>민수</Text>
+                  </Animated.View>
+                  <Text style={styles.quizQuestion}>
+                    {showWrongFeedback
+                      ? <>괜찮아요.{'\n'}신호등을 먼저 살펴봐요.</>
+                      : <>횡단보도를 건너기 전에{'\n'}무엇을 먼저 확인할까요?</>}
+                  </Text>
+                  <Animated.View
+                    pointerEvents="none"
+                    style={[
+                      styles.dialogueAdvanceIndicator,
+                      { transform: [{ translateY: dialogueArrowFloat }] },
+                    ]}
+                  />
                 </View>
 
-                <Text style={styles.quizQuestion}>
-                  횡단보도를 건너기 전에{'\n'}무엇을 먼저 확인할까요?
-                </Text>
-                <View style={styles.quizAnswers}>
+                <Animated.View
+                  accessibilityLabel="횡단보도 안전 퀴즈 선택지"
+                  accessibilityRole="radiogroup"
+                  style={[
+                    styles.quizAnswers,
+                    {
+                      opacity: quizPanelProgress.interpolate({
+                        extrapolate: 'clamp',
+                        inputRange: [0, 0.46, 1],
+                        outputRange: [0, 0, 1],
+                      }),
+                      transform: [
+                        {
+                          translateY: quizPanelProgress.interpolate({
+                            extrapolate: 'clamp',
+                            inputRange: [0, 1],
+                            outputRange: [12, 0],
+                          }),
+                        },
+                      ],
+                    },
+                  ]}
+                >
                   {quizAnswers.map((answer, index) => {
                     const selected = selectedAnswer === index;
                     const wrong = showWrongFeedback && selected;
@@ -1475,37 +1890,26 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
                         accessibilityRole="radio"
                         accessibilityState={{ checked: selected }}
                         key={answer}
-                        onPress={() => {
-                          setSelectedAnswer(index);
-                          setShowWrongFeedback(false);
-                        }}
+                        onPress={() => handleQuizAnswerPress(index)}
                         style={[
                           styles.quizAnswer,
                           selected && styles.quizAnswerSelected,
                           wrong && styles.quizAnswerWrong,
                         ]}
                       >
-                        <Text style={styles.quizAnswerText}>{answer}</Text>
+                        <Text
+                          adjustsFontSizeToFit
+                          minimumFontScale={0.76}
+                          numberOfLines={1}
+                          style={styles.quizAnswerText}
+                        >
+                          {answer}
+                        </Text>
                       </PressScale>
                     );
                   })}
-                </View>
+                </Animated.View>
 
-                {showWrongFeedback ? (
-                  <View style={styles.wrongFeedback}>
-                    <Ionicons color="#E97842" name="refresh" size={18} />
-                    <Text style={styles.wrongFeedbackText}>괜찮아요. 신호등을 먼저 살펴봐요.</Text>
-                  </View>
-                ) : null}
-
-                <PressScale
-                  accessibilityRole="button"
-                  disabled={selectedAnswer === null}
-                  onPress={checkAnswer}
-                  style={[styles.quizButton, selectedAnswer === null && styles.disabled]}
-                >
-                  <Text style={styles.quizButtonText}>정답 확인</Text>
-                </PressScale>
               </>
             ) : (
               <View style={styles.result}>
@@ -1604,68 +2008,50 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 0,
   },
-  marketFloor: {
+  marketArtBase: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#DED6C8',
-    borderColor: '#B8AB98',
-    borderWidth: 12,
-  },
-  marketBackWall: {
-    backgroundColor: '#F3E6D6',
-    borderBottomColor: '#CFBBA6',
-    borderBottomWidth: 4,
-    height: 120,
-    left: 0,
-    position: 'absolute',
-    top: 0,
+    height: MARKET_WORLD_HEIGHT,
     width: MARKET_WORLD_WIDTH,
   },
-  marketWallStripe: {
-    backgroundColor: '#D4775B',
-    bottom: 11,
-    height: 7,
-    left: 0,
-    opacity: 0.8,
-    position: 'absolute',
-    right: 0,
+  marketCounterIllustrated: {
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+    overflow: 'visible',
+    padding: 0,
   },
-  marketLogo: {
+  marketCounterArt: {
+    height: 168,
+    left: -6,
+    position: 'absolute',
+    top: -58,
+    width: 252,
+  },
+  marketCounterNameplate: {
     alignItems: 'center',
-    alignSelf: 'center',
-    backgroundColor: '#C95D46',
-    borderRadius: 9,
+    backgroundColor: 'rgba(255,253,248,0.94)',
+    borderColor: 'rgba(63,114,91,0.24)',
+    borderRadius: 12,
+    borderWidth: 1,
+    bottom: 6,
     flexDirection: 'row',
-    gap: 7,
-    marginTop: 30,
-    paddingHorizontal: 15,
-    paddingVertical: 9,
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    position: 'absolute',
   },
-  marketLogoText: { color: '#FFFFFF', fontFamily: fonts.bold, fontSize: 13 },
-  marketFloorRow: {
-    backgroundColor: 'rgba(255,255,255,0.45)',
-    height: 1,
+  marketShelfIllustrated: {
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+    overflow: 'visible',
+    padding: 0,
+  },
+  marketShelfArt: {
+    bottom: -6,
+    height: 148,
     left: 0,
     position: 'absolute',
-    right: 0,
+    width: 220,
   },
-  marketFloorColumn: {
-    backgroundColor: 'rgba(255,255,255,0.38)',
-    bottom: 0,
-    position: 'absolute',
-    top: 0,
-    transform: [{ rotate: '8deg' }],
-    width: 1,
-  },
-  marketAisle: {
-    backgroundColor: 'rgba(250,244,230,0.54)',
-    borderColor: 'rgba(145,125,99,0.16)',
-    borderRadius: 26,
-    borderWidth: 2,
-    position: 'absolute',
-  },
-  marketAisleMain: { height: 720, left: 365, top: 205, width: 170 },
-  marketAisleTop: { height: 100, left: 245, top: 350, width: 410 },
-  marketAisleBottom: { height: 100, left: 245, top: 630, width: 410 },
   marketCounter: {
     alignItems: 'center',
     backgroundColor: '#A97C59',
@@ -1679,15 +2065,6 @@ const styles = StyleSheet.create({
     top: 92,
     width: 250,
     zIndex: 5,
-  },
-  marketRegister: {
-    backgroundColor: '#52605C',
-    borderColor: '#36403D',
-    borderRadius: 4,
-    borderWidth: 2,
-    height: 25,
-    marginBottom: 9,
-    width: 42,
   },
   marketCounterText: { color: '#FFF4DE', fontFamily: fonts.bold, fontSize: 15 },
   marketShelf: {
@@ -1717,21 +2094,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 5,
     position: 'absolute',
-    top: -11,
+    top: 13,
     zIndex: 3,
   },
   marketShelfLabelText: { color: '#FFFFFF', fontFamily: fonts.semibold, fontSize: 10 },
-  marketShelfProducts: { flexDirection: 'row', gap: 7, justifyContent: 'center', marginTop: 9 },
-  marketProductBox: {
-    borderColor: 'rgba(66,48,35,0.2)',
-    borderRadius: 4,
-    borderWidth: 1,
-    height: 45,
-    overflow: 'hidden',
-    width: 38,
-  },
-  marketProductBand: { height: 9, marginTop: 8, width: '100%' },
-  marketShelfBoard: { backgroundColor: '#735038', height: 8, marginHorizontal: -4, marginTop: 8 },
   marketExit: {
     alignItems: 'center',
     backgroundColor: 'rgba(255,255,255,0.76)',
@@ -1748,6 +2114,7 @@ const styles = StyleSheet.create({
     top: 900,
     width: 150,
   },
+  marketExitInactive: { backgroundColor: 'transparent', borderColor: 'transparent' },
   marketExitText: { color: '#647168', fontFamily: fonts.bold, fontSize: 13 },
   ground: {
     ...StyleSheet.absoluteFillObject,
@@ -1835,49 +2202,77 @@ const styles = StyleSheet.create({
   },
   marketEntrance: {
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.92)',
-    borderColor: 'rgba(69,92,77,0.24)',
-    borderRadius: 16,
-    borderWidth: 1.5,
-    flexDirection: 'row',
-    gap: 8,
-    height: 54,
+    height: 76,
     justifyContent: 'center',
-    left: MARKET_ENTRANCE_POINT.x - 62,
-    paddingHorizontal: 12,
+    left: MARKET_ENTRANCE_POINT.x - 80,
     position: 'absolute',
-    top: MARKET_ENTRANCE_POINT.y - 28,
-    width: 124,
+    top: MARKET_ENTRANCE_POINT.y - 92,
+    width: 160,
     zIndex: 7,
   },
-  marketEntranceActive: {
-    backgroundColor: '#3E8063',
-    borderColor: 'rgba(255,255,255,0.9)',
-    shadowColor: '#1A3528',
-    shadowOffset: { height: 4, width: 0 },
-    shadowOpacity: 0.2,
-    shadowRadius: 9,
-  },
-  marketEntranceIcon: {
+  marketCloudRoot: {
     alignItems: 'center',
-    backgroundColor: 'rgba(99,132,111,0.12)',
-    borderRadius: 11,
+    height: 74,
+    justifyContent: 'center',
+    position: 'relative',
+    width: 160,
+  },
+  marketCloudBubble: {
+    backgroundColor: 'rgba(255,253,248,0.97)',
+    borderColor: 'rgba(255,255,255,0.95)',
+    borderRadius: 22,
+    borderWidth: 1,
+    height: 42,
+    position: 'absolute',
+    top: 4,
+    width: 42,
+    zIndex: 0,
+  },
+  marketCloudBubbleLeft: { left: 24 },
+  marketCloudBubbleRight: { right: 26, top: 7 },
+  marketCloudTail: {
+    backgroundColor: 'rgba(255,253,248,0.97)',
+    bottom: 7,
+    height: 18,
+    position: 'absolute',
+    transform: [{ rotate: '45deg' }],
+    width: 18,
+    zIndex: 1,
+  },
+  marketCloudBody: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,253,248,0.98)',
+    borderColor: 'rgba(255,255,255,0.98)',
+    borderRadius: 26,
+    borderWidth: 1.5,
+    elevation: 5,
+    flexDirection: 'row',
+    gap: 7,
+    height: 52,
+    justifyContent: 'center',
+    paddingHorizontal: 13,
+    shadowColor: '#466A60',
+    shadowOffset: { height: 5, width: 0 },
+    shadowOpacity: 0.14,
+    shadowRadius: 12,
+    width: 150,
+    zIndex: 2,
+  },
+  marketCloudIcon: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(107,198,164,0.18)',
+    borderRadius: 12,
     height: 30,
     justifyContent: 'center',
     width: 30,
   },
-  marketEntranceTitle: {
-    color: '#294237',
-    fontFamily: fonts.bold,
-    fontSize: 12,
+  marketCloudText: {
+    color: '#263A31',
+    flex: 1,
+    fontFamily: fonts.laundryBold,
+    fontSize: 15,
+    textAlign: 'center',
   },
-  marketEntranceHint: {
-    color: '#708078',
-    fontFamily: fonts.medium,
-    fontSize: 10,
-    marginTop: 1,
-  },
-  marketEntranceTextActive: { color: colors.white },
   obstacleBlock: {
     backgroundColor: '#AAB79B',
     borderColor: '#89947E',
@@ -1916,7 +2311,7 @@ const styles = StyleSheet.create({
     left: NPC_POINT.x - 32,
     position: 'absolute',
     top: NPC_POINT.y - 40,
-    width: 64,
+    width: PLAYER_ART_WIDTH,
     zIndex: 8,
   },
   npcInactive: { opacity: 0.75 },
@@ -1975,82 +2370,15 @@ const styles = StyleSheet.create({
   npcShadow: { bottom: 16, width: 38 },
   player: {
     alignItems: 'center',
-    height: PLAYER_SIZE + 12,
-    justifyContent: 'flex-start',
+    height: PLAYER_ART_HEIGHT,
+    justifyContent: 'center',
     left: '50%',
-    marginLeft: -PLAYER_SIZE / 2,
-    marginTop: -(PLAYER_SIZE + 12) / 2,
+    marginLeft: -PLAYER_ART_WIDTH / 2,
+    marginTop: -PLAYER_ART_PIVOT_Y,
     position: 'absolute',
     top: '50%',
-    width: PLAYER_SIZE,
+    width: PLAYER_ART_WIDTH,
     zIndex: 12,
-  },
-  playerBody: {
-    alignItems: 'center',
-    backgroundColor: '#E1A451',
-    borderColor: '#493D31',
-    borderRadius: 9,
-    borderWidth: 2,
-    height: 42,
-    justifyContent: 'flex-start',
-    width: 30,
-  },
-  playerHead: {
-    backgroundColor: '#D9B695',
-    borderColor: '#57463B',
-    borderRadius: 14,
-    borderWidth: 2,
-    height: 28,
-    marginTop: -15,
-    width: 28,
-  },
-  playerMarker: {
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 11,
-    height: 22,
-    justifyContent: 'center',
-    position: 'absolute',
-    top: 13,
-    width: 22,
-  },
-  playerImage: { height: 18, width: 18 },
-  destinationGuide: {
-    alignItems: 'center',
-    alignSelf: 'center',
-    backgroundColor: 'rgba(31,44,36,0.84)',
-    borderColor: 'rgba(255,255,255,0.18)',
-    borderRadius: 16,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: 9,
-    minHeight: 48,
-    paddingHorizontal: 13,
-    paddingVertical: 8,
-    position: 'absolute',
-    top: 92,
-    zIndex: 21,
-  },
-  destinationGuideArrived: { backgroundColor: 'rgba(47,126,90,0.92)' },
-  destinationGuideHidden: { opacity: 0 },
-  destinationGuideIcon: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.16)',
-    borderRadius: 12,
-    height: 28,
-    justifyContent: 'center',
-    width: 28,
-  },
-  destinationGuideEyebrow: {
-    color: 'rgba(255,255,255,0.68)',
-    fontFamily: fonts.medium,
-    fontSize: 9,
-  },
-  destinationGuideText: {
-    color: colors.white,
-    fontFamily: fonts.bold,
-    fontSize: 12,
-    marginTop: 1,
   },
   joystickZone: {
     bottom: 104,
@@ -2060,6 +2388,7 @@ const styles = StyleSheet.create({
     width: '58%',
     zIndex: 20,
   },
+  marketJoystickZone: { bottom: 128 },
   joystick: {
     alignItems: 'center',
     backgroundColor: 'rgba(255,255,255,0.52)',
@@ -2099,6 +2428,7 @@ const styles = StyleSheet.create({
     width: 132,
     zIndex: 22,
   },
+  marketActionCluster: { bottom: 166 },
   actionButton: {
     alignItems: 'center',
     borderColor: 'rgba(255,255,255,0.7)',
@@ -2118,7 +2448,7 @@ const styles = StyleSheet.create({
     shadowOffset: { height: 4, width: 0 },
     shadowOpacity: 0.28,
     shadowRadius: 6,
-    width: 64,
+    width: PLAYER_ART_WIDTH,
   },
   interactionActionText: {
     color: colors.white,
@@ -2139,46 +2469,120 @@ const styles = StyleSheet.create({
   },
   runButtonActive: { backgroundColor: '#4C6E5A' },
   actionButtonDisabled: { opacity: 0.34 },
-  dialogueBox: {
-    backgroundColor: 'rgba(15,18,17,0.78)',
-    borderColor: 'rgba(255,255,255,0.14)',
-    borderRadius: 20,
-    borderWidth: 2,
-    bottom: 154,
-    left: 18,
-    minHeight: 116,
-    paddingBottom: 15,
-    paddingHorizontal: 18,
-    paddingTop: 15,
-    position: 'absolute',
-    right: 18,
-    zIndex: 22,
+  dialogueDim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(49,50,46,0.15)',
+    zIndex: 26,
   },
-  dialogueSpeaker: { color: colors.white, fontFamily: fonts.bold, fontSize: 14 },
-  dialoguePressArea: { flex: 1 },
+  dialogueBox: {
+    alignSelf: 'center',
+    backgroundColor: 'rgba(75,75,75,0.90)',
+    borderRadius: 22,
+    bottom: 131,
+    height: 128,
+    maxWidth: 335,
+    position: 'absolute',
+    shadowColor: '#000000',
+    shadowOffset: { height: 0, width: 0 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 4,
+    width: '89.333%',
+    zIndex: 27,
+  },
+  dialogueChoiceBox: { bottom: 258 },
+  dialogueSpeakerTag: {
+    alignItems: 'center',
+    backgroundColor: '#D4C498',
+    borderRadius: 18,
+    height: 34,
+    justifyContent: 'center',
+    left: 21,
+    position: 'absolute',
+    shadowColor: '#000000',
+    shadowOffset: { height: 0, width: 0 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 2,
+    top: -18,
+    transform: [{ rotate: '-4deg' }],
+    width: 71,
+    zIndex: 3,
+  },
+  dialogueSpeaker: { color: '#333333', fontFamily: fonts.laundryBold, fontSize: 17 },
+  dialoguePressArea: {
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+    width: '100%',
+  },
+  dialogueChoices: {
+    alignItems: 'center',
+    bottom: 139,
+    gap: 10,
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    zIndex: 28,
+  },
   dialogueText: {
     color: colors.white,
-    fontFamily: fonts.medium,
+    fontFamily: fonts.laundryBold,
     fontSize: 17,
-    lineHeight: 25,
-    marginTop: 6,
-    minHeight: 50,
+    lineHeight: 27,
+    textAlign: 'center',
   },
-  dialogueProgress: { flexDirection: 'row', gap: 5, position: 'absolute', right: 15, top: 16 },
-  dialogueDot: { backgroundColor: 'rgba(255,255,255,0.32)', borderRadius: 4, height: 7, width: 7 },
-  dialogueDotActive: { backgroundColor: colors.white },
+  dialogueAdvanceIndicator: {
+    borderLeftColor: 'transparent',
+    borderLeftWidth: 6,
+    borderRightColor: 'transparent',
+    borderRightWidth: 6,
+    borderTopColor: 'rgba(255,255,255,0.94)',
+    borderTopWidth: 8,
+    bottom: 11,
+    height: 0,
+    position: 'absolute',
+    right: 22,
+    width: 0,
+  },
   quizOverlay: { ...StyleSheet.absoluteFillObject, justifyContent: 'flex-end', zIndex: 30 },
-  dim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(17,24,20,0.46)' },
+  dim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(49,50,46,0.18)' },
   quizSheet: {
     alignSelf: 'center',
+    maxWidth: 700,
+    width: '100%',
+  },
+  quizChoiceStage: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'transparent',
+    maxWidth: undefined,
+  },
+  quizResultSheet: {
     backgroundColor: colors.white,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-    maxWidth: 700,
     paddingBottom: 24,
     paddingHorizontal: 20,
     paddingTop: 18,
-    width: '100%',
+  },
+  quizDialogueCard: {
+    alignItems: 'center',
+    alignSelf: 'center',
+    backgroundColor: 'rgba(75,75,75,0.90)',
+    borderRadius: 22,
+    bottom: 258,
+    height: 128,
+    justifyContent: 'center',
+    maxWidth: 335,
+    paddingHorizontal: 22,
+    position: 'absolute',
+    shadowColor: '#000000',
+    shadowOffset: { height: 0, width: 0 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 4,
+    width: '89.333%',
   },
   quizHeader: { alignItems: 'center', flexDirection: 'row' },
   quizNpcAvatar: {
@@ -2193,43 +2597,49 @@ const styles = StyleSheet.create({
   quizNpcName: { color: colors.ink, fontFamily: fonts.bold, fontSize: 15 },
   quizIntro: { color: '#888888', fontFamily: fonts.regular, fontSize: 12, marginTop: 2 },
   quizQuestion: {
-    color: colors.ink,
+    color: colors.white,
     fontFamily: fonts.laundryBold,
-    fontSize: 20,
-    lineHeight: 28,
-    marginBottom: 16,
-    marginTop: 20,
+    fontSize: 17,
+    lineHeight: 27,
+    textAlign: 'center',
   },
-  quizAnswers: { gap: 9 },
+  quizAnswers: {
+    alignItems: 'center',
+    bottom: 139,
+    gap: 10,
+    left: 0,
+    position: 'absolute',
+    right: 0,
+  },
   quizAnswer: {
     alignItems: 'center',
-    borderColor: '#E8E8E8',
-    borderRadius: 18,
-    borderWidth: 2,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(255,255,255,0.96)',
+    borderRadius: 25,
+    height: 50,
     justifyContent: 'center',
-    minHeight: 54,
-    paddingHorizontal: 14,
+    maxWidth: '89.333%',
+    overflow: 'hidden',
+    paddingHorizontal: 41,
   },
-  quizAnswerSelected: { backgroundColor: '#EDFFF5', borderColor: colors.brightMint },
-  quizAnswerWrong: { backgroundColor: '#FFF4EF', borderColor: '#F4A17B' },
+  quizAnswerSelected: {
+    backgroundColor: '#F2FFF7',
+    borderColor: colors.brightMint,
+    borderWidth: 2,
+  },
+  quizAnswerWrong: {
+    backgroundColor: '#FFF4EF',
+    borderColor: '#F4A17B',
+    borderWidth: 2,
+  },
   quizAnswerText: {
     color: '#333333',
-    fontFamily: fonts.semibold,
-    fontSize: 15,
+    flexShrink: 1,
+    fontFamily: fonts.laundryBold,
+    fontSize: 17,
     lineHeight: 20,
     textAlign: 'center',
-    width: '100%',
   },
-  wrongFeedback: {
-    alignItems: 'center',
-    backgroundColor: '#FFF7F2',
-    borderRadius: 14,
-    flexDirection: 'row',
-    marginTop: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-  },
-  wrongFeedbackText: { color: '#B65B32', fontFamily: fonts.medium, fontSize: 13, marginLeft: 7 },
   quizButton: {
     alignItems: 'center',
     backgroundColor: colors.mint,
@@ -2255,7 +2665,7 @@ const styles = StyleSheet.create({
     borderRadius: 32,
     height: 64,
     justifyContent: 'center',
-    width: 64,
+    width: PLAYER_ART_WIDTH,
   },
   resultDetails: { alignItems: 'center', width: '100%' },
   resultTitle: { color: colors.ink, fontFamily: fonts.laundryBold, fontSize: 24, marginTop: 14 },

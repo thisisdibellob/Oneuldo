@@ -2,7 +2,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { ComponentProps, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  AccessibilityInfo,
   Animated,
+  Easing,
   GestureResponderEvent,
   Image,
   LayoutChangeEvent,
@@ -106,6 +108,7 @@ type MarketSimulationScreenProps = {
   interactionRequest?: MarketInteractionRequest | null;
   onExit: () => void;
   onLockChange?: (locked: boolean) => void;
+  onMissionComplete?: () => void;
 };
 
 export function MarketSimulationScreen({
@@ -113,6 +116,7 @@ export function MarketSimulationScreen({
   interactionRequest = null,
   onExit,
   onLockChange,
+  onMissionComplete,
 }: MarketSimulationScreenProps) {
   const [phase, setPhase] = useState<MarketPhase>('briefing');
   const [briefingIndex, setBriefingIndex] = useState(0);
@@ -214,6 +218,7 @@ export function MarketSimulationScreen({
   const checkCart = () => {
     const nextEvaluation = evaluateMarketCart(cart);
     setEvaluation(nextEvaluation);
+    if (nextEvaluation.success) onMissionComplete?.();
     setPhase('result');
   };
 
@@ -245,15 +250,41 @@ export function MarketSimulationScreen({
 
       {phase === 'shopping' ? (
         <View style={[styles.shoppingFooter, embedded && styles.embeddedShoppingFooter]}>
-          <View style={styles.missionStrip}>
-            <View style={styles.missionIcon}>
-              <Ionicons color="#F2D99E" name="list" size={20} />
-            </View>
-            <View style={styles.missionStripCopy}>
+          <View
+            accessibilityLabel={`오늘의 목록, ${objectiveProgress
+              .map(({ current, product, quantity }) => `${product?.name ?? '물건'} ${current}/${quantity}`)
+              .join(', ')}`}
+            accessible
+            style={styles.missionStrip}
+          >
+            <View pointerEvents="none" style={styles.missionTape} />
+            <View style={styles.missionStripHeading}>
+              <Ionicons color="#9A8061" name="create-outline" size={11} />
               <Text style={styles.missionStripLabel}>오늘의 목록</Text>
-              <Text numberOfLines={1} style={styles.missionStripValue}>
-                {objectiveProgress.map(({ current, product, quantity }) => `${product?.name} ${current}/${quantity}`).join(' · ')}
-              </Text>
+            </View>
+            <View style={styles.missionChecklist}>
+              {objectiveProgress.map(({ current, product, productId, quantity }) => {
+                const completed = current >= quantity;
+                return (
+                  <View key={productId} style={styles.missionChecklistItem}>
+                    <View style={styles.missionItemHeading}>
+                      <View style={[styles.missionCheckbox, completed && styles.missionCheckboxComplete]}>
+                        {completed ? <Ionicons color="#FFFFFF" name="checkmark" size={8} /> : null}
+                      </View>
+                      <Text
+                        ellipsizeMode="tail"
+                        numberOfLines={1}
+                        style={[styles.missionItemName, completed && styles.missionItemNameComplete]}
+                      >
+                        {product?.name ?? '물건'}
+                      </Text>
+                    </View>
+                    <Text style={[styles.missionItemCount, completed && styles.missionItemCountComplete]}>
+                      {current}/{quantity}
+                    </Text>
+                  </View>
+                );
+              })}
             </View>
           </View>
           <PressScale
@@ -1122,14 +1153,110 @@ function CheckoutPanel({ cart, onBack, onCheck, total }: { cart: MarketCart; onB
 }
 
 function ResultPanel({ evaluation, onExit, onRetry }: { evaluation: MarketEvaluation; onExit: () => void; onRetry: () => void }) {
+  const [reduceMotionEnabled, setReduceMotionEnabled] = useState<boolean | null>(null);
+  const overlayOpacity = useRef(new Animated.Value(0)).current;
+  const cardOpacity = useRef(new Animated.Value(0)).current;
+  const cardProgress = useRef(new Animated.Value(0)).current;
+  const heroProgress = useRef(new Animated.Value(0)).current;
+  const detailsProgress = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    let mounted = true;
+    AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
+      if (mounted) setReduceMotionEnabled(enabled);
+    });
+    const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduceMotionEnabled);
+    return () => {
+      mounted = false;
+      subscription.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (reduceMotionEnabled === null) return undefined;
+
+    const values = [overlayOpacity, cardOpacity, cardProgress, heroProgress, detailsProgress];
+    values.forEach((value) => value.stopAnimation());
+
+    if (reduceMotionEnabled) {
+      values.forEach((value) => value.setValue(1));
+      return undefined;
+    }
+
+    values.forEach((value) => value.setValue(0));
+    const entrance = Animated.parallel([
+      Animated.timing(overlayOpacity, {
+        duration: 180,
+        easing: Easing.out(Easing.quad),
+        toValue: 1,
+        useNativeDriver: true,
+      }),
+      Animated.parallel([
+        Animated.timing(cardOpacity, {
+          duration: 260,
+          easing: Easing.out(Easing.cubic),
+          toValue: 1,
+          useNativeDriver: true,
+        }),
+        Animated.timing(cardProgress, {
+          duration: 360,
+          easing: Easing.out(Easing.cubic),
+          toValue: 1,
+          useNativeDriver: true,
+        }),
+      ]),
+      Animated.sequence([
+        Animated.delay(120),
+        Animated.spring(heroProgress, {
+          damping: 13,
+          mass: 0.65,
+          stiffness: 190,
+          toValue: 1,
+          useNativeDriver: true,
+        }),
+      ]),
+      Animated.sequence([
+        Animated.delay(210),
+        Animated.timing(detailsProgress, {
+          duration: 280,
+          easing: Easing.out(Easing.cubic),
+          toValue: 1,
+          useNativeDriver: true,
+        }),
+      ]),
+    ]);
+    entrance.start();
+
+    return () => entrance.stop();
+  }, [cardOpacity, cardProgress, detailsProgress, heroProgress, overlayOpacity, reduceMotionEnabled]);
+
+  const overlayAnimationStyle = { opacity: overlayOpacity };
+  const cardAnimationStyle = {
+    opacity: cardOpacity,
+    transform: [
+      { translateY: cardProgress.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) },
+      { scale: cardProgress.interpolate({ inputRange: [0, 1], outputRange: [0.975, 1] }) },
+    ],
+  };
+  const heroAnimationStyle = {
+    opacity: heroProgress,
+    transform: [{ scale: heroProgress.interpolate({ inputRange: [0, 1], outputRange: [0.84, 1] }) }],
+  };
+  const detailsAnimationStyle = {
+    opacity: detailsProgress,
+    transform: [{ translateY: detailsProgress.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }) }],
+  };
+
   if (evaluation.success) {
     return (
-      <View style={styles.resultOverlay}>
-        <View style={styles.resultCard}>
-          <View style={styles.successIconStage}>
-            <View style={styles.successRing} />
-            <Ionicons color="#FFFFFF" name="checkmark" size={40} />
-          </View>
+      <Animated.View accessibilityViewIsModal style={[styles.resultOverlay, overlayAnimationStyle]}>
+        <Animated.View style={[styles.resultCard, cardAnimationStyle]}>
+          <Animated.View style={heroAnimationStyle}>
+            <View style={styles.successIconStage}>
+              <View style={styles.successRing} />
+              <Ionicons color="#FFFFFF" name="checkmark" size={40} />
+            </View>
+          </Animated.View>
           <View style={styles.resultStamp}>
             <Ionicons color="#FFFFFF" name="star" size={14} />
             <Text style={styles.resultStampText}>MISSION CLEAR</Text>
@@ -1137,7 +1264,7 @@ function ResultPanel({ evaluation, onExit, onRetry }: { evaluation: MarketEvalua
           <Text style={styles.resultEyebrow}>장보기 의뢰 완료</Text>
           <Text style={styles.resultTitle}>{marketMission.successMessage}</Text>
           <Text style={styles.resultDescription}>필요한 물건을 빠뜨리지 않고 예산도 지켰어요.</Text>
-          <View style={styles.resultStats}>
+          <Animated.View style={[styles.resultStats, detailsAnimationStyle]}>
             <View style={styles.resultStat}>
               <Text style={styles.resultStatValue}>{marketMission.objectives.length}</Text>
               <Text style={styles.resultStatLabel}>목록 완료</Text>
@@ -1152,22 +1279,24 @@ function ResultPanel({ evaluation, onExit, onRetry }: { evaluation: MarketEvalua
               <Text style={styles.resultStatValue}>+30</Text>
               <Text style={styles.resultStatLabel}>경험치</Text>
             </View>
-          </View>
+          </Animated.View>
           <PressScale accessibilityRole="button" onPress={onExit} style={styles.resultPrimaryButton}>
             <Text style={styles.resultPrimaryButtonText}>마을로 돌아가기</Text>
           </PressScale>
-        </View>
-      </View>
+        </Animated.View>
+      </Animated.View>
     );
   }
 
   return (
-    <View style={styles.resultOverlay}>
-      <View style={styles.resultCard}>
-        <View style={styles.retryIconStage}><Ionicons color="#9A7045" name="basket-outline" size={34} /></View>
+    <Animated.View accessibilityViewIsModal style={[styles.resultOverlay, overlayAnimationStyle]}>
+      <Animated.View style={[styles.resultCard, cardAnimationStyle]}>
+        <Animated.View style={heroAnimationStyle}>
+          <View style={styles.retryIconStage}><Ionicons color="#9A7045" name="basket-outline" size={34} /></View>
+        </Animated.View>
         <Text style={styles.resultEyebrow}>한 번 더 확인해요</Text>
         <Text style={styles.resultTitle}>조금만 고치면 완성할 수 있어요</Text>
-        <View style={styles.feedbackList}>
+        <Animated.View style={[styles.feedbackList, detailsAnimationStyle]}>
           {evaluation.missing.length > 0 ? (
             <FeedbackRow icon="list-outline" text={`목록에 있는 물건 ${evaluation.missing.reduce((sum, item) => sum + item.quantity, 0)}개를 더 찾아보세요.`} />
           ) : null}
@@ -1177,12 +1306,12 @@ function ResultPanel({ evaluation, onExit, onRetry }: { evaluation: MarketEvalua
           {evaluation.overBudget > 0 ? (
             <FeedbackRow icon="wallet-outline" text={`예산보다 ${formatPrice(evaluation.overBudget)} 많아요.`} />
           ) : null}
-        </View>
+        </Animated.View>
         <PressScale accessibilityRole="button" onPress={onRetry} style={styles.resultPrimaryButton}>
           <Text style={styles.resultPrimaryButtonText}>장바구니 고치기</Text>
         </PressScale>
-      </View>
-    </View>
+      </Animated.View>
+    </Animated.View>
   );
 }
 
@@ -1198,7 +1327,7 @@ function FeedbackRow({ icon, text }: { icon: IoniconName; text: string }) {
 const styles = StyleSheet.create({
   root: { backgroundColor: '#D8D1C2', flex: 1 },
   embeddedRoot: { ...StyleSheet.absoluteFillObject, zIndex: 28 },
-  embeddedShoppingFooter: { bottom: undefined, top: 105 },
+  embeddedShoppingFooter: { bottom: undefined, top: 110 },
   embeddedCheckoutOverlay: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'flex-end',
@@ -1289,11 +1418,19 @@ const styles = StyleSheet.create({
   stationActionButton: { alignItems: 'center', backgroundColor: '#317A5B', borderColor: '#F5E8C8', borderRadius: 32, borderWidth: 3, bottom: 91, height: 64, justifyContent: 'center', position: 'absolute', right: 18, shadowColor: '#23352C', shadowOffset: { height: 4, width: 0 }, shadowOpacity: 0.24, shadowRadius: 6, width: 64, zIndex: 25 },
   stationActionText: { color: '#FFF8E8', fontFamily: fonts.bold, fontSize: 9, marginTop: 2 },
   shoppingFooter: { alignItems: 'stretch', bottom: 14, flexDirection: 'row', gap: 9, left: 13, position: 'absolute', right: 13, zIndex: 24 },
-  missionStrip: { alignItems: 'center', backgroundColor: 'rgba(35,47,39,0.9)', borderColor: 'rgba(255,255,255,0.2)', borderRadius: 15, borderWidth: 1, flex: 1, flexDirection: 'row', paddingHorizontal: 10, paddingVertical: 8 },
-  missionIcon: { alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 11, height: 36, justifyContent: 'center', marginRight: 8, width: 36 },
-  missionStripCopy: { flex: 1 },
-  missionStripLabel: { color: '#E7C88D', fontFamily: fonts.bold, fontSize: 8, letterSpacing: 0.6 },
-  missionStripValue: { color: '#FFFFFF', fontFamily: fonts.semibold, fontSize: 10, marginTop: 2 },
+  missionStrip: { backgroundColor: '#FFF9EA', borderColor: '#D8C6A5', borderRadius: 11, borderWidth: 1, elevation: 3, flex: 1, height: 62, justifyContent: 'center', paddingBottom: 6, paddingHorizontal: 9, paddingTop: 9, position: 'relative', shadowColor: '#5D4A34', shadowOffset: { height: 2, width: 0 }, shadowOpacity: 0.14, shadowRadius: 4 },
+  missionTape: { alignSelf: 'center', backgroundColor: 'rgba(224,204,163,0.62)', borderRadius: 2, height: 8, position: 'absolute', top: -4, transform: [{ rotate: '-1deg' }], width: 36 },
+  missionStripHeading: { alignItems: 'center', flexDirection: 'row', gap: 3, height: 13 },
+  missionStripLabel: { color: '#806B53', fontFamily: fonts.handwriting, fontSize: 9, letterSpacing: 0.15 },
+  missionChecklist: { alignItems: 'flex-start', flexDirection: 'row', gap: 7, marginTop: 2, minWidth: 0 },
+  missionChecklistItem: { flex: 1, flexBasis: 0, minWidth: 0 },
+  missionItemHeading: { alignItems: 'center', flexDirection: 'row', gap: 3, minWidth: 0 },
+  missionCheckbox: { alignItems: 'center', backgroundColor: '#FFFCF3', borderColor: '#BBAA89', borderRadius: 6, borderWidth: 1, height: 11, justifyContent: 'center', width: 11 },
+  missionCheckboxComplete: { backgroundColor: '#4E916B', borderColor: '#4E916B' },
+  missionItemName: { color: '#4D4338', flex: 1, fontFamily: fonts.handwriting, fontSize: 12, lineHeight: 15, minWidth: 0 },
+  missionItemNameComplete: { color: '#718074', textDecorationLine: 'line-through' },
+  missionItemCount: { color: '#8C7559', fontFamily: fonts.bold, fontSize: 9, lineHeight: 10, marginLeft: 14 },
+  missionItemCountComplete: { color: '#4E7D60' },
   cartButton: { alignItems: 'center', backgroundColor: '#367A5A', borderColor: '#F5E8C8', borderRadius: 16, borderWidth: 2, height: 62, justifyContent: 'center', position: 'relative', width: 68 },
   cartButtonText: { color: '#FFFFFF', fontFamily: fonts.bold, fontSize: 9, marginTop: 1 },
   cartCountBadge: { alignItems: 'center', backgroundColor: '#F0C95B', borderColor: '#FFFFFF', borderRadius: 10, borderWidth: 1, height: 20, justifyContent: 'center', minWidth: 20, paddingHorizontal: 5, position: 'absolute', right: -4, top: -5 },

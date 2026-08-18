@@ -57,6 +57,33 @@ it('게임을 나갈 때 오디오를 안전하게 멈춘다', async () => {
   expect(onExit).toHaveBeenCalledTimes(1);
 });
 
+it('게임 수첩에 하루 퀘스트 4개를 보여주고 가방을 분류하며 같은 버튼으로 닫는다', async () => {
+  const screen = render(<GamePrototypeScreen onExit={jest.fn()} />);
+
+  fireEvent.press(screen.getByRole('button', { name: '수첩 열기' }));
+  expect(screen.getByText('오늘의 이야기')).toBeTruthy();
+  expect(screen.getByText('퀘스트는 매일 아침 7시에 초기화돼요.')).toBeTruthy();
+  expect(screen.getAllByTestId('daily-quest-row')).toHaveLength(4);
+  expect(screen.getByText('장보기 목록 완성하기')).toBeTruthy();
+
+  fireEvent.press(screen.getByRole('button', { name: '가방 열기' }));
+  expect(screen.getByRole('tab', { name: '물건 검색' }).props.accessibilityState.selected).toBe(true);
+  expect(screen.getByRole('tab', { name: '최근 순' })).toBeTruthy();
+  expect(screen.getAllByTestId('inventory-item-slot')).toHaveLength(4);
+  expect(screen.getAllByTestId('inventory-empty-slot')).toHaveLength(6);
+  expect(screen.getByText('4/30')).toBeTruthy();
+
+  fireEvent.press(screen.getByRole('tab', { name: '가나다 순' }));
+  expect(screen.getByRole('tab', { name: '가나다 순' }).props.accessibilityState.selected).toBe(true);
+  expect(screen.getAllByTestId('inventory-item-slot')).toHaveLength(4);
+
+  fireEvent.press(screen.getByRole('button', { name: '가방 열기' }));
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 210));
+  });
+  expect(screen.queryByText('4/30')).toBeNull();
+});
+
 describe('오늘도 앱', () => {
   it('로그인 뒤 메인 화면과 플로팅 내비게이션을 보여준다', () => {
     const screen = render(<App />);
@@ -107,26 +134,49 @@ describe('오늘도 앱', () => {
     expect(interaction.props.accessibilityState.disabled).toBe(false);
     fireEvent.press(interaction);
 
+    const finishLineAndContinue = async (line: string) => {
+      fireEvent.press(screen.getByRole('button', { name: '대화 계속하기' }));
+      expect(screen.getByText(line)).toBeTruthy();
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 400));
+      });
+      fireEvent.press(screen.getByRole('button', { name: '대화 계속하기' }));
+    };
+
+    await finishLineAndContinue('어, 왔구나! 오늘도 만나서 반가워.');
+    await finishLineAndContinue('나는 마을을 한 바퀴 걷고 있었어.');
+
     fireEvent.press(screen.getByRole('button', { name: '대화 계속하기' }));
-    expect(screen.getByText('안녕하세요. 여기는 오늘도 마을이에요.')).toBeTruthy();
+    expect(screen.getByText('너는 오늘 하루 어땠어?')).toBeTruthy();
+    expect(screen.getByLabelText('오늘 하루 선택지')).toBeTruthy();
+    expect(screen.getByRole('radio', { name: '재미있는 일이 있었어' })).toBeTruthy();
+    expect(screen.getByRole('radio', { name: '조금 피곤한 하루였어' })).toBeTruthy();
+    expect(
+      screen.getByRole('button', { name: '일상 선택지를 선택해 주세요' }).props
+        .accessibilityState.disabled,
+    ).toBe(true);
+
+    fireEvent.press(screen.getByRole('radio', { name: '조금 피곤한 하루였어' }));
+    fireEvent.press(screen.getByRole('button', { name: '대화 계속하기' }));
+    expect(
+      screen.getByText('그랬구나. 오늘도 수고했어. 우리 천천히 걸어가자.'),
+    ).toBeTruthy();
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 400));
     });
+    fireEvent.press(screen.getByRole('button', { name: '대화 계속하기' }));
 
-    fireEvent.press(screen.getByRole('button', { name: '대화 계속하기' }));
-    fireEvent.press(screen.getByRole('button', { name: '대화 계속하기' }));
-    expect(screen.getByText('길을 건널 때 무엇을 먼저 확인하는지 같이 알아볼까요?')).toBeTruthy();
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 400));
-    });
+    await finishLineAndContinue('그럼 우리 같이 조금 걸을까?');
+    await finishLineAndContinue('좋아! 저기 횡단보도까지 가 보자.');
+    await finishLineAndContinue(
+      '가는 길에 안전하게 건너는 방법도 같이 떠올려 보자.',
+    );
 
-    fireEvent.press(screen.getByRole('button', { name: '대화 계속하기' }));
     expect(screen.getByText('횡단보도를 건너기 전에', { exact: false })).toBeTruthy();
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 210));
     });
     fireEvent.press(screen.getByText('초록불인지 확인해요'));
-    fireEvent.press(screen.getByRole('button', { name: '정답 확인' }));
 
     expect(screen.getByText('퀴즈를 마쳤어요!')).toBeTruthy();
     expect(screen.getByText('+10 XP')).toBeTruthy();
@@ -136,6 +186,8 @@ describe('오늘도 앱', () => {
     });
     expect(screen.getByRole('button', { name: '민수와 대화하기' })).toBeTruthy();
     expect(screen.getByLabelText('이동 조이스틱')).toBeTruthy();
+    fireEvent.press(screen.getByRole('button', { name: '수첩 열기' }));
+    expect(screen.getByText('2/4 완료')).toBeTruthy();
   });
 
   it('터치 이동 모드에서 바닥과 NPC를 직접 눌러 이동한다', async () => {
@@ -201,12 +253,14 @@ describe('오늘도 앱', () => {
     fireEvent.press(screen.getByRole('button', { name: '마을에서 마트 장보기 시작' }));
 
     const joystick = screen.getByLabelText('이동 조이스틱');
+    expect(screen.queryByTestId('market-proximity-cloud')).toBeNull();
     for (let step = 0; step < 5; step += 1) {
       fireEvent(joystick, 'accessibilityAction', { nativeEvent: { actionName: 'moveRight' } });
     }
     for (let step = 0; step < 6; step += 1) {
       fireEvent(joystick, 'accessibilityAction', { nativeEvent: { actionName: 'moveUp' } });
     }
+    expect(screen.getByTestId('market-proximity-cloud', { includeHiddenElements: true })).toBeTruthy();
     fireEvent.press(screen.getByRole('button', { name: '하늘마트 들어가기' }));
 
     expect(screen.getByText('안녕하세요. 오늘 저녁에 필요한 물건을 같이 골라볼까요?')).toBeTruthy();
@@ -247,6 +301,9 @@ describe('오늘도 앱', () => {
 
     expect(screen.getByText('목록에 맞게 장보기를 마쳤어요!')).toBeTruthy();
     expect(screen.getByText('+30')).toBeTruthy();
+    fireEvent.press(screen.getByText('마을로 돌아가기'));
+    fireEvent.press(screen.getByRole('button', { name: '수첩 열기' }));
+    expect(screen.getByText('2/4 완료')).toBeTruthy();
   });
 
   it('AI 입력 표시 뒤 답변을 추가하고 여러 대화를 누적한다', async () => {

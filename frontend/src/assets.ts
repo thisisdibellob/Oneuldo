@@ -54,4 +54,7 @@ export const icons = {
   gameDiary: require('../assets/images/game/G_diary.png'),
   gameMoney: require('../assets/images/game/G_money.png'),
   gamePhone: require('../assets/images/game/G_phone.png'),
+  gameUiSearch: require('../assets/images/game/GameUI_Search.png'),
+  gameUiClock: require('../assets/images/game/GameUI_Clock.png'),
+  gameUiSort: require('../assets/images/game/GameUI_A-Z.png'),
 } satisfies Record<string, ImageSourcePropType>;
