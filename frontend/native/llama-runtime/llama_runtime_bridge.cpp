@@ -1,5 +1,6 @@
 #include "llama_runtime_bridge.h"
 
+#include <android/log.h>
 #include <jni.h>
 #include <llama.h>
 #include <ggml-backend.h>
@@ -15,6 +16,9 @@
 
 namespace oneuldo::llama_runtime {
 namespace {
+
+#define ONEULDO_TIMING_LOG(...) \
+  __android_log_print(ANDROID_LOG_INFO, "OneuldoLlamaTiming", __VA_ARGS__)
 
 std::mutex runtime_mutex;
 std::mutex generation_state_mutex;
@@ -51,7 +55,8 @@ std::string formatPrompt(const std::string& prompt) {
   const char* chat_template = llama_model_chat_template(model, nullptr);
   if (chat_template == nullptr) return prompt;
 
-  const char* system_text = "당신은 한국어로 정확하고 간결하게 답하는 도우미입니다.";
+  const char* system_text =
+      "Return concise, natural Korean text only and follow the requested JSON schema exactly.";
   llama_chat_message messages[] = {
       {"system", system_text},
       {"user", prompt.c_str()},
@@ -127,18 +132,26 @@ class SamplerGuard {
 }  // namespace
 
 std::string initializeRuntime(const std::string& model_path) {
+  const int64_t initialization_start_ms = monotonicMilliseconds();
   std::lock_guard<std::mutex> lock(runtime_mutex);
-  if (model != nullptr && context != nullptr) return {};
+  if (model != nullptr && context != nullptr) {
+    ONEULDO_TIMING_LOG("initialize reused totalMs=%lld",
+                       static_cast<long long>(monotonicMilliseconds() - initialization_start_ms));
+    return {};
+  }
   if (!std::ifstream(model_path, std::ios::binary).good()) {
     return "GGUF 모델 파일을 찾을 수 없습니다.";
   }
 
+  ONEULDO_TIMING_LOG("initialize start");
   ggml_backend_load_all();
   llama_model_params model_params = llama_model_default_params();
   model_params.n_gpu_layers = 0;
   model_params.check_tensors = false;
   model = llama_model_load_from_file(model_path.c_str(), model_params);
   if (model == nullptr) return "Bllossom GGUF 모델을 불러오지 못했습니다.";
+  ONEULDO_TIMING_LOG("initialize modelLoaded elapsedMs=%lld",
+                     static_cast<long long>(monotonicMilliseconds() - initialization_start_ms));
 
   vocab = llama_model_get_vocab(model);
   llama_context_params context_params = llama_context_default_params();
@@ -154,6 +167,8 @@ std::string initializeRuntime(const std::string& model_path) {
     clearRuntime();
     return "llama.cpp 추론 컨텍스트를 만들지 못했습니다.";
   }
+  ONEULDO_TIMING_LOG("initialize complete totalMs=%lld nCtx=2048 nThreads=4",
+                     static_cast<long long>(monotonicMilliseconds() - initialization_start_ms));
   return {};
 }
 
@@ -167,6 +182,7 @@ GenerationResult generateText(
     const std::string& prompt,
     int max_tokens,
     int64_t timeout_ms) {
+  const int64_t request_start_ms = monotonicMilliseconds();
   {
     std::lock_guard<std::mutex> state_lock(generation_state_mutex);
     if (!active_request_id.empty()) {
@@ -177,16 +193,27 @@ GenerationResult generateText(
     deadline_ms.store(timeout_ms > 0 ? monotonicMilliseconds() + timeout_ms : 0);
   }
   ActiveRequestGuard request_guard;
+  ONEULDO_TIMING_LOG(
+      "generate start request=%s maxTokens=%d timeoutMs=%lld promptBytes=%zu",
+      request_id.c_str(), max_tokens, static_cast<long long>(timeout_ms), prompt.size());
 
   std::lock_guard<std::mutex> runtime_lock(runtime_mutex);
+  ONEULDO_TIMING_LOG("generate runtimeLock request=%s waitMs=%lld",
+                     request_id.c_str(),
+                     static_cast<long long>(monotonicMilliseconds() - request_start_ms));
   if (model == nullptr || context == nullptr || vocab == nullptr) {
     return {false, {}, "NOT_INITIALIZED", "모델이 초기화되지 않았습니다."};
   }
 
   // 요청마다 KV cache를 비워 이전 대화가 다음 생성에 섞이지 않게 한다.
   llama_memory_clear(llama_get_memory(context), true);
+  const int64_t prompt_prepare_start_ms = monotonicMilliseconds();
   const std::string formatted_prompt = formatPrompt(prompt);
   std::vector<llama_token> prompt_tokens = tokenize(formatted_prompt);
+  ONEULDO_TIMING_LOG(
+      "generate promptPrepared request=%s promptTokens=%zu formattedBytes=%zu elapsedMs=%lld",
+      request_id.c_str(), prompt_tokens.size(), formatted_prompt.size(),
+      static_cast<long long>(monotonicMilliseconds() - prompt_prepare_start_ms));
   if (prompt_tokens.empty()) {
     return {false, {}, "GENERATION_FAILED", "프롬프트를 토큰으로 변환하지 못했습니다."};
   }
@@ -204,6 +231,7 @@ GenerationResult generateText(
   llama_sampler_chain_add(sampler, llama_sampler_init_dist(LLAMA_DEFAULT_SEED));
 
   // 긴 프롬프트는 n_batch(512)에 맞춰 나누어 KV cache에 채운다.
+  const int64_t prompt_decode_start_ms = monotonicMilliseconds();
   size_t prompt_offset = 0;
   while (prompt_offset < prompt_tokens.size()) {
     const int32_t batch_size = static_cast<int32_t>(
@@ -212,40 +240,78 @@ GenerationResult generateText(
     if (llama_decode(context, prompt_batch) != 0) {
       if (shouldAbort(nullptr)) {
         const bool cancelled = cancel_requested.load();
+        ONEULDO_TIMING_LOG(
+            "generate abort request=%s phase=promptDecode decodedTokens=%zu totalMs=%lld",
+            request_id.c_str(), prompt_offset,
+            static_cast<long long>(monotonicMilliseconds() - request_start_ms));
         return {false, {}, cancelled ? "CANCELLED" : "TIMEOUT",
                 cancelled ? "생성 요청이 취소되었습니다." : "텍스트 생성 시간이 제한을 초과했습니다."};
       }
       return {false, {}, "GENERATION_FAILED", "프롬프트 디코딩에 실패했습니다."};
     }
     prompt_offset += static_cast<size_t>(batch_size);
+    ONEULDO_TIMING_LOG(
+        "generate promptProgress request=%s decodedTokens=%zu/%zu elapsedMs=%lld",
+        request_id.c_str(), prompt_offset, prompt_tokens.size(),
+        static_cast<long long>(monotonicMilliseconds() - prompt_decode_start_ms));
   }
+  const int64_t output_start_ms = monotonicMilliseconds();
+  ONEULDO_TIMING_LOG("generate promptComplete request=%s promptDecodeMs=%lld totalMs=%lld",
+                     request_id.c_str(),
+                     static_cast<long long>(output_start_ms - prompt_decode_start_ms),
+                     static_cast<long long>(output_start_ms - request_start_ms));
 
   std::string output;
   for (int token_index = 0; token_index < max_tokens; ++token_index) {
     if (shouldAbort(nullptr)) {
       const bool cancelled = cancel_requested.load();
+      ONEULDO_TIMING_LOG(
+          "generate abort request=%s phase=outputLoop generatedTokens=%d outputMs=%lld totalMs=%lld",
+          request_id.c_str(), token_index,
+          static_cast<long long>(monotonicMilliseconds() - output_start_ms),
+          static_cast<long long>(monotonicMilliseconds() - request_start_ms));
       return {false, {}, cancelled ? "CANCELLED" : "TIMEOUT",
               cancelled ? "생성 요청이 취소되었습니다." : "텍스트 생성 시간이 제한을 초과했습니다."};
     }
     llama_token next_token = llama_sampler_sample(sampler, context, -1);
-    if (llama_vocab_is_eog(vocab, next_token)) break;
+    if (llama_vocab_is_eog(vocab, next_token)) {
+      ONEULDO_TIMING_LOG("generate eog request=%s generatedTokens=%d totalMs=%lld",
+                         request_id.c_str(), token_index,
+                         static_cast<long long>(monotonicMilliseconds() - request_start_ms));
+      break;
+    }
     output += tokenToPiece(next_token);
     if (token_index + 1 < max_tokens) {
       llama_batch token_batch = llama_batch_get_one(&next_token, 1);
       if (llama_decode(context, token_batch) != 0) {
         if (shouldAbort(nullptr)) {
           const bool cancelled = cancel_requested.load();
+          ONEULDO_TIMING_LOG(
+              "generate abort request=%s phase=outputDecode generatedTokens=%d outputMs=%lld totalMs=%lld",
+              request_id.c_str(), token_index + 1,
+              static_cast<long long>(monotonicMilliseconds() - output_start_ms),
+              static_cast<long long>(monotonicMilliseconds() - request_start_ms));
           return {false, {}, cancelled ? "CANCELLED" : "TIMEOUT",
                   cancelled ? "생성 요청이 취소되었습니다." : "텍스트 생성 시간이 제한을 초과했습니다."};
         }
         return {false, {}, "GENERATION_FAILED", "llama.cpp 디코딩에 실패했습니다."};
       }
     }
+    if (token_index == 0 || (token_index + 1) % 5 == 0) {
+      ONEULDO_TIMING_LOG(
+          "generate outputProgress request=%s generatedTokens=%d outputMs=%lld totalMs=%lld",
+          request_id.c_str(), token_index + 1,
+          static_cast<long long>(monotonicMilliseconds() - output_start_ms),
+          static_cast<long long>(monotonicMilliseconds() - request_start_ms));
+    }
   }
 
   if (output.empty()) {
     return {false, {}, "GENERATION_FAILED", "Bllossom이 빈 생성 결과를 반환했습니다."};
   }
+  ONEULDO_TIMING_LOG("generate complete request=%s outputBytes=%zu totalMs=%lld",
+                     request_id.c_str(), output.size(),
+                     static_cast<long long>(monotonicMilliseconds() - request_start_ms));
   return {true, output, {}, {}};
 }
 

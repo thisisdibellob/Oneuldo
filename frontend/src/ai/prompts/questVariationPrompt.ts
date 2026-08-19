@@ -5,6 +5,8 @@ import {
 } from '../contracts';
 
 export function buildQuestVariationPrompt(input: QuestVariationInput): string {
+  // Phase 3용 기존 프롬프트다. 상황과 행동 안내 두 문장만 바꾸도록 범위를 제한한다.
+  // 현재 전체 단계 생성 화면은 questStepGenerator.ts의 프롬프트를 사용한다.
   return [
     `프롬프트 버전: ${QUEST_VARIATION_PROMPT_VERSION}`,
     `출력 계약: ${QUEST_VARIATION_OUTPUT_VERSION}`,

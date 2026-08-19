@@ -2,6 +2,7 @@ import type { QuestVariationInput, QuestVariationOutput } from './contracts';
 
 export const QUEST_VARIATION_MAX_CHARACTERS = 80;
 
+// Phase 3 두 문장 변형에서 공통으로 거절하는 위험 표현이다.
 const forbiddenPatterns = [
   /죽어|죽여|바보|멍청|쓸모없|혼나|벌을 받아/,
   /https?:\/\//i,
@@ -16,6 +17,7 @@ function numbersIn(text: string): Set<string> {
   return new Set(text.match(/\d+/g) ?? []);
 }
 
+// 문장 하나의 공백·줄바꿈·길이·문장 수·금지어를 검사한다.
 function validateSentence(name: string, value: string): string | null {
   if (value !== value.trim() || value.length === 0) return `${name} 문장이 비어 있거나 공백으로 둘러싸여 있습니다.`;
   if (value.includes('\n') || value.includes('\r')) return `${name}은 한 줄이어야 합니다.`;
@@ -29,6 +31,7 @@ export function validateQuestVariation(
   input: QuestVariationInput,
   output: QuestVariationOutput,
 ): QuestVariationPolicyResult {
+  // 상황과 지시 중 하나라도 실패하면 부분 채택하지 않고 정책 전체를 거절한다.
   const situationError = validateSentence('situation', output.situation);
   if (situationError) return { accepted: false, reason: situationError };
   const instructionError = validateSentence('instruction', output.instruction);
@@ -47,6 +50,7 @@ export function validateQuestVariation(
   }
 
   return {
+    // 통과한 문장만 앞뒤 공백을 제거해 화면 계층으로 보낸다.
     accepted: true,
     output: {
       situation: output.situation.trim(),

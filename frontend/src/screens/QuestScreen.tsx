@@ -41,16 +41,22 @@ export function QuestScreen({
   loading,
   onQuest,
   quests,
+  showPersonalDifficulty,
 }: {
   error: string | null;
   loading: boolean;
   onQuest: (uuid: string) => void;
   quests: QuestSummary[];
+  showPersonalDifficulty: boolean;
 }) {
   const [selected, setSelected] = useState('전체');
   const visible = selected === '전체'
     ? quests
     : quests.filter((item) => item.categoryName === selected);
+  const transportQuest = quests.find((quest) => quest.categoryCode === 'PUBLIC_TRANSPORT');
+  const showTransportDifficulty = showPersonalDifficulty
+    && transportQuest !== undefined
+    && (selected === '전체' || selected === '대중교통');
 
   return (
     <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} stickyHeaderIndices={[0]}>
@@ -105,6 +111,20 @@ export function QuestScreen({
         ))}
       </ScrollView>
 
+      {showTransportDifficulty ? (
+        <View style={styles.difficultyBanner}>
+          <View>
+            <Text style={styles.difficultyEyebrow}>나의 대중교통 난이도</Text>
+            <Text style={styles.difficultyDescription}>최근 퀘스트 수행 결과에 따라 자동으로 조정돼요.</Text>
+          </View>
+          <View style={styles.difficultyBadge}>
+            <Text style={styles.difficultyBadgeText}>
+              {transportQuest.difficulty === 'NORMAL' ? '보통' : '쉬움'}
+            </Text>
+          </View>
+        </View>
+      ) : null}
+
       <View style={styles.questList}>
         {loading ? <Text style={styles.questState}>퀘스트를 불러오고 있어요.</Text> : null}
         {error ? <Text style={styles.questState}>{error}</Text> : null}
@@ -128,6 +148,7 @@ function Stat({ background, color, icon, label, value }: { background: string; c
 
 function QuestCard({ quest, onPress }: { quest: QuestSummary; onPress: () => void }) {
   const visual = categoryVisuals[quest.categoryCode] ?? categoryVisuals.DAILY_LIFE;
+  const difficultyLabel = quest.difficulty === 'NORMAL' ? '보통' : '쉬움';
   return (
     <PressScale onPress={onPress} style={styles.questCard}>
       <Image resizeMode="contain" source={visual.icon} style={styles.questIcon} />
@@ -138,7 +159,7 @@ function QuestCard({ quest, onPress }: { quest: QuestSummary; onPress: () => voi
       </View>
       <View style={styles.questProgress}>
         <View style={[styles.xpPill, { backgroundColor: visual.color }]}><Text style={styles.xpText}>+{quest.rewardPoints} XP</Text></View>
-        <Text style={[styles.stepText, { color: visual.color }]}>연습</Text>
+        <Text style={[styles.stepText, { color: visual.color }]}>{difficultyLabel}</Text>
       </View>
     </PressScale>
   );
@@ -175,6 +196,11 @@ const styles = StyleSheet.create({
   filterSelected: { backgroundColor: '#222222' },
   filterText: { color: '#999999', fontFamily: fonts.semibold, fontSize: 14, lineHeight: 18 },
   filterTextSelected: { color: colors.white },
+  difficultyBanner: { alignItems: 'center', backgroundColor: '#EFF8FC', borderColor: '#CFE8F3', borderRadius: 16, borderWidth: 1, flexDirection: 'row', justifyContent: 'space-between', marginTop: 14, paddingHorizontal: 16, paddingVertical: 13 },
+  difficultyEyebrow: { color: '#2D7699', fontFamily: fonts.bold, fontSize: 14, lineHeight: 19 },
+  difficultyDescription: { color: '#7193A3', fontFamily: fonts.regular, fontSize: 11, lineHeight: 16, marginTop: 2 },
+  difficultyBadge: { alignItems: 'center', backgroundColor: '#57ABD8', borderRadius: 18, justifyContent: 'center', marginLeft: 12, minWidth: 54, paddingHorizontal: 13, paddingVertical: 8 },
+  difficultyBadgeText: { color: colors.white, fontFamily: fonts.bold, fontSize: 15, lineHeight: 19 },
   questList: { gap: 10, marginTop: 14 },
   questState: { color: '#777777', fontFamily: fonts.medium, paddingVertical: 20, textAlign: 'center' },
   questCard: { alignItems: 'center', backgroundColor: colors.white, borderRadius: 18, flexDirection: 'row', minHeight: 120, padding: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.06, shadowRadius: 12, elevation: 3 },

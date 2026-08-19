@@ -83,6 +83,14 @@ export async function getQuests(): Promise<QuestSummary[]> {
   return parseResponse<QuestSummary[]>(response);
 }
 
+// 로그인한 사용자의 현재 난이도와 가까운 퀘스트부터 받는다.
+export async function getRecommendedQuests(accessToken: string): Promise<QuestSummary[]> {
+  const response = await fetch(`${API_BASE_URL}/api/quest/recommended`, {
+    headers: authHeaders(accessToken),
+  });
+  return parseResponse<QuestSummary[]>(response);
+}
+
 export async function getQuest(uuid: string): Promise<QuestSummary> {
   const response = await fetch(`${API_BASE_URL}/api/quest/${uuid}`);
   return parseResponse<QuestSummary>(response);

@@ -37,6 +37,8 @@ public class SecurityConfig {
                         // 수행 기록은 로그인한 사용자만 접근한다.
                         .requestMatchers("/api/quest/sessions/**").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/quest/*/sessions").authenticated()
+                        // 개인화된 퀘스트 순서는 로그인한 사용자에게만 제공한다.
+                        .requestMatchers(HttpMethod.GET, "/api/quest/recommended").authenticated()
                         // 퀘스트 정의 데이터는 로그인 전에도 조회할 수 있다.
                         .requestMatchers(HttpMethod.GET, "/api/quest/**").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()

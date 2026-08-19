@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
 import oneuldo.quest.domain.Quest;
+import oneuldo.quest.domain.QuestDifficulty;
 
 // 퀘스트를 저장하고 조회하는 Repository
 public interface QuestRepository extends JpaRepository<Quest, UUID> {
@@ -23,4 +24,9 @@ public interface QuestRepository extends JpaRepository<Quest, UUID> {
             ORDER BY c.sortOrder, s.sortOrder, q.title
             """)
     List<Quest> findAllActiveWithCategory();
+
+    boolean existsBySubcategoryIdAndDifficultyAndActiveTrue(
+            UUID subcategoryId,
+            QuestDifficulty difficulty
+    );
 }

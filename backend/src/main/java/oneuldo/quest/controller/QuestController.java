@@ -37,6 +37,11 @@ public class QuestController {
         return questService.findActiveQuests();
     }
 
+    @GetMapping("/recommended")
+    public List<QuestSummaryResponse> getRecommendedQuests(@AuthenticationPrincipal Jwt jwt) {
+        return questService.findRecommendedQuests(memberId(jwt));
+    }
+
     @GetMapping("/{uuid}")
     public QuestSummaryResponse getQuest(@PathVariable UUID uuid) {
         return questService.findQuest(uuid);

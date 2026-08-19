@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
+  ActivityIndicator,
   Animated,
   Easing,
   Image,
@@ -23,6 +24,7 @@ import { images } from '../assets';
 import { PressScale } from '../components/PressScale';
 import { BrandHeader } from '../components/ui';
 import { colors, fonts } from '../theme';
+import type { AiModelSetupState } from '../ai/useAiVariationSettings';
 
 type Friend = '구름이' | '루나';
 type Message = { id: number; role: 'user' | 'friend'; text: string };
@@ -32,7 +34,17 @@ const friendData = {
   루나: { image: images.luna, description: '항상 보듬어주는 친구. 누구나 차분하게 만들어요.' },
 };
 
-export function AiScreen() {
+export function AiScreen({
+  aiVariationEnabled,
+  errorMessage,
+  modelSetupState,
+  onToggleAiVariation,
+}: {
+  aiVariationEnabled: boolean;
+  errorMessage: string | null;
+  modelSetupState: AiModelSetupState;
+  onToggleAiVariation: () => Promise<void>;
+}) {
   const { width } = useWindowDimensions();
   const [friend, setFriend] = useState<Friend>('구름이');
   const [draftFriend, setDraftFriend] = useState<Friend>('구름이');
@@ -224,6 +236,37 @@ export function AiScreen() {
             )}
           </View>
 
+          <View style={styles.modelCard}>
+            <View style={styles.modelCopy}>
+              <Text style={styles.modelTitle}>온디바이스 퀘스트 변형</Text>
+              <Text style={styles.modelDescription}>
+                {modelSetupState === 'unsupported'
+                  ? 'Android Development Build에서 사용할 수 있어요.'
+                  : modelSetupState === 'preparing'
+                    ? '앱 첫 실행 준비 중 · Bllossom 3B 약 2GB를 받아요.'
+                    : 'Bllossom 3B 약 2GB · 설치 후 자동으로 준비돼요.'}
+              </Text>
+              {errorMessage ? <Text style={styles.modelError}>{errorMessage}</Text> : null}
+            </View>
+            <PressScale
+              accessibilityLabel={aiVariationEnabled ? '퀘스트 상황 변형 끄기' : '퀘스트 상황 변형 켜기'}
+              accessibilityRole="button"
+              disabled={modelSetupState === 'checking' || modelSetupState === 'preparing' || modelSetupState === 'unsupported'}
+              onPress={() => void onToggleAiVariation()}
+              style={[styles.modelButton, aiVariationEnabled && styles.modelButtonEnabled]}
+            >
+              {modelSetupState === 'checking' || modelSetupState === 'preparing' ? (
+                <ActivityIndicator color={colors.white} size="small" />
+              ) : (
+                <Text style={styles.modelButtonText}>
+                  {modelSetupState === 'ready'
+                    ? aiVariationEnabled ? '끄기' : '켜기'
+                    : modelSetupState === 'error' ? '재시도' : '모델 준비'}
+                </Text>
+              )}
+            </PressScale>
+          </View>
+
           <View style={styles.controls}>
             <PressScale onPress={() => setSmartnessOpen(true)}><Text style={styles.controlText}>똑똑함 정도</Text></PressScale>
             <PressScale onPress={openFriend}><Text style={styles.controlText}>친구 변경</Text></PressScale>
@@ -361,6 +404,14 @@ const styles = StyleSheet.create({
   userBubbleText: { color: colors.white },
   typingBubble: { alignItems: 'center', flexDirection: 'row', gap: 5, height: 38, minWidth: 58 },
   typingDot: { backgroundColor: '#999999', borderRadius: 4, height: 7, width: 7 },
+  modelCard: { alignItems: 'center', backgroundColor: '#F4FBF7', borderColor: '#DCEFE4', borderRadius: 16, borderWidth: 1, flexDirection: 'row', marginBottom: 12, padding: 12 },
+  modelCopy: { flex: 1, paddingRight: 10 },
+  modelTitle: { color: colors.ink, fontFamily: fonts.bold, fontSize: 13 },
+  modelDescription: { color: '#6F7D74', fontFamily: fonts.regular, fontSize: 11, lineHeight: 16, marginTop: 3 },
+  modelError: { color: '#C64A4A', fontFamily: fonts.medium, fontSize: 10, marginTop: 3 },
+  modelButton: { alignItems: 'center', backgroundColor: '#7C8B82', borderRadius: 14, justifyContent: 'center', minHeight: 38, minWidth: 72, paddingHorizontal: 12 },
+  modelButtonEnabled: { backgroundColor: colors.mint },
+  modelButtonText: { color: colors.white, fontFamily: fonts.bold, fontSize: 12 },
   controls: { alignSelf: 'flex-end', flexDirection: 'row', gap: 24, marginBottom: 12 },
   controlText: { color: '#999999', fontFamily: fonts.handwriting, fontSize: 12 },
   inputWrap: { alignItems: 'center', borderColor: '#E5E5E5', borderRadius: 24, borderWidth: 1, flexDirection: 'row', height: 50, paddingLeft: 20, paddingRight: 8 },

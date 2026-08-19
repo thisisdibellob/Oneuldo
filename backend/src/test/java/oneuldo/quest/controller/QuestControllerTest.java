@@ -94,7 +94,15 @@ class QuestControllerTest {
         mockMvc.perform(post("/api/quest/{uuid}/sessions", quest.getId()))
                 .andExpect(status().isUnauthorized());
 
+        mockMvc.perform(get("/api/quest/recommended"))
+                .andExpect(status().isUnauthorized());
+
         String accessToken = jwtTokenProvider.createAccessToken(member);
+        mockMvc.perform(get("/api/quest/recommended")
+                        .header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].difficulty").value("EASY"));
+
         mockMvc.perform(post("/api/quest/{uuid}/sessions", quest.getId())
                         .header("Authorization", "Bearer " + accessToken))
                 .andExpect(status().isCreated())

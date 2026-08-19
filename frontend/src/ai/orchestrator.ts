@@ -51,6 +51,7 @@ function createRequestId(now: number): string {
   return `quest-variation-${now}-${requestSequence}`;
 }
 
+// 모델이 준비되지 않았다면 한 번 초기화하고, 그래도 실패하면 공통 오류로 처리한다.
 async function ensureRuntimeReady(runtime: QuestVariationRuntime): Promise<NativeRuntimeStatus> {
   let status = await runtime.getStatus();
   if (!status.supported) throw new Error('RUNTIME_UNAVAILABLE');
@@ -59,6 +60,7 @@ async function ensureRuntimeReady(runtime: QuestVariationRuntime): Promise<Nativ
   return status;
 }
 
+// 여러 계층의 예외를 화면과 진단 로그가 이해하는 공통 실패 코드로 바꾼다.
 function classifyFailure(error: unknown): QuestVariationFailureCode {
   if (error instanceof QuestVariationInputError) return error.code;
   if (error instanceof QuestVariationParseError) return error.code;
@@ -82,6 +84,7 @@ export async function generateQuestVariation(
     failureCode: QuestVariationFailureCode | null,
     variation = getOriginalQuestVariation(options.step),
   ): QuestVariationResult => {
+    // AI 성공과 원문 fallback 모두 같은 결과 타입과 진단 메타데이터를 반환한다.
     const metadata: QuestVariationMetadata = {
       requestId,
       modelVersion,
@@ -102,6 +105,7 @@ export async function generateQuestVariation(
   };
 
   try {
+    // 개인정보 제외 → 런타임 준비 → 생성 → JSON 파싱 → 정책 검사의 고정 순서다.
     const input = selectQuestVariationInput(options.quest, options.step);
     const runtimeStatus = await ensureRuntimeReady(runtime);
     modelVersion = runtimeStatus.runtimeVersion;
@@ -116,6 +120,7 @@ export async function generateQuestVariation(
     if (!policy.accepted) throw new Error('POLICY_REJECTED');
     return finish('ai', null, policy.output);
   } catch (error) {
+    // 어떤 실패든 사용자에게 깨진 AI 문장을 보여주지 않고 서버 원문으로 돌아간다.
     return finish('original', classifyFailure(error));
   }
 }

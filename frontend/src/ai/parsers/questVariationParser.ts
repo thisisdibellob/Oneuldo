@@ -13,6 +13,7 @@ export class QuestVariationParseError extends Error {
 }
 
 function extractJsonObject(text: string): string {
+  // 모델이 JSON 코드 블록을 붙여도 내부 객체만 추출할 수 있게 정리한다.
   let candidate = text.trim();
   if (candidate.startsWith('```') && candidate.endsWith('```')) {
     candidate = candidate.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
@@ -28,6 +29,7 @@ function extractJsonObject(text: string): string {
 }
 
 export function parseQuestVariationOutput(text: string): QuestVariationOutput {
+  // 빈 출력과 JSON 문법 오류를 서로 같은 INVALID_JSON 계열로 정리한다.
   if (text.trim().length === 0) {
     throw new QuestVariationParseError('INVALID_JSON', 'AI 응답이 비어 있습니다.');
   }
@@ -45,6 +47,7 @@ export function parseQuestVariationOutput(text: string): QuestVariationOutput {
   }
   const record = parsed as Record<string, unknown>;
   const keys = Object.keys(record);
+  // 허용하지 않은 키를 무시하지 않고 거절해 모델이 만든 임의 데이터를 차단한다.
   if (keys.length !== 2 || keys.some((key) => !allowedKeys.has(key))) {
     throw new QuestVariationParseError(
       'INVALID_OUTPUT_SHAPE',

@@ -35,6 +35,7 @@ public class QuestSessionService {
     private final QuestChoiceRepository questChoiceRepository;
     private final QuestSessionRepository questSessionRepository;
     private final QuestEventRepository questEventRepository;
+    private final DifficultyAdjustmentService difficultyAdjustmentService;
 
     @Transactional
     public QuestSessionResponse start(UUID memberId, UUID questId) {
@@ -128,6 +129,8 @@ public class QuestSessionService {
         }
 
         session.complete(session.getQuest().getRewardPoints());
+        // 종료된 수행 기록으로 사용자별 난이도를 서버 규칙이 다시 평가한다.
+        difficultyAdjustmentService.recordTerminalSession(session);
         return QuestSessionResponse.from(session);
     }
 
@@ -136,6 +139,7 @@ public class QuestSessionService {
         QuestSession session = findOwnedSession(memberId, sessionId);
         requireInProgress(session);
         session.abandon(reason == null || reason.isBlank() ? "USER_EXIT" : reason.trim());
+        difficultyAdjustmentService.recordTerminalSession(session);
         return QuestSessionResponse.from(session);
     }
 

@@ -9,6 +9,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { FloatingNav } from '../components/FloatingNav';
+import type { AiVariationSettings } from '../ai/useAiVariationSettings';
 import { colors } from '../theme';
 import { AiScreen } from './AiScreen';
 import { GamePrototypeScreen } from './GamePrototypeScreen';
@@ -21,16 +22,20 @@ import { getQuestDetail, QuestDetail, QuestSummary } from '../api/quest';
 
 type AppShellProps = {
   accessToken: string | null;
+  aiVariation: AiVariationSettings;
   quests: QuestSummary[];
   questsLoading: boolean;
   questsError: string | null;
+  onRefreshQuests: () => void;
 };
 
 export function AppShell({
   accessToken,
+  aiVariation,
   quests,
   questsLoading,
   questsError,
+  onRefreshQuests,
 }: AppShellProps) {
   const [selectedQuest, setSelectedQuest] = useState<QuestDetail | null>(null);
 
@@ -82,6 +87,7 @@ export function AppShell({
     beginTransition();
     setPractice(false);
     setSelectedQuest(null);
+    onRefreshQuests();
   };
 
   const openQuest = async (uuid: string) => {
@@ -129,7 +135,12 @@ export function AppShell({
     return (
       <SafeAreaView edges={['top', 'bottom']} style={styles.safe}>
         <Animated.View style={[styles.body, animatedStyle]}>
-          <QuestPracticeScreen accessToken={accessToken} onBack={closePractice} quest={selectedQuest} />
+          <QuestPracticeScreen
+            accessToken={accessToken}
+            aiVariationEnabled={aiVariation.enabled}
+            onBack={closePractice}
+            quest={selectedQuest}
+          />
         </Animated.View>
       </SafeAreaView>
     );
@@ -159,9 +170,16 @@ export function AppShell({
       loading={questsLoading}
       onQuest={openQuest}
       quests={quests}
+      showPersonalDifficulty={accessToken !== null}
     />,
     <GameScreen key="game" onEnter={openGame} />,
-    <AiScreen key="ai" />,
+    <AiScreen
+      aiVariationEnabled={aiVariation.enabled}
+      errorMessage={aiVariation.errorMessage}
+      key="ai"
+      modelSetupState={aiVariation.setupState}
+      onToggleAiVariation={aiVariation.toggleEnabled}
+    />,
     <ProfileScreen key="profile" />,
   ];
 

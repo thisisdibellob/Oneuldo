@@ -94,6 +94,20 @@ class QuestServiceTest {
                 )
         );
 
+        // 같은 세부 분야의 다른 원본 견본은 별도 카드로 늘어나지 않아야 한다.
+        questRepository.save(
+                new Quest(
+                        subcategory,
+                        "Z_SECOND_BUS_SCENARIO",
+                        "두 번째 버스 견본",
+                        "같은 대중교통 트랙 안에서 순환합니다.",
+                        "같은 난이도의 다른 상황을 연습한다.",
+                        QuestDifficulty.EASY,
+                        20,
+                        true
+                )
+        );
+
         // 비활성 퀘스트 저장
         questRepository.save(
                 new Quest(
@@ -112,7 +126,7 @@ class QuestServiceTest {
         List<QuestSummaryResponse> responses =
                 questService.findActiveQuests();
 
-        // 활성 퀘스트 한 개만 조회되는지 확인
+        // 활성 원본이 여러 개여도 세부 분야 카드 한 개만 조회되는지 확인
         assertEquals(1, responses.size());
 
         QuestSummaryResponse response = responses.getFirst();

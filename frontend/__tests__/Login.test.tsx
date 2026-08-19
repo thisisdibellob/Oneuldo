@@ -7,7 +7,9 @@ jest.mock('../src/api/auth', () => ({
 }));
 
 jest.mock('../src/api/quest', () => ({
+  getQuestDetail: jest.fn(async () => null),
   getQuests: jest.fn(async () => []),
+  getRecommendedQuests: jest.fn(async () => []),
 }));
 
 jest.mock('expo-font', () => ({

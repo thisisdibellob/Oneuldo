@@ -21,14 +21,17 @@ import {
 } from '../api/quest';
 import { flushQuestEventQueue, getQueuedQuestEventCount, queueQuestEvent } from '../api/questEventQueue';
 import { PressScale } from '../components/PressScale';
+import { useQuestVariation } from '../ai/useQuestVariation';
 import { colors, fonts } from '../theme';
 
 export function QuestPracticeScreen({
   accessToken,
+  aiVariationEnabled,
   onBack,
   quest,
 }: {
   accessToken: string | null;
+  aiVariationEnabled: boolean;
   onBack: () => void;
   quest: QuestDetail | null;
 }) {
@@ -45,6 +48,7 @@ export function QuestPracticeScreen({
   const [syncNotice, setSyncNotice] = useState<string | null>(null);
   const stepStartedAt = useRef(Date.now());
   const sessionCompleted = useRef(false);
+  const variation = useQuestVariation({ enabled: aiVariationEnabled, quest, stepIndex });
 
   useEffect(() => {
     if (!accessToken || !quest) return;
@@ -78,7 +82,7 @@ export function QuestPracticeScreen({
     );
   }
 
-  const step = quest.steps[stepIndex];
+  const step = variation.step ?? quest.steps[stepIndex];
   const wrong = submittedChoice !== null && !submittedChoice.correct;
   const correct = submittedChoice?.correct === true;
 
@@ -174,6 +178,29 @@ export function QuestPracticeScreen({
     return <QuestResult correctCount={correctCount} onBack={closePractice} quest={quest} />;
   }
 
+  if (variation.isPreparing) {
+    return (
+      <View style={styles.root}>
+        <View style={[styles.frame, compact && styles.frameCompact]}>
+          <View style={styles.topBar}>
+            <PressScale accessibilityLabel="퀘스트 닫기" hitSlop={12} onPress={closePractice}>
+              <Ionicons color={colors.ink} name="close" size={30} />
+            </PressScale>
+            <View style={styles.progressTrack}>
+              <View style={[styles.progressFill, { width: `${((stepIndex + 1) / quest.steps.length) * 100}%` }]} />
+            </View>
+            <Text style={styles.step}>{stepIndex + 1}/{quest.steps.length}</Text>
+          </View>
+          <View accessibilityLiveRegion="polite" style={styles.variationLoading}>
+            <ActivityIndicator color={colors.mint} size="large" />
+            <Text style={styles.variationLoadingTitle}>새로운 퀘스트를 만들고 있어요.</Text>
+            <Text style={styles.variationLoadingDescription}>모든 단계와 선택지를 안전하게 확인하고 있어요.</Text>
+          </View>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.root}>
       <View style={[styles.frame, compact && styles.frameCompact]}>
@@ -187,6 +214,7 @@ export function QuestPracticeScreen({
           <Text style={styles.step}>{stepIndex + 1}/{quest.steps.length}</Text>
         </View>
 
+        {variation.source === 'ai' ? <Text style={styles.variationBadge}>AI 생성 퀘스트</Text> : null}
         <Text style={styles.title}>{step.instruction}</Text>
         <View style={[styles.scene, compact && styles.sceneCompact]}>
           <View style={styles.person}>
@@ -318,6 +346,10 @@ const styles = StyleSheet.create({
   progressFill: { backgroundColor: '#329F00', borderRadius: 8, height: 14 },
   step: { color: colors.ink, fontFamily: fonts.bold, fontSize: 18 },
   title: { color: colors.ink, fontFamily: fonts.laundryBold, fontSize: 20, marginBottom: 18, marginTop: 2 },
+  variationBadge: { alignSelf: 'flex-start', backgroundColor: '#E9FFF2', borderRadius: 10, color: '#16875D', fontFamily: fonts.bold, fontSize: 11, marginBottom: 7, overflow: 'hidden', paddingHorizontal: 9, paddingVertical: 4 },
+  variationLoading: { alignItems: 'center', flex: 1, justifyContent: 'center', paddingBottom: 62 },
+  variationLoadingTitle: { color: colors.ink, fontFamily: fonts.bold, fontSize: 18, marginTop: 16 },
+  variationLoadingDescription: { color: '#777777', fontFamily: fonts.regular, fontSize: 13, marginTop: 7, textAlign: 'center' },
   scene: { backgroundColor: '#B3B3B3', borderRadius: 16, flex: 1, maxHeight: 238, minHeight: 190, overflow: 'hidden', position: 'relative' },
   sceneCompact: { minHeight: 170 },
   person: { bottom: 0, left: '9%', position: 'absolute' },

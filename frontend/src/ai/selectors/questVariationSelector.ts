@@ -19,6 +19,7 @@ export class QuestVariationInputError extends Error {
 }
 
 function requireText(value: string, fieldName: string): string {
+  // 프롬프트에 넣기 전에 빈 값과 이메일·전화번호·UUID를 차단한다.
   const normalized = value.trim();
   if (normalized.length === 0) {
     throw new QuestVariationInputError('INVALID_INPUT', `${fieldName}이 비어 있습니다.`);
@@ -33,7 +34,7 @@ export function selectQuestVariationInput(
   quest: Pick<QuestDetail, 'title' | 'goal'>,
   step: Pick<QuestStep, 'situation' | 'instruction'>,
 ): QuestVariationInput {
-  // ID, 선택지, 정답, 보상은 이 객체에 복사하지 않는다.
+  // ID, 선택지, 정답, 보상과 사용자 정보는 이 객체에 복사하지 않는다.
   return {
     schemaVersion: QUEST_VARIATION_INPUT_VERSION,
     theme: requireText(quest.title, 'theme'),

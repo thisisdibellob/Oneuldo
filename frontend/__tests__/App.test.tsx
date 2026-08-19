@@ -62,6 +62,7 @@ jest.mock('../src/api/quest', () => {
       ],
     })),
     getQuests: jest.fn(async () => [summary]),
+    getRecommendedQuests: jest.fn(async () => [summary]),
     recordQuestEvent: jest.fn(async () => ({ correct: true })),
     startQuestSession: jest.fn(async () => ({ id: 'session-1', status: 'IN_PROGRESS' })),
   };

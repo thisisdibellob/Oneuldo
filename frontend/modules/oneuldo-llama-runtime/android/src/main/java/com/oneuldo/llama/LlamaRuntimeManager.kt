@@ -81,7 +81,8 @@ internal class LlamaRuntimeManager(
   fun reserveGeneration(requestId: String, prompt: String, maxTokens: Int, timeoutMs: Long) {
     if (requestId.isBlank()) throw CodedException("GENERATION_FAILED", "requestId가 비어 있습니다.", null)
     if (prompt.isBlank()) throw CodedException("GENERATION_FAILED", "프롬프트가 비어 있습니다.", null)
-    if (maxTokens !in 1..256) throw CodedException("GENERATION_FAILED", "maxTokens는 1~256이어야 합니다.", null)
+    // GGUF 런타임의 2,048 토큰 컨텍스트 안에서 최대 1,024 토큰 출력을 허용한다.
+    if (maxTokens !in 1..1024) throw CodedException("GENERATION_FAILED", "maxTokens는 1~1024여야 합니다.", null)
     if (timeoutMs <= 0) throw CodedException("GENERATION_FAILED", "timeoutMs는 0보다 커야 합니다.", null)
     synchronized(stateLock) {
       if (recentRequestIds.contains(requestId)) throw CodedException("BUSY", "이미 처리한 requestId입니다.", null)

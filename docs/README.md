@@ -35,6 +35,7 @@
 - [서비스 기획 요약](./product-plan.md)
 - [AI 활용 및 온디바이스 시스템 설계](./ai/ai-system-design.md)
 - [AI 페이즈별 구현 계획](./ai/ai-implementation-roadmap.md)
+- [AI Phase 0~6 구조 및 구현 종합 정리](./ai/phase0-to-phase6-architecture-summary.md)
 - [Phase 1 구현 변경 요약](./ai/phase1-implementation-summary.md)
 - [Phase 2 구현 변경 요약](./ai/phase2-implementation-summary.md)
 - [Phase 3 AI 공통 계층 구현 요약](./ai/phase3-implementation-summary.md)
