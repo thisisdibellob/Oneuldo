@@ -17,10 +17,50 @@ import {
 } from 'react-native';
 
 import { icons } from '../assets';
-import { GameHud, type DailyQuestItem } from '../components/game/GameHud';
+import { GameHud } from '../components/game/GameHud';
 import { MODULAR_CHARACTER_CANVAS, ModularCharacter } from '../components/game/ModularCharacter';
+import {
+  ExpandedVillageLayer,
+  HomeWorldLayer,
+  type HomeStationId,
+  type NpcQuestState,
+  type VillagePortalId,
+} from '../components/game/PrototypeWorldLayers';
 import { PressScale } from '../components/PressScale';
+import {
+  acceptDailyQuest as acceptDailyQuestStatus,
+  completeDailyQuest as completeDailyQuestStatus,
+  createDailyQuestItems,
+  INITIAL_DAILY_QUEST_STATUS,
+  type DailyQuestId,
+  type DailyQuestStatusMap,
+} from '../game/dailyQuests';
 import { marketGameArt, playerGameArt } from '../game/gameAssets';
+import {
+  HOME_EXIT_POINT,
+  HOME_FRIDGE_POINT,
+  HOME_PLAYER_POINT,
+  HOME_STATION_INTERACTION_DISTANCE,
+  HOUSE_ENTRANCE_POINT,
+  HOUSE_RETURN_POINT,
+  INITIAL_PLAYER_POINT,
+  MARKET_ENTRANCE_POINT,
+  MARKET_EXIT_POINT,
+  MARKET_PLAYER_POINT,
+  MARKET_RETURN_POINT,
+  VILLAGE_NPC_BY_ID,
+  VILLAGE_NPC_EXIT_DISTANCE,
+  VILLAGE_NPC_INTERACTION_DISTANCE,
+  VILLAGE_NPCS,
+  VILLAGE_PORTAL_INTERACTION_DISTANCE,
+  WORLD_BOUNDS,
+  WORLD_OBSTACLES,
+  type Point,
+  type Rect,
+  type VillageNpcDefinition,
+  type VillageNpcId,
+  type WorldMapId,
+} from '../game/prototypeWorld';
 import { MarketCategoryId, marketCategories } from '../game/scenarios';
 import { colors, fonts } from '../theme';
 import {
@@ -29,8 +69,6 @@ import {
   MarketStationId,
 } from './MarketSimulationScreen';
 
-const VILLAGE_WORLD_WIDTH = 1000;
-const VILLAGE_WORLD_HEIGHT = 900;
 const MARKET_WORLD_WIDTH = 900;
 const MARKET_WORLD_HEIGHT = 1000;
 const PLAYER_RADIUS = 22;
@@ -48,15 +86,8 @@ const JOYSTICK_SIZE = 110;
 const JOYSTICK_ZONE_HEIGHT = 270;
 const DIALOGUE_CHARACTER_DELAY = 34;
 const DIALOGUE_READ_DELAY = 360;
-const INTERACTION_DISTANCE = 116;
-const NPC_POINT = { x: 610, y: 520 };
-const INITIAL_PLAYER_POINT = { x: 480, y: 700 };
-const MARKET_ENTRANCE_POINT = { x: 775, y: 346 };
-const MARKET_RETURN_POINT = { x: 775, y: 404 };
-const MARKET_INTERACTION_DISTANCE = 92;
 const MARKET_STATION_INTERACTION_DISTANCE = 105;
-const MARKET_PLAYER_POINT = { x: 450, y: 820 };
-const MARKET_EXIT_POINT = { x: 450, y: 950 };
+const BUS_STOP_POINT = { x: 1245, y: 480 };
 
 const MARKET_STATIONS: Record<MarketStationId | 'exit', Point> = {
   checkout: { x: 450, y: 250 },
@@ -73,13 +104,6 @@ const MARKET_SHELVES: Record<MarketCategoryId, Rect> = {
   meal: { height: 128, width: 220, x: 90, y: 590 },
   drink: { height: 128, width: 220, x: 590, y: 590 },
 };
-
-const villageObstacles = [
-  { x: 112, y: 116, width: 238, height: 184 },
-  { x: 660, y: 122, width: 230, height: 190 },
-  { x: 406, y: 330, width: 150, height: 105 },
-  { x: 120, y: 548, width: 184, height: 110 },
-];
 
 const marketObstacles: Rect[] = [
   { height: 105, width: 250, x: 325, y: 92 },
@@ -130,50 +154,32 @@ function resolveDialogueText(
   return selectedChoice ? step.responses[selectedChoice] : '';
 }
 
-const DAILY_QUEST_DEFINITIONS = [
-  {
-    description: '안내원 민수와 대화를 시작해요.',
-    id: 'greet-minsu',
-    rewardXp: 5,
-    title: '민수에게 인사하기',
-  },
-  {
-    description: '횡단보도 안전 문제를 맞혀요.',
-    id: 'safety-quiz',
-    rewardXp: 10,
-    title: '안전 퀴즈 풀기',
-  },
-  {
-    description: '마트 입구로 가서 안으로 들어가요.',
-    id: 'visit-market',
-    rewardXp: 10,
-    title: '하늘마트 방문하기',
-  },
-  {
-    description: '목록에 있는 물건을 모두 준비해요.',
-    id: 'market-list',
-    rewardXp: 30,
-    title: '장보기 목록 완성하기',
-  },
-] as const satisfies readonly Omit<DailyQuestItem, 'completed'>[];
-
-type DailyQuestId = (typeof DAILY_QUEST_DEFINITIONS)[number]['id'];
-
-type Point = { x: number; y: number };
-type Rect = { height: number; width: number; x: number; y: number };
 type QuizStep = 'question' | 'result' | null;
 type ControlMode = 'joystick' | 'touch';
-type WorldMapId = 'village' | 'market';
 type NearbyMarketStation = MarketStationId | 'exit' | null;
+type NearbyHomeStation = HomeStationId | null;
+type PendingPortal = VillagePortalId | null;
+type DialogueMode = 'minsu-quest' | 'small-talk' | null;
+type InfoPanel = { body: string; title: string } | null;
+type TapInteractionOptions = {
+  busStop?: boolean;
+  homeStation?: NearbyHomeStation;
+  marketStation?: NearbyMarketStation;
+  npcId?: VillageNpcId | null;
+  portalId?: PendingPortal;
+};
 
+const NPC_QUEST_IDS: Partial<Record<VillageNpcId, DailyQuestId>> = {
+  driver: 'bus-route',
+  jiyoung: 'market-shopping',
+  minsu: 'minsu-safety',
+};
 function getWorldBounds(worldMap: WorldMapId) {
-  return worldMap === 'market'
-    ? { height: MARKET_WORLD_HEIGHT, width: MARKET_WORLD_WIDTH }
-    : { height: VILLAGE_WORLD_HEIGHT, width: VILLAGE_WORLD_WIDTH };
+  return WORLD_BOUNDS[worldMap];
 }
 
 function isBlocked(point: Point, worldMap: WorldMapId) {
-  const obstacles = worldMap === 'market' ? marketObstacles : villageObstacles;
+  const obstacles = worldMap === 'market' ? marketObstacles : WORLD_OBSTACLES[worldMap];
   return obstacles.some(
     (obstacle) =>
       point.x + PLAYER_RADIUS > obstacle.x &&
@@ -487,25 +493,31 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
   const direction = useRef<Point>({ x: 0, y: 0 });
   const speedMultiplier = useRef(1);
   const tapTarget = useRef<Point | null>(null);
-  const pendingNpcInteraction = useRef(false);
-  const pendingMarketInteraction = useRef(false);
+  const pendingNpcInteraction = useRef<VillageNpcId | null>(null);
+  const pendingPortalInteraction = useRef<PendingPortal>(null);
   const pendingMarketStationInteraction = useRef<NearbyMarketStation>(null);
+  const pendingHomeStationInteraction = useRef<NearbyHomeStation>(null);
+  const pendingBusStopInteraction = useRef(false);
   const joystickEngaged = useRef(false);
   const touchHoldActivated = useRef(false);
   const clearSoundTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const animationFrame = useRef<number | null>(null);
   const previousFrame = useRef<number | null>(null);
-  const nearbyRef = useRef(false);
-  const marketNearbyRef = useRef(false);
+  const nearbyNpcIdRef = useRef<VillageNpcId | null>(null);
+  const nearbyPortalIdRef = useRef<PendingPortal>(null);
   const marketStationNearbyRef = useRef<NearbyMarketStation>(null);
+  const homeStationNearbyRef = useRef<NearbyHomeStation>(null);
+  const busStopNearbyRef = useRef(false);
   const controlsLockedRef = useRef(false);
   const joystickZoneSize = useRef({ width: 220, height: JOYSTICK_ZONE_HEIGHT });
   const dialogueReadyAt = useRef(Number.POSITIVE_INFINITY);
-  const startDialogueRef = useRef<() => void>(() => undefined);
+  const openNpcMenuRef = useRef<(npcId: VillageNpcId) => void>(() => undefined);
 
-  const [npcNearby, setNpcNearby] = useState(false);
-  const [marketNearby, setMarketNearby] = useState(false);
+  const [nearbyNpcId, setNearbyNpcId] = useState<VillageNpcId | null>(null);
+  const [nearbyPortalId, setNearbyPortalId] = useState<PendingPortal>(null);
   const [marketStationNearby, setMarketStationNearby] = useState<NearbyMarketStation>(null);
+  const [nearbyHomeStation, setNearbyHomeStation] = useState<NearbyHomeStation>(null);
+  const [busStopNearby, setBusStopNearby] = useState(false);
   const [marketScenarioLocked, setMarketScenarioLocked] = useState(false);
   const [marketInteractionRequest, setMarketInteractionRequest] =
     useState<MarketInteractionRequest | null>(null);
@@ -518,6 +530,13 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
   const [tapTargetMarker, setTapTargetMarker] = useState<Point | null>(null);
   const [joystickActive, setJoystickActive] = useState(false);
   const [joystickCenter, setJoystickCenter] = useState({ x: 76, y: 190 });
+  const [activeNpcMenu, setActiveNpcMenu] = useState<VillageNpcId | null>(null);
+  const [questOfferId, setQuestOfferId] = useState<DailyQuestId | null>(null);
+  const [infoPanel, setInfoPanel] = useState<InfoPanel>(null);
+  const [dialogueMode, setDialogueMode] = useState<DialogueMode>(null);
+  const [dialogueNpcId, setDialogueNpcId] = useState<VillageNpcId>('minsu');
+  const [activeDialogueSteps, setActiveDialogueSteps] =
+    useState<readonly DialogueStep[]>(dialogueSteps);
   const [dialogueIndex, setDialogueIndex] = useState<number | null>(null);
   const [renderedDialogueIndex, setRenderedDialogueIndex] = useState(0);
   const [dialoguePanelMounted, setDialoguePanelMounted] = useState(false);
@@ -529,20 +548,38 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
   const [quizPanelMounted, setQuizPanelMounted] = useState(false);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [showWrongFeedback, setShowWrongFeedback] = useState(false);
-  const [completedDailyQuestIds, setCompletedDailyQuestIds] = useState<DailyQuestId[]>([]);
-  const completeDailyQuest = useCallback((questId: DailyQuestId) => {
-    setCompletedDailyQuestIds((currentIds) =>
-      currentIds.includes(questId) ? currentIds : [...currentIds, questId],
-    );
+  const [dailyQuestStatuses, setDailyQuestStatuses] =
+    useState<DailyQuestStatusMap>(INITIAL_DAILY_QUEST_STATUS);
+  const questStatusesRef = useRef<DailyQuestStatusMap>(INITIAL_DAILY_QUEST_STATUS);
+  questStatusesRef.current = dailyQuestStatuses;
+
+  const acceptDailyQuest = useCallback((questId: DailyQuestId) => {
+    setDailyQuestStatuses((current) => {
+      const next = acceptDailyQuestStatus(current, questId);
+      questStatusesRef.current = next;
+      return next;
+    });
   }, []);
-  const dailyQuests: DailyQuestItem[] = DAILY_QUEST_DEFINITIONS.map((quest) => ({
-    ...quest,
-    completed: completedDailyQuestIds.includes(quest.id),
-  }));
-  const currentDialogueStep = dialogueIndex === null ? undefined : dialogueSteps[dialogueIndex];
+  const completeDailyQuest = useCallback((questId: DailyQuestId) => {
+    setDailyQuestStatuses((current) => {
+      const next = completeDailyQuestStatus(current, questId);
+      questStatusesRef.current = next;
+      return next;
+    });
+  }, []);
+  const dailyQuests = createDailyQuestItems(dailyQuestStatuses);
+  const npcQuestStates: Partial<Record<VillageNpcId, NpcQuestState>> = {
+    driver: dailyQuestStatuses['bus-route'],
+    jiyoung: dailyQuestStatuses['market-shopping'],
+    minsu: dailyQuestStatuses['minsu-safety'],
+    sujin: 'conversation',
+  };
+  const currentDialogueStep =
+    dialogueIndex === null ? undefined : activeDialogueSteps[dialogueIndex];
   const currentDialogue = resolveDialogueText(currentDialogueStep, selectedDailyChoice);
-  const renderedDialogueStep = dialogueSteps[renderedDialogueIndex];
+  const renderedDialogueStep = activeDialogueSteps[renderedDialogueIndex];
   const renderedDialogue = resolveDialogueText(renderedDialogueStep, selectedDailyChoice);
+  const dialogueSpeakerName = VILLAGE_NPC_BY_ID[dialogueNpcId].name;
   const dailyChoiceVisible =
     currentDialogueStep?.kind === 'choice' &&
     visibleDialogueCharacters >= currentDialogue.length;
@@ -552,6 +589,9 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
     dialogueIndex !== null ||
     quizStep !== null ||
     hudMenuOpen ||
+    activeNpcMenu !== null ||
+    questOfferId !== null ||
+    infoPanel !== null ||
     marketScenarioLocked;
 
   useEffect(() => {
@@ -580,15 +620,33 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
   );
 
   const updateNpcProximity = useCallback((point: Point) => {
-    if (worldMapRef.current === 'market') {
-      if (nearbyRef.current) {
-        nearbyRef.current = false;
-        setNpcNearby(false);
-      }
-      if (marketNearbyRef.current) {
-        marketNearbyRef.current = false;
-        setMarketNearby(false);
-      }
+    const activeMap = worldMapRef.current;
+    const setNpc = (next: VillageNpcId | null) => {
+      if (next === nearbyNpcIdRef.current) return;
+      nearbyNpcIdRef.current = next;
+      setNearbyNpcId(next);
+    };
+    const setPortal = (next: PendingPortal) => {
+      if (next === nearbyPortalIdRef.current) return;
+      nearbyPortalIdRef.current = next;
+      setNearbyPortalId(next);
+    };
+    const setHomeStation = (next: NearbyHomeStation) => {
+      if (next === homeStationNearbyRef.current) return;
+      homeStationNearbyRef.current = next;
+      setNearbyHomeStation(next);
+    };
+    const setBusStop = (next: boolean) => {
+      if (next === busStopNearbyRef.current) return;
+      busStopNearbyRef.current = next;
+      setBusStopNearby(next);
+    };
+
+    if (activeMap === 'market') {
+      setNpc(null);
+      setPortal(null);
+      setHomeStation(null);
+      setBusStop(false);
       let closest: NearbyMarketStation = null;
       let closestDistance = Number.POSITIVE_INFINITY;
       (Object.entries(MARKET_STATIONS) as Array<[MarketStationId | 'exit', Point]>).forEach(
@@ -611,24 +669,71 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
       marketStationNearbyRef.current = null;
       setMarketStationNearby(null);
     }
-    const nearby = Math.hypot(point.x - NPC_POINT.x, point.y - NPC_POINT.y) <= INTERACTION_DISTANCE;
-    if (nearby !== nearbyRef.current) {
-      nearbyRef.current = nearby;
-      setNpcNearby(nearby);
+
+    if (activeMap === 'home') {
+      setNpc(null);
+      setPortal(null);
+      setBusStop(false);
+      const stations: Array<[HomeStationId, Point]> = [
+        ['fridge', HOME_FRIDGE_POINT],
+        ['exit', HOME_EXIT_POINT],
+      ];
+      let closest: NearbyHomeStation = null;
+      let closestDistance = Number.POSITIVE_INFINITY;
+      stations.forEach(([station, stationPoint]) => {
+        const distance = Math.hypot(point.x - stationPoint.x, point.y - stationPoint.y);
+        if (distance <= HOME_STATION_INTERACTION_DISTANCE && distance < closestDistance) {
+          closest = station;
+          closestDistance = distance;
+        }
+      });
+      setHomeStation(closest);
+      return;
     }
 
-    const marketDistance = Math.hypot(
-      point.x - MARKET_ENTRANCE_POINT.x,
-      point.y - MARKET_ENTRANCE_POINT.y,
+    setHomeStation(null);
+    let closestNpc: VillageNpcId | null = null;
+    let closestNpcDistance = Number.POSITIVE_INFINITY;
+    VILLAGE_NPCS.forEach((npc) => {
+      const distance = Math.hypot(point.x - npc.point.x, point.y - npc.point.y);
+      const limit =
+        nearbyNpcIdRef.current === npc.id
+          ? VILLAGE_NPC_EXIT_DISTANCE
+          : VILLAGE_NPC_INTERACTION_DISTANCE;
+      if (distance <= limit && distance < closestNpcDistance) {
+        closestNpc = npc.id;
+        closestNpcDistance = distance;
+      }
+    });
+    setNpc(closestNpc);
+
+    const portalDistances: Array<[VillagePortalId, number]> = [
+      [
+        'market',
+        Math.hypot(point.x - MARKET_ENTRANCE_POINT.x, point.y - MARKET_ENTRANCE_POINT.y),
+      ],
+      [
+        'home',
+        Math.hypot(point.x - HOUSE_ENTRANCE_POINT.x, point.y - HOUSE_ENTRANCE_POINT.y),
+      ],
+    ];
+    let closestPortal: PendingPortal = null;
+    let closestPortalDistance = Number.POSITIVE_INFINITY;
+    portalDistances.forEach(([portal, distance]) => {
+      const limit =
+        nearbyPortalIdRef.current === portal
+          ? VILLAGE_PORTAL_INTERACTION_DISTANCE * 1.18
+          : VILLAGE_PORTAL_INTERACTION_DISTANCE;
+      if (distance <= limit && distance < closestPortalDistance) {
+        closestPortal = portal;
+        closestPortalDistance = distance;
+      }
+    });
+    setPortal(closestPortal);
+    setBusStop(
+      Math.hypot(point.x - BUS_STOP_POINT.x, point.y - BUS_STOP_POINT.y) <=
+        VILLAGE_PORTAL_INTERACTION_DISTANCE,
     );
-    const marketProximityLimit = marketNearbyRef.current
-      ? MARKET_INTERACTION_DISTANCE * 1.18
-      : MARKET_INTERACTION_DISTANCE;
-    const nearMarket = marketDistance <= marketProximityLimit;
-    if (nearMarket !== marketNearbyRef.current) {
-      marketNearbyRef.current = nearMarket;
-      setMarketNearby(nearMarket);
-    }
   }, []);
 
   const movePlayer = useCallback(
@@ -655,9 +760,11 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
     direction.current = { x: 0, y: 0 };
     joystickEngaged.current = false;
     tapTarget.current = null;
-    pendingNpcInteraction.current = false;
-    pendingMarketInteraction.current = false;
+    pendingNpcInteraction.current = null;
+    pendingPortalInteraction.current = null;
     pendingMarketStationInteraction.current = null;
+    pendingHomeStationInteraction.current = null;
+    pendingBusStopInteraction.current = false;
     previousFrame.current = null;
     setJoystickActive(false);
     setTapTargetMarker(null);
@@ -686,24 +793,28 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
     onExit();
   }, [backgroundMusic, backgroundMusicStatus.isLoaded, onExit, stopMovement]);
 
-  const handleEnterMarket = useCallback(() => {
-    if (!marketNearbyRef.current) return;
+  const prepareMapTransition = useCallback(() => {
     stopMovement();
     speedMultiplier.current = 1;
     setRunEnabled(false);
+    setActiveNpcMenu(null);
+    setQuestOfferId(null);
+    setInfoPanel(null);
+  }, [stopMovement]);
+
+  const handleEnterMarket = useCallback(() => {
+    if (nearbyPortalIdRef.current !== 'market') return;
+    prepareMapTransition();
     setMarketScenarioLocked(true);
     worldMapRef.current = 'market';
     setWorldMap('market');
-    completeDailyQuest('visit-market');
     playerPoint.current = { ...MARKET_PLAYER_POINT };
     updateCamera(playerPoint.current);
     updateNpcProximity(playerPoint.current);
-  }, [completeDailyQuest, stopMovement, updateCamera, updateNpcProximity]);
+  }, [prepareMapTransition, updateCamera, updateNpcProximity]);
 
   const handleLeaveMarket = useCallback(() => {
-    stopMovement();
-    speedMultiplier.current = 1;
-    setRunEnabled(false);
+    prepareMapTransition();
     setMarketScenarioLocked(false);
     setMarketInteractionRequest(null);
     worldMapRef.current = 'village';
@@ -711,18 +822,41 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
     playerPoint.current = { ...MARKET_RETURN_POINT };
     updateCamera(playerPoint.current);
     updateNpcProximity(playerPoint.current);
-  }, [stopMovement, updateCamera, updateNpcProximity]);
+  }, [prepareMapTransition, updateCamera, updateNpcProximity]);
+
+  const handleEnterHome = useCallback(() => {
+    if (nearbyPortalIdRef.current !== 'home') return;
+    prepareMapTransition();
+    setMarketScenarioLocked(false);
+    worldMapRef.current = 'home';
+    setWorldMap('home');
+    playerPoint.current = { ...HOME_PLAYER_POINT };
+    updateCamera(playerPoint.current);
+    updateNpcProximity(playerPoint.current);
+  }, [prepareMapTransition, updateCamera, updateNpcProximity]);
+
+  const handleLeaveHome = useCallback(() => {
+    prepareMapTransition();
+    worldMapRef.current = 'village';
+    setWorldMap('village');
+    playerPoint.current = { ...HOUSE_RETURN_POINT };
+    updateCamera(playerPoint.current);
+    updateNpcProximity(playerPoint.current);
+  }, [prepareMapTransition, updateCamera, updateNpcProximity]);
 
   const handleEmergencyExit = useCallback(() => {
-    stopMovement();
-    speedMultiplier.current = 1;
-    setRunEnabled(false);
+    prepareMapTransition();
+    const activeMap = worldMapRef.current;
     playerPoint.current = {
-      ...(worldMapRef.current === 'market' ? MARKET_PLAYER_POINT : INITIAL_PLAYER_POINT),
+      ...(activeMap === 'market'
+        ? MARKET_PLAYER_POINT
+        : activeMap === 'home'
+          ? HOME_PLAYER_POINT
+          : INITIAL_PLAYER_POINT),
     };
     updateCamera(playerPoint.current);
     updateNpcProximity(playerPoint.current);
-  }, [stopMovement, updateCamera, updateNpcProximity]);
+  }, [prepareMapTransition, updateCamera, updateNpcProximity]);
 
   const handleHudMenuVisibilityChange = useCallback((open: boolean) => {
     if (open) stopMovement();
@@ -741,38 +875,78 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
         const dx = target.x - current.x;
         const dy = target.y - current.y;
         const distance = Math.hypot(dx, dy);
-        const npcInteractionReached = pendingNpcInteraction.current && nearbyRef.current;
-        const marketInteractionReached =
-          pendingMarketInteraction.current && marketNearbyRef.current;
-        const pendingStation = pendingMarketStationInteraction.current;
+        const pendingNpc = pendingNpcInteraction.current;
+        const npcInteractionReached =
+          pendingNpc !== null && nearbyNpcIdRef.current === pendingNpc;
+        const pendingPortal = pendingPortalInteraction.current;
+        const portalInteractionReached =
+          pendingPortal !== null && nearbyPortalIdRef.current === pendingPortal;
+        const pendingMarketStation = pendingMarketStationInteraction.current;
         const marketStationInteractionReached =
-          pendingStation !== null && marketStationNearbyRef.current === pendingStation;
+          pendingMarketStation !== null &&
+          marketStationNearbyRef.current === pendingMarketStation;
+        const pendingHomeStation = pendingHomeStationInteraction.current;
+        const homeStationInteractionReached =
+          pendingHomeStation !== null && homeStationNearbyRef.current === pendingHomeStation;
+        const busStopInteractionReached =
+          pendingBusStopInteraction.current && busStopNearbyRef.current;
 
         if (
           distance <= 3 ||
           npcInteractionReached ||
-          marketInteractionReached ||
-          marketStationInteractionReached
+          portalInteractionReached ||
+          marketStationInteractionReached ||
+          homeStationInteractionReached ||
+          busStopInteractionReached
         ) {
-          const shouldTalk = pendingNpcInteraction.current && nearbyRef.current;
-          const shouldEnterMarket =
-            pendingMarketInteraction.current && marketNearbyRef.current;
-          const stationToUse = marketStationInteractionReached ? pendingStation : null;
+          const npcToOpen = npcInteractionReached ? pendingNpc : null;
+          const portalToUse = portalInteractionReached ? pendingPortal : null;
+          const marketStationToUse = marketStationInteractionReached
+            ? pendingMarketStation
+            : null;
+          const homeStationToUse = homeStationInteractionReached ? pendingHomeStation : null;
+          const shouldCheckBusStop = busStopInteractionReached;
           tapTarget.current = null;
-          pendingNpcInteraction.current = false;
-          pendingMarketInteraction.current = false;
+          pendingNpcInteraction.current = null;
+          pendingPortalInteraction.current = null;
           pendingMarketStationInteraction.current = null;
+          pendingHomeStationInteraction.current = null;
+          pendingBusStopInteraction.current = false;
           previousFrame.current = null;
           animationFrame.current = null;
           setTapTargetMarker(null);
-          if (shouldTalk) startDialogueRef.current();
-          if (shouldEnterMarket) handleEnterMarket();
-          if (stationToUse === 'exit') handleLeaveMarket();
-          else if (stationToUse) {
+
+          if (npcToOpen) openNpcMenuRef.current(npcToOpen);
+          if (portalToUse === 'market') handleEnterMarket();
+          if (portalToUse === 'home') handleEnterHome();
+          if (marketStationToUse === 'exit') handleLeaveMarket();
+          else if (marketStationToUse) {
             setMarketInteractionRequest((currentRequest) => ({
               id: (currentRequest?.id ?? 0) + 1,
-              station: stationToUse,
+              station: marketStationToUse,
             }));
+          }
+          if (homeStationToUse === 'exit') handleLeaveHome();
+          if (homeStationToUse === 'fridge') {
+            completeDailyQuest('home-fridge');
+            setInfoPanel({
+              body: '유통기한이 가까운 우유와 부족한 사과를 장보기 목록에 적었어요.',
+              title: '냉장고를 확인했어요',
+            });
+          }
+          if (shouldCheckBusStop) {
+            if (questStatusesRef.current['bus-route'] === 'active') {
+              completeDailyQuest('bus-route');
+              setInfoPanel({
+                body: '목적지로 가는 버스 번호와 정류장 위치를 확인했어요.',
+                title: '버스를 찾았어요',
+              });
+            } else {
+              setInfoPanel({
+                body: '기사님에게 의뢰를 받은 뒤 목적지 버스를 확인할 수 있어요.',
+                title: '동쪽 버스정류장',
+              });
+            }
           }
           return;
         }
@@ -782,9 +956,11 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
         const moved = Math.hypot(next.x - current.x, next.y - current.y);
         if (step > 0 && moved < 0.05) {
           tapTarget.current = null;
-          pendingNpcInteraction.current = false;
-          pendingMarketInteraction.current = false;
+          pendingNpcInteraction.current = null;
+          pendingPortalInteraction.current = null;
           pendingMarketStationInteraction.current = null;
+          pendingHomeStationInteraction.current = null;
+          pendingBusStopInteraction.current = false;
           previousFrame.current = null;
           animationFrame.current = null;
           setTapTargetMarker(null);
@@ -805,7 +981,14 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
         animationFrame.current = null;
       }
     },
-    [handleEnterMarket, handleLeaveMarket, movePlayer],
+    [
+      completeDailyQuest,
+      handleEnterHome,
+      handleEnterMarket,
+      handleLeaveHome,
+      handleLeaveMarket,
+      movePlayer,
+    ],
   );
 
   const beginMovement = useCallback(() => {
@@ -1184,44 +1367,73 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
     if (actionName === 'moveRight') movePlayer(ACCESSIBILITY_STEP, 0);
   };
 
-  const openQuiz = () => {
-    if (!nearbyRef.current) return;
+  const startDialogue = (
+    npcId: VillageNpcId,
+    steps: readonly DialogueStep[],
+    mode: Exclude<DialogueMode, null>,
+  ) => {
     stopMovement();
     speedMultiplier.current = 1;
     setRunEnabled(false);
-    setDialogueIndex(null);
-    setSelectedAnswer(null);
-    setShowWrongFeedback(false);
-    setQuizStep('question');
-  };
-
-  const beginDialogue = () => {
-    if (!nearbyRef.current) return;
-    completeDailyQuest('greet-minsu');
-    stopMovement();
-    speedMultiplier.current = 1;
-    setRunEnabled(false);
+    setActiveNpcMenu(null);
+    setQuestOfferId(null);
+    setDialogueNpcId(npcId);
+    setDialogueMode(mode);
+    setActiveDialogueSteps(steps);
     dialogueReadyAt.current = Number.POSITIVE_INFINITY;
     setVisibleDialogueCharacters(0);
     setSelectedDailyChoice(null);
     setDialogueIndex(0);
   };
-  startDialogueRef.current = beginDialogue;
+
+  const startSmallTalk = (npcId: VillageNpcId) => {
+    const npc = VILLAGE_NPC_BY_ID[npcId];
+    startDialogue(
+      npcId,
+      npc.smallTalk.map((text) => ({ kind: 'line' as const, text })),
+      'small-talk',
+    );
+  };
+
+  const startMinsuQuestDialogue = () => {
+    if (questStatusesRef.current['minsu-safety'] !== 'active') return;
+    startDialogue('minsu', dialogueSteps, 'minsu-quest');
+  };
+
+  const openNpcMenu = (npcId: VillageNpcId) => {
+    if (nearbyNpcIdRef.current !== npcId) return;
+    stopMovement();
+    setQuestOfferId(null);
+    setActiveNpcMenu(npcId);
+  };
+  openNpcMenuRef.current = openNpcMenu;
+
+  const openQuiz = () => {
+    if (dialogueMode !== 'minsu-quest') return;
+    stopMovement();
+    speedMultiplier.current = 1;
+    setRunEnabled(false);
+    setDialogueIndex(null);
+    setDialogueMode(null);
+    setSelectedAnswer(null);
+    setShowWrongFeedback(false);
+    setQuizStep('question');
+  };
 
   const startTapMovement = (
     desired: Point,
-    talkWhenNear = false,
-    enterMarketWhenNear = false,
-    marketStationWhenNear: NearbyMarketStation = null,
+    interaction: TapInteractionOptions = {},
   ) => {
     if (controlsLockedRef.current) return;
     stopMovement();
     const target = findReachableTarget(playerPoint.current, desired, worldMapRef.current);
     if (Math.hypot(target.x - playerPoint.current.x, target.y - playerPoint.current.y) < 2) return;
     tapTarget.current = target;
-    pendingNpcInteraction.current = talkWhenNear;
-    pendingMarketInteraction.current = enterMarketWhenNear;
-    pendingMarketStationInteraction.current = marketStationWhenNear;
+    pendingNpcInteraction.current = interaction.npcId ?? null;
+    pendingPortalInteraction.current = interaction.portalId ?? null;
+    pendingMarketStationInteraction.current = interaction.marketStation ?? null;
+    pendingHomeStationInteraction.current = interaction.homeStation ?? null;
+    pendingBusStopInteraction.current = interaction.busStop ?? false;
     setTapTargetMarker(target);
     beginMovement();
   };
@@ -1275,48 +1487,87 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
     startTapMovement(getTouchedWorldPoint(event));
   };
 
-  const handleNpcPress = (event: GestureResponderEvent) => {
+  const handleNpcPress = (event: GestureResponderEvent, npc: VillageNpcDefinition) => {
     event?.stopPropagation?.();
     if (controlMode !== 'touch' || controlsLockedRef.current) return;
-    if (nearbyRef.current) {
-      beginDialogue();
+    if (nearbyNpcIdRef.current === npc.id) {
+      openNpcMenu(npc.id);
       return;
     }
 
     const current = playerPoint.current;
-    const dx = current.x - NPC_POINT.x;
-    const dy = current.y - NPC_POINT.y;
+    const dx = current.x - npc.point.x;
+    const dy = current.y - npc.point.y;
     const distance = Math.max(Math.hypot(dx, dy), 1);
-    const approachDistance = INTERACTION_DISTANCE - 18;
+    const approachDistance = VILLAGE_NPC_INTERACTION_DISTANCE - 18;
     startTapMovement(
       {
-        x: NPC_POINT.x + (dx / distance) * approachDistance,
-        y: NPC_POINT.y + (dy / distance) * approachDistance,
+        x: npc.point.x + (dx / distance) * approachDistance,
+        y: npc.point.y + (dy / distance) * approachDistance,
       },
-      true,
+      { npcId: npc.id },
     );
   };
 
-  const handleMarketPress = (event: GestureResponderEvent) => {
+  const handlePortalPress = (
+    event: GestureResponderEvent,
+    portalId: VillagePortalId,
+  ) => {
     event?.stopPropagation?.();
     if (controlMode !== 'touch' || controlsLockedRef.current) return;
-    if (marketNearbyRef.current) {
-      handleEnterMarket();
+    if (nearbyPortalIdRef.current === portalId) {
+      if (portalId === 'market') handleEnterMarket();
+      else handleEnterHome();
       return;
     }
 
+    const portalPoint =
+      portalId === 'market' ? MARKET_ENTRANCE_POINT : HOUSE_ENTRANCE_POINT;
     const current = playerPoint.current;
-    const dx = current.x - MARKET_ENTRANCE_POINT.x;
-    const dy = current.y - MARKET_ENTRANCE_POINT.y;
+    const dx = current.x - portalPoint.x;
+    const dy = current.y - portalPoint.y;
     const distance = Math.max(Math.hypot(dx, dy), 1);
-    const approachDistance = MARKET_INTERACTION_DISTANCE - 18;
+    const approachDistance = VILLAGE_PORTAL_INTERACTION_DISTANCE - 18;
     startTapMovement(
       {
-        x: MARKET_ENTRANCE_POINT.x + (dx / distance) * approachDistance,
-        y: MARKET_ENTRANCE_POINT.y + (dy / distance) * approachDistance,
+        x: portalPoint.x + (dx / distance) * approachDistance,
+        y: portalPoint.y + (dy / distance) * approachDistance,
       },
-      false,
-      true,
+      { portalId },
+    );
+  };
+
+  const handleHomeStationPress = (
+    event: GestureResponderEvent,
+    station: HomeStationId,
+  ) => {
+    event?.stopPropagation?.();
+    if (controlMode !== 'touch' || controlsLockedRef.current) return;
+    if (homeStationNearbyRef.current === station) {
+      if (station === 'exit') {
+        handleLeaveHome();
+      } else {
+        completeDailyQuest('home-fridge');
+        setInfoPanel({
+          body: '유통기한이 가까운 우유와 부족한 사과를 장보기 목록에 적었어요.',
+          title: '냉장고를 확인했어요',
+        });
+      }
+      return;
+    }
+
+    const stationPoint = station === 'exit' ? HOME_EXIT_POINT : HOME_FRIDGE_POINT;
+    const current = playerPoint.current;
+    const dx = current.x - stationPoint.x;
+    const dy = current.y - stationPoint.y;
+    const distance = Math.max(Math.hypot(dx, dy), 1);
+    const approachDistance = HOME_STATION_INTERACTION_DISTANCE - 18;
+    startTapMovement(
+      {
+        x: stationPoint.x + (dx / distance) * approachDistance,
+        y: stationPoint.y + (dy / distance) * approachDistance,
+      },
+      { homeStation: station },
     );
   };
 
@@ -1347,9 +1598,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
         x: stationPoint.x + (dx / distance) * approachDistance,
         y: stationPoint.y + (dy / distance) * approachDistance,
       },
-      false,
-      false,
-      station,
+      { marketStation: station },
     );
   };
 
@@ -1358,6 +1607,43 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
     speedMultiplier.current = 1;
     setRunEnabled(false);
     setControlMode(mode);
+  };
+
+  const handleBusStopInteraction = () => {
+    if (!busStopNearbyRef.current) return;
+    if (questStatusesRef.current['bus-route'] === 'active') {
+      completeDailyQuest('bus-route');
+      setInfoPanel({
+        body: '목적지로 가는 버스 번호와 정류장 위치를 확인했어요.',
+        title: '버스를 찾았어요',
+      });
+      return;
+    }
+    setInfoPanel({
+      body: '기사님에게 의뢰를 받은 뒤 목적지 버스를 확인할 수 있어요.',
+      title: '동쪽 버스정류장',
+    });
+  };
+
+  const handleBusStopPress = (event: GestureResponderEvent) => {
+    event?.stopPropagation?.();
+    if (controlMode !== 'touch' || controlsLockedRef.current) return;
+    if (busStopNearbyRef.current) {
+      handleBusStopInteraction();
+      return;
+    }
+    const current = playerPoint.current;
+    const dx = current.x - BUS_STOP_POINT.x;
+    const dy = current.y - BUS_STOP_POINT.y;
+    const distance = Math.max(Math.hypot(dx, dy), 1);
+    const approachDistance = VILLAGE_PORTAL_INTERACTION_DISTANCE - 18;
+    startTapMovement(
+      {
+        x: BUS_STOP_POINT.x + (dx / distance) * approachDistance,
+        y: BUS_STOP_POINT.y + (dy / distance) * approachDistance,
+      },
+      { busStop: true },
+    );
   };
 
   const handleInteraction = () => {
@@ -1373,32 +1659,109 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
       }));
       return;
     }
+
+    if (worldMapRef.current === 'home') {
+      if (homeStationNearbyRef.current === 'exit') {
+        handleLeaveHome();
+      } else if (homeStationNearbyRef.current === 'fridge') {
+        completeDailyQuest('home-fridge');
+        setInfoPanel({
+          body: '유통기한이 가까운 우유와 부족한 사과를 장보기 목록에 적었어요.',
+          title: '냉장고를 확인했어요',
+        });
+      }
+      return;
+    }
+
     if (quizStep) return;
-    if (dialogueIndex === null && marketNearby) {
+    if (dialogueIndex !== null) {
+      if (visibleDialogueCharacters < currentDialogue.length) {
+        setVisibleDialogueCharacters(currentDialogue.length);
+        dialogueReadyAt.current = Date.now() + DIALOGUE_READ_DELAY;
+        return;
+      }
+      if (currentDialogueStep?.kind === 'choice') return;
+      if (Date.now() < dialogueReadyAt.current) return;
+      if (dialogueIndex < activeDialogueSteps.length - 1) {
+        dialogueReadyAt.current = Number.POSITIVE_INFINITY;
+        setVisibleDialogueCharacters(0);
+        setDialogueIndex((index) => (index === null ? 0 : index + 1));
+        return;
+      }
+      if (dialogueMode === 'minsu-quest') {
+        openQuiz();
+      } else {
+        setDialogueIndex(null);
+        setDialogueMode(null);
+      }
+      return;
+    }
+
+    if (
+      busStopNearbyRef.current &&
+      questStatusesRef.current['bus-route'] === 'active'
+    ) {
+      handleBusStopInteraction();
+      return;
+    }
+    if (nearbyNpcIdRef.current) {
+      openNpcMenu(nearbyNpcIdRef.current);
+      return;
+    }
+    if (nearbyPortalIdRef.current === 'market') {
       handleEnterMarket();
       return;
     }
-    if (dialogueIndex === null) {
-      beginDialogue();
+    if (nearbyPortalIdRef.current === 'home') {
+      handleEnterHome();
       return;
     }
+    if (busStopNearbyRef.current) handleBusStopInteraction();
+  };
 
-    if (visibleDialogueCharacters < currentDialogue.length) {
-      setVisibleDialogueCharacters(currentDialogue.length);
-      dialogueReadyAt.current = Date.now() + DIALOGUE_READ_DELAY;
+  const handleNpcQuestPress = (npcId: VillageNpcId) => {
+    const questId = NPC_QUEST_IDS[npcId];
+    if (!questId) return;
+    const status = questStatusesRef.current[questId];
+    if (status === 'available') {
+      setQuestOfferId(questId);
       return;
     }
-
-    if (currentDialogueStep?.kind === 'choice') return;
-
-    if (Date.now() < dialogueReadyAt.current) return;
-    if (dialogueIndex < dialogueSteps.length - 1) {
-      dialogueReadyAt.current = Number.POSITIVE_INFINITY;
-      setVisibleDialogueCharacters(0);
-      setDialogueIndex((index) => (index === null ? 0 : index + 1));
+    if (status === 'completed') {
+      setActiveNpcMenu(null);
+      setInfoPanel({
+        body: '오늘 의뢰는 이미 잘 마쳤어요. 내일 또 만나요!',
+        title: '완료한 의뢰',
+      });
       return;
     }
-    openQuiz();
+    setActiveNpcMenu(null);
+    if (questId === 'minsu-safety') {
+      startMinsuQuestDialogue();
+      return;
+    }
+    setInfoPanel({
+      body:
+        questId === 'bus-route'
+          ? '정류장 표지판 가까이에서 행동 버튼을 눌러 목적지 버스를 확인해요.'
+          : '하늘마트에 들어가 장보기 목록의 물건을 모두 찾아요.',
+      title: questId === 'bus-route' ? '정류장으로 이동해요' : '마트에서 장을 봐요',
+    });
+  };
+
+  const handleAcceptQuest = (npcId: VillageNpcId, questId: DailyQuestId) => {
+    acceptDailyQuest(questId);
+    setQuestOfferId(null);
+    setActiveNpcMenu(null);
+    setInfoPanel({
+      body:
+        questId === 'minsu-safety'
+          ? '민수에게 다시 말을 걸어 함께 연습해요.'
+          : questId === 'bus-route'
+            ? '동쪽 정류장에서 목적지 버스를 확인해요.'
+            : '하늘마트 안에서 장보기 목록을 완성해요.',
+      title: VILLAGE_NPC_BY_ID[npcId].name + '의 의뢰를 받았어요',
+    });
   };
 
   const handleDailyChoicePress = (choice: DailyConversationChoice) => {
@@ -1413,6 +1776,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
 
   const closeQuiz = () => {
     setQuizStep(null);
+    setDialogueMode(null);
     setSelectedAnswer(null);
     setShowWrongFeedback(false);
   };
@@ -1421,7 +1785,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
     setSelectedAnswer(index);
     if (index === 0) {
       setShowWrongFeedback(false);
-      completeDailyQuest('safety-quiz');
+      completeDailyQuest('minsu-safety');
       setQuizStep('result');
       return;
     }
@@ -1432,10 +1796,15 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
     marketStationNearby && marketStationNearby !== 'checkout' && marketStationNearby !== 'exit'
       ? marketCategories.find(({ id }) => id === marketStationNearby)
       : null;
+  const nearbyNpcName = nearbyNpcId ? VILLAGE_NPC_BY_ID[nearbyNpcId].name : null;
+  const activeBusStopInteraction =
+    busStopNearby && dailyQuestStatuses['bus-route'] === 'active';
   const interactionAvailable =
     worldMap === 'market'
       ? marketStationNearby !== null && !marketScenarioLocked
-      : marketNearby || npcNearby || dialogueIndex !== null;
+      : worldMap === 'home'
+        ? nearbyHomeStation !== null
+        : nearbyNpcId !== null || nearbyPortalId !== null || busStopNearby;
   const interactionLabel =
     worldMap === 'market'
       ? marketStationNearby === 'checkout'
@@ -1445,13 +1814,23 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
           : marketStationCategory
             ? `${marketStationCategory.label} 살펴보기`
             : '가까이 가면 상호작용할 수 있어요'
-      : dialogueIndex !== null
-      ? '대화 계속하기'
-      : marketNearby
-        ? '하늘마트 들어가기'
-        : npcNearby
-          ? '민수와 대화하기'
-          : '상호작용할 대상이 없습니다';
+      : worldMap === 'home'
+        ? nearbyHomeStation === 'fridge'
+          ? '냉장고 확인하기'
+          : nearbyHomeStation === 'exit'
+            ? '집에서 마을로 나가기'
+            : '가까이 가면 상호작용할 수 있어요'
+        : activeBusStopInteraction
+          ? '동쪽 버스정류장 확인하기'
+          : nearbyNpcName
+            ? `${nearbyNpcName}와 대화 또는 의뢰 선택하기`
+          : nearbyPortalId === 'market'
+            ? '하늘마트 들어가기'
+            : nearbyPortalId === 'home'
+              ? '집으로 들어가기'
+              : busStopNearby
+                ? '동쪽 버스정류장 확인하기'
+                : '상호작용할 대상이 없습니다';
   const interactionIcon =
     worldMap === 'market'
       ? marketStationNearby === 'checkout'
@@ -1459,11 +1838,19 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
         : marketStationNearby === 'exit'
           ? 'exit-outline'
           : 'search'
-      : dialogueIndex !== null
-        ? 'play'
-        : marketNearby
-          ? 'storefront'
-          : 'chatbubble';
+      : worldMap === 'home'
+        ? nearbyHomeStation === 'fridge'
+          ? 'snow-outline'
+          : 'exit-outline'
+        : activeBusStopInteraction
+          ? 'bus'
+          : nearbyNpcId
+            ? 'chatbubbles'
+          : nearbyPortalId === 'market'
+            ? 'storefront'
+            : nearbyPortalId === 'home'
+              ? 'home'
+              : 'bus';
   const interactionActionText =
     worldMap === 'market'
       ? marketStationNearby === 'checkout'
@@ -1473,13 +1860,35 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
           : marketStationNearby
             ? '보기'
             : '행동'
-      : dialogueIndex !== null
-        ? '다음'
-        : marketNearby
-          ? '입장'
-          : npcNearby
+      : worldMap === 'home'
+        ? nearbyHomeStation === 'fridge'
+          ? '확인'
+          : nearbyHomeStation === 'exit'
+            ? '나가기'
+            : '행동'
+        : activeBusStopInteraction
+          ? '확인'
+          : nearbyNpcId
             ? '대화'
-            : '행동';
+          : nearbyPortalId
+            ? '입장'
+            : busStopNearby
+              ? '확인'
+              : '행동';
+
+  const activeMenuNpcDefinition = activeNpcMenu
+    ? VILLAGE_NPC_BY_ID[activeNpcMenu]
+    : null;
+  const activeMenuQuestId = activeNpcMenu ? NPC_QUEST_IDS[activeNpcMenu] ?? null : null;
+  const activeMenuQuestStatus = activeMenuQuestId
+    ? dailyQuestStatuses[activeMenuQuestId]
+    : null;
+  const offeredQuest = questOfferId
+    ? dailyQuests.find((quest) => quest.id === questOfferId) ?? null
+    : null;
+  const offeredNpc = questOfferId
+    ? VILLAGE_NPCS.find((npc) => NPC_QUEST_IDS[npc.id] === questOfferId) ?? null
+    : null;
 
   const joystickControlsVisible =
     controlMode === 'joystick' &&
@@ -1494,7 +1903,13 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
         { label: '왼쪽으로 이동', name: 'moveLeft' },
         { label: '오른쪽으로 이동', name: 'moveRight' },
       ]}
-      accessibilityLabel={worldMap === 'market' ? '하늘마트 내부 월드' : '쿼터뷰 마을'}
+      accessibilityLabel={
+        worldMap === 'market'
+          ? '하늘마트 내부 월드'
+          : worldMap === 'home'
+            ? '집 내부 월드'
+            : '쿼터뷰 마을'
+      }
       delayLongPress={260}
       onAccessibilityAction={(event) => handleAccessibilityMove(event.nativeEvent.actionName)}
       onLayout={handleViewportLayout}
@@ -1512,76 +1927,56 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
         style={[
           styles.world,
           {
-            height: worldMap === 'market' ? MARKET_WORLD_HEIGHT : VILLAGE_WORLD_HEIGHT,
+            height: WORLD_BOUNDS[worldMap].height,
             transform: camera.getTranslateTransform(),
-            width: worldMap === 'market' ? MARKET_WORLD_WIDTH : VILLAGE_WORLD_WIDTH,
+            width: WORLD_BOUNDS[worldMap].width,
           },
         ]}
       >
         {worldMap === 'village' ? (
-        <>
-        <View style={styles.ground} />
-        <View style={[styles.road, styles.roadMain]} />
-        <View style={[styles.road, styles.roadBranch]} />
-        <View style={[styles.roadEdge, styles.roadEdgeOne]} />
-        <View style={[styles.roadEdge, styles.roadEdgeTwo]} />
-
-        {tapTargetMarker && controlMode === 'touch' ? (
-          <View
-            pointerEvents="none"
-            style={[styles.tapTargetMarker, { left: tapTargetMarker.x - 12, top: tapTargetMarker.y - 12 }]}
-            testID="touch-target-marker"
+          <>
+            <ExpandedVillageLayer
+              controlMode={controlMode}
+              controlsLocked={controlsLockedRef.current}
+              nearbyNpcId={nearbyNpcId}
+              nearbyPortalId={nearbyPortalId}
+              npcQuestStates={npcQuestStates}
+              onNpcPress={handleNpcPress}
+              onPortalPress={handlePortalPress}
+              tapTargetMarker={controlMode === 'touch' ? tapTargetMarker : null}
+            />
+            <PressScale
+              accessibilityHint={
+                controlMode === 'touch'
+                  ? busStopNearby
+                    ? '목적지 버스를 확인합니다'
+                    : '정류장 앞으로 이동합니다'
+                  : undefined
+              }
+              accessibilityLabel="동쪽 버스정류장으로 이동해 확인하기"
+              accessibilityRole={controlMode === 'touch' ? 'button' : undefined}
+              disabled={controlMode !== 'touch' || controlsLockedRef.current}
+              onPress={handleBusStopPress}
+              scaleTo={0.96}
+              style={styles.busStopHotspot}
+            >
+              {busStopNearby ? (
+                <View style={styles.busStopActionBadge}>
+                  <Ionicons color={colors.white} name="bus" size={17} />
+                  <Text style={styles.busStopActionText}>버스 확인</Text>
+                </View>
+              ) : null}
+            </PressScale>
+          </>
+        ) : worldMap === 'home' ? (
+          <HomeWorldLayer
+            controlMode={controlMode}
+            controlsLocked={controlsLockedRef.current}
+            fridgeCompleted={dailyQuestStatuses['home-fridge'] === 'completed'}
+            nearbyStationId={nearbyHomeStation}
+            onStationPress={handleHomeStationPress}
+            tapTargetMarker={controlMode === 'touch' ? tapTargetMarker : null}
           />
-        ) : null}
-
-        <IsoBuilding color="#C99C78" height={184} label="집" width={238} x={112} y={116} />
-        <IsoBuilding color="#9AAE98" height={190} label="하늘마트" width={230} x={660} y={122} />
-
-        <PressScale
-          accessibilityElementsHidden={!marketNearby}
-          accessibilityHint={marketNearby && controlMode === 'touch' ? '누르면 하늘마트에 들어갑니다' : undefined}
-          accessibilityLabel={
-            controlMode === 'touch' ? '하늘마트로 이동해 들어가기' : '하늘마트 입구'
-          }
-          accessibilityRole={marketNearby && controlMode === 'touch' ? 'button' : undefined}
-          disabled={controlMode !== 'touch' || !marketNearby || controlsLockedRef.current}
-          importantForAccessibility={marketNearby ? 'auto' : 'no-hide-descendants'}
-          onPress={handleMarketPress}
-          scaleTo={0.96}
-          style={styles.marketEntrance}
-        >
-          <MarketProximityCloud visible={marketNearby} />
-        </PressScale>
-
-        <View style={[styles.obstacleBlock, styles.centerPlanter]}>
-          <View style={styles.plantCircle} />
-          <View style={[styles.plantCircle, styles.plantCircleRight]} />
-        </View>
-        <View style={[styles.obstacleBlock, styles.lowerBlock]}>
-          <Text style={styles.objectLabel}>공터</Text>
-        </View>
-
-        <PressScale
-          accessibilityHint={controlMode === 'touch' ? '누르면 가까이 이동해 대화를 시작합니다' : undefined}
-          accessibilityLabel={controlMode === 'touch' ? '안내원 민수로 이동해 대화하기' : '안내원 민수'}
-          accessibilityRole={controlMode === 'touch' ? 'button' : undefined}
-          disabled={controlMode !== 'touch' || controlsLockedRef.current}
-          onPress={handleNpcPress}
-          scaleTo={0.94}
-          style={[styles.npc, !npcNearby && styles.npcInactive]}
-        >
-          {npcNearby ? (
-            <View style={styles.interactionBadge}>
-              <Ionicons color={colors.white} name="chatbubble" size={16} />
-            </View>
-          ) : null}
-          <View style={[styles.characterShadow, styles.npcShadow]} />
-          <View style={styles.npcBody}>
-            <View style={styles.npcHead} />
-          </View>
-          <Text style={styles.npcName}>민수</Text>
-        </PressScale>
-        </>
         ) : (
           <MarketWorldLayer
             controlMode={controlMode}
@@ -1694,8 +2089,152 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
           interactionRequest={marketInteractionRequest}
           onExit={handleLeaveMarket}
           onLockChange={setMarketScenarioLocked}
-          onMissionComplete={() => completeDailyQuest('market-list')}
+          onMissionComplete={() => completeDailyQuest('market-shopping')}
         />
+      ) : null}
+
+      {activeMenuNpcDefinition && !questOfferId ? (
+        <View style={styles.interactionOverlay}>
+          <Pressable
+            accessibilityLabel="NPC 메뉴 닫기"
+            onPress={(event) => {
+              event?.stopPropagation?.();
+              setActiveNpcMenu(null);
+            }}
+            style={styles.interactionOverlayDim}
+          />
+          <View accessibilityLabel={activeMenuNpcDefinition.name + ' 상호작용 메뉴'} style={styles.npcMenuSheet}>
+            <View style={styles.npcMenuHeader}>
+              <View
+                style={[
+                  styles.npcMenuAvatar,
+                  { backgroundColor: activeMenuNpcDefinition.accentColor },
+                ]}
+              >
+                <Ionicons color={colors.white} name="person" size={23} />
+              </View>
+              <View style={styles.npcMenuHeaderCopy}>
+                <Text style={styles.npcMenuName}>{activeMenuNpcDefinition.name}</Text>
+                <Text style={styles.npcMenuRole}>
+                  {activeMenuNpcDefinition.region} · {activeMenuNpcDefinition.roleLabel}
+                </Text>
+              </View>
+              <PressScale
+                accessibilityLabel={activeMenuNpcDefinition.name + ' 메뉴 닫기'}
+                onPress={() => setActiveNpcMenu(null)}
+                style={styles.npcMenuClose}
+              >
+                <Ionicons color="#59645D" name="close" size={22} />
+              </PressScale>
+            </View>
+            <PressScale
+              accessibilityLabel={activeMenuNpcDefinition.name + '와 대화하기'}
+              onPress={() => startSmallTalk(activeMenuNpcDefinition.id)}
+              style={styles.npcMenuPrimaryButton}
+            >
+              <Ionicons color="#355E4D" name="chatbubbles-outline" size={20} />
+              <Text style={styles.npcMenuPrimaryText}>대화하기</Text>
+            </PressScale>
+            {activeMenuQuestId ? (
+              <PressScale
+                accessibilityLabel={
+                  activeMenuQuestStatus === 'available'
+                    ? activeMenuNpcDefinition.name + '의 의뢰 확인하기'
+                    : activeMenuQuestStatus === 'active'
+                      ? activeMenuNpcDefinition.name + '의 의뢰 진행하기'
+                      : activeMenuNpcDefinition.name + '의 완료한 의뢰 보기'
+                }
+                onPress={() => handleNpcQuestPress(activeMenuNpcDefinition.id)}
+                style={styles.npcMenuQuestButton}
+              >
+                <Ionicons
+                  color="#FFFFFF"
+                  name={
+                    activeMenuQuestStatus === 'completed'
+                      ? 'checkmark-circle'
+                      : activeMenuQuestStatus === 'active'
+                        ? 'play-circle'
+                        : 'document-text'
+                  }
+                  size={20}
+                />
+                <Text style={styles.npcMenuQuestText}>
+                  {activeMenuQuestStatus === 'available'
+                    ? '의뢰 확인하기'
+                    : activeMenuQuestStatus === 'active'
+                      ? '의뢰 진행하기'
+                      : '완료한 의뢰'}
+                </Text>
+              </PressScale>
+            ) : null}
+          </View>
+        </View>
+      ) : null}
+
+      {questOfferId && offeredQuest && offeredNpc ? (
+        <View style={styles.interactionOverlay}>
+          <Pressable
+            accessibilityLabel="의뢰 제안 닫기"
+            onPress={(event) => {
+              event?.stopPropagation?.();
+              setQuestOfferId(null);
+            }}
+            style={styles.interactionOverlayDim}
+          />
+          <View accessibilityLabel={offeredQuest.title + ' 의뢰 제안'} style={styles.questOfferSheet}>
+            <View style={styles.questOfferBadge}>
+              <Ionicons color="#FFFFFF" name="sparkles" size={16} />
+              <Text style={styles.questOfferBadgeText}>새로운 의뢰</Text>
+            </View>
+            <Text style={styles.questOfferTitle}>{offeredQuest.title}</Text>
+            <Text style={styles.questOfferDescription}>{offeredQuest.description}</Text>
+            <View style={styles.questOfferMeta}>
+              <Text style={styles.questOfferMetaText}>{offeredQuest.region}</Text>
+              <Text style={styles.questOfferMetaText}>+{offeredQuest.rewardXp} XP</Text>
+            </View>
+            <PressScale
+              accessibilityLabel={offeredNpc.name + '의 의뢰 받기'}
+              onPress={() => handleAcceptQuest(offeredNpc.id, questOfferId)}
+              style={styles.npcMenuQuestButton}
+            >
+              <Text style={styles.npcMenuQuestText}>의뢰 받기</Text>
+            </PressScale>
+            <PressScale
+              accessibilityLabel="다음에 받기"
+              onPress={() => setQuestOfferId(null)}
+              style={styles.questOfferLaterButton}
+            >
+              <Text style={styles.questOfferLaterText}>다음에 받기</Text>
+            </PressScale>
+          </View>
+        </View>
+      ) : null}
+
+      {infoPanel ? (
+        <View style={styles.interactionOverlay}>
+          <Pressable
+            accessibilityLabel="안내 닫기"
+            onPress={(event) => {
+              event?.stopPropagation?.();
+              setInfoPanel(null);
+            }}
+            style={styles.interactionOverlayDim}
+          />
+          <View accessibilityLiveRegion="polite" style={styles.infoPanelSheet}>
+            <View style={styles.infoPanelIcon}>
+              <Ionicons color={colors.white} name="checkmark" size={24} />
+            </View>
+            <Text style={styles.infoPanelTitle}>{infoPanel.title}</Text>
+            <Text style={styles.infoPanelBody}>{infoPanel.body}</Text>
+            <PressScale
+              accessibilityLabel="안내 확인"
+              onPress={() => setInfoPanel(null)}
+              style={styles.infoPanelButton}
+            >
+              <Text style={styles.infoPanelButtonText}>확인</Text>
+            </PressScale>
+          </View>
+        </View>
       ) : null}
 
       {dialoguePanelMounted ? (
@@ -1749,7 +2288,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
                   },
                 ]}
               >
-                <Text style={styles.dialogueSpeaker}>민수</Text>
+                <Text style={styles.dialogueSpeaker}>{dialogueSpeakerName}</Text>
               </Animated.View>
               <Text style={styles.dialogueText}>
                 {renderedDialogue.slice(0, visibleDialogueCharacters)}
@@ -2308,9 +2847,9 @@ const styles = StyleSheet.create({
   npc: {
     alignItems: 'center',
     height: 78,
-    left: NPC_POINT.x - 32,
+    left: VILLAGE_NPC_BY_ID.minsu.point.x - 32,
     position: 'absolute',
-    top: NPC_POINT.y - 40,
+    top: VILLAGE_NPC_BY_ID.minsu.point.y - 40,
     width: PLAYER_ART_WIDTH,
     zIndex: 8,
   },
@@ -2469,6 +3008,207 @@ const styles = StyleSheet.create({
   },
   runButtonActive: { backgroundColor: '#4C6E5A' },
   actionButtonDisabled: { opacity: 0.34 },
+  busStopHotspot: {
+    alignItems: 'center',
+    height: 92,
+    justifyContent: 'center',
+    left: BUS_STOP_POINT.x - 68,
+    position: 'absolute',
+    top: BUS_STOP_POINT.y - 46,
+    width: 136,
+    zIndex: 9,
+  },
+  busStopActionBadge: {
+    alignItems: 'center',
+    backgroundColor: '#3E8B6A',
+    borderColor: '#FFFFFF',
+    borderRadius: 18,
+    borderWidth: 2,
+    flexDirection: 'row',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  busStopActionText: { color: colors.white, fontFamily: fonts.bold, fontSize: 12 },
+  interactionOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    zIndex: 42,
+  },
+  interactionOverlayDim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(38,45,40,0.24)',
+  },
+  npcMenuSheet: {
+    backgroundColor: 'rgba(255,253,248,0.98)',
+    borderColor: 'rgba(255,255,255,0.96)',
+    borderRadius: 24,
+    borderWidth: 2,
+    bottom: 128,
+    elevation: 10,
+    gap: 10,
+    maxWidth: 350,
+    padding: 18,
+    position: 'absolute',
+    shadowColor: '#26372E',
+    shadowOffset: { height: 10, width: 0 },
+    shadowOpacity: 0.22,
+    shadowRadius: 20,
+    width: '90%',
+  },
+  npcMenuHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    marginBottom: 3,
+  },
+  npcMenuAvatar: {
+    alignItems: 'center',
+    borderRadius: 21,
+    height: 42,
+    justifyContent: 'center',
+    width: 42,
+  },
+  npcMenuHeaderCopy: { flex: 1, marginLeft: 11 },
+  npcMenuName: { color: '#28352E', fontFamily: fonts.laundryBold, fontSize: 20 },
+  npcMenuRole: { color: '#7A837D', fontFamily: fonts.regular, fontSize: 12, marginTop: 2 },
+  npcMenuClose: {
+    alignItems: 'center',
+    borderRadius: 18,
+    height: 36,
+    justifyContent: 'center',
+    width: 36,
+  },
+  npcMenuPrimaryButton: {
+    alignItems: 'center',
+    backgroundColor: '#EEF6F0',
+    borderColor: '#D7E6DC',
+    borderRadius: 18,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 8,
+    height: 52,
+    justifyContent: 'center',
+  },
+  npcMenuPrimaryText: { color: '#355E4D', fontFamily: fonts.bold, fontSize: 15 },
+  npcMenuQuestButton: {
+    alignItems: 'center',
+    backgroundColor: '#3E8B6A',
+    borderRadius: 18,
+    flexDirection: 'row',
+    gap: 8,
+    height: 52,
+    justifyContent: 'center',
+  },
+  npcMenuQuestText: { color: colors.white, fontFamily: fonts.bold, fontSize: 15 },
+  questOfferSheet: {
+    alignItems: 'center',
+    backgroundColor: '#FFFDF8',
+    borderColor: '#FFFFFF',
+    borderRadius: 26,
+    borderWidth: 2,
+    bottom: 112,
+    elevation: 12,
+    maxWidth: 350,
+    padding: 21,
+    position: 'absolute',
+    shadowColor: '#26372E',
+    shadowOffset: { height: 10, width: 0 },
+    shadowOpacity: 0.24,
+    shadowRadius: 22,
+    width: '90%',
+  },
+  questOfferBadge: {
+    alignItems: 'center',
+    backgroundColor: '#D5A84E',
+    borderRadius: 14,
+    flexDirection: 'row',
+    gap: 5,
+    paddingHorizontal: 11,
+    paddingVertical: 6,
+  },
+  questOfferBadgeText: { color: colors.white, fontFamily: fonts.bold, fontSize: 12 },
+  questOfferTitle: {
+    color: '#29362F',
+    fontFamily: fonts.laundryBold,
+    fontSize: 22,
+    marginTop: 14,
+    textAlign: 'center',
+  },
+  questOfferDescription: {
+    color: '#68726C',
+    fontFamily: fonts.regular,
+    fontSize: 14,
+    lineHeight: 21,
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  questOfferMeta: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+    marginTop: 14,
+    width: '100%',
+  },
+  questOfferMetaText: { color: '#708078', fontFamily: fonts.semibold, fontSize: 12 },
+  questOfferLaterButton: {
+    alignItems: 'center',
+    height: 42,
+    justifyContent: 'center',
+    marginTop: 4,
+    width: '100%',
+  },
+  questOfferLaterText: { color: '#7C857F', fontFamily: fonts.semibold, fontSize: 14 },
+  infoPanelSheet: {
+    alignItems: 'center',
+    backgroundColor: '#FFFDF8',
+    borderColor: '#FFFFFF',
+    borderRadius: 24,
+    borderWidth: 2,
+    bottom: 142,
+    elevation: 12,
+    maxWidth: 340,
+    padding: 21,
+    position: 'absolute',
+    shadowColor: '#26372E',
+    shadowOffset: { height: 10, width: 0 },
+    shadowOpacity: 0.22,
+    shadowRadius: 20,
+    width: '88%',
+  },
+  infoPanelIcon: {
+    alignItems: 'center',
+    backgroundColor: '#4B9875',
+    borderRadius: 22,
+    height: 44,
+    justifyContent: 'center',
+    width: 44,
+  },
+  infoPanelTitle: {
+    color: '#29362F',
+    fontFamily: fonts.laundryBold,
+    fontSize: 20,
+    marginTop: 11,
+    textAlign: 'center',
+  },
+  infoPanelBody: {
+    color: '#69736D',
+    fontFamily: fonts.regular,
+    fontSize: 14,
+    lineHeight: 21,
+    marginTop: 7,
+    textAlign: 'center',
+  },
+  infoPanelButton: {
+    alignItems: 'center',
+    backgroundColor: '#3E8B6A',
+    borderRadius: 17,
+    height: 48,
+    justifyContent: 'center',
+    marginTop: 16,
+    width: '100%',
+  },
+  infoPanelButtonText: { color: colors.white, fontFamily: fonts.bold, fontSize: 15 },
   dialogueDim: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(49,50,46,0.15)',

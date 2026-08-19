@@ -5,22 +5,21 @@ import { AccessibilityInfo, Animated, Easing, Image, Pressable, StyleSheet, Text
 import type { ImageSourcePropType } from 'react-native';
 
 import { icons } from '../../assets';
+import type {
+  DailyQuestId,
+  DailyQuestItem,
+  DailyQuestStatus,
+} from '../../game/dailyQuests';
 import { PressScale } from '../PressScale';
 import { colors, fonts } from '../../theme';
+
+export type { DailyQuestItem } from '../../game/dailyQuests';
 
 type ControlMode = 'joystick' | 'touch';
 type MenuKey = 'bag' | 'diary' | 'phone' | 'settings';
 type PhoneAction = 'exit' | 'emergency' | null;
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
 type InventoryFilter = 'search' | 'recent' | 'alphabetical';
-
-export type DailyQuestItem = {
-  completed: boolean;
-  description: string;
-  id: string;
-  rewardXp: number;
-  title: string;
-};
 
 type InventoryItem = {
   filters: readonly InventoryFilter[];
@@ -53,6 +52,19 @@ const inventoryItems: readonly InventoryItem[] = [
   { filters: ['search', 'recent', 'alphabetical'], id: 'phone-3', label: '휴대폰', source: icons.gamePhone },
   { filters: ['search', 'recent', 'alphabetical'], id: 'phone-4', label: '휴대폰', source: icons.gamePhone },
 ];
+
+const questIconById: Record<DailyQuestId, ImageSourcePropType> = {
+  'bus-route': icons.bus,
+  'home-fridge': icons.home,
+  'market-shopping': icons.mart,
+  'minsu-safety': icons.userMale,
+};
+
+const questStatusCopy: Record<DailyQuestStatus, string> = {
+  active: '진행 중',
+  available: '찾을 의뢰',
+  completed: '완료',
+};
 
 const hudOutlineOffsets = [
   { x: -2, y: -2 },
@@ -442,54 +454,97 @@ function BagPanel() {
   );
 }
 
+function getQuestSectionLabel(quest: DailyQuestItem) {
+  if (quest.status === 'completed') return '완료';
+  if (quest.kind === 'automatic') return '내 생활';
+  return quest.status === 'active' ? '받은 의뢰' : '찾을 의뢰';
+}
+
+function getQuestDetail(quest: DailyQuestItem) {
+  if (quest.status === 'available') {
+    return [quest.region, quest.providerName, quest.discoveryHint].filter(Boolean).join(' · ');
+  }
+  return `${quest.region} · ${quest.description}`;
+}
+
 function DiaryPanel({ quests }: { quests: readonly DailyQuestItem[] }) {
-  const completedCount = quests.filter(({ completed }) => completed).length;
+  const completedCount = quests.filter(({ status }) => status === 'completed').length;
   const questCount = quests.length;
-  const questIcons: ReadonlyArray<ImageSourcePropType | null> = [
-    icons.gamePhone,
-    icons.gameBag,
-    icons.gameDiary,
-    null,
-  ];
+  const requestQuests = quests.filter(({ kind }) => kind === 'request');
+  const receivedRequestCount = requestQuests.filter(({ status }) => status !== 'available').length;
 
   return (
     <View style={styles.questContent}>
       <View style={styles.questHeader}>
         <Text style={styles.questHeaderTitle}>오늘의 이야기</Text>
         <Text style={styles.visuallyHidden}>오늘의 퀘스트</Text>
-        <Text accessibilityLiveRegion="polite" style={styles.visuallyHidden}>
-          {completedCount}/{questCount} 완료
-        </Text>
+        <View
+          accessibilityLabel={`오늘 ${completedCount}/${questCount} 완료, 받은 의뢰 ${receivedRequestCount}/${requestQuests.length}`}
+          accessibilityLiveRegion="polite"
+          style={styles.questHeaderSummary}
+        >
+          <Text style={styles.questHeaderSummaryText}>{completedCount}/{questCount} 완료</Text>
+          <View pointerEvents="none" style={styles.questHeaderSummaryDivider} />
+          <Text style={styles.questHeaderSummaryText}>
+            받은 의뢰 {receivedRequestCount}/{requestQuests.length}
+          </Text>
+        </View>
       </View>
 
       <View style={styles.questSheet}>
         <View pointerEvents="none" style={styles.questDashedOutline} />
         <View style={styles.questList}>
-          {quests.slice(0, 4).map((quest, index) => {
-            const source = questIcons[index] ?? null;
+          {quests.slice(0, 4).map((quest) => {
+            const source = questIconById[quest.id];
+            const sectionLabel = getQuestSectionLabel(quest);
+            const semanticStatus = questStatusCopy[quest.status];
+            const detail = getQuestDetail(quest);
             return (
               <View
-                accessibilityLabel={`${quest.title}, ${quest.completed ? '완료' : '진행 전'}`}
+                accessible
+                accessibilityLabel={`${quest.title}, ${sectionLabel}${sectionLabel === semanticStatus ? '' : `, ${semanticStatus}`}, ${detail}`}
                 key={quest.id}
-                style={[styles.questRow, quest.completed && styles.questRowComplete]}
+                style={[styles.questRow, quest.status === 'completed' && styles.questRowComplete]}
                 testID="daily-quest-row"
               >
-                <View style={styles.questIconCanvas}>
-                  <View style={styles.questIconCircle} />
-                  {source ? <Image resizeMode="contain" source={source} style={styles.questIcon} /> : null}
-                  {quest.completed ? (
-                    <View style={styles.questCompleteBadge}>
-                      <Ionicons color="#FFFFFF" name="checkmark" size={11} />
+                <View style={styles.questRowInner} testID={`quest-row-${quest.id}`}>
+                  <View style={styles.questIconCanvas}>
+                    <View style={styles.questIconCircle} />
+                    <Image resizeMode="contain" source={source} style={styles.questIcon} />
+                    {quest.status === 'completed' ? (
+                      <View style={styles.questCompleteBadge}>
+                        <Ionicons color="#FFFFFF" name="checkmark" size={11} />
+                      </View>
+                    ) : null}
+                  </View>
+                  <View style={styles.questCopy}>
+                    <View style={styles.questTitleLine}>
+                      <Text
+                        style={[
+                          styles.questStatusBadge,
+                          quest.status === 'available'
+                            ? styles.questStatusAvailable
+                            : quest.status === 'completed'
+                              ? styles.questStatusCompleted
+                              : quest.kind === 'automatic'
+                                ? styles.questStatusAutomatic
+                                : styles.questStatusAccepted,
+                        ]}
+                        testID={`quest-status-${quest.id}`}
+                      >
+                        {sectionLabel}
+                      </Text>
+                      <Text numberOfLines={1} style={styles.questTitle}>
+                        {quest.title}
+                      </Text>
                     </View>
-                  ) : null}
-                </View>
-                <View style={styles.questCopy}>
-                  <Text numberOfLines={1} style={styles.questTitle}>
-                    {quest.title}
-                  </Text>
-                  <Text numberOfLines={1} style={styles.questDescription}>
-                    {quest.description}
-                  </Text>
+                    <Text
+                      numberOfLines={quest.status === 'available' ? 2 : 1}
+                      style={styles.questDescription}
+                    >
+                      {detail}
+                    </Text>
+                  </View>
                 </View>
               </View>
             );
@@ -934,6 +989,26 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     transform: [{ translateY: -3 }],
   },
+  questHeaderSummary: {
+    alignItems: 'center',
+    bottom: 1,
+    flexDirection: 'row',
+    gap: 7,
+    justifyContent: 'center',
+    position: 'absolute',
+  },
+  questHeaderSummaryDivider: {
+    backgroundColor: 'rgba(239,236,232,0.30)',
+    height: 8,
+    width: 1,
+  },
+  questHeaderSummaryText: {
+    color: '#BEB6AA',
+    fontFamily: fonts.cafe24SsurroundAir,
+    fontSize: 8.5,
+    letterSpacing: -0.15,
+    lineHeight: 11,
+  },
   questSheet: {
     backgroundColor: '#EFECE8',
     borderRadius: 4,
@@ -969,6 +1044,12 @@ const styles = StyleSheet.create({
     width: 298,
   },
   questRowComplete: { opacity: 0.58 },
+  questRowInner: {
+    alignItems: 'center',
+    flex: 1,
+    flexDirection: 'row',
+    minWidth: 0,
+  },
   questIconCanvas: {
     alignItems: 'center',
     height: 64,
@@ -998,8 +1079,40 @@ const styles = StyleSheet.create({
     width: 16,
   },
   questCopy: { flex: 1, marginLeft: 14, minWidth: 0 },
+  questTitleLine: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    minWidth: 0,
+  },
+  questStatusBadge: {
+    borderRadius: 7,
+    flexShrink: 0,
+    fontFamily: fonts.cafe24SsurroundAir,
+    fontSize: 8,
+    lineHeight: 12,
+    marginRight: 6,
+    overflow: 'hidden',
+    paddingHorizontal: 5,
+  },
+  questStatusAvailable: {
+    backgroundColor: '#E1DDD6',
+    color: '#71695F',
+  },
+  questStatusAutomatic: {
+    backgroundColor: '#DCE9DF',
+    color: '#54705E',
+  },
+  questStatusAccepted: {
+    backgroundColor: '#DCE5EE',
+    color: '#546B7E',
+  },
+  questStatusCompleted: {
+    backgroundColor: '#D6E6DA',
+    color: '#4D7359',
+  },
   questTitle: {
     color: '#333333',
+    flex: 1,
     fontFamily: fonts.cafe24Ssurround,
     fontSize: 16,
     letterSpacing: -0.4,
