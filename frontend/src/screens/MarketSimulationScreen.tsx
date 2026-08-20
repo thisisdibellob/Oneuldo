@@ -249,7 +249,10 @@ export function MarketSimulationScreen({
       ) : null}
 
       {phase === 'shopping' ? (
-        <View style={[styles.shoppingFooter, embedded && styles.embeddedShoppingFooter]}>
+        <View
+          pointerEvents="box-none"
+          style={[styles.shoppingFooter, embedded && styles.embeddedShoppingFooter]}
+        >
           <View
             accessibilityLabel={`오늘의 목록, ${objectiveProgress
               .map(({ current, product, quantity }) => `${product?.name ?? '물건'} ${current}/${quantity}`)
@@ -1327,7 +1330,7 @@ function FeedbackRow({ icon, text }: { icon: IoniconName; text: string }) {
 const styles = StyleSheet.create({
   root: { backgroundColor: '#D8D1C2', flex: 1 },
   embeddedRoot: { ...StyleSheet.absoluteFillObject, zIndex: 28 },
-  embeddedShoppingFooter: { bottom: undefined, top: 110 },
+  embeddedShoppingFooter: { height: 62, top: 110 },
   embeddedCheckoutOverlay: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'flex-end',
@@ -1442,12 +1445,12 @@ const styles = StyleSheet.create({
   dialogueAvatarHair: { backgroundColor: '#5B4437', borderRadius: 11, height: 22, position: 'absolute', top: 8, width: 25 },
   dialogueAvatarFace: { backgroundColor: '#E2B592', borderColor: '#6A4D3D', borderRadius: 10, borderWidth: 1, height: 20, marginTop: -3, width: 20 },
   dialogueHeaderCopy: { flex: 1 },
-  dialogueName: { color: '#F5D895', fontFamily: fonts.bold, fontSize: 15 },
-  dialogueRole: { color: 'rgba(255,255,255,0.58)', fontFamily: fonts.regular, fontSize: 10, marginTop: 2 },
-  dialogueProgress: { color: 'rgba(255,255,255,0.54)', fontFamily: fonts.bold, fontSize: 10 },
-  dialogueMessage: { color: '#FFFFFF', fontFamily: fonts.semibold, fontSize: 18, letterSpacing: -0.4, lineHeight: 27, marginTop: 16, minHeight: 58 },
+  dialogueName: { color: '#F5D895', fontFamily: fonts.cafe24Ssurround, fontSize: 15 },
+  dialogueRole: { color: 'rgba(255,255,255,0.58)', fontFamily: fonts.cafe24SsurroundAir, fontSize: 10, marginTop: 2 },
+  dialogueProgress: { color: 'rgba(255,255,255,0.54)', fontFamily: fonts.cafe24Ssurround, fontSize: 10 },
+  dialogueMessage: { color: '#FFFFFF', fontFamily: fonts.cafe24Ssurround, fontSize: 18, letterSpacing: -0.4, lineHeight: 27, marginTop: 16, minHeight: 58 },
   dialogueButton: { alignItems: 'center', alignSelf: 'flex-end', backgroundColor: '#B85C43', borderColor: '#E9A082', borderRadius: 11, borderWidth: 2, flexDirection: 'row', gap: 7, height: 45, justifyContent: 'center', marginTop: 13, paddingHorizontal: 18 },
-  dialogueButtonText: { color: '#FFFFFF', fontFamily: fonts.bold, fontSize: 14 },
+  dialogueButtonText: { color: '#FFFFFF', fontFamily: fonts.cafe24Ssurround, fontSize: 14 },
   sheetOverlay: { ...StyleSheet.absoluteFillObject, justifyContent: 'flex-end', zIndex: 50 },
   sheetBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(21,27,23,0.56)' },
   productSheet: { backgroundColor: '#F5E7C8', borderColor: '#77583E', borderRadius: 18, borderWidth: 4, margin: 10, paddingBottom: 15, paddingHorizontal: 14, paddingTop: 13 },

@@ -39,7 +39,7 @@ export const DAILY_QUEST_DEFINITIONS = [
   },
   {
     description: '민수와 함께 횡단보도를 안전하게 건너는 방법을 연습해요.',
-    discoveryHint: '가까이 가서 말을 걸어보세요.',
+    discoveryHint: '마을 중앙의 민수를 찾아보세요.',
     iconKey: 'minsu',
     id: 'minsu-safety',
     kind: 'request',
@@ -50,7 +50,7 @@ export const DAILY_QUEST_DEFINITIONS = [
   },
   {
     description: '목적지까지 가는 버스를 확인하고 안전하게 이용해요.',
-    discoveryHint: '정류장에 있는 기사님을 찾아보세요.',
+    discoveryHint: '버스정류장의 기사님을 찾아보세요.',
     iconKey: 'bus',
     id: 'bus-route',
     kind: 'request',
@@ -61,7 +61,7 @@ export const DAILY_QUEST_DEFINITIONS = [
   },
   {
     description: '장보기 목록에 맞게 필요한 물건을 모두 준비해요.',
-    discoveryHint: '마트에 있는 점원을 찾아보세요.',
+    discoveryHint: '하늘마트의 지영을 찾아보세요.',
     iconKey: 'market',
     id: 'market-shopping',
     kind: 'request',

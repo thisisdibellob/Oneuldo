@@ -21,6 +21,7 @@ jest.mock('expo-audio', () => ({
     pause: jest.fn(),
     play: jest.fn(),
     seekTo: jest.fn(() => Promise.resolve()),
+    setPlaybackRate: jest.fn(),
     volume: 1,
   }),
   useAudioPlayerStatus: () => ({ isLoaded: true }),
@@ -57,23 +58,21 @@ it('게임을 나갈 때 오디오를 안전하게 멈춘다', async () => {
   expect(onExit).toHaveBeenCalledTimes(1);
 });
 
-it('게임 수첩에 내 생활 1개와 아직 찾지 않은 의뢰 3개를 보여준다', async () => {
+it('게임 수첩에서 발견한 퀘스트만 제목과 이미지를 보여준다', async () => {
   const screen = render(<GamePrototypeScreen onExit={jest.fn()} />);
 
   fireEvent.press(screen.getByRole('button', { name: '수첩 열기' }));
   expect(screen.getByText('오늘의 이야기')).toBeTruthy();
   expect(screen.getByText('퀘스트는 매일 아침 7시에 초기화돼요.')).toBeTruthy();
-  expect(screen.getByLabelText('오늘 0/4 완료, 받은 의뢰 0/3')).toBeTruthy();
-  expect(screen.getByTestId('quest-status-home-fridge')).toHaveTextContent('내 생활');
-  expect(screen.getByTestId('quest-status-minsu-safety')).toHaveTextContent('찾을 의뢰');
-  expect(screen.getByTestId('quest-status-bus-route')).toHaveTextContent('찾을 의뢰');
-  expect(screen.getByTestId('quest-status-market-shopping')).toHaveTextContent('찾을 의뢰');
-  expect(screen.getByLabelText(/냉장고 살펴보기, 내 생활, 진행 중/)).toBeTruthy();
-  expect(screen.getByLabelText(/안전하게 길 건너기, 찾을 의뢰.*민수/)).toBeTruthy();
-  expect(screen.getByLabelText(/목적지 버스 찾기, 찾을 의뢰.*기사님/)).toBeTruthy();
-  expect(screen.getByLabelText(/장보기 목록 완성하기, 찾을 의뢰.*지영/)).toBeTruthy();
+  expect(screen.getByLabelText('오늘 0/4 완료')).toBeTruthy();
+  expect(screen.getByLabelText(/냉장고 살펴보기, 진행 중/)).toBeTruthy();
+  expect(screen.getByLabelText('마을 중앙의 민수를 찾아보세요.')).toBeTruthy();
+  expect(screen.getByLabelText('버스정류장의 기사님을 찾아보세요.')).toBeTruthy();
+  expect(screen.getByLabelText('하늘마트의 지영을 찾아보세요.')).toBeTruthy();
   expect(screen.getAllByTestId('daily-quest-row')).toHaveLength(4);
-  expect(screen.getByText('장보기 목록 완성하기')).toBeTruthy();
+  expect(screen.queryByText('안전하게 길 건너기')).toBeNull();
+  expect(screen.queryByText('목적지 버스 찾기')).toBeNull();
+  expect(screen.queryByText('장보기 목록 완성하기')).toBeNull();
 
   fireEvent.press(screen.getByRole('button', { name: '가방 열기' }));
   expect(screen.getByRole('tab', { name: '물건 검색' }).props.accessibilityState.selected).toBe(true);
@@ -146,10 +145,6 @@ describe('오늘도 앱', () => {
     fireEvent(joystick, 'accessibilityAction', { nativeEvent: { actionName: 'moveUp' } });
     fireEvent(joystick, 'accessibilityAction', { nativeEvent: { actionName: 'moveRight' } });
 
-    const interaction = screen.getByRole('button', { name: '민수와 대화 또는 의뢰 선택하기' });
-    expect(interaction.props.accessibilityState.disabled).toBe(false);
-    fireEvent.press(interaction);
-
     const finishLineAndContinue = async (line: string) => {
       fireEvent.press(screen.getByRole('button', { name: '대화 계속하기' }));
       expect(screen.getByText(line)).toBeTruthy();
@@ -159,48 +154,50 @@ describe('오늘도 앱', () => {
       fireEvent.press(screen.getByRole('button', { name: '대화 계속하기' }));
     };
 
-    expect(screen.getByLabelText('민수 상호작용 메뉴')).toBeTruthy();
-    fireEvent.press(screen.getByLabelText('민수와 대화하기'));
-    await finishLineAndContinue('오늘도 만나서 반가워!');
-    fireEvent.press(screen.getByRole('button', { name: '대화 계속하기' }));
-    expect(screen.getByText('천천히 마을을 한 바퀴 걸어볼까?')).toBeTruthy();
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 400));
-    });
-    fireEvent.press(screen.getByRole('button', { name: '대화 계속하기' }));
+    const openMinsuActionChoices = async () => {
+      const interaction = screen.getByRole('button', {
+        name: '민수와 대화 또는 의뢰 선택하기',
+      });
+      expect(interaction.props.accessibilityState.disabled).toBe(false);
+      fireEvent.press(interaction);
+      await finishLineAndContinue('오늘도 만나서 반가워!');
+      fireEvent.press(screen.getByRole('button', { name: '대화 계속하기' }));
+      expect(screen.getByText('무엇을 할까요?')).toBeTruthy();
+      expect(screen.getByLabelText('민수 행동 선택지')).toBeTruthy();
+    };
+
+    await openMinsuActionChoices();
+    fireEvent.press(screen.getByRole('button', { name: '대화하기' }));
+    await finishLineAndContinue('천천히 마을을 한 바퀴 걸어볼까?');
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 220));
     });
 
     fireEvent.press(screen.getByRole('button', { name: '수첩 열기' }));
-    expect(screen.getByLabelText('오늘 0/4 완료, 받은 의뢰 0/3')).toBeTruthy();
-    expect(screen.getByTestId('quest-status-minsu-safety')).toHaveTextContent('찾을 의뢰');
+    expect(screen.getByLabelText('오늘 0/4 완료')).toBeTruthy();
+    expect(screen.getByLabelText('마을 중앙의 민수를 찾아보세요.')).toBeTruthy();
     fireEvent.press(screen.getByRole('button', { name: '수첩 열기' }));
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 220));
     });
 
-    fireEvent.press(
-      screen.getByRole('button', { name: '민수와 대화 또는 의뢰 선택하기' }),
-    );
-    fireEvent.press(screen.getByLabelText('민수의 의뢰 확인하기'));
+    await openMinsuActionChoices();
+    fireEvent.press(screen.getByRole('button', { name: '퀘스트 받기' }));
     expect(screen.getByLabelText('안전하게 길 건너기 의뢰 제안')).toBeTruthy();
     fireEvent.press(screen.getByLabelText('민수의 의뢰 받기'));
     expect(screen.getByText('민수의 의뢰를 받았어요')).toBeTruthy();
     fireEvent.press(screen.getByLabelText('안내 확인'));
 
     fireEvent.press(screen.getByRole('button', { name: '수첩 열기' }));
-    expect(screen.getByLabelText('오늘 0/4 완료, 받은 의뢰 1/3')).toBeTruthy();
-    expect(screen.getByTestId('quest-status-minsu-safety')).toHaveTextContent('받은 의뢰');
+    expect(screen.getByLabelText('오늘 0/4 완료')).toBeTruthy();
+    expect(screen.getByLabelText(/안전하게 길 건너기, 진행 중/)).toBeTruthy();
     fireEvent.press(screen.getByRole('button', { name: '수첩 열기' }));
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 220));
     });
 
-    fireEvent.press(
-      screen.getByRole('button', { name: '민수와 대화 또는 의뢰 선택하기' }),
-    );
-    fireEvent.press(screen.getByLabelText('민수의 의뢰 진행하기'));
+    await openMinsuActionChoices();
+    fireEvent.press(screen.getByRole('button', { name: '퀘스트 진행하기' }));
 
     await finishLineAndContinue('어, 왔구나! 오늘도 만나서 반가워.');
     await finishLineAndContinue('나는 마을을 한 바퀴 걷고 있었어.');
@@ -246,7 +243,7 @@ describe('오늘도 앱', () => {
     expect(screen.getByRole('button', { name: '민수와 대화 또는 의뢰 선택하기' })).toBeTruthy();
     expect(screen.getByLabelText('이동 조이스틱')).toBeTruthy();
     fireEvent.press(screen.getByRole('button', { name: '수첩 열기' }));
-    expect(screen.getByLabelText('오늘 1/4 완료, 받은 의뢰 1/3')).toBeTruthy();
+    expect(screen.getByLabelText('오늘 1/4 완료')).toBeTruthy();
   }, 10_000);
 
   it('터치 이동 모드에서 바닥과 NPC를 직접 눌러 이동한다', async () => {
@@ -270,11 +267,19 @@ describe('오늘도 앱', () => {
 
     fireEvent.press(screen.getByRole('button', { name: '안내원 민수로 이동해 대화하기' }));
     await waitFor(
-      () => expect(screen.getByLabelText('민수 상호작용 메뉴')).toBeTruthy(),
+      () => expect(screen.getByRole('button', { name: '대화 계속하기' })).toBeTruthy(),
       { timeout: 2500 },
     );
-    expect(screen.getByLabelText('민수와 대화하기')).toBeTruthy();
-    expect(screen.getByLabelText('민수의 의뢰 확인하기')).toBeTruthy();
+    fireEvent.press(screen.getByRole('button', { name: '대화 계속하기' }));
+    expect(screen.getByText('오늘도 만나서 반가워!')).toBeTruthy();
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 400));
+    });
+    fireEvent.press(screen.getByRole('button', { name: '대화 계속하기' }));
+    fireEvent.press(screen.getByRole('button', { name: '대화 계속하기' }));
+    expect(screen.getByLabelText('민수 행동 선택지')).toBeTruthy();
+    expect(screen.getByRole('button', { name: '대화하기' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: '퀘스트 받기' })).toBeTruthy();
   });
 
   it('집에 들어가 냉장고를 확인하고 마을로 돌아온다', async () => {
@@ -319,8 +324,8 @@ describe('오늘도 앱', () => {
     fireEvent.press(screen.getByLabelText('안내 확인'));
 
     fireEvent.press(screen.getByRole('button', { name: '수첩 열기' }));
-    expect(screen.getByLabelText('오늘 1/4 완료, 받은 의뢰 0/3')).toBeTruthy();
-    expect(screen.getByTestId('quest-status-home-fridge')).toHaveTextContent('완료');
+    expect(screen.getByLabelText('오늘 1/4 완료')).toBeTruthy();
+    expect(screen.getByLabelText(/냉장고 살펴보기, 완료/)).toBeTruthy();
     fireEvent.press(screen.getByRole('button', { name: '수첩 열기' }));
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 220));
@@ -334,7 +339,7 @@ describe('오늘도 앱', () => {
 
     expect(screen.getByLabelText('쿼터뷰 마을')).toBeTruthy();
     fireEvent.press(screen.getByRole('button', { name: '수첩 열기' }));
-    expect(screen.getByLabelText('오늘 1/4 완료, 받은 의뢰 0/3')).toBeTruthy();
+    expect(screen.getByLabelText('오늘 1/4 완료')).toBeTruthy();
   });
 
   it('터치 이동 모드에서 바닥을 누르는 동안 해당 방향으로 계속 이동한다', async () => {
@@ -424,8 +429,8 @@ describe('오늘도 앱', () => {
     expect(screen.getByText('+30')).toBeTruthy();
     fireEvent.press(screen.getByText('마을로 돌아가기'));
     fireEvent.press(screen.getByRole('button', { name: '수첩 열기' }));
-    expect(screen.getByLabelText('오늘 0/4 완료, 받은 의뢰 0/3')).toBeTruthy();
-    expect(screen.getByTestId('quest-status-market-shopping')).toHaveTextContent('찾을 의뢰');
+    expect(screen.getByLabelText('오늘 0/4 완료')).toBeTruthy();
+    expect(screen.getByLabelText('하늘마트의 지영을 찾아보세요.')).toBeTruthy();
   });
 
   it('AI 입력 표시 뒤 답변을 추가하고 여러 대화를 누적한다', async () => {

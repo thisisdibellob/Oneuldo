@@ -10,6 +10,7 @@ import {
   Image,
   LayoutChangeEvent,
   PanResponder,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -78,8 +79,12 @@ const PLAYER_ART_WIDTH = MODULAR_CHARACTER_CANVAS.width * PLAYER_ART_SCALE;
 const PLAYER_ART_PIVOT_Y = MODULAR_CHARACTER_CANVAS.pivotY * PLAYER_ART_SCALE;
 const MOVE_SPEED = 190;
 const RUN_SPEED_MULTIPLIER = 1.55;
-const BACKGROUND_MUSIC_VOLUME = 0.18;
-const BACKGROUND_MUSIC_DUCKED_VOLUME = 0.1;
+const BACKGROUND_MUSIC_VOLUME = 0.5;
+const BACKGROUND_MUSIC_DUCKED_VOLUME = 0.25;
+const DIALOGUE_BLIP_VOLUME = 0.18;
+const DIALOGUE_BLIP_MIN_GAP = 92;
+const DIALOGUE_BLIP_PLAYBACK_RATES = [0.9, 0.96, 1.02] as const;
+const CLEAR_SOUND_VOLUME = 0.32;
 const ACCESSIBILITY_STEP = 58;
 const JOYSTICK_RADIUS = 34;
 const JOYSTICK_SIZE = 110;
@@ -88,6 +93,13 @@ const DIALOGUE_CHARACTER_DELAY = 34;
 const DIALOGUE_READ_DELAY = 360;
 const MARKET_STATION_INTERACTION_DISTANCE = 105;
 const BUS_STOP_POINT = { x: 1245, y: 480 };
+
+const WEB_MOVEMENT_KEYS: Record<string, Point> = {
+  KeyA: { x: -1, y: 0 },
+  KeyD: { x: 1, y: 0 },
+  KeyS: { x: 0, y: 1 },
+  KeyW: { x: 0, y: -1 },
+};
 
 const MARKET_STATIONS: Record<MarketStationId | 'exit', Point> = {
   checkout: { x: 450, y: 250 },
@@ -111,11 +123,14 @@ const marketObstacles: Rect[] = [
 ];
 
 type DailyConversationChoice = 'fun' | 'tired';
+type NpcInteractionChoice = 'npc-quest' | 'npc-talk';
+type DialogueChoice = DailyConversationChoice | NpcInteractionChoice;
 type DialogueStep =
   | { kind: 'line'; text: string }
   | {
       kind: 'choice';
-      options: readonly { id: DailyConversationChoice; label: string }[];
+      options: readonly { id: DialogueChoice; label: string }[];
+      purpose: 'conversation' | 'npc-action';
       text: string;
     }
   | { kind: 'response'; responses: Record<DailyConversationChoice, string> };
@@ -131,6 +146,7 @@ const dialogueSteps = [
       { id: 'fun', label: '재미있는 일이 있었어' },
       { id: 'tired', label: '조금 피곤한 하루였어' },
     ],
+    purpose: 'conversation',
     text: '너는 오늘 하루 어땠어?',
   },
   {
@@ -159,7 +175,7 @@ type ControlMode = 'joystick' | 'touch';
 type NearbyMarketStation = MarketStationId | 'exit' | null;
 type NearbyHomeStation = HomeStationId | null;
 type PendingPortal = VillagePortalId | null;
-type DialogueMode = 'minsu-quest' | 'small-talk' | null;
+type DialogueMode = 'minsu-quest' | 'npc-greeting' | 'small-talk' | null;
 type InfoPanel = { body: string; title: string } | null;
 type TapInteractionOptions = {
   busStop?: boolean;
@@ -457,7 +473,7 @@ type GamePrototypeScreenProps = {
 };
 
 export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
-  const backgroundMusic = useAudioPlayer(require('../../assets/audio/maple-square.mp3'), {
+  const backgroundMusic = useAudioPlayer(require('../../assets/audio/apple-cider.wav'), {
     downloadFirst: true,
     keepAudioSessionActive: true,
   });
@@ -491,6 +507,9 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
   const viewport = useRef({ width: 0, height: 0 });
   const viewportOrigin = useRef({ x: 0, y: 0 });
   const direction = useRef<Point>({ x: 0, y: 0 });
+  const keyboardDirection = useRef<Point>({ x: 0, y: 0 });
+  const keyboardEngaged = useRef(false);
+  const pressedMovementKeys = useRef(new Set<string>());
   const speedMultiplier = useRef(1);
   const tapTarget = useRef<Point | null>(null);
   const pendingNpcInteraction = useRef<VillageNpcId | null>(null);
@@ -501,6 +520,9 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
   const joystickEngaged = useRef(false);
   const touchHoldActivated = useRef(false);
   const clearSoundTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const dialogueBlipCursor = useRef(0);
+  const lastDialogueBlipAt = useRef(0);
+  const previousDialogueCharacterCount = useRef(0);
   const animationFrame = useRef<number | null>(null);
   const previousFrame = useRef<number | null>(null);
   const nearbyNpcIdRef = useRef<VillageNpcId | null>(null);
@@ -511,7 +533,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
   const controlsLockedRef = useRef(false);
   const joystickZoneSize = useRef({ width: 220, height: JOYSTICK_ZONE_HEIGHT });
   const dialogueReadyAt = useRef(Number.POSITIVE_INFINITY);
-  const openNpcMenuRef = useRef<(npcId: VillageNpcId) => void>(() => undefined);
+  const startNpcGreetingRef = useRef<(npcId: VillageNpcId) => void>(() => undefined);
 
   const [nearbyNpcId, setNearbyNpcId] = useState<VillageNpcId | null>(null);
   const [nearbyPortalId, setNearbyPortalId] = useState<PendingPortal>(null);
@@ -530,7 +552,6 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
   const [tapTargetMarker, setTapTargetMarker] = useState<Point | null>(null);
   const [joystickActive, setJoystickActive] = useState(false);
   const [joystickCenter, setJoystickCenter] = useState({ x: 76, y: 190 });
-  const [activeNpcMenu, setActiveNpcMenu] = useState<VillageNpcId | null>(null);
   const [questOfferId, setQuestOfferId] = useState<DailyQuestId | null>(null);
   const [infoPanel, setInfoPanel] = useState<InfoPanel>(null);
   const [dialogueMode, setDialogueMode] = useState<DialogueMode>(null);
@@ -580,7 +601,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
   const renderedDialogueStep = activeDialogueSteps[renderedDialogueIndex];
   const renderedDialogue = resolveDialogueText(renderedDialogueStep, selectedDailyChoice);
   const dialogueSpeakerName = VILLAGE_NPC_BY_ID[dialogueNpcId].name;
-  const dailyChoiceVisible =
+  const dialogueChoiceVisible =
     currentDialogueStep?.kind === 'choice' &&
     visibleDialogueCharacters >= currentDialogue.length;
   controlsLockedRef.current =
@@ -589,7 +610,6 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
     dialogueIndex !== null ||
     quizStep !== null ||
     hudMenuOpen ||
-    activeNpcMenu !== null ||
     questOfferId !== null ||
     infoPanel !== null ||
     marketScenarioLocked;
@@ -758,6 +778,9 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
 
   const stopMovement = useCallback(() => {
     direction.current = { x: 0, y: 0 };
+    keyboardDirection.current = { x: 0, y: 0 };
+    keyboardEngaged.current = false;
+    pressedMovementKeys.current.clear();
     joystickEngaged.current = false;
     tapTarget.current = null;
     pendingNpcInteraction.current = null;
@@ -797,7 +820,6 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
     stopMovement();
     speedMultiplier.current = 1;
     setRunEnabled(false);
-    setActiveNpcMenu(null);
     setQuestOfferId(null);
     setInfoPanel(null);
   }, [stopMovement]);
@@ -865,6 +887,11 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
 
   const runMovement = useCallback(
     (timestamp: number) => {
+      if (controlsLockedRef.current) {
+        stopMovement();
+        return;
+      }
+
       const last = previousFrame.current ?? timestamp;
       const elapsedSeconds = Math.min(timestamp - last, 32) / 1000;
       previousFrame.current = timestamp;
@@ -916,7 +943,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
           animationFrame.current = null;
           setTapTargetMarker(null);
 
-          if (npcToOpen) openNpcMenuRef.current(npcToOpen);
+          if (npcToOpen) startNpcGreetingRef.current(npcToOpen);
           if (portalToUse === 'market') handleEnterMarket();
           if (portalToUse === 'home') handleEnterHome();
           if (marketStationToUse === 'exit') handleLeaveMarket();
@@ -970,11 +997,15 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
         return;
       }
 
+      const combinedX = direction.current.x + keyboardDirection.current.x;
+      const combinedY = direction.current.y + keyboardDirection.current.y;
+      const combinedLength = Math.hypot(combinedX, combinedY);
+      const movementScale = combinedLength > 1 ? 1 / combinedLength : 1;
       movePlayer(
-        direction.current.x * MOVE_SPEED * speedMultiplier.current * elapsedSeconds,
-        direction.current.y * MOVE_SPEED * speedMultiplier.current * elapsedSeconds,
+        combinedX * movementScale * MOVE_SPEED * speedMultiplier.current * elapsedSeconds,
+        combinedY * movementScale * MOVE_SPEED * speedMultiplier.current * elapsedSeconds,
       );
-      if (joystickEngaged.current) {
+      if (joystickEngaged.current || keyboardEngaged.current) {
         animationFrame.current = requestAnimationFrame(runMovement);
       } else {
         previousFrame.current = null;
@@ -988,6 +1019,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
       handleLeaveHome,
       handleLeaveMarket,
       movePlayer,
+      stopMovement,
     ],
   );
 
@@ -996,6 +1028,76 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
       animationFrame.current = requestAnimationFrame(runMovement);
     }
   }, [runMovement]);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') return undefined;
+
+    const syncKeyboardDirection = () => {
+      let x = 0;
+      let y = 0;
+      pressedMovementKeys.current.forEach((code) => {
+        const vector = WEB_MOVEMENT_KEYS[code];
+        if (!vector) return;
+        x += vector.x;
+        y += vector.y;
+      });
+      const length = Math.hypot(x, y);
+      keyboardDirection.current =
+        length > 0 ? { x: x / length, y: y / length } : { x: 0, y: 0 };
+      keyboardEngaged.current = length > 0;
+    };
+
+    const isEditableTarget = (target: EventTarget | null) => {
+      const element = target as { isContentEditable?: boolean; tagName?: string } | null;
+      const tagName = element?.tagName?.toUpperCase();
+      return (
+        element?.isContentEditable ||
+        tagName === 'INPUT' ||
+        tagName === 'TEXTAREA' ||
+        tagName === 'SELECT'
+      );
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (
+        !WEB_MOVEMENT_KEYS[event.code] ||
+        event.altKey ||
+        event.ctrlKey ||
+        event.metaKey
+      ) {
+        return;
+      }
+      if (isEditableTarget(event.target)) return;
+      event.preventDefault();
+      if (controlsLockedRef.current) return;
+
+      if (pressedMovementKeys.current.size === 0) stopMovement();
+      pressedMovementKeys.current.add(event.code);
+      syncKeyboardDirection();
+      beginMovement();
+    };
+
+    const handleKeyUp = (event: KeyboardEvent) => {
+      if (!WEB_MOVEMENT_KEYS[event.code]) return;
+      event.preventDefault();
+      pressedMovementKeys.current.delete(event.code);
+      syncKeyboardDirection();
+      if (keyboardEngaged.current && !controlsLockedRef.current) beginMovement();
+    };
+
+    const handleWindowBlur = () => stopMovement();
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    window.addEventListener('blur', handleWindowBlur);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener('blur', handleWindowBlur);
+      pressedMovementKeys.current.clear();
+      keyboardDirection.current = { x: 0, y: 0 };
+      keyboardEngaged.current = false;
+    };
+  }, [beginMovement, stopMovement]);
 
   const joystickResponder = useRef(
     PanResponder.create({
@@ -1056,7 +1158,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
 
   useEffect(() => {
     dailyChoiceProgress.stopAnimation();
-    if (!dailyChoiceVisible) {
+    if (!dialogueChoiceVisible) {
       dailyChoiceProgress.setValue(0);
       return undefined;
     }
@@ -1075,7 +1177,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
     });
     animation.start();
     return () => animation.stop();
-  }, [dailyChoiceProgress, dailyChoiceVisible, reduceMotionEnabled]);
+  }, [dailyChoiceProgress, dialogueChoiceVisible, reduceMotionEnabled]);
 
   useEffect(() => {
     let mounted = true;
@@ -1110,23 +1212,53 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
   }, [backgroundMusic, backgroundMusicStatus.isLoaded, dialoguePanelMounted, quizPanelMounted]);
 
   useEffect(() => {
-    dialogueBlipOne.volume = 0.32;
-    dialogueBlipTwo.volume = 0.32;
-    dialogueBlipThree.volume = 0.32;
-  }, [dialogueBlipOne, dialogueBlipThree, dialogueBlipTwo]);
+    if (dialogueIndex === null || visibleDialogueCharacters === 0) {
+      previousDialogueCharacterCount.current = visibleDialogueCharacters;
+      lastDialogueBlipAt.current = 0;
+      return;
+    }
 
-  useEffect(() => {
-    if (!audioModeReady || dialogueIndex === null || visibleDialogueCharacters === 0) return;
+    const previousCharacterCount = previousDialogueCharacterCount.current;
+    previousDialogueCharacterCount.current = visibleDialogueCharacters;
+    if (
+      !audioModeReady ||
+      visibleDialogueCharacters !== previousCharacterCount + 1
+    ) {
+      return;
+    }
+
     const lastCharacter = currentDialogue[visibleDialogueCharacters - 1];
-    if (visibleDialogueCharacters % 2 === 0 || !lastCharacter || /[\s.,!?…]/.test(lastCharacter)) return;
+    if (!lastCharacter || /[\s.,!?…]/.test(lastCharacter)) return;
+
+    const now = Date.now();
+    if (now - lastDialogueBlipAt.current < DIALOGUE_BLIP_MIN_GAP) return;
 
     const players = [
-      { isLoaded: dialogueBlipOneStatus.isLoaded, player: dialogueBlipOne },
-      { isLoaded: dialogueBlipTwoStatus.isLoaded, player: dialogueBlipTwo },
-      { isLoaded: dialogueBlipThreeStatus.isLoaded, player: dialogueBlipThree },
+      {
+        isLoaded: dialogueBlipOneStatus.isLoaded,
+        player: dialogueBlipOne,
+        rate: DIALOGUE_BLIP_PLAYBACK_RATES[0],
+      },
+      {
+        isLoaded: dialogueBlipTwoStatus.isLoaded,
+        player: dialogueBlipTwo,
+        rate: DIALOGUE_BLIP_PLAYBACK_RATES[1],
+      },
+      {
+        isLoaded: dialogueBlipThreeStatus.isLoaded,
+        player: dialogueBlipThree,
+        rate: DIALOGUE_BLIP_PLAYBACK_RATES[2],
+      },
     ];
-    const { isLoaded, player } = players[visibleDialogueCharacters % players.length];
+    const playerIndex =
+      (dialogueBlipCursor.current + lastCharacter.charCodeAt(0)) % players.length;
+    dialogueBlipCursor.current = (dialogueBlipCursor.current + 1) % players.length;
+    const { isLoaded, player, rate } = players[playerIndex];
     if (!isLoaded) return;
+    lastDialogueBlipAt.current = now;
+    player.volume = DIALOGUE_BLIP_VOLUME;
+    player.shouldCorrectPitch = false;
+    player.setPlaybackRate(rate);
     void player
       .seekTo(0)
       .then(() => player.play())
@@ -1157,6 +1289,9 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
     clearSoundTimers.current = notes.map(({ delay, isLoaded, player }) =>
       setTimeout(() => {
         if (!isLoaded) return;
+        player.volume = CLEAR_SOUND_VOLUME;
+        player.shouldCorrectPitch = false;
+        player.setPlaybackRate(1);
         void player
           .seekTo(0)
           .then(() => player.play())
@@ -1375,7 +1510,6 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
     stopMovement();
     speedMultiplier.current = 1;
     setRunEnabled(false);
-    setActiveNpcMenu(null);
     setQuestOfferId(null);
     setDialogueNpcId(npcId);
     setDialogueMode(mode);
@@ -1386,11 +1520,17 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
     setDialogueIndex(0);
   };
 
-  const startSmallTalk = (npcId: VillageNpcId) => {
+  const startSmallTalk = (npcId: VillageNpcId, skipGreeting = false) => {
     const npc = VILLAGE_NPC_BY_ID[npcId];
+    const lines = skipGreeting ? npc.smallTalk.slice(1) : npc.smallTalk;
+    if (lines.length === 0) {
+      setDialogueIndex(null);
+      setDialogueMode(null);
+      return;
+    }
     startDialogue(
       npcId,
-      npc.smallTalk.map((text) => ({ kind: 'line' as const, text })),
+      lines.map((text) => ({ kind: 'line' as const, text })),
       'small-talk',
     );
   };
@@ -1400,13 +1540,35 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
     startDialogue('minsu', dialogueSteps, 'minsu-quest');
   };
 
-  const openNpcMenu = (npcId: VillageNpcId) => {
+  const startNpcGreeting = (npcId: VillageNpcId) => {
     if (nearbyNpcIdRef.current !== npcId) return;
-    stopMovement();
-    setQuestOfferId(null);
-    setActiveNpcMenu(npcId);
+    const npc = VILLAGE_NPC_BY_ID[npcId];
+    const questId = NPC_QUEST_IDS[npcId];
+    const options: { id: NpcInteractionChoice; label: string }[] = [
+      { id: 'npc-talk', label: '대화하기' },
+    ];
+    if (questId) {
+      const questStatus = questStatusesRef.current[questId];
+      options.push({
+        id: 'npc-quest',
+        label:
+          questStatus === 'available'
+            ? '퀘스트 받기'
+            : questStatus === 'active'
+              ? '퀘스트 진행하기'
+              : '완료한 퀘스트',
+      });
+    }
+    startDialogue(
+      npcId,
+      [
+        { kind: 'line', text: npc.smallTalk[0] ?? `${npc.name}이 반갑게 인사했어요.` },
+        { kind: 'choice', options, purpose: 'npc-action', text: '무엇을 할까요?' },
+      ],
+      'npc-greeting',
+    );
   };
-  openNpcMenuRef.current = openNpcMenu;
+  startNpcGreetingRef.current = startNpcGreeting;
 
   const openQuiz = () => {
     if (dialogueMode !== 'minsu-quest') return;
@@ -1491,7 +1653,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
     event?.stopPropagation?.();
     if (controlMode !== 'touch' || controlsLockedRef.current) return;
     if (nearbyNpcIdRef.current === npc.id) {
-      openNpcMenu(npc.id);
+      startNpcGreeting(npc.id);
       return;
     }
 
@@ -1705,7 +1867,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
       return;
     }
     if (nearbyNpcIdRef.current) {
-      openNpcMenu(nearbyNpcIdRef.current);
+      startNpcGreeting(nearbyNpcIdRef.current);
       return;
     }
     if (nearbyPortalIdRef.current === 'market') {
@@ -1728,14 +1890,12 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
       return;
     }
     if (status === 'completed') {
-      setActiveNpcMenu(null);
       setInfoPanel({
         body: '오늘 의뢰는 이미 잘 마쳤어요. 내일 또 만나요!',
         title: '완료한 의뢰',
       });
       return;
     }
-    setActiveNpcMenu(null);
     if (questId === 'minsu-safety') {
       startMinsuQuestDialogue();
       return;
@@ -1752,7 +1912,6 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
   const handleAcceptQuest = (npcId: VillageNpcId, questId: DailyQuestId) => {
     acceptDailyQuest(questId);
     setQuestOfferId(null);
-    setActiveNpcMenu(null);
     setInfoPanel({
       body:
         questId === 'minsu-safety'
@@ -1764,10 +1923,26 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
     });
   };
 
-  const handleDailyChoicePress = (choice: DailyConversationChoice) => {
-    if (!dailyChoiceVisible || currentDialogueStep?.kind !== 'choice' || dialogueIndex === null) {
+  const handleDialogueChoicePress = (choice: DialogueChoice) => {
+    if (!dialogueChoiceVisible || currentDialogueStep?.kind !== 'choice' || dialogueIndex === null) {
       return;
     }
+
+    if (currentDialogueStep.purpose === 'npc-action') {
+      if (choice === 'npc-talk') {
+        startSmallTalk(dialogueNpcId, true);
+        return;
+      }
+      if (choice === 'npc-quest') {
+        setDialogueIndex(null);
+        setDialogueMode(null);
+        setSelectedDailyChoice(null);
+        handleNpcQuestPress(dialogueNpcId);
+      }
+      return;
+    }
+
+    if (choice !== 'fun' && choice !== 'tired') return;
     setSelectedDailyChoice(choice);
     dialogueReadyAt.current = Number.POSITIVE_INFINITY;
     setVisibleDialogueCharacters(0);
@@ -1876,13 +2051,6 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
               ? '확인'
               : '행동';
 
-  const activeMenuNpcDefinition = activeNpcMenu
-    ? VILLAGE_NPC_BY_ID[activeNpcMenu]
-    : null;
-  const activeMenuQuestId = activeNpcMenu ? NPC_QUEST_IDS[activeNpcMenu] ?? null : null;
-  const activeMenuQuestStatus = activeMenuQuestId
-    ? dailyQuestStatuses[activeMenuQuestId]
-    : null;
   const offeredQuest = questOfferId
     ? dailyQuests.find((quest) => quest.id === questOfferId) ?? null
     : null;
@@ -2093,84 +2261,6 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
         />
       ) : null}
 
-      {activeMenuNpcDefinition && !questOfferId ? (
-        <View style={styles.interactionOverlay}>
-          <Pressable
-            accessibilityLabel="NPC 메뉴 닫기"
-            onPress={(event) => {
-              event?.stopPropagation?.();
-              setActiveNpcMenu(null);
-            }}
-            style={styles.interactionOverlayDim}
-          />
-          <View accessibilityLabel={activeMenuNpcDefinition.name + ' 상호작용 메뉴'} style={styles.npcMenuSheet}>
-            <View style={styles.npcMenuHeader}>
-              <View
-                style={[
-                  styles.npcMenuAvatar,
-                  { backgroundColor: activeMenuNpcDefinition.accentColor },
-                ]}
-              >
-                <Ionicons color={colors.white} name="person" size={23} />
-              </View>
-              <View style={styles.npcMenuHeaderCopy}>
-                <Text style={styles.npcMenuName}>{activeMenuNpcDefinition.name}</Text>
-                <Text style={styles.npcMenuRole}>
-                  {activeMenuNpcDefinition.region} · {activeMenuNpcDefinition.roleLabel}
-                </Text>
-              </View>
-              <PressScale
-                accessibilityLabel={activeMenuNpcDefinition.name + ' 메뉴 닫기'}
-                onPress={() => setActiveNpcMenu(null)}
-                style={styles.npcMenuClose}
-              >
-                <Ionicons color="#59645D" name="close" size={22} />
-              </PressScale>
-            </View>
-            <PressScale
-              accessibilityLabel={activeMenuNpcDefinition.name + '와 대화하기'}
-              onPress={() => startSmallTalk(activeMenuNpcDefinition.id)}
-              style={styles.npcMenuPrimaryButton}
-            >
-              <Ionicons color="#355E4D" name="chatbubbles-outline" size={20} />
-              <Text style={styles.npcMenuPrimaryText}>대화하기</Text>
-            </PressScale>
-            {activeMenuQuestId ? (
-              <PressScale
-                accessibilityLabel={
-                  activeMenuQuestStatus === 'available'
-                    ? activeMenuNpcDefinition.name + '의 의뢰 확인하기'
-                    : activeMenuQuestStatus === 'active'
-                      ? activeMenuNpcDefinition.name + '의 의뢰 진행하기'
-                      : activeMenuNpcDefinition.name + '의 완료한 의뢰 보기'
-                }
-                onPress={() => handleNpcQuestPress(activeMenuNpcDefinition.id)}
-                style={styles.npcMenuQuestButton}
-              >
-                <Ionicons
-                  color="#FFFFFF"
-                  name={
-                    activeMenuQuestStatus === 'completed'
-                      ? 'checkmark-circle'
-                      : activeMenuQuestStatus === 'active'
-                        ? 'play-circle'
-                        : 'document-text'
-                  }
-                  size={20}
-                />
-                <Text style={styles.npcMenuQuestText}>
-                  {activeMenuQuestStatus === 'available'
-                    ? '의뢰 확인하기'
-                    : activeMenuQuestStatus === 'active'
-                      ? '의뢰 진행하기'
-                      : '완료한 의뢰'}
-                </Text>
-              </PressScale>
-            ) : null}
-          </View>
-        </View>
-      ) : null}
-
       {questOfferId && offeredQuest && offeredNpc ? (
         <View style={styles.interactionOverlay}>
           <Pressable
@@ -2197,7 +2287,9 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
               onPress={() => handleAcceptQuest(offeredNpc.id, questOfferId)}
               style={styles.npcMenuQuestButton}
             >
-              <Text style={styles.npcMenuQuestText}>의뢰 받기</Text>
+              <Text numberOfLines={1} style={styles.npcMenuQuestText}>
+                의뢰 받기
+              </Text>
             </PressScale>
             <PressScale
               accessibilityLabel="다음에 받기"
@@ -2268,11 +2360,17 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
             ]}
           >
             <Pressable
-              accessibilityLabel={dailyChoiceVisible ? '일상 선택지를 선택해 주세요' : '대화 계속하기'}
+              accessibilityLabel={
+                dialogueChoiceVisible
+                  ? currentDialogueStep?.kind === 'choice' && currentDialogueStep.purpose === 'npc-action'
+                    ? '행동을 선택해 주세요'
+                    : '일상 선택지를 선택해 주세요'
+                  : '대화 계속하기'
+              }
               accessibilityLiveRegion="polite"
               accessibilityRole="button"
-              accessibilityState={{ disabled: dailyChoiceVisible }}
-              disabled={dailyChoiceVisible}
+              accessibilityState={{ disabled: dialogueChoiceVisible }}
+              disabled={dialogueChoiceVisible}
               onPress={(event) => {
                 event?.stopPropagation?.();
                 handleInteraction();
@@ -2293,7 +2391,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
               <Text style={styles.dialogueText}>
                 {renderedDialogue.slice(0, visibleDialogueCharacters)}
               </Text>
-              {!dailyChoiceVisible ? (
+              {!dialogueChoiceVisible ? (
                 <Animated.View
                   pointerEvents="none"
                   style={[
@@ -2304,10 +2402,14 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
               ) : null}
             </Pressable>
           </Animated.View>
-          {dailyChoiceVisible && currentDialogueStep?.kind === 'choice' ? (
+          {dialogueChoiceVisible && currentDialogueStep?.kind === 'choice' ? (
             <Animated.View
-              accessibilityLabel="오늘 하루 선택지"
-              accessibilityRole="radiogroup"
+              accessibilityLabel={
+                currentDialogueStep.purpose === 'npc-action'
+                  ? `${dialogueSpeakerName} 행동 선택지`
+                  : '오늘 하루 선택지'
+              }
+              accessibilityRole={currentDialogueStep.purpose === 'npc-action' ? 'menu' : 'radiogroup'}
               style={[
                 styles.dialogueChoices,
                 {
@@ -2325,12 +2427,16 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
             >
               {currentDialogueStep.options.map((option) => (
                 <PressScale
-                  accessibilityRole="radio"
-                  accessibilityState={{ checked: selectedDailyChoice === option.id }}
+                  accessibilityRole={currentDialogueStep.purpose === 'npc-action' ? 'button' : 'radio'}
+                  accessibilityState={
+                    currentDialogueStep.purpose === 'npc-action'
+                      ? undefined
+                      : { checked: selectedDailyChoice === option.id }
+                  }
                   key={option.id}
                   onPress={(event) => {
                     event?.stopPropagation?.();
-                    handleDailyChoicePress(option.id);
+                    handleDialogueChoicePress(option.id);
                   }}
                   style={styles.quizAnswer}
                 >
@@ -2539,6 +2645,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
 const styles = StyleSheet.create({
   root: {
     backgroundColor: '#CAD3C3',
+    cursor: 'auto',
     flex: 1,
     overflow: 'hidden',
   },
@@ -3093,12 +3200,15 @@ const styles = StyleSheet.create({
   npcMenuPrimaryText: { color: '#355E4D', fontFamily: fonts.bold, fontSize: 15 },
   npcMenuQuestButton: {
     alignItems: 'center',
+    alignSelf: 'center',
     backgroundColor: '#3E8B6A',
-    borderRadius: 18,
+    borderRadius: 26,
     flexDirection: 'row',
     gap: 8,
     height: 52,
     justifyContent: 'center',
+    maxWidth: '100%',
+    paddingHorizontal: 24,
   },
   npcMenuQuestText: { color: colors.white, fontFamily: fonts.bold, fontSize: 15 },
   questOfferSheet: {
@@ -3249,7 +3359,7 @@ const styles = StyleSheet.create({
     width: 71,
     zIndex: 3,
   },
-  dialogueSpeaker: { color: '#333333', fontFamily: fonts.laundryBold, fontSize: 17 },
+  dialogueSpeaker: { color: '#333333', fontFamily: fonts.cafe24Ssurround, fontSize: 17 },
   dialoguePressArea: {
     alignItems: 'center',
     flex: 1,
@@ -3268,7 +3378,7 @@ const styles = StyleSheet.create({
   },
   dialogueText: {
     color: colors.white,
-    fontFamily: fonts.laundryBold,
+    fontFamily: fonts.cafe24Ssurround,
     fontSize: 17,
     lineHeight: 27,
     textAlign: 'center',
@@ -3295,8 +3405,10 @@ const styles = StyleSheet.create({
   },
   quizChoiceStage: {
     ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
     backgroundColor: 'transparent',
-    maxWidth: undefined,
+    maxWidth: '100%',
+    width: '100%',
   },
   quizResultSheet: {
     backgroundColor: colors.white,
@@ -3338,7 +3450,7 @@ const styles = StyleSheet.create({
   quizIntro: { color: '#888888', fontFamily: fonts.regular, fontSize: 12, marginTop: 2 },
   quizQuestion: {
     color: colors.white,
-    fontFamily: fonts.laundryBold,
+    fontFamily: fonts.cafe24Ssurround,
     fontSize: 17,
     lineHeight: 27,
     textAlign: 'center',
@@ -3358,9 +3470,9 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     height: 50,
     justifyContent: 'center',
-    maxWidth: '89.333%',
+    maxWidth: 335,
     overflow: 'hidden',
-    paddingHorizontal: 41,
+    paddingHorizontal: 42,
   },
   quizAnswerSelected: {
     backgroundColor: '#F2FFF7',
@@ -3375,10 +3487,11 @@ const styles = StyleSheet.create({
   quizAnswerText: {
     color: '#333333',
     flexShrink: 1,
-    fontFamily: fonts.laundryBold,
+    fontFamily: fonts.cafe24Ssurround,
     fontSize: 17,
     lineHeight: 20,
     textAlign: 'center',
+    transform: [{ translateY: 1 }],
   },
   quizButton: {
     alignItems: 'center',
