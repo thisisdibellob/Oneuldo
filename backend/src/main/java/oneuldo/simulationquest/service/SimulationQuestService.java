@@ -8,6 +8,7 @@ import oneuldo.quest.service.QuestService;
 import oneuldo.simulationquest.domain.SimulationQuest;
 import oneuldo.simulationquest.dto.SimulationQuestResponse;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
 
@@ -18,6 +19,7 @@ public class SimulationQuestService {
     private final MemberRepository memberRepository;
     private final SimulationQuestGenerator generator;
 
+    @Transactional(readOnly = true)
     public SimulationQuestResponse getSimulationQuest(UUID id) {
 
         Member member = memberRepository.findById(id)
