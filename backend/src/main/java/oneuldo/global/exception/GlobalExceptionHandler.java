@@ -66,6 +66,54 @@ public class GlobalExceptionHandler {
                 ));
     }
 
+    @ExceptionHandler(ActiveQuestNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleActiveQuestNotFound(
+            ActiveQuestNotFoundException exception
+    ) {
+        return ResponseEntity
+                .status(HttpStatus.NOT_FOUND)
+                .body(new ErrorResponse(
+                        "ACTIVE_QUEST_NOT_FOUND",
+                        exception.getMessage()
+                ));
+    }
+
+    @ExceptionHandler(SimulationNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleSimulationNotFound(
+            SimulationNotFoundException exception
+    ) {
+        return ResponseEntity
+                .status(HttpStatus.NOT_FOUND)
+                .body(new ErrorResponse(
+                        "SIMULATION_NOT_FOUND",
+                        exception.getMessage()
+                ));
+    }
+
+    @ExceptionHandler(PlaceNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handlePlaceNotFound(
+            PlaceNotFoundException exception
+    ) {
+        return ResponseEntity
+                .status(HttpStatus.NOT_FOUND)
+                .body(new ErrorResponse(
+                        "PLACE_NOT_FOUND",
+                        exception.getMessage()
+                ));
+    }
+
+    @ExceptionHandler(DailyQuestLimitExceededException.class)
+    public ResponseEntity<ErrorResponse> handleDailyQuestLimitExceeded(
+            DailyQuestLimitExceededException exception
+    ) {
+        return ResponseEntity
+                .status(HttpStatus.TOO_MANY_REQUESTS)
+                .body(new ErrorResponse(
+                        "DAILY_QUEST_LIMIT_EXCEEDED",
+                        exception.getMessage()
+                ));
+    }
+
     @ExceptionHandler(InvalidCredentialsException.class)
     public ResponseEntity<ErrorResponse> handleInvalidCredentials(
             InvalidCredentialsException exception

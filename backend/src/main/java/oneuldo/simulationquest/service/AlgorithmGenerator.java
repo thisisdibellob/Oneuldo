@@ -5,6 +5,9 @@ import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
+import oneuldo.global.exception.ActiveQuestNotFoundException;
+import oneuldo.global.exception.PlaceNotFoundException;
+import oneuldo.global.exception.SimulationNotFoundException;
 import oneuldo.member.domain.Member;
 import oneuldo.member.domain.MemberQuestProfile;
 import oneuldo.member.repository.MemberQuestProfileRepository;
@@ -67,13 +70,25 @@ public class AlgorithmGenerator implements SimulationQuestGenerator {
                 .map(candidate -> new ScoredQuest(candidate, calculateScore(member, profile, candidate)))
                 .sorted(Comparator.comparingInt(ScoredQuest::score)
                         .reversed()
-                        .thenComparing(scored -> scored.quest().getCode()))
+                .thenComparing(scored -> scored.quest().getCode()))
                 .toList();
 
+        if (rankedQuests.isEmpty()) {
+            throw new ActiveQuestNotFoundException();
+        }
+
+        boolean simulationFound = false;
+
         for (ScoredQuest scoredQuest : rankedQuests) {
-            List<SimulationPlace> availableSimulations = findAvailableSimulations(
-                    scoredQuest.quest()
-            );
+            List<Simulation> simulations = simulationRepository
+                    .findAllByQuestIdAndActiveTrueOrderByTitle(scoredQuest.quest().getId());
+
+            if (simulations.isEmpty()) {
+                continue;
+            }
+
+            simulationFound = true;
+            List<SimulationPlace> availableSimulations = findAvailableSimulations(simulations);
 
             if (!availableSimulations.isEmpty()) {
                 SimulationPlace selected = selectSimulation(member, availableSimulations);
@@ -87,7 +102,11 @@ public class AlgorithmGenerator implements SimulationQuestGenerator {
             }
         }
 
-        throw new IllegalStateException("추천할 수 있는 활성 퀘스트와 시뮬레이션이 없습니다.");
+        if (!simulationFound) {
+            throw new SimulationNotFoundException();
+        }
+
+        throw new PlaceNotFoundException();
     }
 
     private int calculateScore(Member member, MemberQuestProfile profile, Quest quest) {
@@ -124,9 +143,8 @@ public class AlgorithmGenerator implements SimulationQuestGenerator {
         return Math.floorMod(hash, EXPLORATION_WEIGHT + 1);
     }
 
-    private List<SimulationPlace> findAvailableSimulations(Quest quest) {
-        return simulationRepository.findAllByQuestIdAndActiveTrueOrderByTitle(quest.getId())
-                .stream()
+    private List<SimulationPlace> findAvailableSimulations(List<Simulation> simulations) {
+        return simulations.stream()
                 .flatMap(simulation -> placeRepository
                         .findByIdAndActiveTrue(simulation.getPlaceId())
                         .map(place -> new SimulationPlace(simulation, place))
