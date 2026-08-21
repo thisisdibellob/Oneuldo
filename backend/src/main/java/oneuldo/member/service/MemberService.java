@@ -3,6 +3,7 @@ package oneuldo.member.service;
 
 import lombok.RequiredArgsConstructor;
 import oneuldo.member.domain.Member;
+import oneuldo.member.domain.MemberQuestProfile;
 import oneuldo.member.domain.MemberRole;
 import oneuldo.member.dto.MemberResponse;
 import oneuldo.member.dto.MemberSignUpRequest;
@@ -10,6 +11,7 @@ import oneuldo.member.dto.MemberUpdateRequest;
 import oneuldo.global.exception.DuplicateMemberException;
 import oneuldo.global.exception.MemberNotFoundException;
 import oneuldo.member.repository.MemberRepository;
+import oneuldo.member.repository.MemberQuestProfileRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,6 +25,7 @@ import java.util.UUID;
 public class MemberService {
 
     private final MemberRepository memberRepository;
+    private final MemberQuestProfileRepository memberQuestProfileRepository;
     private final PasswordEncoder passwordEncoder;
 
     @Transactional
@@ -71,6 +74,7 @@ public class MemberService {
 
         // DB에 저장
         Member savedMember = memberRepository.save(newMember);
+        memberQuestProfileRepository.save(MemberQuestProfile.defaultFor(savedMember));
 
         // MemberResponse 생성 후 반환
         return MemberResponse.from(savedMember);
@@ -105,6 +109,7 @@ public class MemberService {
         Member member = memberRepository.findById(id)
                 .orElseThrow(MemberNotFoundException::new);
 
+        memberQuestProfileRepository.deleteById(id);
         memberRepository.delete(member);
     }
 
