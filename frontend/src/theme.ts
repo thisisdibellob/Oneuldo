@@ -28,6 +28,8 @@ export const fonts = {
   laundryBold: 'LaundryGothic-Bold',
   handwriting: 'KyoboHandwriting',
   gameHud: 'Griun-InaDoongdoong',
+  cafe24Ssurround: 'Cafe24-Ssurround',
+  cafe24SsurroundAir: 'Cafe24-Ssurround-Air',
 };
 
 export const shadow = Platform.select({
