@@ -46,84 +46,106 @@ const themeAnchors: Record<string, string[]> = {
 };
 
 // 모델에는 화면 문장과 정답 배열만 보내고 DB ID·보상·사용자 정보는 보내지 않는다.
-function buildPrompt(quest: Pick<QuestDetail, 'title' | 'goal' | 'difficulty'>, step: QuestStep, variationTheme: string): string {
-  const correctSequence = step.choices.map((choice) => choice.correct);
-  const hintSchema = step.hint === null ? 'null' : '"..."';
-  const choicesSchema = correctSequence
-    .map((correct) => `{"l":"...","r":${correct}}`)
-    .join(',');
-  const complexityRule = quest.difficulty === 'NORMAL'
-    ? 'This is NORMAL difficulty: preserve every original condition, unexpected event, and action order.'
-    : 'This is EASY difficulty: express one clear clue and one action.';
+function buildPrompt(
+  quest: Pick<QuestDetail, 'title' | 'goal' | 'difficulty'>,
+  step: QuestStep,
+  variationTheme: string,
+  retryFailureCode?: string,
+): string {
   const input = {
     t: quest.title,
     g: quest.goal,
-    variationTheme,
+    d: quest.difficulty,
+    theme: variationTheme,
     s: step.situation,
     i: step.instruction,
-    h: step.hint,
     // ID는 보내지 않고 배열 순서와 정답 의미만 전달한다.
     choices: step.choices.map((choice) => ({
       l: choice.label,
       r: choice.correct,
     })),
   };
-  return [
-    `Input: ${JSON.stringify(input)}`,
-    'Rewrite this child social-skills quest step in natural, simple, polite Korean. Mandatory: s must be a new setting that includes variationTheme; change every s, i, h, and c.l using only facts in Input.',
-    `${complexityRule} Keep meaning, numbers, hint presence, choice count/order, and every r value unchanged.`,
-    'Output Korean text only. Add no new place, person, object, condition, or unsafe action. Limits: s/i/h 60 Korean characters and each c.l 35.',
-    'Keep field roles distinct: s is only the setting/event, i is only the action request, h is only a helpful clue, and each c.l is one distinct answer action. Never copy an answer choice into s, i, or h.',
-    `Return only this JSON shape with no markdown or extra keys: {"s":"...","i":"...","h":${hintSchema},"c":[${choicesSchema}]}`,
-  ].join('\n');
+  const situationOnlyRetry = retryFailureCode === 'THEME_NOT_APPLIED'
+    || retryFailureCode === 'SITUATION_MEANING_LOST';
+  if (situationOnlyRetry) {
+    return [
+      '지시문을 실제로 수행할 수 있는 구체적인 상황 한 문장만 한국어로 작성하세요.',
+      `문장을 "${variationTheme}"으로 시작하고, 원래 상황 s의 장소·대상·사건을 새롭게 표현하세요. 테마 이름만 쓰면 실패입니다.`,
+      '숫자와 의미를 유지하고 새로운 사실이나 위험한 행동을 추가하지 마세요. 번호·글머리표·따옴표·설명 없이 한 줄만 출력하세요.',
+      `입력: ${JSON.stringify(input)}`,
+    ].join('\n');
+  }
+  const lines = [
+    `아동용 사회기술 퀘스트에서 지시문에 맞는 새로운 상황 1문장과 선택지 ${step.choices.length}문장을 한국어로 작성하세요.`,
+    `1번째 줄은 "${variationTheme}"으로 시작하고, 원래 상황 s의 구체적인 장소·대상·사건을 바꿔 쓰세요. 테마 이름만 쓰면 실패입니다.`,
+    `2~${step.choices.length + 1}번째 줄은 choices의 순서·의미를 유지해 바꿔 쓰세요. r=true는 도움이 되는 행동, r=false는 잘못되거나 도움이 안 되는 행동으로 유지하세요.`,
+    '숫자를 유지하고 새로운 사실이나 위험한 행동을 추가하지 마세요. 각 줄은 60자 이하로 쓰세요.',
+    `정확히 ${step.choices.length + 1}줄만 출력하세요. JSON·키·번호·글머리표·따옴표·설명은 출력하지 마세요.`,
+    `입력: ${JSON.stringify(input)}`,
+  ];
+  if (retryFailureCode) {
+    lines.push(
+      `이전 출력 실패(${retryFailureCode}): 1번째 줄에 s/i의 핵심 대상이나 행동을 넣고 총 ${step.choices.length + 1}줄을 완성하세요.`,
+    );
+  }
+  return lines.join('\n');
 }
 
-// Bllossom 출력에서 JSON만 꺼낸 뒤 허용한 필드와 자료형인지 확인한다.
-// 짧은 키는 실제 프롬프트용이고, 긴 키는 이전 출력과 테스트 호환용이다.
-function parseOutput(text: string): QuestStepGenerationOutput {
-  const candidate = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
-  const start = candidate.indexOf('{');
-  const end = candidate.lastIndexOf('}');
-  if (start < 0 || end <= start) throw new Error('INVALID_JSON');
-  let value: unknown;
-  try {
-    value = JSON.parse(candidate.slice(start, end + 1));
-  } catch {
-    throw new Error('INVALID_JSON');
+function normalizeGeneratedLine(value: string): string {
+  return value
+    .trim()
+    .replace(/^(?:[-*•]\s*|\d+\s*[.)]\s*)/u, '')
+    .replace(/^["'“”‘’](.*)["'“”‘’]$/u, '$1')
+    .trim();
+}
+
+// 모델은 상황과 선택지 문장만 줄 단위로 반환하고, 나머지 구조는 원본에서 복원한다.
+function parseOutput(text: string, step: QuestStep, variationTheme: string): QuestStepGenerationOutput {
+  let lines = text
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0 && !/^```(?:text)?$/iu.test(line))
+    .map(normalizeGeneratedLine);
+  if (lines.some((line) => line.length === 0)) throw new Error('INVALID_OUTPUT_SHAPE');
+  const [firstLine, ...rawChoiceLabels] = lines;
+  let situationLines = [firstLine];
+  let choiceLabels = rawChoiceLabels;
+  if (rawChoiceLabels.length > step.choices.length
+      && rawChoiceLabels.length % step.choices.length === 0) {
+    const firstBlock = rawChoiceLabels.slice(0, step.choices.length);
+    const repeatedExactly = rawChoiceLabels.every(
+      (line, index) => line === firstBlock[index % step.choices.length],
+    );
+    if (repeatedExactly) choiceLabels = firstBlock;
   }
-  if (!value || Array.isArray(value) || typeof value !== 'object') throw new Error('INVALID_OUTPUT_SHAPE');
-  const record = value as Record<string, unknown>;
-  const keys = Object.keys(record).sort();
-  const compact = keys.join(',') === 'c,h,i,s';
-  const expanded = keys.join(',') === 'choices,hint,instruction,situation';
-  if (!compact && !expanded) throw new Error('INVALID_OUTPUT_SHAPE');
-  const situation = compact ? record.s : record.situation;
-  const instruction = compact ? record.i : record.instruction;
-  const hint = compact ? record.h : record.hint;
-  const rawChoices = compact ? record.c : record.choices;
-  if (typeof situation !== 'string' || typeof instruction !== 'string') throw new Error('INVALID_OUTPUT_SHAPE');
-  if (hint !== null && typeof hint !== 'string') throw new Error('INVALID_OUTPUT_SHAPE');
-  if (!Array.isArray(rawChoices)) throw new Error('INVALID_OUTPUT_SHAPE');
-  const choices = rawChoices.map((choice) => {
-    if (!choice || Array.isArray(choice) || typeof choice !== 'object') throw new Error('INVALID_OUTPUT_SHAPE');
-    const item = choice as Record<string, unknown>;
-    const itemKeys = Object.keys(item).sort().join(',');
-    const compactShape = itemKeys === 'l,r' || itemKeys === 'correct,f,l';
-    const expandedShape = itemKeys === 'correct,label' || itemKeys === 'correct,feedback,label';
-    if (compact ? !compactShape : !expandedShape) throw new Error('INVALID_OUTPUT_SHAPE');
-    const label = compact ? item.l : item.label;
-    const correct = compact ? (item.r ?? item.correct) : item.correct;
-    const feedback = compact ? item.f : item.feedback;
-    if (typeof label !== 'string' || typeof correct !== 'boolean') throw new Error('INVALID_OUTPUT_SHAPE');
-    if (feedback !== undefined && typeof feedback !== 'string') throw new Error('INVALID_OUTPUT_SHAPE');
-    return { label, correct, ...(typeof feedback === 'string' ? { feedback } : {}) };
-  });
+  if (choiceLabels === rawChoiceLabels && lines.length > step.choices.length + 1) {
+    situationLines = lines.slice(0, -step.choices.length);
+    choiceLabels = lines.slice(-step.choices.length);
+  }
+  const situation = situationLines[0] === variationTheme && situationLines.length > 1
+    ? `${variationTheme}, ${situationLines.slice(1).join(' ')}`
+    : situationLines.join(' ');
+  if (!situation || choiceLabels.length !== step.choices.length) throw new Error('CHOICE_COUNT_CHANGED');
   return {
     situation,
-    instruction,
-    hint: hint as string | null,
-    choices,
+    instruction: step.instruction,
+    hint: step.hint,
+    choices: step.choices.map((choice, index) => ({
+      label: choiceLabels[index],
+      correct: choice.correct,
+    })),
   };
+}
+
+function parseSituationOutput(text: string, variationTheme: string): string {
+  const lines = text
+    .split(/\r?\n/u)
+    .map(normalizeGeneratedLine)
+    .filter((line) => line.length > 0 && !/^```(?:text)?$/iu.test(line));
+  if (lines.length === 0) throw new Error('INVALID_OUTPUT_SHAPE');
+  // 상황 전용 재시도에서 모델이 선택지를 덧붙여도 첫 문장만 사용하고 기존 선택지는 유지한다.
+  if (lines[0] === variationTheme && lines.length === 2) return `${lines[0]}, ${lines[1]}`;
+  return lines[0];
 }
 
 // 생성 결과가 원문에 없던 버스 번호 같은 숫자를 만들었는지 비교할 때 사용한다.
@@ -144,6 +166,7 @@ function validateSentence(value: string): boolean {
 
 const semanticStopWords = new Set(['한다', '해요', '하세요', '보세요', '봐요', '있어요', '됩니다']);
 const negativeMarkers = ['않', '말', '없이', '아니', '못'];
+const positiveEndorsementMarkers = ['좋', '맞', '안전', '도움', '편하', '괜찮', '추천'];
 
 // 조사와 흔한 종결 표현을 제거해 의미 비교에 쓸 핵심 단어만 남긴다.
 function semanticTokens(value: string): string[] {
@@ -175,12 +198,12 @@ function applyApprovedTheme(
   const situation = output.situation.trim();
   const anchors = themeAnchors[variationTheme] ?? [];
   const usableSituation = !/[A-Za-z]/.test(situation)
-    && !situation.includes(step.situation.trim())
+    && situation !== step.situation.trim()
     && anchors.some((anchor) => situation.includes(anchor));
   const koreanOnly = (generated: string, original: string): string => (
     /[A-Za-z]/.test(generated) ? original : generated
   );
-  // 복사·테마 이탈·영어 출력은 억지 접두어를 붙이지 않고 해당 원본 필드로 복구한다.
+  // 테마 이탈·영어 출력은 억지 접두어를 붙이지 않고 해당 원본 필드로 복구한다.
   return {
     ...output,
     situation: usableSituation ? situation : step.situation,
@@ -210,6 +233,11 @@ function validateAndMerge(step: QuestStep, output: QuestStepGenerationOutput): Q
   if (strings.some((value) => !validateSentence(value))) throw new Error('UNSAFE_OR_LONG_TEXT');
   // 상황 변형의 핵심인 테마가 빠지면 어색한 부분 생성물을 쓰지 않고 단계 전체를 복구한다.
   if (output.situation.trim() === step.situation.trim()) throw new Error('THEME_NOT_APPLIED');
+  // 테마 이름만 출력한 상황은 지시를 수행할 사건이 없으므로 사용하지 않는다.
+  if (!preservesCoreMeaning(
+    `${step.situation} ${step.instruction}`,
+    output.situation,
+  )) throw new Error('SITUATION_MEANING_LOST');
   const generatedChoiceSentences = output.choices.map((choice) => choice.label.trim());
   const instructionText = output.instruction.trim();
   const hintText = output.hint?.trim() ?? null;
@@ -238,10 +266,14 @@ function validateAndMerge(step: QuestStep, output: QuestStepGenerationOutput): Q
     const generated = output.choices[index];
     // 모델이 정답 위치를 바꾸면 서버 판정과 화면이 어긋나므로 즉시 거절한다.
     if (generated.correct !== choice.correct) throw new Error('CORRECTNESS_CHANGED');
+    const wronglyEndorsesUnsafeChoice = !choice.correct
+      && positiveEndorsementMarkers.some((marker) => generated.label.includes(marker));
     return {
       ...choice,
       // 핵심 단어·부정 의미가 사라진 선택지는 안전한 서버 원문을 유지한다.
-      label: preservesCoreMeaning(choice.label, generated.label) ? generated.label.trim() : choice.label,
+      label: !wronglyEndorsesUnsafeChoice && preservesCoreMeaning(choice.label, generated.label)
+        ? generated.label.trim()
+        : choice.label,
       feedback: generated.feedback?.trim() ?? choice.feedback,
     };
   });
@@ -276,20 +308,41 @@ export async function generateFullQuestStep(
     if (!status.supported) throw new Error('RUNTIME_UNAVAILABLE');
     if (status.state !== 'ready') status = await dependency.initialize();
     if (status.state !== 'ready') throw new Error('RUNTIME_ERROR');
-    const generated = await dependency.generate({
-      requestId,
-      prompt: buildPrompt(quest, step, variationTheme),
-      // 복잡한 상황과 전체 선택지를 충분히 생성할 수 있도록 출력 여유를 둔다.
-      maxTokens: 1024,
-      // 3B 모델로 선택지 세 개까지 만드는 MuMu x86_64 환경을 고려한다.
-      timeoutMs: 120_000,
-    });
-    return {
-      step: validateAndMerge(step, applyApprovedTheme(parseOutput(generated.text), variationTheme, step)),
-      source: 'ai',
-      requestId,
-      failureCode: null,
-    };
+    let retryFailureCode: string | undefined;
+    let previousOutput: QuestStepGenerationOutput | undefined;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        const generated = await dependency.generate({
+          requestId: attempt === 0 ? requestId : `${requestId}-retry-1`,
+          prompt: buildPrompt(quest, step, variationTheme, retryFailureCode),
+          // 상황 한 줄과 선택지만 생성하므로 256토큰이면 충분한 여유가 있다.
+          maxTokens: 256,
+          timeoutMs: 120_000,
+        });
+        const situationOnlyRetry = attempt === 1
+          && previousOutput !== undefined
+          && (retryFailureCode === 'THEME_NOT_APPLIED' || retryFailureCode === 'SITUATION_MEANING_LOST');
+        const retryBaseOutput = previousOutput;
+        const output = situationOnlyRetry && retryBaseOutput
+          ? applyApprovedTheme({
+            ...retryBaseOutput,
+            situation: parseSituationOutput(generated.text, variationTheme),
+          }, variationTheme, step)
+          : applyApprovedTheme(parseOutput(generated.text, step, variationTheme), variationTheme, step);
+        previousOutput = output;
+        return {
+          step: validateAndMerge(step, output),
+          source: 'ai',
+          requestId,
+          failureCode: null,
+        };
+      } catch (error) {
+        retryFailureCode = error instanceof Error ? error.message : 'RUNTIME_ERROR';
+        const retryable = !['CANCELLED', 'RUNTIME_ERROR', 'RUNTIME_UNAVAILABLE'].includes(retryFailureCode);
+        if (attempt === 1 || !retryable) throw error;
+      }
+    }
+    throw new Error(retryFailureCode ?? 'RUNTIME_ERROR');
   } catch (error) {
     return {
       step,

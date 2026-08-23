@@ -8,12 +8,12 @@
   "library": "liboneuldo_llama_runtime.so",
   "artifacts": {
     "arm64-v8a": {
-      "size": 51819112,
-      "sha256": "05b2d9168ece0a954c9fb02cc21ab7cdc30a1f75a77ea50bfd20af7180e6f07e"
+      "size": 51843064,
+      "sha256": "152ee34c8dc9276237d5d408ee48b67f2af9fb7971a1821dba74410ab2b75a50"
     },
     "x86_64": {
-      "size": 50734912,
-      "sha256": "c5eae76c8e38eae9b0bcd7b5a4222db9499743aad8627913ab2a1cab21973608"
+      "size": 50755024,
+      "sha256": "9202175d291b5454c1c968ea71750a53700ddeea8c6f576a779962f9defbd47b"
     }
   }
 }

@@ -25,6 +25,7 @@ std::mutex generation_state_mutex;
 llama_model* model = nullptr;
 llama_context* context = nullptr;
 const llama_vocab* vocab = nullptr;
+std::vector<llama_token> cached_prompt_tokens;
 std::string active_request_id;
 std::atomic<bool> cancel_requested{false};
 std::atomic<int64_t> deadline_ms{0};
@@ -49,6 +50,7 @@ void clearRuntime() {
     model = nullptr;
   }
   vocab = nullptr;
+  cached_prompt_tokens.clear();
 }
 
 std::string formatPrompt(const std::string& prompt) {
@@ -56,7 +58,7 @@ std::string formatPrompt(const std::string& prompt) {
   if (chat_template == nullptr) return prompt;
 
   const char* system_text =
-      "Return concise, natural Korean text only and follow the requested JSON schema exactly.";
+      "Return concise, natural Korean text only and follow the requested output format exactly.";
   llama_chat_message messages[] = {
       {"system", system_text},
       {"user", prompt.c_str()},
@@ -205,8 +207,6 @@ GenerationResult generateText(
     return {false, {}, "NOT_INITIALIZED", "모델이 초기화되지 않았습니다."};
   }
 
-  // 요청마다 KV cache를 비워 이전 대화가 다음 생성에 섞이지 않게 한다.
-  llama_memory_clear(llama_get_memory(context), true);
   const int64_t prompt_prepare_start_ms = monotonicMilliseconds();
   const std::string formatted_prompt = formatPrompt(prompt);
   std::vector<llama_token> prompt_tokens = tokenize(formatted_prompt);
@@ -221,6 +221,30 @@ GenerationResult generateText(
     return {false, {}, "GENERATION_FAILED", "프롬프트가 2048 토큰 컨텍스트를 초과합니다."};
   }
 
+  // 직전 요청과 동일한 프롬프트 앞부분은 KV cache에서 재사용한다.
+  // 마지막 공통 토큰은 다시 디코드해 현재 요청의 샘플링 logits를 항상 새로 만든다.
+  llama_memory_t memory = llama_get_memory(context);
+  size_t common_prefix = 0;
+  while (common_prefix < cached_prompt_tokens.size()
+      && common_prefix < prompt_tokens.size()
+      && cached_prompt_tokens[common_prefix] == prompt_tokens[common_prefix]) {
+    ++common_prefix;
+  }
+  size_t reusable_prefix = prompt_tokens.empty()
+      ? 0
+      : std::min(common_prefix, prompt_tokens.size() - 1);
+  if (reusable_prefix == 0) {
+    llama_memory_clear(memory, true);
+  } else if (!llama_memory_seq_rm(
+                 memory, 0, static_cast<llama_pos>(reusable_prefix), -1)) {
+    llama_memory_clear(memory, true);
+    reusable_prefix = 0;
+  }
+  ONEULDO_TIMING_LOG(
+      "generate cache request=%s hitTokens=%zu decodeTokens=%zu previousPromptTokens=%zu",
+      request_id.c_str(), reusable_prefix, prompt_tokens.size() - reusable_prefix,
+      cached_prompt_tokens.size());
+
   auto sampler_params = llama_sampler_chain_default_params();
   sampler_params.no_perf = true;
   llama_sampler* sampler = llama_sampler_chain_init(sampler_params);
@@ -232,13 +256,15 @@ GenerationResult generateText(
 
   // 긴 프롬프트는 n_batch(512)에 맞춰 나누어 KV cache에 채운다.
   const int64_t prompt_decode_start_ms = monotonicMilliseconds();
-  size_t prompt_offset = 0;
+  size_t prompt_offset = reusable_prefix;
   while (prompt_offset < prompt_tokens.size()) {
     const int32_t batch_size = static_cast<int32_t>(
         std::min<size_t>(512, prompt_tokens.size() - prompt_offset));
     llama_batch prompt_batch = llama_batch_get_one(prompt_tokens.data() + prompt_offset, batch_size);
     if (llama_decode(context, prompt_batch) != 0) {
       if (shouldAbort(nullptr)) {
+        cached_prompt_tokens.clear();
+        llama_memory_clear(memory, true);
         const bool cancelled = cancel_requested.load();
         ONEULDO_TIMING_LOG(
             "generate abort request=%s phase=promptDecode decodedTokens=%zu totalMs=%lld",
@@ -247,6 +273,8 @@ GenerationResult generateText(
         return {false, {}, cancelled ? "CANCELLED" : "TIMEOUT",
                 cancelled ? "생성 요청이 취소되었습니다." : "텍스트 생성 시간이 제한을 초과했습니다."};
       }
+      cached_prompt_tokens.clear();
+      llama_memory_clear(memory, true);
       return {false, {}, "GENERATION_FAILED", "프롬프트 디코딩에 실패했습니다."};
     }
     prompt_offset += static_cast<size_t>(batch_size);
@@ -255,6 +283,7 @@ GenerationResult generateText(
         request_id.c_str(), prompt_offset, prompt_tokens.size(),
         static_cast<long long>(monotonicMilliseconds() - prompt_decode_start_ms));
   }
+  cached_prompt_tokens = prompt_tokens;
   const int64_t output_start_ms = monotonicMilliseconds();
   ONEULDO_TIMING_LOG("generate promptComplete request=%s promptDecodeMs=%lld totalMs=%lld",
                      request_id.c_str(),

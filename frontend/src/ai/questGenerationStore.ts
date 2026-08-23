@@ -57,8 +57,9 @@ export function warmFullQuest(quest: QuestDetail): Promise<QuestGenerationSnapsh
     const generatedSteps = [];
     const sources: Array<'ai' | 'original'> = [];
     const failures: Array<string | null> = [];
+    let failedStepIndex = -1;
     // 네이티브 런타임은 동시 생성을 허용하지 않으므로 단계별로 순서대로 기다린다.
-    for (const step of quest.steps) {
+    for (const [stepIndex, step] of quest.steps.entries()) {
       generationSequence = (generationSequence + 1) % 1_000_000;
       const result = await generateFullQuestStep(
         quest,
@@ -79,13 +80,26 @@ export function warmFullQuest(quest: QuestDetail): Promise<QuestGenerationSnapsh
           failureCode: result.failureCode,
         });
       }
+      // 한 단계라도 원문 fallback이면 뒤 단계의 흐름을 보장할 수 없다.
+      // 남은 생성을 중단하고 이미 만든 AI 단계까지 포함해 퀘스트 전체를 원문으로 되돌린다.
+      if (result.source === 'original') {
+        failedStepIndex = stepIndex;
+        break;
+      }
     }
+    const fallbackUsed = failedStepIndex >= 0;
     const snapshot: QuestGenerationSnapshot = {
       questId: quest.id,
       state: 'ready',
-      quest: { ...quest, steps: generatedSteps },
-      sources,
-      failures,
+      quest: fallbackUsed ? quest : { ...quest, steps: generatedSteps },
+      sources: fallbackUsed ? quest.steps.map(() => 'original') : sources,
+      failures: fallbackUsed
+        ? quest.steps.map((_, stepIndex) => {
+          if (stepIndex < failedStepIndex) return null;
+          if (stepIndex === failedStepIndex) return failures[stepIndex];
+          return 'SKIPPED_AFTER_FAILURE';
+        })
+        : failures,
     };
     // 화면은 이 스냅샷 하나만 읽어 AI 단계와 원문 fallback을 동일하게 처리한다.
     snapshots.set(quest.id, snapshot);
