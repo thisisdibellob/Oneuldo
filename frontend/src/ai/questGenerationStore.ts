@@ -1,5 +1,6 @@
 import type { QuestDetail } from '../api/quest';
 import { generateFullQuestStep } from './questStepGenerator';
+import { createCloudFirstQuestRuntime } from './cloudFirstQuestRuntime';
 
 const QUEST_VARIATION_TARGET_CATEGORY = 'PUBLIC_TRANSPORT';
 
@@ -36,7 +37,10 @@ export function getQuestGenerationSnapshot(questId: string): QuestGenerationSnap
   };
 }
 
-export function warmFullQuest(quest: QuestDetail): Promise<QuestGenerationSnapshot> {
+export function warmFullQuest(
+  quest: QuestDetail,
+  accessToken: string | null = null,
+): Promise<QuestGenerationSnapshot> {
   // 현재 Phase 4 적용 대상이 아닌 퀘스트는 AI를 호출하지 않는다.
   if (quest.categoryCode !== QUEST_VARIATION_TARGET_CATEGORY) {
     return Promise.resolve({ questId: quest.id, state: 'ready', quest, sources: [], failures: [] });
@@ -49,6 +53,7 @@ export function warmFullQuest(quest: QuestDetail): Promise<QuestGenerationSnapsh
   snapshots.set(quest.id, { questId: quest.id, state: 'generating', quest: null, sources: [], failures: [] });
   emit();
   const task = (async () => {
+    const generationRuntime = accessToken ? createCloudFirstQuestRuntime(accessToken) : undefined;
     // 퀘스트 한 번에는 테마 하나만 사용해 4단계 상황이 서로 이어지게 한다.
     const approvedThemes = quest.difficulty === 'NORMAL'
       ? ['사람이 많은 퇴근 시간', '안내가 잘 들리지 않는 순간', '비가 와서 이동이 느린 날']
@@ -65,7 +70,7 @@ export function warmFullQuest(quest: QuestDetail): Promise<QuestGenerationSnapsh
         quest,
         step,
         `quest-warmup-${Date.now()}-${generationSequence}`,
-        undefined,
+        generationRuntime,
         variationTheme,
       );
       generatedSteps.push(result.step);

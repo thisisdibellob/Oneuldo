@@ -48,7 +48,7 @@ export function QuestPracticeScreen({
   const [syncNotice, setSyncNotice] = useState<string | null>(null);
   const stepStartedAt = useRef(Date.now());
   const sessionCompleted = useRef(false);
-  const variation = useQuestVariation({ enabled: aiVariationEnabled, quest, stepIndex });
+  const variation = useQuestVariation({ accessToken, enabled: aiVariationEnabled, quest, stepIndex });
 
   useEffect(() => {
     if (!accessToken || !quest) return;

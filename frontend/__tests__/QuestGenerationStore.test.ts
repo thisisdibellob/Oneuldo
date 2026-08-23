@@ -4,12 +4,18 @@ import {
   warmFullQuest,
 } from '../src/ai/questGenerationStore';
 import { generateFullQuestStep } from '../src/ai/questStepGenerator';
+import { createCloudFirstQuestRuntime } from '../src/ai/cloudFirstQuestRuntime';
 
 jest.mock('../src/ai/questStepGenerator', () => ({
   generateFullQuestStep: jest.fn(),
 }));
 
+jest.mock('../src/ai/cloudFirstQuestRuntime', () => ({
+  createCloudFirstQuestRuntime: jest.fn(),
+}));
+
 const mockedGenerateFullQuestStep = jest.mocked(generateFullQuestStep);
+const mockedCreateCloudFirstQuestRuntime = jest.mocked(createCloudFirstQuestRuntime);
 
 const steps: QuestStep[] = Array.from({ length: 4 }, (_, index) => ({
   id: `step-${index + 1}`,
@@ -45,6 +51,23 @@ describe('퀘스트 전체 생성 조기 중단', () => {
   beforeEach(() => {
     clearQuestGenerationStore();
     mockedGenerateFullQuestStep.mockReset();
+    mockedCreateCloudFirstQuestRuntime.mockReset();
+  });
+
+  it('로그인 토큰이 있으면 클라우드 우선 런타임을 생성기에 전달한다', async () => {
+    const cloudRuntime = { getStatus: jest.fn(), initialize: jest.fn(), generate: jest.fn() };
+    mockedCreateCloudFirstQuestRuntime.mockReturnValue(cloudRuntime as ReturnType<typeof createCloudFirstQuestRuntime>);
+    mockedGenerateFullQuestStep.mockResolvedValueOnce({
+      step: steps[0],
+      source: 'original',
+      requestId: 'cloud-failed',
+      failureCode: 'THEME_NOT_APPLIED',
+    });
+
+    await warmFullQuest(quest, 'access-token');
+
+    expect(mockedCreateCloudFirstQuestRuntime).toHaveBeenCalledWith('access-token');
+    expect(mockedGenerateFullQuestStep.mock.calls[0][3]).toBe(cloudRuntime);
   });
 
   it('첫 단계가 실패하면 뒤 단계를 호출하지 않고 전체 원문을 사용한다', async () => {

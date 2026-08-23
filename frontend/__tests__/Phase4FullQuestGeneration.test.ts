@@ -19,10 +19,11 @@ const step: QuestStep = {
 };
 
 const quest = {
+  id: '30000000-0000-0000-0000-000000000001',
   difficulty: 'EASY',
   title: '혼자 버스 타기',
   goal: '목적지로 가는 버스를 구분한다.',
-} satisfies Pick<QuestDetail, 'title' | 'goal' | 'difficulty'>;
+} satisfies Pick<QuestDetail, 'id' | 'title' | 'goal' | 'difficulty'>;
 
 const ready: NativeRuntimeStatus = {
   supported: true,
@@ -58,7 +59,9 @@ describe('Phase 4 전체 단계 생성', () => {
     expect(prompt).toContain(step.situation);
     expect(prompt).toContain(step.instruction);
     expect(prompt).toContain(step.choices[0].label);
-    expect(prompt.split('\n')).toHaveLength(6);
+    expect(prompt.split('\n').length).toBeGreaterThan(6);
+    expect(prompt).toContain('교통수단: 버스');
+    expect(prompt).toContain('일반 시내·마을버스에 안전벨트가 반드시 있다고 만들지 않는다.');
     expect(prompt).toContain('선택지 2문장');
     expect(prompt).toContain('정확히 3줄만 출력하세요');
     expect(prompt).toContain('JSON·키·번호');
@@ -73,6 +76,13 @@ describe('Phase 4 전체 단계 생성', () => {
 
     expect(result.source).toBe('ai');
     expect(runtime.generate).toHaveBeenCalledWith(expect.objectContaining({ maxTokens: 256 }));
+    expect(runtime.generate).toHaveBeenCalledWith(expect.objectContaining({
+      cloudInput: {
+        questId: quest.id,
+        stepId: step.id,
+        theme: '비가 살짝 오는 날',
+      },
+    }));
     expect(result.step.situation).not.toBe(step.situation);
     expect(result.step.instruction).toBe(step.instruction);
     expect(result.step.hint).toBe(step.hint);
@@ -117,6 +127,17 @@ describe('Phase 4 전체 단계 생성', () => {
     expect(result.source).toBe('ai');
     expect(result.failureCode).toBeNull();
     expect(runtime.generate).toHaveBeenCalledTimes(2);
+  });
+
+  it('한국 버스 원문에 없던 안전벨트 사실을 추가하면 거절한다', async () => {
+    const invalid = validText.replace(
+      '안내판과 버스 번호를 서로 비교해요.',
+      '안전벨트를 반드시 매고 버스 번호를 비교해요.',
+    );
+    const result = await generateFullQuestStep(quest, step, 'unsupported-seatbelt', createRuntime(invalid));
+
+    expect(result.source).toBe('original');
+    expect(result.failureCode).toBe('UNSUPPORTED_TRANSPORT_FACT');
   });
 
   it('안전한 원문 선택지를 유지해도 승인된 상황 변형은 채택한다', async () => {

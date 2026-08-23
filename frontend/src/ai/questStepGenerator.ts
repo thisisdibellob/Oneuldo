@@ -1,6 +1,8 @@
 import type { QuestDetail, QuestStep } from '../api/quest';
 import { generateNativeText, getNativeRuntimeStatus, initializeNativeModel } from './nativeRuntime';
-import type { GenerateRequest, GenerateResult, NativeRuntimeStatus } from './nativeRuntime.types';
+import type { GenerateResult, NativeRuntimeStatus } from './nativeRuntime.types';
+import type { CloudCapableGenerateRequest } from './cloudFirstQuestRuntime';
+import { buildKoreanTransportRulePrompt } from './prompts/koreanTransportRules';
 
 export type QuestStepGenerationOutput = {
   situation: string;
@@ -19,7 +21,7 @@ export type QuestStepGenerationResult = {
 export type QuestStepGenerationRuntime = {
   getStatus(): Promise<NativeRuntimeStatus>;
   initialize(): Promise<NativeRuntimeStatus>;
-  generate(request: GenerateRequest): Promise<GenerateResult>;
+  generate(request: CloudCapableGenerateRequest): Promise<GenerateResult>;
 };
 
 const runtime: QuestStepGenerationRuntime = {
@@ -47,7 +49,7 @@ const themeAnchors: Record<string, string[]> = {
 
 // 모델에는 화면 문장과 정답 배열만 보내고 DB ID·보상·사용자 정보는 보내지 않는다.
 function buildPrompt(
-  quest: Pick<QuestDetail, 'title' | 'goal' | 'difficulty'>,
+  quest: Pick<QuestDetail, 'title' | 'goal' | 'difficulty'> & Partial<Pick<QuestDetail, 'code' | 'summary'>>,
   step: QuestStep,
   variationTheme: string,
   retryFailureCode?: string,
@@ -70,16 +72,21 @@ function buildPrompt(
   if (situationOnlyRetry) {
     return [
       '지시문을 실제로 수행할 수 있는 구체적인 상황 한 문장만 한국어로 작성하세요.',
-      `문장을 "${variationTheme}"으로 시작하고, 원래 상황 s의 장소·대상·사건을 새롭게 표현하세요. 테마 이름만 쓰면 실패입니다.`,
+      `문장을 "${variationTheme}"으로 시작하고, 원래 상황의 장소·대상·사건을 새롭게 표현하세요. 테마 이름만 쓰면 실패입니다.`,
+      '규칙은 사실 확인에만 사용하세요. 원문의 핵심 사건과 교통수단을 다른 사건이나 교통수단으로 바꾸면 실패입니다.',
       '숫자와 의미를 유지하고 새로운 사실이나 위험한 행동을 추가하지 마세요. 번호·글머리표·따옴표·설명 없이 한 줄만 출력하세요.',
+      buildKoreanTransportRulePrompt(quest, step),
       `입력: ${JSON.stringify(input)}`,
     ].join('\n');
   }
   const lines = [
     `아동용 사회기술 퀘스트에서 지시문에 맞는 새로운 상황 1문장과 선택지 ${step.choices.length}문장을 한국어로 작성하세요.`,
-    `1번째 줄은 "${variationTheme}"으로 시작하고, 원래 상황 s의 구체적인 장소·대상·사건을 바꿔 쓰세요. 테마 이름만 쓰면 실패입니다.`,
-    `2~${step.choices.length + 1}번째 줄은 choices의 순서·의미를 유지해 바꿔 쓰세요. r=true는 도움이 되는 행동, r=false는 잘못되거나 도움이 안 되는 행동으로 유지하세요.`,
+    `1번째 줄은 "${variationTheme}"으로 시작하고, 원래 상황의 구체적인 장소·대상·사건을 같은 의미로 바꿔 쓰세요. 테마 이름만 쓰면 실패입니다.`,
+    `2~${step.choices.length + 1}번째 줄은 입력 선택지의 순서·핵심 대상·행동·정답 의미를 유지해 바꿔 쓰세요. r=true는 도움이 되는 행동, r=false는 잘못되거나 도움이 안 되는 행동으로 유지하세요.`,
+    '규칙은 사실 확인에만 사용하세요. 원문의 개찰구 사건을 환승 사건으로 바꾸는 것처럼 핵심 사건을 다른 규칙의 사건으로 교체하면 실패입니다.',
     '숫자를 유지하고 새로운 사실이나 위험한 행동을 추가하지 마세요. 각 줄은 60자 이하로 쓰세요.',
+    '아래 한국 대중교통 규칙에 없는 운영 방식·설비·요금·법규를 추측하지 마세요.',
+    buildKoreanTransportRulePrompt(quest, step),
     `정확히 ${step.choices.length + 1}줄만 출력하세요. JSON·키·번호·글머리표·따옴표·설명은 출력하지 마세요.`,
     `입력: ${JSON.stringify(input)}`,
   ];
@@ -219,6 +226,33 @@ function applyApprovedTheme(
   };
 }
 
+// 규칙집으로 막는 대표적인 한국 교통 맥락 오류를 화면 노출 전에 한 번 더 거절한다.
+function hasUnsupportedTransportFact(step: QuestStep, output: QuestStepGenerationOutput): boolean {
+  const originalText = [
+    step.situation,
+    step.instruction,
+    step.hint ?? '',
+    ...step.choices.map((choice) => choice.label),
+  ].join(' ');
+  const generatedPositiveText = [
+    output.situation,
+    output.instruction,
+    output.hint ?? '',
+    ...output.choices.filter((choice) => choice.correct).map((choice) => choice.label),
+  ].join(' ');
+  const subway = /지하철|전철|개찰구|승강장|역무원/u.test(originalText);
+  if (subway) {
+    return /하차\s*버튼|버스\s*번호|기사님/u.test(generatedPositiveText)
+      && !/하차\s*버튼|버스\s*번호|기사님/u.test(originalText);
+  }
+  const addedSubwayEquipment = /개찰구|스크린도어|승강장|역무원/u.test(generatedPositiveText)
+    && !/개찰구|스크린도어|승강장|역무원/u.test(originalText);
+  const addedSeatBelt = /안전벨트/u.test(generatedPositiveText) && !/안전벨트/u.test(originalText);
+  const pressesAfterArrival = /(?:도착한|도착하고|도착한\s*(?:뒤|후)).{0,20}하차\s*버튼|하차\s*버튼.{0,20}도착한\s*(?:뒤|후)/u
+    .test(generatedPositiveText);
+  return addedSubwayEquipment || addedSeatBelt || pressesAfterArrival || /승차권\s*(?:찍는|기계)/u.test(generatedPositiveText);
+}
+
 // AI 문장만 서버 원본 QuestStep에 병합해 ID·순서·정답·보상 구조를 보존한다.
 function validateAndMerge(step: QuestStep, output: QuestStepGenerationOutput): QuestStep {
   // 선택지 개수와 힌트 유무가 달라지면 단계 전체를 사용할 수 없다.
@@ -231,6 +265,7 @@ function validateAndMerge(step: QuestStep, output: QuestStepGenerationOutput): Q
     ...output.choices.flatMap((choice) => [choice.label, ...(choice.feedback ? [choice.feedback] : [])]),
   ];
   if (strings.some((value) => !validateSentence(value))) throw new Error('UNSAFE_OR_LONG_TEXT');
+  if (hasUnsupportedTransportFact(step, output)) throw new Error('UNSUPPORTED_TRANSPORT_FACT');
   // 상황 변형의 핵심인 테마가 빠지면 어색한 부분 생성물을 쓰지 않고 단계 전체를 복구한다.
   if (output.situation.trim() === step.situation.trim()) throw new Error('THEME_NOT_APPLIED');
   // 테마 이름만 출력한 상황은 지시를 수행할 사건이 없으므로 사용하지 않는다.
@@ -297,7 +332,7 @@ function validateAndMerge(step: QuestStep, output: QuestStepGenerationOutput): Q
 // 런타임 준비 → 프롬프트 생성 → 모델 호출 → 파싱 → 정책 검사 → 원문 병합 순서로 실행한다.
 // 어느 단계에서든 실패하면 예외를 화면으로 보내지 않고 서버 원본 단계를 반환한다.
 export async function generateFullQuestStep(
-  quest: Pick<QuestDetail, 'title' | 'goal' | 'difficulty'>,
+  quest: Pick<QuestDetail, 'title' | 'goal' | 'difficulty'> & Partial<Pick<QuestDetail, 'id'>>,
   step: QuestStep,
   requestId: string,
   dependency: QuestStepGenerationRuntime = runtime,
@@ -318,6 +353,14 @@ export async function generateFullQuestStep(
           // 상황 한 줄과 선택지만 생성하므로 256토큰이면 충분한 여유가 있다.
           maxTokens: 256,
           timeoutMs: 120_000,
+          ...(quest.id ? {
+            cloudInput: {
+              questId: quest.id,
+              stepId: step.id,
+              theme: variationTheme,
+              ...(retryFailureCode ? { retryFailureCode } : {}),
+            },
+          } : {}),
         });
         const situationOnlyRetry = attempt === 1
           && previousOutput !== undefined
@@ -356,6 +399,7 @@ export async function generateFullQuestStep(
 export const questStepGeneratorTestables = {
   applyApprovedTheme,
   buildPrompt,
+  hasUnsupportedTransportFact,
   parseOutput,
   preservesCoreMeaning,
   validateAndMerge,

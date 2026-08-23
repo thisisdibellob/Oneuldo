@@ -15,10 +15,12 @@ export function isQuestVariationTarget(quest: QuestDetail | null): boolean {
 
 export function useQuestVariation({
   enabled,
+  accessToken,
   quest,
   stepIndex,
 }: {
   enabled: boolean;
+  accessToken: string | null;
   quest: QuestDetail | null;
   stepIndex: number;
 }): {
@@ -35,8 +37,8 @@ export function useQuestVariation({
   }, []);
 
   useEffect(() => {
-    if (applies && quest) void warmFullQuest(quest);
-  }, [applies, quest]);
+    if (applies && quest) void warmFullQuest(quest, accessToken);
+  }, [accessToken, applies, quest]);
 
   if (!originalStep) return { isPreparing: false, source: 'original', step: null };
   if (!applies || !quest) return { isPreparing: false, source: 'original', step: originalStep };

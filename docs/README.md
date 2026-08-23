@@ -41,6 +41,7 @@
 - [Phase 3 AI 공통 계층 구현 요약](./ai/phase3-implementation-summary.md)
 - [Bllossom 3B 온디바이스 모델 실행](./bllossom-model-setup.md)
 - [Bllossom 3B 전환 설계](./ai/bllossom-3b-on-device-migration-plan.md)
+- [Groq Qwen 클라우드 퀘스트 생성 설계](./ai/groq-qwen-quest-generation.md)
 - [Expo Development Build 가이드](./development-build.md)
 - [데이터베이스 실행 가이드](./database-setup.md)
 - [데이터베이스 스키마](./database-schema.md)

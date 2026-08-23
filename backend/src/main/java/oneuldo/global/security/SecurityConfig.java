@@ -39,6 +39,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/quest/*/sessions").authenticated()
                         // 개인화된 퀘스트 순서는 로그인한 사용자에게만 제공한다.
                         .requestMatchers(HttpMethod.GET, "/api/quest/recommended").authenticated()
+                        // 외부 AI 무료 한도를 보호하기 위해 로그인 사용자만 생성할 수 있다.
+                        .requestMatchers(HttpMethod.POST, "/api/ai/**").authenticated()
                         // 퀘스트 정의 데이터는 로그인 전에도 조회할 수 있다.
                         .requestMatchers(HttpMethod.GET, "/api/quest/**").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()

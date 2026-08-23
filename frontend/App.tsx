@@ -59,7 +59,7 @@ export default function App() {
   }, [accessToken]);
 
   useEffect(() => {
-    if (!aiVariation.enabled || quests.length === 0) return;
+    if (!aiVariation.enabled || !accessToken || quests.length === 0) return;
     let active = true;
     // 모델 준비가 끝나는 즉시 상세 퀘스트를 읽고 화면 진입 전에 전체 단계를 만든다.
     void Promise.allSettled(quests.map((quest) => getQuestDetail(quest.id)))
@@ -68,12 +68,12 @@ export default function App() {
         .map((result) => result.value)
         .find((quest) => quest.categoryCode === 'PUBLIC_TRANSPORT'))
       .then((quest) => {
-        if (active && quest) void warmFullQuest(quest);
+        if (active && quest) void warmFullQuest(quest, accessToken);
       });
     return () => {
       active = false;
     };
-  }, [aiVariation.enabled, quests]);
+  }, [accessToken, aiVariation.enabled, quests]);
 
   useEffect(() => {
     const loadQuests = async () => {

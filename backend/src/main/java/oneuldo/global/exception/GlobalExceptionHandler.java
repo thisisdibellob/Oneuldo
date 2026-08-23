@@ -10,11 +10,34 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import oneuldo.ai.exception.CloudAiRateLimitException;
+import oneuldo.ai.exception.CloudAiUnavailableException;
+
 import java.util.Map;
 import java.util.stream.Collectors;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    @ExceptionHandler(CloudAiRateLimitException.class)
+    public ResponseEntity<ErrorResponse> handleCloudAiRateLimit(
+            CloudAiRateLimitException exception
+    ) {
+        ResponseEntity.BodyBuilder response = ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS);
+        if (exception.retryAfter() != null && !exception.retryAfter().isBlank()) {
+            response.header("Retry-After", exception.retryAfter());
+        }
+        return response.body(new ErrorResponse("CLOUD_AI_RATE_LIMITED", exception.getMessage()));
+    }
+
+    @ExceptionHandler(CloudAiUnavailableException.class)
+    public ResponseEntity<ErrorResponse> handleCloudAiUnavailable(
+            CloudAiUnavailableException exception
+    ) {
+        return ResponseEntity
+                .status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(new ErrorResponse("CLOUD_AI_UNAVAILABLE", exception.getMessage()));
+    }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)

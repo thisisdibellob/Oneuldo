@@ -97,6 +97,11 @@ class QuestControllerTest {
         mockMvc.perform(get("/api/quest/recommended"))
                 .andExpect(status().isUnauthorized());
 
+        mockMvc.perform(post("/api/ai/quest-step/generate")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isUnauthorized());
+
         String accessToken = jwtTokenProvider.createAccessToken(member);
         mockMvc.perform(get("/api/quest/recommended")
                         .header("Authorization", "Bearer " + accessToken))
