@@ -12,7 +12,7 @@ import oneuldo.quest.domain.QuestDifficulty;
 @Component
 public class DifficultyAdjustmentPolicy {
 
-    public static final String RULE_VERSION = "five-level-difficulty-v2";
+    public static final String RULE_VERSION = "five-level-difficulty-v3";
     private static final int REQUIRED_SESSIONS = 3;
 
     public DifficultyAdjustmentResult evaluate(
@@ -32,7 +32,6 @@ public class DifficultyAdjustmentPolicy {
 
         boolean promote = current.higher() != null
                 && metrics.sessionCount() >= REQUIRED_SESSIONS
-                && metrics.stepCount() >= current.getMaxSteps() * REQUIRED_SESSIONS
                 && metrics.completionRate() == 1.0
                 && metrics.firstAttemptAccuracy() >= 0.85
                 && metrics.hintUseRate() <= 0.20

@@ -27,6 +27,18 @@ class DifficultyAdjustmentPolicyTest {
     }
 
     @Test
+    void 매우_쉬운_두세_단계_퀘스트_세개를_완료하면_쉬움으로_올린다() {
+        DifficultyMetrics metrics = new DifficultyMetrics(3, 7, 1.0, 1.0, 0, 0, 3, 0);
+
+        DifficultyAdjustmentResult result = policy.evaluate(
+                QuestDifficulty.VERY_EASY, metrics, true, false, null, now
+        );
+
+        assertEquals(DifficultyAdjustmentDecision.PROMOTE, result.decision());
+        assertEquals(QuestDifficulty.EASY, result.nextDifficulty());
+    }
+
+    @Test
     void 서로_다른_퀘스트를_두_개_이상_풀지_않으면_승급하지_않는다() {
         DifficultyMetrics metrics = new DifficultyMetrics(3, 12, 1.0, 1.0, 0, 0, 1, 0);
 

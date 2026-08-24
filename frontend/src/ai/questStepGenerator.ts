@@ -3,6 +3,11 @@ import { generateNativeText, getNativeRuntimeStatus, initializeNativeModel } fro
 import type { GenerateResult, NativeRuntimeStatus } from './nativeRuntime.types';
 import type { CloudCapableGenerateRequest } from './cloudFirstQuestRuntime';
 import { buildKoreanTransportRulePrompt } from './prompts/koreanTransportRules';
+import {
+  buildIncidentPromptBlock,
+  transportIncidents,
+  type TransportIncident,
+} from './transportIncidents';
 
 export type QuestStepGenerationOutput = {
   situation: string;
@@ -37,36 +42,18 @@ const forbiddenPatterns = [
   /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i,
 ];
 
-// AI가 실제로 선택된 테마를 반영했는지 빠르게 확인하는 핵심 단어다.
-const themeAnchors: Record<string, string[]> = {
-  '한산한 낮': ['한산', '낮', '조용'],
-  '안내가 잘 보이는 시간': ['안내', '화면', '표지'],
-  '보호자와 연습하는 날': ['보호자', '함께', '연습'],
-  '비가 살짝 오는 날': ['비', '빗', '우산', '젖'],
-  '사람이 조금 있는 시간': ['사람', '승객', '차례'],
-  '사람이 많은 퇴근 시간': ['사람', '승객', '혼잡', '붐비', '퇴근'],
-  '안내가 잘 들리지 않는 순간': ['안내', '방송', '화면', '소리'],
-  '비가 와서 이동이 느린 날': ['비', '빗', '우산', '젖', '천천히'],
-  '낯선 지역을 이동하는 시간': ['낯선', '처음', '익숙하지'],
-  '운행 안내가 갑자기 바뀐 순간': ['운행', '안내', '변경', '갑자기'],
-  '한 번 이상 환승해야 하는 길': ['환승', '갈아타', '노선'],
-  '여러 교통수단을 연이어 이용하는 길': ['교통수단', '버스', '지하철', '연이어'],
-  '두 가지 운행 문제가 겹친 상황': ['문제', '운행', '겹', '동시'],
-  '늦은 시간 안전한 대안을 찾아야 하는 순간': ['늦은', '안전', '대안', '시간'],
-};
-
 // 모델에는 화면 문장과 정답 배열만 보내고 DB ID·보상·사용자 정보는 보내지 않는다.
 function buildPrompt(
   quest: Pick<QuestDetail, 'title' | 'goal' | 'difficulty'> & Partial<Pick<QuestDetail, 'code' | 'summary'>>,
   step: QuestStep,
-  variationTheme: string,
+  incident: TransportIncident,
   retryFailureCode?: string,
 ): string {
   const input = {
     t: quest.title,
     g: quest.goal,
     d: quest.difficulty,
-    theme: variationTheme,
+    incidentType: incident.id,
     s: step.situation,
     i: step.instruction,
     // ID는 보내지 않고 배열 순서와 정답 의미만 전달한다.
@@ -75,13 +62,14 @@ function buildPrompt(
       r: choice.correct,
     })),
   };
-  const situationOnlyRetry = retryFailureCode === 'THEME_NOT_APPLIED'
+  const situationOnlyRetry = retryFailureCode === 'INCIDENT_NOT_APPLIED'
     || retryFailureCode === 'SITUATION_MEANING_LOST';
   if (situationOnlyRetry) {
     return [
       '지시문을 실제로 수행할 수 있는 구체적인 상황 한 문장만 한국어로 작성하세요.',
-      `문장을 "${variationTheme}"으로 시작하고, 원래 상황의 장소·대상·사건을 새롭게 표현하세요. 테마 이름만 쓰면 실패입니다.`,
-      '규칙은 사실 확인에만 사용하세요. 원문의 핵심 사건과 교통수단을 다른 사건이나 교통수단으로 바꾸면 실패입니다.',
+      '원래 단계의 목적을 수행하는 도중 돌발상황이 발생하도록 두 내용을 자연스럽게 결합하세요. 템플릿 제목을 접두어처럼 붙이면 실패입니다.',
+      '원문의 핵심 사건과 교통수단을 유지하고, 허용된 돌발상황 외의 사건으로 바꾸면 실패입니다.',
+      buildIncidentPromptBlock(incident),
       '숫자와 의미를 유지하고 새로운 사실이나 위험한 행동을 추가하지 마세요. 번호·글머리표·따옴표·설명 없이 한 줄만 출력하세요.',
       buildKoreanTransportRulePrompt(quest, step),
       `입력: ${JSON.stringify(input)}`,
@@ -89,10 +77,11 @@ function buildPrompt(
   }
   const lines = [
     `아동용 사회기술 퀘스트에서 지시문에 맞는 새로운 상황 1문장과 선택지 ${step.choices.length}문장을 한국어로 작성하세요.`,
-    `1번째 줄은 "${variationTheme}"으로 시작하고, 원래 상황의 구체적인 장소·대상·사건을 같은 의미로 바꿔 쓰세요. 테마 이름만 쓰면 실패입니다.`,
-    `2~${step.choices.length + 1}번째 줄은 입력 선택지의 순서·핵심 대상·행동·정답 의미를 유지해 바꿔 쓰세요. r=true는 도움이 되는 행동, r=false는 잘못되거나 도움이 안 되는 행동으로 유지하세요.`,
+    '1번째 줄은 원래 상황과 허용된 돌발상황을 자연스럽게 결합하세요. 템플릿 제목을 접두어처럼 붙이면 실패입니다.',
+    `2~${step.choices.length + 1}번째 줄은 입력 선택지의 순서·정답 위치를 유지하고, r=true에는 원래 행동과 돌발상황의 필수 대처를 함께 반영하세요.`,
     '규칙은 사실 확인에만 사용하세요. 원문의 개찰구 사건을 환승 사건으로 바꾸는 것처럼 핵심 사건을 다른 규칙의 사건으로 교체하면 실패입니다.',
-    '숫자를 유지하고 새로운 사실이나 위험한 행동을 추가하지 마세요. 각 줄은 60자 이하로 쓰세요.',
+    '숫자를 유지하고 허용된 돌발상황 밖의 새로운 사실이나 위험한 행동을 추가하지 마세요. 각 줄은 80자 이하로 쓰세요.',
+    buildIncidentPromptBlock(incident),
     '아래 한국 대중교통 규칙에 없는 운영 방식·설비·요금·법규를 추측하지 마세요.',
     buildKoreanTransportRulePrompt(quest, step),
     `정확히 ${step.choices.length + 1}줄만 출력하세요. JSON·키·번호·글머리표·따옴표·설명은 출력하지 마세요.`,
@@ -115,7 +104,7 @@ function normalizeGeneratedLine(value: string): string {
 }
 
 // 모델은 상황과 선택지 문장만 줄 단위로 반환하고, 나머지 구조는 원본에서 복원한다.
-function parseOutput(text: string, step: QuestStep, variationTheme: string): QuestStepGenerationOutput {
+function parseOutput(text: string, step: QuestStep): QuestStepGenerationOutput {
   let lines = text
     .split(/\r?\n/u)
     .map((line) => line.trim())
@@ -137,9 +126,7 @@ function parseOutput(text: string, step: QuestStep, variationTheme: string): Que
     situationLines = lines.slice(0, -step.choices.length);
     choiceLabels = lines.slice(-step.choices.length);
   }
-  const situation = situationLines[0] === variationTheme && situationLines.length > 1
-    ? `${variationTheme}, ${situationLines.slice(1).join(' ')}`
-    : situationLines.join(' ');
+  const situation = situationLines.join(' ');
   if (!situation || choiceLabels.length !== step.choices.length) throw new Error('CHOICE_COUNT_CHANGED');
   return {
     situation,
@@ -152,14 +139,13 @@ function parseOutput(text: string, step: QuestStep, variationTheme: string): Que
   };
 }
 
-function parseSituationOutput(text: string, variationTheme: string): string {
+function parseSituationOutput(text: string): string {
   const lines = text
     .split(/\r?\n/u)
     .map(normalizeGeneratedLine)
     .filter((line) => line.length > 0 && !/^```(?:text)?$/iu.test(line));
   if (lines.length === 0) throw new Error('INVALID_OUTPUT_SHAPE');
   // 상황 전용 재시도에서 모델이 선택지를 덧붙여도 첫 문장만 사용하고 기존 선택지는 유지한다.
-  if (lines[0] === variationTheme && lines.length === 2) return `${lines[0]}, ${lines[1]}`;
   return lines[0];
 }
 
@@ -205,20 +191,19 @@ function preservesCoreMeaning(original: string, generated: string): boolean {
 
 // 상황 품질과 한국어 전용 규칙을 필드별로 보정한다.
 // 상황은 검토 문장으로 교체하고, 나머지 영문 혼입 필드는 서버 원문으로 복구한다.
-function applyApprovedTheme(
+function applyIncidentTemplate(
   output: QuestStepGenerationOutput,
-  variationTheme: string,
+  incident: TransportIncident,
   step: QuestStep,
 ): QuestStepGenerationOutput {
   const situation = output.situation.trim();
-  const anchors = themeAnchors[variationTheme] ?? [];
   const usableSituation = !/[A-Za-z]/.test(situation)
     && situation !== step.situation.trim()
-    && anchors.some((anchor) => situation.includes(anchor));
+    && incident.situationAnchors.some((anchor) => situation.includes(anchor));
   const koreanOnly = (generated: string, original: string): string => (
     /[A-Za-z]/.test(generated) ? original : generated
   );
-  // 테마 이탈·영어 출력은 억지 접두어를 붙이지 않고 해당 원본 필드로 복구한다.
+  // 돌발상황 이탈·영어 출력은 억지 접두어를 붙이지 않고 해당 원본 필드로 복구한다.
   return {
     ...output,
     situation: usableSituation ? situation : step.situation,
@@ -262,7 +247,7 @@ function hasUnsupportedTransportFact(step: QuestStep, output: QuestStepGeneratio
 }
 
 // AI 문장만 서버 원본 QuestStep에 병합해 ID·순서·정답·보상 구조를 보존한다.
-function validateAndMerge(step: QuestStep, output: QuestStepGenerationOutput): QuestStep {
+function validateAndMerge(step: QuestStep, output: QuestStepGenerationOutput, incident: TransportIncident): QuestStep {
   // 선택지 개수와 힌트 유무가 달라지면 단계 전체를 사용할 수 없다.
   if (output.choices.length !== step.choices.length) throw new Error('CHOICE_COUNT_CHANGED');
   if ((step.hint === null) !== (output.hint === null)) throw new Error('HINT_SHAPE_CHANGED');
@@ -274,14 +259,22 @@ function validateAndMerge(step: QuestStep, output: QuestStepGenerationOutput): Q
   ];
   if (strings.some((value) => !validateSentence(value))) throw new Error('UNSAFE_OR_LONG_TEXT');
   if (hasUnsupportedTransportFact(step, output)) throw new Error('UNSUPPORTED_TRANSPORT_FACT');
-  // 상황 변형의 핵심인 테마가 빠지면 어색한 부분 생성물을 쓰지 않고 단계 전체를 복구한다.
-  if (output.situation.trim() === step.situation.trim()) throw new Error('THEME_NOT_APPLIED');
-  // 테마 이름만 출력한 상황은 지시를 수행할 사건이 없으므로 사용하지 않는다.
+  if (output.situation.trim() === step.situation.trim()
+      || !incident.situationAnchors.some((anchor) => output.situation.includes(anchor))) {
+    throw new Error('INCIDENT_NOT_APPLIED');
+  }
   if (!preservesCoreMeaning(
     `${step.situation} ${step.instruction}`,
     output.situation,
   )) throw new Error('SITUATION_MEANING_LOST');
   const generatedChoiceSentences = output.choices.map((choice) => choice.label.trim());
+  const correctResponses = output.choices
+    .filter((choice) => choice.correct)
+    .map((choice) => choice.label)
+    .join(' ');
+  if (!incident.responseAnchors.some((anchor) => correctResponses.includes(anchor))) {
+    throw new Error('INCIDENT_RESPONSE_MISSING');
+  }
   const instructionText = output.instruction.trim();
   const hintText = output.hint?.trim() ?? null;
   // 지시·힌트가 서로 같거나 선택지 전체를 복사하면 역할이 무너진 출력으로 판단한다.
@@ -344,7 +337,7 @@ export async function generateFullQuestStep(
   step: QuestStep,
   requestId: string,
   dependency: QuestStepGenerationRuntime = runtime,
-  variationTheme = '비가 살짝 오는 날',
+  incident: TransportIncident = transportIncidents.BUS[9],
 ): Promise<QuestStepGenerationResult> {
   try {
     let status = await dependency.getStatus();
@@ -357,7 +350,7 @@ export async function generateFullQuestStep(
       try {
         const generated = await dependency.generate({
           requestId: attempt === 0 ? requestId : `${requestId}-retry-1`,
-          prompt: buildPrompt(quest, step, variationTheme, retryFailureCode),
+          prompt: buildPrompt(quest, step, incident, retryFailureCode),
           // 상황 한 줄과 선택지만 생성하므로 256토큰이면 충분한 여유가 있다.
           maxTokens: 256,
           timeoutMs: 120_000,
@@ -365,24 +358,24 @@ export async function generateFullQuestStep(
             cloudInput: {
               questId: quest.id,
               stepId: step.id,
-              theme: variationTheme,
+              incidentType: incident.id,
               ...(retryFailureCode ? { retryFailureCode } : {}),
             },
           } : {}),
         });
         const situationOnlyRetry = attempt === 1
           && previousOutput !== undefined
-          && (retryFailureCode === 'THEME_NOT_APPLIED' || retryFailureCode === 'SITUATION_MEANING_LOST');
+          && (retryFailureCode === 'INCIDENT_NOT_APPLIED' || retryFailureCode === 'SITUATION_MEANING_LOST');
         const retryBaseOutput = previousOutput;
         const output = situationOnlyRetry && retryBaseOutput
-          ? applyApprovedTheme({
+          ? applyIncidentTemplate({
             ...retryBaseOutput,
-            situation: parseSituationOutput(generated.text, variationTheme),
-          }, variationTheme, step)
-          : applyApprovedTheme(parseOutput(generated.text, step, variationTheme), variationTheme, step);
+            situation: parseSituationOutput(generated.text),
+          }, incident, step)
+          : applyIncidentTemplate(parseOutput(generated.text, step), incident, step);
         previousOutput = output;
         return {
-          step: validateAndMerge(step, output),
+          step: validateAndMerge(step, output, incident),
           source: 'ai',
           requestId,
           failureCode: null,
@@ -405,7 +398,7 @@ export async function generateFullQuestStep(
 }
 
 export const questStepGeneratorTestables = {
-  applyApprovedTheme,
+  applyIncidentTemplate,
   buildPrompt,
   hasUnsupportedTransportFact,
   parseOutput,

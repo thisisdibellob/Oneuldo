@@ -5,6 +5,9 @@ import {
   type QuestStepGenerationRuntime,
 } from '../src/ai/questStepGenerator';
 import type { NativeRuntimeStatus } from '../src/ai/nativeRuntime.types';
+import { transportIncidents } from '../src/ai/transportIncidents';
+
+const incident = transportIncidents.BUS[9];
 
 const step: QuestStep = {
   id: 'step-2',
@@ -55,7 +58,7 @@ function createRuntime(text = validText): QuestStepGenerationRuntime {
 
 describe('Phase 4 전체 단계 생성', () => {
   it('지시에 맞는 상황·선택지만 줄 단위 생성 대상으로 보낸다', () => {
-    const prompt = questStepGeneratorTestables.buildPrompt(quest, step, '비가 살짝 오는 날');
+    const prompt = questStepGeneratorTestables.buildPrompt(quest, step, incident);
     expect(prompt).toContain(step.situation);
     expect(prompt).toContain(step.instruction);
     expect(prompt).toContain(step.choices[0].label);
@@ -80,7 +83,7 @@ describe('Phase 4 전체 단계 생성', () => {
       cloudInput: {
         questId: quest.id,
         stepId: step.id,
-        theme: '비가 살짝 오는 날',
+        incidentType: 'BUS_WEATHER_VISIBILITY',
       },
     }));
     expect(result.step.situation).not.toBe(step.situation);
@@ -154,7 +157,7 @@ describe('Phase 4 전체 단계 생성', () => {
     const result = await generateFullQuestStep(quest, step, 'theme-prefix', createRuntime(copied));
 
     expect(result.source).toBe('original');
-    expect(result.failureCode).toBe('THEME_NOT_APPLIED');
+    expect(result.failureCode).toBe('INCIDENT_NOT_APPLIED');
     expect(result.step).toBe(step);
   });
 
@@ -194,7 +197,7 @@ describe('Phase 4 전체 단계 생성', () => {
     const result = await generateFullQuestStep(quest, step, 'split-situation', createRuntime(splitSituation));
 
     expect(result.source).toBe('ai');
-    expect(result.step.situation).toBe('비가 살짝 오는 날, 정류장 앞에 기다리던 버스가 멈췄어요.');
+    expect(result.step.situation).toBe('비가 살짝 오는 날 정류장 앞에 기다리던 버스가 멈췄어요.');
     expect(result.step.choices).toHaveLength(2);
   });
 
@@ -225,14 +228,13 @@ describe('Phase 4 전체 단계 생성', () => {
     expect(result.step.choices[1].label).toBe(step.choices[1].label);
   });
 
-  it('핵심 행동이 사라진 안내와 선택지는 해당 필드만 원문으로 복구한다', async () => {
+  it('돌발상황 대처 행동이 정답에서 사라지면 단계 전체를 거절한다', async () => {
     const invalidChoice = validText.replace('안내판과 버스 번호를 서로 비교해요.', '그냥 해요.');
     const result = await generateFullQuestStep(quest, step, 'meaning-lost', createRuntime(invalidChoice));
 
-    expect(result.source).toBe('ai');
-    expect(result.step.instruction).toBe(step.instruction);
-    expect(result.step.choices[0].label).toBe(step.choices[0].label);
-    expect(result.step.situation).toBe('비가 살짝 오는 날, 정류장 앞에 기다리던 버스가 멈췄어요.');
+    expect(result.source).toBe('original');
+    expect(result.failureCode).toBe('INCIDENT_RESPONSE_MISSING');
+    expect(result.step).toBe(step);
   });
 
   it('선택지를 지시문과 같게 만들면 단계 전체를 원문으로 복구한다', async () => {
@@ -260,7 +262,7 @@ describe('Phase 4 전체 단계 생성', () => {
     const result = await generateFullQuestStep(quest, step, 'english-block', createRuntime(english));
 
     expect(result.source).toBe('original');
-    expect(result.failureCode).toBe('THEME_NOT_APPLIED');
+    expect(result.failureCode).toBe('INCIDENT_NOT_APPLIED');
     expect(result.step.situation).toBe(step.situation);
     expect(result.step.instruction).toBe(step.instruction);
     expect(result.step.hint).toBe(step.hint);

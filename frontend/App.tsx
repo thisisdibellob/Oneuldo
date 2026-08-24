@@ -92,6 +92,7 @@ export default function App() {
 
   const [showOnboarding, setShowOnboarding] = useState(true);
   const [reduceMotion, setReduceMotion] = useState(false);
+  const [fontLoadingTimedOut, setFontLoadingTimedOut] = useState(false);
   const entryProgress = useRef(new Animated.Value(0)).current;
   const entering = useRef(false);
   const [loaded, error] = useFonts({
@@ -107,6 +108,17 @@ export default function App() {
     'Cafe24-Ssurround': require('./assets/fonts/Cafe24Ssurround.otf'),
     'Cafe24-Ssurround-Air': require('./assets/fonts/Cafe24SsurroundAir.otf'),
   });
+
+  useEffect(() => {
+    if (loaded || error) return;
+
+    const timeout = setTimeout(() => {
+      console.warn('[Fonts] Font loading timed out. Continuing with system fonts.');
+      setFontLoadingTimedOut(true);
+    }, 5000);
+
+    return () => clearTimeout(timeout);
+  }, [error, loaded]);
 
   useEffect(() => {
     AccessibilityInfo.isReduceMotionEnabled().then(setReduceMotion);
@@ -131,7 +143,7 @@ export default function App() {
     }).start(() => setShowOnboarding(false));
   };
 
-  if (!loaded && !error) {
+  if (!loaded && !error && !fontLoadingTimedOut) {
     return (
       <View style={styles.loading}>
         <ActivityIndicator color={colors.mint} size="large" />

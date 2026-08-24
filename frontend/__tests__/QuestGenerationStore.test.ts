@@ -1,6 +1,8 @@
 import type { QuestDetail, QuestStep } from '../src/api/quest';
 import {
   clearQuestGenerationStore,
+  evictQuestGenerationSnapshot,
+  getQuestGenerationSnapshot,
   warmFullQuest,
 } from '../src/ai/questGenerationStore';
 import { generateFullQuestStep } from '../src/ai/questStepGenerator';
@@ -117,5 +119,24 @@ describe('퀘스트 전체 생성 조기 중단', () => {
       'SKIPPED_AFTER_FAILURE',
       'SKIPPED_AFTER_FAILURE',
     ]);
+  });
+
+  it('완료한 퀘스트 스냅샷만 제거해 다음 수행에서 다시 생성한다', async () => {
+    mockedGenerateFullQuestStep.mockImplementation(async (_quest, step) => ({
+      step: { ...step, situation: `AI ${step.situation}` },
+      source: 'ai',
+      requestId: `generated-${step.id}`,
+      failureCode: null,
+    }));
+
+    await warmFullQuest(quest);
+    expect(getQuestGenerationSnapshot(quest.id).state).toBe('ready');
+    expect(mockedGenerateFullQuestStep).toHaveBeenCalledTimes(4);
+
+    evictQuestGenerationSnapshot(quest.id);
+    expect(getQuestGenerationSnapshot(quest.id).state).toBe('idle');
+
+    await warmFullQuest(quest);
+    expect(mockedGenerateFullQuestStep).toHaveBeenCalledTimes(8);
   });
 });

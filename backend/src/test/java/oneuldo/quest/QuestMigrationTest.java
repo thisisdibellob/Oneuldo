@@ -52,6 +52,60 @@ class QuestMigrationTest {
                     WHEN 'HARD' THEN 6 ELSE 7 END
                 """));
 
+        // V13 자동 생성 퀘스트도 교통수단 공통 문장이 아니라 각 퀘스트 고유 목표를 사용한다.
+        assertEquals(0, count("""
+                SELECT COUNT(*) FROM quest_steps s
+                JOIN quests q ON q.id = s.quest_id
+                WHERE CAST(q.id AS VARCHAR) LIKE '31000000-0000-0000-0000-%'
+                  AND (s.instruction LIKE '%지금은%'
+                    OR s.situation LIKE '%지금은%')
+                """));
+        assertEquals(0, count("""
+                SELECT COUNT(*) FROM quest_choices c
+                JOIN quest_steps s ON s.id = c.step_id
+                JOIN quests q ON q.id = s.quest_id
+                WHERE CAST(q.id AS VARCHAR) LIKE '31000000-0000-0000-0000-%'
+                  AND c.label LIKE '%퀘스트%'
+                """));
+        assertEquals(0, count("""
+                SELECT COUNT(*) FROM (
+                    SELECT s.quest_id, COUNT(*) step_count, COUNT(DISTINCT s.situation) situation_count
+                    FROM quest_steps s
+                    JOIN quests q ON q.id = s.quest_id
+                    WHERE CAST(q.id AS VARCHAR) LIKE '31000000-0000-0000-0000-%'
+                    GROUP BY s.quest_id
+                ) generated
+                WHERE step_count <> situation_count
+                """));
+        assertEquals(0, count("""
+                SELECT COUNT(*) FROM (
+                    SELECT c.step_id, COUNT(*) wrong_count, COUNT(DISTINCT c.label) wrong_label_count
+                    FROM quest_choices c
+                    JOIN quest_steps s ON s.id = c.step_id
+                    JOIN quests q ON q.id = s.quest_id
+                    WHERE CAST(q.id AS VARCHAR) LIKE '31000000-0000-0000-0000-%'
+                      AND c.correct = FALSE
+                    GROUP BY c.step_id
+                ) generated
+                WHERE wrong_count <> wrong_label_count
+                """));
+        assertEquals(0, count("""
+                SELECT COUNT(*) FROM quest_steps s
+                JOIN quests q ON q.id = s.quest_id
+                WHERE q.code = 'SUBWAY_PREPARE_TRANSIT_CARD_VE'
+                  AND (s.instruction LIKE '%노선과 방면%'
+                    OR EXISTS (
+                        SELECT 1 FROM quest_choices c
+                        WHERE c.step_id = s.id AND c.label LIKE '%노선과 목적지 방면%'
+                    ))
+                """));
+        assertEquals(0, count("""
+                SELECT COUNT(*) FROM quest_steps s
+                JOIN quests q ON q.id = s.quest_id
+                WHERE q.code = 'BUS_MATCH_NUMBER_VE'
+                  AND s.instruction NOT LIKE '%버스의 번호%'
+                """));
+
         assertEquals(0, count("""
                 SELECT COUNT(*) FROM (
                     SELECT q.difficulty, s.id, COUNT(c.id) AS choice_count

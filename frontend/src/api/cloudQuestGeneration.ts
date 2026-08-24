@@ -4,7 +4,7 @@ export type CloudQuestGenerationInput = {
   questId: string;
   stepId: string;
   requestId: string;
-  theme: string;
+  incidentType: string;
   retryFailureCode?: string;
 };
 

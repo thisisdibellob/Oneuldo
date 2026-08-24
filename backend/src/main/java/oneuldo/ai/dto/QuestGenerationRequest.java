@@ -10,7 +10,7 @@ public record QuestGenerationRequest(
         @NotNull UUID questId,
         @NotNull UUID stepId,
         @NotBlank @Size(max = 100) String requestId,
-        @NotBlank @Size(max = 40) String theme,
+        @NotBlank @Size(max = 64) String incidentType,
         @Size(max = 64) String retryFailureCode
 ) {
 }

@@ -1,8 +1,5 @@
 package oneuldo.ai.service;
 
-import java.util.Map;
-import java.util.Set;
-
 import lombok.RequiredArgsConstructor;
 import oneuldo.ai.client.GroqChatClient;
 import oneuldo.ai.config.GroqProperties;
@@ -17,16 +14,10 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class QuestGenerationService {
 
-    private static final Map<String, Set<String>> APPROVED_THEMES = Map.of(
-            "VERY_EASY", Set.of("한산한 낮", "안내가 잘 보이는 시간", "보호자와 연습하는 날"),
-            "EASY", Set.of("한산한 낮", "비가 살짝 오는 날", "사람이 조금 있는 시간"),
-            "NORMAL", Set.of("사람이 많은 퇴근 시간", "안내가 잘 들리지 않는 순간", "비가 와서 이동이 느린 날"),
-            "HARD", Set.of("낯선 지역을 이동하는 시간", "운행 안내가 갑자기 바뀐 순간", "한 번 이상 환승해야 하는 길"),
-            "VERY_HARD", Set.of("여러 교통수단을 연이어 이용하는 길", "두 가지 운행 문제가 겹친 상황", "늦은 시간 안전한 대안을 찾아야 하는 순간")
-    );
-
     private final QuestService questService;
     private final QuestGenerationPromptFactory promptFactory;
+    private final KoreanPublicTransportRuleBook ruleBook;
+    private final TransportIncidentCatalog incidentCatalog;
     private final GroqChatClient groqChatClient;
     private final GroqProperties properties;
 
@@ -35,10 +26,8 @@ public class QuestGenerationService {
         if (!"PUBLIC_TRANSPORT".equals(quest.categoryCode())) {
             throw new IllegalArgumentException("AI 생성 대상 퀘스트가 아닙니다.");
         }
-        Set<String> approved = APPROVED_THEMES.get(quest.difficulty());
-        if (!approved.contains(request.theme())) {
-            throw new IllegalArgumentException("허용되지 않은 퀘스트 테마입니다.");
-        }
+        String mode = ruleBook.select(quest).mode();
+        TransportIncidentCatalog.IncidentTemplate incident = incidentCatalog.require(mode, request.incidentType());
         QuestStepResponse step = quest.steps().stream()
                 .filter(candidate -> candidate.id().equals(request.stepId()))
                 .findFirst()
@@ -47,12 +36,12 @@ public class QuestGenerationService {
         String prompt = promptFactory.build(
                 quest,
                 step,
-                request.theme(),
+                incident,
                 request.retryFailureCode()
         );
         long startedAt = System.nanoTime();
         GroqChatClient.GroqChatResult result = groqChatClient.complete(
-                "한국의 아동용 대중교통 퀘스트를 작성합니다. 제공된 규칙과 원문만 사실로 사용하고, "
+                "한국의 아동용 대중교통 퀘스트를 작성합니다. 제공된 규칙·원문·돌발상황 템플릿만 사실로 사용하고, "
                         + "모르는 운영 방식·설비·요금·법규는 추측하지 마세요. 간결하고 자연스러운 한국어와 요청한 출력 형식을 정확히 따르세요.",
                 prompt
         );

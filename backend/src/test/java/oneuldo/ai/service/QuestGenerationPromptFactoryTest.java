@@ -14,13 +14,15 @@ import tools.jackson.databind.ObjectMapper;
 
 class QuestGenerationPromptFactoryTest {
 
+    private final TransportIncidentCatalog catalog = new TransportIncidentCatalog(new ObjectMapper());
+
     private final QuestGenerationPromptFactory factory = new QuestGenerationPromptFactory(
             new KoreanPublicTransportRuleBook(new ObjectMapper())
     );
 
     @Test
     void 상황과_선택지만_일반_텍스트로_요청한다() {
-        String prompt = factory.build(quest(), quest().steps().getFirst(), "비가 살짝 오는 날", null);
+        String prompt = factory.build(quest(), quest().steps().getFirst(), catalog.require("BUS", "BUS_WEATHER_VISIBILITY"), null);
 
         assertTrue(prompt.contains("정확히 3줄만 출력하세요"));
         assertTrue(prompt.contains("원래 상황: 정류장에 버스가 도착했어요."));
@@ -39,7 +41,7 @@ class QuestGenerationPromptFactoryTest {
         String prompt = factory.build(
                 subwayQuest,
                 subwayQuest.steps().getFirst(),
-                "사람이 조금 있는 시간",
+                catalog.require("SUBWAY", "SUBWAY_CROWDED_PLATFORM"),
                 null
         );
 
@@ -53,13 +55,19 @@ class QuestGenerationPromptFactoryTest {
         String prompt = factory.build(
                 quest(),
                 quest().steps().getFirst(),
-                "비가 살짝 오는 날",
+                catalog.require("BUS", "BUS_WEATHER_VISIBILITY"),
                 "SITUATION_MEANING_LOST"
         );
 
         assertTrue(prompt.contains("상황 한 문장만"));
         assertTrue(prompt.contains("한 줄만 출력하세요"));
         assertFalse(prompt.contains("정확히 3줄"));
+    }
+
+    @Test
+    void 버스와_지하철_돌발상황을_각각_열_개씩_제공한다() {
+        assertTrue(catalog.templates("BUS").size() == 10);
+        assertTrue(catalog.templates("SUBWAY").size() == 10);
     }
 
     static QuestDetailResponse quest() {

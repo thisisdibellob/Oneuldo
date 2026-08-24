@@ -3,6 +3,7 @@
 > 기준일: 2026-08-24  
 > 문서 상태: 현재 코드 기준 단일 진실 공급원(SSOT)  
 > 적용 범위: 퀘스트 탭의 대중교통 연습 생성, 수행 기록, 난이도 조정, 클라우드·온디바이스 런타임
+> 변경 비교 기준: `8ce6c7c` (`refactor: 프론트 수정`) 직후와 현재 `HEAD`
 
 ## 1. 이 문서를 먼저 읽는 이유
 
@@ -57,9 +58,68 @@ flowchart LR
     STORE -. 클라우드 실패 .-> NATIVE
     UI --> EVENT --> QUEST --> DB
     DB --> DIFF --> DB
+
+    classDef baseline fill:#dbeafe,stroke:#2563eb,color:#172554,stroke-width:2px;
+    classDef added fill:#dcfce7,stroke:#16a34a,color:#052e16,stroke-width:2px;
+    classDef external fill:#ffedd5,stroke:#ea580c,color:#431407,stroke-width:2px;
+    class U,QS,UI,AUTH,QUEST,DB baseline;
+    class STORE,VALIDATE,NATIVE,EVENT,AIAPI,PROMPT,RULES,DIFF added;
+    class GROQ external;
 ```
 
-### 2.1 책임 분리
+색상은 이 문서의 모든 변경 비교 그림에서 같은 뜻으로 사용한다.
+
+| 색 | 의미 |
+|---|---|
+| 파란색 | `8ce6c7c` 시점에 이미 존재했던 앱·회원 인증·기본 퀘스트·DB 경계 |
+| 초록색 | `8ce6c7c` 이후 저장소에 추가된 AI, 수행 기록, 개인화, 네이티브 실행 계층 |
+| 주황색 | 이후 새로 연결한 저장소 외부 실행 서비스(Groq/Qwen) |
+
+> Mermaid를 색상 없이 보는 환경에서는 각 노드의 `[기존]`, `[이후 추가]`, `[외부]` 의미를 위 표와 19절의 변경표로 함께 확인한다. 색은 변경 시점을 나타낼 뿐 중요도나 신뢰 수준을 나타내지 않는다.
+
+### 2.1 `8ce6c7c` 전후 구조 차이
+
+기준 커밋에는 앱의 `QuestScreen`·`QuestPracticeScreen`, 프론트 `quest.ts`, 백엔드의 기본 `Quest` 조회 계층, 회원/JWT 기반, PostgreSQL 마이그레이션 V1~V4가 있었다. 단계·선택지 단위 수행과 AI 생성은 없었다. 현재 구조는 그 기존 조회 경로를 없애지 않고 아래처럼 확장한다.
+
+```mermaid
+flowchart LR
+    subgraph BASE[8ce6c7c 시점]
+        BAPP[기존: Expo 앱]
+        BQ[기존: 퀘스트 목록·연습 화면]
+        BAPI[기존: Quest API]
+        BDB[(기존: 회원·퀘스트 DB<br/>V1~V4)]
+        BAPP --> BQ --> BAPI --> BDB
+    end
+
+    subgraph AFTER[이후 추가된 확장]
+        DETAIL[이후 추가: 단계·선택지 상세]
+        SESSION[이후 추가: 세션·이벤트]
+        PERSONAL[이후 추가: 사용자 난이도·추천]
+        SAFE[이후 추가: 생성·검증·원문 fallback]
+        CLOUD[이후 추가: 백엔드 AI 중계]
+        DEVICE[이후 추가: Android llama.cpp]
+        RULEBOOK[이후 추가: 한국 교통 규칙집]
+    end
+
+    EXT[외부: Groq/Qwen]
+    BQ --> DETAIL
+    DETAIL --> SESSION --> PERSONAL
+    DETAIL --> SAFE
+    SAFE --> CLOUD --> EXT
+    SAFE -. 클라우드 실패 .-> DEVICE
+    RULEBOOK --> CLOUD
+    SESSION --> BDB
+    PERSONAL --> BDB
+
+    classDef baseline fill:#dbeafe,stroke:#2563eb,color:#172554,stroke-width:2px;
+    classDef added fill:#dcfce7,stroke:#16a34a,color:#052e16,stroke-width:2px;
+    classDef external fill:#ffedd5,stroke:#ea580c,color:#431407,stroke-width:2px;
+    class BAPP,BQ,BAPI,BDB baseline;
+    class DETAIL,SESSION,PERSONAL,SAFE,CLOUD,DEVICE,RULEBOOK added;
+    class EXT external;
+```
+
+### 2.2 책임 분리
 
 | 영역 | 책임 | 하지 않는 일 |
 |---|---|---|
@@ -99,7 +159,7 @@ flowchart TB
 
 ## 4. 사용자에게 보이는 정상 생성 흐름
 
-대중교통 퀘스트 하나에는 여러 단계가 있다. 한 퀘스트의 모든 단계는 동일한 테마를 사용하고 순차 생성된다.
+대중교통 퀘스트 하나에는 여러 단계가 있다. 한 퀘스트의 모든 단계는 동일한 돌발상황 템플릿을 사용하고 순차 생성된다. 원문의 학습 목표는 그대로 두되, 화면·혼잡·운행 변경 같은 문제를 해결하는 행동을 정답에 함께 요구한다.
 
 ```mermaid
 sequenceDiagram
@@ -115,9 +175,9 @@ sequenceDiagram
 
     User->>Screen: 대중교통 퀘스트 시작
     Screen->>Store: warmFullQuest(원본, accessToken)
-    Store->>Store: 난이도에 맞는 허용 테마 1개 선택
+    Store->>Store: 교통수단별 돌발상황 10개 중 1개 선택
     loop 퀘스트의 각 단계
-        Store->>API: questId, stepId, requestId, theme
+        Store->>API: questId, stepId, requestId, incidentType
         API->>DB: 서버 원본 퀘스트·단계 조회
         API->>Rules: BUS 또는 SUBWAY 규칙 선택
         API->>Groq: system prompt + 최소 입력 prompt
@@ -130,6 +190,37 @@ sequenceDiagram
 ```
 
 화면은 생성 중 원문을 잠깐 보여 주지 않고 준비 화면을 표시한다. 생성이 끝난 뒤에만 `AI 생성 퀘스트` 또는 원문 중 하나를 일관되게 사용한다.
+
+### 4.1 화면 진입부터 다음 추천까지의 전체 수명주기
+
+AI 문장 생성만 보면 수행 기록과 난이도 변경이 누락되기 쉽다. 실제 한 번의 사용자 여정은 다음 네 구간으로 나뉜다.
+
+| 구간 | 시작 조건 | 핵심 처리 | 종료 상태 |
+|---|---|---|---|
+| 목록·추천 | 퀘스트 탭 진입 | 비로그인은 일반 목록, 로그인은 사용자 난이도 기반 추천 목록 조회 | 선택할 원본 퀘스트 확정 |
+| 생성 준비 | 대중교통 상세 진입 | 버스/지하철 템플릿 선택, 단계별 생성, 대처 행동 검증, 캐시 저장 | `ready(ai)` 또는 `ready(original)` |
+| 수행 | 사용자가 선택지 제출 | 세션 생성, 정답·힌트·재시도 이벤트 큐잉 및 전송 | 완료 또는 중단 세션 |
+| 개인화 | 완료·중단 처리 | 최근 같은 세부 분야 세션을 집계하고 고정 정책 평가 | 난이도 유지·한 단계 이동, 이력 저장 |
+
+```mermaid
+stateDiagram-v2
+    [*] --> idle
+    idle --> generating: warmFullQuest
+    generating --> ready_ai: 모든 단계 검증 통과
+    generating --> retrying: 재시도 가능 실패
+    retrying --> ready_ai: 재검증 통과
+    retrying --> ready_original: 재검증 실패
+    generating --> ready_original: 런타임 불가·취소·앞 단계 실패
+    ready_ai --> practicing: 화면 표시
+    ready_original --> practicing: 화면 표시
+    practicing --> completed: 모든 단계 종료
+    practicing --> abandoned: 사용자 이탈
+    completed --> evaluated: 이벤트 집계·난이도 정책
+    abandoned --> evaluated: 중단 이력 반영
+    evaluated --> [*]
+```
+
+`ready_ai`와 `ready_original`은 UI 관점에서는 모두 정상 준비 완료 상태다. 원문 복귀는 장애 화면이 아니라 제품이 의도한 안전 결과다.
 
 ## 5. 클라우드 우선과 온디바이스 대체
 
@@ -178,8 +269,8 @@ flowchart TD
   "questId": "UUID",
   "stepId": "UUID",
   "requestId": "quest-warmup-...",
-  "theme": "비가 살짝 오는 날",
-  "retryFailureCode": "THEME_NOT_APPLIED"
+  "incidentType": "BUS_WEATHER_VISIBILITY",
+  "retryFailureCode": "INCIDENT_NOT_APPLIED"
 }
 ```
 
@@ -211,7 +302,7 @@ flowchart TD
 백엔드는 DB에서 다음 정보만 골라 프롬프트를 만든다.
 
 - 퀘스트 제목, 목표, 난이도
-- 승인된 테마
+- 서버가 승인한 돌발상황 템플릿의 조건·필수 대처·금지 행동
 - 해당 단계의 원래 상황과 지시문
 - 선택지 문장과 정답 의미(`r=true/false`)
 - 해당 교통수단의 한국 대중교통 규칙
@@ -224,13 +315,13 @@ flowchart TD
 flowchart LR
     SYSTEM[시스템 지시<br/>한국 아동용·추측 금지]
     TASK[작업 지시<br/>상황 1 + 선택지 N]
-    THEME[승인 테마]
+    INCIDENT[교통수단별 돌발상황 템플릿]
     FACT[BUS/SUBWAY 규칙]
     SOURCE[DB 원문·정답 의미]
     FORMAT[정확한 줄 수·60자 제한]
     SYSTEM --> PROMPT[최종 프롬프트]
     TASK --> PROMPT
-    THEME --> PROMPT
+    INCIDENT --> PROMPT
     FACT --> PROMPT
     SOURCE --> PROMPT
     FORMAT --> PROMPT
@@ -239,12 +330,31 @@ flowchart LR
 기본 요청의 핵심 원칙은 다음과 같다.
 
 1. 지시문에 맞는 새로운 상황 한 문장과 선택지만 작성한다.
-2. 상황은 승인된 테마로 시작하며 원래 장소·대상·사건의 의미를 유지한다.
-3. 선택지 순서, 핵심 행동, 정답과 오답의 의미를 유지한다.
+2. 상황은 원래 장소·대상·사건과 돌발상황을 자연스럽게 결합하며 템플릿 이름을 접두어로 붙이지 않는다.
+3. 선택지 순서와 정답 위치를 유지하고, 정답에는 원래 행동과 템플릿의 필수 대처를 함께 넣는다.
 4. 원문에 없는 숫자, 설비, 요금, 법규, 위험 행동을 추가하지 않는다.
 5. JSON, 키, 번호, 글머리표, 따옴표, 해설을 출력하지 않는다.
 
-`THEME_NOT_APPLIED` 또는 `SITUATION_MEANING_LOST`로 실패하면 재시도 프롬프트는 상황 한 문장만 요구한다. 첫 응답에서 이미 검증된 선택지는 그대로 재사용해 불필요한 재생성을 줄인다.
+`INCIDENT_NOT_APPLIED` 또는 `SITUATION_MEANING_LOST`로 실패하면 재시도 프롬프트는 상황 한 문장만 요구한다. `INCIDENT_RESPONSE_MISSING`이면 선택지까지 다시 생성한다. 첫 응답에서 이미 검증된 선택지는 상황 전용 재시도에서 그대로 재사용한다.
+
+### 7.1 돌발상황 템플릿 카탈로그
+
+서버의 권위 원본은 `backend/src/main/resources/ai/transport-incident-templates.json`이다. 버스 10개와 지하철 10개를 분리하며 각 템플릿은 `id`, 상황 제약, 필수 대처, 금지 행동, 상황 앵커, 대처 앵커를 가진다. 앱에는 온디바이스 fallback 프롬프트와 출력 검증을 위한 최소 미러가 있다.
+
+| 버스 10종 | 지하철 10종 |
+|---|---|
+| 안내 화면 사용 불가 | 안내 화면 사용 불가 |
+| 혼잡한 정류장 | 혼잡한 승강장 |
+| 비슷한 버스 번호 | 비슷한 노선색·이름 |
+| 방송 청취 곤란 | 방송 청취 곤란 |
+| 임시 정류장 변경 | 승강장 변경 |
+| 버스 도착 지연 | 열차 운행 지연 |
+| 반대 방향 버스 | 반대 방면 승강장 |
+| 동행자의 확인 없는 재촉 | 동행자의 확인 없는 재촉 |
+| 휴대전화 사용 불가 | 휴대전화 사용 불가 |
+| 날씨로 시야 저하 | 출구 안내 혼동 |
+
+따라서 버스 원문이 10개라면 버스 템플릿 10개와 조합해 최대 100개의 통제된 조합을 만들 수 있다. 문장 표현은 모델이 달리 만들 수 있으므로 실제 표면 문장 수는 더 많지만, 검증 가능한 의미 조합의 기준은 `원문 × 템플릿`이다.
 
 ## 8. 한국 대중교통 규칙 매핑
 
@@ -284,13 +394,13 @@ flowchart TD
 | 층 | 검사 내용 | 실패 시 |
 |---|---|---|
 | Spring Security | `/api/ai/**` JWT 인증 | 401/403 |
-| 요청 DTO | UUID, requestId·theme 길이 | 400 |
-| 생성 서비스 | `PUBLIC_TRANSPORT` 여부, 승인 테마, 퀘스트에 포함된 stepId | 400 |
+| 요청 DTO | UUID, requestId·incidentType 길이 | 400 |
+| 생성 서비스 | `PUBLIC_TRANSPORT` 여부, BUS/SUBWAY에 허용된 템플릿, 퀘스트에 포함된 stepId | 400 |
 | 규칙 선택 | 버스 또는 지하철 문맥인지 | 400 |
 | Groq 클라이언트 | 키 설정, 빈 응답, 429, 타임아웃, 기타 HTTP 오류 | 429 또는 503 |
 | 앱 파서 | 줄 수, 선택지 개수, 빈 출력 | 1회 재시도 또는 원문 |
 | 문장 검사 | 한 줄, 80자 이하, 문장 수, 한국어, 금지어·링크·이메일 | 1회 재시도 또는 원문 |
-| 의미 검사 | 부정 의미, 핵심 단어, 숫자, 정답 의미, 선택지 순서 | 1회 재시도 또는 원문 |
+| 의미 검사 | 원문 핵심, 돌발상황 앵커, 정답 대처 앵커, 부정 의미, 숫자, 정답 위치 | 1회 재시도 또는 원문 |
 | 교통 검사 | 버스·지하철 설비 혼입, 안전벨트, 하차 순서 등 | 1회 재시도 또는 원문 |
 | 퀘스트 조립 | 모든 단계 성공 여부 | 하나라도 실패하면 전체 원문 |
 
@@ -298,7 +408,7 @@ flowchart TD
 
 - 상황 표현
 - 선택지의 자연스러운 표현
-- 승인 목록 안의 상황 테마
+- 승인 템플릿 안에서 돌발상황을 표현하는 방식
 
 ### 9.2 AI가 바꿀 수 없는 것
 
@@ -311,6 +421,18 @@ flowchart TD
 - 사용자의 난이도
 
 일부 생성 선택지가 의미 검사를 통과하지 못하면 해당 선택지만 원문으로 복구될 수 있다. 그러나 단계 자체가 실패하거나 재시도도 실패하면 혼합된 문장 흐름을 피하기 위해 **퀘스트 전체가 원문**으로 돌아간다.
+
+### 9.3 신뢰 경계를 통과하는 값
+
+| 경계 | 통과 허용 | 통과 금지·재조회 | 이유 |
+|---|---|---|---|
+| 앱 → AI 백엔드 | JWT, questId, stepId, requestId, incidentType, 재시도 코드 | 앱이 주장하는 템플릿 내용·정답·보상·원문 | 서버 JSON과 DB 원본을 권위 데이터로 유지 |
+| AI 백엔드 → Groq | 최소 퀘스트 문맥, 단계 문장, 선택지 의미, 교통 규칙 | 이메일, 이름, 장애 정보, 토큰, DB 전체 레코드 | 개인정보와 공격 표면 최소화 |
+| Groq → 앱 | 생성 텍스트, 모델명, 지연시간 | 단계 ID·정답·보상 변경 | 생성 모델의 권한 제한 |
+| 앱 검증기 → UI | 통과한 표현 또는 서버 원문 | 부분적으로 깨진 단계 묶음 | 사용자 경험과 정답 의미 일관성 |
+| UI → 수행 API | 세션 ID, 선택 ID, 이벤트 종류·순서 | AI가 새로 만든 정답 판정 | 학습 사실은 서버 ID 기준 저장 |
+
+`requestId`는 생성 요청의 상관관계 식별자이며 인증 수단이 아니다. JWT는 백엔드 경계에서만 인증에 쓰고 모델 프롬프트에는 포함하지 않는다.
 
 ## 10. 재시도와 전체 원문 복귀
 
@@ -349,7 +471,8 @@ sequenceDiagram
 
 - `CHOICE_COUNT_CHANGED`: 선택지 개수가 달라짐
 - `INVALID_OUTPUT_SHAPE`: 빈 줄이나 해석 불가능한 형식
-- `THEME_NOT_APPLIED`: 승인 테마가 상황에 반영되지 않음
+- `INCIDENT_NOT_APPLIED`: 선택한 돌발상황이 상황 문장에 반영되지 않음
+- `INCIDENT_RESPONSE_MISSING`: 정답에 돌발상황의 필수 대처가 없음
 - `SITUATION_MEANING_LOST`: 원문 핵심 사건이 사라짐
 - `NEW_NUMBER_ADDED`: 원문에 없는 숫자를 만듦
 - `CORRECTNESS_CHANGED`: 정답 의미가 바뀜
@@ -434,6 +557,43 @@ flowchart LR
 
 난이도는 `VERY_EASY ↔ EASY ↔ NORMAL ↔ HARD ↔ VERY_HARD`에서 한 번에 한 단계만 이동한다. 최저·최고 난이도 밖으로는 이동하지 않으며, 변경 후 24시간 동안 다시 변경하지 않는다. 이동하려는 난이도에 활성 콘텐츠가 없으면 현재 난이도를 유지하고 판정 이력에 `NO_CONTENT`를 남긴다.
 
+### 13.3 `8ce6c7c` 이후 추가된 데이터 모델
+
+파란색 엔터티는 기준 커밋에 존재했고, 초록색 엔터티는 이후 추가됐다. 실제 FK 방향을 단순화한 논리 그림이다.
+
+```mermaid
+flowchart TB
+    MEMBER[기존: member]
+    QUEST[기존: quest]
+    CATEGORY[기존: quest_category / subcategory]
+
+    STEP[이후 추가: quest_step]
+    CHOICE[이후 추가: quest_choice]
+    PROFILE[이후 추가: member_quest_profiles]
+    LEVEL[이후 추가: user_subcategory_difficulties]
+    SESSION[이후 추가: quest_session]
+    EVENT[이후 추가: quest_event]
+    HISTORY[이후 추가: difficulty_adjustment_history]
+    PLACE[이후 추가: place / simulation]
+
+    CATEGORY --> QUEST
+    QUEST --> STEP --> CHOICE
+    MEMBER --> PROFILE
+    MEMBER --> LEVEL
+    MEMBER --> SESSION
+    QUEST --> SESSION --> EVENT
+    LEVEL --> HISTORY
+    MEMBER --> HISTORY
+    PLACE -. 게임 시뮬레이션 문맥 .-> QUEST
+
+    classDef baseline fill:#dbeafe,stroke:#2563eb,color:#172554,stroke-width:2px;
+    classDef added fill:#dcfce7,stroke:#16a34a,color:#052e16,stroke-width:2px;
+    class MEMBER,QUEST,CATEGORY baseline;
+    class STEP,CHOICE,PROFILE,LEVEL,SESSION,EVENT,HISTORY,PLACE added;
+```
+
+마이그레이션 관점에서는 V1~V4가 기준 시점, V5~V13이 이후 추가 범위다. V5~V10은 단계·선택지·세션·이벤트·난이도 기반을 만들고 버스 시나리오를 확장한다. V11은 사용자 프로필·장소·시뮬레이션을, V12는 지하철 시나리오를, V13은 5단계 난이도 콘텐츠를 완성한다.
+
 ## 14. 데이터 저장 원칙
 
 | 데이터 | 저장 위치 | 지속성 |
@@ -469,7 +629,7 @@ flowchart LR
 |---|---:|---|
 | Groq 한도 초과 | 429 | `CLOUD_AI_RATE_LIMITED` |
 | 키 비활성·Groq 장애·서버 타임아웃 | 503 | `CLOUD_AI_UNAVAILABLE` |
-| 잘못된 대상·테마·단계 | 400 | `INVALID_REQUEST` |
+| 잘못된 대상·돌발상황·단계 | 400 | `INVALID_REQUEST` |
 | 앱 자체 25초 초과 | 앱 오류 | `CLOUD_AI_TIMEOUT` |
 | 앱 네트워크 실패 | 앱 오류 | `CLOUD_AI_NETWORK_ERROR` |
 
@@ -507,7 +667,8 @@ flowchart LR
 
 ### 17.2 백엔드
 
-- `QuestGenerationServiceTest`: 대상 카테고리, 테마, 단계 검증과 모델 호출
+- `QuestGenerationServiceTest`: 대상 카테고리, 교통수단별 돌발상황, 단계 검증과 모델 호출
+- `QuestGenerationPromptFactoryTest`: 버스·지하철 템플릿이 각각 정확히 10개인지와 프롬프트 결합 검증
 - `QuestGenerationPromptFactoryTest`: 최소 입력, 규칙 블록, 출력 형식
 - `DifficultyAdjustmentPolicyTest`: 승급·하향·유지·쿨다운·콘텐츠 부재
 
@@ -542,7 +703,9 @@ flowchart LR
 | 파일 | 역할 |
 |---|---|
 | `ai/controller/QuestGenerationController.java` | `/api/ai/quest-step/generate` |
-| `ai/service/QuestGenerationService.java` | 원본·대상·테마 검증과 호출 조율 |
+| `ai/service/QuestGenerationService.java` | 원본·교통수단·돌발상황 검증과 호출 조율 |
+| `ai/service/TransportIncidentCatalog.java` | 서버 JSON 로딩, 모드별 10개 보장, ID 검증 |
+| `resources/ai/transport-incident-templates.json` | 버스 10개·지하철 10개 돌발상황 권위 원본 |
 | `ai/service/QuestGenerationPromptFactory.java` | 서버 권위 원본으로 프롬프트 조립 |
 | `ai/service/KoreanPublicTransportRuleBook.java` | 교통수단 판별과 규칙 선택 |
 | `ai/client/RestGroqChatClient.java` | Groq Chat Completions 호출 |
@@ -565,6 +728,51 @@ flowchart LR
 | Groq 전환 | Qwen 클라우드 우선 호출 | 품질 향상, 키 보호, 서버 원본 신뢰 |
 
 초기 MNN/Qwen 온디바이스 구현은 Bllossom GGUF/llama.cpp 경로로 대체되었다. 과거 계획 문서를 유지하지 않고 이 결정 이력만 남기는 이유는 현재 빌드 구조와 혼동하지 않기 위해서다.
+
+### 19.1 `8ce6c7c` 이후 변경 상세
+
+아래 표는 `git log --reverse 8ce6c7c..HEAD`와 실제 파일 차이를 함께 대조한 결과다. 커밋 제목은 구현 의도를 설명하고, “현재 남은 결과”는 중간 구현이 교체된 경우 현재 코드에 남아 있는 상태를 적는다.
+
+| 순서 | 커밋 | 추가·변경 내용 | 현재 시스템에 남은 결과 |
+|---:|---|---|---|
+| 1 | `11c4f5b` | 시뮬레이션 퀘스트 파이프라인 설계 | 게임 퀘스트와 AI 연습 퀘스트를 분리하는 기반 |
+| 2 | `5752834` | Qwen 온디바이스 개발 환경·설계 | 모델 배포, 체크섬, 네이티브 경계 설계의 출발점 |
+| 3 | `290d5f6` | 시뮬레이션 게임 UI·마트 장보기 | 현재 게임 탭의 비-AI 로컬 시나리오 |
+| 4 | `90e9783` | 퀘스트 수행 세션·이벤트 | `quest_session`, `quest_event`, 수행 API |
+| 5 | `05a0d67` | Phase 2 계획 문서 | 이후 네이티브 런타임 구현 기준 제공 |
+| 6 | `ca0bc93` | MNN 온디바이스 런타임 | 이후 Bllossom/llama.cpp로 교체된 중간 구현 |
+| 7 | `f87324b` | Bllossom 런타임·Phase 3 안전 계층 | 현재 Android 네이티브 모듈, 계약·파서·정책·fallback |
+| 8 | `dba4f7a` | 게임 UI·대화 흐름 개선 | 게임 탭 대화 경험 확장 |
+| 9 | `3dea4b2` | 온디바이스 퀘스트 변형·자동 난이도 | 전체 단계 생성 store와 수행 기반 개인화 |
+| 10 | `1efc31e` | 수락형 퀘스트·확장 월드 | 게임 월드와 NPC 의뢰 확장; AI 생성과는 분리 |
+| 11 | `dd24580` | 시뮬레이션 생성 알고리즘 | 규칙 기반 `AlgorithmGenerator`와 시뮬레이션 도메인 |
+| 12 | `fdc1dd8` | 게임 퀘스트·대화 경험 개선 | 게임 진행·피드백 UI 보강 |
+| 13 | `e78c132` | 전역 예외 처리 | AI·세션 API 오류의 공통 응답 기반 |
+| 14~15 | `36c5fba`, `63e2fc2` | 게임/AI 브랜치 병합 | 두 퀘스트 시스템이 한 앱에 공존 |
+| 16 | `42e6f13` | 상황·선택지 생성과 실패 처리 개선 | 의미 검증, 선택지 복구, 재시도, 전체 원문 복귀 강화 |
+| 17 | `20e46c8` | Groq 기반 생성 확장 | 인증된 클라우드 우선·Android 네이티브 대체 경로 |
+| 18 | `14a85f9` | 난이도 세분화 | 5단계 난이도, 버스·지하철 각 단계별 콘텐츠와 검증 |
+
+### 19.2 파일·기능 단위 변경 매트릭스
+
+| 기능 묶음 | 기준 커밋 상태 | 이후 추가된 대표 구현 | 현재 실행 경로 |
+|---|---|---|---|
+| 퀘스트 데이터 | 목록 중심 `Quest`·카테고리·난이도 | `QuestStep`, `QuestChoice`, 상세 DTO, V5~V13 | 상세 원본이 AI 입력과 수행 판정의 기준 |
+| 수행 기록 | 없음 | 세션·이벤트 API, 이벤트 큐 | 앱 이벤트 → 백엔드 → PostgreSQL |
+| 개인화 | 단일 퀘스트 난이도 필드 | 프로필, 세부 분야 난이도, 조정 이력·정책 | 최근 수행 집계 → 결정론적 한 단계 조정 |
+| 앱 AI 계층 | 없음 | `src/ai/**`, 생성 store, 파서, 정책, 캐시 | 클라우드 우선 → 네이티브 → 원문 |
+| 서버 AI 계층 | 없음 | `backend/.../ai/**`, 규칙 JSON | 서버 원본 재조회 → prompt → Groq |
+| 네이티브 실행 | 없음 | Expo 모듈, Kotlin 관리자, C++ bridge, `.so` | Android Development Build에서 Bllossom GGUF 실행 |
+| 외부 모델 | 없음 | Groq REST 클라이언트·Qwen 설정 | JWT 인증된 백엔드만 API 키 사용 |
+| 안전성 | 서버 원본만 표시 | 다층 검증·실패 코드·1회 재시도 | 하나라도 치명적 실패면 전체 원문 |
+| 테스트 | 기본 앱·퀘스트 테스트 | AI/규칙/런타임/난이도/마이그레이션 테스트 | 프론트 Jest + 백엔드 Gradle 테스트 |
+
+### 19.3 변경 범위 해석 시 주의사항
+
+- `8ce6c7c..HEAD`에는 AI와 직접 관계없는 게임 UI, 이미지·오디오, 연구 문서 산출물도 포함된다. 이 문서의 다이어그램은 그중 AI 실행 또는 AI가 의존하는 수행·개인화 경로만 초록색으로 표시한다.
+- `docs/ai/ai-system.md` 자체도 기준 커밋 이후 생성됐다. 그러므로 “기존 문서에 몇 줄 추가”가 아니라, 이후 구현을 현재 관점에서 통합한 SSOT다.
+- MNN은 변경 이력에는 존재하지만 현재 런타임이 아니다. 현재 Android 경로는 Bllossom GGUF와 llama.cpp다.
+- 파일이 이후 추가됐다는 사실과 기능이 운영상 활성화됐다는 사실은 다르다. Groq는 `GROQ_ENABLED`와 키가 있어야 활성화되고, 네이티브 경로는 Android Development Build와 유효한 모델이 필요하다.
 
 ## 20. 현재 한계와 다음 작업
 

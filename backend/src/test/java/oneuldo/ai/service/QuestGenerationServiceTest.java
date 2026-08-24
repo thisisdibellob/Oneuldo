@@ -34,11 +34,13 @@ class QuestGenerationServiceTest {
     @BeforeEach
     void setUp() {
         quest = QuestGenerationPromptFactoryTest.quest();
+        var objectMapper = new ObjectMapper();
+        var ruleBook = new KoreanPublicTransportRuleBook(objectMapper);
         service = new QuestGenerationService(
                 questService,
-                new QuestGenerationPromptFactory(
-                        new KoreanPublicTransportRuleBook(new ObjectMapper())
-                ),
+                new QuestGenerationPromptFactory(ruleBook),
+                ruleBook,
+                new TransportIncidentCatalog(objectMapper),
                 groqChatClient,
                 new GroqProperties(true, "secret", "https://api.groq.com", "qwen/qwen3.6-27b", Duration.ofSeconds(20))
         );
@@ -46,7 +48,7 @@ class QuestGenerationServiceTest {
 
     @Test
     void DB_원본으로_프롬프트를_만들고_Groq_결과를_반환한다() {
-        QuestGenerationRequest request = request("비가 살짝 오는 날");
+        QuestGenerationRequest request = request("BUS_WEATHER_VISIBILITY");
         when(questService.findQuestDetail(quest.id())).thenReturn(quest);
         when(groqChatClient.complete(
                 contains("한국의 아동용 대중교통 퀘스트"),
@@ -61,20 +63,20 @@ class QuestGenerationServiceTest {
     }
 
     @Test
-    void 허용되지_않은_테마는_Groq를_호출하지_않는다() {
+    void 허용되지_않은_돌발상황은_Groq를_호출하지_않는다() {
         when(questService.findQuestDetail(quest.id())).thenReturn(quest);
 
-        assertThrows(IllegalArgumentException.class, () -> service.generate(request("임의의 테마")));
+        assertThrows(IllegalArgumentException.class, () -> service.generate(request("SUBWAY_PLATFORM_CHANGED")));
 
         verify(groqChatClient, never()).complete(anyString(), anyString());
     }
 
-    private QuestGenerationRequest request(String theme) {
+    private QuestGenerationRequest request(String incidentType) {
         return new QuestGenerationRequest(
                 quest.id(),
                 quest.steps().getFirst().id(),
                 "request-1",
-                theme,
+                incidentType,
                 null
         );
     }

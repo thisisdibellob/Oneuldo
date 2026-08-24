@@ -22,6 +22,7 @@ import {
 import { flushQuestEventQueue, getQueuedQuestEventCount, queueQuestEvent } from '../api/questEventQueue';
 import { PressScale } from '../components/PressScale';
 import { useQuestVariation } from '../ai/useQuestVariation';
+import { evictQuestGenerationSnapshot } from '../ai/questGenerationStore';
 import { colors, fonts } from '../theme';
 
 export function QuestPracticeScreen({
@@ -129,6 +130,8 @@ export function QuestPracticeScreen({
 
   const finishQuest = async () => {
     setShowResult(true);
+    // AI 성공·원문 fallback 여부와 관계없이 완료한 퀘스트는 다음 수행 때 새로 생성한다.
+    evictQuestGenerationSnapshot(quest.id);
     if (!accessToken || !sessionId) return;
     try {
       await flushQuestEventQueue();

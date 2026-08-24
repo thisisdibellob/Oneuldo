@@ -24,7 +24,7 @@ const request = {
   cloudInput: {
     questId: 'quest-id',
     stepId: 'step-id',
-    theme: '비가 살짝 오는 날',
+    incidentType: 'BUS_WEATHER_VISIBILITY',
   },
 };
 
