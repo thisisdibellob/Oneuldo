@@ -4,7 +4,6 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
-import java.util.UUID;
 import oneuldo.global.exception.ActiveQuestNotFoundException;
 import oneuldo.global.exception.PlaceNotFoundException;
 import oneuldo.global.exception.SimulationNotFoundException;
@@ -15,9 +14,8 @@ import oneuldo.place.domain.Place;
 import oneuldo.place.repository.PlaceRepository;
 import oneuldo.quest.domain.Quest;
 import oneuldo.quest.repository.QuestRepository;
-import oneuldo.simulationquest.domain.Simulation;
 import oneuldo.simulationquest.domain.SimulationQuest;
-import oneuldo.simulationquest.repository.SimulationRepository;
+import oneuldo.simulationquest.repository.SimulationQuestRepository;
 
 public class AlgorithmGenerator implements SimulationQuestGenerator {
 
@@ -27,20 +25,20 @@ public class AlgorithmGenerator implements SimulationQuestGenerator {
 
     private final QuestRepository questRepository;
     private final MemberQuestProfileRepository profileRepository;
-    private final SimulationRepository simulationRepository;
+    private final SimulationQuestRepository simulationQuestRepository;
     private final PlaceRepository placeRepository;
     private final Clock clock;
 
     public AlgorithmGenerator(
             QuestRepository questRepository,
             MemberQuestProfileRepository profileRepository,
-            SimulationRepository simulationRepository,
+            SimulationQuestRepository simulationQuestRepository,
             PlaceRepository placeRepository
     ) {
         this(
                 questRepository,
                 profileRepository,
-                simulationRepository,
+                simulationQuestRepository,
                 placeRepository,
                 Clock.systemDefaultZone()
         );
@@ -49,13 +47,13 @@ public class AlgorithmGenerator implements SimulationQuestGenerator {
     AlgorithmGenerator(
             QuestRepository questRepository,
             MemberQuestProfileRepository profileRepository,
-            SimulationRepository simulationRepository,
+            SimulationQuestRepository simulationQuestRepository,
             PlaceRepository placeRepository,
             Clock clock
     ) {
         this.questRepository = questRepository;
         this.profileRepository = profileRepository;
-        this.simulationRepository = simulationRepository;
+        this.simulationQuestRepository = simulationQuestRepository;
         this.placeRepository = placeRepository;
         this.clock = clock;
     }
@@ -80,7 +78,7 @@ public class AlgorithmGenerator implements SimulationQuestGenerator {
         boolean simulationFound = false;
 
         for (ScoredQuest scoredQuest : rankedQuests) {
-            List<Simulation> simulations = simulationRepository
+            List<SimulationQuest> simulations = simulationQuestRepository
                     .findAllByQuestIdAndActiveTrueOrderByTitle(scoredQuest.quest().getId());
 
             if (simulations.isEmpty()) {
@@ -92,13 +90,7 @@ public class AlgorithmGenerator implements SimulationQuestGenerator {
 
             if (!availableSimulations.isEmpty()) {
                 SimulationPlace selected = selectSimulation(member, availableSimulations);
-                return new SimulationQuest(
-                        UUID.randomUUID(),
-                        scoredQuest.quest(),
-                        selected.place().getCode(),
-                        selected.simulation(),
-                        List.of()
-                );
+                return selected.simulationQuest();
             }
         }
 
@@ -143,11 +135,11 @@ public class AlgorithmGenerator implements SimulationQuestGenerator {
         return Math.floorMod(hash, EXPLORATION_WEIGHT + 1);
     }
 
-    private List<SimulationPlace> findAvailableSimulations(List<Simulation> simulations) {
+    private List<SimulationPlace> findAvailableSimulations(List<SimulationQuest> simulations) {
         return simulations.stream()
-                .flatMap(simulation -> placeRepository
-                        .findByIdAndActiveTrue(simulation.getPlaceId())
-                        .map(place -> new SimulationPlace(simulation, place))
+                .flatMap(simulationQuest -> placeRepository
+                        .findByIdAndActiveTrue(simulationQuest.getPlace().getId())
+                        .map(place -> new SimulationPlace(simulationQuest, place))
                         .stream())
                 .toList();
     }
@@ -162,5 +154,5 @@ public class AlgorithmGenerator implements SimulationQuestGenerator {
 
     private record ScoredQuest(Quest quest, int score) {}
 
-    private record SimulationPlace(Simulation simulation, Place place) {}
+    private record SimulationPlace(SimulationQuest simulationQuest, Place place) {}
 }

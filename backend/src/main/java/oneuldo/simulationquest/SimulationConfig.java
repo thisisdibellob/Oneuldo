@@ -5,7 +5,7 @@ import oneuldo.simulationquest.service.SimulationQuestGenerator;
 import oneuldo.member.repository.MemberQuestProfileRepository;
 import oneuldo.place.repository.PlaceRepository;
 import oneuldo.quest.repository.QuestRepository;
-import oneuldo.simulationquest.repository.SimulationRepository;
+import oneuldo.simulationquest.repository.SimulationQuestRepository;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -16,13 +16,13 @@ public class SimulationConfig {
     public SimulationQuestGenerator simulationQuestGenerator(
             QuestRepository questRepository,
             MemberQuestProfileRepository profileRepository,
-            SimulationRepository simulationRepository,
+            SimulationQuestRepository simulationQuestRepository,
             PlaceRepository placeRepository
     ) {
         return new AlgorithmGenerator(
                 questRepository,
                 profileRepository,
-                simulationRepository,
+                simulationQuestRepository,
                 placeRepository
         );
     }
