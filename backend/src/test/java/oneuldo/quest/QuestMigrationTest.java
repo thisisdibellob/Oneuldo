@@ -21,20 +21,57 @@ class QuestMigrationTest {
 
     @Test
     void 전체_마이그레이션을_적용할_수_있다() {
-        assertEquals(2, jdbcTemplate.queryForObject("""
-                SELECT COUNT(*) FROM quests
-                WHERE code IN ('BOARD_SUBWAY_SAFELY', 'TRANSFER_SUBWAY_SAFELY')
-                """, Integer.class));
-        assertEquals(8, jdbcTemplate.queryForObject("""
-                SELECT COUNT(*) FROM quest_steps s
-                JOIN quests q ON q.id = s.quest_id
-                WHERE q.code IN ('BOARD_SUBWAY_SAFELY', 'TRANSFER_SUBWAY_SAFELY')
-                """, Integer.class));
-        assertEquals(24, jdbcTemplate.queryForObject("""
-                SELECT COUNT(*) FROM quest_choices c
-                JOIN quest_steps s ON s.id = c.step_id
-                JOIN quests q ON q.id = s.quest_id
-                WHERE q.code IN ('BOARD_SUBWAY_SAFELY', 'TRANSFER_SUBWAY_SAFELY')
-                """, Integer.class));
+        for (String difficulty : new String[]{"VERY_EASY", "EASY", "NORMAL", "HARD", "VERY_HARD"}) {
+            assertEquals(10, count("""
+                    SELECT COUNT(*) FROM quests q
+                    JOIN quest_subcategories s ON s.id = q.subcategory_id
+                    WHERE s.code = 'PUBLIC_TRANSPORT' AND q.difficulty = ? AND q.active = TRUE
+                    """, difficulty));
+            assertEquals(5, count("""
+                    SELECT COUNT(*) FROM quests q
+                    JOIN quest_subcategories s ON s.id = q.subcategory_id
+                    WHERE s.code = 'PUBLIC_TRANSPORT' AND q.difficulty = ?
+                      AND q.code LIKE '%SUBWAY%' AND q.active = TRUE
+                    """, difficulty));
+        }
+
+        assertEquals(0, count("""
+                SELECT COUNT(*) FROM (
+                    SELECT q.id, q.difficulty, COUNT(s.id) AS step_count
+                    FROM quests q
+                    JOIN quest_subcategories sc ON sc.id = q.subcategory_id
+                    JOIN quest_steps s ON s.quest_id = q.id
+                    WHERE sc.code = 'PUBLIC_TRANSPORT' AND q.active = TRUE
+                    GROUP BY q.id, q.difficulty
+                ) counts
+                WHERE step_count < CASE difficulty
+                    WHEN 'VERY_EASY' THEN 2 WHEN 'EASY' THEN 3 WHEN 'NORMAL' THEN 4
+                    WHEN 'HARD' THEN 5 ELSE 6 END
+                   OR step_count > CASE difficulty
+                    WHEN 'VERY_EASY' THEN 3 WHEN 'EASY' THEN 4 WHEN 'NORMAL' THEN 5
+                    WHEN 'HARD' THEN 6 ELSE 7 END
+                """));
+
+        assertEquals(0, count("""
+                SELECT COUNT(*) FROM (
+                    SELECT q.difficulty, s.id, COUNT(c.id) AS choice_count
+                    FROM quests q
+                    JOIN quest_subcategories sc ON sc.id = q.subcategory_id
+                    JOIN quest_steps s ON s.quest_id = q.id
+                    JOIN quest_choices c ON c.step_id = s.id
+                    WHERE sc.code = 'PUBLIC_TRANSPORT' AND q.active = TRUE
+                    GROUP BY q.difficulty, s.id
+                ) counts
+                WHERE choice_count < CASE difficulty
+                    WHEN 'VERY_EASY' THEN 2 WHEN 'EASY' THEN 2 WHEN 'NORMAL' THEN 3
+                    WHEN 'HARD' THEN 3 ELSE 4 END
+                   OR choice_count > CASE difficulty
+                    WHEN 'VERY_EASY' THEN 3 WHEN 'EASY' THEN 3 WHEN 'NORMAL' THEN 4
+                    WHEN 'HARD' THEN 4 ELSE 5 END
+                """));
+    }
+
+    private int count(String sql, Object... arguments) {
+        return jdbcTemplate.queryForObject(sql, Integer.class, arguments);
     }
 }

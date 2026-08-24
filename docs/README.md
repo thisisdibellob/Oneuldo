@@ -33,15 +33,8 @@
 ## 관련 문서
 
 - [서비스 기획 요약](./product-plan.md)
-- [AI 활용 및 온디바이스 시스템 설계](./ai/ai-system-design.md)
-- [AI 페이즈별 구현 계획](./ai/ai-implementation-roadmap.md)
-- [AI Phase 0~6 구조 및 구현 종합 정리](./ai/phase0-to-phase6-architecture-summary.md)
-- [Phase 1 구현 변경 요약](./ai/phase1-implementation-summary.md)
-- [Phase 2 구현 변경 요약](./ai/phase2-implementation-summary.md)
-- [Phase 3 AI 공통 계층 구현 요약](./ai/phase3-implementation-summary.md)
+- [AI 시스템 통합 문서](./ai/ai-system.md)
 - [Bllossom 3B 온디바이스 모델 실행](./bllossom-model-setup.md)
-- [Bllossom 3B 전환 설계](./ai/bllossom-3b-on-device-migration-plan.md)
-- [Groq Qwen 클라우드 퀘스트 생성 설계](./ai/groq-qwen-quest-generation.md)
 - [Expo Development Build 가이드](./development-build.md)
 - [데이터베이스 실행 가이드](./database-setup.md)
 - [데이터베이스 스키마](./database-schema.md)

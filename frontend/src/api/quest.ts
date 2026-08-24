@@ -1,10 +1,12 @@
+export type QuestDifficulty = 'VERY_EASY' | 'EASY' | 'NORMAL' | 'HARD' | 'VERY_HARD';
+
 export type QuestSummary = {
   id: string;
   categoryCode: string;
   categoryName: string;
   title: string;
   summary: string;
-  difficulty: string;
+  difficulty: QuestDifficulty;
   rewardPoints: number;
 };
 
@@ -35,7 +37,7 @@ export type QuestSession = {
   id: string;
   questId: string;
   status: 'IN_PROGRESS' | 'COMPLETED' | 'ABANDONED';
-  questDifficulty: string;
+  questDifficulty: QuestDifficulty;
   totalSteps: number;
   completedSteps: number;
   rewardPoints: number;

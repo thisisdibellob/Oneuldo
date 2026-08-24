@@ -57,7 +57,7 @@ public class UserSubcategoryDifficulty {
     public UserSubcategoryDifficulty(Member member, QuestSubcategory subcategory, String ruleVersion) {
         this.member = member;
         this.subcategory = subcategory;
-        this.currentDifficulty = QuestDifficulty.EASY;
+        this.currentDifficulty = QuestDifficulty.VERY_EASY;
         this.sessionsSinceEvaluation = 0;
         this.ruleVersion = ruleVersion;
     }

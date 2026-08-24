@@ -19,7 +19,7 @@ class DifficultyAdjustmentPolicyTest {
         DifficultyMetrics metrics = new DifficultyMetrics(3, 12, 1.0, 0.92, 0.08, 0.08, 2, 0);
 
         DifficultyAdjustmentResult result = policy.evaluate(
-                QuestDifficulty.EASY, metrics, true, null, now
+                QuestDifficulty.EASY, metrics, true, true, null, now
         );
 
         assertEquals(DifficultyAdjustmentDecision.PROMOTE, result.decision());
@@ -31,7 +31,7 @@ class DifficultyAdjustmentPolicyTest {
         DifficultyMetrics metrics = new DifficultyMetrics(3, 12, 1.0, 1.0, 0, 0, 1, 0);
 
         DifficultyAdjustmentResult result = policy.evaluate(
-                QuestDifficulty.EASY, metrics, true, null, now
+                QuestDifficulty.EASY, metrics, true, true, null, now
         );
 
         assertEquals(DifficultyAdjustmentDecision.MAINTAIN, result.decision());
@@ -43,7 +43,7 @@ class DifficultyAdjustmentPolicyTest {
         DifficultyMetrics metrics = new DifficultyMetrics(2, 2, 0, 0, 0, 0, 1, 2);
 
         DifficultyAdjustmentResult result = policy.evaluate(
-                QuestDifficulty.NORMAL, metrics, true, null, now
+                QuestDifficulty.NORMAL, metrics, true, true, null, now
         );
 
         assertEquals(DifficultyAdjustmentDecision.LOWER, result.decision());
@@ -55,7 +55,7 @@ class DifficultyAdjustmentPolicyTest {
         DifficultyMetrics metrics = new DifficultyMetrics(3, 12, 1.0, 1.0, 0, 0, 2, 0);
 
         DifficultyAdjustmentResult result = policy.evaluate(
-                QuestDifficulty.EASY, metrics, false, null, now
+                QuestDifficulty.EASY, metrics, false, true, null, now
         );
 
         assertEquals(DifficultyAdjustmentDecision.NO_CONTENT, result.decision());
@@ -67,10 +67,34 @@ class DifficultyAdjustmentPolicyTest {
         DifficultyMetrics metrics = new DifficultyMetrics(3, 12, 1.0, 1.0, 0, 0, 2, 0);
 
         DifficultyAdjustmentResult result = policy.evaluate(
-                QuestDifficulty.EASY, metrics, true, now.minusSeconds(60 * 60), now
+                QuestDifficulty.EASY, metrics, true, true, now.minusSeconds(60 * 60), now
         );
 
         assertEquals(DifficultyAdjustmentDecision.MAINTAIN, result.decision());
         assertEquals("CHANGE_COOLDOWN_24H", result.reasonCodes());
+    }
+
+    @Test
+    void 어려움에서_승급하면_매우_어려움으로_한_단계만_올린다() {
+        DifficultyMetrics metrics = new DifficultyMetrics(3, 18, 1.0, 0.90, 0.10, 0.10, 2, 0);
+
+        DifficultyAdjustmentResult result = policy.evaluate(
+                QuestDifficulty.HARD, metrics, true, true, null, now
+        );
+
+        assertEquals(DifficultyAdjustmentDecision.PROMOTE, result.decision());
+        assertEquals(QuestDifficulty.VERY_HARD, result.nextDifficulty());
+    }
+
+    @Test
+    void 매우_쉬움은_더_낮출_수_없다() {
+        DifficultyMetrics metrics = new DifficultyMetrics(3, 9, 0, 0, 1.0, 1.0, 1, 3);
+
+        DifficultyAdjustmentResult result = policy.evaluate(
+                QuestDifficulty.VERY_EASY, metrics, true, false, null, now
+        );
+
+        assertEquals(DifficultyAdjustmentDecision.MAINTAIN, result.decision());
+        assertEquals(QuestDifficulty.VERY_EASY, result.nextDifficulty());
     }
 }

@@ -54,10 +54,15 @@ export function warmFullQuest(
   emit();
   const task = (async () => {
     const generationRuntime = accessToken ? createCloudFirstQuestRuntime(accessToken) : undefined;
-    // 퀘스트 한 번에는 테마 하나만 사용해 4단계 상황이 서로 이어지게 한다.
-    const approvedThemes = quest.difficulty === 'NORMAL'
-      ? ['사람이 많은 퇴근 시간', '안내가 잘 들리지 않는 순간', '비가 와서 이동이 느린 날']
-      : ['한산한 낮', '비가 살짝 오는 날', '사람이 조금 있는 시간'];
+    // 퀘스트 한 번에는 테마 하나만 사용해 모든 단계의 상황이 서로 이어지게 한다.
+    const themesByDifficulty = {
+      VERY_EASY: ['한산한 낮', '안내가 잘 보이는 시간', '보호자와 연습하는 날'],
+      EASY: ['한산한 낮', '비가 살짝 오는 날', '사람이 조금 있는 시간'],
+      NORMAL: ['사람이 많은 퇴근 시간', '안내가 잘 들리지 않는 순간', '비가 와서 이동이 느린 날'],
+      HARD: ['낯선 지역을 이동하는 시간', '운행 안내가 갑자기 바뀐 순간', '한 번 이상 환승해야 하는 길'],
+      VERY_HARD: ['여러 교통수단을 연이어 이용하는 길', '두 가지 운행 문제가 겹친 상황', '늦은 시간 안전한 대안을 찾아야 하는 순간'],
+    } as const;
+    const approvedThemes = themesByDifficulty[quest.difficulty];
     const variationTheme = approvedThemes[generationSequence % approvedThemes.length];
     const generatedSteps = [];
     const sources: Array<'ai' | 'original'> = [];

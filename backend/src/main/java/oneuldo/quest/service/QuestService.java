@@ -42,7 +42,7 @@ public class QuestService {
         return groupBySubcategory(questRepository.findAllActiveWithCategory())
                 .values()
                 .stream()
-                .map(quests -> selectScenario(quests, oneuldo.quest.domain.QuestDifficulty.EASY, 0))
+                .map(quests -> selectScenario(quests, oneuldo.quest.domain.QuestDifficulty.VERY_EASY, 0))
                 .map(QuestSummaryResponse::from)
                 .toList();
     }
@@ -60,7 +60,7 @@ public class QuestService {
                     UUID subcategoryId = quests.getFirst().getSubcategory().getId();
                     var target = difficulties.getOrDefault(
                             subcategoryId,
-                            oneuldo.quest.domain.QuestDifficulty.EASY
+                            oneuldo.quest.domain.QuestDifficulty.VERY_EASY
                     );
                     // 시작된 세션 수를 이용해 같은 난이도의 견본을 차례로 순환한다.
                     long playedCount = questSessionRepository
@@ -139,8 +139,10 @@ public class QuestService {
                 .toList();
         List<Quest> candidates = exact.isEmpty()
                 ? quests.stream()
-                    .sorted(Comparator.comparingInt(quest ->
-                            Math.abs(difficultyRank(quest.getDifficulty()) - difficultyRank(target))))
+                    .sorted(Comparator
+                            .comparingInt((Quest quest) -> Math.abs(
+                                    difficultyRank(quest.getDifficulty()) - difficultyRank(target)))
+                            .thenComparing(Quest::getCode))
                     .toList()
                 : exact;
         return candidates.get(Math.floorMod(playedCount, candidates.size()));

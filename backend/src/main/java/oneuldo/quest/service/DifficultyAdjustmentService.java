@@ -67,17 +67,20 @@ public class DifficultyAdjustmentService {
                 PageRequest.of(0, SAMPLE_SESSION_LIMIT)
         );
         DifficultyMetrics metrics = calculateMetrics(sessions);
-        QuestDifficulty target = state.getCurrentDifficulty() == QuestDifficulty.EASY
-                ? QuestDifficulty.NORMAL
-                : QuestDifficulty.EASY;
-        boolean targetContentExists = questRepository
-                .existsBySubcategoryIdAndDifficultyAndActiveTrue(subcategory.getId(), target);
+        QuestDifficulty currentDifficulty = state.getCurrentDifficulty();
+        QuestDifficulty higher = currentDifficulty.higher();
+        QuestDifficulty lower = currentDifficulty.lower();
+        boolean higherContentExists = higher != null && questRepository
+                .existsBySubcategoryIdAndDifficultyAndActiveTrue(subcategory.getId(), higher);
+        boolean lowerContentExists = lower != null && questRepository
+                .existsBySubcategoryIdAndDifficultyAndActiveTrue(subcategory.getId(), lower);
         Instant now = Instant.now();
         QuestDifficulty previous = state.getCurrentDifficulty();
         DifficultyAdjustmentResult result = policy.evaluate(
                 previous,
                 metrics,
-                targetContentExists,
+                higherContentExists,
+                lowerContentExists,
                 state.getLastChangedAt(),
                 now
         );

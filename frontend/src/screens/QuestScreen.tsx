@@ -3,7 +3,7 @@ import { Image, ImageSourcePropType, Pressable, ScrollView, StyleSheet, Text, Vi
 import { Ionicons } from '@expo/vector-icons';
 
 import { icons } from '../assets';
-import { QuestSummary } from '../api/quest';
+import { QuestDifficulty, QuestSummary } from '../api/quest';
 import { PressScale } from '../components/PressScale';
 import { StickyBrandHeader } from '../components/ui';
 import { colors, fonts } from '../theme';
@@ -34,6 +34,13 @@ const categoryVisuals: Record<string, { color: string; icon: ImageSourcePropType
   PUBLIC_TRANSPORT: { color: '#57ABD8', icon: icons.bus },
   DAILY_LIFE: { color: '#EFAC2B', icon: icons.cashier },
   SAFETY: { color: '#E04173', icon: icons.sos },
+};
+const difficultyLabels: Record<QuestDifficulty, string> = {
+  VERY_EASY: '매우 쉬움',
+  EASY: '쉬움',
+  NORMAL: '보통',
+  HARD: '어려움',
+  VERY_HARD: '매우 어려움',
 };
 
 export function QuestScreen({
@@ -119,7 +126,7 @@ export function QuestScreen({
           </View>
           <View style={styles.difficultyBadge}>
             <Text style={styles.difficultyBadgeText}>
-              {transportQuest.difficulty === 'NORMAL' ? '보통' : '쉬움'}
+              {difficultyLabels[transportQuest.difficulty]}
             </Text>
           </View>
         </View>
@@ -148,7 +155,7 @@ function Stat({ background, color, icon, label, value }: { background: string; c
 
 function QuestCard({ quest, onPress }: { quest: QuestSummary; onPress: () => void }) {
   const visual = categoryVisuals[quest.categoryCode] ?? categoryVisuals.DAILY_LIFE;
-  const difficultyLabel = quest.difficulty === 'NORMAL' ? '보통' : '쉬움';
+  const difficultyLabel = difficultyLabels[quest.difficulty];
   return (
     <PressScale onPress={onPress} style={styles.questCard}>
       <Image resizeMode="contain" source={visual.icon} style={styles.questIcon} />
