@@ -6,21 +6,27 @@ import {
   Animated,
   Easing,
   GestureResponderEvent,
+  Image,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 
 import {
+  BUS_STOP_POINT,
   HOME_EXIT_POINT,
   HOME_FRIDGE_POINT,
   HOUSE_ENTRANCE_POINT,
+  MARKET_BUS_STOP_POINT,
   MARKET_ENTRANCE_POINT,
   Point,
+  VILLAGE_BUILDINGS,
   VILLAGE_NPCS,
+  VillageBuildingDefinition,
   VillageNpcDefinition,
   VillageNpcId,
 } from '../../game/prototypeWorld';
+import { villageBuildingArt, villageLandmarkArt } from '../../game/gameAssets';
 import { colors, fonts } from '../../theme';
 import { PressScale } from '../PressScale';
 
@@ -29,14 +35,12 @@ type IoniconName = ComponentProps<typeof Ionicons>['name'];
 export type PrototypeControlMode = 'joystick' | 'touch';
 export type VillagePortalId = 'home' | 'market';
 export type HomeStationId = 'fridge' | 'exit';
-export type NpcQuestState = 'available' | 'active' | 'completed' | 'conversation';
 
 export type ExpandedVillageLayerProps = {
   controlsLocked?: boolean;
   controlMode: PrototypeControlMode;
   nearbyNpcId: VillageNpcId | null;
   nearbyPortalId: VillagePortalId | null;
-  npcQuestStates?: Partial<Record<VillageNpcId, NpcQuestState>>;
   onNpcPress: (event: GestureResponderEvent, npc: VillageNpcDefinition) => void;
   onPortalPress: (event: GestureResponderEvent, portalId: VillagePortalId) => void;
   tapTargetMarker?: Point | null;
@@ -161,31 +165,85 @@ function InteractionCloud({
       ]}
       testID={testID}
     >
-      <View style={[styles.cloudBubble, styles.cloudBubbleLeft]} />
-      <View style={[styles.cloudBubble, styles.cloudBubbleRight]} />
-      <View style={styles.cloudTail} />
       <View style={styles.cloudBody}>
         <View style={styles.cloudIcon}>
-          <Ionicons color="#42695A" name={icon} size={16} />
+          <Ionicons color="#42695A" name={icon} size={17} />
         </View>
         <Text numberOfLines={1} style={styles.cloudText}>
           {label}
         </Text>
-        <Ionicons color="#5C766B" name="chevron-forward" size={15} />
       </View>
     </Animated.View>
   );
 }
 
-function IsoBuilding({
-  color,
+function VillageBuilding({ building }: { building: VillageBuildingDefinition }) {
+  const compact = building.width < 110;
+  const artSource = villageBuildingArt[building.id];
+  return (
+    <View
+      pointerEvents="none"
+      style={[
+        styles.building,
+        {
+          height: building.height,
+          left: building.x,
+          top: building.y,
+          width: building.width,
+        },
+      ]}
+      testID={`village-building-${building.id}`}
+    >
+      {artSource ? (
+        <Image resizeMode="stretch" source={artSource} style={styles.buildingArt} />
+      ) : (
+        <View style={[styles.buildingFront, { backgroundColor: building.color }]}>
+          <View style={styles.buildingRoofLine} />
+          <View style={[styles.buildingWindow, styles.buildingWindowLeft]} />
+          {building.width >= 125 ? (
+            <View style={[styles.buildingWindow, styles.buildingWindowRight]} />
+          ) : null}
+          <View style={styles.buildingDoor} />
+        </View>
+      )}
+      <Text numberOfLines={1} style={[styles.buildingLabel, compact && styles.buildingLabelCompact]}>
+        {building.label}
+      </Text>
+    </View>
+  );
+}
+
+function VillageBusStop({
+  label,
+  point,
+}: {
+  label: string;
+  point: Point;
+}) {
+  return (
+    <View
+      pointerEvents="none"
+      style={[styles.busStop, { left: point.x - 64, top: point.y - 70 }]}
+    >
+      <Image
+        resizeMode="stretch"
+        source={villageLandmarkArt.busStop}
+        style={styles.landmarkArt}
+      />
+      <Text numberOfLines={1} style={styles.landmarkLabel}>
+        {label}
+      </Text>
+    </View>
+  );
+}
+
+function VillagePark({
   height,
   label,
   width,
   x,
   y,
 }: {
-  color: string;
   height: number;
   label: string;
   width: number;
@@ -193,11 +251,9 @@ function IsoBuilding({
   y: number;
 }) {
   return (
-    <View pointerEvents="none" style={[styles.building, { height, left: x, top: y, width }]}>
-      <View style={[styles.buildingFront, { backgroundColor: color }]} />
-      <View style={[styles.buildingRoof, { backgroundColor: color, width: width * 0.72 }]} />
-      <View style={styles.buildingDoor} />
-      <Text style={styles.buildingLabel}>{label}</Text>
+    <View pointerEvents="none" style={[styles.park, { height, left: x, top: y, width }]}>
+      <Image resizeMode="stretch" source={villageLandmarkArt.park} style={styles.landmarkArt} />
+      <Text style={styles.parkLabel}>{label}</Text>
     </View>
   );
 }
@@ -205,45 +261,17 @@ function IsoBuilding({
 function VillageLandmarks() {
   return (
     <>
-      <View pointerEvents="none" style={styles.busStop}>
-        <View style={styles.busStopRoof} />
-        <View style={styles.busStopBench} />
-        <View style={styles.busStopSign}>
-          <Ionicons color="#FFFFFF" name="bus" size={19} />
-        </View>
-        <Text style={styles.landmarkLabel}>동쪽 버스정류장</Text>
+      <VillagePark height={460} label="마을 공원" width={260} x={55} y={100} />
+      <View pointerEvents="none" style={styles.communityGarden}>
+        <View style={styles.communityGardenPath} />
+        <View style={[styles.communityShrub, styles.communityShrubOne]} />
+        <View style={[styles.communityShrub, styles.communityShrubTwo]} />
+        <Text style={styles.communityGardenLabel}>주민센터 공원</Text>
       </View>
-
-      <IsoBuilding color="#C8A588" height={160} label="마을 상가" width={240} x={650} y={800} />
-      <IsoBuilding color="#97AD9C" height={180} label="주민센터" width={280} x={1080} y={720} />
-
-      <View pointerEvents="none" style={[styles.planter, styles.eastPlanter]}>
-        <View style={styles.shrub} />
-        <View style={[styles.shrub, styles.shrubMiddle]} />
-        <View style={[styles.shrub, styles.shrubRight]} />
-        <Text style={styles.parkLabel}>작은 공원</Text>
-      </View>
-      <View pointerEvents="none" style={[styles.planter, styles.southPlanter]}>
-        <View style={styles.flowerDot} />
-        <View style={[styles.flowerDot, styles.flowerDotTwo]} />
-        <View style={[styles.flowerDot, styles.flowerDotThree]} />
-        <Text style={styles.parkLabel}>산책 화단</Text>
-      </View>
+      <VillageBusStop label="마트 앞 버스정류장" point={MARKET_BUS_STOP_POINT} />
+      <VillageBusStop label="동쪽 버스정류장" point={BUS_STOP_POINT} />
     </>
   );
-}
-
-function questStatePresentation(state: NpcQuestState | undefined, hasQuest: boolean) {
-  if (!hasQuest || state === 'conversation') {
-    return { icon: 'chatbubble' as const, label: '대화하기' };
-  }
-  if (state === 'completed') {
-    return { icon: 'checkmark' as const, label: '부탁 완료' };
-  }
-  if (state === 'active') {
-    return { icon: 'book-outline' as const, label: '부탁 진행 중' };
-  }
-  return { icon: 'sparkles' as const, label: '새로운 부탁' };
 }
 
 function VillageNpc({
@@ -252,16 +280,13 @@ function VillageNpc({
   nearby,
   npc,
   onPress,
-  questState,
 }: {
   controlMode: PrototypeControlMode;
   controlsLocked: boolean;
   nearby: boolean;
   npc: VillageNpcDefinition;
   onPress: (event: GestureResponderEvent, npc: VillageNpcDefinition) => void;
-  questState?: NpcQuestState;
 }) {
-  const presentation = questStatePresentation(questState, Boolean(npc.questId));
   const rolePrefix = npc.id === 'minsu' ? '안내원 ' : '';
   const touchLabel = `${rolePrefix}${npc.name}로 이동해 대화하기`;
 
@@ -291,8 +316,8 @@ function VillageNpc({
     >
       <View style={styles.npcCloudAnchor}>
         <InteractionCloud
-          icon={presentation.icon}
-          label={`${npc.name} · ${presentation.label}`}
+          icon="chatbubble"
+          label={npc.name}
           testID={`npc-proximity-cloud-${npc.id}`}
           visible={nearby}
         />
@@ -313,7 +338,6 @@ export function ExpandedVillageLayer({
   controlsLocked = false,
   nearbyNpcId,
   nearbyPortalId,
-  npcQuestStates = {},
   onNpcPress,
   onPortalPress,
   tapTargetMarker = null,
@@ -321,12 +345,20 @@ export function ExpandedVillageLayer({
   return (
     <View pointerEvents="box-none" style={styles.layer} testID="expanded-village-layer">
       <View pointerEvents="none" style={styles.villageGround} />
+      <View pointerEvents="none" style={[styles.road, styles.roadWest]} />
       <View pointerEvents="none" style={[styles.road, styles.roadMain]} />
-      <View pointerEvents="none" style={[styles.road, styles.roadBranch]} />
+      <View pointerEvents="none" style={[styles.road, styles.roadMarketLane]} />
+      <View pointerEvents="none" style={[styles.road, styles.roadMarketLaneSouth]} />
       <View pointerEvents="none" style={[styles.road, styles.roadEast]} />
       <View pointerEvents="none" style={[styles.road, styles.roadSouth]} />
-      <View pointerEvents="none" style={[styles.roadEdge, styles.roadEdgeOne]} />
-      <View pointerEvents="none" style={[styles.roadEdge, styles.roadEdgeTwo]} />
+      <View pointerEvents="none" style={[styles.road, styles.roadToCoast]} />
+      <View pointerEvents="none" style={[styles.roadEdge, styles.roadMainTopEdge]} />
+      <View pointerEvents="none" style={[styles.roadEdge, styles.roadMainBottomEdge]} />
+      <View pointerEvents="none" style={[styles.roadEdge, styles.roadSouthTopEdge]} />
+      <View pointerEvents="none" style={[styles.roadEdge, styles.roadSouthBottomEdge]} />
+      <View pointerEvents="none" style={[styles.crosswalk, styles.crosswalkWest]} />
+      <View pointerEvents="none" style={[styles.crosswalk, styles.crosswalkMarket]} />
+      <View pointerEvents="none" style={[styles.crosswalk, styles.crosswalkEast]} />
 
       {tapTargetMarker && controlMode === 'touch' ? (
         <View
@@ -339,8 +371,9 @@ export function ExpandedVillageLayer({
         />
       ) : null}
 
-      <IsoBuilding color="#C99C78" height={184} label="집" width={238} x={112} y={116} />
-      <IsoBuilding color="#9AAE98" height={190} label="하늘마트" width={230} x={660} y={122} />
+      {VILLAGE_BUILDINGS.map((building) => (
+        <VillageBuilding building={building} key={building.id} />
+      ))}
 
       <PressScale
         accessibilityHint={
@@ -410,14 +443,6 @@ export function ExpandedVillageLayer({
         />
       </PressScale>
 
-      <View pointerEvents="none" style={[styles.originalObstacle, styles.centerPlanter]}>
-        <View style={styles.originalShrub} />
-        <View style={[styles.originalShrub, styles.originalShrubRight]} />
-      </View>
-      <View pointerEvents="none" style={[styles.originalObstacle, styles.lowerBlock]}>
-        <Text style={styles.objectLabel}>공터</Text>
-      </View>
-
       <VillageLandmarks />
 
       {VILLAGE_NPCS.map((npc) => (
@@ -428,7 +453,6 @@ export function ExpandedVillageLayer({
           nearby={nearbyNpcId === npc.id}
           npc={npc}
           onPress={onNpcPress}
-          questState={npcQuestStates[npc.id]}
         />
       ))}
     </View>
@@ -474,11 +498,11 @@ export function HomeWorldLayer({
         accessibilityHint={
           controlMode === 'touch'
             ? nearbyStationId === 'fridge'
-              ? '냉장고의 유통기한과 필요한 물건을 확인합니다'
+              ? '냉장고를 열어 살펴보기 또는 요리를 선택합니다'
               : '냉장고 앞으로 이동합니다'
             : undefined
         }
-        accessibilityLabel="냉장고 확인하기"
+        accessibilityLabel="냉장고로 이동해 열기"
         accessibilityRole={controlMode === 'touch' ? 'button' : undefined}
         disabled={controlMode !== 'touch' || controlsLocked}
         onPress={(event) => {
@@ -502,7 +526,7 @@ export function HomeWorldLayer({
         <View style={styles.fridgeCloudAnchor}>
           <InteractionCloud
             icon={fridgeCompleted ? 'checkmark' : 'search'}
-            label={fridgeCompleted ? '확인 완료' : '냉장고 확인'}
+            label="냉장고"
             testID="fridge-proximity-cloud"
             visible={nearbyStationId === 'fridge'}
           />
@@ -591,42 +615,70 @@ const styles = StyleSheet.create({
     borderWidth: 12,
   },
   road: { backgroundColor: '#C8C6B8', position: 'absolute' },
-  roadMain: {
-    height: 126,
-    left: -80,
-    top: 444,
-    transform: [{ rotate: '-18deg' }],
-    width: 1160,
+  roadWest: {
+    height: 1410,
+    left: 350,
+    top: -20,
+    width: 170,
   },
-  roadBranch: {
-    height: 104,
-    left: 420,
-    top: 120,
-    transform: [{ rotate: '49deg' }],
-    width: 760,
+  roadMain: {
+    height: 220,
+    left: 350,
+    top: 620,
+    width: 1850,
+  },
+  roadMarketLane: {
+    height: 150,
+    left: 1135,
+    top: 470,
+    width: 160,
+  },
+  roadMarketLaneSouth: {
+    height: 550,
+    left: 1135,
+    top: 840,
+    width: 160,
   },
   roadEast: {
-    height: 126,
-    left: 850,
-    top: 420,
-    transform: [{ rotate: '5deg' }],
-    width: 750,
+    height: 1410,
+    left: 1720,
+    top: -20,
+    width: 170,
   },
   roadSouth: {
-    height: 700,
-    left: 900,
-    top: 500,
-    transform: [{ rotate: '-4deg' }],
-    width: 120,
+    height: 170,
+    left: 350,
+    top: 1390,
+    width: 1540,
+  },
+  roadToCoast: {
+    height: 310,
+    left: 1720,
+    top: 1390,
+    width: 190,
   },
   roadEdge: {
     backgroundColor: 'rgba(255,255,255,0.55)',
     height: 3,
     position: 'absolute',
-    width: 1120,
   },
-  roadEdgeOne: { left: -50, top: 444, transform: [{ rotate: '-18deg' }] },
-  roadEdgeTwo: { left: -30, top: 564, transform: [{ rotate: '-18deg' }] },
+  roadMainTopEdge: { left: 350, top: 620, width: 1850 },
+  roadMainBottomEdge: { left: 350, top: 837, width: 1850 },
+  roadSouthTopEdge: { left: 350, top: 1390, width: 1540 },
+  roadSouthBottomEdge: { left: 350, top: 1557, width: 1540 },
+  crosswalk: {
+    backgroundColor: 'rgba(255,255,255,0.28)',
+    borderColor: 'rgba(255,255,255,0.68)',
+    borderStyle: 'dashed',
+    borderWidth: 3,
+    height: 176,
+    position: 'absolute',
+    top: 642,
+    width: 65,
+  },
+  crosswalkWest: { left: 402 },
+  crosswalkMarket: { left: 1182 },
+  crosswalkEast: { left: 1772 },
   tapTargetMarker: {
     borderColor: 'rgba(52,91,68,0.72)',
     borderRadius: 12,
@@ -636,36 +688,54 @@ const styles = StyleSheet.create({
     width: 24,
     zIndex: 3,
   },
-  building: { alignItems: 'center', position: 'absolute' },
+  building: { alignItems: 'center', position: 'absolute', zIndex: 2 },
+  buildingArt: {
+    height: '100%',
+    left: 0,
+    position: 'absolute',
+    top: 0,
+    width: '100%',
+  },
   buildingFront: {
     borderColor: 'rgba(54,54,54,0.25)',
+    borderRadius: 9,
     borderWidth: 2,
-    bottom: 0,
-    height: '66%',
+    height: '100%',
+    overflow: 'hidden',
+    position: 'absolute',
+    width: '100%',
+  },
+  buildingRoofLine: {
+    backgroundColor: 'rgba(67,71,66,0.2)',
+    height: 22,
     left: 0,
-    opacity: 0.86,
     position: 'absolute',
     right: 0,
-  },
-  buildingRoof: {
-    aspectRatio: 1,
-    borderColor: 'rgba(54,54,54,0.3)',
-    borderWidth: 2,
-    position: 'absolute',
-    top: -18,
-    transform: [{ rotate: '45deg' }, { scaleY: 0.64 }],
+    top: 0,
   },
   buildingDoor: {
-    backgroundColor: '#5E625D',
+    backgroundColor: 'rgba(66,69,65,0.72)',
     bottom: 0,
-    height: 42,
+    height: 52,
     position: 'absolute',
-    width: 28,
+    width: 38,
   },
+  buildingWindow: {
+    backgroundColor: 'rgba(236,243,236,0.7)',
+    borderColor: 'rgba(73,82,76,0.25)',
+    borderRadius: 5,
+    borderWidth: 1,
+    height: 36,
+    position: 'absolute',
+    top: '52%',
+    width: 46,
+  },
+  buildingWindowLeft: { left: 22 },
+  buildingWindowRight: { right: 22 },
   buildingLabel: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#B9B9B9',
-    borderRadius: 9,
+    backgroundColor: 'rgba(255,255,255,0.94)',
+    borderColor: 'rgba(95,105,97,0.35)',
+    borderRadius: 10,
     borderWidth: 1,
     color: '#333333',
     fontFamily: fonts.semibold,
@@ -674,8 +744,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     position: 'absolute',
-    top: 46,
+    top: 32,
+    zIndex: 3,
   },
+  buildingLabelCompact: { fontSize: 9, paddingHorizontal: 5 },
   portal: {
     alignItems: 'center',
     height: 78,
@@ -686,186 +758,77 @@ const styles = StyleSheet.create({
   },
   cloudRoot: {
     alignItems: 'center',
-    height: 70,
+    alignSelf: 'center',
+    height: 38,
     justifyContent: 'center',
     position: 'relative',
-    width: 158,
-  },
-  cloudBubble: {
-    backgroundColor: 'rgba(255,253,248,0.97)',
-    borderColor: 'rgba(255,255,255,0.95)',
-    borderRadius: 21,
-    borderWidth: 1,
-    height: 40,
-    position: 'absolute',
-    top: 4,
-    width: 40,
-  },
-  cloudBubbleLeft: { left: 24 },
-  cloudBubbleRight: { right: 25, top: 7 },
-  cloudTail: {
-    backgroundColor: 'rgba(255,253,248,0.97)',
-    bottom: 6,
-    height: 17,
-    position: 'absolute',
-    transform: [{ rotate: '45deg' }],
-    width: 17,
-    zIndex: 1,
   },
   cloudBody: {
     alignItems: 'center',
     backgroundColor: 'rgba(255,253,248,0.98)',
     borderColor: 'rgba(255,255,255,0.98)',
-    borderRadius: 25,
-    borderWidth: 1.5,
+    borderRadius: 16,
+    borderWidth: 1,
     elevation: 5,
     flexDirection: 'row',
-    gap: 6,
-    height: 50,
+    gap: 5,
+    height: 32,
     justifyContent: 'center',
-    paddingHorizontal: 11,
+    maxWidth: 190,
+    minWidth: 64,
+    paddingHorizontal: 12,
     shadowColor: '#466A60',
     shadowOffset: { height: 5, width: 0 },
     shadowOpacity: 0.14,
     shadowRadius: 12,
-    width: 150,
     zIndex: 2,
   },
   cloudIcon: {
     alignItems: 'center',
-    backgroundColor: 'rgba(107,198,164,0.18)',
-    borderRadius: 11,
-    height: 29,
+    height: 18,
     justifyContent: 'center',
-    width: 29,
+    width: 18,
   },
   cloudText: {
     color: '#263A31',
-    flex: 1,
-    fontFamily: fonts.laundryBold,
+    flexShrink: 1,
+    fontFamily: fonts.cafe24Ssurround,
     fontSize: 13,
+    lineHeight: 16,
     textAlign: 'center',
+    transform: [{ translateY: 1 }],
   },
-  originalObstacle: {
-    backgroundColor: '#AAB79B',
-    borderColor: '#89947E',
-    borderWidth: 2,
-    position: 'absolute',
-  },
-  centerPlanter: {
-    height: 105,
-    left: 406,
-    top: 330,
-    transform: [{ rotate: '-8deg' }],
-    width: 150,
-  },
-  lowerBlock: {
-    alignItems: 'center',
-    height: 110,
-    justifyContent: 'center',
-    left: 120,
-    top: 548,
-    width: 184,
-  },
-  originalShrub: {
-    backgroundColor: '#73876C',
-    borderRadius: 35,
-    height: 70,
-    left: 12,
-    position: 'absolute',
-    top: 14,
-    width: 70,
-  },
-  originalShrubRight: { left: 65, top: 23 },
-  objectLabel: { color: '#4D5748', fontFamily: fonts.semibold, fontSize: 13 },
   busStop: {
-    backgroundColor: '#A8B9B5',
-    borderColor: '#758983',
-    borderRadius: 14,
-    borderWidth: 2,
-    height: 170,
-    left: 1030,
+    height: 70,
     position: 'absolute',
-    top: 180,
-    width: 290,
+    width: 128,
+    zIndex: 4,
   },
-  busStopRoof: {
-    backgroundColor: '#5D7F94',
-    borderRadius: 8,
-    height: 24,
-    left: -8,
+  landmarkArt: {
+    height: '100%',
+    left: 0,
     position: 'absolute',
-    right: -8,
-    top: -7,
-  },
-  busStopBench: {
-    backgroundColor: '#886D59',
-    borderColor: '#5D4A3C',
-    borderRadius: 7,
-    borderWidth: 2,
-    bottom: 25,
-    height: 38,
-    left: 55,
-    position: 'absolute',
-    width: 176,
-  },
-  busStopSign: {
-    alignItems: 'center',
-    backgroundColor: '#5D7F94',
-    borderRadius: 20,
-    height: 40,
-    justifyContent: 'center',
-    position: 'absolute',
-    right: 18,
-    top: 35,
-    width: 40,
+    top: 0,
+    width: '100%',
   },
   landmarkLabel: {
     backgroundColor: 'rgba(255,255,255,0.94)',
-    borderRadius: 9,
-    bottom: -14,
+    borderRadius: 7,
+    bottom: 0,
     color: '#344A43',
     fontFamily: fonts.semibold,
-    fontSize: 12,
-    left: 72,
+    fontSize: 9,
+    left: 0,
     overflow: 'hidden',
-    paddingHorizontal: 11,
-    paddingVertical: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
     position: 'absolute',
   },
-  planter: {
+  park: {
     alignItems: 'center',
-    backgroundColor: '#AAB79B',
-    borderColor: '#89947E',
-    borderRadius: 18,
-    borderWidth: 2,
     justifyContent: 'center',
     position: 'absolute',
   },
-  eastPlanter: { height: 90, left: 900, top: 555, width: 160 },
-  southPlanter: { height: 100, left: 350, top: 910, width: 220 },
-  shrub: {
-    backgroundColor: '#73876C',
-    borderRadius: 24,
-    height: 48,
-    left: 16,
-    position: 'absolute',
-    top: 17,
-    width: 48,
-  },
-  shrubMiddle: { left: 54, top: 10 },
-  shrubRight: { left: 94, top: 18 },
-  flowerDot: {
-    backgroundColor: '#F1C777',
-    borderRadius: 10,
-    height: 20,
-    left: 37,
-    position: 'absolute',
-    top: 32,
-    width: 20,
-  },
-  flowerDotTwo: { backgroundColor: '#EAA695', left: 88, top: 20 },
-  flowerDotThree: { backgroundColor: '#F6E6A4', left: 143, top: 40 },
   parkLabel: {
     backgroundColor: 'rgba(255,255,255,0.9)',
     borderRadius: 8,
@@ -878,6 +841,49 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     position: 'absolute',
   },
+  communityGarden: {
+    backgroundColor: '#B3C2A5',
+    borderColor: '#88997F',
+    borderRadius: 8,
+    borderWidth: 2,
+    height: 90,
+    left: 1480,
+    overflow: 'hidden',
+    position: 'absolute',
+    top: 510,
+    width: 210,
+    zIndex: 1,
+  },
+  communityGardenPath: {
+    backgroundColor: 'rgba(239,232,207,0.72)',
+    bottom: 0,
+    left: 92,
+    position: 'absolute',
+    top: 0,
+    width: 25,
+  },
+  communityShrub: {
+    backgroundColor: '#70896D',
+    borderRadius: 20,
+    height: 40,
+    position: 'absolute',
+    top: 13,
+    width: 40,
+  },
+  communityShrubOne: { left: 20 },
+  communityShrubTwo: { right: 20, top: 31 },
+  communityGardenLabel: {
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    borderRadius: 6,
+    bottom: 3,
+    color: '#4D5748',
+    fontFamily: fonts.semibold,
+    fontSize: 8,
+    overflow: 'hidden',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    position: 'absolute',
+  },
   npc: {
     alignItems: 'center',
     height: 92,
@@ -886,7 +892,7 @@ const styles = StyleSheet.create({
     zIndex: 12,
   },
   npcDistant: { opacity: 0.82 },
-  npcCloudAnchor: { left: -44, position: 'absolute', top: -73 },
+  npcCloudAnchor: { alignItems: 'center', left: -65, position: 'absolute', top: -45, width: 200 },
   npcShadow: {
     backgroundColor: 'rgba(26,35,28,0.2)',
     borderRadius: 20,
@@ -1043,7 +1049,7 @@ const styles = StyleSheet.create({
     top: 9,
     width: 26,
   },
-  fridgeCloudAnchor: { left: -5, position: 'absolute', top: 154 },
+  fridgeCloudAnchor: { alignItems: 'center', left: -25, position: 'absolute', top: 154, width: 200 },
   furnitureLabel: {
     backgroundColor: 'rgba(255,255,255,0.92)',
     borderRadius: 7,
@@ -1196,7 +1202,7 @@ const styles = StyleSheet.create({
     zIndex: 8,
   },
   homeExitText: { color: '#617168', fontFamily: fonts.bold, fontSize: 13 },
-  exitCloudAnchor: { left: 7, position: 'absolute', top: -73 },
+  exitCloudAnchor: { alignItems: 'center', left: -18, position: 'absolute', top: -55, width: 200 },
   fridgeInteractionGuide: {
     backgroundColor: '#5D987C',
     borderRadius: 5,
