@@ -196,8 +196,12 @@ describe('오늘도 앱', () => {
     expect(screen.getByLabelText('지영')).toBeTruthy();
     expect(screen.getByLabelText('수진')).toBeTruthy();
     expect(screen.getByText('동쪽 버스정류장')).toBeTruthy();
+    expect(screen.getByText('마트 앞 버스정류장')).toBeTruthy();
     expect(screen.getByText('주민센터')).toBeTruthy();
-    expect(screen.getByText('작은 공원')).toBeTruthy();
+    expect(screen.getByText('마을 공원')).toBeTruthy();
+    ['학교', '식당', '지하철역', '편의점', '노래방', 'PC방', '카페', '은행', '부동산', '도서관'].forEach(
+      (landmark) => expect(screen.getByText(landmark)).toBeTruthy(),
+    );
     expect(screen.getByTestId('expanded-village-layer')).toBeTruthy();
     const inactiveInteraction = screen.getByRole('button', { name: '상호작용할 대상이 없습니다' });
     expect(inactiveInteraction.props.accessibilityState.disabled).toBe(true);
@@ -206,8 +210,6 @@ describe('오늘도 앱', () => {
     expect(screen.getByRole('button', { name: '달리기 끄기' }).props.accessibilityState.selected).toBe(true);
 
     const joystick = screen.getByLabelText('이동 조이스틱');
-    fireEvent(joystick, 'accessibilityAction', { nativeEvent: { actionName: 'moveUp' } });
-    fireEvent(joystick, 'accessibilityAction', { nativeEvent: { actionName: 'moveUp' } });
     fireEvent(joystick, 'accessibilityAction', { nativeEvent: { actionName: 'moveRight' } });
 
     const finishLineAndContinue = async (line: string) => {
@@ -345,9 +347,16 @@ describe('오늘도 앱', () => {
     expect(screen.getByLabelText('민수 행동 선택지')).toBeTruthy();
     expect(screen.getByRole('button', { name: '대화하기' })).toBeTruthy();
     expect(screen.getByRole('button', { name: '퀘스트 받기' })).toBeTruthy();
+
+    fireEvent.press(screen.getByRole('button', { name: '대화 선택 닫기' }));
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 220));
+    });
+    expect(screen.queryByLabelText('민수 행동 선택지')).toBeNull();
+    expect(screen.queryByText('무엇을 할까요?')).toBeNull();
   });
 
-  it('집에 들어가 냉장고를 확인하고 마을로 돌아온다', async () => {
+  it('집 냉장고에서 바나나 요거트 컵을 만들고 마을로 돌아온다', async () => {
     const screen = render(<GamePrototypeScreen onExit={jest.fn()} />);
     await act(async () => {
       await Promise.resolve();
@@ -370,9 +379,10 @@ describe('오늘도 앱', () => {
     };
 
     const village = screen.getByLabelText('쿼터뷰 마을');
-    moveOnMap(village, 'moveUp', 4);
-    moveOnMap(village, 'moveLeft', 4);
-    moveOnMap(village, 'moveUp', 2);
+    moveOnMap(village, 'moveUp', 3);
+    moveOnMap(village, 'moveRight', 21);
+    moveOnMap(village, 'moveDown', 8);
+    moveOnMap(village, 'moveRight', 4);
     fireEvent.press(screen.getByRole('button', { name: '집으로 이동해 들어가기' }));
 
     const home = screen.getByLabelText('집 내부 월드');
@@ -384,7 +394,79 @@ describe('오늘도 앱', () => {
     moveOnMap(home, 'moveUp', 6);
     moveOnMap(home, 'moveLeft', 11);
     moveOnMap(home, 'moveUp', 3);
-    fireEvent.press(screen.getByRole('button', { name: '냉장고 확인하기' }));
+    fireEvent.press(screen.getByRole('button', { name: '냉장고로 이동해 열기' }));
+    expect(screen.getByLabelText('냉장고에서 할 일 선택')).toBeTruthy();
+    expect(screen.getByRole('button', { name: '냉장고 살펴보기' })).toBeTruthy();
+    fireEvent.press(screen.getByRole('button', { name: '바나나 요거트 컵 요리 시작' }));
+
+    expect(screen.getByTestId('cooking-simulation-screen')).toBeTruthy();
+    expect(screen.getByText('시작하기 전에 확인해요')).toBeTruthy();
+    fireEvent.press(
+      screen.getByRole('button', { name: '연습 모드로 바나나 요거트 컵 만들기 시작' }),
+    );
+
+    fireEvent(screen.getByRole('button', { name: /바나나, 바구니로 끌기/ }), 'accessibilityAction', {
+      nativeEvent: { actionName: 'activate' },
+    });
+    fireEvent(screen.getByRole('button', { name: /요거트, 바구니로 끌기/ }), 'accessibilityAction', {
+      nativeEvent: { actionName: 'activate' },
+    });
+    fireEvent.press(screen.getByRole('button', { name: '다음 요리 단계' }));
+
+    for (let count = 0; count < 3; count += 1) {
+      fireEvent(
+        screen.getByRole('button', { name: /바나나 껍질 아래로 벗기기/ }),
+        'accessibilityAction',
+        { nativeEvent: { actionName: 'activate' } },
+      );
+    }
+    fireEvent.press(screen.getByRole('button', { name: '다음 요리 단계' }));
+
+    for (let count = 0; count < 6; count += 1) {
+      fireEvent(
+        screen.getByRole('button', { name: /바나나 조각 그릇에 넣기/ }),
+        'accessibilityAction',
+        { nativeEvent: { actionName: 'activate' } },
+      );
+    }
+    fireEvent.press(screen.getByRole('button', { name: '다음 요리 단계' }));
+
+    for (let count = 0; count < 4; count += 1) {
+      fireEvent(
+        screen.getByRole('button', { name: /요거트 그릇에 담기/ }),
+        'accessibilityAction',
+        { nativeEvent: { actionName: 'activate' } },
+      );
+    }
+    fireEvent.press(screen.getByRole('button', { name: '다음 요리 단계' }));
+
+    fireEvent.press(screen.getByRole('button', { name: '토핑 없이 계속하기' }));
+    fireEvent.press(screen.getByRole('button', { name: '다음 요리 단계' }));
+
+    for (let count = 0; count < 3; count += 1) {
+      fireEvent(
+        screen.getByRole('button', { name: /숟가락으로 원 그리며 섞기/ }),
+        'accessibilityAction',
+        { nativeEvent: { actionName: 'activate' } },
+      );
+    }
+    fireEvent.press(screen.getByRole('button', { name: '요리 완성하기' }));
+
+    expect(screen.getByText('첫 요리 완성!')).toBeTruthy();
+    expect(screen.getByText('만든 순서를 다시 볼까요?')).toBeTruthy();
+    fireEvent.press(screen.getByRole('button', { name: '요리를 마치고 집으로 돌아가기' }));
+    expect(screen.queryByTestId('cooking-simulation-screen')).toBeNull();
+
+    fireEvent.press(screen.getByRole('button', { name: '수첩 열기' }));
+    expect(screen.getByLabelText('오늘 0/4 완료')).toBeTruthy();
+    expect(screen.getByLabelText(/냉장고 살펴보기, 진행 중/)).toBeTruthy();
+    fireEvent.press(screen.getByRole('button', { name: '수첩 열기' }));
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 220));
+    });
+
+    fireEvent.press(screen.getByRole('button', { name: '냉장고로 이동해 열기' }));
+    fireEvent.press(screen.getByRole('button', { name: '냉장고 살펴보기' }));
     expect(screen.getByText('냉장고를 확인했어요')).toBeTruthy();
     fireEvent.press(screen.getByLabelText('안내 확인'));
 
@@ -445,7 +527,7 @@ describe('오늘도 앱', () => {
 
     const joystick = screen.getByLabelText('이동 조이스틱');
     expect(screen.queryByTestId('market-proximity-cloud')).toBeNull();
-    for (let step = 0; step < 5; step += 1) {
+    for (let step = 0; step < 11; step += 1) {
       fireEvent(joystick, 'accessibilityAction', { nativeEvent: { actionName: 'moveRight' } });
     }
     for (let step = 0; step < 6; step += 1) {

@@ -10,6 +10,8 @@ export const MODULAR_CHARACTER_CANVAS = {
 
 export const MODULAR_CHARACTER_LAYER_ORDER = [
   'hairBack',
+  'bagBack',
+  'heldItemBack',
   'bodySkin',
   'shoes',
   'bottom',
@@ -19,9 +21,7 @@ export const MODULAR_CHARACTER_LAYER_ORDER = [
   'hairFront',
   'eyewear',
   'headwear',
-  'bagBack',
   'bagFront',
-  'heldItemBack',
   'heldItemFront',
   'effect',
 ] as const;
@@ -30,6 +30,7 @@ export type CharacterLayerSlot = (typeof MODULAR_CHARACTER_LAYER_ORDER)[number];
 
 export type CharacterArtLayer = {
   id: string;
+  opacity?: number;
   slot: CharacterLayerSlot;
   source: ImageSourcePropType;
 };
@@ -86,7 +87,7 @@ export function ModularCharacter({
           key={layer.id}
           resizeMode="contain"
           source={layer.source}
-          style={[styles.layer, { height, width }]}
+          style={[styles.layer, { height, opacity: layer.opacity ?? 1, width }]}
         />
       ))}
     </View>

@@ -1,0 +1,44 @@
+{
+  "id": "fresh-player-v2",
+  "canvas": { "width": 128, "height": 192 },
+  "pivot": { "x": 64, "y": 186 },
+  "assetPixelRatio": 2,
+  "assetCanvas": { "width": 256, "height": 384 },
+  "assetPivot": { "x": 128, "y": 372 },
+  "directions": [
+    "front",
+    "frontLeft",
+    "left",
+    "backLeft",
+    "back",
+    "backRight",
+    "right",
+    "frontRight"
+  ],
+  "animations": {
+    "idle": { "frames": 2, "runtimeFrame": 0 },
+    "walk": { "frames": 8, "frameDurationMs": 96 }
+  },
+  "defaultLayer": {
+    "slot": "bodySkin",
+    "kind": "bakedFullBody",
+    "outfit": "sage-jacket-default"
+  },
+  "compatibleLayerSlots": [
+    "hairBack",
+    "bagBack",
+    "heldItemBack",
+    "bodySkin",
+    "shoes",
+    "bottom",
+    "top",
+    "outerwear",
+    "face",
+    "hairFront",
+    "eyewear",
+    "headwear",
+    "bagFront",
+    "heldItemFront",
+    "effect"
+  ]
+}

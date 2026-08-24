@@ -18,13 +18,13 @@ import {
 } from 'react-native';
 
 import { icons } from '../assets';
+import { DirectionalAvatar } from '../components/game/DirectionalAvatar';
 import { GameHud } from '../components/game/GameHud';
-import { MODULAR_CHARACTER_CANVAS, ModularCharacter } from '../components/game/ModularCharacter';
+import { MODULAR_CHARACTER_CANVAS } from '../components/game/ModularCharacter';
 import {
   ExpandedVillageLayer,
   HomeWorldLayer,
   type HomeStationId,
-  type NpcQuestState,
   type VillagePortalId,
 } from '../components/game/PrototypeWorldLayers';
 import { PressScale } from '../components/PressScale';
@@ -36,8 +36,15 @@ import {
   type DailyQuestId,
   type DailyQuestStatusMap,
 } from '../game/dailyQuests';
-import { marketGameArt, playerGameArt } from '../game/gameAssets';
 import {
+  facingFromVector,
+  type AvatarFacing,
+  type AvatarMotion,
+} from '../game/avatarAnimation';
+import { freshPlayerAvatar } from '../game/freshPlayerAvatar';
+import { marketGameArt } from '../game/gameAssets';
+import {
+  BUS_STOP_POINT,
   HOME_EXIT_POINT,
   HOME_FRIDGE_POINT,
   HOME_PLAYER_POINT,
@@ -63,12 +70,20 @@ import {
   type WorldMapId,
 } from '../game/prototypeWorld';
 import { MarketCategoryId, marketCategories } from '../game/scenarios';
+import {
+  clampWorldZoom,
+  screenPointToWorld,
+  WORLD_ZOOM_MIN,
+  zoomFromPinch,
+  zoomFromWheel,
+} from '../game/worldZoom';
 import { colors, fonts } from '../theme';
 import {
   MarketInteractionRequest,
   MarketSimulationScreen,
   MarketStationId,
 } from './MarketSimulationScreen';
+import { CookingSimulationScreen } from './CookingSimulationScreen';
 
 const MARKET_WORLD_WIDTH = 900;
 const MARKET_WORLD_HEIGHT = 1000;
@@ -92,7 +107,14 @@ const JOYSTICK_ZONE_HEIGHT = 270;
 const DIALOGUE_CHARACTER_DELAY = 34;
 const DIALOGUE_READ_DELAY = 360;
 const MARKET_STATION_INTERACTION_DISTANCE = 105;
-const BUS_STOP_POINT = { x: 1245, y: 480 };
+
+function touchDistance(touches: readonly { pageX: number; pageY: number }[]): number {
+  if (touches.length < 2) return 0;
+  return Math.hypot(
+    touches[0].pageX - touches[1].pageX,
+    touches[0].pageY - touches[1].pageY,
+  );
+}
 
 const WEB_MOVEMENT_KEYS: Record<string, Point> = {
   KeyA: { x: -1, y: 0 },
@@ -495,6 +517,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
   const dialogueBlipThreeStatus = useAudioPlayerStatus(dialogueBlipThree);
   const viewportNode = useRef<View | null>(null);
   const camera = useRef(new Animated.ValueXY()).current;
+  const worldZoom = useRef(new Animated.Value(WORLD_ZOOM_MIN)).current;
   const joystickKnob = useRef(new Animated.ValueXY()).current;
   const dialoguePanelProgress = useRef(new Animated.Value(0)).current;
   const dailyChoiceProgress = useRef(new Animated.Value(0)).current;
@@ -506,6 +529,12 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
   const worldMapRef = useRef<WorldMapId>('village');
   const viewport = useRef({ width: 0, height: 0 });
   const viewportOrigin = useRef({ x: 0, y: 0 });
+  const worldZoomCurrentRef = useRef(WORLD_ZOOM_MIN);
+  const worldZoomTargetRef = useRef(WORLD_ZOOM_MIN);
+  const pinchStartDistanceRef = useRef(0);
+  const pinchStartZoomRef = useRef(WORLD_ZOOM_MIN);
+  const zoomGestureActiveRef = useRef(false);
+  const suppressWorldPressRef = useRef(false);
   const direction = useRef<Point>({ x: 0, y: 0 });
   const keyboardDirection = useRef<Point>({ x: 0, y: 0 });
   const keyboardEngaged = useRef(false);
@@ -534,6 +563,8 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
   const joystickZoneSize = useRef({ width: 220, height: JOYSTICK_ZONE_HEIGHT });
   const dialogueReadyAt = useRef(Number.POSITIVE_INFINITY);
   const startNpcGreetingRef = useRef<(npcId: VillageNpcId) => void>(() => undefined);
+  const playerFacingRef = useRef<AvatarFacing>('front');
+  const playerMotionRef = useRef<AvatarMotion>('idle');
 
   const [nearbyNpcId, setNearbyNpcId] = useState<VillageNpcId | null>(null);
   const [nearbyPortalId, setNearbyPortalId] = useState<PendingPortal>(null);
@@ -543,12 +574,18 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
   const [marketScenarioLocked, setMarketScenarioLocked] = useState(false);
   const [marketInteractionRequest, setMarketInteractionRequest] =
     useState<MarketInteractionRequest | null>(null);
+  const [fridgeMenuOpen, setFridgeMenuOpen] = useState(false);
+  const [cookingOpen, setCookingOpen] = useState(false);
   const [worldMap, setWorldMap] = useState<WorldMapId>('village');
   const [audioModeReady, setAudioModeReady] = useState(false);
   const [reduceMotionEnabled, setReduceMotionEnabled] = useState(false);
   const [controlMode, setControlMode] = useState<ControlMode>('joystick');
   const [hudMenuOpen, setHudMenuOpen] = useState(false);
   const [runEnabled, setRunEnabled] = useState(false);
+  const [playerAvatarPose, setPlayerAvatarPose] = useState<{
+    facing: AvatarFacing;
+    motion: AvatarMotion;
+  }>({ facing: 'front', motion: 'idle' });
   const [tapTargetMarker, setTapTargetMarker] = useState<Point | null>(null);
   const [joystickActive, setJoystickActive] = useState(false);
   const [joystickCenter, setJoystickCenter] = useState({ x: 76, y: 190 });
@@ -589,12 +626,6 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
     });
   }, []);
   const dailyQuests = createDailyQuestItems(dailyQuestStatuses);
-  const npcQuestStates: Partial<Record<VillageNpcId, NpcQuestState>> = {
-    driver: dailyQuestStatuses['bus-route'],
-    jiyoung: dailyQuestStatuses['market-shopping'],
-    minsu: dailyQuestStatuses['minsu-safety'],
-    sujin: 'conversation',
-  };
   const currentDialogueStep =
     dialogueIndex === null ? undefined : activeDialogueSteps[dialogueIndex];
   const currentDialogue = resolveDialogueText(currentDialogueStep, selectedDailyChoice);
@@ -604,6 +635,8 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
   const dialogueChoiceVisible =
     currentDialogueStep?.kind === 'choice' &&
     visibleDialogueCharacters >= currentDialogue.length;
+  const npcActionChoiceOpen =
+    currentDialogueStep?.kind === 'choice' && currentDialogueStep.purpose === 'npc-action';
   controlsLockedRef.current =
     dialoguePanelMounted ||
     quizPanelMounted ||
@@ -612,6 +645,8 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
     hudMenuOpen ||
     questOfferId !== null ||
     infoPanel !== null ||
+    fridgeMenuOpen ||
+    cookingOpen ||
     marketScenarioLocked;
 
   useEffect(() => {
@@ -756,6 +791,16 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
     );
   }, []);
 
+  const syncPlayerAvatarPose = useCallback((x: number, y: number, moving: boolean) => {
+    const nextFacing = facingFromVector(x, y, playerFacingRef.current);
+    const nextMotion: AvatarMotion = moving && Math.hypot(x, y) >= 0.04 ? 'walk' : 'idle';
+    if (nextFacing === playerFacingRef.current && nextMotion === playerMotionRef.current) return;
+
+    playerFacingRef.current = nextFacing;
+    playerMotionRef.current = nextMotion;
+    setPlayerAvatarPose({ facing: nextFacing, motion: nextMotion });
+  }, []);
+
   const movePlayer = useCallback(
     (dx: number, dy: number) => {
       const current = playerPoint.current;
@@ -789,6 +834,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
     pendingHomeStationInteraction.current = null;
     pendingBusStopInteraction.current = false;
     previousFrame.current = null;
+    syncPlayerAvatarPose(0, 0, false);
     setJoystickActive(false);
     setTapTargetMarker(null);
     if (animationFrame.current !== null) {
@@ -802,7 +848,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
       toValue: { x: 0, y: 0 },
       useNativeDriver: true,
     }).start();
-  }, [joystickKnob]);
+  }, [joystickKnob, syncPlayerAvatarPose]);
 
   const handleExit = useCallback(() => {
     stopMovement();
@@ -822,6 +868,8 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
     setRunEnabled(false);
     setQuestOfferId(null);
     setInfoPanel(null);
+    setFridgeMenuOpen(false);
+    setCookingOpen(false);
   }, [stopMovement]);
 
   const handleEnterMarket = useCallback(() => {
@@ -885,6 +933,27 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
     setHudMenuOpen(open);
   }, [stopMovement]);
 
+  const openFridgeMenu = useCallback(() => {
+    stopMovement();
+    setInfoPanel(null);
+    setFridgeMenuOpen(true);
+  }, [stopMovement]);
+
+  const inspectFridge = useCallback(() => {
+    setFridgeMenuOpen(false);
+    completeDailyQuest('home-fridge');
+    setInfoPanel({
+      body: '유통기한이 가까운 우유와 부족한 사과를 장보기 목록에 적었어요.',
+      title: '냉장고를 확인했어요',
+    });
+  }, [completeDailyQuest]);
+
+  const startCooking = useCallback(() => {
+    stopMovement();
+    setFridgeMenuOpen(false);
+    setCookingOpen(true);
+  }, [stopMovement]);
+
   const runMovement = useCallback(
     (timestamp: number) => {
       if (controlsLockedRef.current) {
@@ -942,6 +1011,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
           previousFrame.current = null;
           animationFrame.current = null;
           setTapTargetMarker(null);
+          syncPlayerAvatarPose(0, 0, false);
 
           if (npcToOpen) startNpcGreetingRef.current(npcToOpen);
           if (portalToUse === 'market') handleEnterMarket();
@@ -955,11 +1025,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
           }
           if (homeStationToUse === 'exit') handleLeaveHome();
           if (homeStationToUse === 'fridge') {
-            completeDailyQuest('home-fridge');
-            setInfoPanel({
-              body: '유통기한이 가까운 우유와 부족한 사과를 장보기 목록에 적었어요.',
-              title: '냉장고를 확인했어요',
-            });
+            openFridgeMenu();
           }
           if (shouldCheckBusStop) {
             if (questStatusesRef.current['bus-route'] === 'active') {
@@ -979,6 +1045,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
         }
 
         const step = Math.min(distance, MOVE_SPEED * speedMultiplier.current * elapsedSeconds);
+        syncPlayerAvatarPose(dx, dy, true);
         const next = movePlayer((dx / distance) * step, (dy / distance) * step);
         const moved = Math.hypot(next.x - current.x, next.y - current.y);
         if (step > 0 && moved < 0.05) {
@@ -991,6 +1058,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
           previousFrame.current = null;
           animationFrame.current = null;
           setTapTargetMarker(null);
+          syncPlayerAvatarPose(0, 0, false);
           return;
         }
         animationFrame.current = requestAnimationFrame(runMovement);
@@ -1001,6 +1069,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
       const combinedY = direction.current.y + keyboardDirection.current.y;
       const combinedLength = Math.hypot(combinedX, combinedY);
       const movementScale = combinedLength > 1 ? 1 / combinedLength : 1;
+      syncPlayerAvatarPose(combinedX, combinedY, combinedLength >= 0.04);
       movePlayer(
         combinedX * movementScale * MOVE_SPEED * speedMultiplier.current * elapsedSeconds,
         combinedY * movementScale * MOVE_SPEED * speedMultiplier.current * elapsedSeconds,
@@ -1018,8 +1087,10 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
       handleEnterMarket,
       handleLeaveHome,
       handleLeaveMarket,
+      openFridgeMenu,
       movePlayer,
       stopMovement,
+      syncPlayerAvatarPose,
     ],
   );
 
@@ -1099,6 +1170,41 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
     };
   }, [beginMovement, stopMovement]);
 
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') return undefined;
+
+    const handleWheel = (event: WheelEvent) => {
+      const origin = viewportOrigin.current;
+      const size = viewport.current;
+      const insideViewport =
+        event.clientX >= origin.x &&
+        event.clientX <= origin.x + size.width &&
+        event.clientY >= origin.y &&
+        event.clientY <= origin.y + size.height;
+      if (!insideViewport || controlsLockedRef.current) return;
+
+      event.preventDefault();
+      const deltaPixels =
+        event.deltaMode === 1
+          ? event.deltaY * 16
+          : event.deltaMode === 2
+            ? event.deltaY * Math.max(size.height, 1)
+            : event.deltaY;
+      const nextZoom = zoomFromWheel(worldZoomTargetRef.current, deltaPixels);
+      worldZoomTargetRef.current = nextZoom;
+      worldZoom.stopAnimation();
+      Animated.timing(worldZoom, {
+        duration: reduceMotionEnabled ? 0 : 150,
+        easing: Easing.out(Easing.cubic),
+        toValue: nextZoom,
+        useNativeDriver: true,
+      }).start();
+    };
+
+    window.addEventListener('wheel', handleWheel, { passive: false });
+    return () => window.removeEventListener('wheel', handleWheel);
+  }, [reduceMotionEnabled, worldZoom]);
+
   const joystickResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => !controlsLockedRef.current,
@@ -1127,6 +1233,60 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
       },
       onPanResponderRelease: stopMovement,
       onPanResponderTerminate: stopMovement,
+      onPanResponderTerminationRequest: () => true,
+    }),
+  ).current;
+
+  const finishPinchZoom = useCallback(() => {
+    zoomGestureActiveRef.current = false;
+    const settledZoom = clampWorldZoom(worldZoomCurrentRef.current);
+    worldZoomCurrentRef.current = settledZoom;
+    worldZoomTargetRef.current = settledZoom;
+    worldZoom.setValue(settledZoom);
+    requestAnimationFrame(() => {
+      suppressWorldPressRef.current = false;
+    });
+  }, [worldZoom]);
+
+  const pinchZoomResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponderCapture: (event) =>
+        Platform.OS !== 'web' &&
+        event.nativeEvent.touches.length >= 2 &&
+        !controlsLockedRef.current,
+      onPanResponderGrant: (event) => {
+        const distance = touchDistance(event.nativeEvent.touches);
+        if (distance <= 0) return;
+        suppressWorldPressRef.current = true;
+        zoomGestureActiveRef.current = true;
+        touchHoldActivated.current = false;
+        pinchStartDistanceRef.current = distance;
+        pinchStartZoomRef.current = worldZoomCurrentRef.current;
+        worldZoom.stopAnimation();
+        stopMovement();
+      },
+      onPanResponderMove: (event) => {
+        if (!zoomGestureActiveRef.current || controlsLockedRef.current) return;
+        const touches = event.nativeEvent.touches;
+        if (touches.length < 2) return;
+        const distance = touchDistance(touches);
+        if (distance <= 0) return;
+        const nextZoom = zoomFromPinch(
+          pinchStartZoomRef.current,
+          pinchStartDistanceRef.current,
+          distance,
+        );
+        worldZoomCurrentRef.current = nextZoom;
+        worldZoomTargetRef.current = nextZoom;
+        worldZoom.setValue(nextZoom);
+      },
+      onPanResponderRelease: finishPinchZoom,
+      onPanResponderTerminate: finishPinchZoom,
+      onPanResponderTerminationRequest: () => false,
+      onStartShouldSetPanResponderCapture: (event) =>
+        Platform.OS !== 'web' &&
+        event.nativeEvent.touches.length >= 2 &&
+        !controlsLockedRef.current,
     }),
   ).current;
 
@@ -1196,6 +1356,16 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
       mounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    const listenerId = worldZoom.addListener(({ value }) => {
+      worldZoomCurrentRef.current = value;
+    });
+    return () => {
+      worldZoom.removeListener(listenerId);
+      worldZoom.stopAnimation();
+    };
+  }, [worldZoom]);
 
   useEffect(() => {
     if (!audioModeReady || !backgroundMusicStatus.isLoaded) return;
@@ -1496,10 +1666,22 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
 
   const handleAccessibilityMove = (actionName: string) => {
     if (controlsLockedRef.current) return;
-    if (actionName === 'moveUp') movePlayer(0, -ACCESSIBILITY_STEP);
-    if (actionName === 'moveDown') movePlayer(0, ACCESSIBILITY_STEP);
-    if (actionName === 'moveLeft') movePlayer(-ACCESSIBILITY_STEP, 0);
-    if (actionName === 'moveRight') movePlayer(ACCESSIBILITY_STEP, 0);
+    if (actionName === 'moveUp') {
+      syncPlayerAvatarPose(0, -1, false);
+      movePlayer(0, -ACCESSIBILITY_STEP);
+    }
+    if (actionName === 'moveDown') {
+      syncPlayerAvatarPose(0, 1, false);
+      movePlayer(0, ACCESSIBILITY_STEP);
+    }
+    if (actionName === 'moveLeft') {
+      syncPlayerAvatarPose(-1, 0, false);
+      movePlayer(-ACCESSIBILITY_STEP, 0);
+    }
+    if (actionName === 'moveRight') {
+      syncPlayerAvatarPose(1, 0, false);
+      movePlayer(ACCESSIBILITY_STEP, 0);
+    }
   };
 
   const startDialogue = (
@@ -1607,19 +1789,35 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
     const localY = Number.isFinite(pageY) ? pageY - viewportOrigin.current.y : locationY;
     const safeX = Math.max(0, Math.min(localX, viewport.current.width));
     const safeY = Math.max(0, Math.min(localY, viewport.current.height));
-    return {
-      x: current.x + safeX - viewport.current.width / 2,
-      y: current.y + safeY - viewport.current.height / 2,
-    };
+    return screenPointToWorld(
+      { x: safeX, y: safeY },
+      current,
+      viewport.current,
+      worldZoomCurrentRef.current,
+    );
   };
 
   const handleWorldPressIn = () => {
-    if (controlMode !== 'touch' || controlsLockedRef.current) return;
+    if (
+      controlMode !== 'touch' ||
+      controlsLockedRef.current ||
+      zoomGestureActiveRef.current ||
+      suppressWorldPressRef.current
+    ) {
+      return;
+    }
     touchHoldActivated.current = false;
   };
 
   const handleWorldLongPress = (event: GestureResponderEvent) => {
-    if (controlMode !== 'touch' || controlsLockedRef.current) return;
+    if (
+      controlMode !== 'touch' ||
+      controlsLockedRef.current ||
+      zoomGestureActiveRef.current ||
+      suppressWorldPressRef.current
+    ) {
+      return;
+    }
     const current = playerPoint.current;
     const desired = getTouchedWorldPoint(event);
     const dx = desired.x - current.x;
@@ -1636,12 +1834,23 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
   };
 
   const handleWorldPressOut = () => {
+    if (zoomGestureActiveRef.current || suppressWorldPressRef.current) {
+      touchHoldActivated.current = false;
+      return;
+    }
     if (!touchHoldActivated.current) return;
     stopMovement();
   };
 
   const handleWorldPress = (event: GestureResponderEvent) => {
-    if (controlMode !== 'touch' || controlsLockedRef.current) return;
+    if (
+      controlMode !== 'touch' ||
+      controlsLockedRef.current ||
+      zoomGestureActiveRef.current ||
+      suppressWorldPressRef.current
+    ) {
+      return;
+    }
     if (touchHoldActivated.current) {
       touchHoldActivated.current = false;
       return;
@@ -1651,7 +1860,14 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
 
   const handleNpcPress = (event: GestureResponderEvent, npc: VillageNpcDefinition) => {
     event?.stopPropagation?.();
-    if (controlMode !== 'touch' || controlsLockedRef.current) return;
+    if (
+      controlMode !== 'touch' ||
+      controlsLockedRef.current ||
+      zoomGestureActiveRef.current ||
+      suppressWorldPressRef.current
+    ) {
+      return;
+    }
     if (nearbyNpcIdRef.current === npc.id) {
       startNpcGreeting(npc.id);
       return;
@@ -1676,7 +1892,12 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
     portalId: VillagePortalId,
   ) => {
     event?.stopPropagation?.();
-    if (controlMode !== 'touch' || controlsLockedRef.current) return;
+    if (
+      controlMode !== 'touch' ||
+      controlsLockedRef.current ||
+      zoomGestureActiveRef.current ||
+      suppressWorldPressRef.current
+    ) return;
     if (nearbyPortalIdRef.current === portalId) {
       if (portalId === 'market') handleEnterMarket();
       else handleEnterHome();
@@ -1704,16 +1925,17 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
     station: HomeStationId,
   ) => {
     event?.stopPropagation?.();
-    if (controlMode !== 'touch' || controlsLockedRef.current) return;
+    if (
+      controlMode !== 'touch' ||
+      controlsLockedRef.current ||
+      zoomGestureActiveRef.current ||
+      suppressWorldPressRef.current
+    ) return;
     if (homeStationNearbyRef.current === station) {
       if (station === 'exit') {
         handleLeaveHome();
       } else {
-        completeDailyQuest('home-fridge');
-        setInfoPanel({
-          body: '유통기한이 가까운 우유와 부족한 사과를 장보기 목록에 적었어요.',
-          title: '냉장고를 확인했어요',
-        });
+        openFridgeMenu();
       }
       return;
     }
@@ -1738,7 +1960,12 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
     station: MarketStationId | 'exit',
   ) => {
     event?.stopPropagation?.();
-    if (controlMode !== 'touch' || controlsLockedRef.current) return;
+    if (
+      controlMode !== 'touch' ||
+      controlsLockedRef.current ||
+      zoomGestureActiveRef.current ||
+      suppressWorldPressRef.current
+    ) return;
     if (marketStationNearbyRef.current === station) {
       if (station === 'exit') handleLeaveMarket();
       else {
@@ -1789,7 +2016,12 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
 
   const handleBusStopPress = (event: GestureResponderEvent) => {
     event?.stopPropagation?.();
-    if (controlMode !== 'touch' || controlsLockedRef.current) return;
+    if (
+      controlMode !== 'touch' ||
+      controlsLockedRef.current ||
+      zoomGestureActiveRef.current ||
+      suppressWorldPressRef.current
+    ) return;
     if (busStopNearbyRef.current) {
       handleBusStopInteraction();
       return;
@@ -1826,11 +2058,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
       if (homeStationNearbyRef.current === 'exit') {
         handleLeaveHome();
       } else if (homeStationNearbyRef.current === 'fridge') {
-        completeDailyQuest('home-fridge');
-        setInfoPanel({
-          body: '유통기한이 가까운 우유와 부족한 사과를 장보기 목록에 적었어요.',
-          title: '냉장고를 확인했어요',
-        });
+        openFridgeMenu();
       }
       return;
     }
@@ -1949,6 +2177,13 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
     setDialogueIndex(dialogueIndex + 1);
   };
 
+  const dismissNpcActionDialogue = () => {
+    if (!npcActionChoiceOpen) return;
+    setDialogueIndex(null);
+    setDialogueMode(null);
+    setSelectedDailyChoice(null);
+  };
+
   const closeQuiz = () => {
     setQuizStep(null);
     setDialogueMode(null);
@@ -1991,7 +2226,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
             : '가까이 가면 상호작용할 수 있어요'
       : worldMap === 'home'
         ? nearbyHomeStation === 'fridge'
-          ? '냉장고 확인하기'
+          ? '냉장고 열기'
           : nearbyHomeStation === 'exit'
             ? '집에서 마을로 나가기'
             : '가까이 가면 상호작용할 수 있어요'
@@ -2037,7 +2272,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
             : '행동'
       : worldMap === 'home'
         ? nearbyHomeStation === 'fridge'
-          ? '확인'
+          ? '열기'
           : nearbyHomeStation === 'exit'
             ? '나가기'
             : '행동'
@@ -2062,105 +2297,120 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
     controlMode === 'joystick' &&
     !dialoguePanelMounted &&
     !quizPanelMounted &&
+    !fridgeMenuOpen &&
+    !cookingOpen &&
     !marketScenarioLocked;
   return (
-    <Pressable
-      accessibilityActions={[
-        { label: '위로 이동', name: 'moveUp' },
-        { label: '아래로 이동', name: 'moveDown' },
-        { label: '왼쪽으로 이동', name: 'moveLeft' },
-        { label: '오른쪽으로 이동', name: 'moveRight' },
-      ]}
-      accessibilityLabel={
-        worldMap === 'market'
-          ? '하늘마트 내부 월드'
-          : worldMap === 'home'
-            ? '집 내부 월드'
-            : '쿼터뷰 마을'
-      }
-      delayLongPress={260}
-      onAccessibilityAction={(event) => handleAccessibilityMove(event.nativeEvent.actionName)}
+    <View
       onLayout={handleViewportLayout}
-      onLongPress={handleWorldLongPress}
-      onPress={handleWorldPress}
-      onPressIn={handleWorldPressIn}
-      onPressOut={handleWorldPressOut}
       ref={viewportNode}
       style={styles.root}
+      testID="game-viewport"
+      {...pinchZoomResponder.panHandlers}
     >
+      <Pressable
+        accessibilityActions={[
+          { label: '위로 이동', name: 'moveUp' },
+          { label: '아래로 이동', name: 'moveDown' },
+          { label: '왼쪽으로 이동', name: 'moveLeft' },
+          { label: '오른쪽으로 이동', name: 'moveRight' },
+        ]}
+        accessibilityLabel={
+          worldMap === 'market'
+            ? '하늘마트 내부 월드'
+            : worldMap === 'home'
+              ? '집 내부 월드'
+              : '쿼터뷰 마을'
+        }
+        delayLongPress={260}
+        onAccessibilityAction={(event) => handleAccessibilityMove(event.nativeEvent.actionName)}
+        onLayout={handleViewportLayout}
+        onLongPress={handleWorldLongPress}
+        onPress={handleWorldPress}
+        onPressIn={handleWorldPressIn}
+        onPressOut={handleWorldPressOut}
+        style={styles.touchSurface}
+      >
       <StatusBar hidden />
 
       <Animated.View
-        pointerEvents={quizPanelMounted ? 'none' : 'auto'}
-        style={[
-          styles.world,
-          {
-            height: WORLD_BOUNDS[worldMap].height,
-            transform: camera.getTranslateTransform(),
-            width: WORLD_BOUNDS[worldMap].width,
-          },
-        ]}
+        pointerEvents="box-none"
+        style={[styles.zoomScene, { transform: [{ scale: worldZoom }] }]}
       >
-        {worldMap === 'village' ? (
-          <>
-            <ExpandedVillageLayer
+        <Animated.View
+          pointerEvents={quizPanelMounted ? 'none' : 'auto'}
+          style={[
+            styles.world,
+            {
+              height: WORLD_BOUNDS[worldMap].height,
+              transform: camera.getTranslateTransform(),
+              width: WORLD_BOUNDS[worldMap].width,
+            },
+          ]}
+        >
+          {worldMap === 'village' ? (
+            <>
+              <ExpandedVillageLayer
+                controlMode={controlMode}
+                controlsLocked={controlsLockedRef.current}
+                nearbyNpcId={nearbyNpcId}
+                nearbyPortalId={nearbyPortalId}
+                onNpcPress={handleNpcPress}
+                onPortalPress={handlePortalPress}
+                tapTargetMarker={controlMode === 'touch' ? tapTargetMarker : null}
+              />
+              <PressScale
+                accessibilityHint={
+                  controlMode === 'touch'
+                    ? busStopNearby
+                      ? '목적지 버스를 확인합니다'
+                      : '정류장 앞으로 이동합니다'
+                    : undefined
+                }
+                accessibilityLabel="동쪽 버스정류장으로 이동해 확인하기"
+                accessibilityRole={controlMode === 'touch' ? 'button' : undefined}
+                disabled={controlMode !== 'touch' || controlsLockedRef.current}
+                onPress={handleBusStopPress}
+                scaleTo={0.96}
+                style={styles.busStopHotspot}
+              >
+                {busStopNearby ? (
+                  <View style={styles.busStopActionBadge}>
+                    <Ionicons color={colors.white} name="bus" size={17} />
+                    <Text style={styles.busStopActionText}>버스 확인</Text>
+                  </View>
+                ) : null}
+              </PressScale>
+            </>
+          ) : worldMap === 'home' ? (
+            <HomeWorldLayer
               controlMode={controlMode}
               controlsLocked={controlsLockedRef.current}
-              nearbyNpcId={nearbyNpcId}
-              nearbyPortalId={nearbyPortalId}
-              npcQuestStates={npcQuestStates}
-              onNpcPress={handleNpcPress}
-              onPortalPress={handlePortalPress}
+              fridgeCompleted={dailyQuestStatuses['home-fridge'] === 'completed'}
+              nearbyStationId={nearbyHomeStation}
+              onStationPress={handleHomeStationPress}
               tapTargetMarker={controlMode === 'touch' ? tapTargetMarker : null}
             />
-            <PressScale
-              accessibilityHint={
-                controlMode === 'touch'
-                  ? busStopNearby
-                    ? '목적지 버스를 확인합니다'
-                    : '정류장 앞으로 이동합니다'
-                  : undefined
-              }
-              accessibilityLabel="동쪽 버스정류장으로 이동해 확인하기"
-              accessibilityRole={controlMode === 'touch' ? 'button' : undefined}
-              disabled={controlMode !== 'touch' || controlsLockedRef.current}
-              onPress={handleBusStopPress}
-              scaleTo={0.96}
-              style={styles.busStopHotspot}
-            >
-              {busStopNearby ? (
-                <View style={styles.busStopActionBadge}>
-                  <Ionicons color={colors.white} name="bus" size={17} />
-                  <Text style={styles.busStopActionText}>버스 확인</Text>
-                </View>
-              ) : null}
-            </PressScale>
-          </>
-        ) : worldMap === 'home' ? (
-          <HomeWorldLayer
-            controlMode={controlMode}
-            controlsLocked={controlsLockedRef.current}
-            fridgeCompleted={dailyQuestStatuses['home-fridge'] === 'completed'}
-            nearbyStationId={nearbyHomeStation}
-            onStationPress={handleHomeStationPress}
-            tapTargetMarker={controlMode === 'touch' ? tapTargetMarker : null}
-          />
-        ) : (
-          <MarketWorldLayer
-            controlMode={controlMode}
-            nearbyStation={marketStationNearby}
-            onStationPress={handleMarketStationPress}
-            tapTargetMarker={tapTargetMarker}
-          />
-        )}
-      </Animated.View>
+          ) : (
+            <MarketWorldLayer
+              controlMode={controlMode}
+              nearbyStation={marketStationNearby}
+              onStationPress={handleMarketStationPress}
+              tapTargetMarker={tapTargetMarker}
+            />
+          )}
+        </Animated.View>
 
-      <View accessibilityLabel="내 캐릭터" pointerEvents="none" style={styles.player}>
-        <ModularCharacter
-          layers={[{ id: 'approved-full-body', slot: 'bodySkin', source: playerGameArt.blueBobFrontIdle }]}
-          scale={PLAYER_ART_SCALE}
-        />
-      </View>
+        <View accessibilityLabel="내 캐릭터" pointerEvents="none" style={styles.player}>
+          <DirectionalAvatar
+            facing={playerAvatarPose.facing}
+            manifest={freshPlayerAvatar}
+            motion={playerAvatarPose.motion}
+            reduceMotion={reduceMotionEnabled}
+            scale={PLAYER_ART_SCALE}
+          />
+        </View>
+      </Animated.View>
 
 
       {joystickControlsVisible ? (
@@ -2242,14 +2492,16 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
       </View>
       ) : null}
 
-      <GameHud
-        controlMode={controlMode}
-        dailyQuests={dailyQuests}
-        onControlModeChange={selectControlMode}
-        onEmergencyExit={handleEmergencyExit}
-        onExit={handleExit}
-        onMenuVisibilityChange={handleHudMenuVisibilityChange}
-      />
+      {!cookingOpen ? (
+        <GameHud
+          controlMode={controlMode}
+          dailyQuests={dailyQuests}
+          onControlModeChange={selectControlMode}
+          onEmergencyExit={handleEmergencyExit}
+          onExit={handleExit}
+          onMenuVisibilityChange={handleHudMenuVisibilityChange}
+        />
+      ) : null}
 
       {worldMap === 'market' ? (
         <MarketSimulationScreen
@@ -2259,6 +2511,72 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
           onLockChange={setMarketScenarioLocked}
           onMissionComplete={() => completeDailyQuest('market-shopping')}
         />
+      ) : null}
+
+      {fridgeMenuOpen ? (
+        <View style={styles.interactionOverlay}>
+          <Pressable
+            accessibilityLabel="냉장고 메뉴 닫기"
+            onPress={(event) => {
+              event?.stopPropagation?.();
+              setFridgeMenuOpen(false);
+            }}
+            style={styles.interactionOverlayDim}
+          />
+          <View accessibilityLabel="냉장고에서 할 일 선택" style={styles.fridgeMenuSheet}>
+            <View style={styles.fridgeMenuHeader}>
+              <View style={styles.fridgeMenuIcon}>
+                <Ionicons color="#4F7B68" name="snow" size={23} />
+              </View>
+              <View style={styles.fridgeMenuHeaderCopy}>
+                <Text style={styles.fridgeMenuTitle}>냉장고</Text>
+                <Text style={styles.fridgeMenuSubtitle}>무엇을 할까요?</Text>
+              </View>
+              <PressScale
+                accessibilityLabel="냉장고 메뉴 닫기"
+                accessibilityRole="button"
+                onPress={(event) => {
+                  event?.stopPropagation?.();
+                  setFridgeMenuOpen(false);
+                }}
+                scaleTo={0.9}
+                style={styles.fridgeMenuClose}
+              >
+                <Ionicons color="#737B76" name="close" size={22} />
+              </PressScale>
+            </View>
+            <PressScale
+              accessibilityLabel="바나나 요거트 컵 요리 시작"
+              accessibilityRole="button"
+              onPress={(event) => {
+                event?.stopPropagation?.();
+                startCooking();
+              }}
+              style={styles.fridgeCookingButton}
+            >
+              <View style={styles.fridgeCookingIcon}>
+                <Ionicons color="#FFFFFF" name="restaurant" size={23} />
+              </View>
+              <View style={styles.fridgeCookingCopy}>
+                <Text style={styles.fridgeCookingEyebrow}>불과 칼 없이 · 약 5분</Text>
+                <Text style={styles.fridgeCookingTitle}>바나나 요거트 컵 만들기</Text>
+              </View>
+              <Ionicons color="#4F7B68" name="chevron-forward" size={21} />
+            </PressScale>
+            <PressScale
+              accessibilityLabel="냉장고 살펴보기"
+              accessibilityRole="button"
+              onPress={(event) => {
+                event?.stopPropagation?.();
+                inspectFridge();
+              }}
+              style={styles.fridgeInspectButton}
+            >
+              <Ionicons color="#5B6E63" name="search" size={20} />
+              <Text style={styles.fridgeInspectText}>냉장고 살펴보기</Text>
+            </PressScale>
+          </View>
+        </View>
       ) : null}
 
       {questOfferId && offeredQuest && offeredNpc ? (
@@ -2332,9 +2650,19 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
       {dialoguePanelMounted ? (
         <>
           <Animated.View
-            pointerEvents="none"
+            pointerEvents={npcActionChoiceOpen ? 'auto' : 'none'}
             style={[styles.dialogueDim, { opacity: dialoguePanelProgress }]}
-          />
+          >
+            {npcActionChoiceOpen ? (
+              <Pressable
+                accessibilityLabel="대화 선택 닫기"
+                accessibilityRole="button"
+                onPress={dismissNpcActionDialogue}
+                style={StyleSheet.absoluteFill}
+                testID="dialogue-dismiss-backdrop"
+              />
+            ) : null}
+          </Animated.View>
           <Animated.View
             pointerEvents={dialogueIndex !== null ? 'auto' : 'none'}
             style={[
@@ -2638,7 +2966,11 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
           </Animated.View>
         </View>
       ) : null}
-    </Pressable>
+      </Pressable>
+      {cookingOpen ? (
+        <CookingSimulationScreen onClose={() => setCookingOpen(false)} />
+      ) : null}
+    </View>
   );
 }
 
@@ -2648,6 +2980,12 @@ const styles = StyleSheet.create({
     cursor: 'auto',
     flex: 1,
     overflow: 'hidden',
+  },
+  touchSurface: {
+    flex: 1,
+  },
+  zoomScene: {
+    ...StyleSheet.absoluteFillObject,
   },
   world: {
     left: 0,
@@ -3147,6 +3485,72 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(38,45,40,0.24)',
   },
+  fridgeMenuSheet: {
+    backgroundColor: '#FFFDF8',
+    borderRadius: 26,
+    bottom: 124,
+    elevation: 12,
+    maxWidth: 360,
+    padding: 18,
+    position: 'absolute',
+    shadowColor: '#26372E',
+    shadowOffset: { height: 10, width: 0 },
+    shadowOpacity: 0.2,
+    shadowRadius: 22,
+    width: '90%',
+  },
+  fridgeMenuHeader: { alignItems: 'center', flexDirection: 'row' },
+  fridgeMenuIcon: {
+    alignItems: 'center',
+    backgroundColor: '#E8F2EA',
+    borderRadius: 21,
+    height: 42,
+    justifyContent: 'center',
+    width: 42,
+  },
+  fridgeMenuHeaderCopy: { flex: 1, marginLeft: 11 },
+  fridgeMenuTitle: { color: '#28362E', fontFamily: fonts.laundryBold, fontSize: 21 },
+  fridgeMenuSubtitle: { color: '#7E8681', fontFamily: fonts.regular, fontSize: 12, marginTop: 1 },
+  fridgeMenuClose: {
+    alignItems: 'center',
+    backgroundColor: '#F1EEE7',
+    borderRadius: 18,
+    height: 36,
+    justifyContent: 'center',
+    width: 36,
+  },
+  fridgeCookingButton: {
+    alignItems: 'center',
+    backgroundColor: '#EAF3E9',
+    borderRadius: 20,
+    flexDirection: 'row',
+    marginTop: 16,
+    minHeight: 76,
+    paddingHorizontal: 13,
+    paddingVertical: 11,
+  },
+  fridgeCookingIcon: {
+    alignItems: 'center',
+    backgroundColor: '#5D9275',
+    borderRadius: 22,
+    height: 44,
+    justifyContent: 'center',
+    width: 44,
+  },
+  fridgeCookingCopy: { flex: 1, marginHorizontal: 11 },
+  fridgeCookingEyebrow: { color: '#6D8175', fontFamily: fonts.semibold, fontSize: 10 },
+  fridgeCookingTitle: { color: '#2D4438', fontFamily: fonts.bold, fontSize: 15, marginTop: 3 },
+  fridgeInspectButton: {
+    alignItems: 'center',
+    backgroundColor: '#F3F0E9',
+    borderRadius: 18,
+    flexDirection: 'row',
+    gap: 8,
+    height: 52,
+    justifyContent: 'center',
+    marginTop: 9,
+  },
+  fridgeInspectText: { color: '#526158', fontFamily: fonts.semibold, fontSize: 14 },
   npcMenuSheet: {
     backgroundColor: 'rgba(255,253,248,0.98)',
     borderColor: 'rgba(255,255,255,0.96)',
