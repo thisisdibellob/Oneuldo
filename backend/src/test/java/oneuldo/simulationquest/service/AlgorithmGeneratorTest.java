@@ -3,8 +3,11 @@ package oneuldo.simulationquest.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
+import jakarta.persistence.EntityManager;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import oneuldo.member.domain.Member;
 import oneuldo.member.domain.MemberQuestProfile;
 import oneuldo.member.domain.MemberRole;
@@ -20,9 +23,11 @@ import oneuldo.quest.domain.QuestSubcategory;
 import oneuldo.quest.repository.QuestCategoryRepository;
 import oneuldo.quest.repository.QuestRepository;
 import oneuldo.quest.repository.QuestSubcategoryRepository;
-import oneuldo.simulationquest.domain.Simulation;
 import oneuldo.simulationquest.domain.SimulationQuest;
-import oneuldo.simulationquest.repository.SimulationRepository;
+import oneuldo.simulationquest.dto.payload.SimulationType;
+import oneuldo.simulationquest.dto.payload.transit.TransitSimulationPayload;
+import oneuldo.simulationquest.dto.payload.transit.TransitStation;
+import oneuldo.simulationquest.repository.SimulationQuestRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -51,7 +56,10 @@ class AlgorithmGeneratorTest {
     private PlaceRepository placeRepository;
 
     @Autowired
-    private SimulationRepository simulationRepository;
+    private SimulationQuestRepository simulationQuestRepository;
+
+    @Autowired
+    private EntityManager entityManager;
 
     @Autowired
     private SimulationQuestGenerator generator;
@@ -124,20 +132,35 @@ class AlgorithmGeneratorTest {
         ));
 
         Place place = placeRepository.save(new Place("TEST_BUS_STOP", "버스 정류장", true));
-        Simulation simulation = simulationRepository.save(new Simulation(
-                preferredQuest.getId(),
-                place.getId(),
+        SimulationQuest simulationQuest = simulationQuestRepository.save(new SimulationQuest(
+                preferredQuest,
+                place,
                 "목적지 버스 찾기",
                 "버스 번호를 확인하고 탑승한다.",
+                new TransitSimulationPayload(
+                        new TransitStation("TEST_BUS_STOP", "버스 정류장"),
+                        new TransitStation("TEST_DESTINATION", "목적지"),
+                        List.of(),
+                        "",
+                        "TEST_BUS_STOP",
+                        "TEST_DESTINATION",
+                        0
+                ),
+                List.of(),
                 true
         ));
+        UUID simulationQuestId = simulationQuest.getId();
+        entityManager.flush();
+        entityManager.clear();
 
         SimulationQuest result = generator.create(member);
 
         assertNotNull(result.getId());
         assertEquals(preferredQuest.getId(), result.getQuest().getId());
-        assertEquals("TEST_BUS_STOP", result.getPlaceId());
-        assertEquals(simulation.getId(), result.getSimulation().getId());
+        assertEquals("TEST_BUS_STOP", result.getPlace().getCode());
+        assertEquals(simulationQuestId, result.getId());
+        assertEquals(SimulationType.TRANSIT, result.getType());
+        assertEquals(SimulationType.TRANSIT, result.getPayload().type());
         assertEquals(0, result.getDialogues().size());
     }
 }
