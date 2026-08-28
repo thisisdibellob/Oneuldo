@@ -34,6 +34,8 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .cors(Customizer.withDefaults())
                 .authorizeHttpRequests(auth -> auth
+                        // 행동 로그는 JWT 사용자에게만 귀속하여 저장한다.
+                        .requestMatchers("/api/behavior-logs/**").authenticated()
                         // 수행 기록은 로그인한 사용자만 접근한다.
                         .requestMatchers("/api/quest/sessions/**").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/quest/*/sessions").authenticated()
