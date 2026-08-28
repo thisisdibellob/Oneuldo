@@ -8,4 +8,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface NormalizedBehaviorEvidenceRepository
         extends JpaRepository<NormalizedBehaviorEvidence, UUID> {
     List<NormalizedBehaviorEvidence> findAllByNormalizedEventId(UUID normalizedEventId);
+
+    List<NormalizedBehaviorEvidence> findAllByNormalizedEventIdIn(
+            List<UUID> normalizedEventIds);
 }

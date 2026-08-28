@@ -5,6 +5,8 @@ import java.util.UUID;
 import oneuldo.global.entity.BaseTimeEntity;
 
 import jakarta.persistence.Column;
+import jakarta.persistence.CollectionTable;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -18,6 +20,8 @@ import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import java.util.HashSet;
+import java.util.Set;
 
 // 사용자가 수행할 퀘스트 Entity
 @Entity
@@ -66,6 +70,14 @@ public class Quest extends BaseTimeEntity {
     // 사용자에게 보여줄 퀘스트인지 나타냄
     @Column(nullable = false)
     private boolean active;
+
+    @ElementCollection(fetch = FetchType.LAZY)
+    @CollectionTable(
+            name = "quest_skill_requirements",
+            joinColumns = @JoinColumn(name = "quest_id")
+    )
+    @Column(name = "skill_code", nullable = false, length = 100)
+    private Set<String> requiredSkillCodes = new HashSet<>();
 
     // 새로운 퀘스트를 만들 때 사용하는 생성자
     public Quest(
