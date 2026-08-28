@@ -34,6 +34,8 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .cors(Customizer.withDefaults())
                 .authorizeHttpRequests(auth -> auth
+                        // 정규화 운영 API는 Controller에서 JWT role=ADMIN을 추가 검증한다.
+                        .requestMatchers("/api/admin/behavior-normalization/**").authenticated()
                         // 행동 로그는 JWT 사용자에게만 귀속하여 저장한다.
                         .requestMatchers("/api/behavior-logs/**").authenticated()
                         // 수행 기록은 로그인한 사용자만 접근한다.

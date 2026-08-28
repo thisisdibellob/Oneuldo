@@ -12,9 +12,11 @@ import oneuldo.behaviorlog.domain.BehaviorLogIngestStatus;
 import oneuldo.behaviorlog.domain.BehaviorLogRequest;
 import oneuldo.behaviorlog.domain.BehaviorLogResponse;
 import oneuldo.behaviorlog.repository.BehaviorLogRepository;
+import oneuldo.behaviorlog.normalization.service.BehaviorLogSavedEvent;
 import oneuldo.member.domain.Member;
 import oneuldo.member.repository.MemberRepository;
 import org.springframework.http.HttpStatus;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -27,6 +29,7 @@ public class BehaviorLogService {
 
     private final BehaviorLogRepository behaviorLogRepository;
     private final MemberRepository memberRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public BehaviorLogResponse record(UUID memberId, BehaviorLogRequest request) {
@@ -52,6 +55,7 @@ public class BehaviorLogService {
         if (duplicate.isPresent()) {
             BehaviorLog existing = duplicate.get();
             requireSameIdentity(existing, request);
+            eventPublisher.publishEvent(new BehaviorLogSavedEvent(existing.getId()));
             return response(existing, BehaviorLogIngestStatus.DUPLICATE);
         }
 
@@ -70,6 +74,7 @@ public class BehaviorLogService {
                 request,
                 Instant.now()
         ));
+        eventPublisher.publishEvent(new BehaviorLogSavedEvent(saved.getId()));
         return response(saved, BehaviorLogIngestStatus.ACCEPTED);
     }
 
