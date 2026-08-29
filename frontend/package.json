@@ -10,6 +10,7 @@
     "android": "expo run:android",
     "android:device": "expo run:android --device",
     "ios": "expo run:ios",
+    "ios:go": "expo start --go --ios --localhost",
     "prebuild": "expo prebuild",
     "web": "expo start --web",
     "build:web": "expo export --platform web",
