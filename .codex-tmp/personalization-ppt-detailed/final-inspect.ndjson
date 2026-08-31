@@ -1,0 +1,283 @@
+{"kind":"slide","id":"sl/y90nupkv","slide":1,"title":"오늘도 · 개인화 시스템","textShapes":12}
+{"kind":"textbox","id":"sh/90ve1w7q","slide":1,"name":"직사각형 23","text":"오늘도 · 개인화 시스템","textPreview":"오늘도 · 개인화 시스템","textChars":13,"textLines":1,"bbox":[42,28,500,24]}
+{"kind":"textbox","id":"sh/547294r6","slide":1,"name":"직사각형 1","text":"데이터로 난이도와 퀘스트를 개인화한다","textPreview":"데이터로 난이도와 퀘스트를 개인화한다","textChars":20,"textLines":1,"bbox":[42,58,1150,66]}
+{"kind":"textbox","id":"sh/k3yl0zql","slide":1,"name":"직사각형 2","text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[1182,670,56,20]}
+{"kind":"shape","id":"sh/7qp4be9c","slide":1,"name":"모서리가 둥근 직사각형 3","bbox":[46,276,190,100]}
+{"kind":"textbox","id":"sh/65g3298r","slide":1,"name":"직사각형 4","text":"장보기 플레이\n세부 행동 수집","textPreview":"장보기 플레이 | 세부 행동 수집","textChars":16,"textLines":2,"bbox":[56,286,170,80]}
+{"kind":"shape","id":"sh/ts7md4r2","slide":1,"name":"모서리가 둥근 직사각형 5","bbox":[294,276,208,100]}
+{"kind":"textbox","id":"sh/sryl4zqx","slide":1,"name":"직사각형 6","text":"서버 정규화\n유효성·무결성","textPreview":"서버 정규화 | 유효성·무결성","textChars":14,"textLines":2,"bbox":[304,286,188,80]}
+{"kind":"shape","id":"sh/fu94fe98","slide":1,"name":"모서리가 둥근 직사각형 7","bbox":[560,276,220,100]}
+{"kind":"textbox","id":"sh/utg3698n","slide":1,"name":"직사각형 8","text":"기술 프로파일\n수행률·신뢰도","textPreview":"기술 프로파일 | 수행률·신뢰도","textChars":15,"textLines":2,"bbox":[570,286,200,80]}
+{"kind":"shape","id":"sh/wn6dc7eh","slide":1,"name":"모서리가 둥근 직사각형 9","bbox":[838,194,210,100]}
+{"kind":"textbox","id":"sh/hofulsf2","slide":1,"name":"직사각형 10","text":"AI 난이도 추천\n1~3 + 세부 조정","textPreview":"AI 난이도 추천 | 1~3 + 세부 조정","textChars":21,"textLines":2,"bbox":[848,204,190,80]}
+{"kind":"shape","id":"sh/ul4vaxgb","slide":1,"name":"모서리가 둥근 직사각형 11","bbox":[838,360,210,100]}
+{"kind":"textbox","id":"sh/vmdcj2xw","slide":1,"name":"직사각형 12","text":"AI 퀘스트 생성\n상품·수량·예산","textPreview":"AI 퀘스트 생성 | 상품·수량·예산","textChars":18,"textLines":2,"bbox":[848,370,190,80]}
+{"kind":"shape","id":"sh/4r6dg7et","slide":1,"name":"모서리가 둥근 직사각형 13","bbox":[1090,276,150,100]}
+{"kind":"textbox","id":"sh/5sfepcfe","slide":1,"name":"직사각형 14","text":"서버 검증·저장\n채택·fallback","textPreview":"서버 검증·저장 | 채택·fallback","textChars":20,"textLines":2,"bbox":[1100,286,130,80]}
+{"kind":"shape","id":"sh/9kby1g3i","slide":1,"name":"직선 화살표 연결선 38","bbox":[236,326,58,0]}
+{"kind":"shape","id":"sh/yhkza1wv","slide":1,"name":"직선 화살표 연결선 39","bbox":[502,326,58,0]}
+{"kind":"shape","id":"sh/jitg36dg","slide":1,"name":"꺾인 연결선[E] 40","bbox":[780,244,58,82]}
+{"kind":"shape","id":"sh/kj2hcbel","slide":1,"name":"직선 화살표 연결선 41","bbox":[943,294,0,66]}
+{"kind":"shape","id":"sh/l4by5wv6","slide":1,"name":"직선 화살표 연결선 42","bbox":[780,326,310,0]}
+{"kind":"textbox","id":"sh/0bmd476t","slide":1,"name":"직사각형 20","text":"결정적 계산","textPreview":"결정적 계산","textChars":6,"textLines":1,"bbox":[590,230,80,22]}
+{"kind":"textbox","id":"sh/zadcv2p8","slide":1,"name":"직사각형 21","text":"제한된 생성","textPreview":"제한된 생성","textChars":6,"textLines":1,"bbox":[870,500,180,24]}
+{"kind":"textbox","id":"sh/e94v2hon","slide":1,"name":"직사각형 22","text":"개인화의 핵심은 사용자를 진단하는 것이 아니라 다음 과제를 조정하는 것이다","textPreview":"개인화의 핵심은 사용자를 진단하는 것이 아니라 다음 과제를 조정하는 것이다","textChars":41,"textLines":1,"bbox":[280,570,720,38]}
+{"kind":"notes","id":"nt/y90nupkv","slide":1,"text":"[Sources]\n/Users/bluem/Documents/GitHub/Oneuldo/docs/ai/personalization-system.md\n/Users/bluem/Documents/GitHub/Oneuldo/docs/ai-data-rule/1.행동_로그_수집표.md\n/Users/bluem/Documents/GitHub/Oneuldo/docs/ai-data-rule/2.행동_로그_데이터_정규화.md\n/Users/bluem/Documents/GitHub/Oneuldo/docs/ai-data-rule/3.행동로그_근거자료_프로파일_설계.md\n/Users/bluem/Documents/GitHub/Oneuldo/docs/ai-data-rule/4.프로파일_LLM_입력_설계.md\n/Users/bluem/Downloads/oneuldo-ai-system-presentation-v2-slide12-black (1).pptx"}
+{"kind":"slide","id":"sl/hwbqtkby","slide":2,"title":"오늘도 · 개인화 시스템","textShapes":23}
+{"kind":"textbox","id":"sh/wbidwb29","slide":2,"name":"직사각형 35","text":"오늘도 · 개인화 시스템","textPreview":"오늘도 · 개인화 시스템","textChars":13,"textLines":1,"bbox":[42,28,500,24]}
+{"kind":"textbox","id":"sh/9072xkry","slide":2,"name":"직사각형 1","text":"플레이 기록이 다음 플레이를 바꾸는 여섯 단계","textPreview":"플레이 기록이 다음 플레이를 바꾸는 여섯 단계","textChars":25,"textLines":1,"bbox":[42,58,1150,66]}
+{"kind":"textbox","id":"sh/ozy1ofad","slide":2,"name":"직사각형 2","text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[1182,670,56,20]}
+{"kind":"shape","id":"sh/b29kza94","slide":2,"name":"직사각형 3","bbox":[192,312,52,2]}
+{"kind":"shape","id":"sh/a10jqpsj","slide":2,"name":"직사각형 4","bbox":[394,312,52,2]}
+{"kind":"shape","id":"sh/x4r21kru","slide":2,"name":"직사각형 5","bbox":[596,312,52,2]}
+{"kind":"shape","id":"sh/w3i1sfa9","slide":2,"name":"직사각형 6","bbox":[798,312,52,2]}
+{"kind":"shape","id":"sh/r65knqtk","slide":2,"name":"직사각형 7","bbox":[1000,312,52,2]}
+{"kind":"textbox","id":"sh/q5wjelsz","slide":2,"name":"직사각형 8","text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[42,210,70,28]}
+{"kind":"textbox","id":"sh/ove9o7yd","slide":2,"name":"직사각형 9","text":"행동 로그","textPreview":"행동 로그","textChars":5,"textLines":1,"bbox":[42,252,166,38]}
+{"kind":"shape","id":"sh/9wnqhczy","slide":2,"name":"직사각형 10","bbox":[42,308,162,146]}
+{"kind":"textbox","id":"sh/mtwrmxg7","slide":2,"name":"직사각형 11","text":"선택·수량\n예산·지원","textPreview":"선택·수량 | 예산·지원","textChars":11,"textLines":2,"bbox":[56,337,134,86]}
+{"kind":"textbox","id":"sh/nu58f2hs","slide":2,"name":"직사각형 12","text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[244,210,70,28]}
+{"kind":"textbox","id":"sh/wjy9sry9","slide":2,"name":"직사각형 13","text":"정규화","textPreview":"정규화","textChars":3,"textLines":1,"bbox":[244,252,166,38]}
+{"kind":"shape","id":"sh/xk7qlczu","slide":2,"name":"직사각형 14","bbox":[244,308,162,146]}
+{"kind":"textbox","id":"sh/ahwrqhgj","slide":2,"name":"직사각형 15","text":"결과·오류\n독립 수준","textPreview":"결과·오류 | 독립 수준","textChars":11,"textLines":2,"bbox":[258,337,134,86]}
+{"kind":"textbox","id":"sh/bip8jmho","slide":2,"name":"직사각형 16","text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[446,210,70,28]}
+{"kind":"textbox","id":"sh/cnupgny5","slide":2,"name":"직사각형 17","text":"프로파일","textPreview":"프로파일","textChars":4,"textLines":1,"bbox":[446,252,166,38]}
+{"kind":"shape","id":"sh/do3q9szq","slide":2,"name":"직사각형 18","bbox":[446,308,162,146]}
+{"kind":"textbox","id":"sh/t8byxkn2","slide":2,"name":"직사각형 19","text":"기술별 수행률\n근거·신뢰도","textPreview":"기술별 수행률 | 근거·신뢰도","textChars":14,"textLines":2,"bbox":[460,337,134,86]}
+{"kind":"textbox","id":"sh/s72xofmh","slide":2,"name":"직사각형 20","text":"04","textPreview":"04","textChars":2,"textLines":1,"bbox":[648,210,70,28]}
+{"kind":"textbox","id":"sh/76twva5c","slide":2,"name":"직사각형 21","text":"AI 난이도","textPreview":"AI 난이도","textChars":6,"textLines":1,"bbox":[648,252,166,38]}
+{"kind":"shape","id":"sh/65kfmpor","slide":2,"name":"직사각형 22","bbox":[648,308,162,146]}
+{"kind":"textbox","id":"sh/hcvy14ne","slide":2,"name":"직사각형 23","text":"1~3단계\n지원·복잡도","textPreview":"1~3단계 | 지원·복잡도","textChars":12,"textLines":2,"bbox":[662,337,134,86]}
+{"kind":"textbox","id":"sh/gbmxszmt","slide":2,"name":"직사각형 24","text":"05","textPreview":"05","textChars":2,"textLines":1,"bbox":[850,210,70,28]}
+{"kind":"textbox","id":"sh/fadgzu58","slide":2,"name":"직사각형 25","text":"AI 퀘스트","textPreview":"AI 퀘스트","textChars":6,"textLines":1,"bbox":[850,252,166,38]}
+{"kind":"shape","id":"sh/u94fqp4n","slide":2,"name":"직사각형 26","bbox":[850,308,162,146]}
+{"kind":"textbox","id":"sh/p0vy54na","slide":2,"name":"직사각형 27","text":"품목·수량\n예산·안내","textPreview":"품목·수량 | 예산·안내","textChars":11,"textLines":2,"bbox":[864,337,134,86]}
+{"kind":"textbox","id":"sh/4zmxwzmp","slide":2,"name":"직사각형 28","text":"06","textPreview":"06","textChars":2,"textLines":1,"bbox":[1052,210,70,28]}
+{"kind":"textbox","id":"sh/mlgvq147","slide":2,"name":"직사각형 29","text":"검증·플레이","textPreview":"검증·플레이","textChars":6,"textLines":1,"bbox":[1052,252,166,38]}
+{"kind":"shape","id":"sh/nmpcj6ls","slide":2,"name":"직사각형 30","bbox":[1052,308,162,146]}
+{"kind":"textbox","id":"sh/onydsbmd","slide":2,"name":"직사각형 31","text":"서버 승인 후\n실제 제공","textPreview":"서버 승인 후 | 실제 제공","textChars":13,"textLines":2,"bbox":[1066,337,134,86]}
+{"kind":"textbox","id":"sh/9o7ulg3y","slide":2,"name":"직사각형 32","text":"반복 구조","textPreview":"반복 구조","textChars":5,"textLines":1,"bbox":[862,486,100,24]}
+{"kind":"textbox","id":"sh/a9gvulkj","slide":2,"name":"직사각형 33","text":"새 행동이 다시 로그가 되고 프로파일과 다음 퀘스트를 갱신한다","textPreview":"새 행동이 다시 로그가 되고 프로파일과 다음 퀘스트를 갱신한다","textChars":34,"textLines":1,"bbox":[958,486,280,24]}
+{"kind":"shape","id":"sh/ba9cn6l4","slide":2,"name":"직사각형 34","bbox":[42,574,1196,34]}
+{"kind":"notes","id":"nt/hwbqtkby","slide":2,"text":"[Sources]\n/Users/bluem/Documents/GitHub/Oneuldo/docs/ai/personalization-system.md\n/Users/bluem/Documents/GitHub/Oneuldo/docs/ai-data-rule/1.행동_로그_수집표.md\n/Users/bluem/Documents/GitHub/Oneuldo/docs/ai-data-rule/2.행동_로그_데이터_정규화.md\n/Users/bluem/Documents/GitHub/Oneuldo/docs/ai-data-rule/3.행동로그_근거자료_프로파일_설계.md\n/Users/bluem/Documents/GitHub/Oneuldo/docs/ai-data-rule/4.프로파일_LLM_입력_설계.md\n/Users/bluem/Downloads/oneuldo-ai-system-presentation-v2-slide12-black (1).pptx"}
+{"kind":"slide","id":"sl/ofy9wn61","slide":3,"title":"오늘도 · 개인화 시스템","textShapes":18}
+{"kind":"textbox","id":"sh/sfix03y9","slide":3,"name":"직사각형 25","text":"오늘도 · 개인화 시스템","textPreview":"오늘도 · 개인화 시스템","textChars":13,"textLines":1,"bbox":[42,28,500,24]}
+{"kind":"textbox","id":"sh/cza94vmx","slide":3,"name":"직사각형 1","text":"장보기에서는 네 가지 생활 기술을 따로 관찰한다","textPreview":"장보기에서는 네 가지 생활 기술을 따로 관찰한다","textChars":26,"textLines":1,"bbox":[42,58,1150,66]}
+{"kind":"textbox","id":"sh/d0jax03i","slide":3,"name":"직사각형 2","text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[1182,670,56,20]}
+{"kind":"shape","id":"sh/298ryl4v","slide":3,"name":"직사각형 3","bbox":[44,168,204,78]}
+{"kind":"textbox","id":"sh/3ah8rqlg","slide":3,"name":"직사각형 4","text":"언어 이해","textPreview":"언어 이해","textChars":5,"textLines":1,"bbox":[44,193,204,26]}
+{"kind":"textbox","id":"sh/obq90bml","slide":3,"name":"직사각형 5","text":"·","textPreview":"·","textChars":1,"textLines":1,"bbox":[249,192,32,30]}
+{"kind":"shape","id":"sh/pcjqtg36","slide":3,"name":"직사각형 6","bbox":[282,168,204,78]}
+{"kind":"textbox","id":"sh/m5cra54z","slide":3,"name":"직사각형 7","text":"수 개념","textPreview":"수 개념","textChars":4,"textLines":1,"bbox":[282,193,204,26]}
+{"kind":"textbox","id":"sh/n6ls3alk","slide":3,"name":"직사각형 8","text":"·","textPreview":"·","textChars":1,"textLines":1,"bbox":[487,192,32,30]}
+{"kind":"shape","id":"sh/n2l4fq98","slide":3,"name":"직사각형 9","bbox":[520,168,204,78]}
+{"kind":"textbox","id":"sh/m1c3mlsn","slide":3,"name":"직사각형 10","text":"돈 관리","textPreview":"돈 관리","textChars":4,"textLines":1,"bbox":[520,193,204,26]}
+{"kind":"textbox","id":"sh/943mhgre","slide":3,"name":"직사각형 11","text":"·","textPreview":"·","textChars":1,"textLines":1,"bbox":[725,192,32,30]}
+{"kind":"shape","id":"sh/83ulovat","slide":3,"name":"직사각형 12","bbox":[758,168,204,78]}
+{"kind":"textbox","id":"sh/v6l4jq94","slide":3,"name":"직사각형 13","text":"계획과 순서","textPreview":"계획과 순서","textChars":6,"textLines":1,"bbox":[758,193,204,26]}
+{"kind":"textbox","id":"sh/a5c3ql8z","slide":3,"name":"직사각형 14","text":"·","textPreview":"·","textChars":1,"textLines":1,"bbox":[963,192,32,30]}
+{"kind":"shape","id":"sh/x8nml0ra","slide":3,"name":"직사각형 15","bbox":[996,168,204,78]}
+{"kind":"textbox","id":"sh/w7ulsvqp","slide":3,"name":"직사각형 16","text":"데이터 품질","textPreview":"데이터 품질","textChars":6,"textLines":1,"bbox":[996,193,204,26]}
+{"kind":"textbox","id":"sh/ja54na9g","slide":3,"name":"직사각형 17","text":"상품을 이해하고 고르기","textPreview":"상품을 이해하고 고르기","textChars":12,"textLines":1,"bbox":[44,302,300,32]}
+{"kind":"textbox","id":"sh/i9w3u58v","slide":3,"name":"직사각형 18","text":"필요 상품 선택\n상품 누락\n목록 밖 상품\n안내 이해","textPreview":"필요 상품 선택 | 상품 누락 | 목록 밖 상품 | 안내 이해","textChars":28,"textLines":4,"bbox":[44,354,340,196]}
+{"kind":"textbox","id":"sh/e10f2twf","slide":3,"name":"직사각형 19","text":"수량·예산·순서","textPreview":"수량·예산·순서","textChars":8,"textLines":1,"bbox":[456,302,340,32]}
+{"kind":"textbox","id":"sh/f29gbyx0","slide":3,"name":"직사각형 20","text":"요구 수량 일치\n예산 안에서 완료\n목록 확인\n과제 완료 순서","textPreview":"요구 수량 일치 | 예산 안에서 완료 | 목록 확인 | 과제 완료 순서","textChars":33,"textLines":4,"bbox":[456,354,340,164]}
+{"kind":"textbox","id":"sh/03ix43e5","slide":3,"name":"직사각형 21","text":"해석 원칙","textPreview":"해석 원칙","textChars":5,"textLines":1,"bbox":[866,302,240,32]}
+{"kind":"textbox","id":"sh/14ryd8fq","slide":3,"name":"직사각형 22","text":"한 행동으로 단정하지 않음\n반복 평가 근거 사용\n진단·IQ 추정 금지\n근거 부족을 별도 표시","textPreview":"한 행동으로 단정하지 않음 | 반복 평가 근거 사용 | 진단·IQ 추정 금지 | 근거 부족을 별도 표시","textChars":51,"textLines":4,"bbox":[866,354,340,164]}
+{"kind":"shape","id":"sh/6d0fytg3","slide":3,"name":"직사각형 23","bbox":[44,576,1162,48]}
+{"kind":"shape","id":"sh/re9g7yxo","slide":3,"name":"직사각형 24","bbox":[64,589,1122,24]}
+{"kind":"notes","id":"nt/ofy9wn61","slide":3,"text":"[Sources]\n/Users/bluem/Documents/GitHub/Oneuldo/docs/ai/personalization-system.md\n/Users/bluem/Documents/GitHub/Oneuldo/docs/ai-data-rule/1.행동_로그_수집표.md\n/Users/bluem/Documents/GitHub/Oneuldo/docs/ai-data-rule/2.행동_로그_데이터_정규화.md\n/Users/bluem/Documents/GitHub/Oneuldo/docs/ai-data-rule/3.행동로그_근거자료_프로파일_설계.md\n/Users/bluem/Documents/GitHub/Oneuldo/docs/ai-data-rule/4.프로파일_LLM_입력_설계.md\n/Users/bluem/Downloads/oneuldo-ai-system-presentation-v2-slide12-black (1).pptx"}
+{"kind":"slide","id":"sl/jyx0ra1s","slide":4,"title":"오늘도 · 개인화 시스템","textShapes":11}
+{"kind":"textbox","id":"sh/w72947yt","slide":4,"name":"직사각형 13","text":"오늘도 · 개인화 시스템","textPreview":"오늘도 · 개인화 시스템","textChars":13,"textLines":1,"bbox":[42,28,500,24]}
+{"kind":"textbox","id":"sh/1cj2d8b6","slide":4,"name":"직사각형 1","text":"행동 로그는 한 번의 플레이를 재현할 수 있게 남긴다","textPreview":"행동 로그는 한 번의 플레이를 재현할 수 있게 남긴다","textChars":29,"textLines":1,"bbox":[42,58,1150,66]}
+{"kind":"textbox","id":"sh/0ba143al","slide":4,"name":"직사각형 2","text":"04","textPreview":"04","textChars":2,"textLines":1,"bbox":[1182,670,56,20]}
+{"kind":"shape","id":"sh/rm1k7yt4","slide":4,"name":"직사각형 3","bbox":[42,142,508,502]}
+{"kind":"textbox","id":"sh/ql8jytsj","slide":4,"name":"직사각형 4","text":"수집 단위","textPreview":"수집 단위","textChars":5,"textLines":1,"bbox":[70,168,110,24]}
+{"kind":"textbox","id":"sh/doj29oba","slide":4,"name":"직사각형 5","text":"마트 입장부터 계산 또는 중단까지를 하나의 sessionId로 묶습니다.\n첫 수행은 ASSESSMENT_TASK, 같은 과제 재수행은 TRAINING_TASK로 분리합니다.","textPreview":"마트 입장부터 계산 또는 중단까지를 하나의 sessionId로 묶습니다. | 첫 수행은 ASSESSMENT_TASK, 같은 과제 재수행은 TRAINING_TASK로 분리합니다.","textChars":96,"textLines":2,"bbox":[70,208,444,120]}
+{"kind":"textbox","id":"sh/sna103ap","slide":4,"name":"직사각형 6","text":"연결 정보","textPreview":"연결 정보","textChars":5,"textLines":1,"bbox":[70,354,200,24]}
+{"kind":"textbox","id":"sh/3ihk3et8","slide":4,"name":"직사각형 7","text":"• sessionId · eventSequence\n• questInstanceId · contentSource\n• taskId · taskVersion · difficulty\n• occurredAt · clientEventId\n• supportContext · sessionEnd","textPreview":"• sessionId · eventSequence | • questInstanceId · contentSource | • taskId · taskVersion · difficulty | • occurredAt · clientEventId | • ...","textChars":156,"textLines":5,"bbox":[70,394,434,190]}
+{"kind":"textbox","id":"sh/ih8ju9sn","slide":4,"name":"직사각형 8","text":"행동 로그 예시","textPreview":"행동 로그 예시","textChars":8,"textLines":1,"bbox":[590,154,260,30]}
+{"kind":"shape","id":"sh/kbm987y5","slide":4,"name":"직사각형 9","bbox":[590,198,648,280]}
+{"kind":"textbox","id":"sh/5cva1cfq","slide":4,"name":"직사각형 10","text":"eventCode  SHOP.QUANTITY_CHANGED\nstepOutcome  FAILURE\nproductId  apple\nrequiredQuantity  2\nselectedQuantity  1\npromptLevel  0\ncontentSource  GENERATED","textPreview":"eventCode  SHOP.QUANTITY_CHANGED | stepOutcome  FAILURE | productId  apple | requiredQuantity  2 | selectedQuantity  1 | promptLevel  0 |...","textChars":150,"textLines":7,"bbox":[616,224,596,230]}
+{"kind":"textbox","id":"sh/i94r6xgz","slide":4,"name":"직사각형 11","text":"아직 능력 판정은 아님","textPreview":"아직 능력 판정은 아님","textChars":12,"textLines":1,"bbox":[590,508,250,28]}
+{"kind":"textbox","id":"sh/jadsz2xk","slide":4,"name":"직사각형 12","text":"이 로그는 ‘사과 수량이 달랐다’는 관찰 사실\n→ 서버 검증과 반복 근거 집계 후에만 프로파일에 반영","textPreview":"이 로그는 ‘사과 수량이 달랐다’는 관찰 사실 | → 서버 검증과 반복 근거 집계 후에만 프로파일에 반영","textChars":56,"textLines":2,"bbox":[590,548,648,92]}
+{"kind":"notes","id":"nt/jyx0ra1s","slide":4,"text":"[Sources]\n/Users/bluem/Documents/GitHub/Oneuldo/docs/ai/personalization-system.md\n/Users/bluem/Documents/GitHub/Oneuldo/docs/ai-data-rule/1.행동_로그_수집표.md\n/Users/bluem/Documents/GitHub/Oneuldo/docs/ai-data-rule/2.행동_로그_데이터_정규화.md\n/Users/bluem/Documents/GitHub/Oneuldo/docs/ai-data-rule/3.행동로그_근거자료_프로파일_설계.md\n/Users/bluem/Documents/GitHub/Oneuldo/docs/ai-data-rule/4.프로파일_LLM_입력_설계.md\n/Users/bluem/Downloads/oneuldo-ai-system-presentation-v2-slide12-black (1).pptx"}
+{"kind":"slide","id":"sl/i107q5of","slide":5,"title":"오늘도 · 개인화 시스템","textShapes":16}
+{"kind":"textbox","id":"sh/ud0ne10b","slide":5,"name":"직사각형 22","text":"오늘도 · 개인화 시스템","textPreview":"오늘도 · 개인화 시스템","textChars":13,"textLines":1,"bbox":[42,28,500,24]}
+{"kind":"textbox","id":"sh/dgbulwnm","slide":5,"name":"직사각형 1","text":"정규화가 게임 행동을 비교 가능한 기술 근거로 바꾼다","textPreview":"정규화가 게임 행동을 비교 가능한 기술 근거로 바꾼다","textChars":29,"textLines":1,"bbox":[42,58,1150,66]}
+{"kind":"textbox","id":"sh/cf2tcr61","slide":5,"name":"직사각형 2","text":"05","textPreview":"05","textChars":2,"textLines":1,"bbox":[1182,670,56,20]}
+{"kind":"textbox","id":"sh/z2tcnm5s","slide":5,"name":"직사각형 3","text":"정규화 결과 예시","textPreview":"정규화 결과 예시","textChars":9,"textLines":1,"bbox":[44,150,460,28]}
+{"kind":"shape","id":"sh/yhkbe1o7","slide":5,"name":"직사각형 4","bbox":[44,194,620,286]}
+{"kind":"textbox","id":"sh/l4bupwny","slide":5,"name":"직사각형 5","text":"event  SHOP.QUANTITY_CHANGED\n\noutcome  FAILURE\n\nerror  QUANTITY_ERROR\n\nindependence  INDEPENDENT\nskill  NUMERACY · NEGATIVE","textPreview":"event  SHOP.QUANTITY_CHANGED |  | outcome  FAILURE |  | error  QUANTITY_ERROR |  | independence  INDEPENDENT | skill  NUMERACY · NEGATIVE","textChars":123,"textLines":8,"bbox":[72,224,564,224]}
+{"kind":"textbox","id":"sh/032tgr6d","slide":5,"name":"직사각형 6","text":"서버 정규화 검사","textPreview":"서버 정규화 검사","textChars":9,"textLines":1,"bbox":[718,150,240,28]}
+{"kind":"shape","id":"sh/n6dcr65o","slide":5,"name":"직사각형 7","bbox":[718,194,478,58]}
+{"kind":"textbox","id":"sh/m5kbi1oj","slide":5,"name":"직사각형 8","text":"형식","textPreview":"형식","textChars":2,"textLines":1,"bbox":[738,211,70,24]}
+{"kind":"textbox","id":"sh/w32dkbuh","slide":5,"name":"직사각형 9","text":"eventCode · payload 필수값","textPreview":"eventCode · payload 필수값","textChars":23,"textLines":1,"bbox":[820,211,350,24]}
+{"kind":"shape","id":"sh/x4vedgvm","slide":5,"name":"직사각형 10","bbox":[718,270,478,58]}
+{"kind":"textbox","id":"sh/ahkvi1cb","slide":5,"name":"직사각형 11","text":"유효성","textPreview":"유효성","textChars":3,"textLines":1,"bbox":[738,287,70,24]}
+{"kind":"textbox","id":"sh/v2twb6dw","slide":5,"name":"직사각형 12","text":"기술 오류 · 접근성 · 직접 개입","textPreview":"기술 오류 · 접근성 · 직접 개입","textChars":19,"textLines":1,"bbox":[820,287,350,24]}
+{"kind":"shape","id":"sh/k7mxovud","slide":5,"name":"직사각형 13","bbox":[718,346,478,58]}
+{"kind":"textbox","id":"sh/58vehgvy","slide":5,"name":"직사각형 14","text":"무결성","textPreview":"무결성","textChars":3,"textLines":1,"bbox":[738,363,70,24]}
+{"kind":"textbox","id":"sh/i54fmlc7","slide":5,"name":"직사각형 15","text":"COMPLETE · 순번 누락 없음","textPreview":"COMPLETE · 순번 누락 없음","textChars":19,"textLines":1,"bbox":[820,363,350,24]}
+{"kind":"shape","id":"sh/j6dwfqds","slide":5,"name":"직사각형 16","bbox":[718,422,478,58]}
+{"kind":"textbox","id":"sh/sb6xsvu9","slide":5,"name":"직사각형 17","text":"용도","textPreview":"용도","textChars":2,"textLines":1,"bbox":[738,439,70,24]}
+{"kind":"textbox","id":"sh/tcfel0vu","slide":5,"name":"직사각형 18","text":"평가 · 훈련 · 중립 · 제외 분리","textPreview":"평가 · 훈련 · 중립 · 제외 분리","textChars":20,"textLines":1,"bbox":[820,439,350,24]}
+{"kind":"shape","id":"sh/hgrmpwj2","slide":5,"name":"직사각형 19","bbox":[44,526,1152,92]}
+{"kind":"textbox","id":"sh/gfi5grih","slide":5,"name":"직사각형 20","text":"점수 반영 원칙","textPreview":"점수 반영 원칙","textChars":8,"textLines":1,"bbox":[70,550,120,28]}
+{"kind":"textbox","id":"sh/fe94nm1w","slide":5,"name":"직사각형 21","text":"SUCCESS는 긍정, FAILURE는 부정 / 중립·미완료·조력자 개입은 성공률에서 제외","textPreview":"SUCCESS는 긍정, FAILURE는 부정 / 중립·미완료·조력자 개입은 성공률에서 제외","textChars":50,"textLines":1,"bbox":[196,548,964,32]}
+{"kind":"notes","id":"nt/i107q5of","slide":5,"text":"[Sources]\n/Users/bluem/Documents/GitHub/Oneuldo/docs/ai/personalization-system.md\n/Users/bluem/Documents/GitHub/Oneuldo/docs/ai-data-rule/1.행동_로그_수집표.md\n/Users/bluem/Documents/GitHub/Oneuldo/docs/ai-data-rule/2.행동_로그_데이터_정규화.md\n/Users/bluem/Documents/GitHub/Oneuldo/docs/ai-data-rule/3.행동로그_근거자료_프로파일_설계.md\n/Users/bluem/Documents/GitHub/Oneuldo/docs/ai-data-rule/4.프로파일_LLM_입력_설계.md\n/Users/bluem/Downloads/oneuldo-ai-system-presentation-v2-slide12-black (1).pptx"}
+{"kind":"slide","id":"sl/x8f69ofe","slide":6,"title":"오늘도 · 개인화 시스템","textShapes":11}
+{"kind":"textbox","id":"sh/5svutgni","slide":6,"name":"직사각형 13","text":"오늘도 · 개인화 시스템","textPreview":"오늘도 · 개인화 시스템","textChars":13,"textLines":1,"bbox":[42,28,500,24]}
+{"kind":"textbox","id":"sh/yhg7epsj","slide":6,"name":"직사각형 1","text":"같은 성공도 도움 여부에 따라 따로 계산한다","textPreview":"같은 성공도 도움 여부에 따라 따로 계산한다","textChars":24,"textLines":1,"bbox":[42,58,1150,66]}
+{"kind":"textbox","id":"sh/zi98nu94","slide":6,"name":"직사각형 2","text":"06","textPreview":"06","textChars":2,"textLines":1,"bbox":[1182,670,56,20]}
+{"kind":"shape","id":"sh/87ipkzal","slide":6,"name":"직사각형 3","bbox":[42,142,508,502]}
+{"kind":"textbox","id":"sh/98rqt4r6","slide":6,"name":"직사각형 4","text":"두 성공률의 의미","textPreview":"두 성공률의 의미","textChars":9,"textLines":1,"bbox":[70,168,110,24]}
+{"kind":"textbox","id":"sh/ml07i9sv","slide":6,"name":"직사각형 5","text":"독립 성공률은 promptLevel 0에서 스스로 수행한 비율입니다.\n지원 성공률은 promptLevel 1~3의 힌트·안내를 받은 상태에서 성공한 비율입니다.","textPreview":"독립 성공률은 promptLevel 0에서 스스로 수행한 비율입니다. | 지원 성공률은 promptLevel 1~3의 힌트·안내를 받은 상태에서 성공한 비율입니다.","textChars":89,"textLines":2,"bbox":[70,208,444,120]}
+{"kind":"textbox","id":"sh/7m98ru9g","slide":6,"name":"직사각형 6","text":"계산식","textPreview":"계산식","textChars":3,"textLines":1,"bbox":[70,354,200,24]}
+{"kind":"textbox","id":"sh/oryp8fah","slide":6,"name":"직사각형 7","text":"• 독립 = 독립 긍정 ÷ (독립 긍정+부정)\n• 지원 = 지원 긍정 ÷ (지원 긍정+부정)\n• NEUTRAL · INCOMPLETE 제외\n• ASSISTED 직접 개입 제외","textPreview":"• 독립 = 독립 긍정 ÷ (독립 긍정+부정) | • 지원 = 지원 긍정 ÷ (지원 긍정+부정) | • NEUTRAL · INCOMPLETE 제외 | • ASSISTED 직접 개입 제외","textChars":97,"textLines":4,"bbox":[70,394,434,190]}
+{"kind":"textbox","id":"sh/pc76hkr2","slide":6,"name":"직사각형 8","text":"수 개념 예시","textPreview":"수 개념 예시","textChars":7,"textLines":1,"bbox":[590,154,260,30]}
+{"kind":"shape","id":"sh/h4bupgn6","slide":6,"name":"직사각형 9","bbox":[590,198,648,280]}
+{"kind":"textbox","id":"sh/w32twb6l","slide":6,"name":"직사각형 10","text":"독립 수행\n긍정 3건 · 부정 2건\n→ independentSuccessRate  60%\n\n지원 수행\n긍정 3건 · 부정 1건\n→ supportedSuccessRate  75%","textPreview":"독립 수행 | 긍정 3건 · 부정 2건 | → independentSuccessRate  60% |  | 지원 수행 | 긍정 3건 · 부정 1건 | → supportedSuccessRate  75%","textChars":98,"textLines":7,"bbox":[616,224,596,230]}
+{"kind":"textbox","id":"sh/v2tcn650","slide":6,"name":"직사각형 11","text":"왜 분리하는가","textPreview":"왜 분리하는가","textChars":7,"textLines":1,"bbox":[590,508,250,28]}
+{"kind":"textbox","id":"sh/u1kbu1ov","slide":6,"name":"직사각형 12","text":"독립 30%·지원 90%라면 안내가 있을 때 수행 가능\n단, 지원 성공률만으로 특정 지원의 효과를 확정하지 않음","textPreview":"독립 30%·지원 90%라면 안내가 있을 때 수행 가능 | 단, 지원 성공률만으로 특정 지원의 효과를 확정하지 않음","textChars":62,"textLines":2,"bbox":[590,548,648,92]}
+{"kind":"notes","id":"nt/x8f69ofe","slide":6,"text":"[Sources]\n/Users/bluem/Documents/GitHub/Oneuldo/docs/ai/personalization-system.md\n/Users/bluem/Documents/GitHub/Oneuldo/docs/ai-data-rule/1.행동_로그_수집표.md\n/Users/bluem/Documents/GitHub/Oneuldo/docs/ai-data-rule/2.행동_로그_데이터_정규화.md\n/Users/bluem/Documents/GitHub/Oneuldo/docs/ai-data-rule/3.행동로그_근거자료_프로파일_설계.md\n/Users/bluem/Documents/GitHub/Oneuldo/docs/ai-data-rule/4.프로파일_LLM_입력_설계.md\n/Users/bluem/Downloads/oneuldo-ai-system-presentation-v2-slide12-black (1).pptx"}
+{"kind":"slide","id":"sl/gnmp4jqx","slide":7,"title":"오늘도 · 개인화 시스템","textShapes":16}
+{"kind":"textbox","id":"sh/50v2pgna","slide":7,"name":"직사각형 22","text":"오늘도 · 개인화 시스템","textPreview":"오늘도 · 개인화 시스템","textChars":13,"textLines":1,"bbox":[42,28,500,24]}
+{"kind":"textbox","id":"sh/cb2tkvap","slide":7,"name":"직사각형 1","text":"프로파일은 성공률보다 근거의 신뢰도를 먼저 본다","textPreview":"프로파일은 성공률보다 근거의 신뢰도를 먼저 본다","textChars":26,"textLines":1,"bbox":[42,58,1150,66]}
+{"kind":"textbox","id":"sh/dcbud0ra","slide":7,"name":"직사각형 2","text":"07","textPreview":"07","textChars":2,"textLines":1,"bbox":[1182,670,56,20]}
+{"kind":"textbox","id":"sh/ydkbm5sv","slide":7,"name":"직사각형 3","text":"기술 프로파일 예시","textPreview":"기술 프로파일 예시","textChars":10,"textLines":1,"bbox":[44,150,460,28]}
+{"kind":"shape","id":"sh/zedcfa9g","slide":7,"name":"직사각형 4","bbox":[44,194,620,286]}
+{"kind":"textbox","id":"sh/kzmdova1","slide":7,"name":"직사각형 5","text":"NUMERACY\n\n독립 성공률  60%\n지원 성공률  75%\n독립 근거  5건\n서로 다른 과제  2개\n서로 다른 세션  2회\n신뢰도  MEDIUM","textPreview":"NUMERACY |  | 독립 성공률  60% | 지원 성공률  75% | 독립 근거  5건 | 서로 다른 과제  2개 | 서로 다른 세션  2회 | 신뢰도  MEDIUM","textChars":81,"textLines":8,"bbox":[72,224,564,224]}
+{"kind":"textbox","id":"sh/l0vuh0rm","slide":7,"name":"직사각형 6","text":"신뢰도와 근거 부족","textPreview":"신뢰도와 근거 부족","textChars":10,"textLines":1,"bbox":[718,150,240,28]}
+{"kind":"shape","id":"sh/eh0ba1sr","slide":7,"name":"직사각형 7","bbox":[718,194,478,58]}
+{"kind":"textbox","id":"sh/fi9c369c","slide":7,"name":"직사각형 8","text":"근거 수","textPreview":"근거 수","textChars":4,"textLines":1,"bbox":[738,211,70,24]}
+{"kind":"textbox","id":"sh/baxkjqlk","slide":7,"name":"직사각형 9","text":"평가 가능한 근거 5건 이상","textPreview":"평가 가능한 근거 5건 이상","textChars":15,"textLines":1,"bbox":[820,211,350,24]}
+{"kind":"shape","id":"sh/a9ojq5kz","slide":7,"name":"직사각형 10","bbox":[718,270,478,58]}
+{"kind":"textbox","id":"sh/xcz2l03q","slide":7,"name":"직사각형 11","text":"과제 다양성","textPreview":"과제 다양성","textChars":6,"textLines":1,"bbox":[738,287,70,24]}
+{"kind":"textbox","id":"sh/cbq1sv25","slide":7,"name":"직사각형 12","text":"서로 다른 taskId·version 2개 이상","textPreview":"서로 다른 taskId·version 2개 이상","textChars":26,"textLines":1,"bbox":[820,287,350,24]}
+{"kind":"shape","id":"sh/n6x0fqlo","slide":7,"name":"직사각형 13","bbox":[718,346,478,58]}
+{"kind":"textbox","id":"sh/25ojml43","slide":7,"name":"직사각형 14","text":"반복 관찰","textPreview":"반복 관찰","textChars":5,"textLines":1,"bbox":[738,363,70,24]}
+{"kind":"textbox","id":"sh/p8fih03e","slide":7,"name":"직사각형 15","text":"서로 다른 완료 세션 2회 이상","textPreview":"서로 다른 완료 세션 2회 이상","textChars":17,"textLines":1,"bbox":[820,363,350,24]}
+{"kind":"shape","id":"sh/o761ov2t","slide":7,"name":"직사각형 16","bbox":[718,422,478,58]}
+{"kind":"textbox","id":"sh/f2d0b6lc","slide":7,"name":"직사각형 17","text":"데이터 품질","textPreview":"데이터 품질","textChars":6,"textLines":1,"bbox":[738,439,70,24]}
+{"kind":"textbox","id":"sh/eh4jil4r","slide":7,"name":"직사각형 18","text":"제외율 · 순번 누락 · 상충 결과","textPreview":"제외율 · 순번 누락 · 상충 결과","textChars":19,"textLines":1,"bbox":[820,439,350,24]}
+{"kind":"shape","id":"sh/id4ju1oz","slide":7,"name":"직사각형 19","bbox":[44,526,1152,92]}
+{"kind":"textbox","id":"sh/jedkn654","slide":7,"name":"직사각형 20","text":"판단 보류","textPreview":"판단 보류","textChars":5,"textLines":1,"bbox":[70,550,120,28]}
+{"kind":"textbox","id":"sh/4fm1wb6p","slide":7,"name":"직사각형 21","text":"근거가 부족하면 INSUFFICIENT_EVIDENCE로 표시하고 중간 난이도에서 추가 관찰","textPreview":"근거가 부족하면 INSUFFICIENT_EVIDENCE로 표시하고 중간 난이도에서 추가 관찰","textChars":51,"textLines":1,"bbox":[196,548,964,32]}
+{"kind":"notes","id":"nt/gnmp4jqx","slide":7,"text":"[Sources]\n/Users/bluem/Documents/GitHub/Oneuldo/docs/ai/personalization-system.md\n/Users/bluem/Documents/GitHub/Oneuldo/docs/ai-data-rule/1.행동_로그_수집표.md\n/Users/bluem/Documents/GitHub/Oneuldo/docs/ai-data-rule/2.행동_로그_데이터_정규화.md\n/Users/bluem/Documents/GitHub/Oneuldo/docs/ai-data-rule/3.행동로그_근거자료_프로파일_설계.md\n/Users/bluem/Documents/GitHub/Oneuldo/docs/ai-data-rule/4.프로파일_LLM_입력_설계.md\n/Users/bluem/Downloads/oneuldo-ai-system-presentation-v2-slide12-black (1).pptx"}
+{"kind":"slide","id":"sl/fu1gfa1s","slide":8,"title":"오늘도 · 개인화 시스템","textShapes":11}
+{"kind":"textbox","id":"sh/0jydkreh","slide":8,"name":"직사각형 13","text":"오늘도 · 개인화 시스템","textPreview":"오늘도 · 개인화 시스템","textChars":13,"textLines":1,"bbox":[42,28,500,24]}
+{"kind":"textbox","id":"sh/18byd4zy","slide":8,"name":"직사각형 1","text":"AI에는 사용자를 식별할 수 없는 수행 요약만 보낸다","textPreview":"AI에는 사용자를 식별할 수 없는 수행 요약만 보낸다","textChars":29,"textLines":1,"bbox":[42,58,1150,66]}
+{"kind":"textbox","id":"sh/g72x4zyd","slide":8,"name":"직사각형 2","text":"08","textPreview":"08","textChars":2,"textLines":1,"bbox":[1182,670,56,20]}
+{"kind":"shape","id":"sh/ri9g7uhw","slide":8,"name":"직사각형 3","bbox":[42,142,508,502]}
+{"kind":"textbox","id":"sh/6h0fypgb","slide":8,"name":"직사각형 4","text":"보내지 않는 정보","textPreview":"보내지 않는 정보","textChars":9,"textLines":1,"bbox":[70,168,110,24]}
+{"kind":"textbox","id":"sh/tkby9kzm","slide":8,"name":"직사각형 5","text":"이름·이메일·생년월일·회원 ID를 보내지 않습니다.\nIQ·장애 정보·진단 정보와 원본 행동 로그 전체도 전달하지 않습니다.","textPreview":"이름·이메일·생년월일·회원 ID를 보내지 않습니다. | IQ·장애 정보·진단 정보와 원본 행동 로그 전체도 전달하지 않습니다.","textChars":68,"textLines":2,"bbox":[70,208,444,120]}
+{"kind":"textbox","id":"sh/sjix0zy1","slide":8,"name":"직사각형 6","text":"전달하는 정보","textPreview":"전달하는 정보","textChars":7,"textLines":1,"bbox":[70,354,200,24]}
+{"kind":"textbox","id":"sh/je9g3ahk","slide":8,"name":"직사각형 7","text":"• 기술별 독립·지원 성공률\n• 평가 근거 수 · 신뢰도\n• 반복 강점 · 어려움 · 오류\n• 평균 지원 수준 · 안전 요약\n• 제외율 · 추가 관찰 기술","textPreview":"• 기술별 독립·지원 성공률 | • 평가 근거 수 · 신뢰도 | • 반복 강점 · 어려움 · 오류 | • 평균 지원 수준 · 안전 요약 | • 제외율 · 추가 관찰 기술","textChars":86,"textLines":5,"bbox":[70,394,434,190]}
+{"kind":"textbox","id":"sh/id0fu50z","slide":8,"name":"직사각형 8","text":"비식별 프로파일 예시","textPreview":"비식별 프로파일 예시","textChars":11,"textLines":1,"bbox":[590,154,260,30]}
+{"kind":"shape","id":"sh/o7ydoret","slide":8,"name":"직사각형 9","bbox":[590,198,648,280]}
+{"kind":"textbox","id":"sh/98rehwve","slide":8,"name":"직사각형 10","text":"skillCode  NUMERACY\nindependentRate  60%\nsupportedRate  75%\nconfidence  MEDIUM\nevidenceCount  9\nrepeatedError  QUANTITY_ERROR\npreferredSupport  GUIDED","textPreview":"skillCode  NUMERACY | independentRate  60% | supportedRate  75% | confidence  MEDIUM | evidenceCount  9 | repeatedError  QUANTITY_ERROR |...","textChars":150,"textLines":7,"bbox":[616,224,596,230]}
+{"kind":"textbox","id":"sh/m5gvmhwn","slide":8,"name":"직사각형 11","text":"비식별의 의미","textPreview":"비식별의 의미","textChars":7,"textLines":1,"bbox":[590,508,250,28]}
+{"kind":"textbox","id":"sh/n6pwfmd8","slide":8,"name":"직사각형 12","text":"완전한 익명화가 아니라 외부 AI 입력에서 직접 식별자를 제거한 가명·집계 데이터","textPreview":"완전한 익명화가 아니라 외부 AI 입력에서 직접 식별자를 제거한 가명·집계 데이터","textChars":45,"textLines":1,"bbox":[590,548,648,92]}
+{"kind":"notes","id":"nt/fu1gfa1s","slide":8,"text":"[Sources]\n/Users/bluem/Documents/GitHub/Oneuldo/docs/ai/personalization-system.md\n/Users/bluem/Documents/GitHub/Oneuldo/docs/ai-data-rule/1.행동_로그_수집표.md\n/Users/bluem/Documents/GitHub/Oneuldo/docs/ai-data-rule/2.행동_로그_데이터_정규화.md\n/Users/bluem/Documents/GitHub/Oneuldo/docs/ai-data-rule/3.행동로그_근거자료_프로파일_설계.md\n/Users/bluem/Documents/GitHub/Oneuldo/docs/ai-data-rule/4.프로파일_LLM_입력_설계.md\n/Users/bluem/Downloads/oneuldo-ai-system-presentation-v2-slide12-black (1).pptx"}
+{"kind":"slide","id":"sl/udsvah03","slide":9,"title":"오늘도 · 개인화 시스템","textShapes":11}
+{"kind":"textbox","id":"sh/cnu1kzyd","slide":9,"name":"직사각형 13","text":"오늘도 · 개인화 시스템","textPreview":"오늘도 · 개인화 시스템","textChars":13,"textLines":1,"bbox":[42,28,500,24]}
+{"kind":"textbox","id":"sh/1cfmhgne","slide":9,"name":"직사각형 1","text":"프롬프트는 AI의 역할과 생성 범위를 동시에 제한한다","textPreview":"프롬프트는 AI의 역할과 생성 범위를 동시에 제한한다","textChars":29,"textLines":1,"bbox":[42,58,1150,66]}
+{"kind":"textbox","id":"sh/0b65obm9","slide":9,"name":"직사각형 2","text":"09","textPreview":"09","textChars":2,"textLines":1,"bbox":[1182,670,56,20]}
+{"kind":"shape","id":"sh/nex4jq5k","slide":9,"name":"직사각형 3","bbox":[42,142,508,502]}
+{"kind":"textbox","id":"sh/mdonql4z","slide":9,"name":"직사각형 4","text":"SYSTEM 지시","textPreview":"SYSTEM 지시","textChars":9,"textLines":1,"bbox":[70,168,110,24]}
+{"kind":"textbox","id":"sh/9gzml0nq","slide":9,"name":"직사각형 5","text":"게임 행동 프로파일만 사용합니다.\n사용자의 IQ·장애 정도·실생활 전체 능력을 추정하지 않습니다.\n근거 부족 상태와 서버 제한을 우선합니다.","textPreview":"게임 행동 프로파일만 사용합니다. | 사용자의 IQ·장애 정도·실생활 전체 능력을 추정하지 않습니다. | 근거 부족 상태와 서버 제한을 우선합니다.","textChars":78,"textLines":3,"bbox":[70,208,444,120]}
+{"kind":"textbox","id":"sh/ofq5svm5","slide":9,"name":"직사각형 6","text":"프롬프트 입력","textPreview":"프롬프트 입력","textChars":7,"textLines":1,"bbox":[70,354,200,24]}
+{"kind":"textbox","id":"sh/bih4na5w","slide":9,"name":"직사각형 7","text":"• personalizationMode · 선호\n• selectedSkills · successRate · confidence\n• strengths · difficulties · support\n• safety · dataQuality\n• 허용 상품 · 수량 · 예산 범위","textPreview":"• personalizationMode · 선호 | • selectedSkills · successRate · confidence | • strengths · difficulties · support | • safety · dataQuality ...","textChars":151,"textLines":5,"bbox":[70,394,434,190]}
+{"kind":"textbox","id":"sh/ah8nu54b","slide":9,"name":"직사각형 8","text":"AI가 해야 하는 일","textPreview":"AI가 해야 하는 일","textChars":11,"textLines":1,"bbox":[590,154,260,30]}
+{"kind":"shape","id":"sh/oza1gfyh","slide":9,"name":"직사각형 9","bbox":[590,198,648,280]}
+{"kind":"textbox","id":"sh/p0ji9kf2","slide":9,"name":"직사각형 10","text":"1단계: 추천 난이도 1~3\nitemCount · quantityComplexity\nbudgetPressure · textSupport\n\n2단계: 해당 난이도의 퀘스트\n제목 · 목표 상품 · 수량 · 예산 · 안내","textPreview":"1단계: 추천 난이도 1~3 | itemCount · quantityComplexity | budgetPressure · textSupport |  | 2단계: 해당 난이도의 퀘스트 | 제목 · 목표 상품 · 수량 · 예산 · 안내","textChars":119,"textLines":6,"bbox":[616,224,596,230]}
+{"kind":"textbox","id":"sh/2xsjepgb","slide":9,"name":"직사각형 11","text":"AI가 하지 않는 일","textPreview":"AI가 하지 않는 일","textChars":11,"textLines":1,"bbox":[590,508,250,28]}
+{"kind":"textbox","id":"sh/3y107axw","slide":9,"name":"직사각형 12","text":"원본 로그 재해석 · 능력 진단 · 서버 허용 범위 밖 상품·수량·예산 생성","textPreview":"원본 로그 재해석 · 능력 진단 · 서버 허용 범위 밖 상품·수량·예산 생성","textChars":42,"textLines":1,"bbox":[590,548,648,92]}
+{"kind":"notes","id":"nt/udsvah03","slide":9,"text":"[Sources]\n/Users/bluem/Documents/GitHub/Oneuldo/docs/ai/personalization-system.md\n/Users/bluem/Documents/GitHub/Oneuldo/docs/ai-data-rule/1.행동_로그_수집표.md\n/Users/bluem/Documents/GitHub/Oneuldo/docs/ai-data-rule/2.행동_로그_데이터_정규화.md\n/Users/bluem/Documents/GitHub/Oneuldo/docs/ai-data-rule/3.행동로그_근거자료_프로파일_설계.md\n/Users/bluem/Documents/GitHub/Oneuldo/docs/ai-data-rule/4.프로파일_LLM_입력_설계.md\n/Users/bluem/Downloads/oneuldo-ai-system-presentation-v2-slide12-black (1).pptx"}
+{"kind":"slide","id":"sl/m90b6t0r","slide":10,"title":"오늘도 · 개인화 시스템","textShapes":23}
+{"kind":"textbox","id":"sh/0zu9ora5","slide":10,"name":"직사각형 35","text":"오늘도 · 개인화 시스템","textPreview":"오늘도 · 개인화 시스템","textChars":13,"textLines":1,"bbox":[42,28,500,24]}
+{"kind":"textbox","id":"sh/xc3mho32","slide":10,"name":"직사각형 1","text":"AI는 난이도를 먼저 추천하고 그 범위 안에서 퀘스트를 만든다","textPreview":"AI는 난이도를 먼저 추천하고 그 범위 안에서 퀘스트를 만든다","textChars":34,"textLines":1,"bbox":[42,58,1150,66]}
+{"kind":"textbox","id":"sh/cbu58j2h","slide":10,"name":"직사각형 2","text":"10","textPreview":"10","textChars":2,"textLines":1,"bbox":[1182,670,56,20]}
+{"kind":"shape","id":"sh/zelojyl8","slide":10,"name":"직사각형 3","bbox":[192,312,52,2]}
+{"kind":"shape","id":"sh/ydcnatkn","slide":10,"name":"직사각형 4","bbox":[394,312,52,2]}
+{"kind":"shape","id":"sh/l036l83y","slide":10,"name":"직사각형 5","bbox":[596,312,52,2]}
+{"kind":"shape","id":"sh/kzu5c32t","slide":10,"name":"직사각형 6","bbox":[798,312,52,2]}
+{"kind":"shape","id":"sh/725onyl4","slide":10,"name":"직사각형 7","bbox":[1000,312,52,2]}
+{"kind":"textbox","id":"sh/m1cnetkj","slide":10,"name":"직사각형 8","text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[42,210,70,28]}
+{"kind":"textbox","id":"sh/s7yt4b21","slide":10,"name":"직사각형 9","text":"프로파일 입력","textPreview":"프로파일 입력","textChars":7,"textLines":1,"bbox":[42,252,166,38]}
+{"kind":"shape","id":"sh/d87uxg3m","slide":10,"name":"직사각형 10","bbox":[42,308,162,146]}
+{"kind":"textbox","id":"sh/q5gb21kb","slide":10,"name":"직사각형 11","text":"기술 수행률\n신뢰도·선호","textPreview":"기술 수행률 | 신뢰도·선호","textChars":13,"textLines":2,"bbox":[56,337,134,86]}
+{"kind":"textbox","id":"sh/r6pcv6lw","slide":10,"name":"직사각형 12","text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[244,210,70,28]}
+{"kind":"textbox","id":"sh/0bit8b2d","slide":10,"name":"직사각형 13","text":"난이도 AI","textPreview":"난이도 AI","textChars":6,"textLines":1,"bbox":[244,252,166,38]}
+{"kind":"shape","id":"sh/1cru1g3y","slide":10,"name":"직사각형 14","bbox":[244,308,162,146]}
+{"kind":"textbox","id":"sh/e9gb61k7","slide":10,"name":"직사각형 15","text":"난이도 1~3\n세부 조정","textPreview":"난이도 1~3 | 세부 조정","textChars":13,"textLines":2,"bbox":[258,337,134,86]}
+{"kind":"textbox","id":"sh/fapcz6ls","slide":10,"name":"직사각형 16","text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[446,210,70,28]}
+{"kind":"textbox","id":"sh/ozitcv29","slide":10,"name":"직사각형 17","text":"범위 검증","textPreview":"범위 검증","textChars":5,"textLines":1,"bbox":[446,252,166,38]}
+{"kind":"shape","id":"sh/p0ru503u","slide":10,"name":"직사각형 18","bbox":[446,308,162,146]}
+{"kind":"textbox","id":"sh/xwnupgvy","slide":10,"name":"직사각형 19","text":"enum·수치\n사유 코드","textPreview":"enum·수치 | 사유 코드","textChars":13,"textLines":2,"bbox":[460,337,134,86]}
+{"kind":"textbox","id":"sh/wvetgbud","slide":10,"name":"직사각형 20","text":"04","textPreview":"04","textChars":2,"textLines":1,"bbox":[648,210,70,28]}
+{"kind":"textbox","id":"sh/bu5cnqd8","slide":10,"name":"직사각형 21","text":"퀘스트 AI","textPreview":"퀘스트 AI","textChars":6,"textLines":1,"bbox":[648,252,166,38]}
+{"kind":"shape","id":"sh/atwbelcn","slide":10,"name":"직사각형 22","bbox":[648,308,162,146]}
+{"kind":"textbox","id":"sh/lk7ut0va","slide":10,"name":"직사각형 23","text":"품목·수량\n예산·문장","textPreview":"품목·수량 | 예산·문장","textChars":11,"textLines":2,"bbox":[662,337,134,86]}
+{"kind":"textbox","id":"sh/kjytkvup","slide":10,"name":"직사각형 24","text":"05","textPreview":"05","textChars":2,"textLines":1,"bbox":[850,210,70,28]}
+{"kind":"textbox","id":"sh/jypcrqd4","slide":10,"name":"직사각형 25","text":"콘텐츠 검증","textPreview":"콘텐츠 검증","textChars":6,"textLines":1,"bbox":[850,252,166,38]}
+{"kind":"shape","id":"sh/yxgbilcj","slide":10,"name":"직사각형 26","bbox":[850,308,162,146]}
+{"kind":"textbox","id":"sh/1o3ahwvq","slide":10,"name":"직사각형 27","text":"중복·가격\n문장 길이","textPreview":"중복·가격 | 문장 길이","textChars":11,"textLines":2,"bbox":[864,337,134,86]}
+{"kind":"textbox","id":"sh/0nut8rul","slide":10,"name":"직사각형 28","text":"06","textPreview":"06","textChars":2,"textLines":1,"bbox":[1052,210,70,28]}
+{"kind":"textbox","id":"sh/q9srixs3","slide":10,"name":"직사각형 29","text":"제공·저장","textPreview":"제공·저장","textChars":5,"textLines":1,"bbox":[1052,252,166,38]}
+{"kind":"shape","id":"sh/ru18r2to","slide":10,"name":"직사각형 30","bbox":[1052,308,162,146]}
+{"kind":"textbox","id":"sh/cva9k7a9","slide":10,"name":"직사각형 31","text":"generationId로\n플레이 연결","textPreview":"generationId로 | 플레이 연결","textChars":20,"textLines":2,"bbox":[1066,337,134,86]}
+{"kind":"textbox","id":"sh/dwjqtcbu","slide":10,"name":"직사각형 32","text":"실패 처리","textPreview":"실패 처리","textChars":5,"textLines":1,"bbox":[862,486,100,24]}
+{"kind":"textbox","id":"sh/exsrmhsf","slide":10,"name":"직사각형 33","text":"AI 실패 → 규칙형 난이도·미션 / 생성 출처와 실패 이유는 DB에 저장","textPreview":"AI 실패 → 규칙형 난이도·미션 / 생성 출처와 실패 이유는 DB에 저장","textChars":41,"textLines":1,"bbox":[958,486,280,24]}
+{"kind":"shape","id":"sh/zyl8vmt0","slide":10,"name":"직사각형 34","bbox":[42,574,1196,34]}
+{"kind":"notes","id":"nt/m90b6t0r","slide":10,"text":"[Sources]\n/Users/bluem/Documents/GitHub/Oneuldo/docs/ai/personalization-system.md\n/Users/bluem/Documents/GitHub/Oneuldo/docs/ai-data-rule/1.행동_로그_수집표.md\n/Users/bluem/Documents/GitHub/Oneuldo/docs/ai-data-rule/2.행동_로그_데이터_정규화.md\n/Users/bluem/Documents/GitHub/Oneuldo/docs/ai-data-rule/3.행동로그_근거자료_프로파일_설계.md\n/Users/bluem/Documents/GitHub/Oneuldo/docs/ai-data-rule/4.프로파일_LLM_입력_설계.md\n/Users/bluem/Downloads/oneuldo-ai-system-presentation-v2-slide12-black (1).pptx"}
+{"kind":"slide","id":"sl/jetc3ut0","slide":11,"title":"오늘도 · 개인화 시스템","textShapes":16}
+{"kind":"textbox","id":"sh/65wzelo7","slide":11,"name":"직사각형 22","text":"오늘도 · 개인화 시스템","textPreview":"오늘도 · 개인화 시스템","textChars":13,"textLines":1,"bbox":[42,28,500,24]}
+{"kind":"textbox","id":"sh/xcryxg7y","slide":11,"name":"직사각형 1","text":"AI 생성물은 서버 검증과 감사 기록을 통과해야 플레이된다","textPreview":"AI 생성물은 서버 검증과 감사 기록을 통과해야 플레이된다","textChars":32,"textLines":1,"bbox":[42,58,1150,66]}
+{"kind":"textbox","id":"sh/wbih4b6d","slide":11,"name":"직사각형 2","text":"11","textPreview":"11","textChars":2,"textLines":1,"bbox":[1182,670,56,20]}
+{"kind":"textbox","id":"sh/n69grmpw","slide":11,"name":"직사각형 3","text":"검증된 퀘스트 예시","textPreview":"검증된 퀘스트 예시","textChars":10,"textLines":1,"bbox":[44,150,460,28]}
+{"kind":"shape","id":"sh/250zy18b","slide":11,"name":"직사각형 4","bbox":[44,194,620,286]}
+{"kind":"textbox","id":"sh/98rytw72","slide":11,"name":"직사각형 5","text":"난이도 2\n\n흰 우유 1개\n사과 2개\n오렌지 주스 1개\n\n예산 10,000원\ncontentSource  GENERATED","textPreview":"난이도 2 |  | 흰 우유 1개 | 사과 2개 | 오렌지 주스 1개 |  | 예산 10,000원 | contentSource  GENERATED","textChars":67,"textLines":8,"bbox":[72,224,564,224]}
+{"kind":"textbox","id":"sh/o7ih0r6h","slide":11,"name":"직사각형 6","text":"서버 검증·저장","textPreview":"서버 검증·저장","textChars":8,"textLines":1,"bbox":[718,150,240,28]}
+{"kind":"shape","id":"sh/72t03qp0","slide":11,"name":"직사각형 7","bbox":[718,194,478,58]}
+{"kind":"textbox","id":"sh/61kzalof","slide":11,"name":"직사각형 8","text":"구조","textPreview":"구조","textChars":2,"textLines":1,"bbox":[738,211,70,24]}
+{"kind":"textbox","id":"sh/ofqtgnyt","slide":11,"name":"직사각형 9","text":"난이도 · 상품 ID · 중복 · 수량","textPreview":"난이도 · 상품 ID · 중복 · 수량","textChars":21,"textLines":1,"bbox":[820,211,350,24]}
+{"kind":"shape","id":"sh/9gza9sze","slide":11,"name":"직사각형 10","bbox":[718,270,478,58]}
+{"kind":"textbox","id":"sh/mdobedg3","slide":11,"name":"직사각형 11","text":"가격","textPreview":"가격","textChars":2,"textLines":1,"bbox":[738,287,70,24]}
+{"kind":"textbox","id":"sh/nehs7iho","slide":11,"name":"직사각형 12","text":"목표 총액 ≤ 예산 ≤ 총액+4천원","textPreview":"목표 총액 ≤ 예산 ≤ 총액+4천원","textChars":19,"textLines":1,"bbox":[820,287,350,24]}
+{"kind":"shape","id":"sh/0b6tc3yx","slide":11,"name":"직사각형 13","bbox":[718,346,478,58]}
+{"kind":"textbox","id":"sh/1cfa58zi","slide":11,"name":"직사각형 14","text":"문장","textPreview":"문장","textChars":2,"textLines":1,"bbox":[738,363,70,24]}
+{"kind":"textbox","id":"sh/epobatgr","slide":11,"name":"직사각형 15","text":"문장 수 · 80자 · 출력 형식","textPreview":"문장 수 · 80자 · 출력 형식","textChars":18,"textLines":1,"bbox":[820,363,350,24]}
+{"kind":"shape","id":"sh/zaxs3yhc","slide":11,"name":"직사각형 16","bbox":[718,422,478,58]}
+{"kind":"textbox","id":"sh/cn6t83y1","slide":11,"name":"직사각형 17","text":"추적","textPreview":"추적","textChars":2,"textLines":1,"bbox":[738,439,70,24]}
+{"kind":"textbox","id":"sh/dofa18z6","slide":11,"name":"직사각형 18","text":"원본 출력 · 재시도 · 최종본 · 지연시간","textPreview":"원본 출력 · 재시도 · 최종본 · 지연시간","textChars":24,"textLines":1,"bbox":[820,439,350,24]}
+{"kind":"shape","id":"sh/tsnip0ny","slide":11,"name":"직사각형 19","bbox":[44,526,1152,92]}
+{"kind":"textbox","id":"sh/87ehgv6d","slide":11,"name":"직사각형 20","text":"DB 연결과 fallback","textPreview":"DB 연결과 fallback","textChars":15,"textLines":1,"bbox":[70,550,120,28]}
+{"kind":"textbox","id":"sh/7650nq5s","slide":11,"name":"직사각형 21","text":"market_ai_quest_generations.id → behavior_logs.quest_instance_id / 재실패하면 RULE_FALLBACK","textPreview":"market_ai_quest_generations.id → behavior_logs.quest_instance_id / 재실패하면 RULE_FALLBACK","textChars":86,"textLines":1,"bbox":[196,548,964,32]}
+{"kind":"notes","id":"nt/jetc3ut0","slide":11,"text":"[Sources]\n/Users/bluem/Documents/GitHub/Oneuldo/docs/ai/personalization-system.md\n/Users/bluem/Documents/GitHub/Oneuldo/docs/ai-data-rule/1.행동_로그_수집표.md\n/Users/bluem/Documents/GitHub/Oneuldo/docs/ai-data-rule/2.행동_로그_데이터_정규화.md\n/Users/bluem/Documents/GitHub/Oneuldo/docs/ai-data-rule/3.행동로그_근거자료_프로파일_설계.md\n/Users/bluem/Documents/GitHub/Oneuldo/docs/ai-data-rule/4.프로파일_LLM_입력_설계.md\n/Users/bluem/Downloads/oneuldo-ai-system-presentation-v2-slide12-black (1).pptx"}
+{"kind":"slide","id":"sl/8f2psfyx","slide":12,"title":"오늘도 · 개인화 시스템","textShapes":12}
+{"kind":"textbox","id":"sh/tgrm1wzy","slide":12,"name":"직사각형 23","text":"오늘도 · 개인화 시스템","textPreview":"오늘도 · 개인화 시스템","textChars":13,"textLines":1,"bbox":[42,28,500,24]}
+{"kind":"textbox","id":"sh/1gbm9s3a","slide":12,"name":"직사각형 1","text":"개인화는 관찰과 제한된 생성을 반복한다","textPreview":"개인화는 관찰과 제한된 생성을 반복한다","textChars":21,"textLines":1,"bbox":[42,58,1150,66]}
+{"kind":"textbox","id":"sh/0f2lgnmp","slide":12,"name":"직사각형 2","text":"12","textPreview":"12","textChars":2,"textLines":1,"bbox":[1182,670,56,20]}
+{"kind":"shape","id":"sh/ra943il8","slide":12,"name":"모서리가 둥근 직사각형 3","bbox":[46,276,190,100]}
+{"kind":"textbox","id":"sh/q903ad4n","slide":12,"name":"직사각형 4","text":"행동 로그\n무엇을 했는가","textPreview":"행동 로그 | 무엇을 했는가","textChars":13,"textLines":2,"bbox":[56,286,170,80]}
+{"kind":"shape","id":"sh/dcbm583y","slide":12,"name":"모서리가 둥근 직사각형 5","bbox":[294,276,208,100]}
+{"kind":"textbox","id":"sh/sb2lcnmd","slide":12,"name":"직사각형 6","text":"정규화\n쓸 수 있는 근거인가","textPreview":"정규화 | 쓸 수 있는 근거인가","textChars":15,"textLines":2,"bbox":[304,286,188,80]}
+{"kind":"shape","id":"sh/b6d4f2lc","slide":12,"name":"모서리가 둥근 직사각형 7","bbox":[560,276,220,100]}
+{"kind":"textbox","id":"sh/a543mx4r","slide":12,"name":"직사각형 8","text":"기술 프로파일\n어떤 지원이 필요한가","textPreview":"기술 프로파일 | 어떤 지원이 필요한가","textChars":19,"textLines":2,"bbox":[570,286,200,80]}
+{"kind":"shape","id":"sh/wvupgz6t","slide":12,"name":"모서리가 둥근 직사각형 9","bbox":[838,194,210,100]}
+{"kind":"textbox","id":"sh/xw3q94ne","slide":12,"name":"직사각형 10","text":"AI 추천\n난이도·조정값","textPreview":"AI 추천 | 난이도·조정값","textChars":13,"textLines":2,"bbox":[848,204,190,80]}
+{"kind":"shape","id":"sh/atc7epon","slide":12,"name":"모서리가 둥근 직사각형 11","bbox":[838,360,210,100]}
+{"kind":"textbox","id":"sh/bulo7u58","slide":12,"name":"직사각형 12","text":"AI 생성\n다음 장보기 미션","textPreview":"AI 생성 | 다음 장보기 미션","textChars":15,"textLines":2,"bbox":[848,370,190,80]}
+{"kind":"shape","id":"sh/orapcf6h","slide":12,"name":"모서리가 둥근 직사각형 13","bbox":[1090,276,150,100]}
+{"kind":"textbox","id":"sh/9sj65kn2","slide":12,"name":"직사각형 14","text":"다음 플레이\n새 근거 수집","textPreview":"다음 플레이 | 새 근거 수집","textChars":14,"textLines":2,"bbox":[1100,286,130,80]}
+{"kind":"shape","id":"sh/hsva94ve","slide":12,"name":"직선 화살표 연결선 38","bbox":[236,326,58,0]}
+{"kind":"shape","id":"sh/2hc3m5cb","slide":12,"name":"직선 화살표 연결선 39","bbox":[502,326,58,0]}
+{"kind":"shape","id":"sh/3ilkfadw","slide":12,"name":"꺾인 연결선[E] 40","bbox":[780,244,58,82]}
+{"kind":"shape","id":"sh/4julovuh","slide":12,"name":"직선 화살표 연결선 41","bbox":[943,294,0,66]}
+{"kind":"shape","id":"sh/p432h0v2","slide":12,"name":"직선 화살표 연결선 42","bbox":[780,326,310,0]}
+{"kind":"textbox","id":"sh/gj25cry9","slide":12,"name":"직사각형 20","text":"서버 계산","textPreview":"서버 계산","textChars":5,"textLines":1,"bbox":[590,230,80,22]}
+{"kind":"textbox","id":"sh/fit436ho","slide":12,"name":"직사각형 21","text":"AI 생성+검증","textPreview":"AI 생성+검증","textChars":8,"textLines":1,"bbox":[870,500,180,24]}
+{"kind":"textbox","id":"sh/uh0na1g3","slide":12,"name":"직사각형 22","text":"핵심: 데이터는 판단 근거를 만들고, AI는 허용 범위 안에서 다음 과제를 구성한다","textPreview":"핵심: 데이터는 판단 근거를 만들고, AI는 허용 범위 안에서 다음 과제를 구성한다","textChars":46,"textLines":1,"bbox":[280,570,720,38]}
+{"kind":"notes","id":"nt/8f2psfyx","slide":12,"text":"[Sources]\n/Users/bluem/Documents/GitHub/Oneuldo/docs/ai/personalization-system.md\n/Users/bluem/Documents/GitHub/Oneuldo/docs/ai-data-rule/1.행동_로그_수집표.md\n/Users/bluem/Documents/GitHub/Oneuldo/docs/ai-data-rule/2.행동_로그_데이터_정규화.md\n/Users/bluem/Documents/GitHub/Oneuldo/docs/ai-data-rule/3.행동로그_근거자료_프로파일_설계.md\n/Users/bluem/Documents/GitHub/Oneuldo/docs/ai-data-rule/4.프로파일_LLM_입력_설계.md\n/Users/bluem/Downloads/oneuldo-ai-system-presentation-v2-slide12-black (1).pptx"}

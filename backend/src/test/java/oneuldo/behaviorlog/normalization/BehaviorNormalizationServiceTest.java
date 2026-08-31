@@ -96,6 +96,21 @@ class BehaviorNormalizationServiceTest {
     }
 
     @Test
+    void 장보기_수량은_목표와_실제값을_비교해_오류를_판정한다() {
+        ShoppingBehaviorPayload exact = new ShoppingBehaviorPayload(
+                10.0, 8.0, 0.8, 1, 1, 0, 0, 0, 0, 0L,
+                2, 2, 1000L, 5000L, null, "ITEM_A", null, null);
+
+        var success = normalizationService.normalize(save("SHOP.QUANTITY_CHANGED", exact, null));
+        var failure = normalizationService.normalize(
+                save("SHOP.QUANTITY_CHANGED", shoppingPayload(), null));
+
+        assertEquals(ObservedOutcome.SUCCESS, success.getOutcome());
+        assertEquals(ErrorType.NONE, success.getErrorType());
+        assertEquals(ErrorType.QUANTITY_ERROR, failure.getErrorType());
+    }
+
+    @Test
     void 필수_payload_필드가_없으면_필드_경로와_함께_격리한다() {
         ShoppingBehaviorPayload missingItemId = new ShoppingBehaviorPayload(
                 10.0, 8.0, 0.8, 1, 0, 0, 0, 0, 0, 0L,

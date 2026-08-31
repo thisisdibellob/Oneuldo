@@ -11,7 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { FloatingNav } from '../components/FloatingNav';
 import type { AiVariationSettings } from '../ai/useAiVariationSettings';
 import { colors } from '../theme';
-import { AiScreen } from './AiScreen';
+import { AbilityAnalysisScreen } from './AbilityAnalysisScreen';
 import { GamePrototypeScreen } from './GamePrototypeScreen';
 import { GameScreen } from './GameScreen';
 import { HomeScreen } from './HomeScreen';
@@ -150,7 +150,7 @@ export function AppShell({
     return (
       <SafeAreaView edges={[]} style={styles.gameSafe}>
         <Animated.View style={[styles.body, animatedStyle]}>
-          <GamePrototypeScreen onExit={closeGame} />
+          <GamePrototypeScreen accessToken={accessToken} onExit={closeGame} />
         </Animated.View>
       </SafeAreaView>
     );
@@ -173,13 +173,7 @@ export function AppShell({
       showPersonalDifficulty={accessToken !== null}
     />,
     <GameScreen key="game" onEnter={openGame} />,
-    <AiScreen
-      aiVariationEnabled={aiVariation.enabled}
-      errorMessage={aiVariation.errorMessage}
-      key="ai"
-      modelSetupState={aiVariation.setupState}
-      onToggleAiVariation={aiVariation.toggleEnabled}
-    />,
+    <AbilityAnalysisScreen accessToken={accessToken} key="ability-analysis" />,
     <ProfileScreen key="profile" />,
   ];
 

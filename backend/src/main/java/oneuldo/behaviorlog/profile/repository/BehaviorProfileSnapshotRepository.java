@@ -8,4 +8,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface BehaviorProfileSnapshotRepository
         extends JpaRepository<BehaviorProfileSnapshot, UUID> {
     Optional<BehaviorProfileSnapshot> findFirstByMemberIdOrderByGeneratedAtDesc(UUID memberId);
+    Optional<BehaviorProfileSnapshot> findByMemberIdAndSourceSessionId(UUID memberId, UUID sourceSessionId);
 }

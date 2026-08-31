@@ -163,6 +163,8 @@ describe('오늘도 앱', () => {
     fireEvent.press(screen.getByRole('button', { name: '카카오로 시작하기' }));
     expect(screen.getByText('오늘도 함께 해 볼까요?', { exact: false })).toBeTruthy();
     expect(screen.getByRole('tab', { name: '퀘스트 탭' })).toBeTruthy();
+    expect(screen.getByRole('tab', { name: '분석 탭' })).toBeTruthy();
+    expect(screen.queryByRole('tab', { name: 'AI 탭' })).toBeNull();
   });
 
   it('메인 카드의 퀘스트는 화면 이동 없이 목록만 바꾼다', () => {
@@ -182,7 +184,7 @@ describe('오늘도 앱', () => {
     expect(screen.getByText('상담 예약')).toBeTruthy();
   });
 
-  it('민수와 일상 대화 후 의뢰를 받아 안전 퀴즈를 완료한다', async () => {
+  it('민수와 일상 대화 후 의뢰를 받아 추천 대중교통 퀴즈를 완료한다', async () => {
     const screen = render(<App />);
     fireEvent.press(screen.getByRole('button', { name: 'Google로 시작하기' }));
     fireEvent.press(screen.getByRole('tab', { name: '게임 탭' }));
@@ -250,14 +252,14 @@ describe('오늘도 앱', () => {
 
     await openMinsuActionChoices();
     fireEvent.press(screen.getByRole('button', { name: '퀘스트 받기' }));
-    expect(screen.getByLabelText('안전하게 길 건너기 의뢰 제안')).toBeTruthy();
+    expect(screen.getByLabelText('대중교통 안전 연습 의뢰 제안')).toBeTruthy();
     fireEvent.press(screen.getByLabelText('민수의 의뢰 받기'));
     expect(screen.getByText('민수의 의뢰를 받았어요')).toBeTruthy();
     fireEvent.press(screen.getByLabelText('안내 확인'));
 
     fireEvent.press(screen.getByRole('button', { name: '수첩 열기' }));
     expect(screen.getByLabelText('오늘 0/4 완료')).toBeTruthy();
-    expect(screen.getByLabelText(/안전하게 길 건너기, 진행 중/)).toBeTruthy();
+    expect(screen.getByLabelText(/대중교통 안전 연습, 진행 중/)).toBeTruthy();
     fireEvent.press(screen.getByRole('button', { name: '수첩 열기' }));
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 220));
@@ -289,20 +291,30 @@ describe('오늘도 앱', () => {
     });
     fireEvent.press(screen.getByRole('button', { name: '대화 계속하기' }));
 
-    await finishLineAndContinue('그럼 우리 같이 조금 걸을까?');
-    await finishLineAndContinue('좋아! 저기 횡단보도까지 가 보자.');
+    await finishLineAndContinue('그럼 우리 같이 문제를 풀어볼까?');
+    await finishLineAndContinue('좋아! 오늘은 대중교통을 안전하게 이용하는 연습을 해 보자.');
     await finishLineAndContinue(
-      '가는 길에 안전하게 건너는 방법도 같이 떠올려 보자.',
+      '최근 연습 결과에 맞는 문제를 준비해 줄게.',
     );
 
-    expect(screen.getByText('횡단보도를 건너기 전에', { exact: false })).toBeTruthy();
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 210));
-    });
-    fireEvent.press(screen.getByText('초록불인지 확인해요'));
+    await waitFor(() => expect(screen.getByText('버스 번호를 찾아보세요.')).toBeTruthy());
+    expect(screen.getByLabelText('대중교통 안전 퀴즈 선택지')).toBeTruthy();
 
-    expect(screen.getByText('퀴즈를 마쳤어요!')).toBeTruthy();
-    expect(screen.getByText('+10 XP')).toBeTruthy();
+    const correctChoices = [
+      '목적지가 적힌 노선의 버스 번호를 확인한다.',
+      '버스 앞 번호와 확인한 번호를 비교한다.',
+      '교통카드를 단말기에 댄다.',
+      '하차 버튼을 누르고 버스가 멈출 때까지 기다린다.',
+    ];
+    for (const [index, choice] of correctChoices.entries()) {
+      fireEvent.press(screen.getByText(choice));
+      fireEvent.press(screen.getByRole('button', {
+        name: index === correctChoices.length - 1 ? '결과 보기' : '다음 문제',
+      }));
+    }
+
+    expect(screen.getByText('혼자 버스 타기 퀴즈를 마쳤어요!')).toBeTruthy();
+    expect(screen.getByText('+20 XP')).toBeTruthy();
     fireEvent.press(screen.getByRole('button', { name: '마을로 돌아가기' }));
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 220));
@@ -580,26 +592,14 @@ describe('오늘도 앱', () => {
     expect(screen.getByLabelText('하늘마트의 지영을 찾아보세요.')).toBeTruthy();
   });
 
-  it('AI 입력 표시 뒤 답변을 추가하고 여러 대화를 누적한다', async () => {
+  it('기존 AI 탭 대신 사용자 능력 분석 화면을 보여준다', () => {
     const screen = render(<App />);
     fireEvent.press(screen.getByRole('button', { name: 'Google로 시작하기' }));
-    fireEvent.press(screen.getByRole('tab', { name: 'AI 탭' }));
+    fireEvent.press(screen.getByRole('tab', { name: '분석 탭' }));
 
-    const firstInput = screen.getByLabelText('AI 친구에게 메시지 보내기');
-    fireEvent.changeText(firstInput, '오늘 기분이 조금 어려워');
-    fireEvent(firstInput, 'submitEditing');
-
-    const nextInput = screen.getByLabelText('AI 친구에게 메시지 보내기');
-    fireEvent.changeText(nextInput, '그래도 연습은 해 보고 싶어');
-    fireEvent(nextInput, 'submitEditing');
-
-    expect(screen.getByLabelText('AI가 답변을 입력 중')).toBeTruthy();
-    expect(screen.getByText('오늘 기분이 조금 어려워')).toBeTruthy();
-    expect(screen.getByText('그래도 연습은 해 보고 싶어')).toBeTruthy();
-    await waitFor(
-      () => expect(screen.getAllByText('구름이가 듣고 있어요. 우리 같이 천천히 생각해 봐요.')).toHaveLength(2),
-      { timeout: 2000 },
-    );
+    expect(screen.getByText('나의 능력 분석')).toBeTruthy();
+    expect(screen.getByText('로그인하면 나의 능력 분석을 볼 수 있어요.')).toBeTruthy();
+    expect(screen.queryByLabelText('AI 친구에게 메시지 보내기')).toBeNull();
   });
 
   it('퀘스트를 끝내면 결과와 XP를 확인한 뒤 목록으로 돌아온다', async () => {

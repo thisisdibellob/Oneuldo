@@ -1,0 +1,13 @@
+Communication job
+By the end, project reviewers should understand how observed shopping behavior becomes a bounded AI-generated next quest, because the server validates and summarizes evidence before AI use.
+
+Slide sequence
+1. Personalization overview — personalization is a closed evidence loop.
+2. End-to-end process — behavior log to next play in six steps.
+3. Behavior log — what is collected and why sessions/IDs matter.
+4. Normalization — raw failure becomes valid technical evidence only after checks.
+5. Profile — four shopping skills, success rate, confidence and evidence gaps.
+6. Prompt — the AI receives a de-identified profile, not raw identity or diagnosis.
+7. Result — AI recommends difficulty then generates a quest; server validates/fallbacks.
+8. Closing synthesis — deterministic server evidence and bounded AI repeat as a loop.
+

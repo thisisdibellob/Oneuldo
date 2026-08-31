@@ -38,7 +38,7 @@ export const DAILY_QUEST_DEFINITIONS = [
     title: '냉장고 살펴보기',
   },
   {
-    description: '민수와 함께 횡단보도를 안전하게 건너는 방법을 연습해요.',
+    description: '민수와 함께 나에게 맞는 대중교통 안전 문제를 연습해요.',
     discoveryHint: '마을 중앙의 민수를 찾아보세요.',
     iconKey: 'minsu',
     id: 'minsu-safety',
@@ -46,7 +46,7 @@ export const DAILY_QUEST_DEFINITIONS = [
     providerName: '민수',
     region: '마을 중앙',
     rewardXp: 10,
-    title: '안전하게 길 건너기',
+    title: '대중교통 안전 연습',
   },
   {
     description: '목적지까지 가는 버스를 확인하고 안전하게 이용해요.',

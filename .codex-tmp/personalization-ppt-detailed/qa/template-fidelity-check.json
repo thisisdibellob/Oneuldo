@@ -1,0 +1,13 @@
+{
+  "status": "pass",
+  "checkedAt": "2026-08-31T07:03:21.558Z",
+  "workspace": "/Users/bluem/Documents/GitHub/Oneuldo/.codex-tmp/personalization-ppt-detailed",
+  "finalPptx": "/Users/bluem/Downloads/oneuldo-personalization-system-presentation-detailed.pptx",
+  "starterPptx": "/Users/bluem/Documents/GitHub/Oneuldo/.codex-tmp/personalization-ppt-detailed/template-starter.pptx",
+  "mapPath": "/Users/bluem/Documents/GitHub/Oneuldo/.codex-tmp/personalization-ppt-detailed/template-frame-map.json",
+  "starterLayoutDir": "/Users/bluem/Documents/GitHub/Oneuldo/.codex-tmp/personalization-ppt-detailed/template-starter-layout",
+  "finalLayoutDir": "/Users/bluem/Documents/GitHub/Oneuldo/.codex-tmp/personalization-ppt-detailed/final-layout",
+  "editDir": "/Users/bluem/Documents/GitHub/Oneuldo/.codex-tmp/personalization-ppt-detailed",
+  "issueCount": 0,
+  "issues": []
+}

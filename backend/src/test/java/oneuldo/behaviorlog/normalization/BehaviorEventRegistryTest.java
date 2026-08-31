@@ -38,6 +38,14 @@ class BehaviorEventRegistryTest {
         assertTrue(quantity.measurementRules().stream()
                 .anyMatch(rule -> rule.metricCode().equals("selectedQuantity")
                         && rule.targetSourcePath().equals("payload.requiredQuantity")));
+        assertEquals(oneuldo.behaviorlog.normalization.domain.ErrorType.NONE,
+                quantity.defaultErrorType());
+
+        var missing = registry.find("SHOP.ITEM_MISSING").orElseThrow();
+        assertEquals(java.util.Set.of("itemId", "requiredQuantity", "selectedQuantity"),
+                missing.requiredPayloadFields());
+        assertEquals(oneuldo.behaviorlog.normalization.domain.ErrorType.OMISSION,
+                missing.defaultErrorType());
 
         var unknown = registry.find("SHOP.NOT_REGISTERED");
         assertFalse(unknown.isPresent());

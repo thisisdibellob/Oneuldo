@@ -53,9 +53,10 @@ public class BehaviorEventRegistry {
         add(map, p, BehaviorDomain.SHOPPING, VIEW_INSTRUCTION, NEUTRAL, NONE, false, "EXECUTIVE_FUNCTION", "SHOP.LIST_OPENED");
         add(map, p, BehaviorDomain.SHOPPING, SELECT, null, NONE, false, "LANGUAGE_COMPREHENSION", "SHOP.ITEM_SELECTED");
         add(map, p, BehaviorDomain.SHOPPING, SELECT, FAILURE, WRONG_SELECTION, false, "LANGUAGE_COMPREHENSION", "SHOP.WRONG_ITEM_SELECTED");
+        add(map, p, BehaviorDomain.SHOPPING, SELECT, FAILURE, OMISSION, false, "LANGUAGE_COMPREHENSION", "SHOP.ITEM_MISSING");
         add(map, p, BehaviorDomain.SHOPPING, START, NEUTRAL, NONE, false, "SPATIAL_NAVIGATION", "SHOP.ITEM_SEARCH_STARTED");
         add(map, p, BehaviorDomain.SHOPPING, NAVIGATE, FAILURE, NAVIGATION_ERROR, false, "SPATIAL_NAVIGATION", "SHOP.WRONG_AISLE_ENTERED", "SHOP.TARGET_PASSED");
-        add(map, p, BehaviorDomain.SHOPPING, SELECT, null, QUANTITY_ERROR, false, "NUMERACY", "SHOP.QUANTITY_CHANGED");
+        add(map, p, BehaviorDomain.SHOPPING, SELECT, null, NONE, false, "NUMERACY", "SHOP.QUANTITY_CHANGED");
         add(map, p, BehaviorDomain.SHOPPING, COMPARE, null, NONE, false, "MONEY_MANAGEMENT", "SHOP.PRICE_CHECKED");
         add(map, p, BehaviorDomain.SHOPPING, COMPARE, FAILURE, QUANTITY_ERROR, false, "MONEY_MANAGEMENT", "SHOP.BUDGET_EXCEEDED");
         add(map, p, BehaviorDomain.SHOPPING, CHECK, SUCCESS, NONE, false, "PROBLEM_SOLVING", "SHOP.OUT_OF_STOCK_DETECTED");
@@ -200,6 +201,7 @@ public class BehaviorEventRegistry {
     private void requiredFields(Map<String, BehaviorEventDefinition> map) {
         require(map, "SHOP.ITEM_SELECTED", "itemId");
         require(map, "SHOP.WRONG_ITEM_SELECTED", "itemId");
+        require(map, "SHOP.ITEM_MISSING", "itemId", "requiredQuantity", "selectedQuantity");
         require(map, "SHOP.QUANTITY_CHANGED", "requiredQuantity", "selectedQuantity");
         require(map, "SHOP.SUBSTITUTE_SELECTED", "substituteItemId");
         require(map, "PAYMENT.METHOD_SELECTED", "paymentMethod");
@@ -248,6 +250,9 @@ public class BehaviorEventRegistry {
                         "payload.requiredQuantity", COUNT, OBSERVATION));
         measure(map, "SHOP.WRONG_ITEM_SELECTED",
                 MeasurementRule.delta("selectionAttempt"), MeasurementRule.delta("wrongItem"),
+                MeasurementRule.valueWithTarget("selectedQuantity", "payload.selectedQuantity",
+                        "payload.requiredQuantity", COUNT, OBSERVATION));
+        measure(map, "SHOP.ITEM_MISSING", MeasurementRule.delta("omissionCount"),
                 MeasurementRule.valueWithTarget("selectedQuantity", "payload.selectedQuantity",
                         "payload.requiredQuantity", COUNT, OBSERVATION));
         measure(map, "SHOP.ITEM_SEARCH_STARTED",

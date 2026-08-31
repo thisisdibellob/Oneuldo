@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
+  ActivityIndicator,
   Animated,
   Easing,
   GestureResponderEvent,
@@ -18,6 +19,8 @@ import {
 } from 'react-native';
 
 import { icons } from '../assets';
+import type { BehaviorSimulationContext } from '../api/behaviorLog';
+import { getMarketAiQuest } from '../api/marketPersonalization';
 import { DirectionalAvatar } from '../components/game/DirectionalAvatar';
 import { GameHud } from '../components/game/GameHud';
 import { MODULAR_CHARACTER_CANVAS } from '../components/game/ModularCharacter';
@@ -69,7 +72,11 @@ import {
   type VillageNpcId,
   type WorldMapId,
 } from '../game/prototypeWorld';
-import { MarketCategoryId, marketCategories } from '../game/scenarios';
+import {
+  MarketCategoryId,
+  marketCategories,
+  marketMission,
+} from '../game/scenarios';
 import {
   clampWorldZoom,
   screenPointToWorld,
@@ -77,6 +84,7 @@ import {
   zoomFromPinch,
   zoomFromWheel,
 } from '../game/worldZoom';
+import { useNpcTransportQuest } from '../game/useNpcTransportQuest';
 import { colors, fonts } from '../theme';
 import {
   MarketInteractionRequest,
@@ -157,8 +165,6 @@ type DialogueStep =
     }
   | { kind: 'response'; responses: Record<DailyConversationChoice, string> };
 
-const quizAnswers = ['초록불인지 확인해요', '차가 오기 전에 빨리 건너요'];
-
 const dialogueSteps = [
   { kind: 'line', text: '어, 왔구나! 오늘도 만나서 반가워.' },
   { kind: 'line', text: '나는 마을을 한 바퀴 걷고 있었어.' },
@@ -178,9 +184,9 @@ const dialogueSteps = [
       tired: '그랬구나. 오늘도 수고했어. 우리 천천히 걸어가자.',
     },
   },
-  { kind: 'line', text: '그럼 우리 같이 조금 걸을까?' },
-  { kind: 'line', text: '좋아! 저기 횡단보도까지 가 보자.' },
-  { kind: 'line', text: '가는 길에 안전하게 건너는 방법도 같이 떠올려 보자.' },
+  { kind: 'line', text: '그럼 우리 같이 문제를 풀어볼까?' },
+  { kind: 'line', text: '좋아! 오늘은 대중교통을 안전하게 이용하는 연습을 해 보자.' },
+  { kind: 'line', text: '최근 연습 결과에 맞는 문제를 준비해 줄게.' },
 ] as const satisfies readonly DialogueStep[];
 
 function resolveDialogueText(
@@ -192,7 +198,6 @@ function resolveDialogueText(
   return selectedChoice ? step.responses[selectedChoice] : '';
 }
 
-type QuizStep = 'question' | 'result' | null;
 type ControlMode = 'joystick' | 'touch';
 type NearbyMarketStation = MarketStationId | 'exit' | null;
 type NearbyHomeStation = HomeStationId | null;
@@ -491,10 +496,11 @@ function MarketWorldLayer({
 }
 
 type GamePrototypeScreenProps = {
+  accessToken?: string | null;
   onExit: () => void;
 };
 
-export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
+export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototypeScreenProps) {
   const backgroundMusic = useAudioPlayer(require('../../assets/audio/apple-cider.wav'), {
     downloadFirst: true,
     keepAudioSessionActive: true,
@@ -572,6 +578,11 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
   const [nearbyHomeStation, setNearbyHomeStation] = useState<NearbyHomeStation>(null);
   const [busStopNearby, setBusStopNearby] = useState(false);
   const [marketScenarioLocked, setMarketScenarioLocked] = useState(false);
+  const [personalizedMarketMission, setPersonalizedMarketMission] = useState(marketMission);
+  const [marketDifficulty, setMarketDifficulty] = useState(2);
+  const [marketSimulation, setMarketSimulation] = useState<
+    Omit<BehaviorSimulationContext, 'simulationStarted'> | undefined
+  >(undefined);
   const [marketInteractionRequest, setMarketInteractionRequest] =
     useState<MarketInteractionRequest | null>(null);
   const [fridgeMenuOpen, setFridgeMenuOpen] = useState(false);
@@ -601,11 +612,8 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
   const [visibleDialogueCharacters, setVisibleDialogueCharacters] = useState(0);
   const [selectedDailyChoice, setSelectedDailyChoice] =
     useState<DailyConversationChoice | null>(null);
-  const [quizStep, setQuizStep] = useState<QuizStep>(null);
-  const [renderedQuizStep, setRenderedQuizStep] = useState<Exclude<QuizStep, null>>('question');
+  const [renderedQuizStep, setRenderedQuizStep] = useState<'loading' | 'question' | 'result' | 'error'>('question');
   const [quizPanelMounted, setQuizPanelMounted] = useState(false);
-  const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
-  const [showWrongFeedback, setShowWrongFeedback] = useState(false);
   const [dailyQuestStatuses, setDailyQuestStatuses] =
     useState<DailyQuestStatusMap>(INITIAL_DAILY_QUEST_STATUS);
   const questStatusesRef = useRef<DailyQuestStatusMap>(INITIAL_DAILY_QUEST_STATUS);
@@ -625,6 +633,15 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
       return next;
     });
   }, []);
+  const handleTransportQuizCompleted = useCallback(
+    () => completeDailyQuest('minsu-safety'),
+    [completeDailyQuest],
+  );
+  const transportQuiz = useNpcTransportQuest({
+    accessToken,
+    onCompleted: handleTransportQuizCompleted,
+  });
+  const quizStep = transportQuiz.stage === 'idle' ? null : transportQuiz.stage;
   const dailyQuests = createDailyQuestItems(dailyQuestStatuses);
   const currentDialogueStep =
     dialogueIndex === null ? undefined : activeDialogueSteps[dialogueIndex];
@@ -648,6 +665,61 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
     fridgeMenuOpen ||
     cookingOpen ||
     marketScenarioLocked;
+
+  useEffect(() => {
+    let active = true;
+
+    if (!accessToken) {
+      setPersonalizedMarketMission(marketMission);
+      setMarketDifficulty(2);
+      setMarketSimulation(undefined);
+      return () => {
+        active = false;
+      };
+    }
+
+    if (worldMap !== 'market') {
+      return () => {
+        active = false;
+      };
+    }
+
+    getMarketAiQuest(accessToken)
+      .then((generation) => {
+        if (!active) return;
+        setPersonalizedMarketMission(generation.quest);
+        setMarketDifficulty(generation.quest.difficulty);
+        setMarketSimulation({
+          contentSource: generation.source === 'AI' ? 'GENERATED' : 'FALLBACK',
+          questInstanceId: generation.generationId,
+        });
+        if (__DEV__) {
+          console.info('[market-personalization] AI quest applied', {
+            generationId: generation.generationId,
+            source: generation.source,
+            contentSource: generation.source === 'AI' ? 'GENERATED' : 'FALLBACK',
+            model: generation.model,
+            difficulty: generation.quest.difficulty,
+            mode: generation.personalizationMode,
+            summary: generation.adaptationSummary,
+            reasons: generation.reasonCodes,
+          });
+        }
+      })
+      .catch((error: unknown) => {
+        if (!active) return;
+        setPersonalizedMarketMission(marketMission);
+        setMarketDifficulty(2);
+        setMarketSimulation(undefined);
+        if (__DEV__) {
+          console.warn('[market-personalization] baseline fallback', error);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [accessToken, worldMap]);
 
   useEffect(() => {
     let active = true;
@@ -1449,7 +1521,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
   useEffect(() => {
     clearSoundTimers.current.forEach(clearTimeout);
     clearSoundTimers.current = [];
-    if (!audioModeReady || quizStep !== 'result') return undefined;
+    if (!audioModeReady || transportQuiz.stage !== 'result') return undefined;
 
     const notes = [
       { delay: 0, isLoaded: dialogueBlipOneStatus.isLoaded, player: dialogueBlipOne },
@@ -1481,12 +1553,12 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
     dialogueBlipThreeStatus.isLoaded,
     dialogueBlipTwo,
     dialogueBlipTwoStatus.isLoaded,
-    quizStep,
+    transportQuiz.stage,
   ]);
 
   useEffect(() => {
     resultCelebration.stopAnimation();
-    if (quizStep !== 'result') {
+    if (transportQuiz.stage !== 'result') {
       resultCelebration.setValue(0);
       return;
     }
@@ -1501,7 +1573,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
       toValue: 1,
       useNativeDriver: true,
     }).start();
-  }, [quizStep, reduceMotionEnabled, resultCelebration]);
+  }, [transportQuiz.stage, reduceMotionEnabled, resultCelebration]);
 
   useEffect(() => {
     dialoguePanelProgress.stopAnimation();
@@ -1542,8 +1614,8 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
 
   useEffect(() => {
     quizPanelProgress.stopAnimation();
-    if (quizStep) {
-      setRenderedQuizStep(quizStep);
+    if (transportQuiz.stage !== 'idle') {
+      setRenderedQuizStep(transportQuiz.stage);
       if (!quizPanelMounted) {
         setQuizPanelMounted(true);
         quizPanelProgress.setValue(0);
@@ -1577,7 +1649,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
         if (finished) setQuizPanelMounted(false);
       });
     }
-  }, [quizPanelProgress, quizStep, reduceMotionEnabled]);
+  }, [quizPanelProgress, reduceMotionEnabled, transportQuiz.stage]);
 
   useEffect(() => {
     speakerTagFloat.stopAnimation();
@@ -1759,9 +1831,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
     setRunEnabled(false);
     setDialogueIndex(null);
     setDialogueMode(null);
-    setSelectedAnswer(null);
-    setShowWrongFeedback(false);
-    setQuizStep('question');
+    void transportQuiz.open();
   };
 
   const startTapMovement = (
@@ -2185,21 +2255,8 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
   };
 
   const closeQuiz = () => {
-    setQuizStep(null);
+    transportQuiz.close();
     setDialogueMode(null);
-    setSelectedAnswer(null);
-    setShowWrongFeedback(false);
-  };
-
-  const handleQuizAnswerPress = (index: number) => {
-    setSelectedAnswer(index);
-    if (index === 0) {
-      setShowWrongFeedback(false);
-      completeDailyQuest('minsu-safety');
-      setQuizStep('result');
-      return;
-    }
-    setShowWrongFeedback(true);
   };
 
   const marketStationCategory =
@@ -2505,11 +2562,16 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
 
       {worldMap === 'market' ? (
         <MarketSimulationScreen
+          accessToken={accessToken}
+          difficulty={marketDifficulty}
           embedded
           interactionRequest={marketInteractionRequest}
+          key={`${personalizedMarketMission.id}-${marketDifficulty}-${marketSimulation?.questInstanceId ?? 'static'}`}
+          mission={personalizedMarketMission}
           onExit={handleLeaveMarket}
           onLockChange={setMarketScenarioLocked}
           onMissionComplete={() => completeDailyQuest('market-shopping')}
+          simulation={marketSimulation}
         />
       ) : null}
 
@@ -2804,9 +2866,40 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
               },
             ]}
           >
-            {renderedQuizStep === 'question' ? (
+            {renderedQuizStep === 'loading' ? (
+              <View accessibilityLiveRegion="polite" style={styles.quizLoading}>
+                <ActivityIndicator color={colors.mint} size="large" />
+                <Text style={styles.quizLoadingTitle}>나에게 맞는 문제를 준비하고 있어요</Text>
+                <Text style={styles.quizLoadingDescription}>
+                  최근 난이도와 대중교통 퀘스트를 확인해요.
+                </Text>
+              </View>
+            ) : renderedQuizStep === 'error' ? (
+              <View accessibilityLiveRegion="assertive" style={styles.quizLoading}>
+                <Ionicons color="#D5685D" name="alert-circle-outline" size={42} />
+                <Text style={styles.quizLoadingTitle}>문제를 준비하지 못했어요</Text>
+                <Text style={styles.quizLoadingDescription}>
+                  {transportQuiz.errorMessage ?? '잠시 후 다시 시도해 주세요.'}
+                </Text>
+                <PressScale
+                  accessibilityRole="button"
+                  onPress={() => void transportQuiz.open()}
+                  style={styles.quizButton}
+                >
+                  <Text style={styles.quizButtonText}>다시 시도하기</Text>
+                </PressScale>
+                <PressScale accessibilityRole="button" onPress={closeQuiz} style={styles.quizTextButton}>
+                  <Text style={styles.quizTextButtonLabel}>마을로 돌아가기</Text>
+                </PressScale>
+              </View>
+            ) : renderedQuizStep === 'question' && transportQuiz.step && transportQuiz.quest ? (
               <>
-                <View style={styles.quizDialogueCard}>
+                <View
+                  style={[
+                    styles.quizDialogueCard,
+                    { bottom: 157 + transportQuiz.step.choices.length * 60 },
+                  ]}
+                >
                   <Animated.View
                     pointerEvents="none"
                     style={[
@@ -2818,11 +2911,29 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
                   >
                     <Text style={styles.dialogueSpeaker}>민수</Text>
                   </Animated.View>
+                  <View style={styles.quizMetaRow}>
+                    <Text style={styles.quizProgressText}>
+                      {transportQuiz.stepIndex + 1}/{transportQuiz.quest.steps.length}
+                    </Text>
+                    {transportQuiz.contentSource === 'ai' ? (
+                      <Text style={styles.quizAiBadge}>AI 맞춤 문제</Text>
+                    ) : null}
+                  </View>
                   <Text style={styles.quizQuestion}>
-                    {showWrongFeedback
-                      ? <>괜찮아요.{'\n'}신호등을 먼저 살펴봐요.</>
-                      : <>횡단보도를 건너기 전에{'\n'}무엇을 먼저 확인할까요?</>}
+                    {transportQuiz.step.instruction}
                   </Text>
+                  <Text style={styles.quizSituation}>{transportQuiz.step.situation}</Text>
+                  {transportQuiz.submittedChoice ? (
+                    <Text
+                      accessibilityLiveRegion="polite"
+                      style={[
+                        styles.quizFeedback,
+                        transportQuiz.submittedChoice.correct && styles.quizFeedbackCorrect,
+                      ]}
+                    >
+                      {transportQuiz.submittedChoice.feedback}
+                    </Text>
+                  ) : null}
                   <Animated.View
                     pointerEvents="none"
                     style={[
@@ -2833,7 +2944,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
                 </View>
 
                 <Animated.View
-                  accessibilityLabel="횡단보도 안전 퀴즈 선택지"
+                  accessibilityLabel="대중교통 안전 퀴즈 선택지"
                   accessibilityRole="radiogroup"
                   style={[
                     styles.quizAnswers,
@@ -2855,15 +2966,16 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
                     },
                   ]}
                 >
-                  {quizAnswers.map((answer, index) => {
-                    const selected = selectedAnswer === index;
-                    const wrong = showWrongFeedback && selected;
+                  {transportQuiz.step.choices.map((choice) => {
+                    const selected = transportQuiz.selectedChoiceId === choice.id;
+                    const wrong = selected && transportQuiz.submittedChoice?.correct === false;
                     return (
                       <PressScale
                         accessibilityRole="radio"
                         accessibilityState={{ checked: selected }}
-                        key={answer}
-                        onPress={() => handleQuizAnswerPress(index)}
+                        disabled={transportQuiz.submittedChoice?.correct === true}
+                        key={choice.id}
+                        onPress={() => transportQuiz.selectChoice(choice.id)}
                         style={[
                           styles.quizAnswer,
                           selected && styles.quizAnswerSelected,
@@ -2876,15 +2988,30 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
                           numberOfLines={1}
                           style={styles.quizAnswerText}
                         >
-                          {answer}
+                          {choice.label}
                         </Text>
                       </PressScale>
                     );
                   })}
                 </Animated.View>
-
+                {transportQuiz.submittedChoice?.correct ? (
+                  <PressScale
+                    accessibilityRole="button"
+                    onPress={transportQuiz.advance}
+                    style={styles.quizNextButton}
+                  >
+                    <Text style={styles.quizButtonText}>
+                      {transportQuiz.stepIndex === transportQuiz.quest.steps.length - 1
+                        ? '결과 보기'
+                        : '다음 문제'}
+                    </Text>
+                  </PressScale>
+                ) : null}
+                {transportQuiz.syncNotice ? (
+                  <Text style={styles.quizSyncNotice}>{transportQuiz.syncNotice}</Text>
+                ) : null}
               </>
-            ) : (
+            ) : renderedQuizStep === 'result' && transportQuiz.quest ? (
               <View style={styles.result}>
                 <View style={styles.resultIconStage}>
                   <Animated.View
@@ -2951,18 +3078,23 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
                     },
                   ]}
                 >
-                  <Text style={styles.resultTitle}>퀴즈를 마쳤어요!</Text>
-                  <Text style={styles.resultDescription}>신호를 확인하고 안전하게 건너요.</Text>
+                  <Text style={styles.resultTitle}>{transportQuiz.quest.title} 퀴즈를 마쳤어요!</Text>
+                  <Text style={styles.resultDescription}>
+                    {transportQuiz.quest.steps.length}개의 대중교통 안전 단계를 완료했어요.
+                  </Text>
                   <View style={styles.xpCard}>
                     <Text style={styles.xpLabel}>받은 경험치</Text>
-                    <Text style={styles.xpValue}>+10 XP</Text>
+                    <Text style={styles.xpValue}>+{transportQuiz.quest.rewardPoints} XP</Text>
                   </View>
+                  {transportQuiz.syncNotice ? (
+                    <Text style={styles.quizSyncNotice}>{transportQuiz.syncNotice}</Text>
+                  ) : null}
                   <PressScale accessibilityRole="button" onPress={closeQuiz} style={styles.quizButton}>
                     <Text style={styles.quizButtonText}>마을로 돌아가기</Text>
                   </PressScale>
                 </Animated.View>
               </View>
-            )}
+            ) : null}
           </Animated.View>
         </View>
       ) : null}
@@ -3822,16 +3954,39 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 18,
   },
+  quizLoading: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 310,
+    paddingHorizontal: 18,
+  },
+  quizLoadingTitle: {
+    color: colors.ink,
+    fontFamily: fonts.bold,
+    fontSize: 18,
+    marginTop: 14,
+    textAlign: 'center',
+  },
+  quizLoadingDescription: {
+    color: '#777777',
+    fontFamily: fonts.regular,
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: 7,
+    textAlign: 'center',
+  },
+  quizTextButton: { marginTop: 14, padding: 8 },
+  quizTextButtonLabel: { color: '#68736D', fontFamily: fonts.semibold, fontSize: 14 },
   quizDialogueCard: {
     alignItems: 'center',
     alignSelf: 'center',
     backgroundColor: 'rgba(75,75,75,0.90)',
     borderRadius: 22,
-    bottom: 258,
-    height: 128,
+    minHeight: 154,
     justifyContent: 'center',
     maxWidth: 335,
     paddingHorizontal: 22,
+    paddingVertical: 22,
     position: 'absolute',
     shadowColor: '#000000',
     shadowOffset: { height: 0, width: 0 },
@@ -3859,6 +4014,41 @@ const styles = StyleSheet.create({
     lineHeight: 27,
     textAlign: 'center',
   },
+  quizMetaRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'center',
+    marginBottom: 7,
+  },
+  quizProgressText: { color: '#DDE6E1', fontFamily: fonts.bold, fontSize: 11 },
+  quizAiBadge: {
+    backgroundColor: '#DFF7E9',
+    borderRadius: 9,
+    color: '#277354',
+    fontFamily: fonts.bold,
+    fontSize: 10,
+    overflow: 'hidden',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+  },
+  quizSituation: {
+    color: '#E8E8E8',
+    fontFamily: fonts.regular,
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: 6,
+    textAlign: 'center',
+  },
+  quizFeedback: {
+    color: '#FFC1A6',
+    fontFamily: fonts.semibold,
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: 7,
+    textAlign: 'center',
+  },
+  quizFeedbackCorrect: { color: '#9CE7BE' },
   quizAnswers: {
     alignItems: 'center',
     bottom: 139,
@@ -3906,6 +4096,25 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   quizButtonText: { color: colors.white, fontFamily: fonts.bold, fontSize: 17 },
+  quizNextButton: {
+    alignItems: 'center',
+    alignSelf: 'center',
+    backgroundColor: colors.mint,
+    borderRadius: 20,
+    bottom: 65,
+    height: 52,
+    justifyContent: 'center',
+    maxWidth: 335,
+    position: 'absolute',
+    width: '89.333%',
+  },
+  quizSyncNotice: {
+    color: '#777777',
+    fontFamily: fonts.regular,
+    fontSize: 11,
+    marginTop: 8,
+    textAlign: 'center',
+  },
   disabled: { opacity: 0.38 },
   result: { alignItems: 'center', paddingTop: 10 },
   resultIconStage: { alignItems: 'center', height: 76, justifyContent: 'center', width: 76 },

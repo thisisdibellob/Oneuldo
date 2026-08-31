@@ -18,6 +18,19 @@ public interface NormalizedBehaviorEventRepository
 
     long countByNormalizationStatus(NormalizationStatus status);
 
+    @Query("""
+            select count(event)
+            from NormalizedBehaviorEvent event
+            where event.behaviorLog.member.id = :memberId
+              and event.behaviorLog.sessionId = :sessionId
+              and event.normalizerVersion = :normalizerVersion
+            """)
+    long countNormalizedSessionEvents(
+            @Param("memberId") UUID memberId,
+            @Param("sessionId") UUID sessionId,
+            @Param("normalizerVersion") String normalizerVersion
+    );
+
     List<NormalizedBehaviorEvent> findByNormalizationStatusOrderByNormalizedAtDesc(
             NormalizationStatus status, Pageable pageable);
 

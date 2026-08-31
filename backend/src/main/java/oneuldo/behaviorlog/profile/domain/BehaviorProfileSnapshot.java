@@ -63,6 +63,9 @@ public class BehaviorProfileSnapshot {
     @Column(name = "input_event_count", nullable = false, updatable = false)
     private int inputEventCount;
 
+    @Column(name = "source_session_id", updatable = false)
+    private UUID sourceSessionId;
+
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "profile_data", nullable = false, columnDefinition = "jsonb", updatable = false)
     private BehaviorProfileData profileData;
@@ -72,6 +75,11 @@ public class BehaviorProfileSnapshot {
 
     public BehaviorProfileSnapshot(Member member, BehaviorProfileData profileData,
             int inputEventCount) {
+        this(member, profileData, inputEventCount, null);
+    }
+
+    public BehaviorProfileSnapshot(Member member, BehaviorProfileData profileData,
+            int inputEventCount, UUID sourceSessionId) {
         this.member = Objects.requireNonNull(member);
         this.profileData = Objects.requireNonNull(profileData);
         this.profileVersion = profileData.profileVersion();
@@ -82,6 +90,7 @@ public class BehaviorProfileSnapshot {
         this.evidenceFrom = profileData.evidenceFrom();
         this.evidenceTo = profileData.evidenceTo();
         this.inputEventCount = inputEventCount;
+        this.sourceSessionId = sourceSessionId;
         this.generatedAt = profileData.generatedAt();
     }
 }

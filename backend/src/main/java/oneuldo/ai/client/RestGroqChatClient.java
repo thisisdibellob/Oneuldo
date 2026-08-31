@@ -23,6 +23,12 @@ public class RestGroqChatClient implements GroqChatClient {
 
     @Override
     public GroqChatResult complete(String systemPrompt, String userPrompt) {
+        return complete(systemPrompt, userPrompt, 256, 0.7);
+    }
+
+    @Override
+    public GroqChatResult complete(String systemPrompt, String userPrompt,
+            int maxCompletionTokens, double temperature) {
         if (!properties.available()) {
             throw new CloudAiUnavailableException("Groq API가 활성화되지 않았습니다.");
         }
@@ -36,8 +42,8 @@ public class RestGroqChatClient implements GroqChatClient {
                                     new Message("system", systemPrompt),
                                     new Message("user", userPrompt)
                             ),
-                            256,
-                            0.7,
+                            maxCompletionTokens,
+                            temperature,
                             0.8,
                             "none",
                             "hidden",

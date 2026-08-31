@@ -177,12 +177,66 @@ export const marketMission: MarketMission = {
   successMessage: '목록에 맞게 장보기를 마쳤어요!',
 };
 
+export type MarketMissionRecommendation = {
+  recommendedDifficulty: 1 | 2 | 3;
+  adjustments: {
+    itemCount: 2 | 3 | 4;
+    quantityComplexity: 'LOW' | 'MEDIUM' | 'HIGH';
+    budgetPressure: 'LOW' | 'MEDIUM' | 'HIGH';
+    textSupport: 'SIMPLIFIED' | 'STANDARD' | 'REDUCED';
+  };
+};
+
+export function buildPersonalizedMarketMission(
+  recommendation: MarketMissionRecommendation,
+): MarketMission {
+  const products = ['milk', 'apple', 'curry', 'juice'].slice(
+    0,
+    recommendation.adjustments.itemCount,
+  );
+  const quantities = recommendation.adjustments.quantityComplexity === 'LOW'
+    ? [1, 1, 1, 1]
+    : recommendation.adjustments.quantityComplexity === 'HIGH'
+      ? [2, 3, 2, 1]
+      : [1, 2, 1, 1];
+  const objectives = products.map((productId, index) => ({
+    productId,
+    quantity: quantities[index],
+  }));
+  const objectiveTotal = objectives.reduce((sum, objective) => {
+    const product = getMarketProduct(objective.productId);
+    return sum + (product?.price ?? 0) * objective.quantity;
+  }, 0);
+  const margin = recommendation.adjustments.budgetPressure === 'LOW'
+    ? 3500
+    : recommendation.adjustments.budgetPressure === 'HIGH' ? 500 : 2500;
+  const budget = Math.ceil((objectiveTotal + margin) / 500) * 500;
+  const briefing = recommendation.adjustments.textSupport === 'SIMPLIFIED'
+    ? ['목록에 있는 물건을 필요한 수만큼 담아요.', '모두 담은 뒤 계산대로 가요.']
+    : recommendation.adjustments.textSupport === 'REDUCED'
+      ? ['목록과 예산을 확인하고 장보기를 시작해요.']
+      : marketMission.briefing;
+
+  return {
+    ...marketMission,
+    id: `market-personalized-d${recommendation.recommendedDifficulty}`,
+    budget,
+    objectives,
+    briefing,
+  };
+}
+
 export type MarketCart = Record<string, number>;
 
 export type MarketEvaluation = {
   success: boolean;
   total: number;
   missing: MarketObjective[];
+  quantityMismatches: Array<{
+    productId: string;
+    requiredQuantity: number;
+    selectedQuantity: number;
+  }>;
   extra: Array<{ productId: string; quantity: number }>;
   overBudget: number;
 };
@@ -211,15 +265,23 @@ export function evaluateMarketCart(cart: MarketCart, mission: MarketMission = ma
       quantity: Math.max(0, objective.quantity - getCartQuantity(cart, objective.productId)),
     }))
     .filter((objective) => objective.quantity > 0);
+  const quantityMismatches = mission.objectives
+    .map((objective) => ({
+      productId: objective.productId,
+      requiredQuantity: objective.quantity,
+      selectedQuantity: getCartQuantity(cart, objective.productId),
+    }))
+    .filter(({ requiredQuantity, selectedQuantity }) => requiredQuantity !== selectedQuantity);
   const extra = Object.entries(cart)
     .filter(([productId, quantity]) => quantity > 0 && !objectiveIds.has(productId))
     .map(([productId, quantity]) => ({ productId, quantity }));
   const overBudget = Math.max(0, total - mission.budget);
 
   return {
-    success: missing.length === 0 && extra.length === 0 && overBudget === 0,
+    success: quantityMismatches.length === 0 && extra.length === 0 && overBudget === 0,
     total,
     missing,
+    quantityMismatches,
     extra,
     overBudget,
   };

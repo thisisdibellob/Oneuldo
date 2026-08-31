@@ -1,0 +1,145 @@
+{
+  "sourcePptx": "/Users/bluem/Downloads/oneuldo-ai-system-presentation-v2-slide12-black (1).pptx",
+  "mapPath": "/Users/bluem/Documents/GitHub/Oneuldo/.codex-tmp/personalization-ppt-detailed/template-frame-map.json",
+  "output": "/Users/bluem/Documents/GitHub/Oneuldo/.codex-tmp/personalization-ppt-detailed/template-starter.pptx",
+  "outputBytes": 68722,
+  "sourceSlideCount": 12,
+  "slideCount": 12,
+  "previewDir": "/Users/bluem/Documents/GitHub/Oneuldo/.codex-tmp/personalization-ppt-detailed/template-starter-preview",
+  "layoutDir": "/Users/bluem/Documents/GitHub/Oneuldo/.codex-tmp/personalization-ppt-detailed/template-starter-layout",
+  "contactSheet": "/Users/bluem/Documents/GitHub/Oneuldo/.codex-tmp/personalization-ppt-detailed/template-starter-contact-sheet.png",
+  "slides": [
+    {
+      "outputSlide": 1,
+      "sourceSlide": 1,
+      "narrativeRole": "opening thesis",
+      "reuseMode": "duplicate-slide",
+      "editTargetCount": 1,
+      "previewPath": "/Users/bluem/Documents/GitHub/Oneuldo/.codex-tmp/personalization-ppt-detailed/template-starter-preview/starter-slide-01.png",
+      "previewRelativePath": "template-starter-preview/starter-slide-01.png",
+      "layoutPath": "/Users/bluem/Documents/GitHub/Oneuldo/.codex-tmp/personalization-ppt-detailed/template-starter-layout/starter-slide-01.layout.json",
+      "layoutRelativePath": "template-starter-layout/starter-slide-01.layout.json"
+    },
+    {
+      "outputSlide": 2,
+      "sourceSlide": 3,
+      "narrativeRole": "end-to-end process",
+      "reuseMode": "duplicate-slide",
+      "editTargetCount": 1,
+      "previewPath": "/Users/bluem/Documents/GitHub/Oneuldo/.codex-tmp/personalization-ppt-detailed/template-starter-preview/starter-slide-02.png",
+      "previewRelativePath": "template-starter-preview/starter-slide-02.png",
+      "layoutPath": "/Users/bluem/Documents/GitHub/Oneuldo/.codex-tmp/personalization-ppt-detailed/template-starter-layout/starter-slide-02.layout.json",
+      "layoutRelativePath": "template-starter-layout/starter-slide-02.layout.json"
+    },
+    {
+      "outputSlide": 3,
+      "sourceSlide": 8,
+      "narrativeRole": "skill domains",
+      "reuseMode": "duplicate-slide",
+      "editTargetCount": 1,
+      "previewPath": "/Users/bluem/Documents/GitHub/Oneuldo/.codex-tmp/personalization-ppt-detailed/template-starter-preview/starter-slide-03.png",
+      "previewRelativePath": "template-starter-preview/starter-slide-03.png",
+      "layoutPath": "/Users/bluem/Documents/GitHub/Oneuldo/.codex-tmp/personalization-ppt-detailed/template-starter-layout/starter-slide-03.layout.json",
+      "layoutRelativePath": "template-starter-layout/starter-slide-03.layout.json"
+    },
+    {
+      "outputSlide": 4,
+      "sourceSlide": 6,
+      "narrativeRole": "behavior logging",
+      "reuseMode": "duplicate-slide",
+      "editTargetCount": 1,
+      "previewPath": "/Users/bluem/Documents/GitHub/Oneuldo/.codex-tmp/personalization-ppt-detailed/template-starter-preview/starter-slide-04.png",
+      "previewRelativePath": "template-starter-preview/starter-slide-04.png",
+      "layoutPath": "/Users/bluem/Documents/GitHub/Oneuldo/.codex-tmp/personalization-ppt-detailed/template-starter-layout/starter-slide-04.layout.json",
+      "layoutRelativePath": "template-starter-layout/starter-slide-04.layout.json"
+    },
+    {
+      "outputSlide": 5,
+      "sourceSlide": 7,
+      "narrativeRole": "normalization",
+      "reuseMode": "duplicate-slide",
+      "editTargetCount": 1,
+      "previewPath": "/Users/bluem/Documents/GitHub/Oneuldo/.codex-tmp/personalization-ppt-detailed/template-starter-preview/starter-slide-05.png",
+      "previewRelativePath": "template-starter-preview/starter-slide-05.png",
+      "layoutPath": "/Users/bluem/Documents/GitHub/Oneuldo/.codex-tmp/personalization-ppt-detailed/template-starter-layout/starter-slide-05.layout.json",
+      "layoutRelativePath": "template-starter-layout/starter-slide-05.layout.json"
+    },
+    {
+      "outputSlide": 6,
+      "sourceSlide": 6,
+      "narrativeRole": "independent supported rates",
+      "reuseMode": "duplicate-slide",
+      "editTargetCount": 1,
+      "previewPath": "/Users/bluem/Documents/GitHub/Oneuldo/.codex-tmp/personalization-ppt-detailed/template-starter-preview/starter-slide-06.png",
+      "previewRelativePath": "template-starter-preview/starter-slide-06.png",
+      "layoutPath": "/Users/bluem/Documents/GitHub/Oneuldo/.codex-tmp/personalization-ppt-detailed/template-starter-layout/starter-slide-06.layout.json",
+      "layoutRelativePath": "template-starter-layout/starter-slide-06.layout.json"
+    },
+    {
+      "outputSlide": 7,
+      "sourceSlide": 7,
+      "narrativeRole": "profile confidence",
+      "reuseMode": "duplicate-slide",
+      "editTargetCount": 1,
+      "previewPath": "/Users/bluem/Documents/GitHub/Oneuldo/.codex-tmp/personalization-ppt-detailed/template-starter-preview/starter-slide-07.png",
+      "previewRelativePath": "template-starter-preview/starter-slide-07.png",
+      "layoutPath": "/Users/bluem/Documents/GitHub/Oneuldo/.codex-tmp/personalization-ppt-detailed/template-starter-layout/starter-slide-07.layout.json",
+      "layoutRelativePath": "template-starter-layout/starter-slide-07.layout.json"
+    },
+    {
+      "outputSlide": 8,
+      "sourceSlide": 6,
+      "narrativeRole": "deidentified profile",
+      "reuseMode": "duplicate-slide",
+      "editTargetCount": 1,
+      "previewPath": "/Users/bluem/Documents/GitHub/Oneuldo/.codex-tmp/personalization-ppt-detailed/template-starter-preview/starter-slide-08.png",
+      "previewRelativePath": "template-starter-preview/starter-slide-08.png",
+      "layoutPath": "/Users/bluem/Documents/GitHub/Oneuldo/.codex-tmp/personalization-ppt-detailed/template-starter-layout/starter-slide-08.layout.json",
+      "layoutRelativePath": "template-starter-layout/starter-slide-08.layout.json"
+    },
+    {
+      "outputSlide": 9,
+      "sourceSlide": 6,
+      "narrativeRole": "prompt contents",
+      "reuseMode": "duplicate-slide",
+      "editTargetCount": 1,
+      "previewPath": "/Users/bluem/Documents/GitHub/Oneuldo/.codex-tmp/personalization-ppt-detailed/template-starter-preview/starter-slide-09.png",
+      "previewRelativePath": "template-starter-preview/starter-slide-09.png",
+      "layoutPath": "/Users/bluem/Documents/GitHub/Oneuldo/.codex-tmp/personalization-ppt-detailed/template-starter-layout/starter-slide-09.layout.json",
+      "layoutRelativePath": "template-starter-layout/starter-slide-09.layout.json"
+    },
+    {
+      "outputSlide": 10,
+      "sourceSlide": 3,
+      "narrativeRole": "two stage AI",
+      "reuseMode": "duplicate-slide",
+      "editTargetCount": 1,
+      "previewPath": "/Users/bluem/Documents/GitHub/Oneuldo/.codex-tmp/personalization-ppt-detailed/template-starter-preview/starter-slide-10.png",
+      "previewRelativePath": "template-starter-preview/starter-slide-10.png",
+      "layoutPath": "/Users/bluem/Documents/GitHub/Oneuldo/.codex-tmp/personalization-ppt-detailed/template-starter-layout/starter-slide-10.layout.json",
+      "layoutRelativePath": "template-starter-layout/starter-slide-10.layout.json"
+    },
+    {
+      "outputSlide": 11,
+      "sourceSlide": 7,
+      "narrativeRole": "validation and storage",
+      "reuseMode": "duplicate-slide",
+      "editTargetCount": 1,
+      "previewPath": "/Users/bluem/Documents/GitHub/Oneuldo/.codex-tmp/personalization-ppt-detailed/template-starter-preview/starter-slide-11.png",
+      "previewRelativePath": "template-starter-preview/starter-slide-11.png",
+      "layoutPath": "/Users/bluem/Documents/GitHub/Oneuldo/.codex-tmp/personalization-ppt-detailed/template-starter-layout/starter-slide-11.layout.json",
+      "layoutRelativePath": "template-starter-layout/starter-slide-11.layout.json"
+    },
+    {
+      "outputSlide": 12,
+      "sourceSlide": 1,
+      "narrativeRole": "closing synthesis",
+      "reuseMode": "duplicate-slide",
+      "editTargetCount": 1,
+      "previewPath": "/Users/bluem/Documents/GitHub/Oneuldo/.codex-tmp/personalization-ppt-detailed/template-starter-preview/starter-slide-12.png",
+      "previewRelativePath": "template-starter-preview/starter-slide-12.png",
+      "layoutPath": "/Users/bluem/Documents/GitHub/Oneuldo/.codex-tmp/personalization-ppt-detailed/template-starter-layout/starter-slide-12.layout.json",
+      "layoutRelativePath": "template-starter-layout/starter-slide-12.layout.json"
+    }
+  ]
+}

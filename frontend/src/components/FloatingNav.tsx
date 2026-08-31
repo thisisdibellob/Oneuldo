@@ -18,7 +18,7 @@ export const navItems = [
   { label: '홈', icon: icons.home },
   { label: '퀘스트', icon: icons.quest },
   { label: '게임', icon: icons.game },
-  { label: 'AI', icon: icons.ai },
+  { label: '분석', icon: icons.ranking },
   { label: '사용자', icon: icons.user },
 ];
 

@@ -18,6 +18,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
@@ -66,6 +67,7 @@ import oneuldo.member.repository.MemberRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.web.server.ResponseStatusException;
 
 @Service
@@ -89,8 +91,26 @@ public class BehaviorProfileService {
     private final BehaviorProfileSnapshotRepository snapshotRepository;
     private final BehaviorProfileEvidenceLinkRepository evidenceLinkRepository;
 
+    @Transactional(readOnly = true)
+    public Optional<BehaviorProfileResponse> latest(UUID memberId) {
+        return snapshotRepository.findFirstByMemberIdOrderByGeneratedAtDesc(memberId)
+                .map(BehaviorProfileResponse::from);
+    }
+
     @Transactional
     public BehaviorProfileResponse generate(UUID memberId, BehaviorProfileGenerateRequest request) {
+        return generate(memberId, request, null);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public BehaviorProfileResponse generateForCompletedSession(UUID memberId, UUID sessionId) {
+        return snapshotRepository.findByMemberIdAndSourceSessionId(memberId, sessionId)
+                .map(BehaviorProfileResponse::from)
+                .orElseGet(() -> generate(memberId, null, sessionId));
+    }
+
+    private BehaviorProfileResponse generate(UUID memberId, BehaviorProfileGenerateRequest request,
+            UUID sourceSessionId) {
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."));
@@ -153,7 +173,7 @@ public class BehaviorProfileService {
         );
 
         BehaviorProfileSnapshot snapshot = snapshotRepository.save(
-                new BehaviorProfileSnapshot(member, data, events.size()));
+                new BehaviorProfileSnapshot(member, data, events.size(), sourceSessionId));
         evidenceLinkRepository.saveAll(createEvidenceLinks(snapshot, events, index));
         return BehaviorProfileResponse.from(snapshot);
     }

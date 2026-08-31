@@ -1,0 +1,11 @@
+최종 QA 기록
+
+- 산출물: /Users/bluem/Downloads/oneuldo-personalization-system-presentation.pptx
+- 슬라이드 수: 8
+- 개별 렌더 검수: 1~8번 완료
+- 수정 사항: 2·6·8번 긴 제목을 템플릿 폭에 맞게 축약
+- 오래된 대중교통/기존 시스템 문구 잔존 검사: 없음
+- slides_test.py: 통과, overflow 없음
+- template fidelity: 통과, issue 0
+- 발표자 노트: 8장 모두 Sources 블록 포함
+- 빈 플레이스홀더 전용 슬라이드: 없음

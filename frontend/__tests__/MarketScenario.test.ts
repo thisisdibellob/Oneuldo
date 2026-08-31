@@ -1,4 +1,5 @@
 import {
+  buildPersonalizedMarketMission,
   evaluateMarketCart,
   getMarketProduct,
   getMarketCartTotal,
@@ -29,9 +30,19 @@ describe('마트 장보기 시나리오', () => {
       success: true,
       total: 7400,
       missing: [],
+      quantityMismatches: [],
       extra: [],
       overBudget: 0,
     });
+  });
+
+  it('목표 상품을 필요한 수량보다 많이 담으면 수량 오류로 판정한다', () => {
+    const evaluation = evaluateMarketCart({ apple: 3, curry: 1, milk: 1 });
+
+    expect(evaluation.success).toBe(false);
+    expect(evaluation.quantityMismatches).toEqual([
+      { productId: 'apple', requiredQuantity: 2, selectedQuantity: 3 },
+    ]);
   });
 
   it('빠진 물건, 목록에 없는 물건, 초과 예산을 데이터로 판정한다', () => {
@@ -44,5 +55,45 @@ describe('마트 장보기 시나리오', () => {
       { productId: 'watermelon', quantity: 1 },
     ]);
     expect(evaluation.overBudget).toBe(11200);
+  });
+
+  it('지원이 필요한 추천은 품목과 수량을 줄이고 안내 문장을 구체화한다', () => {
+    const mission = buildPersonalizedMarketMission({
+      recommendedDifficulty: 1,
+      adjustments: {
+        itemCount: 2,
+        quantityComplexity: 'LOW',
+        budgetPressure: 'LOW',
+        textSupport: 'SIMPLIFIED',
+      },
+    });
+
+    expect(mission.objectives).toEqual([
+      { productId: 'milk', quantity: 1 },
+      { productId: 'apple', quantity: 1 },
+    ]);
+    expect(mission.budget).toBe(7000);
+    expect(mission.briefing).toHaveLength(2);
+  });
+
+  it('안정적인 추천은 품목과 수량 복잡도를 높이고 안내를 줄인다', () => {
+    const mission = buildPersonalizedMarketMission({
+      recommendedDifficulty: 3,
+      adjustments: {
+        itemCount: 4,
+        quantityComplexity: 'HIGH',
+        budgetPressure: 'HIGH',
+        textSupport: 'REDUCED',
+      },
+    });
+
+    expect(mission.objectives).toEqual([
+      { productId: 'milk', quantity: 2 },
+      { productId: 'apple', quantity: 3 },
+      { productId: 'curry', quantity: 2 },
+      { productId: 'juice', quantity: 1 },
+    ]);
+    expect(mission.budget).toBe(17500);
+    expect(mission.briefing).toHaveLength(1);
   });
 });

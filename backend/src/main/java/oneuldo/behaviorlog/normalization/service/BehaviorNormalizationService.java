@@ -6,6 +6,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import oneuldo.behaviorlog.domain.BehaviorLog;
 import oneuldo.behaviorlog.domain.context.ErrorContext;
@@ -122,7 +123,7 @@ public class BehaviorNormalizationService {
                 definition == null ? null : definition.domain(),
                 definition == null ? null : definition.actionType(),
                 outcome,
-                definition == null ? null : resolveErrorType(log.getErrorContext(), definition),
+                definition == null ? null : resolveErrorType(log, definition),
                 definition == null ? null : resolveIndependence(log),
                 evidenceUse,
                 validity,
@@ -175,6 +176,15 @@ public class BehaviorNormalizationService {
                         "payload 필드를 읽을 수 없습니다."));
             }
         }
+        if ("SHOP.ITEM_MISSING".equals(log.getEventCode())
+                && log.getPayload() instanceof oneuldo.behaviorlog.domain.payload.ShoppingBehaviorPayload payload
+                && !Integer.valueOf(0).equals(payload.selectedQuantity())) {
+            issues.add(new NormalizationIssue(
+                    "INVALID_MISSING_ITEM_QUANTITY",
+                    "payload.selectedQuantity",
+                    "누락 상품의 선택 수량은 0이어야 합니다."
+            ));
+        }
         return new PayloadValidationResult(issues);
     }
 
@@ -221,7 +231,13 @@ public class BehaviorNormalizationService {
         return ObservedOutcome.valueOf(raw.name());
     }
 
-    private ErrorType resolveErrorType(ErrorContext error, BehaviorEventDefinition definition) {
+    private ErrorType resolveErrorType(BehaviorLog log, BehaviorEventDefinition definition) {
+        if ("SHOP.QUANTITY_CHANGED".equals(log.getEventCode())
+                && log.getPayload() instanceof oneuldo.behaviorlog.domain.payload.ShoppingBehaviorPayload payload) {
+            return Objects.equals(payload.requiredQuantity(), payload.selectedQuantity())
+                    ? ErrorType.NONE : ErrorType.QUANTITY_ERROR;
+        }
+        ErrorContext error = log.getErrorContext();
         if (error == null) return definition.defaultErrorType();
         if (positive(error.sequenceErrorCount())) return ErrorType.SEQUENCE_ERROR;
         if (positive(error.wrongActionCount())) return ErrorType.WRONG_SELECTION;
