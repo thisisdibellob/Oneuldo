@@ -1,6 +1,7 @@
 import type { ImageSourcePropType } from 'react-native';
 
 import type { MarketCategoryId } from './scenarios';
+import type { VillageDecorationKind } from './prototypeWorld';
 
 const marketShelves = {
   drink: require('../../assets/images/game/props/mart/prop_shelf_drink_v1.png'),
@@ -36,4 +37,19 @@ export const villageBuildingArt: Partial<Record<string, ImageSourcePropType>> = 
 export const villageLandmarkArt = {
   busStop: require('../../assets/images/game/buildings/village/runtime/prop_bus_stop_v1.png'),
   park: require('../../assets/images/game/buildings/village/runtime/landmark_park_v1.png'),
+};
+
+export const villageDecorationArt = {
+  bench: require('../../assets/images/game/environment/village/runtime/env_bench_wood_v1.png'),
+  bicycle: require('../../assets/images/game/environment/village/runtime/env_bicycle_v1.png'),
+  fence: require('../../assets/images/game/environment/village/runtime/env_fence_wood_v1.png'),
+  flowerbed: require('../../assets/images/game/environment/village/runtime/env_flowerbed_v1.png'),
+  shrub: require('../../assets/images/game/environment/village/runtime/env_shrub_cluster_v1.png'),
+  streetlamp: require('../../assets/images/game/environment/village/runtime/env_streetlamp_v1.png'),
+  'trash-bin': require('../../assets/images/game/environment/village/runtime/env_trash_bin_v1.png'),
+  tree: require('../../assets/images/game/environment/village/runtime/env_tree_round_v1.png'),
+} satisfies Record<VillageDecorationKind, ImageSourcePropType>;
+
+export const villageSurfaceArt = {
+  road: require('../../assets/images/game/environment/village/runtime/env_road_surface_warm_v1.png'),
 };

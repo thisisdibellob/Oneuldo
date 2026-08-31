@@ -462,11 +462,11 @@ describe('오늘도 앱', () => {
 
     const joystick = screen.getByLabelText('이동 조이스틱');
     expect(screen.queryByTestId('market-proximity-cloud')).toBeNull();
-    for (let step = 0; step < 11; step += 1) {
-      fireEvent(joystick, 'accessibilityAction', { nativeEvent: { actionName: 'moveRight' } });
-    }
     for (let step = 0; step < 6; step += 1) {
       fireEvent(joystick, 'accessibilityAction', { nativeEvent: { actionName: 'moveUp' } });
+    }
+    for (let step = 0; step < 10; step += 1) {
+      fireEvent(joystick, 'accessibilityAction', { nativeEvent: { actionName: 'moveRight' } });
     }
     expect(screen.getByTestId('market-proximity-cloud', { includeHiddenElements: true })).toBeTruthy();
     fireEvent.press(screen.getByRole('button', { name: '하늘마트 들어가기' }));
