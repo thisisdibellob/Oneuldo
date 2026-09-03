@@ -126,7 +126,29 @@ public record BehaviorProfileData(
             int helpRequestCount,
             Long medianHelpRequestLatencyMs,
             Long medianStartLatencyMs,
-            Map<String, Double> averagePathEfficiencyByTaskVersion
+            Map<String, Double> averagePathEfficiencyByTaskVersion,
+            List<ShoppingSessionPattern> shoppingSessions
+    ) {}
+
+    public record ShoppingSessionPattern(
+            UUID sessionId,
+            Instant startedAt,
+            Instant endedAt,
+            double movementDistance,
+            long movementDurationMs,
+            Double movementDirectness,
+            long targetPassedCount,
+            long targetShelfRevisitCount,
+            long wrongAisleCount,
+            long offTargetDwellMs,
+            long routeLoopCount,
+            long blockedMovementCount,
+            long idleDurationMs,
+            long cartCheckCount,
+            long quantityOvershotCount,
+            long earlyCheckoutCount,
+            long checkoutCorrectionCount,
+            long interruptionDurationMs
     ) {}
 
     public record EvidenceGap(

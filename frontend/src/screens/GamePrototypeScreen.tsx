@@ -68,6 +68,7 @@ import {
   MarketInteractionRequest,
   MarketSimulationScreen,
   MarketStationId,
+  type MarketTelemetrySink,
 } from './MarketSimulationScreen';
 
 const MARKET_WORLD_WIDTH = 900;
@@ -469,10 +470,11 @@ function MarketWorldLayer({
 }
 
 type GamePrototypeScreenProps = {
+  accessToken?: string | null;
   onExit: () => void;
 };
 
-export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
+export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototypeScreenProps) {
   const backgroundMusic = useAudioPlayer(require('../../assets/audio/apple-cider.wav'), {
     downloadFirst: true,
     keepAudioSessionActive: true,
@@ -503,6 +505,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
   const dialogueArrowFloat = useRef(new Animated.Value(0)).current;
   const resultCelebration = useRef(new Animated.Value(0)).current;
   const playerPoint = useRef<Point>({ ...INITIAL_PLAYER_POINT });
+  const marketTelemetry = useRef<MarketTelemetrySink | null>(null);
   const worldMapRef = useRef<WorldMapId>('village');
   const viewport = useRef({ width: 0, height: 0 });
   const viewportOrigin = useRef({ x: 0, y: 0 });
@@ -771,12 +774,22 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
       playerPoint.current = next;
       updateCamera(next);
       updateNpcProximity(next);
+      if (activeMap === 'market') {
+        const requestedDistance = Math.hypot(dx, dy);
+        const movedDistance = Math.hypot(next.x - current.x, next.y - current.y);
+        marketTelemetry.current?.observeMovement(
+          next,
+          controlMode,
+          requestedDistance > 0.05 && movedDistance < 0.05,
+        );
+      }
       return next;
     },
-    [updateCamera, updateNpcProximity],
+    [controlMode, updateCamera, updateNpcProximity],
   );
 
   const stopMovement = useCallback(() => {
+    if (worldMapRef.current === 'market') marketTelemetry.current?.movementStopped(controlMode);
     direction.current = { x: 0, y: 0 };
     keyboardDirection.current = { x: 0, y: 0 };
     keyboardEngaged.current = false;
@@ -802,7 +815,11 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
       toValue: { x: 0, y: 0 },
       useNativeDriver: true,
     }).start();
-  }, [joystickKnob]);
+  }, [controlMode, joystickKnob]);
+
+  const registerMarketTelemetry = useCallback((sink: MarketTelemetrySink | null) => {
+    marketTelemetry.current = sink;
+  }, []);
 
   const handleExit = useCallback(() => {
     stopMovement();
@@ -2253,11 +2270,13 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
 
       {worldMap === 'market' ? (
         <MarketSimulationScreen
+          accessToken={accessToken}
           embedded
           interactionRequest={marketInteractionRequest}
           onExit={handleLeaveMarket}
           onLockChange={setMarketScenarioLocked}
           onMissionComplete={() => completeDailyQuest('market-shopping')}
+          onTelemetryReady={registerMarketTelemetry}
         />
       ) : null}
 

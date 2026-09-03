@@ -16,6 +16,7 @@ public record BehaviorEventDefinition(
         ObservedOutcome defaultOutcome,
         ErrorType defaultErrorType,
         boolean safetyRelevant,
+        EvidencePolicy evidencePolicy,
         Set<String> requiredPayloadFields,
         List<SkillEvidenceRule> evidenceRules,
         List<MeasurementRule> measurementRules

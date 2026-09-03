@@ -3,6 +3,7 @@ package oneuldo.behaviorlog.normalization.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
@@ -13,6 +14,7 @@ public class BehaviorNormalizationListener {
 
     private final BehaviorNormalizationProcessor normalizationProcessor;
 
+    @Async("behaviorNormalizationExecutor")
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void normalizeAfterCommit(BehaviorLogSavedEvent event) {
         try {

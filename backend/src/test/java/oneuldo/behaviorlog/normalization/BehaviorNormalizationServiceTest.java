@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
+import tools.jackson.databind.ObjectMapper;
 import oneuldo.behaviorlog.domain.BehaviorLogRequest;
 import oneuldo.behaviorlog.domain.context.AccessibilityContext;
 import oneuldo.behaviorlog.domain.context.ActionContext;
@@ -57,6 +58,7 @@ class BehaviorNormalizationServiceTest {
     @Autowired private NormalizedBehaviorMeasurementRepository measurementRepository;
     @Autowired private MemberRepository memberRepository;
     @Autowired private BehaviorSessionIntegrityService sessionIntegrityService;
+    @Autowired private ObjectMapper objectMapper;
 
     private Member member;
 
@@ -93,6 +95,56 @@ class BehaviorNormalizationServiceTest {
         assertTrue(measurementRepository.findAllByNormalizedEventId(normalized.getId()).stream()
                 .anyMatch(value -> value.getMetricCode().equals("selectedQuantity")
                         && value.getTargetNumericValue().intValueExact() == 2));
+    }
+
+    @Test
+    void 이동_구간은_문맥_근거와_거리_시간_측정값으로_정규화한다() throws Exception {
+        BehaviorPayload payload = objectMapper.readValue("""
+                {
+                  "type": "SHOPPING",
+                  "controlMode": "joystick",
+                  "durationMs": 5000,
+                  "pathDistance": 142.5,
+                  "straightDistance": 80.25,
+                  "travelDistance": 142.5
+                }
+                """, BehaviorPayload.class);
+
+        var normalized = normalizationService.normalize(
+                save("SHOP.MOVEMENT_SEGMENT_SUMMARIZED", payload, null));
+
+        assertEquals(NormalizationStatus.NORMALIZED, normalized.getNormalizationStatus());
+        assertEquals(CanonicalActionType.NAVIGATE, normalized.getActionType());
+        assertEquals(EvidenceUse.CONTEXT_ONLY, normalized.getEvidenceUse());
+        var measurements = measurementRepository.findAllByNormalizedEventId(normalized.getId());
+        assertTrue(measurements.stream().anyMatch(value ->
+                value.getMetricCode().equals("movementPathDistance")
+                        && value.getNumericValue().doubleValue() == 142.5));
+        assertTrue(measurements.stream().anyMatch(value ->
+                value.getMetricCode().equals("movementDurationMs")
+                        && value.getNumericValue().longValueExact() == 5000L));
+    }
+
+    @Test
+    void 목표_진열장_통과는_공간탐색의_프로파일_근거로_정규화한다() throws Exception {
+        BehaviorPayload payload = objectMapper.readValue("""
+                {
+                  "type": "SHOPPING",
+                  "stationId": "produce",
+                  "visitIndex": 2,
+                  "proximityDurationMs": 1800,
+                  "targetPassedWithoutSelectionCount": 1
+                }
+                """, BehaviorPayload.class);
+
+        var normalized = normalizationService.normalize(save("SHOP.TARGET_PASSED", payload, null));
+
+        assertEquals(NormalizationStatus.NORMALIZED, normalized.getNormalizationStatus());
+        assertEquals(EvidenceUse.TRAINING_PROGRESS, normalized.getEvidenceUse());
+        assertTrue(evidenceRepository.findAllByNormalizedEventId(normalized.getId()).stream()
+                .anyMatch(value -> value.getSkillCode().equals("SPATIAL_NAVIGATION")));
+        assertTrue(measurementRepository.findAllByNormalizedEventId(normalized.getId()).stream()
+                .anyMatch(value -> value.getMetricCode().equals("targetPassed")));
     }
 
     @Test

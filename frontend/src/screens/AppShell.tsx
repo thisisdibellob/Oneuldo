@@ -150,7 +150,7 @@ export function AppShell({
     return (
       <SafeAreaView edges={[]} style={styles.gameSafe}>
         <Animated.View style={[styles.body, animatedStyle]}>
-          <GamePrototypeScreen onExit={closeGame} />
+          <GamePrototypeScreen accessToken={accessToken} onExit={closeGame} />
         </Animated.View>
       </SafeAreaView>
     );

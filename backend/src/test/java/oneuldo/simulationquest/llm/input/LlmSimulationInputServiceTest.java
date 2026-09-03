@@ -189,7 +189,7 @@ class LlmSimulationInputServiceTest {
                 new ValidityProfile(
                         10, 0, 0, Map.of(ValidityStatus.VALID, 10),
                         Map.of(), 0, 0, 0.0),
-                new BehaviorPatternProfile(null, null, 0, null, null, Map.of()),
+                new BehaviorPatternProfile(null, null, 0, null, null, Map.of(), List.of()),
                 Set.of(),
                 List.of(),
                 evidenceTo.minus(Duration.ofDays(7)),

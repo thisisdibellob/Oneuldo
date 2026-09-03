@@ -117,6 +117,7 @@ class BehaviorProfileServiceTest {
         assertThat(response.profileData().skills()).isEmpty();
         assertThat(response.profileData().validityProfile().excludedEventRate()).isNull();
         assertThat(response.profileData().behaviorPatternProfile().selfCorrectionRate()).isNull();
+        assertThat(response.profileData().behaviorPatternProfile().shoppingSessions()).isEmpty();
     }
 
     @Test

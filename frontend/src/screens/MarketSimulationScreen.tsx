@@ -4,6 +4,7 @@ import { ComponentProps, useCallback, useEffect, useMemo, useRef, useState } fro
 import {
   AccessibilityInfo,
   Animated,
+  AppState,
   Easing,
   GestureResponderEvent,
   Image,
@@ -17,6 +18,11 @@ import {
 } from 'react-native';
 
 import { icons } from '../assets';
+import { MarketBehaviorTracker } from '../behavior/marketBehaviorTracker';
+import type {
+  MarketTelemetryControlMode,
+  MarketTelemetryPoint,
+} from '../behavior/marketMovementDetector';
 import { PressScale } from '../components/PressScale';
 import {
   evaluateMarketCart,
@@ -40,6 +46,11 @@ export type MarketStationId = MarketCategoryId | 'checkout';
 export type MarketInteractionRequest = { id: number; station: MarketStationId };
 type MarketPoint = { x: number; y: number };
 type MarketControlMode = 'joystick' | 'touch';
+
+export type MarketTelemetrySink = {
+  movementStopped: (controlMode: MarketTelemetryControlMode) => void;
+  observeMovement: (point: MarketTelemetryPoint, controlMode: MarketTelemetryControlMode, blocked?: boolean) => void;
+};
 
 const MARKET_WORLD_WIDTH = 900;
 const MARKET_WORLD_HEIGHT = 1000;
@@ -104,19 +115,23 @@ function findMarketReachableTarget(current: MarketPoint, desired: MarketPoint): 
 const formatPrice = (price: number) => `${price.toLocaleString('ko-KR')}원`;
 
 type MarketSimulationScreenProps = {
+  accessToken?: string | null;
   embedded?: boolean;
   interactionRequest?: MarketInteractionRequest | null;
   onExit: () => void;
   onLockChange?: (locked: boolean) => void;
   onMissionComplete?: () => void;
+  onTelemetryReady?: (sink: MarketTelemetrySink | null) => void;
 };
 
 export function MarketSimulationScreen({
+  accessToken = null,
   embedded = false,
   interactionRequest = null,
   onExit,
   onLockChange,
   onMissionComplete,
+  onTelemetryReady,
 }: MarketSimulationScreenProps) {
   const [phase, setPhase] = useState<MarketPhase>('briefing');
   const [briefingIndex, setBriefingIndex] = useState(0);
@@ -126,8 +141,47 @@ export function MarketSimulationScreen({
   const [evaluation, setEvaluation] = useState<MarketEvaluation | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [nearbyStation, setNearbyStation] = useState<MarketStationId | null>(null);
+  const behaviorTracker = useRef<MarketBehaviorTracker | null>(null);
+  const briefingShownAt = useRef(Date.now());
+  const cartOpenedAt = useRef<number | null>(null);
+  const cartRef = useRef<MarketCart>({});
   const noticeOpacity = useRef(new Animated.Value(0)).current;
   const handledInteractionId = useRef<number | null>(null);
+  const shelfOpenedAt = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!accessToken) return;
+    const tracker = new MarketBehaviorTracker(accessToken, marketMission);
+    behaviorTracker.current = tracker;
+    void tracker.flushNow().catch(() => undefined);
+    return () => {
+      void tracker.abort(cartRef.current);
+      behaviorTracker.current = null;
+    };
+  }, [accessToken]);
+
+  useEffect(() => {
+    if (!onTelemetryReady) return;
+    const sink: MarketTelemetrySink = {
+      movementStopped: (controlMode) => behaviorTracker.current?.movementStopped(controlMode),
+      observeMovement: (point, controlMode, blocked) => behaviorTracker.current?.observeMovement({
+        blocked,
+        controlMode,
+        point,
+        targetZoneIds: new Set(),
+      }),
+    };
+    onTelemetryReady(sink);
+    return () => onTelemetryReady(null);
+  }, [onTelemetryReady]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') behaviorTracker.current?.appForegrounded();
+      else behaviorTracker.current?.appBackgrounded();
+    });
+    return () => subscription.remove();
+  }, []);
 
   const total = getMarketCartTotal(cart);
   const cartCount = Object.values(cart).reduce((sum, quantity) => sum + quantity, 0);
@@ -157,10 +211,15 @@ export function MarketSimulationScreen({
 
   const changeQuantity = (productId: string, change: number) => {
     setCart((current) => {
-      const nextQuantity = Math.max(0, Math.min(5, getCartQuantity(current, productId) + change));
+      const currentQuantity = getCartQuantity(current, productId);
+      const nextQuantity = Math.max(0, Math.min(5, currentQuantity + change));
+      if (nextQuantity === currentQuantity) return current;
       const next = { ...current };
       if (nextQuantity === 0) delete next[productId];
       else next[productId] = nextQuantity;
+      cartRef.current = next;
+      behaviorTracker.current?.updateCart(next);
+      behaviorTracker.current?.quantityChanged(productId, currentQuantity, nextQuantity, next);
       return next;
     });
     const product = getMarketProduct(productId);
@@ -168,6 +227,11 @@ export function MarketSimulationScreen({
   };
 
   const continueBriefing = () => {
+    behaviorTracker.current?.briefingAdvanced(
+      briefingIndex,
+      Math.max(0, Date.now() - briefingShownAt.current),
+    );
+    briefingShownAt.current = Date.now();
     if (briefingIndex < marketMission.briefing.length - 1) {
       setBriefingIndex((index) => index + 1);
       return;
@@ -176,10 +240,29 @@ export function MarketSimulationScreen({
   };
 
   const goToCheckout = () => {
+    behaviorTracker.current?.checkoutEntered(cartRef.current);
     setCartOpen(false);
     setActiveCategory(null);
     setEvaluation(null);
     setPhase('checkout');
+  };
+
+  const openShelf = (station: MarketCategoryId) => {
+    shelfOpenedAt.current = Date.now();
+    behaviorTracker.current?.shelfOpened(station);
+    setActiveCategory(station);
+  };
+
+  const closeShelf = () => {
+    if (activeCategory) {
+      behaviorTracker.current?.shelfClosed(
+        activeCategory,
+        cartRef.current,
+        shelfOpenedAt.current ?? Date.now(),
+      );
+    }
+    shelfOpenedAt.current = null;
+    setActiveCategory(null);
   };
 
   const useNearbyStation = () => {
@@ -192,7 +275,7 @@ export function MarketSimulationScreen({
       goToCheckout();
       return;
     }
-    setActiveCategory(nearbyStation);
+    openShelf(nearbyStation);
   };
 
   useEffect(() => {
@@ -207,7 +290,7 @@ export function MarketSimulationScreen({
       goToCheckout();
       return;
     }
-    setActiveCategory(interactionRequest.station);
+    openShelf(interactionRequest.station);
   }, [cartCount, embedded, interactionRequest, phase]);
 
   useEffect(() => {
@@ -217,14 +300,43 @@ export function MarketSimulationScreen({
 
   const checkCart = () => {
     const nextEvaluation = evaluateMarketCart(cart);
+    behaviorTracker.current?.checkoutSubmitted(cart, nextEvaluation);
     setEvaluation(nextEvaluation);
-    if (nextEvaluation.success) onMissionComplete?.();
+    if (nextEvaluation.success) {
+      onMissionComplete?.();
+      void behaviorTracker.current?.complete(cart, nextEvaluation);
+    }
     setPhase('result');
   };
 
   const retryShopping = () => {
+    behaviorTracker.current?.correctionStarted(cartRef.current);
     setEvaluation(null);
     setPhase('shopping');
+  };
+
+  const exitMarket = () => {
+    const tracker = behaviorTracker.current;
+    if (!tracker) {
+      onExit();
+      return;
+    }
+    void tracker.abort(cartRef.current).catch(() => undefined).finally(onExit);
+  };
+
+  const openCart = () => {
+    cartOpenedAt.current = Date.now();
+    behaviorTracker.current?.cartOpened(cartRef.current);
+    setCartOpen(true);
+  };
+
+  const closeCart = () => {
+    behaviorTracker.current?.cartClosed(
+      cartRef.current,
+      Math.max(0, Date.now() - (cartOpenedAt.current ?? Date.now())),
+    );
+    cartOpenedAt.current = null;
+    setCartOpen(false);
   };
 
   return (
@@ -234,7 +346,7 @@ export function MarketSimulationScreen({
       {!embedded ? <MarketTopBar
         cartCount={cartCount}
         objectiveProgress={objectiveProgress}
-        onExit={onExit}
+        onExit={exitMarket}
         remainingBudget={remainingBudget}
       /> : null}
 
@@ -243,6 +355,13 @@ export function MarketSimulationScreen({
           interactive={phase === 'shopping' && activeCategory === null && !cartOpen}
           nearbyStation={nearbyStation}
           onNearbyStationChange={setNearbyStation}
+          onMovementSample={(point, controlMode, blocked) => behaviorTracker.current?.observeMovement({
+            blocked,
+            controlMode,
+            point,
+            targetZoneIds: new Set(),
+          })}
+          onMovementStopped={(controlMode) => behaviorTracker.current?.movementStopped(controlMode)}
         />
       ) : !embedded ? (
         <CheckoutScene cart={cart} />
@@ -293,7 +412,7 @@ export function MarketSimulationScreen({
           <PressScale
             accessibilityLabel={`장바구니 ${cartCount}개`}
             accessibilityRole="button"
-            onPress={() => setCartOpen(true)}
+            onPress={openCart}
             style={styles.cartButton}
           >
             <Ionicons color={colors.white} name="basket" size={24} />
@@ -349,7 +468,7 @@ export function MarketSimulationScreen({
       ) : null}
 
       {phase === 'result' && evaluation ? (
-        <ResultPanel evaluation={evaluation} onExit={onExit} onRetry={retryShopping} />
+        <ResultPanel evaluation={evaluation} onExit={exitMarket} onRetry={retryShopping} />
       ) : null}
 
       {activeCategory && phase === 'shopping' ? (
@@ -357,7 +476,7 @@ export function MarketSimulationScreen({
           cart={cart}
           category={marketCategories.find((category) => category.id === activeCategory)!}
           onChangeQuantity={changeQuantity}
-          onClose={() => setActiveCategory(null)}
+          onClose={closeShelf}
         />
       ) : null}
 
@@ -366,10 +485,10 @@ export function MarketSimulationScreen({
           cart={cart}
           onChangeQuantity={changeQuantity}
           onCheckout={() => {
-            setCartOpen(false);
+            closeCart();
             showNotice('계산대로 이동해 주세요');
           }}
-          onClose={() => setCartOpen(false)}
+          onClose={closeCart}
           total={total}
         />
       ) : null}
@@ -424,10 +543,14 @@ function MarketMap({
   interactive,
   nearbyStation,
   onNearbyStationChange,
+  onMovementSample,
+  onMovementStopped,
 }: {
   interactive: boolean;
   nearbyStation: MarketStationId | null;
   onNearbyStationChange: (station: MarketStationId | null) => void;
+  onMovementSample: (point: MarketPoint, controlMode: MarketTelemetryControlMode, blocked?: boolean) => void;
+  onMovementStopped: (controlMode: MarketTelemetryControlMode) => void;
 }) {
   const viewportNode = useRef<View | null>(null);
   const camera = useRef(new Animated.ValueXY()).current;
@@ -486,8 +609,9 @@ function MarketMap({
     playerPoint.current = next;
     updateCamera(next);
     updateStationProximity(next);
+    onMovementSample(next, controlMode, Math.hypot(next.x - current.x, next.y - current.y) < 0.05);
     return next;
-  }, [updateCamera, updateStationProximity]);
+  }, [controlMode, onMovementSample, updateCamera, updateStationProximity]);
 
   const stopMovement = useCallback(() => {
     direction.current = { x: 0, y: 0 };
@@ -507,7 +631,8 @@ function MarketMap({
       toValue: { x: 0, y: 0 },
       useNativeDriver: true,
     }).start();
-  }, [joystickKnob]);
+    onMovementStopped(controlMode);
+  }, [controlMode, joystickKnob, onMovementStopped]);
 
   const runMovement = useCallback((timestamp: number) => {
     const last = previousFrame.current ?? timestamp;

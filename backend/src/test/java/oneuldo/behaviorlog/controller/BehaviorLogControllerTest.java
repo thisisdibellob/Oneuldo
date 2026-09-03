@@ -1,5 +1,7 @@
 package oneuldo.behaviorlog.controller;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -7,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.time.LocalDate;
 import java.util.UUID;
 import oneuldo.auth.token.JwtTokenProvider;
+import oneuldo.behaviorlog.domain.payload.ShoppingBehaviorPayload;
 import oneuldo.behaviorlog.repository.BehaviorLogRepository;
 import oneuldo.member.domain.Member;
 import oneuldo.member.domain.MemberRole;
@@ -105,5 +108,91 @@ class BehaviorLogControllerTest {
         var saved = behaviorLogRepository.findAll().getFirst();
         org.junit.jupiter.api.Assertions.assertEquals(member.getId(), saved.getMember().getId());
         org.junit.jupiter.api.Assertions.assertEquals(sessionId, saved.getSessionId());
+    }
+
+    @Test
+    void 장보기_이동_배치를_필드_손실_없이_저장한다() throws Exception {
+        String suffix = UUID.randomUUID().toString();
+        Member member = memberRepository.save(new Member(
+                "market-controller-" + suffix,
+                "encoded-password",
+                "장보기 로그 사용자",
+                suffix + "@example.com",
+                MemberRole.CHILD,
+                LocalDate.of(2000, 1, 1)
+        ));
+        String accessToken = jwtTokenProvider.createAccessToken(member);
+        UUID batchId = UUID.randomUUID();
+        String eventBody = """
+                {
+                  "metadata": {
+                    "clientEventId": "%s",
+                    "eventSequence": 12,
+                    "eventSchemaVersion": "behavior-event-v1",
+                    "appVersion": "1.0.0",
+                    "contentVersion": "market-micro-behavior-v1",
+                    "offlineQueued": true,
+                    "occurredAt": "2026-09-03T10:00:00Z"
+                  },
+                  "identity": { "sessionId": "%s" },
+                  "task": {
+                    "gameId": "MARKET_SIMULATION",
+                    "taskId": "%s",
+                    "taskVersion": "market-micro-behavior-v1",
+                    "difficulty": 2,
+                    "scenarioVariant": "BASELINE",
+                    "evidenceContext": "ASSESSMENT_TASK"
+                  },
+                  "action": {
+                    "eventCode": "SHOP.MOVEMENT_SEGMENT_SUMMARIZED",
+                    "microActionId": "MOVE_SEGMENT",
+                    "stepOrder": 12
+                  },
+                  "accessibility": {
+                    "instructionMode": "TEXT",
+                    "textLevel": "STANDARD",
+                    "audioEnabled": false,
+                    "symbolSupport": true,
+                    "controllerMode": "TOUCH"
+                  },
+                  "payload": {
+                    "type": "SHOPPING",
+                    "thresholdRuleVersion": "market-detection-rules-v1",
+                    "controlMode": "joystick",
+                    "durationMs": 5000,
+                    "pathDistance": 142.5,
+                    "straightDistance": 80.25,
+                    "travelDistance": 142.5,
+                    "stationId": "produce",
+                    "visitIndex": 2,
+                    "intervalSinceLastVisitMs": 31000,
+                    "stationSequence": ["produce", "meal", "produce"]
+                  }
+                }
+                """.formatted(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID());
+
+        String batchBody = """
+                {
+                  "batchId": "%s",
+                  "events": [%s]
+                }
+                """.formatted(batchId, eventBody);
+
+        mockMvc.perform(post("/api/behavior-logs/batches")
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(batchBody))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.batchId").value(batchId.toString()))
+                .andExpect(jsonPath("$.events[0].status").value("ACCEPTED"));
+
+        ShoppingBehaviorPayload payload = assertInstanceOf(
+                ShoppingBehaviorPayload.class, behaviorLogRepository.findAll().getFirst().getPayload());
+
+        assertEquals("market-detection-rules-v1", payload.thresholdRuleVersion());
+        assertEquals("joystick", payload.controlMode());
+        assertEquals(5000L, payload.durationMs());
+        assertEquals(142.5, payload.travelDistance());
+        assertEquals(java.util.List.of("produce", "meal", "produce"), payload.stationSequence());
     }
 }

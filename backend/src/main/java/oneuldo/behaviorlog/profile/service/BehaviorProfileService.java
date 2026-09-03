@@ -26,6 +26,7 @@ import lombok.RequiredArgsConstructor;
 import oneuldo.behaviorlog.domain.BehaviorLog;
 import oneuldo.behaviorlog.domain.type.SafetyStatus;
 import oneuldo.behaviorlog.normalization.domain.EvidenceDirection;
+import oneuldo.behaviorlog.normalization.domain.BehaviorDomain;
 import oneuldo.behaviorlog.normalization.domain.EvidenceRole;
 import oneuldo.behaviorlog.normalization.domain.EvidenceUse;
 import oneuldo.behaviorlog.normalization.domain.ErrorType;
@@ -50,6 +51,7 @@ import oneuldo.behaviorlog.profile.domain.BehaviorProfileData.EvidenceGap;
 import oneuldo.behaviorlog.profile.domain.BehaviorProfileData.EvidenceGapType;
 import oneuldo.behaviorlog.profile.domain.BehaviorProfileData.ObservedEvidenceSummary;
 import oneuldo.behaviorlog.profile.domain.BehaviorProfileData.SafetyProfile;
+import oneuldo.behaviorlog.profile.domain.BehaviorProfileData.ShoppingSessionPattern;
 import oneuldo.behaviorlog.profile.domain.BehaviorProfileData.SkillPerformanceProfile;
 import oneuldo.behaviorlog.profile.domain.BehaviorProfileData.SupportLevelObservation;
 import oneuldo.behaviorlog.profile.domain.BehaviorProfileData.SupportProfile;
@@ -430,8 +432,64 @@ public class BehaviorProfileService {
                         .map(BigDecimal::longValue).toList()),
                 medianLong(numericValues(measurements, "startLatencyMs").stream()
                         .map(BigDecimal::longValue).toList()),
-                Map.copyOf(pathEfficiency)
+                Map.copyOf(pathEfficiency),
+                shoppingSessionPatterns(events, index)
         );
+    }
+
+    private List<ShoppingSessionPattern> shoppingSessionPatterns(
+            List<NormalizedBehaviorEvent> events, ProfileIndex index) {
+        return events.stream()
+                .filter(event -> event.getDomain() == BehaviorDomain.SHOPPING)
+                .collect(Collectors.groupingBy(
+                        event -> event.getBehaviorLog().getSessionId(), LinkedHashMap::new,
+                        Collectors.toList()))
+                .entrySet().stream()
+                .map(entry -> shoppingSessionPattern(entry.getKey(), entry.getValue(), index))
+                .sorted(Comparator.comparing(ShoppingSessionPattern::endedAt))
+                .toList();
+    }
+
+    private ShoppingSessionPattern shoppingSessionPattern(
+            UUID sessionId, List<NormalizedBehaviorEvent> events, ProfileIndex index) {
+        List<NormalizedBehaviorMeasurement> measurements = index.measurementsFor(events);
+        double movementDistance = sumAsDouble(measurements, "movementTravelDistance");
+        double straightDistance = sumAsDouble(measurements, "movementStraightDistance");
+        Double directness = movementDistance <= 0 ? null
+                : BigDecimal.valueOf(Math.min(1.0, straightDistance / movementDistance))
+                        .setScale(4, RoundingMode.HALF_UP).doubleValue();
+        return new ShoppingSessionPattern(
+                sessionId,
+                events.stream().map(NormalizedBehaviorEvent::getOccurredAt)
+                        .min(Comparator.naturalOrder()).orElseThrow(),
+                events.stream().map(NormalizedBehaviorEvent::getOccurredAt)
+                        .max(Comparator.naturalOrder()).orElseThrow(),
+                movementDistance,
+                sumAsLong(measurements, "movementDurationMs"),
+                directness,
+                sumAsLong(measurements, "targetPassed"),
+                sumAsLong(measurements, "targetShelfRevisitCount"),
+                sumAsLong(measurements, "wrongAisle"),
+                sumAsLong(measurements, "offTargetDwellMs"),
+                sumAsLong(measurements, "routeLoopCount"),
+                sumAsLong(measurements, "blockedMovementCount"),
+                sumAsLong(measurements, "idleDurationMs"),
+                sumAsLong(measurements, "cartCheckCount"),
+                sumAsLong(measurements, "quantityOvershotCount"),
+                sumAsLong(measurements, "earlyCheckoutCount"),
+                sumAsLong(measurements, "checkoutCorrectionCount"),
+                sumAsLong(measurements, "interruptionDurationMs")
+        );
+    }
+
+    private long sumAsLong(List<NormalizedBehaviorMeasurement> measurements, String metricCode) {
+        return numericValues(measurements, metricCode).stream()
+                .reduce(BigDecimal.ZERO, BigDecimal::add).longValue();
+    }
+
+    private double sumAsDouble(List<NormalizedBehaviorMeasurement> measurements, String metricCode) {
+        return numericValues(measurements, metricCode).stream()
+                .reduce(BigDecimal.ZERO, BigDecimal::add).doubleValue();
     }
 
     private List<EvidenceGap> evidenceGaps(Map<String, SkillPerformanceProfile> skills,
