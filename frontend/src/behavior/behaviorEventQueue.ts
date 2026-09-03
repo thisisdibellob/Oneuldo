@@ -18,7 +18,6 @@ const QUEUE_PREFIX = 'oneuldo.behavior-event-outbox.v2';
 const DEAD_LETTER_PREFIX = 'oneuldo.behavior-event-dead-letter.v2';
 const UPLOAD_BATCH_SIZE = 50;
 const AUTO_UPLOAD_EVENT_COUNT = 20;
-const MAX_QUEUED_EVENTS = 2000;
 
 const operations = new Map<string, Promise<unknown>>();
 const flushing = new Set<string>();
@@ -62,18 +61,6 @@ function serialized<T>(key: string, operation: () => Promise<T>): Promise<T> {
   return current;
 }
 
-function applyBackpressure(events: QueuedBehaviorEvent[]) {
-  if (events.length <= MAX_QUEUED_EVENTS) return events;
-  const retained = [...events];
-  for (const priority of ['low', 'normal'] as const) {
-    for (let index = 0; index < retained.length && retained.length > MAX_QUEUED_EVENTS;) {
-      if (retained[index].priority === priority) retained.splice(index, 1);
-      else index += 1;
-    }
-  }
-  return retained.slice(-MAX_QUEUED_EVENTS);
-}
-
 export async function enqueueBehaviorEvents(
   accessToken: string,
   events: Array<{ event: BehaviorLogRequest; priority: BehaviorPriority }>,
@@ -83,10 +70,10 @@ export async function enqueueBehaviorEvents(
   const count = await serialized(key, async () => {
     const queue = await readQueue(key);
     const queuedAt = new Date().toISOString();
-    const next = applyBackpressure([
+    const next = [
       ...queue,
       ...events.map((item) => ({ ...item, queuedAt })),
-    ]);
+    ];
     await writeQueue(key, next);
     return next.length;
   });

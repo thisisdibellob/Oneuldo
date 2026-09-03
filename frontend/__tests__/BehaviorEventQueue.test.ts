@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { BehaviorLogRequest } from '../src/api/behaviorLog';
 import { recordBehaviorLogBatch } from '../src/api/behaviorLog';
 import {
@@ -64,7 +65,8 @@ function event(index: number): BehaviorLogRequest {
 }
 
 describe('행동 로그 영구 Outbox', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    await AsyncStorage.clear();
     mockedRecord.mockReset();
   });
 
@@ -98,5 +100,18 @@ describe('행동 로그 영구 Outbox', () => {
     await flushBehaviorEventQueue('another-token');
 
     expect(await getQueuedBehaviorEventCount('another-token')).toBe(1);
+  });
+
+  it('대량의 낮은 우선순위 이벤트도 용량 제한으로 폐기하지 않는다', async () => {
+    const events = Array.from({ length: 2050 }, (_, index) => ({
+      event: event(index + 1000),
+      priority: 'low' as const,
+    }));
+    mockedRecord.mockRejectedValue(new Error('offline'));
+
+    const queued = await enqueueBehaviorEvents('large-queue-token', events);
+
+    expect(queued).toBe(2050);
+    expect(await getQueuedBehaviorEventCount('large-queue-token')).toBe(2050);
   });
 });

@@ -1,5 +1,6 @@
 package oneuldo.behaviorlog.repository;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -20,6 +21,19 @@ public interface BehaviorLogRepository extends JpaRepository<BehaviorLog, UUID> 
     );
 
     List<BehaviorLog> findAllByMemberIdOrderByOccurredAtAsc(UUID memberId);
+
+    @Query("""
+            select log
+            from BehaviorLog log
+            where log.member.id = :memberId
+              and log.occurredAt between :analysisFrom and :analysisTo
+            order by log.sessionId, log.eventSequence, log.occurredAt
+            """)
+    List<BehaviorLog> findAnalysisInputLogs(
+            @Param("memberId") UUID memberId,
+            @Param("analysisFrom") Instant analysisFrom,
+            @Param("analysisTo") Instant analysisTo
+    );
 
     @Query("""
             select log.eventSequence

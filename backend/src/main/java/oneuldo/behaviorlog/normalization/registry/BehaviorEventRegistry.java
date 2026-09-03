@@ -64,7 +64,7 @@ public class BehaviorEventRegistry {
                 "SHOP.SHELF_PROXIMITY_ENTERED", "SHOP.SHELF_PROXIMITY_EXITED",
                 "SHOP.CHECKOUT_PROXIMITY_ENTERED", "SHOP.CHECKOUT_PROXIMITY_EXITED",
                 "SHOP.TARGET_SHELF_APPROACHED", "SHOP.SHELF_REVISITED",
-                "SHOP.MOVEMENT_BLOCKED");
+                "SHOP.MOVEMENT_BLOCKED", "SHOP.MOVEMENT_SAMPLED");
         addContext(map, p, BehaviorDomain.SHOPPING, WAIT, NEUTRAL, NONE,
                 "SELF_REGULATION", "SHOP.MOVEMENT_STOPPED", "SHOP.IDLE_STARTED",
                 "SHOP.IDLE_ENDED", "SHOP.APP_BACKGROUNDED", "SHOP.APP_FOREGROUNDED");
@@ -256,6 +256,7 @@ public class BehaviorEventRegistry {
                 "pathDistance", "straightDistance", "travelDistance");
         require(map, "SHOP.MOVEMENT_STOPPED", "controlMode", "durationMs", "travelDistance");
         require(map, "SHOP.MOVEMENT_BLOCKED", "controlMode", "x", "y");
+        require(map, "SHOP.MOVEMENT_SAMPLED", "controlMode", "x", "y", "blocked");
         require(map, "SHOP.MOVEMENT_BLOCKED_REPEATEDLY", "blockedCount", "observationWindowMs");
         require(map, "SHOP.SHELF_PROXIMITY_ENTERED", "stationId", "visitIndex", "isTargetZone");
         require(map, "SHOP.SHELF_PROXIMITY_EXITED", "stationId", "visitIndex", "durationMs");
@@ -332,6 +333,11 @@ public class BehaviorEventRegistry {
                 value("movementTravelDistance", "travelDistance", GAME_DISTANCE, OBSERVATION),
                 value("movementDurationMs", "durationMs", MILLISECONDS, DURATION));
         measure(map, "SHOP.MOVEMENT_BLOCKED", MeasurementRule.delta("blockedMovementCount"));
+        measure(map, "SHOP.MOVEMENT_SAMPLED",
+                value("positionX", "x", GAME_DISTANCE, OBSERVATION),
+                value("positionY", "y", GAME_DISTANCE, OBSERVATION),
+                value("movementControlMode", "controlMode", CODE, OBSERVATION),
+                value("movementBlocked", "blocked", CODE, OBSERVATION));
         measure(map, "SHOP.MOVEMENT_BLOCKED_REPEATEDLY",
                 value("blockedMovementCount", "blockedCount", COUNT, OBSERVATION),
                 value("blockedObservationWindowMs", "observationWindowMs", MILLISECONDS, DURATION));

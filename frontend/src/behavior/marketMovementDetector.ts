@@ -61,6 +61,13 @@ export class MarketMovementDetector {
       return events;
     }
 
+    events.push(this.event('SHOP.MOVEMENT_SAMPLED', 'SAMPLE_MARKET_POSITION', now, {
+      blocked: Boolean(sample.blocked),
+      controlMode: sample.controlMode,
+      x: this.round(sample.point.x),
+      y: this.round(sample.point.y),
+    }, 'low'));
+
     if (this.lastPoint) this.segmentDistance += distance;
     else {
       this.segmentStartedAt = now;

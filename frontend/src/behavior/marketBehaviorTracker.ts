@@ -78,6 +78,15 @@ export class MarketBehaviorTracker {
       payload: {
         budgetAmount: mission.budget,
         objectiveCount: mission.objectives.length,
+        objectives: mission.objectives.map(({ productId, quantity }) => {
+          const product = getMarketProduct(productId);
+          return {
+            categoryId: product?.categoryId,
+            itemId: productId,
+            priceAmount: product?.price,
+            requiredQuantity: quantity,
+          };
+        }),
         thresholdRuleVersion: DETECTION_RULE_VERSION,
       },
       priority: 'critical',

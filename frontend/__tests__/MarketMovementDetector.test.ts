@@ -77,4 +77,22 @@ describe('장보기 이동 의미 이벤트 판정', () => {
     expect(observe(detector, 50, 1000)).not.toHaveLength(0);
     expect(observe(detector, 51, 1100)).toHaveLength(0);
   });
+
+  it('수집기로 받아들인 모든 위치 샘플을 원시 이동 이벤트로 남긴다', () => {
+    const detector = new MarketMovementDetector(stations, 30);
+
+    const first = observe(detector, 43.12789, 1000);
+    const second = detector.observe({
+      blocked: true,
+      controlMode: 'touch',
+      occurredAt: 1100,
+      point: { x: 44.12345, y: 9.98765 },
+      targetZoneIds: new Set(['produce']),
+    });
+
+    expect(first.find(({ eventCode }) => eventCode === 'SHOP.MOVEMENT_SAMPLED')?.payload)
+      .toMatchObject({ blocked: false, controlMode: 'joystick', x: 43.1, y: 0 });
+    expect(second.find(({ eventCode }) => eventCode === 'SHOP.MOVEMENT_SAMPLED')?.payload)
+      .toMatchObject({ blocked: true, controlMode: 'touch', x: 44.1, y: 10 });
+  });
 });
