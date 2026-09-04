@@ -1,4 +1,4 @@
-import type { AbilitySkillProfile } from '../api/abilityProfile';
+import type { AbilitySkillProfile, ObservedBehaviorEvidence } from '../api/abilityProfile';
 
 export type AbilityStatus = 'STRENGTH' | 'DEVELOPING' | 'NEEDS_PRACTICE' | 'INSUFFICIENT';
 
@@ -52,4 +52,50 @@ export function confidenceLabel(confidence: AbilitySkillProfile['confidence']) {
     LOW: '근거 적음',
     INSUFFICIENT: '추가 관찰 필요',
   }[confidence];
+}
+
+const BEHAVIOR_COPY: Record<string, { difficulty: string; strength: string }> = {
+  'SHOP.ITEM_SELECTED': {
+    difficulty: '목록에 필요한 상품을 고르지 못했어요.',
+    strength: '목록에 필요한 상품을 골랐어요.',
+  },
+  'SHOP.ITEM_MISSING': {
+    difficulty: '목록에 있는 상품을 빠뜨렸어요.',
+    strength: '목록에 있는 상품을 빠뜨리지 않았어요.',
+  },
+  'SHOP.WRONG_ITEM_SELECTED': {
+    difficulty: '목록에 없는 상품을 골랐어요.',
+    strength: '목록에 없는 상품을 피했어요.',
+  },
+  'SHOP.QUANTITY_CHANGED': {
+    difficulty: '필요한 수량과 다르게 담았어요.',
+    strength: '필요한 수량을 정확히 맞췄어요.',
+  },
+  'SHOP.PRICE_CHECKED': {
+    difficulty: '가격과 예산을 정확히 확인하지 못했어요.',
+    strength: '가격과 예산을 확인했어요.',
+  },
+  'SHOP.BUDGET_EXCEEDED': {
+    difficulty: '장바구니 금액이 예산을 넘었어요.',
+    strength: '예산을 넘지 않게 장보기를 마쳤어요.',
+  },
+};
+
+export function behaviorEvidenceCopy(
+  evidence: ObservedBehaviorEvidence,
+  kind: 'strength' | 'difficulty',
+) {
+  const copy = BEHAVIOR_COPY[evidence.eventCode];
+  if (copy) return copy[kind];
+  return kind === 'strength' ? '과제를 올바르게 수행했어요.' : '과제 수행 중 어려움이 관찰됐어요.';
+}
+
+export function independenceLabel(level: ObservedBehaviorEvidence['independenceLevel']) {
+  return {
+    ASSISTED: '직접 도움',
+    INDEPENDENT: '독립 수행',
+    SUPPORTED_LEVEL_1: '힌트 1단계',
+    SUPPORTED_LEVEL_2: '힌트 2단계',
+    SUPPORTED_LEVEL_3: '힌트 3단계',
+  }[level];
 }

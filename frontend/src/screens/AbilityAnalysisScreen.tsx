@@ -16,8 +16,10 @@ import {
 import {
   abilityCopy,
   abilityLevel,
+  behaviorEvidenceCopy,
   classifyAbility,
   confidenceLabel,
+  independenceLabel,
   type AbilityStatus,
 } from '../analysis/abilityAnalysis';
 import { PressScale } from '../components/PressScale';
@@ -28,7 +30,6 @@ const TARGET_SKILLS = [
   'LANGUAGE_COMPREHENSION',
   'NUMERACY',
   'MONEY_MANAGEMENT',
-  'EXECUTIVE_FUNCTION',
 ];
 
 const STATUS_STYLE: Record<AbilityStatus, {
@@ -52,6 +53,7 @@ const DIFFICULTY_COPY = {
 export function AbilityAnalysisScreen({ accessToken }: { accessToken: string | null }) {
   const [profile, setProfile] = useState<AbilityProfileResponse | null>(null);
   const [recommendation, setRecommendation] = useState<MarketDifficultyRecommendation | null>(null);
+  const [showAnalyzedBehaviors, setShowAnalyzedBehaviors] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -160,8 +162,18 @@ export function AbilityAnalysisScreen({ accessToken }: { accessToken: string | n
         <View style={styles.summaryRow}>
           <SummaryCard color="#27845D" count={strengthCount} label="강점으로 관찰" />
           <SummaryCard color="#C45C42" count={practiceCount} label="연습 필요" />
-          <SummaryCard color="#65777C" count={profile.inputEventCount} label="분석한 행동" />
+          <SummaryCard
+            color="#65777C"
+            count={profile.inputEventCount}
+            label="분석한 행동"
+            onPress={() => setShowAnalyzedBehaviors((visible) => !visible)}
+            open={showAnalyzedBehaviors}
+          />
         </View>
+
+        {showAnalyzedBehaviors ? (
+          <AnalyzedBehaviorPanel eventCount={profile.inputEventCount} skills={skills} />
+        ) : null}
 
         <View style={styles.sectionHeading}>
           <Text style={styles.sectionTitle}>능력별 분석</Text>
@@ -224,11 +236,118 @@ export function AbilityAnalysisScreen({ accessToken }: { accessToken: string | n
   );
 }
 
-function SummaryCard({ color, count, label }: { color: string; count: number; label: string }) {
-  return (
-    <View style={styles.summaryCard}>
+function SummaryCard({
+  color,
+  count,
+  label,
+  onPress,
+  open = false,
+}: {
+  color: string;
+  count: number;
+  label: string;
+  onPress?: () => void;
+  open?: boolean;
+}) {
+  const content = (
+    <>
       <Text style={[styles.summaryCount, { color }]}>{count}</Text>
-      <Text style={styles.summaryLabel}>{label}</Text>
+      <View style={styles.summaryLabelRow}>
+        <Text style={styles.summaryLabel}>{label}</Text>
+        {onPress ? (
+          <Ionicons color="#77847F" name={open ? 'chevron-up' : 'chevron-down'} size={12} />
+        ) : null}
+      </View>
+    </>
+  );
+  if (!onPress) return <View style={styles.summaryCard}>{content}</View>;
+  return (
+    <PressScale
+      accessibilityHint="능력 판단에 반영된 행동 목록을 펼쳐 봅니다."
+      accessibilityLabel={`분석한 행동 ${count}개`}
+      accessibilityRole="button"
+      accessibilityState={{ expanded: open }}
+      onPress={onPress}
+      style={[styles.summaryCard, styles.summaryButton, open && styles.summaryButtonOpen]}
+    >
+      {content}
+    </PressScale>
+  );
+}
+
+function AnalyzedBehaviorPanel({
+  eventCount,
+  skills,
+}: {
+  eventCount: number;
+  skills: AbilityProfileResponse['profileData']['skills'][string][];
+}) {
+  const evidenceCount = skills.reduce(
+    (total, skill) => total + skill.observedStrengths.length + skill.observedDifficulties.length,
+    0,
+  );
+  return (
+    <View style={styles.behaviorPanel}>
+      <View style={styles.behaviorPanelHeader}>
+        <View style={styles.behaviorPanelIcon}>
+          <Ionicons color="#397B68" name="list-outline" size={20} />
+        </View>
+        <View style={styles.behaviorPanelHeadingCopy}>
+          <Text style={styles.behaviorPanelTitle}>분석한 행동</Text>
+          <Text style={styles.behaviorPanelSubtitle}>
+            수집한 행동 {eventCount}개 중 능력 판단에 반영된 행동을 기술별로 요약했어요.
+          </Text>
+        </View>
+      </View>
+
+      {evidenceCount === 0 ? (
+        <Text style={styles.noBehaviorText}>아직 능력 판단에 사용할 행동 근거가 없어요.</Text>
+      ) : skills.map((skill) => {
+        const evidence = [
+          ...skill.observedStrengths.map((item) => ({ item, kind: 'strength' as const })),
+          ...skill.observedDifficulties.map((item) => ({ item, kind: 'difficulty' as const })),
+        ];
+        if (evidence.length === 0) return null;
+        return (
+          <View key={skill.skillCode} style={styles.behaviorSkillSection}>
+            <Text style={styles.behaviorSkillName}>{abilityCopy(skill.skillCode).label}</Text>
+            {evidence.map(({ item, kind }, index) => {
+              const positive = kind === 'strength';
+              return (
+                <View
+                  key={`${item.eventCode}-${kind}-${index}`}
+                  style={styles.behaviorEvidenceRow}
+                >
+                  <View
+                    style={[
+                      styles.behaviorEvidenceIcon,
+                      { backgroundColor: positive ? '#E7F7EE' : '#FFF0EC' },
+                    ]}
+                  >
+                    <Ionicons
+                      color={positive ? '#27845D' : '#C45C42'}
+                      name={positive ? 'checkmark' : 'alert'}
+                      size={14}
+                    />
+                  </View>
+                  <View style={styles.behaviorEvidenceCopy}>
+                    <Text style={styles.behaviorEvidenceText}>
+                      {behaviorEvidenceCopy(item, kind)}
+                    </Text>
+                    <Text style={styles.behaviorEvidenceMeta}>
+                      {independenceLabel(item.independenceLevel)} · {item.observationCount}회 관찰
+                    </Text>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        );
+      })}
+
+      <Text style={styles.behaviorPanelNotice}>
+        같은 행동을 여러 번 수행한 경우 한 줄로 묶어 횟수로 표시해요.
+      </Text>
     </View>
   );
 }
@@ -285,8 +404,26 @@ const styles = StyleSheet.create({
   difficultyBadgeText: { color: '#FFFFFF', fontFamily: fonts.bold, fontSize: 13 },
   summaryRow: { flexDirection: 'row', gap: 8, marginTop: 10 },
   summaryCard: { alignItems: 'center', backgroundColor: '#FFFFFF', borderColor: '#E6ECE8', borderRadius: 16, borderWidth: 1, flex: 1, paddingHorizontal: 5, paddingVertical: 13 },
+  summaryButton: { justifyContent: 'center' },
+  summaryButtonOpen: { backgroundColor: '#EDF5F1', borderColor: '#8DB6A8' },
   summaryCount: { fontFamily: fonts.extraBold, fontSize: 21, lineHeight: 27 },
-  summaryLabel: { color: '#74817C', fontFamily: fonts.medium, fontSize: 10, lineHeight: 14, marginTop: 1, textAlign: 'center' },
+  summaryLabel: { color: '#74817C', fontFamily: fonts.medium, fontSize: 10, lineHeight: 14, textAlign: 'center' },
+  summaryLabelRow: { alignItems: 'center', flexDirection: 'row', gap: 2, marginTop: 1 },
+  behaviorPanel: { backgroundColor: '#FFFFFF', borderColor: '#DCE8E2', borderRadius: 20, borderWidth: 1, marginTop: 10, padding: 17 },
+  behaviorPanelHeader: { alignItems: 'flex-start', flexDirection: 'row' },
+  behaviorPanelIcon: { alignItems: 'center', backgroundColor: '#E6F3EE', borderRadius: 13, height: 40, justifyContent: 'center', width: 40 },
+  behaviorPanelHeadingCopy: { flex: 1, marginLeft: 11 },
+  behaviorPanelTitle: { color: '#24342F', fontFamily: fonts.bold, fontSize: 17, lineHeight: 22 },
+  behaviorPanelSubtitle: { color: '#72807B', fontFamily: fonts.regular, fontSize: 11, lineHeight: 17, marginTop: 3 },
+  behaviorSkillSection: { borderTopColor: '#EDF1EF', borderTopWidth: 1, marginTop: 15, paddingTop: 13 },
+  behaviorSkillName: { color: '#3B5049', fontFamily: fonts.bold, fontSize: 13, lineHeight: 18, marginBottom: 8 },
+  behaviorEvidenceRow: { alignItems: 'flex-start', flexDirection: 'row', marginBottom: 9 },
+  behaviorEvidenceIcon: { alignItems: 'center', borderRadius: 10, height: 28, justifyContent: 'center', marginTop: 1, width: 28 },
+  behaviorEvidenceCopy: { flex: 1, marginLeft: 9 },
+  behaviorEvidenceText: { color: '#34463F', fontFamily: fonts.medium, fontSize: 12, lineHeight: 17 },
+  behaviorEvidenceMeta: { color: '#8A9691', fontFamily: fonts.regular, fontSize: 10, lineHeight: 14, marginTop: 1 },
+  behaviorPanelNotice: { color: '#7C8A84', fontFamily: fonts.regular, fontSize: 10, lineHeight: 15, marginTop: 4 },
+  noBehaviorText: { color: '#7B8883', fontFamily: fonts.regular, fontSize: 12, lineHeight: 18, marginTop: 15 },
   sectionHeading: { alignItems: 'flex-end', flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10, marginTop: 23 },
   sectionTitle: { color: '#24342F', fontFamily: fonts.bold, fontSize: 20, lineHeight: 27 },
   updatedAt: { color: '#8A9792', fontFamily: fonts.regular, fontSize: 11 },

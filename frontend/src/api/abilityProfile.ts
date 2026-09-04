@@ -2,6 +2,19 @@ const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL;
 
 export type AbilityConfidence = 'INSUFFICIENT' | 'LOW' | 'MEDIUM' | 'HIGH';
 
+export type ObservedBehaviorEvidence = {
+  eventCode: string;
+  outcome: 'SUCCESS' | 'FAILURE' | 'NEUTRAL' | 'INCOMPLETE';
+  independenceLevel:
+    | 'INDEPENDENT'
+    | 'SUPPORTED_LEVEL_1'
+    | 'SUPPORTED_LEVEL_2'
+    | 'SUPPORTED_LEVEL_3'
+    | 'ASSISTED';
+  errorType: string;
+  observationCount: number;
+};
+
 export type AbilitySkillProfile = {
   skillCode: string;
   independentSuccessRate: number | null;
@@ -11,6 +24,8 @@ export type AbilitySkillProfile = {
   distinctTaskCount: number;
   distinctSessionCount: number;
   confidence: AbilityConfidence;
+  observedStrengths: ObservedBehaviorEvidence[];
+  observedDifficulties: ObservedBehaviorEvidence[];
   interpretationLimits: string[];
 };
 

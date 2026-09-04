@@ -1,4 +1,9 @@
-import { abilityLevel, classifyAbility } from '../src/analysis/abilityAnalysis';
+import {
+  abilityLevel,
+  behaviorEvidenceCopy,
+  classifyAbility,
+  independenceLabel,
+} from '../src/analysis/abilityAnalysis';
 import type { AbilitySkillProfile } from '../src/api/abilityProfile';
 
 function skill(rate: number | null, confidence: AbilitySkillProfile['confidence'] = 'MEDIUM') {
@@ -9,6 +14,8 @@ function skill(rate: number | null, confidence: AbilitySkillProfile['confidence'
     independentEvaluableEvidenceCount: 5,
     independentSuccessRate: rate,
     interpretationLimits: [],
+    observedDifficulties: [],
+    observedStrengths: [],
     skillCode: 'NUMERACY',
     supportedEvaluableEvidenceCount: 0,
     supportedSuccessRate: null,
@@ -29,5 +36,17 @@ describe('능력별 분석 표시', () => {
     expect(classifyAbility(skill(100, 'INSUFFICIENT'))).toBe('INSUFFICIENT');
     expect(abilityLevel(skill(100, 'INSUFFICIENT'))).toBeNull();
     expect(classifyAbility(skill(null))).toBe('INSUFFICIENT');
+  });
+
+  it('수집한 행동 근거를 사용자에게 읽기 쉬운 문장으로 바꾼다', () => {
+    const evidence = {
+      errorType: 'QUANTITY_ERROR',
+      eventCode: 'SHOP.QUANTITY_CHANGED',
+      independenceLevel: 'INDEPENDENT' as const,
+      observationCount: 2,
+      outcome: 'FAILURE' as const,
+    };
+    expect(behaviorEvidenceCopy(evidence, 'difficulty')).toBe('필요한 수량과 다르게 담았어요.');
+    expect(independenceLabel(evidence.independenceLevel)).toBe('독립 수행');
   });
 });
