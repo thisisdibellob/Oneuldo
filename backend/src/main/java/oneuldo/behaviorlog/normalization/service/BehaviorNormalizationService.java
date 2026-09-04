@@ -31,6 +31,7 @@ import oneuldo.behaviorlog.normalization.domain.ObservedOutcome;
 import oneuldo.behaviorlog.normalization.domain.ValidityStatus;
 import oneuldo.behaviorlog.normalization.registry.BehaviorEventDefinition;
 import oneuldo.behaviorlog.normalization.registry.BehaviorEventRegistry;
+import oneuldo.behaviorlog.normalization.registry.EvidencePolicy;
 import oneuldo.behaviorlog.normalization.repository.NormalizedBehaviorEventRepository;
 import oneuldo.behaviorlog.normalization.repository.NormalizedBehaviorEvidenceRepository;
 import oneuldo.behaviorlog.normalization.repository.NormalizedBehaviorMeasurementRepository;
@@ -214,7 +215,9 @@ public class BehaviorNormalizationService {
     private EvidenceUse resolveEvidenceUse(BehaviorLog log, BehaviorEventDefinition definition,
             ValidityStatus validity) {
         if (definition == null || validity != ValidityStatus.VALID) return EvidenceUse.EXCLUDED;
+        if (definition.evidencePolicy() == EvidencePolicy.EXCLUDED) return EvidenceUse.EXCLUDED;
         if (definition.safetyRelevant()) return EvidenceUse.SAFETY_ONLY;
+        if (definition.evidencePolicy() == EvidencePolicy.CONTEXT_ONLY) return EvidenceUse.CONTEXT_ONLY;
         EvidenceContext context = log.getEvidenceContext();
         return switch (context) {
             case ASSESSMENT_TASK -> EvidenceUse.ASSESSMENT_PRIMARY;

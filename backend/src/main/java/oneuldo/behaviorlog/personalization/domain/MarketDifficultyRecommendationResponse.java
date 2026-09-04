@@ -6,7 +6,7 @@ import java.util.UUID;
 
 public record MarketDifficultyRecommendationResponse(
         UUID recommendationId,
-        UUID profileSnapshotId,
+        UUID analysisInputSnapshotId,
         String gameId,
         int recommendedDifficulty,
         String personalizationMode,
@@ -26,8 +26,8 @@ public record MarketDifficultyRecommendationResponse(
             MarketDifficultyRecommendation recommendation) {
         return new MarketDifficultyRecommendationResponse(
                 recommendation.getId(),
-                recommendation.getProfileSnapshot() == null
-                        ? null : recommendation.getProfileSnapshot().getId(),
+                recommendation.getAnalysisInputSnapshot() == null
+                        ? null : recommendation.getAnalysisInputSnapshot().getId(),
                 "MARKET_SIMULATION",
                 recommendation.getRecommendedDifficulty(),
                 recommendation.getPersonalizationMode(),

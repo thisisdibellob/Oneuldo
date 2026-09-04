@@ -8,6 +8,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface MarketDifficultyRecommendationRepository
         extends JpaRepository<MarketDifficultyRecommendation, UUID> {
     Optional<MarketDifficultyRecommendation> findFirstByMemberIdOrderByGeneratedAtDesc(UUID memberId);
-    Optional<MarketDifficultyRecommendation> findByMemberIdAndProfileSnapshotId(
-            UUID memberId, UUID profileSnapshotId);
+    Optional<MarketDifficultyRecommendation> findByMemberIdAndAnalysisInputSnapshotId(
+            UUID memberId, UUID analysisInputSnapshotId);
 }

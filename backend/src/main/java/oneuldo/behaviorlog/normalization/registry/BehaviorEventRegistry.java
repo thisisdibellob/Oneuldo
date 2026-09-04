@@ -50,13 +50,51 @@ public class BehaviorEventRegistry {
 
     private void shopping(Map<String, BehaviorEventDefinition> map) {
         var p = BehaviorPayloadType.SHOPPING;
+        addContext(map, p, BehaviorDomain.SHOPPING, START, NEUTRAL, NONE,
+                "EXECUTIVE_FUNCTION", "SHOP.SESSION_STARTED");
+        addContext(map, p, BehaviorDomain.SHOPPING, VIEW_INSTRUCTION, NEUTRAL, NONE,
+                "EXECUTIVE_FUNCTION", "SHOP.MISSION_PRESENTED", "SHOP.BRIEFING_ADVANCED");
         add(map, p, BehaviorDomain.SHOPPING, VIEW_INSTRUCTION, NEUTRAL, NONE, false, "EXECUTIVE_FUNCTION", "SHOP.LIST_OPENED");
         add(map, p, BehaviorDomain.SHOPPING, SELECT, null, NONE, false, "LANGUAGE_COMPREHENSION", "SHOP.ITEM_SELECTED");
         add(map, p, BehaviorDomain.SHOPPING, SELECT, FAILURE, WRONG_SELECTION, false, "LANGUAGE_COMPREHENSION", "SHOP.WRONG_ITEM_SELECTED");
         add(map, p, BehaviorDomain.SHOPPING, SELECT, FAILURE, OMISSION, false, "LANGUAGE_COMPREHENSION", "SHOP.ITEM_MISSING");
         add(map, p, BehaviorDomain.SHOPPING, START, NEUTRAL, NONE, false, "SPATIAL_NAVIGATION", "SHOP.ITEM_SEARCH_STARTED");
         add(map, p, BehaviorDomain.SHOPPING, NAVIGATE, FAILURE, NAVIGATION_ERROR, false, "SPATIAL_NAVIGATION", "SHOP.WRONG_AISLE_ENTERED", "SHOP.TARGET_PASSED");
-        add(map, p, BehaviorDomain.SHOPPING, SELECT, null, NONE, false, "NUMERACY", "SHOP.QUANTITY_CHANGED");
+        addContext(map, p, BehaviorDomain.SHOPPING, NAVIGATE, NEUTRAL, NONE,
+                "SPATIAL_NAVIGATION", "SHOP.MOVEMENT_SEGMENT_SUMMARIZED",
+                "SHOP.SHELF_PROXIMITY_ENTERED", "SHOP.SHELF_PROXIMITY_EXITED",
+                "SHOP.CHECKOUT_PROXIMITY_ENTERED", "SHOP.CHECKOUT_PROXIMITY_EXITED",
+                "SHOP.TARGET_SHELF_APPROACHED", "SHOP.SHELF_REVISITED",
+                "SHOP.MOVEMENT_BLOCKED", "SHOP.MOVEMENT_SAMPLED");
+        addContext(map, p, BehaviorDomain.SHOPPING, WAIT, NEUTRAL, NONE,
+                "SELF_REGULATION", "SHOP.MOVEMENT_STOPPED", "SHOP.IDLE_STARTED",
+                "SHOP.IDLE_ENDED", "SHOP.APP_BACKGROUNDED", "SHOP.APP_FOREGROUNDED");
+        add(map, p, BehaviorDomain.SHOPPING, NAVIGATE, NEUTRAL, REPETITION, false,
+                "SPATIAL_NAVIGATION", "SHOP.TARGET_SHELF_REVISITED", "SHOP.ROUTE_LOOP_DETECTED");
+        add(map, p, BehaviorDomain.SHOPPING, WAIT, INCOMPLETE, NAVIGATION_ERROR, false,
+                "SUSTAINED_ATTENTION", "SHOP.OFF_TARGET_DWELL");
+        add(map, p, BehaviorDomain.SHOPPING, NAVIGATE, FAILURE, NAVIGATION_ERROR, false,
+                "SPATIAL_NAVIGATION", "SHOP.MOVEMENT_BLOCKED_REPEATEDLY");
+        addContext(map, p, BehaviorDomain.SHOPPING, CHECK, NEUTRAL, NONE,
+                "EXECUTIVE_FUNCTION", "SHOP.SHELF_OPENED", "SHOP.SHELF_CLOSED",
+                "SHOP.NON_TARGET_SHELF_OPENED", "SHOP.CART_OPENED", "SHOP.CART_CLOSED");
+        add(map, p, BehaviorDomain.SHOPPING, COMPLETE_STEP, INCOMPLETE, OMISSION, false,
+                "EXECUTIVE_FUNCTION", "SHOP.TARGET_SHELF_LEFT_WITHOUT_SELECTION");
+        add(map, p, BehaviorDomain.SHOPPING, SELECT, null, QUANTITY_ERROR, false, "NUMERACY", "SHOP.QUANTITY_CHANGED");
+        add(map, p, BehaviorDomain.SHOPPING, SELECT, SUCCESS, NONE, false,
+                "NUMERACY", "SHOP.QUANTITY_MATCHED");
+        add(map, p, BehaviorDomain.SHOPPING, SELECT, FAILURE, QUANTITY_ERROR, false,
+                "NUMERACY", "SHOP.QUANTITY_OVERSHOT");
+        addContext(map, p, BehaviorDomain.SHOPPING, NAVIGATE, NEUTRAL, NONE,
+                "EXECUTIVE_FUNCTION", "SHOP.CHECKOUT_ENTERED");
+        add(map, p, BehaviorDomain.SHOPPING, NAVIGATE, INCOMPLETE, OMISSION, false,
+                "EXECUTIVE_FUNCTION", "SHOP.EARLY_CHECKOUT_APPROACH");
+        add(map, p, BehaviorDomain.SHOPPING, COMPLETE_TASK, null, NONE, false,
+                "DAILY_LIVING", "SHOP.CHECKOUT_SUBMITTED");
+        add(map, p, BehaviorDomain.SHOPPING, SELF_CORRECT, SUCCESS, NONE, false,
+                "ERROR_RECOVERY", "SHOP.CHECKOUT_CORRECTION_STARTED");
+        add(map, p, BehaviorDomain.SHOPPING, COMPLETE_TASK, SUCCESS, NONE, false,
+                "DAILY_LIVING", "SHOP.SESSION_COMPLETED");
         add(map, p, BehaviorDomain.SHOPPING, COMPARE, null, NONE, false, "MONEY_MANAGEMENT", "SHOP.PRICE_CHECKED");
         add(map, p, BehaviorDomain.SHOPPING, COMPARE, FAILURE, QUANTITY_ERROR, false, "MONEY_MANAGEMENT", "SHOP.BUDGET_EXCEEDED");
         add(map, p, BehaviorDomain.SHOPPING, CHECK, SUCCESS, NONE, false, "PROBLEM_SOLVING", "SHOP.OUT_OF_STOCK_DETECTED");
@@ -171,9 +209,25 @@ public class BehaviorEventRegistry {
     private void add(Map<String, BehaviorEventDefinition> map, BehaviorPayloadType payloadType,
             BehaviorDomain domain, CanonicalActionType actionType, ObservedOutcome outcome,
             ErrorType errorType, boolean safetyRelevant, String skillCode, String... eventCodes) {
+        addWithPolicy(map, payloadType, domain, actionType, outcome, errorType,
+                safetyRelevant, EvidencePolicy.PROFILE_EVIDENCE, skillCode, eventCodes);
+    }
+
+    private void addContext(Map<String, BehaviorEventDefinition> map, BehaviorPayloadType payloadType,
+            BehaviorDomain domain, CanonicalActionType actionType, ObservedOutcome outcome,
+            ErrorType errorType, String skillCode, String... eventCodes) {
+        addWithPolicy(map, payloadType, domain, actionType, outcome, errorType,
+                false, EvidencePolicy.CONTEXT_ONLY, skillCode, eventCodes);
+    }
+
+    private void addWithPolicy(Map<String, BehaviorEventDefinition> map,
+            BehaviorPayloadType payloadType, BehaviorDomain domain,
+            CanonicalActionType actionType, ObservedOutcome outcome,
+            ErrorType errorType, boolean safetyRelevant, EvidencePolicy evidencePolicy,
+            String skillCode, String... eventCodes) {
         for (String eventCode : eventCodes) {
             var definition = new BehaviorEventDefinition(eventCode, payloadType, domain, actionType,
-                    outcome, errorType, safetyRelevant, Set.of(),
+                    outcome, errorType, safetyRelevant, evidencePolicy, Set.of(),
                     List.of(new SkillEvidenceRule(skillCode, EvidenceRole.PRIMARY)), commonMeasurements());
             if (map.put(eventCode, definition) != null) {
                 throw new IllegalStateException("중복 eventCode: " + eventCode);
@@ -199,6 +253,26 @@ public class BehaviorEventRegistry {
     }
 
     private void requiredFields(Map<String, BehaviorEventDefinition> map) {
+        require(map, "SHOP.MOVEMENT_SEGMENT_SUMMARIZED", "controlMode", "durationMs",
+                "pathDistance", "straightDistance", "travelDistance");
+        require(map, "SHOP.MOVEMENT_STOPPED", "controlMode", "durationMs", "travelDistance");
+        require(map, "SHOP.MOVEMENT_BLOCKED", "controlMode", "x", "y");
+        require(map, "SHOP.MOVEMENT_SAMPLED", "controlMode", "x", "y", "blocked");
+        require(map, "SHOP.MOVEMENT_BLOCKED_REPEATEDLY", "blockedCount", "observationWindowMs");
+        require(map, "SHOP.SHELF_PROXIMITY_ENTERED", "stationId", "visitIndex", "isTargetZone");
+        require(map, "SHOP.SHELF_PROXIMITY_EXITED", "stationId", "visitIndex", "durationMs");
+        require(map, "SHOP.CHECKOUT_PROXIMITY_ENTERED", "stationId", "visitIndex");
+        require(map, "SHOP.CHECKOUT_PROXIMITY_EXITED", "stationId", "visitIndex", "durationMs");
+        require(map, "SHOP.TARGET_SHELF_APPROACHED", "stationId", "visitIndex");
+        require(map, "SHOP.SHELF_REVISITED", "stationId", "visitIndex", "intervalSinceLastVisitMs");
+        require(map, "SHOP.TARGET_SHELF_REVISITED", "stationId", "visitIndex", "intervalSinceLastVisitMs");
+        require(map, "SHOP.TARGET_PASSED", "stationId", "visitIndex", "proximityDurationMs");
+        require(map, "SHOP.ROUTE_LOOP_DETECTED", "stationSequence");
+        require(map, "SHOP.OFF_TARGET_DWELL", "stationId", "durationMs");
+        require(map, "SHOP.SHELF_OPENED", "stationId", "isTargetZone");
+        require(map, "SHOP.NON_TARGET_SHELF_OPENED", "stationId", "isTargetZone");
+        require(map, "SHOP.QUANTITY_MATCHED", "itemId", "requiredQuantity", "selectedQuantity");
+        require(map, "SHOP.QUANTITY_OVERSHOT", "itemId", "requiredQuantity", "selectedQuantity");
         require(map, "SHOP.ITEM_SELECTED", "itemId");
         require(map, "SHOP.WRONG_ITEM_SELECTED", "itemId");
         require(map, "SHOP.ITEM_MISSING", "itemId", "requiredQuantity", "selectedQuantity");
@@ -245,6 +319,57 @@ public class BehaviorEventRegistry {
     }
 
     private void measurementRules(Map<String, BehaviorEventDefinition> map) {
+        measure(map, "SHOP.SESSION_STARTED",
+                value("objectiveCount", "objectiveCount", COUNT, TARGET),
+                value("budgetAmount", "budgetAmount", KRW, TARGET));
+        measure(map, "SHOP.BRIEFING_ADVANCED",
+                value("briefingIndex", "briefingIndex", COUNT, SNAPSHOT),
+                value("briefingDurationMs", "durationMs", MILLISECONDS, DURATION));
+        measure(map, "SHOP.MOVEMENT_SEGMENT_SUMMARIZED",
+                value("movementPathDistance", "pathDistance", GAME_DISTANCE, OBSERVATION),
+                value("movementStraightDistance", "straightDistance", GAME_DISTANCE, OBSERVATION),
+                value("movementTravelDistance", "travelDistance", GAME_DISTANCE, OBSERVATION),
+                value("movementDurationMs", "durationMs", MILLISECONDS, DURATION),
+                value("movementControlMode", "controlMode", CODE, OBSERVATION));
+        measure(map, "SHOP.MOVEMENT_STOPPED",
+                value("movementTravelDistance", "travelDistance", GAME_DISTANCE, OBSERVATION),
+                value("movementDurationMs", "durationMs", MILLISECONDS, DURATION));
+        measure(map, "SHOP.MOVEMENT_BLOCKED", MeasurementRule.delta("blockedMovementCount"));
+        measure(map, "SHOP.MOVEMENT_SAMPLED",
+                value("positionX", "x", GAME_DISTANCE, OBSERVATION),
+                value("positionY", "y", GAME_DISTANCE, OBSERVATION),
+                value("movementControlMode", "controlMode", CODE, OBSERVATION),
+                value("movementBlocked", "blocked", CODE, OBSERVATION));
+        measure(map, "SHOP.MOVEMENT_BLOCKED_REPEATEDLY",
+                value("blockedMovementCount", "blockedCount", COUNT, OBSERVATION),
+                value("blockedObservationWindowMs", "observationWindowMs", MILLISECONDS, DURATION));
+        measure(map, "SHOP.SHELF_PROXIMITY_ENTERED",
+                value("shelfVisitIndex", "visitIndex", COUNT, SNAPSHOT),
+                value("shelfRevisitIntervalMs", "intervalSinceLastVisitMs", MILLISECONDS, DURATION));
+        measure(map, "SHOP.SHELF_PROXIMITY_EXITED",
+                value("shelfVisitDurationMs", "durationMs", MILLISECONDS, DURATION));
+        measure(map, "SHOP.CHECKOUT_PROXIMITY_EXITED",
+                value("checkoutProximityDurationMs", "durationMs", MILLISECONDS, DURATION));
+        measure(map, "SHOP.SHELF_REVISITED", MeasurementRule.delta("shelfRevisitCount"),
+                value("shelfRevisitIntervalMs", "intervalSinceLastVisitMs", MILLISECONDS, DURATION));
+        measure(map, "SHOP.TARGET_SHELF_REVISITED", MeasurementRule.delta("targetShelfRevisitCount"),
+                value("targetShelfRevisitIntervalMs", "intervalSinceLastVisitMs", MILLISECONDS, DURATION));
+        measure(map, "SHOP.TARGET_SHELF_APPROACHED", MeasurementRule.delta("targetShelfApproachCount"));
+        measure(map, "SHOP.OFF_TARGET_DWELL",
+                value("offTargetDwellMs", "durationMs", MILLISECONDS, DURATION));
+        measure(map, "SHOP.ROUTE_LOOP_DETECTED", MeasurementRule.delta("routeLoopCount"));
+        measure(map, "SHOP.SHELF_OPENED", MeasurementRule.delta("targetShelfOpenCount"));
+        measure(map, "SHOP.NON_TARGET_SHELF_OPENED", MeasurementRule.delta("nonTargetShelfOpenCount"));
+        measure(map, "SHOP.SHELF_CLOSED",
+                value("shelfViewDurationMs", "durationMs", MILLISECONDS, DURATION));
+        measure(map, "SHOP.TARGET_SHELF_LEFT_WITHOUT_SELECTION",
+                MeasurementRule.delta("targetShelfLeftWithoutSelectionCount"),
+                value("shelfViewDurationMs", "durationMs", MILLISECONDS, DURATION));
+        measure(map, "SHOP.CART_OPENED", MeasurementRule.delta("cartCheckCount"),
+                value("cartItemCount", "cartItemCount", COUNT, SNAPSHOT),
+                value("remainingObjectiveCount", "remainingObjectiveCount", COUNT, SNAPSHOT));
+        measure(map, "SHOP.CART_CLOSED",
+                value("cartViewDurationMs", "durationMs", MILLISECONDS, DURATION));
         measure(map, "SHOP.ITEM_SELECTED", MeasurementRule.delta("selectionAttempt"),
                 MeasurementRule.valueWithTarget("selectedQuantity", "payload.selectedQuantity",
                         "payload.requiredQuantity", COUNT, OBSERVATION));
@@ -263,6 +388,29 @@ public class BehaviorEventRegistry {
         measure(map, "SHOP.QUANTITY_CHANGED",
                 MeasurementRule.valueWithTarget("selectedQuantity", "payload.selectedQuantity",
                         "payload.requiredQuantity", COUNT, OBSERVATION));
+        measure(map, "SHOP.QUANTITY_MATCHED", MeasurementRule.delta("quantityMatchedCount"),
+                MeasurementRule.valueWithTarget("selectedQuantity", "payload.selectedQuantity",
+                        "payload.requiredQuantity", COUNT, OBSERVATION));
+        measure(map, "SHOP.QUANTITY_OVERSHOT", MeasurementRule.delta("quantityOvershotCount"),
+                MeasurementRule.valueWithTarget("selectedQuantity", "payload.selectedQuantity",
+                        "payload.requiredQuantity", COUNT, OBSERVATION));
+        measure(map, "SHOP.EARLY_CHECKOUT_APPROACH", MeasurementRule.delta("earlyCheckoutCount"),
+                value("remainingObjectiveCount", "remainingObjectiveCount", COUNT, SNAPSHOT));
+        measure(map, "SHOP.CHECKOUT_SUBMITTED", MeasurementRule.delta("checkoutSubmitCount"),
+                value("cartItemCount", "cartItemCount", COUNT, SNAPSHOT),
+                value("cartTotalAmount", "cartTotalAmount", KRW, SNAPSHOT),
+                value("remainingObjectiveCount", "remainingObjectiveCount", COUNT, SNAPSHOT),
+                value("overBudgetAmount", "overBudgetAmount", KRW, OBSERVATION));
+        measure(map, "SHOP.CHECKOUT_CORRECTION_STARTED",
+                MeasurementRule.delta("checkoutCorrectionCount"));
+        measure(map, "SHOP.IDLE_ENDED",
+                value("idleDurationMs", "idleDurationMs", MILLISECONDS, DURATION));
+        measure(map, "SHOP.APP_FOREGROUNDED",
+                value("interruptionDurationMs", "interruptionDurationMs", MILLISECONDS, DURATION));
+        measure(map, "SHOP.SESSION_COMPLETED",
+                value("cartItemCount", "cartItemCount", COUNT, SNAPSHOT),
+                value("cartTotalAmount", "cartTotalAmount", KRW, SNAPSHOT),
+                value("remainingObjectiveCount", "remainingObjectiveCount", COUNT, SNAPSHOT));
         measure(map, "SHOP.PRICE_CHECKED", value("priceAmount", "priceAmount", KRW, OBSERVATION));
         measure(map, "SHOP.BUDGET_EXCEEDED",
                 MeasurementRule.valueWithTarget("priceAmount", "payload.priceAmount",
@@ -327,13 +475,14 @@ public class BehaviorEventRegistry {
             List<SkillEvidenceRule> evidence, List<MeasurementRule> measurements) {
         return new BehaviorEventDefinition(old.eventCode(), old.requiredPayloadType(), old.domain(),
                 old.actionType(), old.defaultOutcome(), old.defaultErrorType(), old.safetyRelevant(),
-                requiredFields, evidence, measurements);
+                old.evidencePolicy(), requiredFields, evidence, measurements);
     }
 
     private void validateDefinitions(Map<String, BehaviorEventDefinition> map) {
         for (BehaviorEventDefinition definition : map.values()) {
             if (definition.domain() == null || definition.actionType() == null
-                    || definition.defaultErrorType() == null || definition.evidenceRules().isEmpty()) {
+                    || definition.defaultErrorType() == null || definition.evidencePolicy() == null
+                    || definition.evidenceRules().isEmpty()) {
                 throw new IllegalStateException("불완전한 이벤트 정의: " + definition.eventCode());
             }
             if (!definition.requiredPayloadFields().isEmpty()

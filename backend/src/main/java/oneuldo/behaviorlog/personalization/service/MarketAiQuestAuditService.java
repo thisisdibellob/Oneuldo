@@ -8,7 +8,7 @@ import oneuldo.behaviorlog.personalization.domain.MarketAiQuestDraft;
 import oneuldo.behaviorlog.personalization.domain.MarketAiQuestGeneration;
 import oneuldo.behaviorlog.personalization.domain.MarketAiQuestResponse;
 import oneuldo.behaviorlog.personalization.repository.MarketAiQuestGenerationRepository;
-import oneuldo.behaviorlog.profile.repository.BehaviorProfileSnapshotRepository;
+import oneuldo.behaviorlog.analysis.repository.BehaviorAnalysisInputSnapshotRepository;
 import oneuldo.member.repository.MemberRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -21,20 +21,21 @@ import org.springframework.web.server.ResponseStatusException;
 public class MarketAiQuestAuditService {
 
     private final MemberRepository memberRepository;
-    private final BehaviorProfileSnapshotRepository profileRepository;
+    private final BehaviorAnalysisInputSnapshotRepository analysisInputRepository;
     private final MarketAiQuestGenerationRepository generationRepository;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void record(UUID memberId, MarketAiQuestResponse response,
+    public void record(UUID memberId, UUID analysisInputSnapshotId, MarketAiQuestResponse response,
             MarketAiQuestDraft validatedQuest, List<MarketAiQuestGeneration.Attempt> attempts,
             String failureReason) {
         var member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."));
-        var profile = profileRepository.findFirstByMemberIdOrderByGeneratedAtDesc(memberId)
-                .orElse(null);
+        var analysisInput = analysisInputRepository.findByIdAndMemberId(
+                analysisInputSnapshotId, memberId).orElseThrow(() ->
+                new ResponseStatusException(HttpStatus.NOT_FOUND, "행동 분석 입력을 찾을 수 없습니다."));
         generationRepository.save(new MarketAiQuestGeneration(
-                response.generationId(), member, profile, response.source(), response.model(),
+                response.generationId(), member, analysisInput, response.source(), response.model(),
                 response.latencyMs(), response.personalizationMode(), response.promptVersion(),
                 attempts, validatedQuest, failureReason, Instant.now()));
     }

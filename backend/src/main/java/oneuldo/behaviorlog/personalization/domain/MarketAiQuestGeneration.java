@@ -13,7 +13,7 @@ import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import oneuldo.behaviorlog.profile.domain.BehaviorProfileSnapshot;
+import oneuldo.behaviorlog.analysis.domain.BehaviorAnalysisInputSnapshot;
 import oneuldo.member.domain.Member;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
@@ -34,8 +34,8 @@ public class MarketAiQuestGeneration {
     private Member member;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "profile_snapshot_id", updatable = false)
-    private BehaviorProfileSnapshot profileSnapshot;
+    @JoinColumn(name = "analysis_input_snapshot_id", updatable = false)
+    private BehaviorAnalysisInputSnapshot analysisInputSnapshot;
 
     @Column(nullable = false, length = 20, updatable = false)
     private String source;
@@ -67,13 +67,13 @@ public class MarketAiQuestGeneration {
     private Instant createdAt;
 
     public MarketAiQuestGeneration(UUID id, Member member,
-            BehaviorProfileSnapshot profileSnapshot, String source, String model,
+            BehaviorAnalysisInputSnapshot analysisInputSnapshot, String source, String model,
             long latencyMs, String personalizationMode, String promptVersion,
             List<Attempt> attempts, MarketAiQuestDraft validatedQuest,
             String failureReason, Instant createdAt) {
         this.id = id;
         this.member = member;
-        this.profileSnapshot = profileSnapshot;
+        this.analysisInputSnapshot = analysisInputSnapshot;
         this.source = source;
         this.model = model;
         this.latencyMs = latencyMs;

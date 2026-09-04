@@ -15,7 +15,7 @@ import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import oneuldo.behaviorlog.profile.domain.BehaviorProfileSnapshot;
+import oneuldo.behaviorlog.analysis.domain.BehaviorAnalysisInputSnapshot;
 import oneuldo.member.domain.Member;
 import org.hibernate.annotations.Immutable;
 import org.hibernate.annotations.JdbcTypeCode;
@@ -37,8 +37,8 @@ public class MarketDifficultyRecommendation {
     private Member member;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "profile_snapshot_id", updatable = false)
-    private BehaviorProfileSnapshot profileSnapshot;
+    @JoinColumn(name = "analysis_input_snapshot_id", updatable = false)
+    private BehaviorAnalysisInputSnapshot analysisInputSnapshot;
 
     @Column(name = "policy_version", nullable = false, length = 50, updatable = false)
     private String policyVersion;
@@ -68,10 +68,10 @@ public class MarketDifficultyRecommendation {
     @Column(name = "generated_at", nullable = false, updatable = false)
     private Instant generatedAt;
 
-    public MarketDifficultyRecommendation(Member member, BehaviorProfileSnapshot profileSnapshot,
+    public MarketDifficultyRecommendation(Member member, BehaviorAnalysisInputSnapshot analysisInputSnapshot,
             String policyVersion, MarketPersonalizationDecision decision, Instant generatedAt) {
         this.member = member;
-        this.profileSnapshot = profileSnapshot;
+        this.analysisInputSnapshot = analysisInputSnapshot;
         this.policyVersion = policyVersion;
         this.recommendedDifficulty = decision.recommendedDifficulty();
         this.personalizationMode = decision.personalizationMode();

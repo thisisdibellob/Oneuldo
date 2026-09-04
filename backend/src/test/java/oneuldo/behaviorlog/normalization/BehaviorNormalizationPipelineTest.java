@@ -44,7 +44,7 @@ class BehaviorNormalizationPipelineTest {
     @Autowired private BehaviorSessionIntegrityRepository sessionIntegrityRepository;
 
     @Test
-    void 원본_커밋_후_세션_조정과_정규화를_완료한다() {
+    void 원본_커밋_후_세션_조정과_정규화를_비동기로_완료한다() throws InterruptedException {
         String suffix = UUID.randomUUID().toString();
         Member member = memberRepository.save(new Member(
                 "pipeline-" + suffix, "encoded-password", "파이프라인 사용자",
@@ -52,6 +52,8 @@ class BehaviorNormalizationPipelineTest {
         UUID sessionId = UUID.randomUUID();
 
         var response = behaviorLogService.record(member.getId(), request(sessionId));
+
+        waitUntilNormalized(response.id());
 
         var normalized = eventRepository.findByBehaviorLogIdAndNormalizerVersion(
                 response.id(), BehaviorNormalizationService.NORMALIZER_VERSION).orElseThrow();
@@ -63,6 +65,22 @@ class BehaviorNormalizationPipelineTest {
         assertEquals(NormalizationAttemptStatus.COMPLETED, attempt.getStatus());
         assertEquals(integrity.getId(), normalized.getSessionIntegrity().getId());
         assertTrue(integrity.getMissingEventSequences().isEmpty());
+    }
+
+    private void waitUntilNormalized(UUID behaviorLogId) throws InterruptedException {
+        long deadline = System.currentTimeMillis() + 5_000;
+        while (System.currentTimeMillis() < deadline) {
+            var event = eventRepository.findByBehaviorLogIdAndNormalizerVersion(
+                    behaviorLogId, BehaviorNormalizationService.NORMALIZER_VERSION);
+            var attempt = attemptRepository.findByBehaviorLogIdAndNormalizerVersion(
+                    behaviorLogId, BehaviorNormalizationService.NORMALIZER_VERSION);
+            if (event.isPresent() && attempt.isPresent()
+                    && attempt.get().getStatus() == NormalizationAttemptStatus.COMPLETED) {
+                return;
+            }
+            Thread.sleep(20);
+        }
+        throw new AssertionError("비동기 행동 로그 정규화가 제한 시간 안에 완료되지 않았습니다.");
     }
 
     private BehaviorLogRequest request(UUID sessionId) {

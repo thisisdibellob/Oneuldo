@@ -90,6 +90,7 @@ import {
   MarketInteractionRequest,
   MarketSimulationScreen,
   MarketStationId,
+  type MarketTelemetrySink,
 } from './MarketSimulationScreen';
 import { CookingSimulationScreen } from './CookingSimulationScreen';
 
@@ -532,6 +533,7 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
   const dialogueArrowFloat = useRef(new Animated.Value(0)).current;
   const resultCelebration = useRef(new Animated.Value(0)).current;
   const playerPoint = useRef<Point>({ ...INITIAL_PLAYER_POINT });
+  const marketTelemetry = useRef<MarketTelemetrySink | null>(null);
   const worldMapRef = useRef<WorldMapId>('village');
   const viewport = useRef({ width: 0, height: 0 });
   const viewportOrigin = useRef({ x: 0, y: 0 });
@@ -888,12 +890,22 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
       playerPoint.current = next;
       updateCamera(next);
       updateNpcProximity(next);
+      if (activeMap === 'market') {
+        const requestedDistance = Math.hypot(dx, dy);
+        const movedDistance = Math.hypot(next.x - current.x, next.y - current.y);
+        marketTelemetry.current?.observeMovement(
+          next,
+          controlMode,
+          requestedDistance > 0.05 && movedDistance < 0.05,
+        );
+      }
       return next;
     },
-    [updateCamera, updateNpcProximity],
+    [controlMode, updateCamera, updateNpcProximity],
   );
 
   const stopMovement = useCallback(() => {
+    if (worldMapRef.current === 'market') marketTelemetry.current?.movementStopped(controlMode);
     direction.current = { x: 0, y: 0 };
     keyboardDirection.current = { x: 0, y: 0 };
     keyboardEngaged.current = false;
@@ -920,7 +932,11 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
       toValue: { x: 0, y: 0 },
       useNativeDriver: true,
     }).start();
-  }, [joystickKnob, syncPlayerAvatarPose]);
+  }, [controlMode, joystickKnob, syncPlayerAvatarPose]);
+
+  const registerMarketTelemetry = useCallback((sink: MarketTelemetrySink | null) => {
+    marketTelemetry.current = sink;
+  }, []);
 
   const handleExit = useCallback(() => {
     stopMovement();
@@ -2572,6 +2588,7 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
           onLockChange={setMarketScenarioLocked}
           onMissionComplete={() => completeDailyQuest('market-shopping')}
           simulation={marketSimulation}
+          onTelemetryReady={registerMarketTelemetry}
         />
       ) : null}
 

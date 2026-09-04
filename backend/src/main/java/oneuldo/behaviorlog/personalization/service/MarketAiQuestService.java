@@ -6,12 +6,12 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import oneuldo.ai.client.GroqChatClient;
+import oneuldo.behaviorlog.analysis.domain.BehaviorAnalysisInputResponse;
+import oneuldo.behaviorlog.analysis.repository.BehaviorAnalysisInputSnapshotRepository;
 import oneuldo.behaviorlog.personalization.domain.MarketAiQuestDraft;
 import oneuldo.behaviorlog.personalization.domain.MarketAiQuestGeneration;
 import oneuldo.behaviorlog.personalization.domain.MarketAiQuestResponse;
 import oneuldo.behaviorlog.personalization.domain.MarketDifficultyRecommendationResponse;
-import oneuldo.simulationquest.llm.input.LlmSimulationGenerationInput;
-import oneuldo.simulationquest.llm.input.LlmSimulationInputService;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.ObjectMapper;
 
@@ -20,10 +20,7 @@ import tools.jackson.databind.ObjectMapper;
 @Slf4j
 public class MarketAiQuestService {
 
-    private static final UUID MARKET_TEMPLATE_ID = UUID.fromString(
-            "50000000-0000-0000-0000-000000000003");
-
-    private final LlmSimulationInputService inputService;
+    private final BehaviorAnalysisInputSnapshotRepository analysisInputRepository;
     private final MarketAiQuestPromptFactory promptFactory;
     private final MarketAiQuestValidator validator;
     private final MarketDifficultyRecommendationService fallbackRecommendationService;
@@ -32,9 +29,11 @@ public class MarketAiQuestService {
     private final ObjectMapper objectMapper;
 
     public MarketAiQuestResponse generate(UUID memberId) {
-        LlmSimulationGenerationInput input = inputService.build(memberId, MARKET_TEMPLATE_ID);
         MarketDifficultyRecommendationResponse recommendation =
                 fallbackRecommendationService.recommend(memberId);
+        var snapshot = analysisInputRepository.findById(
+                recommendation.analysisInputSnapshotId()).orElseThrow();
+        BehaviorAnalysisInputResponse input = BehaviorAnalysisInputResponse.from(snapshot);
         UUID generationId = UUID.randomUUID();
         List<MarketAiQuestGeneration.Attempt> attempts = new ArrayList<>();
         String model = null;
@@ -71,21 +70,23 @@ public class MarketAiQuestService {
             long latencyMs = elapsedMillis(startedAt);
             MarketAiQuestResponse response = MarketAiQuestResponse.from(
                     generationId, "AI", model, latencyMs,
-                    input.generationPlan().personalizationMode().name(),
+                    recommendation.personalizationMode(),
                     MarketAiQuestPromptFactory.PROMPT_VERSION, draft);
-            auditService.record(memberId, response, draft, attempts, null);
+            auditService.record(memberId, recommendation.analysisInputSnapshotId(),
+                    response, draft, attempts, null);
             return response;
         } catch (RuntimeException exception) {
             log.warn("AI 장보기 퀘스트 생성 실패. 규칙형 미션으로 복구합니다. memberId={}, cause={}",
                     memberId, exception.getMessage());
-            MarketAiQuestDraft fallbackDraft = fallback(memberId);
+            MarketAiQuestDraft fallbackDraft = fallback(recommendation);
             MarketAiQuestResponse response = MarketAiQuestResponse.from(
                     generationId, "RULE_FALLBACK", model, elapsedMillis(startedAt),
-                    input.generationPlan().personalizationMode().name(),
+                    recommendation.personalizationMode(),
                     MarketAiQuestPromptFactory.PROMPT_VERSION,
                     fallbackDraft);
             auditService.record(
-                    memberId, response, fallbackDraft, attempts, exception.getMessage());
+                    memberId, recommendation.analysisInputSnapshotId(), response,
+                    fallbackDraft, attempts, exception.getMessage());
             return response;
         }
     }
@@ -103,9 +104,7 @@ public class MarketAiQuestService {
         }
     }
 
-    private MarketAiQuestDraft fallback(UUID memberId) {
-        MarketDifficultyRecommendationResponse recommendation =
-                fallbackRecommendationService.recommend(memberId);
+    private MarketAiQuestDraft fallback(MarketDifficultyRecommendationResponse recommendation) {
         var adjustment = recommendation.adjustments();
         List<String> productIds = List.of("milk", "apple", "curry", "juice")
                 .subList(0, adjustment.itemCount());

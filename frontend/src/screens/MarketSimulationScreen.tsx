@@ -4,6 +4,7 @@ import { ComponentProps, useCallback, useEffect, useMemo, useRef, useState } fro
 import {
   AccessibilityInfo,
   Animated,
+  AppState,
   Easing,
   GestureResponderEvent,
   Image,
@@ -18,14 +19,11 @@ import {
 
 import { icons } from '../assets';
 import type { BehaviorSimulationContext } from '../api/behaviorLog';
-import { enqueueBehaviorLogBatch, flushBehaviorLogQueue } from '../behavior/behaviorEventQueue';
-import {
-  buildMarketAbortEvents,
-  buildMarketCheckoutEvents,
-  createMarketBehaviorSession,
-  MarketBehaviorSession,
-  MarketQuantityInteraction,
-} from '../behavior/marketBehaviorTracker';
+import { MarketBehaviorTracker } from '../behavior/marketBehaviorTracker';
+import type {
+  MarketTelemetryControlMode,
+  MarketTelemetryPoint,
+} from '../behavior/marketMovementDetector';
 import { PressScale } from '../components/PressScale';
 import {
   evaluateMarketCart,
@@ -50,6 +48,11 @@ export type MarketStationId = MarketCategoryId | 'checkout';
 export type MarketInteractionRequest = { id: number; station: MarketStationId };
 type MarketPoint = { x: number; y: number };
 type MarketControlMode = 'joystick' | 'touch';
+
+export type MarketTelemetrySink = {
+  movementStopped: (controlMode: MarketTelemetryControlMode) => void;
+  observeMovement: (point: MarketTelemetryPoint, controlMode: MarketTelemetryControlMode, blocked?: boolean) => void;
+};
 
 const MARKET_WORLD_WIDTH = 900;
 const MARKET_WORLD_HEIGHT = 1000;
@@ -120,6 +123,7 @@ type MarketSimulationScreenProps = {
   onExit: () => void;
   onLockChange?: (locked: boolean) => void;
   onMissionComplete?: () => void;
+  onTelemetryReady?: (sink: MarketTelemetrySink | null) => void;
   mission?: MarketMission;
   difficulty?: number;
   simulation?: Omit<BehaviorSimulationContext, 'simulationStarted'>;
@@ -135,26 +139,57 @@ export function MarketSimulationScreen({
   onExit,
   onLockChange,
   onMissionComplete,
+  onTelemetryReady,
 }: MarketSimulationScreenProps) {
   const [phase, setPhase] = useState<MarketPhase>('briefing');
   const [briefingIndex, setBriefingIndex] = useState(0);
   const [activeCategory, setActiveCategory] = useState<MarketCategoryId | null>(null);
   const [cart, setCart] = useState<MarketCart>({});
-  const cartRef = useRef<MarketCart>({});
   const [cartOpen, setCartOpen] = useState(false);
   const [evaluation, setEvaluation] = useState<MarketEvaluation | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [nearbyStation, setNearbyStation] = useState<MarketStationId | null>(null);
+  const behaviorTracker = useRef<MarketBehaviorTracker | null>(null);
+  const briefingShownAt = useRef(Date.now());
+  const cartOpenedAt = useRef<number | null>(null);
+  const cartRef = useRef<MarketCart>({});
   const noticeOpacity = useRef(new Animated.Value(0)).current;
   const handledInteractionId = useRef<number | null>(null);
-  const behaviorSession = useRef<MarketBehaviorSession | null>(null);
-  const behaviorInteractions = useRef<MarketQuantityInteraction[]>([]);
-  const behaviorSessionFinalized = useRef(false);
-  if (!behaviorSession.current) {
-    behaviorSession.current = createMarketBehaviorSession(
-      'ASSESSMENT_TASK', new Date(), mission, difficulty, simulation,
-    );
-  }
+  const shelfOpenedAt = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!accessToken) return;
+    const tracker = new MarketBehaviorTracker(accessToken, mission, difficulty, simulation);
+    behaviorTracker.current = tracker;
+    void tracker.flushNow().catch(() => undefined);
+    return () => {
+      void tracker.abort(cartRef.current);
+      behaviorTracker.current = null;
+    };
+  }, [accessToken, difficulty, mission, simulation]);
+
+  useEffect(() => {
+    if (!onTelemetryReady) return;
+    const sink: MarketTelemetrySink = {
+      movementStopped: (controlMode) => behaviorTracker.current?.movementStopped(controlMode),
+      observeMovement: (point, controlMode, blocked) => behaviorTracker.current?.observeMovement({
+        blocked,
+        controlMode,
+        point,
+        targetZoneIds: new Set(),
+      }),
+    };
+    onTelemetryReady(sink);
+    return () => onTelemetryReady(null);
+  }, [onTelemetryReady]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') behaviorTracker.current?.appForegrounded();
+      else behaviorTracker.current?.appBackgrounded();
+    });
+    return () => subscription.remove();
+  }, []);
 
   const total = getMarketCartTotal(cart);
   const cartCount = Object.values(cart).reduce((sum, quantity) => sum + quantity, 0);
@@ -170,10 +205,6 @@ export function MarketSimulationScreen({
     [cart, mission],
   );
 
-  useEffect(() => {
-    if (accessToken) void flushBehaviorLogQueue(accessToken);
-  }, [accessToken]);
-
   const showNotice = (message: string) => {
     setNotice(message);
     noticeOpacity.stopAnimation();
@@ -188,25 +219,28 @@ export function MarketSimulationScreen({
   };
 
   const changeQuantity = (productId: string, change: number) => {
-    const currentCart = cartRef.current;
-    const currentQuantity = getCartQuantity(currentCart, productId);
-    const nextQuantity = Math.max(0, Math.min(5, currentQuantity + change));
-    if (nextQuantity === currentQuantity) return;
-    const next = { ...currentCart };
-    if (nextQuantity === 0) delete next[productId];
-    else next[productId] = nextQuantity;
-    cartRef.current = next;
-    setCart(next);
-    behaviorInteractions.current.push({
-      occurredAt: new Date().toISOString(),
-      productId,
-      selectedQuantity: nextQuantity,
+    setCart((current) => {
+      const currentQuantity = getCartQuantity(current, productId);
+      const nextQuantity = Math.max(0, Math.min(5, currentQuantity + change));
+      if (nextQuantity === currentQuantity) return current;
+      const next = { ...current };
+      if (nextQuantity === 0) delete next[productId];
+      else next[productId] = nextQuantity;
+      cartRef.current = next;
+      behaviorTracker.current?.updateCart(next);
+      behaviorTracker.current?.quantityChanged(productId, currentQuantity, nextQuantity, next);
+      return next;
     });
     const product = getMarketProduct(productId);
     if (change > 0 && product) showNotice(`${product.name}을 담았어요`);
   };
 
   const continueBriefing = () => {
+    behaviorTracker.current?.briefingAdvanced(
+      briefingIndex,
+      Math.max(0, Date.now() - briefingShownAt.current),
+    );
+    briefingShownAt.current = Date.now();
     if (briefingIndex < mission.briefing.length - 1) {
       setBriefingIndex((index) => index + 1);
       return;
@@ -215,10 +249,29 @@ export function MarketSimulationScreen({
   };
 
   const goToCheckout = () => {
+    behaviorTracker.current?.checkoutEntered(cartRef.current);
     setCartOpen(false);
     setActiveCategory(null);
     setEvaluation(null);
     setPhase('checkout');
+  };
+
+  const openShelf = (station: MarketCategoryId) => {
+    shelfOpenedAt.current = Date.now();
+    behaviorTracker.current?.shelfOpened(station);
+    setActiveCategory(station);
+  };
+
+  const closeShelf = () => {
+    if (activeCategory) {
+      behaviorTracker.current?.shelfClosed(
+        activeCategory,
+        cartRef.current,
+        shelfOpenedAt.current ?? Date.now(),
+      );
+    }
+    shelfOpenedAt.current = null;
+    setActiveCategory(null);
   };
 
   const useNearbyStation = () => {
@@ -231,7 +284,7 @@ export function MarketSimulationScreen({
       goToCheckout();
       return;
     }
-    setActiveCategory(nearbyStation);
+    openShelf(nearbyStation);
   };
 
   useEffect(() => {
@@ -246,7 +299,7 @@ export function MarketSimulationScreen({
       goToCheckout();
       return;
     }
-    setActiveCategory(interactionRequest.station);
+    openShelf(interactionRequest.station);
   }, [cartCount, embedded, interactionRequest, phase]);
 
   useEffect(() => {
@@ -256,69 +309,43 @@ export function MarketSimulationScreen({
 
   const checkCart = () => {
     const nextEvaluation = evaluateMarketCart(cart, mission);
+    behaviorTracker.current?.checkoutSubmitted(cart, nextEvaluation);
     setEvaluation(nextEvaluation);
-    if (nextEvaluation.success) onMissionComplete?.();
-    setPhase('result');
-    if (accessToken && behaviorSession.current && !behaviorSessionFinalized.current) {
-      behaviorSessionFinalized.current = true;
-      const events = buildMarketCheckoutEvents(
-        behaviorSession.current,
-        cart,
-        nextEvaluation,
-        new Date(),
-        behaviorInteractions.current,
-      );
-      console.info(
-        `[BehaviorPilot][0/5] GENERATED session=${behaviorSession.current.sessionId} `
-        + `quest=${behaviorSession.current.simulation.questInstanceId} `
-        + `source=${behaviorSession.current.simulation.contentSource} events=${events.length}`,
-      );
-      void enqueueBehaviorLogBatch(accessToken, events)
-        .then(() => flushBehaviorLogQueue(accessToken))
-        .catch((error: unknown) => {
-          console.error('[BehaviorPilot] 행동 로그를 로컬 큐에 저장하지 못했습니다.', error);
-        });
+    if (nextEvaluation.success) {
+      onMissionComplete?.();
+      void behaviorTracker.current?.complete(cart, nextEvaluation);
     }
-  };
-
-  const backToShopping = () => {
-    setEvaluation(null);
-    setPhase('shopping');
+    setPhase('result');
   };
 
   const retryShopping = () => {
+    behaviorTracker.current?.correctionStarted(cartRef.current);
     setEvaluation(null);
-    const currentSimulation = behaviorSession.current?.simulation;
-    behaviorSession.current = createMarketBehaviorSession(
-      'TRAINING_TASK', new Date(), mission, difficulty,
-      currentSimulation ? {
-        contentSource: currentSimulation.contentSource,
-        questInstanceId: currentSimulation.questInstanceId,
-      } : simulation,
-    );
-    behaviorInteractions.current = [];
-    behaviorSessionFinalized.current = false;
     setPhase('shopping');
   };
 
   const exitMarket = () => {
-    if (!accessToken || !behaviorSession.current || behaviorSessionFinalized.current) {
+    const tracker = behaviorTracker.current;
+    if (!tracker) {
       onExit();
       return;
     }
-    behaviorSessionFinalized.current = true;
-    const events = buildMarketAbortEvents(behaviorSession.current);
-    console.info(
-      `[BehaviorPilot][0/5] GENERATED_ABORT session=${behaviorSession.current.sessionId} `
-      + `quest=${behaviorSession.current.simulation.questInstanceId} `
-      + `source=${behaviorSession.current.simulation.contentSource} events=${events.length}`,
+    void tracker.abort(cartRef.current).catch(() => undefined).finally(onExit);
+  };
+
+  const openCart = () => {
+    cartOpenedAt.current = Date.now();
+    behaviorTracker.current?.cartOpened(cartRef.current);
+    setCartOpen(true);
+  };
+
+  const closeCart = () => {
+    behaviorTracker.current?.cartClosed(
+      cartRef.current,
+      Math.max(0, Date.now() - (cartOpenedAt.current ?? Date.now())),
     );
-    void enqueueBehaviorLogBatch(accessToken, events)
-      .then(() => flushBehaviorLogQueue(accessToken))
-      .catch((error: unknown) => {
-        console.error('[BehaviorPilot] 중단 로그를 로컬 큐에 저장하지 못했습니다.', error);
-      })
-      .finally(onExit);
+    cartOpenedAt.current = null;
+    setCartOpen(false);
   };
 
   return (
@@ -337,6 +364,13 @@ export function MarketSimulationScreen({
           interactive={phase === 'shopping' && activeCategory === null && !cartOpen}
           nearbyStation={nearbyStation}
           onNearbyStationChange={setNearbyStation}
+          onMovementSample={(point, controlMode, blocked) => behaviorTracker.current?.observeMovement({
+            blocked,
+            controlMode,
+            point,
+            targetZoneIds: new Set(),
+          })}
+          onMovementStopped={(controlMode) => behaviorTracker.current?.movementStopped(controlMode)}
         />
       ) : !embedded ? (
         <CheckoutScene cart={cart} mission={mission} />
@@ -389,7 +423,7 @@ export function MarketSimulationScreen({
           <PressScale
             accessibilityLabel={`장바구니 ${cartCount}개`}
             accessibilityRole="button"
-            onPress={() => setCartOpen(true)}
+            onPress={openCart}
             style={styles.cartButton}
           >
             <Ionicons color={colors.white} name="basket" size={24} />
@@ -438,10 +472,10 @@ export function MarketSimulationScreen({
         embedded ? (
           <View style={styles.embeddedCheckoutOverlay}>
             <View style={styles.embeddedCheckoutBackdrop} />
-            <CheckoutPanel cart={cart} mission={mission} onBack={backToShopping} onCheck={checkCart} total={total} />
+            <CheckoutPanel cart={cart} mission={mission} onBack={retryShopping} onCheck={checkCart} total={total} />
           </View>
         ) : (
-          <CheckoutPanel cart={cart} mission={mission} onBack={backToShopping} onCheck={checkCart} total={total} />
+          <CheckoutPanel cart={cart} mission={mission} onBack={retryShopping} onCheck={checkCart} total={total} />
         )
       ) : null}
 
@@ -454,7 +488,7 @@ export function MarketSimulationScreen({
           cart={cart}
           category={marketCategories.find((category) => category.id === activeCategory)!}
           onChangeQuantity={changeQuantity}
-          onClose={() => setActiveCategory(null)}
+          onClose={closeShelf}
         />
       ) : null}
 
@@ -463,10 +497,10 @@ export function MarketSimulationScreen({
           cart={cart}
           onChangeQuantity={changeQuantity}
           onCheckout={() => {
-            setCartOpen(false);
+            closeCart();
             showNotice('계산대로 이동해 주세요');
           }}
-          onClose={() => setCartOpen(false)}
+          onClose={closeCart}
           total={total}
         />
       ) : null}
@@ -521,10 +555,14 @@ function MarketMap({
   interactive,
   nearbyStation,
   onNearbyStationChange,
+  onMovementSample,
+  onMovementStopped,
 }: {
   interactive: boolean;
   nearbyStation: MarketStationId | null;
   onNearbyStationChange: (station: MarketStationId | null) => void;
+  onMovementSample: (point: MarketPoint, controlMode: MarketTelemetryControlMode, blocked?: boolean) => void;
+  onMovementStopped: (controlMode: MarketTelemetryControlMode) => void;
 }) {
   const viewportNode = useRef<View | null>(null);
   const camera = useRef(new Animated.ValueXY()).current;
@@ -583,8 +621,9 @@ function MarketMap({
     playerPoint.current = next;
     updateCamera(next);
     updateStationProximity(next);
+    onMovementSample(next, controlMode, Math.hypot(next.x - current.x, next.y - current.y) < 0.05);
     return next;
-  }, [updateCamera, updateStationProximity]);
+  }, [controlMode, onMovementSample, updateCamera, updateStationProximity]);
 
   const stopMovement = useCallback(() => {
     direction.current = { x: 0, y: 0 };
@@ -604,7 +643,8 @@ function MarketMap({
       toValue: { x: 0, y: 0 },
       useNativeDriver: true,
     }).start();
-  }, [joystickKnob]);
+    onMovementStopped(controlMode);
+  }, [controlMode, joystickKnob, onMovementStopped]);
 
   const runMovement = useCallback((timestamp: number) => {
     const last = previousFrame.current ?? timestamp;
@@ -1009,7 +1049,7 @@ function NpcDialogueCard({
           </View>
           {aiGenerated ? (
             <View style={styles.dialogueAiBadge}>
-              <Ionicons color="#325F51" name="sparkles" size={11} />
+              <Ionicons color="#325F51" name="sparkles" size={10} />
               <Text style={styles.dialogueAiBadgeText}>AI 생성 퀘스트</Text>
             </View>
           ) : null}
@@ -1410,9 +1450,6 @@ function ResultPanel({ evaluation, mission, onExit, onRetry }: { evaluation: Mar
           ) : null}
           {evaluation.extra.length > 0 ? (
             <FeedbackRow icon="remove-circle-outline" text={`목록에 없는 물건 ${evaluation.extra.reduce((sum, item) => sum + item.quantity, 0)}개가 들어 있어요.`} />
-          ) : null}
-          {evaluation.quantityMismatches.some(({ selectedQuantity }) => selectedQuantity > 0) ? (
-            <FeedbackRow icon="calculator-outline" text="목록에 적힌 수량과 다르게 담은 물건이 있어요." />
           ) : null}
           {evaluation.overBudget > 0 ? (
             <FeedbackRow icon="wallet-outline" text={`예산보다 ${formatPrice(evaluation.overBudget)} 많아요.`} />

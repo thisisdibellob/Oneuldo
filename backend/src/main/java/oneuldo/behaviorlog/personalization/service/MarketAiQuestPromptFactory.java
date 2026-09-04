@@ -2,8 +2,8 @@ package oneuldo.behaviorlog.personalization.service;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import oneuldo.behaviorlog.analysis.domain.BehaviorAnalysisInputResponse;
 import oneuldo.behaviorlog.personalization.domain.MarketDifficultyRecommendationResponse;
-import oneuldo.simulationquest.llm.input.LlmSimulationGenerationInput;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
 
@@ -23,13 +23,12 @@ public class MarketAiQuestPromptFactory {
                 + "허용된 상품과 가격만 사용하고 반드시 JSON 하나만 출력하세요.";
     }
 
-    public String userPrompt(LlmSimulationGenerationInput input,
+    public String userPrompt(BehaviorAnalysisInputResponse input,
             MarketDifficultyRecommendationResponse recommendation) {
         Map<String, Object> context = new LinkedHashMap<>();
         context.put("promptVersion", PROMPT_VERSION);
-        context.put("goal", input.quest().goal());
-        context.put("preferences", input.preferences());
-        context.put("behaviorProfile", input.profile());
+        context.put("goal", "장보기 목록의 상품을 수량과 예산에 맞게 고른다");
+        context.put("behaviorTimeline", input.input());
         context.put("aiDifficultyRecommendation", recommendation);
         context.put("availableProducts", MarketQuestCatalog.PRODUCTS);
         context.put("constraints", Map.of(

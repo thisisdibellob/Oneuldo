@@ -2,7 +2,7 @@ const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL;
 
 export type MarketDifficultyRecommendation = {
   recommendationId: string;
-  profileSnapshotId: string | null;
+  analysisInputSnapshotId: string | null;
   gameId: 'MARKET_SIMULATION';
   recommendedDifficulty: 1 | 2 | 3;
   personalizationMode: 'NO_PROFILE' | 'INSUFFICIENT_EVIDENCE' | 'BEHAVIOR_INFORMED';

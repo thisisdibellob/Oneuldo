@@ -3,18 +3,24 @@ import { CryptoDigestAlgorithm, digestStringAsync, randomUUID } from 'expo-crypt
 
 import {
   BehaviorLogApiError,
-  BehaviorLogRequest,
+  type BehaviorLogRequest,
+  type BehaviorPriority,
   recordBehaviorLogBatch,
 } from '../api/behaviorLog';
 
-type QueuedBehaviorBatch = {
-  batchId: string;
-  events: BehaviorLogRequest[];
+type QueuedBehaviorEvent = {
+  event: BehaviorLogRequest;
+  priority: BehaviorPriority;
   queuedAt: string;
 };
 
-const STORAGE_PREFIX = 'oneuldo.behavior-log-queue.v1';
-const DEAD_LETTER_PREFIX = 'oneuldo.behavior-log-dead-letter.v1';
+const QUEUE_PREFIX = 'oneuldo.behavior-event-outbox.v2';
+const DEAD_LETTER_PREFIX = 'oneuldo.behavior-event-dead-letter.v2';
+const UPLOAD_BATCH_SIZE = 50;
+const AUTO_UPLOAD_EVENT_COUNT = 20;
+
+const operations = new Map<string, Promise<unknown>>();
+const flushing = new Set<string>();
 
 async function ownerKey(accessToken: string) {
   const digest = await digestStringAsync(CryptoDigestAlgorithm.SHA256, accessToken);
@@ -25,78 +31,108 @@ async function storageKey(prefix: string, accessToken: string) {
   return `${prefix}.${await ownerKey(accessToken)}`;
 }
 
-async function readBatches(key: string): Promise<QueuedBehaviorBatch[]> {
-  const stored = await AsyncStorage.getItem(key);
-  if (!stored) return [];
+async function readQueue(key: string): Promise<QueuedBehaviorEvent[]> {
+  const value = await AsyncStorage.getItem(key);
+  if (!value) return [];
   try {
-    const parsed: unknown = JSON.parse(stored);
-    return Array.isArray(parsed) ? parsed as QueuedBehaviorBatch[] : [];
+    const parsed: unknown = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed as QueuedBehaviorEvent[] : [];
   } catch {
     return [];
   }
 }
 
-async function writeBatches(key: string, batches: QueuedBehaviorBatch[]) {
-  if (batches.length === 0) {
+async function writeQueue(key: string, queue: QueuedBehaviorEvent[]) {
+  if (queue.length === 0) {
     await AsyncStorage.removeItem(key);
     return;
   }
-  await AsyncStorage.setItem(key, JSON.stringify(batches));
+  await AsyncStorage.setItem(key, JSON.stringify(queue));
 }
 
-export async function enqueueBehaviorLogBatch(
-  accessToken: string,
-  events: BehaviorLogRequest[],
-) {
-  const key = await storageKey(STORAGE_PREFIX, accessToken);
-  const batches = await readBatches(key);
-  const batch: QueuedBehaviorBatch = {
-    batchId: randomUUID(),
-    events,
-    queuedAt: new Date().toISOString(),
+function serialized<T>(key: string, operation: () => Promise<T>): Promise<T> {
+  const previous = operations.get(key) ?? Promise.resolve();
+  const current = previous.catch(() => undefined).then(operation);
+  operations.set(key, current);
+  const cleanup = () => {
+    if (operations.get(key) === current) operations.delete(key);
   };
-  await writeBatches(key, [...batches, batch]);
-  console.info(`[BehaviorPilot][1/5] QUEUED batch=${batch.batchId} events=${events.length}`);
-  return batch.batchId;
+  void current.then(cleanup, cleanup);
+  return current;
 }
 
-export async function flushBehaviorLogQueue(accessToken: string) {
-  const key = await storageKey(STORAGE_PREFIX, accessToken);
-  const deadLetterKey = await storageKey(DEAD_LETTER_PREFIX, accessToken);
-  const batches = await readBatches(key);
-  const remaining = [...batches];
-
-  while (remaining.length > 0) {
-    const batch = remaining[0];
-    console.info(`[BehaviorPilot][2/5] SENDING batch=${batch.batchId}`);
-    try {
-      const response = await recordBehaviorLogBatch(batch.batchId, batch.events, accessToken);
-      const accepted = response.events.filter((event) => event.status === 'ACCEPTED').length;
-      const duplicated = response.events.filter((event) => event.status === 'DUPLICATE').length;
-      console.info(
-        `[BehaviorPilot][3/5] STORED batch=${batch.batchId} accepted=${accepted} duplicate=${duplicated}`,
-      );
-      remaining.shift();
-      await writeBatches(key, remaining);
-    } catch (error) {
-      if (error instanceof BehaviorLogApiError && error.status >= 400 && error.status < 500) {
-        const deadLetters = await readBatches(deadLetterKey);
-        await writeBatches(deadLetterKey, [...deadLetters, batch]);
-        remaining.shift();
-        await writeBatches(key, remaining);
-        console.error(`[BehaviorPilot] REJECTED batch=${batch.batchId} status=${error.status}`);
-        continue;
-      }
-      remaining[0] = {
-        ...batch,
-        events: batch.events.map((event) => ({
-          ...event,
-          metadata: { ...event.metadata, offlineQueued: true },
-        })),
-      };
-      await writeBatches(key, remaining);
-      console.warn(`[BehaviorPilot] RETRY_LATER batch=${batch.batchId}`, error);
-      break;
-    }
+export async function enqueueBehaviorEvents(
+  accessToken: string,
+  events: Array<{ event: BehaviorLogRequest; priority: BehaviorPriority }>,
+) {
+  if (events.length === 0) return 0;
+  const key = await storageKey(QUEUE_PREFIX, accessToken);
+  const count = await serialized(key, async () => {
+    const queue = await readQueue(key);
+    const queuedAt = new Date().toISOString();
+    const next = [
+      ...queue,
+      ...events.map((item) => ({ ...item, queuedAt })),
+    ];
+    await writeQueue(key, next);
+    return next.length;
+  });
+  if (count >= AUTO_UPLOAD_EVENT_COUNT) {
+    void flushBehaviorEventQueue(accessToken).catch(() => undefined);
   }
+  return count;
+}
+
+export async function flushBehaviorEventQueue(accessToken: string) {
+  const key = await storageKey(QUEUE_PREFIX, accessToken);
+  if (flushing.has(key)) return;
+  flushing.add(key);
+  try {
+    await serialized(key, async () => {
+      const deadLetterKey = await storageKey(DEAD_LETTER_PREFIX, accessToken);
+      let queue = await readQueue(key);
+      while (queue.length > 0) {
+        const batch = queue.slice(0, UPLOAD_BATCH_SIZE);
+        const batchId = randomUUID();
+        try {
+          const response = await recordBehaviorLogBatch(
+            batchId,
+            batch.map(({ event }) => event),
+            accessToken,
+          );
+          const acknowledged = new Set(response.events
+            .filter(({ status }) => status === 'ACCEPTED' || status === 'DUPLICATE')
+            .map(({ clientEventId }) => clientEventId));
+          if (acknowledged.size !== batch.length) break;
+          queue = queue.slice(batch.length);
+          await writeQueue(key, queue);
+        } catch (error) {
+          if (error instanceof BehaviorLogApiError && error.status >= 400 && error.status < 500
+            && error.status !== 401 && error.status !== 408 && error.status !== 429) {
+            const deadLetters = await readQueue(deadLetterKey);
+            await writeQueue(deadLetterKey, [...deadLetters, ...batch]);
+            queue = queue.slice(batch.length);
+            await writeQueue(key, queue);
+            continue;
+          }
+          const offlineQueue = queue.map((item, index) => index < batch.length ? {
+            ...item,
+            event: {
+              ...item.event,
+              metadata: { ...item.event.metadata, offlineQueued: true },
+            },
+          } : item);
+          await writeQueue(key, offlineQueue);
+          break;
+        }
+      }
+    });
+  } finally {
+    flushing.delete(key);
+  }
+}
+
+export async function getQueuedBehaviorEventCount(accessToken: string) {
+  const key = await storageKey(QUEUE_PREFIX, accessToken);
+  return (await readQueue(key)).length;
 }

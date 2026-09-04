@@ -2,7 +2,7 @@ package oneuldo.behaviorlog.personalization.service;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
-import oneuldo.simulationquest.llm.input.LlmSimulationGenerationInput;
+import oneuldo.behaviorlog.analysis.domain.BehaviorAnalysisInputResponse;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
 
@@ -17,17 +17,16 @@ public class MarketAiDifficultyPromptFactory {
     }
 
     public String systemPrompt() {
-        return "아동용 장보기 퀘스트의 맞춤 난이도를 판단합니다. 제공된 게임 행동 프로파일만 사용하세요. "
+        return "아동용 장보기 퀘스트의 맞춤 난이도를 판단합니다. 제공된 원본 행동 타임라인과 정규화 주석만 사용하세요. "
                 + "의학적 진단, IQ, 장애 정도나 실제 생활 전체의 능력을 추정하지 마세요. "
                 + "근거가 부족하다는 사실도 판단에 반영하고 JSON 객체 하나만 출력하세요.";
     }
 
-    public String userPrompt(LlmSimulationGenerationInput input) {
+    public String userPrompt(BehaviorAnalysisInputResponse input) {
         Map<String, Object> context = new LinkedHashMap<>();
         context.put("promptVersion", PROMPT_VERSION);
-        context.put("personalizationMode", input.generationPlan().personalizationMode());
-        context.put("preferences", input.preferences());
-        context.put("behaviorProfile", input.profile());
+        context.put("personalizationMode", input.eventCount() == 0 ? "NO_HISTORY" : "FULL_TIMELINE");
+        context.put("behaviorTimeline", input.input());
         context.put("difficultyMeaning", Map.of(
                 "1", "품목과 수량을 단순화하고 안내를 충분히 제공",
                 "2", "현재 수행을 안정적으로 관찰하고 연습",
@@ -48,7 +47,7 @@ public class MarketAiDifficultyPromptFactory {
                 "quantityComplexity", "MEDIUM",
                 "budgetPressure", "MEDIUM",
                 "textSupport", "STANDARD",
-                "reasonCodes", new String[]{"PROFILE_EVIDENCE_REVIEWED"}
+                "reasonCodes", new String[]{"BEHAVIOR_TIMELINE_REVIEWED"}
         ));
         try {
             return objectMapper.writeValueAsString(context);

@@ -5,7 +5,7 @@ import lombok.RequiredArgsConstructor;
 import oneuldo.behaviorlog.personalization.domain.MarketDifficultyRecommendation;
 import oneuldo.behaviorlog.personalization.domain.MarketPersonalizationDecision;
 import oneuldo.behaviorlog.personalization.repository.MarketDifficultyRecommendationRepository;
-import oneuldo.behaviorlog.profile.domain.BehaviorProfileSnapshot;
+import oneuldo.behaviorlog.analysis.domain.BehaviorAnalysisInputSnapshot;
 import oneuldo.member.domain.Member;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -18,9 +18,9 @@ public class MarketDifficultyRecommendationPersistenceService {
     private final MarketDifficultyRecommendationRepository repository;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public MarketDifficultyRecommendation save(Member member, BehaviorProfileSnapshot profile,
+    public MarketDifficultyRecommendation save(Member member, BehaviorAnalysisInputSnapshot analysisInput,
             String version, MarketPersonalizationDecision decision) {
         return repository.save(new MarketDifficultyRecommendation(
-                member, profile, version, decision, Instant.now()));
+                member, analysisInput, version, decision, Instant.now()));
     }
 }
