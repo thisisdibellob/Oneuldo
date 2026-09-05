@@ -17,6 +17,15 @@ public class AiBehaviorAnalysisController {
     private final AiBehaviorAnalysisService service;
     private final oneuldo.behaviorlog.repository.BehaviorLogRepository logs;
 
+    @PostMapping("/datasets/{datasetId}")
+    public AiBehaviorAnalysisResponse analyzeSnapshot(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID datasetId) {
+        return service.analyzeSnapshot(UUID.fromString(jwt.getSubject()), datasetId);
+    }
+    @PostMapping("/{id}/resume")
+    public AiBehaviorAnalysisResponse resume(@AuthenticationPrincipal Jwt jwt,@PathVariable UUID id) {
+        return service.resume(UUID.fromString(jwt.getSubject()),id);
+    }
+
     @PostMapping("/sessions/{sessionId}")
     public AiBehaviorAnalysisResponse analyzeSession(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID sessionId) {
         return service.analyzeSession(UUID.fromString(jwt.getSubject()), sessionId);

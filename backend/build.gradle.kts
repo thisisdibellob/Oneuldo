@@ -18,6 +18,7 @@ repositories {
 }
 
 dependencies {
+	implementation("ai.djl.huggingface:tokenizers:0.36.0")
 	implementation("org.springframework.boot:spring-boot-starter-webmvc")
 	compileOnly("org.projectlombok:lombok")
 	runtimeOnly("org.postgresql:postgresql")

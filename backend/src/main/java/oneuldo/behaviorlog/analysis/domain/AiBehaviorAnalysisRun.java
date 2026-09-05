@@ -17,8 +17,12 @@ import org.hibernate.type.SqlTypes;
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class AiBehaviorAnalysisRun {
-    public record Attempt(int number, String inputPrompt, String rawOutput, String errorCode) {}
+    public record Attempt(int number, String inputPrompt, String rawOutput, String errorCode, String source,
+            String systemPrompt,Integer outputMax,String finishReason,Integer inputTokens,Integer outputTokens,Long latencyMs) {
+        public Attempt(int number,String prompt,String raw,String error) {this(number,prompt,raw,error,null,null,null,null,null,null,null);}
+    }
     @Id private UUID id;
+    @Column(length = 64, updatable = false) private String requestKey;
     @Column(nullable = false, updatable = false) private UUID memberId;
     @Column(nullable = false, updatable = false) private UUID datasetId;
     @Column(nullable = false, length = 30, updatable = false) private String status;
@@ -55,5 +59,13 @@ public class AiBehaviorAnalysisRun {
         this.latencyMs = latencyMs;
         this.eventCount = eventCount;
         this.createdAt = Instant.now();
+    }
+
+    public AiBehaviorAnalysisRun(UUID memberId, UUID datasetId, String status,
+            String promptVersion, String evidenceVersion, String model,
+            String systemPrompt, String inputPrompt, List<Attempt> attempts,
+            AiBehaviorAnalysis result, String errorCode, long latencyMs, int eventCount, String requestKey) {
+        this(memberId,datasetId,status,promptVersion,evidenceVersion,model,systemPrompt,inputPrompt,attempts,result,errorCode,latencyMs,eventCount);
+        this.requestKey=requestKey;
     }
 }

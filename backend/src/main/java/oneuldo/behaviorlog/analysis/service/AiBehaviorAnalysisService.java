@@ -11,7 +11,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
-import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.ObjectMapper;
 
 @Service
@@ -23,67 +22,75 @@ public class AiBehaviorAnalysisService {
     private final AiBehaviorAnalysisValidator validator;
     private final GroqChatClient client;
     private final ObjectMapper mapper;
-    @Value("${ai.behavior-analysis.max-input-chars:60000}")
-    private int maxInputChars = 60000;
+    private final AnalysisTokenBudget budget;
+    private final AnalysisCallPacer pacer;
+    @Value("${ai.behavior-analysis.max-chunks:64}")
+    private int maxChunks = 64;
+    @Value("${ai.groq.model:qwen/qwen3.6-27b}") private String configuredModel="qwen/qwen3.6-27b";
+    private final oneuldo.ai.service.SingleFlight<String,AiBehaviorAnalysisResponse> requests=new oneuldo.ai.service.SingleFlight<>();
+    private final oneuldo.ai.service.SingleFlight<String,AiBehaviorAnalysisResponse> datasets=new oneuldo.ai.service.SingleFlight<>();
+    private AnalysisCheckpointStore checkpointStore;
+    @org.springframework.beans.factory.annotation.Autowired
+    public void setCheckpointStore(AnalysisCheckpointStore store) {checkpointStore=store;}
 
     public AiBehaviorAnalysisResponse analyze(UUID memberId, BehaviorAnalysisInputRequest request) {
-        return analyzeInput(memberId, inputs.create(memberId, request));
+        String scope=memberId+":window:"+(request==null?"null:null":request.analysisFrom()+":"+request.analysisTo());
+        return requests.run(scope,()->analyzeShared(memberId, inputs.create(memberId, request)));
     }
 
     public AiBehaviorAnalysisResponse analyzeSession(UUID memberId, UUID sessionId) {
-        return analyzeInput(memberId, inputs.createForSession(memberId, null, sessionId));
+        return requests.run(memberId+":session:"+sessionId,()->analyzeShared(memberId, inputs.createForSession(memberId, null, sessionId)));
     }
 
+    public AiBehaviorAnalysisResponse analyzeSnapshot(UUID memberId, UUID datasetId) {
+        return analyzeShared(memberId, inputs.find(memberId, datasetId));
+    }
+    public AiBehaviorAnalysisResponse resume(UUID memberId, UUID analysisId) {
+        return analyzeSnapshot(memberId,find(memberId,analysisId).datasetId());
+    }
+
+    private AiBehaviorAnalysisResponse analyzeShared(UUID memberId, BehaviorAnalysisInputResponse input) {
+        return datasets.run(memberId+":"+input.id(),()->analyzeInput(memberId,input));
+    }
     private AiBehaviorAnalysisResponse analyzeInput(UUID memberId, BehaviorAnalysisInputResponse input) {
         long start = System.nanoTime();
         String system = prompts.systemPrompt();
-        String prompt = prompts.userPrompt(input);
+        String prompt = new AnalysisReferences(mapper, input).encode(prompts.userPrompt(input));
+        String requestKey=oneuldo.ai.service.AiRequestFingerprint.of(mapper,memberId,input.id(),configuredModel,
+                system,mapper.readTree(prompt),prompts.observationSystem(),prompts.digestContract(),prompts.reductionContract(),
+                FinalAnalysisPromptCompactor.systemPrompt(),FinalAnalysisPromptCompactor.VERSION,
+                budget.requestTokens(),budget.chunkOutputTokens(),budget.finalOutputTokens(),maxChunks,0.2,"analysis-reuse-v1");
+        var reusable=repository.findFirstByMemberIdAndDatasetIdAndRequestKeyAndStatusOrderByCreatedAtDesc(memberId,input.id(),requestKey,"READY");
+        if(reusable.isPresent()) {
+            try {
+                validator.validate(reusable.get().getResult(),input);
+                return AiBehaviorAnalysisResponse.from(reusable.get());
+            } catch(IllegalArgumentException invalid) { /* Current validation wins; recompute rather than serve stale data. */ }
+        }
         String status = "FAILED", error = null, model = null;
         AiBehaviorAnalysis analysis = null;
         List<AiBehaviorAnalysisRun.Attempt> attempts = new ArrayList<>();
         if (input.eventCount() == 0) {
             status = "NO_HISTORY";
-        } else if (system.length() + prompt.length() > maxInputChars) {
-            var pipeline = new TimelineAnalysisPipeline(prompts, validator, client, mapper);
+        } else {
+            var pipeline = new TimelineAnalysisPipeline(prompts, validator, client, mapper, maxChunks, budget, pacer);
+            if(checkpointStore!=null) pipeline.withCheckpoints(checkpointStore.scope(memberId,input.id()));
             try {
-                analysis = pipeline.analyze(input, maxInputChars, attempts);
+                analysis = pipeline.analyze(input, budget.requestTokens(), attempts);
                 model = pipeline.model(); status = "READY";
             } catch (IllegalArgumentException tooLarge) {
                 status = "INPUT_TOO_LARGE"; error = tooLarge.getMessage();
             } catch (RuntimeException failure) {
-                status = "FAILED"; error = "CHUNK_ANALYSIS_FAILED";
+                status = "FAILED";
+                error = List.of("AI_RATE_LIMITED", "AI_UNAVAILABLE", "INVALID_AI_ANALYSIS").contains(failure.getMessage())
+                        ? failure.getMessage() : "CHUNK_ANALYSIS_FAILED";
             }
-        } else {
-            for (int number = 1; number <= 2; number++) {
-                GroqChatClient.GroqChatResult output;
-                String submittedPrompt = prompt + (number == 2
-                        ? "\n이전 응답은 구조 또는 근거 참조 검사를 통과하지 못했습니다. 실제 ID와 출력 계약을 다시 확인하세요." : "");
-                try {
-                    output = client.complete(system, submittedPrompt, 4500, 0.2);
-                    model = output.model();
-                } catch (RuntimeException failure) {
-                    error = "AI_UNAVAILABLE";
-                    attempts.add(new AiBehaviorAnalysisRun.Attempt(number, submittedPrompt, null, error));
-                    break;
-                }
-                try {
-                    analysis = validator.validate(mapper.readerFor(AiBehaviorAnalysis.class)
-                            .with(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
-                            .with(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
-                            .readValue(output.text()), input);
-                    attempts.add(new AiBehaviorAnalysisRun.Attempt(number, submittedPrompt, output.text(), null));
-                    status = "READY"; error = null; break;
-                } catch (RuntimeException invalid) {
-                    error = "INVALID_AI_ANALYSIS";
-                    analysis = null;
-                    attempts.add(new AiBehaviorAnalysisRun.Attempt(number, submittedPrompt, output.text(), error));
-                }
-            }
+            model = pipeline.model();
         }
         var saved = repository.save(new AiBehaviorAnalysisRun(memberId, input.id(), status,
                 AiBehaviorAnalysisPromptFactory.VERSION, AiBehaviorAnalysisPromptFactory.EVIDENCE_VERSION,
                 model, system, prompt, attempts, analysis, error,
-                (System.nanoTime() - start) / 1_000_000L, input.eventCount()));
+                (System.nanoTime() - start) / 1_000_000L, input.eventCount(),requestKey));
         return AiBehaviorAnalysisResponse.from(saved);
     }
 

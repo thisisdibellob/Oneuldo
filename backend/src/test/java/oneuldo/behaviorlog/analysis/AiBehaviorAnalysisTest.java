@@ -25,7 +25,8 @@ class AiBehaviorAnalysisTest {
     private final GroqChatClient client = mock(GroqChatClient.class);
     private final AiBehaviorAnalysisPromptFactory prompts = new AiBehaviorAnalysisPromptFactory(mapper);
     private final AiBehaviorAnalysisValidator validator = new AiBehaviorAnalysisValidator(new MarketAiDifficultyValidator());
-    private final AiBehaviorAnalysisService service = new AiBehaviorAnalysisService(inputs, repository, prompts, validator, client, mapper);
+    private final AnalysisTokenBudget budget = new AnalysisTokenBudget();
+    private final AiBehaviorAnalysisService service = new AiBehaviorAnalysisService(inputs, repository, prompts, validator, client, mapper, budget, mock(AnalysisCallPacer.class));
     private final UUID memberId = UUID.randomUUID();
     private final UUID datasetId = UUID.randomUUID();
     private final UUID sessionId = UUID.randomUUID();
@@ -33,6 +34,8 @@ class AiBehaviorAnalysisTest {
 
     @BeforeEach
     void setup() {
+        // These mock-provider tests exercise response contracts, not the real free-account quota.
+        ReflectionTestUtils.setField(budget, "requestTokens", 12000);
         var fixture = input(true);
         when(inputs.create(eq(memberId), any())).thenReturn(fixture);
         when(repository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
@@ -42,7 +45,7 @@ class AiBehaviorAnalysisTest {
     void 모든_사건을_보존하고_판정필드만_입력에서_분리한다() {
         var input = input(true);
         var tree = mapper.readTree(prompts.userPrompt(input));
-        var events = tree.path("behaviorTimeline").path("sessions").get(0).path("events");
+        var events = new CompactBehaviorTimeline(mapper).decodeWithTables(tree.path("behaviorTimeline")).path("sessions").get(0).path("events");
         assertThat(events.size()).isEqualTo(1);
         var event = events.get(0);
         assertThat(event.path("behaviorLogId").asString()).isEqualTo(eventId.toString());
@@ -67,7 +70,8 @@ class AiBehaviorAnalysisTest {
         assertThat(response.analysis().sessionAssessments().getFirst().judgment()).isEqualTo("FAILURE");
         assertThat(response.evidenceVersion()).isEqualTo(EvidenceIndex.VERSION);
         verify(repository).save(argThat(run -> run.getSystemPrompt().contains("지적장애")
-                && run.getAttempts().size() == 1 && run.getInputPrompt().contains(eventId.toString())));
+                && run.getAttempts().size() == 1 && run.getInputPrompt().contains("E1")
+                && !run.getInputPrompt().contains(eventId.toString())));
     }
 
     @Test
@@ -79,10 +83,10 @@ class AiBehaviorAnalysisTest {
         var historical = mapper.convertValue(inputTree, BehaviorAnalysisInputResponse.class);
         var oldPrompt = mapper.readTree(prompts.userPrompt(historical));
         assertThat(oldPrompt.path("matchingContentCatalog").isEmpty()).isTrue();
-        assertThat(oldPrompt.path("behaviorTimeline").path("sessions").get(0).path("events").get(0).path("payload").path("priceAmount").asInt()).isEqualTo(999);
+        assertThat(new CompactBehaviorTimeline(mapper).decodeWithTables(oldPrompt.path("behaviorTimeline")).path("sessions").get(0).path("events").get(0).path("payload").path("priceAmount").asInt()).isEqualTo(999);
         payload.put("catalogVersion", oneuldo.behaviorlog.personalization.service.MarketQuestCatalog.VERSION);
         var currentPrompt = mapper.readTree(prompts.userPrompt(mapper.convertValue(inputTree, BehaviorAnalysisInputResponse.class)));
-        assertThat(currentPrompt.path("matchingContentCatalog").path("products").size()).isEqualTo(60);
+        assertThat(new LosslessTables(mapper).decode(currentPrompt).path("matchingContentCatalog").path("products").size()).isEqualTo(60);
     }
 
     @Test
@@ -97,6 +101,27 @@ class AiBehaviorAnalysisTest {
                 List.of(new AiBehaviorAnalysis.SessionAssessment(UUID.randomUUID(), "SUCCESS", "설명", List.of(eventId))),
                 valid.uncertainties(), valid.practicePlan());
         assertThatThrownBy(() -> validator.validate(wrongSession, input(true))).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test void 짧은_ID를_복원하고_만들어낸_ID와_타입혼동은_거부한다() {
+        var refs = new AnalysisReferences(mapper, input(true));
+        String raw = mapper.writeValueAsString(valid("UNDETERMINED"))
+                .replace(eventId.toString(), "E1").replace(sessionId.toString(), "S1");
+        var restored = validator.validate(refs.read(raw), input(true));
+        assertThat(restored.findings().getFirst().evidenceEventIds()).containsExactly(eventId);
+        assertThat(restored.sessionAssessments().getFirst().sessionId()).isEqualTo(sessionId);
+        assertThatThrownBy(() -> refs.read(raw.replace("E1", "E999"))).hasMessage("UNKNOWN_ANALYSIS_REFERENCE");
+        assertThatThrownBy(() -> refs.read(raw.replace("E1", "S1"))).hasMessage("UNKNOWN_ANALYSIS_REFERENCE");
+        assertThatThrownBy(() -> refs.read(raw + " {}" )).isInstanceOf(RuntimeException.class);
+    }
+
+    @Test void 단계별_출력예산으로_작은_관측은_무료계정_예산에_들어간다() {
+        ReflectionTestUtils.setField(budget, "requestTokens", 7000);
+        when(client.complete(anyString(), anyString(), anyInt(), anyDouble()))
+                .thenReturn(new GroqChatClient.GroqChatResult(mapper.writeValueAsString(valid("UNDETERMINED")), "mock-qwen"));
+        var response = service.analyze(memberId, new BehaviorAnalysisInputRequest(null, null));
+        assertThat(response.status()).isEqualTo("READY");
+        verify(client).complete(anyString(), anyString(), eq(900), anyDouble());
     }
 
     @Test
@@ -135,7 +160,7 @@ class AiBehaviorAnalysisTest {
         when(inputs.create(eq(memberId), any())).thenReturn(input(false));
         assertThat(service.analyze(memberId, new BehaviorAnalysisInputRequest(null, null)).status()).isEqualTo("NO_HISTORY");
         when(inputs.create(eq(memberId), any())).thenReturn(input(true));
-        ReflectionTestUtils.setField(service, "maxInputChars", 100);
+        ReflectionTestUtils.setField(budget, "requestTokens", 901);
         var response = service.analyze(memberId, new BehaviorAnalysisInputRequest(null, null));
         assertThat(response.status()).isEqualTo("INPUT_TOO_LARGE");
         assertThat(response.eventCount()).isEqualTo(1);
@@ -158,6 +183,25 @@ class AiBehaviorAnalysisTest {
         when(client.complete(anyString(), anyString(), anyInt(), anyDouble()))
                 .thenReturn(new GroqChatClient.GroqChatResult(json.toString(), "test-model"));
         assertThat(service.analyze(memberId, new BehaviorAnalysisInputRequest(null, null)).status()).isEqualTo("FAILED");
+    }
+
+    @Test
+    void 재분석은_소유한_기존스냅샷만_사용한다() {
+        when(inputs.find(memberId, datasetId)).thenReturn(input(true));
+        when(client.complete(anyString(), anyString(), anyInt(), anyDouble()))
+                .thenReturn(new GroqChatClient.GroqChatResult(mapper.writeValueAsString(valid("UNDETERMINED")), "test-model"));
+        var response = service.analyzeSnapshot(memberId, datasetId);
+        assertThat(response.status()).isEqualTo("READY");
+        assertThat(response.datasetId()).isEqualTo(datasetId);
+        verify(inputs).find(memberId, datasetId);
+        verify(inputs, never()).create(any(), any());
+    }
+
+    @Test
+    void 소유하지_않은_스냅샷은_AI호출전에_거부한다() {
+        when(inputs.find(memberId, datasetId)).thenThrow(new ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND));
+        assertThatThrownBy(() -> service.analyzeSnapshot(memberId, datasetId)).isInstanceOf(ResponseStatusException.class);
+        verifyNoInteractions(client, repository);
     }
 
     private AiBehaviorAnalysis valid(String judgment) {

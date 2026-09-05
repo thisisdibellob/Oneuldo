@@ -58,7 +58,7 @@ export type MarketAiQuestResponse = {
   reasonCodes: string[];
 };
 
-export async function getMarketAiQuest(accessToken: string) {
+async function requestMarketAiQuest(accessToken: string) {
   if (!API_BASE_URL) throw new Error('EXPO_PUBLIC_API_URL이 설정되지 않았습니다.');
   const response = await fetch(`${API_BASE_URL}/api/market-personalization/quest`, {
     method: 'POST',
@@ -67,4 +67,16 @@ export async function getMarketAiQuest(accessToken: string) {
   if (!response.ok) throw new Error(`AI 맞춤 장보기 퀘스트 생성 실패: ${response.status}`);
   const result = await response.json() as MarketAiQuestResponse;
   return { ...result, quest: { ...result.quest, ...resolveMarketAiMission(result.quest) } };
+}
+
+// Survives screen unmount/re-entry. No fulfilled result or token is retained after completion.
+const pendingMarketQuests = new Map<string, ReturnType<typeof requestMarketAiQuest>>();
+export function getMarketAiQuest(accessToken: string) {
+  const pending = pendingMarketQuests.get(accessToken);
+  if (pending) return pending;
+  const request = requestMarketAiQuest(accessToken).finally(() => {
+    if (pendingMarketQuests.get(accessToken) === request) pendingMarketQuests.delete(accessToken);
+  });
+  pendingMarketQuests.set(accessToken, request);
+  return request;
 }

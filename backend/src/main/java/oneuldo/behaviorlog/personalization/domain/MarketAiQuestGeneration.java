@@ -28,6 +28,8 @@ public class MarketAiQuestGeneration {
 
     @Id
     private UUID id;
+    @Column(length = 64, updatable = false)
+    private String requestKey;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "member_id", nullable = false, updatable = false)
@@ -87,5 +89,13 @@ public class MarketAiQuestGeneration {
         this.validatedQuest = validatedQuest;
         this.failureReason = failureReason;
         this.createdAt = createdAt;
+    }
+
+    public MarketAiQuestGeneration(UUID id, Member member,
+            BehaviorAnalysisInputSnapshot input, UUID analysisId, String source, String model,
+            long latencyMs, String mode, String promptVersion,List<Attempt> attempts,
+            MarketAiQuestDraft quest,String failure,Instant createdAt,String requestKey) {
+        this(id,member,input,analysisId,source,model,latencyMs,mode,promptVersion,attempts,quest,failure,createdAt);
+        this.requestKey=requestKey;
     }
 }

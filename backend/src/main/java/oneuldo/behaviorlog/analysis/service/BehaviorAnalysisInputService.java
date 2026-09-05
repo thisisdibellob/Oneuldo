@@ -91,7 +91,8 @@ public class BehaviorAnalysisInputService {
 
     @Transactional
     public BehaviorAnalysisInputResponse createForSession(UUID memberId, BehaviorAnalysisInputRequest request, UUID sessionIdFilter) {
-        Member member = memberRepository.findById(memberId).orElseThrow(MemberNotFoundException::new);
+        // Serialize the short snapshot transaction across full/session entry points; never hold this lock during AI calls.
+        Member member = memberRepository.findByIdForUpdate(memberId).orElseThrow(MemberNotFoundException::new);
         Instant generatedAt = Instant.now();
         Instant from = request == null || request.analysisFrom() == null
                 ? Instant.EPOCH : request.analysisFrom();
@@ -105,6 +106,15 @@ public class BehaviorAnalysisInputService {
         List<BehaviorLog> logs = sessionIdFilter == null ? logRepository.findAnalysisInputLogs(memberId, from, to)
                 : logRepository.findAllByMemberIdAndSessionIdOrderByEventSequence(memberId, sessionIdFilter);
         if (sessionIdFilter != null && logs.isEmpty()) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "수행 기록을 찾을 수 없습니다.");
+        // Immutable raw event IDs, not timestamps/count alone, define unchanged input. Explicit date windows keep their original behavior.
+        if ((request == null || (request.analysisFrom() == null && request.analysisTo() == null)) && !logs.isEmpty()) {
+            var ids = logs.stream().map(BehaviorLog::getId).collect(Collectors.toSet());
+            for (var prior : snapshotRepository.findTop20ByMemberIdAndEventCountAndAnalysisFromOrderByGeneratedAtDesc(memberId, logs.size(), from)) {
+                var data = prior.getInputData();
+                var priorIds = data.sessions().stream().flatMap(s -> s.events().stream()).map(EventTimeline::behaviorLogId).collect(Collectors.toSet());
+                if (SCHEMA_VERSION.equals(prior.getSchemaVersion()) && priorIds.equals(ids)) return BehaviorAnalysisInputResponse.from(prior);
+            }
+        }
         // 로그 전달 무결성만 갱신한다. 의미 정규화나 사용자 판정은 실행하지 않는다.
         logs.stream().map(BehaviorLog::getSessionId).distinct()
                 .forEach(sessionId -> sessionIntegrityService.reconcile(memberId, sessionId));

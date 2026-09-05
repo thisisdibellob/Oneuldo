@@ -1,0 +1,78 @@
+package oneuldo.behaviorlog.analysis.service;
+
+import java.util.*;
+import oneuldo.behaviorlog.analysis.domain.*;
+import tools.jackson.databind.*;
+import tools.jackson.databind.node.*;
+
+/** Run-scoped aliases. The immutable dataset is the audit mapping; no mapping is sent to the AI. */
+public final class AnalysisReferences {
+    private final ObjectMapper mapper;
+    private final Map<String, String> aliases = new LinkedHashMap<>();
+    private final Map<String, String> originals = new LinkedHashMap<>();
+    public AnalysisReferences(ObjectMapper mapper, BehaviorAnalysisInputResponse input) {
+        this.mapper = mapper;
+        int sessionNumber = 0, eventNumber = 0;
+        for (var session : input.input().sessions()) {
+            add(session.sessionId().toString(), "S" + (++sessionNumber));
+            for (var event : session.events()) add(event.behaviorLogId().toString(), "E" + (++eventNumber));
+        }
+        collectOtherIds(mapper.valueToTree(input.input()));
+    }
+    private void collectOtherIds(JsonNode node) {
+        if (node.isString() && node.asString().matches("(?i)[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}")) {
+            if (!aliases.containsKey(node.asString())) add(node.asString(), "U" + (aliases.size() + 1));
+        } else if (node instanceof ObjectNode object) {
+            for (String name : new TreeSet<>(object.propertyNames())) collectOtherIds(object.get(name));
+        } else if (node.isArray()) node.forEach(this::collectOtherIds);
+    }
+    private void add(String uuid, String alias) {
+        if (aliases.putIfAbsent(uuid, alias) != null) throw new IllegalArgumentException("DUPLICATE_ANALYSIS_REFERENCE");
+        originals.put(alias, uuid);
+    }
+    public String encode(String json) {
+        ObjectNode root = (ObjectNode) replace(mapper.readTree(json));
+        root.put("referenceEncoding", "E숫자는 사건, S숫자는 세션, U숫자는 기타 원본 UUID의 고정 별칭입니다. 구간 사이에도 같은 ID는 같은 대상입니다. "
+                + "출력의 evidenceEventIds/sessionId에 제공된 짧은 ID를 그대로 쓰세요. UUID를 만들지 마세요.");
+        return mapper.writeValueAsString(root);
+    }
+    private JsonNode replace(JsonNode node) {
+        if (node.isString()) return aliases.containsKey(node.asString()) ? mapper.valueToTree(aliases.get(node.asString())) : node;
+        if (node instanceof ObjectNode object) {
+            for (String name : new ArrayList<>(object.propertyNames())) object.set(name, replace(object.get(name)));
+        } else if (node instanceof ArrayNode array) {
+            for (int i = 0; i < array.size(); i++) array.set(i, replace(array.get(i)));
+        }
+        return node;
+    }
+    public AiBehaviorAnalysis read(String raw) {
+        JsonNode root = mapper.reader().with(DeserializationFeature.FAIL_ON_TRAILING_TOKENS).readTree(raw);
+        for (var finding : root.path("findings")) restoreEvidence(finding);
+        for (var assessment : root.path("sessionAssessments")) {
+            if (assessment instanceof ObjectNode object && object.path("sessionId").isString())
+                object.put("sessionId", restore(object.path("sessionId").asString(), "S"));
+            restoreEvidence(assessment);
+        }
+        return mapper.readerFor(AiBehaviorAnalysis.class).with(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+                .readValue(root);
+    }
+    public AiObservationDigest readDigest(String raw) {
+        JsonNode root = mapper.reader().with(DeserializationFeature.FAIL_ON_TRAILING_TOKENS).readTree(raw);
+        for (var observation : root.path("observations")) restoreEvidence(observation);
+        return mapper.readerFor(AiObservationDigest.class).with(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES).readValue(root);
+    }
+    private void restoreEvidence(JsonNode node) {
+        if (node.path("evidenceEventIds") instanceof ArrayNode ids) {
+            for (int i = 0; i < ids.size(); i++) {
+                if (!ids.get(i).isString()) throw new IllegalArgumentException("INVALID_EVENT_REFERENCE");
+                ids.set(i, mapper.valueToTree(restore(ids.get(i).asString(), "E")));
+            }
+        }
+    }
+    private String restore(String reference, String prefix) {
+        if (reference.startsWith(prefix) && originals.containsKey(reference)) return originals.get(reference);
+        // Old UUID responses remain acceptable only when they name a supplied reference of the right kind.
+        if (aliases.getOrDefault(reference, "").startsWith(prefix)) return reference;
+        throw new IllegalArgumentException("UNKNOWN_ANALYSIS_REFERENCE");
+    }
+}

@@ -20,6 +20,18 @@ import org.springframework.web.client.RestClient;
 class RestGroqChatClientTest {
 
     @Test
+    void 한도진단은_숫자와_허용헤더만_노출한다() {
+        var headers = new org.springframework.http.HttpHeaders();
+        headers.add("retry-after", "30");
+        headers.add("Authorization", "Bearer secret-key");
+        var error = org.springframework.web.client.HttpClientErrorException.create(
+                org.springframework.http.HttpStatus.TOO_MANY_REQUESTS, "limited", headers,
+                "tokens per minute Limit 8000 Used 50 Requested 12000 secret-key user@example.com".getBytes(java.nio.charset.StandardCharsets.UTF_8),
+                java.nio.charset.StandardCharsets.UTF_8);
+        assertEquals("kind=TPM Limit=8000 Used=50 Requested=12000 retry-after=30", RestGroqChatClient.rateLimitDetails(error));
+    }
+
+    @Test
     void Qwen_비추론_모드로_Chat_Completions를_호출한다() {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();

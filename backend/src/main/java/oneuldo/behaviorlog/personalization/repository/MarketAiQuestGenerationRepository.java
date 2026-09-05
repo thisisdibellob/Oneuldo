@@ -8,4 +8,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface MarketAiQuestGenerationRepository
         extends JpaRepository<MarketAiQuestGeneration, UUID> {
     List<MarketAiQuestGeneration> findAllByMemberIdOrderByCreatedAtDesc(UUID memberId);
+    java.util.Optional<MarketAiQuestGeneration> findFirstByMemberIdAndRequestKeyAndSourceOrderByCreatedAtDesc(UUID memberId,String requestKey,String source);
 }

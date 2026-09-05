@@ -9,6 +9,7 @@ public interface GroqChatClient {
         return complete(systemPrompt, userPrompt);
     }
 
-    record GroqChatResult(String text, String model) {
+    record GroqChatResult(String text, String model, String finishReason, Integer inputTokens, Integer outputTokens, Long latencyMs) {
+        public GroqChatResult(String text,String model) {this(text,model,null,null,null,null);}
     }
 }

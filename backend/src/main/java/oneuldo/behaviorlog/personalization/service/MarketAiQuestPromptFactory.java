@@ -10,7 +10,7 @@ import tools.jackson.databind.ObjectMapper;
 @Component
 public class MarketAiQuestPromptFactory {
 
-    public static final String PROMPT_VERSION = "market-ai-quest-v3-content";
+    public static final String PROMPT_VERSION = "market-ai-quest-v4-lossless";
     private final ObjectMapper objectMapper;
 
     public MarketAiQuestPromptFactory(ObjectMapper objectMapper) {
@@ -31,7 +31,7 @@ public class MarketAiQuestPromptFactory {
         context.put("goal", analysis.analysis().practicePlan().goal());
         context.put("aiUserAnalysis", analysis);
         context.put("aiDifficultyRecommendation", recommendation);
-        context.put("availableProducts", MarketQuestCatalog.PRODUCTS);
+        // contentContext.products contains the same complete 60-product catalog; no duplicate copy is necessary.
         context.put("contentContext", MarketQuestCatalog.contentContext());
         context.put("scenarioSelection", "AI가 분석의 연습 목표에 따라 S01, S02 또는 CUSTOM을 선택한다. "
                 + "S01/S02는 정의된 기준 상품 ID·수량·예산을 유지하고 안내 문장과 연습 이유를 작성한다. "
@@ -66,7 +66,9 @@ public class MarketAiQuestPromptFactory {
         schema.put("scenarioId", "S01 또는 S02 또는 CUSTOM");
         context.put("outputSchema", schema);
         try {
-            return objectMapper.writeValueAsString(context);
+            var root=(tools.jackson.databind.node.ObjectNode)new oneuldo.behaviorlog.analysis.service.LosslessTables(objectMapper).encode(objectMapper.valueToTree(context));
+            root.put("tableEncoding","$table는 열, rows는 원래 순서의 값, defaults는 공통 속성이다. 합쳐 원본 객체로 읽는다. $missing:true는 누락, $literal은 원본 객체다. 상품은 contentContext.products 전체 목록을 사용한다.");
+            return objectMapper.writeValueAsString(root);
         } catch (RuntimeException exception) {
             throw new IllegalStateException("AI 장보기 입력을 직렬화할 수 없습니다.", exception);
         }

@@ -22,8 +22,15 @@ public class MarketAiQuestService {
     private final MarketAiQuestAuditService auditService;
     private final GroqChatClient groqChatClient;
     private final ObjectMapper objectMapper;
+    private final oneuldo.ai.service.SingleFlight<UUID,MarketAiQuestResponse> activeRequests=new oneuldo.ai.service.SingleFlight<>();
+    @org.springframework.beans.factory.annotation.Value("${ai.groq.model:qwen/qwen3.6-27b}")
+    private String configuredModel="qwen/qwen3.6-27b";
 
     public MarketAiQuestResponse generate(UUID memberId) {
+        return activeRequests.run(memberId,()->generateOnce(memberId));
+    }
+
+    private MarketAiQuestResponse generateOnce(UUID memberId) {
         var recommendation = recommendationService.recommend(memberId);
         var analysis = analysisService.find(memberId, recommendation.analysisId());
         UUID generationId = UUID.randomUUID();
@@ -32,6 +39,15 @@ public class MarketAiQuestService {
         long startedAt = System.nanoTime();
         MarketAiQuestDraft draft = null;
         String userPrompt = promptFactory.userPrompt(analysis, recommendation);
+        // Recommendation IDs/times change on every read; only its AI plan/settings affect generation.
+        var semanticPrompt=(tools.jackson.databind.node.ObjectNode)new oneuldo.behaviorlog.analysis.service.LosslessTables(objectMapper).decode(objectMapper.readTree(userPrompt));
+        if(semanticPrompt.path("aiDifficultyRecommendation") instanceof tools.jackson.databind.node.ObjectNode rec)
+            rec.remove(List.of("recommendationId","generatedAt"));
+        if(semanticPrompt.path("aiUserAnalysis") instanceof tools.jackson.databind.node.ObjectNode record)
+            record.remove(List.of("createdAt","latencyMs"));
+        String requestKey=oneuldo.ai.service.AiRequestFingerprint.of(objectMapper,memberId,configuredModel,promptFactory.systemPrompt(),semanticPrompt,900,0.2,"quest-reuse-v1");
+        var reusable=auditService.findReusable(memberId,requestKey);
+        if(reusable.isPresent()) return reusable.get();
         for (int number = 1; number <= 2; number++) {
             GroqChatClient.GroqChatResult result;
             try {
@@ -60,12 +76,12 @@ public class MarketAiQuestService {
             var failed = new MarketAiQuestResponse(generationId, analysis.analysisId(), "FAILED", model, latency,
                     recommendation.personalizationMode(), MarketAiQuestPromptFactory.PROMPT_VERSION,
                     null, null, List.of());
-            auditService.record(memberId, recommendation.analysisInputSnapshotId(), failed, null, attempts, "AI_QUEST_FAILED");
+            auditService.record(memberId, recommendation.analysisInputSnapshotId(), failed, null, attempts, "AI_QUEST_FAILED",requestKey);
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "AI 퀘스트 생성 실패. 대체 판정이나 미션을 만들지 않았습니다.");
         }
         var response = MarketAiQuestResponse.from(generationId, analysis.analysisId(), "AI", model, latency,
                 recommendation.personalizationMode(), MarketAiQuestPromptFactory.PROMPT_VERSION, draft);
-        auditService.record(memberId, recommendation.analysisInputSnapshotId(), response, draft, attempts, null);
+        auditService.record(memberId, recommendation.analysisInputSnapshotId(), response, draft, attempts, null,requestKey);
         return response;
     }
 }

@@ -58,7 +58,37 @@ public class AiBehaviorAnalysisValidator {
         EvidenceIndex.validateCitations(result.usedEvidenceCardIds(), input.eventCount() > 0 ? "interface" : "");
         return result;
     }
+    public oneuldo.behaviorlog.analysis.domain.AiObservationDigest validateDigest(
+            oneuldo.behaviorlog.analysis.domain.AiObservationDigest digest, BehaviorAnalysisInputResponse input) {
+        require(digest != null); text(digest.summary());
+        require(digest.observations() != null && digest.observations().size() <= 6);
+        require(digest.uncertainties() != null && digest.uncertainties().size() <= 12);
+        digest.uncertainties().forEach(this::text);
+        require(!digest.observations().isEmpty() || !digest.uncertainties().isEmpty());
+        Set<UUID> allowed = new HashSet<>();
+        input.input().sessions().forEach(s -> s.events().forEach(e -> allowed.add(e.behaviorLogId())));
+        for (var observation : digest.observations()) {
+            require(observation != null); text(observation.observation()); text(observation.interpretation());
+            require(observation.alternativeExplanations() != null && !observation.alternativeExplanations().isEmpty()
+                    && observation.alternativeExplanations().size() <= 8);
+            observation.alternativeExplanations().forEach(this::text);
+            evidence(observation.evidenceEventIds(), allowed);
+        }
+        return digest;
+    }
 
+    public oneuldo.behaviorlog.analysis.domain.AiObservationDigest validateReduction(
+            oneuldo.behaviorlog.analysis.domain.AiObservationDigest digest, BehaviorAnalysisInputResponse input,
+            List<oneuldo.behaviorlog.analysis.domain.AiObservationDigest> children) {
+        validateDigest(digest, input);
+        require(!digest.uncertainties().isEmpty());
+        Set<UUID> cited = new HashSet<>();
+        children.forEach(child -> child.observations().forEach(o -> cited.addAll(o.evidenceEventIds())));
+        for (var o : digest.observations()) {
+            if(!cited.containsAll(o.evidenceEventIds())) throw new IllegalArgumentException("EVIDENCE_NOT_IN_CHILD_INTERPRETATIONS");
+        }
+        return digest;
+    }
     private void evidence(List<UUID> ids, Set<UUID> allowed) {
         require(ids != null && !ids.isEmpty() && ids.size() <= 30 && allowed.containsAll(ids));
     }
