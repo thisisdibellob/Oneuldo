@@ -1,0 +1,10 @@
+{
+  "version": "market-runtime-phase2-v1",
+  "catalogVersion": "oneuldo-shopping-content-2026-09-04-v2",
+  "enabledScenarioIds": ["S01", "S02"],
+  "customScenarioId": "CUSTOM",
+  "initialStockPerSku": 5,
+  "stockNote": "2페이즈의 세션별 가상 초기 재고. 패키지의 실제 재고 데이터가 아니며 실제 재고와 무관하다.",
+  "implementedSupportOptions": ["목록 다시 보기", "글 정보", "잠시 쉬기", "거절/중단"],
+  "displayPolicy": "전체 60종을 분류별 목록에 표시. 세션별 24슬롯/seed 배치는 3페이즈 대상."
+}

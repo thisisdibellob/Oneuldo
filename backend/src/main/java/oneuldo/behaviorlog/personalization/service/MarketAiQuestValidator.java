@@ -10,6 +10,7 @@ public class MarketAiQuestValidator {
     public MarketAiQuestDraft validate(MarketAiQuestDraft draft) {
         if (draft == null) throw invalid("빈 결과");
         if (draft.difficulty() < 1 || draft.difficulty() > 3) throw invalid("난이도");
+        if (draft.scenarioId() == null) throw invalid("시나리오 ID");
         text(draft.title(), 40, "제목");
         text(draft.description(), 120, "설명");
         text(draft.successMessage(), 80, "성공 문장");
@@ -27,6 +28,16 @@ public class MarketAiQuestValidator {
             total += product.price() * objective.quantity();
         }
         if (draft.budget() < total || draft.budget() > total + 4000) throw invalid("예산");
+        if (!"CUSTOM".equals(draft.scenarioId())) {
+            var scenario = MarketQuestCatalog.requireScenario(draft.scenarioId());
+            if (draft.budget() != scenario.budget() || draft.objectives().size() != scenario.objectives().size()) {
+                throw invalid("시나리오 콘텐츠 계약");
+            }
+            for (var objective : scenario.objectives()) {
+                if (draft.objectives().stream().noneMatch(o -> o.productId().equals(objective.productId())
+                        && o.quantity() == objective.quantity())) throw invalid("시나리오 목표");
+            }
+        }
         sentences(draft.briefing(), 1, 3, "안내");
         sentences(draft.checkoutDialogue(), 2, 2, "계산대 대화");
         if (draft.reasonCodes() == null || draft.reasonCodes().isEmpty()

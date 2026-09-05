@@ -3,7 +3,7 @@ package oneuldo.quest.dto;
 public record QuestEventResponse(
         long eventId,
         int attemptNumber,
-        boolean correct,
+        Boolean correct,
         String feedback,
         int completedSteps,
         int totalSteps

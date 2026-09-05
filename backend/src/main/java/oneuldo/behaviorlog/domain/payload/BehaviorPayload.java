@@ -10,6 +10,7 @@ import oneuldo.behaviorlog.domain.type.BehaviorPayloadType;
         property = "type"
 )
 @JsonSubTypes({
+        @JsonSubTypes.Type(value = TransportBehaviorPayload.class, name = "TRANSPORT"),
         @JsonSubTypes.Type(value = PassivePlayBehaviorPayload.class, name = "PASSIVE_PLAY"),
         @JsonSubTypes.Type(value = ShoppingBehaviorPayload.class, name = "SHOPPING"),
         @JsonSubTypes.Type(value = CookingBehaviorPayload.class, name = "COOKING"),

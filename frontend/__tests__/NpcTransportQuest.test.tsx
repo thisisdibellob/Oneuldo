@@ -91,7 +91,7 @@ function Harness({ onCompleted }: { onCompleted: () => void }) {
 describe('NPC 대중교통 퀘스트', () => {
   beforeEach(() => jest.clearAllMocks());
 
-  it('추천 퀘스트로 세션을 만들고 오답·정답 시도와 완료를 기록한다', async () => {
+  it('선택 한 건을 기록하고 정답과 무관하게 제출하되 보상 콜백을 실행하지 않는다', async () => {
     const onCompleted = jest.fn();
     const screen = render(<Harness onCompleted={onCompleted} />);
 
@@ -105,19 +105,16 @@ describe('NPC 대중교통 퀘스트', () => {
     fireEvent.press(screen.getByText('아무 버스나 타요.'));
     expect(screen.getByText('다시 확인해요.')).toBeTruthy();
     fireEvent.press(screen.getByText('번호를 확인해요.'));
-    expect(screen.getByText('잘했어요.')).toBeTruthy();
+    expect(queueQuestEvent).toHaveBeenCalledTimes(1);
 
     expect(queueQuestEvent).toHaveBeenNthCalledWith(1, expect.objectContaining({
       request: expect.objectContaining({ attemptNumber: 1, choiceId: 'wrong', stepId: 'step-1' }),
       sessionId: 'session-1',
     }));
-    expect(queueQuestEvent).toHaveBeenNthCalledWith(2, expect.objectContaining({
-      request: expect.objectContaining({ attemptNumber: 2, choiceId: 'correct', stepId: 'step-1' }),
-      sessionId: 'session-1',
-    }));
+    expect(queueQuestEvent).toHaveBeenCalledWith(expect.objectContaining({ request: expect.objectContaining({ presentedContent: expect.objectContaining({ situation: expect.any(String) }) }) }));
 
     fireEvent.press(screen.getByText('다음'));
-    expect(onCompleted).toHaveBeenCalledTimes(1);
+    expect(onCompleted).not.toHaveBeenCalled();
     await waitFor(() => expect(completeQuestSession).toHaveBeenCalledWith('session-1', 'token'));
   });
 });

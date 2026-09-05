@@ -8,5 +8,6 @@ public enum BehaviorPayloadType {
     HOUSEHOLD,
     KIOSK_ATM,
     SAFETY,
+    TRANSPORT,
     WORK
 }

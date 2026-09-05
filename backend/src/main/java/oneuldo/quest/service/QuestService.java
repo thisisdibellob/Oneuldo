@@ -51,7 +51,7 @@ public class QuestService {
     @Transactional(readOnly = true)
     public List<QuestSummaryResponse> findRecommendedQuests(UUID memberId) {
         Map<UUID, oneuldo.quest.domain.QuestDifficulty> difficulties =
-                difficultyAdjustmentService.findCurrentDifficulties(memberId);
+                Map.of();
 
         return groupBySubcategory(questRepository.findAllActiveWithCategory())
                 .values()

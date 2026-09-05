@@ -85,6 +85,12 @@ public class QuestSession {
         }
     }
 
+    public void submit() {
+        status = QuestSessionStatus.SUBMITTED;
+        rewardPoints = 0;
+        completedAt = Instant.now();
+    }
+
     public void complete(int rewardPoints) {
         status = QuestSessionStatus.COMPLETED;
         this.rewardPoints = rewardPoints;

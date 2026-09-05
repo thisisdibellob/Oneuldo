@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
-import { ComponentProps, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ComponentProps, createContext, useContext, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
   Animated,
@@ -26,10 +26,10 @@ import type {
 } from '../behavior/marketMovementDetector';
 import { PressScale } from '../components/PressScale';
 import {
-  evaluateMarketCart,
   getCartQuantity,
   getMarketCartTotal,
   getMarketProduct,
+  getObjectiveQuantity,
   MarketCart,
   MarketCategory,
   MarketCategoryId,
@@ -40,6 +40,8 @@ import {
   marketMission,
   marketProducts,
 } from '../game/scenarios';
+import { createMarketScene, restoreMarketScene } from '../game/marketScene';
+import { createSessionBehaviorAnalysis } from '../api/behaviorAnalysis';
 import { colors, fonts } from '../theme';
 
 type MarketPhase = 'briefing' | 'shopping' | 'checkout' | 'result';
@@ -129,7 +131,16 @@ type MarketSimulationScreenProps = {
   simulation?: Omit<BehaviorSimulationContext, 'simulationStarted'>;
 };
 
-export function MarketSimulationScreen({
+const SceneProducts = createContext(marketProducts);
+
+export function MarketSimulationScreen(props: MarketSimulationScreenProps) {
+  const mission = useMemo(() => props.mission?.scene ? restoreMarketScene(props.mission.scene)
+    : restoreMarketScene(createMarketScene(props.mission ?? marketMission, Math.floor(Math.random() * 0x100000000), props.simulation?.questInstanceId)),
+    [props.mission, props.simulation?.questInstanceId]);
+  return <SceneProducts.Provider value={mission.scene!.products}><MarketSimulationContent {...props} mission={mission} /></SceneProducts.Provider>;
+}
+
+function MarketSimulationContent({
   accessToken = null,
   embedded = false,
   interactionRequest = null,
@@ -141,6 +152,14 @@ export function MarketSimulationScreen({
   onMissionComplete,
   onTelemetryReady,
 }: MarketSimulationScreenProps) {
+  const sceneProducts = useContext(SceneProducts);
+  const getMarketProduct = (id: string) => sceneProducts.find(p => p.id === id);
+  const [paused, setPaused] = useState(false);
+  const pauseStarted = useRef(0);
+  const [review, setReview] = useState('');
+  const reviewing = useRef(false);
+  const mounted = useRef(true);
+  useEffect(() => () => { mounted.current = false; }, []);
   const [phase, setPhase] = useState<MarketPhase>('briefing');
   const [briefingIndex, setBriefingIndex] = useState(0);
   const [activeCategory, setActiveCategory] = useState<MarketCategoryId | null>(null);
@@ -191,7 +210,7 @@ export function MarketSimulationScreen({
     return () => subscription.remove();
   }, []);
 
-  const total = getMarketCartTotal(cart);
+  const total = getMarketCartTotal(cart, sceneProducts);
   const cartCount = Object.values(cart).reduce((sum, quantity) => sum + quantity, 0);
   const remainingBudget = mission.budget - total;
   const aiGenerated = simulation?.contentSource === 'GENERATED';
@@ -200,7 +219,7 @@ export function MarketSimulationScreen({
     () => mission.objectives.map((objective) => ({
       ...objective,
       product: getMarketProduct(objective.productId),
-      current: getCartQuantity(cart, objective.productId),
+      current: getObjectiveQuantity(cart, objective),
     })),
     [cart, mission],
   );
@@ -221,7 +240,7 @@ export function MarketSimulationScreen({
   const changeQuantity = (productId: string, change: number) => {
     setCart((current) => {
       const currentQuantity = getCartQuantity(current, productId);
-      const nextQuantity = Math.max(0, Math.min(5, currentQuantity + change));
+      const nextQuantity = Math.max(0, Math.min(getMarketProduct(productId)?.initialStock ?? 0, currentQuantity + change));
       if (nextQuantity === currentQuantity) return current;
       const next = { ...current };
       if (nextQuantity === 0) delete next[productId];
@@ -288,7 +307,7 @@ export function MarketSimulationScreen({
   };
 
   useEffect(() => {
-    if (!embedded || !interactionRequest || phase !== 'shopping') return;
+    if (paused || !embedded || !interactionRequest || phase !== 'shopping') return;
     if (handledInteractionId.current === interactionRequest.id) return;
     handledInteractionId.current = interactionRequest.id;
     if (interactionRequest.station === 'checkout') {
@@ -304,18 +323,26 @@ export function MarketSimulationScreen({
 
   useEffect(() => {
     if (!embedded || !onLockChange) return;
-    onLockChange(phase !== 'shopping' || activeCategory !== null || cartOpen);
-  }, [activeCategory, cartOpen, embedded, onLockChange, phase]);
+    onLockChange(phase !== 'shopping' || activeCategory !== null || cartOpen || paused);
+  }, [activeCategory, cartOpen, embedded, onLockChange, phase, paused]);
 
-  const checkCart = () => {
-    const nextEvaluation = evaluateMarketCart(cart, mission);
-    behaviorTracker.current?.checkoutSubmitted(cart, nextEvaluation);
-    setEvaluation(nextEvaluation);
-    if (nextEvaluation.success) {
-      onMissionComplete?.();
-      void behaviorTracker.current?.complete(cart, nextEvaluation);
-    }
+  const checkCart = async () => {
+    if (reviewing.current) return;
+    reviewing.current = true;
     setPhase('result');
+    setReview('기록을 전송하고 AI가 검토하고 있어요.');
+    const tracker = behaviorTracker.current;
+    try {
+      if (!tracker || !accessToken) throw new Error('로그인 후 AI 검토를 사용할 수 있어요.');
+      tracker.checkoutSubmitted(cart);
+      await tracker.flushConfirmed();
+      const result = await createSessionBehaviorAnalysis(accessToken, tracker.sessionId);
+      const assessment = result.analysis?.sessionAssessments.find(item => item.sessionId === tracker.sessionId);
+      if (result.status !== 'READY' || !assessment) throw new Error('AI가 판단을 완료하지 못했어요. 결과와 보상은 보류돼요.');
+      if (mounted.current) setReview('AI 검토: ' + ({ SUCCESS: '목표 수행', FAILURE: '다시 연습할 부분 있음', UNDETERMINED: '판단 보류' }[assessment.judgment]) + '\n' + assessment.explanation + '\n성공 보상 자동 지급은 아직 사용하지 않아요.');
+    } catch (error) {
+      if (mounted.current) setReview(error instanceof Error ? error.message : '검토를 완료하지 못했어요. 판단 보류 상태예요.');
+    } finally { reviewing.current = false; }
   };
 
   const retryShopping = () => {
@@ -383,7 +410,7 @@ export function MarketSimulationScreen({
         >
           <View
             accessibilityLabel={`오늘의 목록, ${objectiveProgress
-              .map(({ current, product, quantity }) => `${product?.name ?? '물건'} ${current}/${quantity}`)
+              .map(({ current, product, quantity, label }) => `${label ?? `${product?.name} ${product?.detail}`} ${current}/${quantity}`)
               .join(', ')}`}
             accessible
             style={styles.missionStrip}
@@ -396,7 +423,7 @@ export function MarketSimulationScreen({
               </Text>
             </View>
             <View style={styles.missionChecklist}>
-              {objectiveProgress.map(({ current, product, productId, quantity }) => {
+              {objectiveProgress.map(({ current, product, productId, quantity, label }) => {
                 const completed = current >= quantity;
                 return (
                   <View key={productId} style={styles.missionChecklistItem}>
@@ -409,11 +436,11 @@ export function MarketSimulationScreen({
                         numberOfLines={1}
                         style={[styles.missionItemName, completed && styles.missionItemNameComplete]}
                       >
-                        {product?.name ?? '물건'}
+                        {label ?? `${product?.name ?? '물건'} ${product?.detail ?? ''}`}
                       </Text>
                     </View>
                     <Text style={[styles.missionItemCount, completed && styles.missionItemCountComplete]}>
-                      {current}/{quantity}
+                      {current}/{quantity} {product?.salesUnit}
                     </Text>
                   </View>
                 );
@@ -458,6 +485,27 @@ export function MarketSimulationScreen({
         </PressScale>
       ) : null}
 
+      {phase === 'shopping' && !activeCategory && !cartOpen ? (
+        <View style={{ position: 'absolute', top: 108, right: 12, gap: 6, zIndex: 55 }}>
+          <PressScale accessibilityRole="button" onPress={() => {
+            pauseStarted.current = Date.now(); setPaused(true);
+            behaviorTracker.current?.track({ eventCode: 'SHOP.PAUSE_REQUESTED', microActionId: 'REQUEST_PAUSE', payload: {} });
+          }} style={styles.checkoutBackButton}><Text>잠시 쉬기</Text></PressScale>
+          <PressScale accessibilityRole="button" onPress={() => {
+            const message = mission.description;
+            behaviorTracker.current?.track({ eventCode: 'SHOP.STAFF_QUESTION_REQUESTED', microActionId: 'ASK_LIST',
+              payload: { marketContent: { question: '목록을 다시 알려주세요', response: message, responseSource: 'mission_text' } } });
+            showNotice(message);
+          }} style={styles.checkoutBackButton}><Text>목록 물어보기</Text></PressScale>
+        </View>
+      ) : null}
+      {paused ? <View style={styles.resultOverlay}><View style={styles.resultCard}>
+        <Text style={styles.resultTitle}>쉬는 중이에요</Text>
+        <PressScale accessibilityRole="button" onPress={() => {
+          behaviorTracker.current?.track({ eventCode: 'SHOP.PAUSE_ENDED', microActionId: 'RESUME',
+            payload: { durationMs: Date.now() - pauseStarted.current } }); setPaused(false);
+        }} style={styles.resultPrimaryButton}><Text>다시 시작하기</Text></PressScale>
+      </View></View> : null}
       {phase === 'briefing' ? (
         <NpcDialogueCard
           aiGenerated={aiGenerated}
@@ -479,8 +527,12 @@ export function MarketSimulationScreen({
         )
       ) : null}
 
-      {phase === 'result' && evaluation ? (
-        <ResultPanel evaluation={evaluation} mission={mission} onExit={exitMarket} onRetry={retryShopping} />
+      {phase === 'result' ? (
+        <View style={styles.resultOverlay}><View style={styles.resultCard}>
+          <Text style={styles.resultTitle}>AI 수행 검토</Text><Text style={styles.resultDescription}>{review}</Text>
+          <PressScale accessibilityRole="button" onPress={retryShopping} style={styles.resultPrimaryButton}><Text style={styles.resultPrimaryButtonText}>계속 연습하기</Text></PressScale>
+          <PressScale accessibilityRole="button" onPress={exitMarket} style={styles.resultPrimaryButton}><Text style={styles.resultPrimaryButtonText}>마을로 돌아가기</Text></PressScale>
+        </View></View>
       ) : null}
 
       {activeCategory && phase === 'shopping' ? (
@@ -990,7 +1042,7 @@ function ShelfZone({
   layout: { height: number; width: number; x: number; y: number };
   onPress: (event: GestureResponderEvent) => void;
 }) {
-  const products = marketProducts.filter((product) => product.categoryId === category.id);
+  const products = useContext(SceneProducts).filter((product) => product.categoryId === category.id);
   return (
     <PressScale
       accessibilityLabel={`${category.label} 진열대`}
@@ -1076,7 +1128,7 @@ function ProductShelfSheet({
   onChangeQuantity: (productId: string, change: number) => void;
   onClose: () => void;
 }) {
-  const products = marketProducts.filter((product) => product.categoryId === category.id);
+  const products = useContext(SceneProducts).filter((product) => product.categoryId === category.id);
   return (
     <View style={styles.sheetOverlay}>
       <Pressable accessibilityLabel="진열대 닫기" accessibilityRole="button" onPress={onClose} style={styles.sheetBackdrop} />
@@ -1138,8 +1190,10 @@ function ProductCard({
         ) : null}
       </View>
       <Text numberOfLines={1} style={styles.productName}>{product.name}</Text>
-      <Text numberOfLines={1} style={styles.productDetail}>{product.detail}</Text>
+      <Text style={styles.productDetail}>{product.detail} · 구매 단위: {product.salesUnit}</Text>
+      {product.attributes.brand ? <Text style={styles.productDetail}>브랜드: {product.attributes.brand}</Text> : null}
       <Text style={styles.productPrice}>{formatPrice(product.price)}</Text>
+      <Text style={styles.productDetail}>진열 재고 {Math.max(0, product.initialStock - quantity)}{product.salesUnit}</Text>
       {quantity === 0 ? (
         <PressScale accessibilityLabel={`${product.name} 담기`} accessibilityRole="button" onPress={onAdd} style={styles.addProductButton}>
           <Ionicons color="#FFFFFF" name="add" size={15} />
@@ -1151,7 +1205,7 @@ function ProductCard({
             <Ionicons color="#4E5D55" name="remove" size={15} />
           </PressScale>
           <Text style={styles.quantityValue}>{quantity}</Text>
-          <PressScale accessibilityLabel={`${product.name} 한 개 더 담기`} onPress={onAdd} style={styles.quantityButton}>
+          <PressScale accessibilityLabel={`${product.name} 한 개 더 담기`} disabled={quantity >= product.initialStock} onPress={onAdd} style={styles.quantityButton}>
             <Ionicons color="#4E5D55" name="add" size={15} />
           </PressScale>
         </View>
@@ -1173,6 +1227,8 @@ function CartSheet({
   onClose: () => void;
   total: number;
 }) {
+  const products = useContext(SceneProducts);
+  const getMarketProduct = (id: string) => products.find(p => p.id === id);
   const lines = Object.entries(cart)
     .map(([productId, quantity]) => ({ product: getMarketProduct(productId), quantity }))
     .filter((line): line is { product: MarketProduct; quantity: number } => Boolean(line.product));
@@ -1212,7 +1268,7 @@ function CartSheet({
                     <Ionicons color="#4D5751" name="remove" size={16} />
                   </PressScale>
                   <Text style={styles.cartQuantityText}>{quantity}</Text>
-                  <PressScale accessibilityLabel={`${product.name} 한 개 더 담기`} onPress={() => onChangeQuantity(product.id, 1)} style={styles.cartQuantityButton}>
+                  <PressScale accessibilityLabel={`${product.name} 한 개 더 담기`} disabled={quantity >= product.initialStock} onPress={() => onChangeQuantity(product.id, 1)} style={styles.cartQuantityButton}>
                     <Ionicons color="#4D5751" name="add" size={16} />
                   </PressScale>
                 </View>
@@ -1239,6 +1295,8 @@ function CartSheet({
 }
 
 function CheckoutScene({ cart, mission }: { cart: MarketCart; mission: MarketMission }) {
+  const products = useContext(SceneProducts);
+  const getMarketProduct = (id: string) => products.find(p => p.id === id);
   return (
     <View style={styles.checkoutScene}>
       <View style={styles.checkoutWall}>
@@ -1300,177 +1358,6 @@ function CheckoutPanel({ cart, mission, onBack, onCheck, total }: { cart: Market
   );
 }
 
-function ResultPanel({ evaluation, mission, onExit, onRetry }: { evaluation: MarketEvaluation; mission: MarketMission; onExit: () => void; onRetry: () => void }) {
-  const [reduceMotionEnabled, setReduceMotionEnabled] = useState<boolean | null>(null);
-  const overlayOpacity = useRef(new Animated.Value(0)).current;
-  const cardOpacity = useRef(new Animated.Value(0)).current;
-  const cardProgress = useRef(new Animated.Value(0)).current;
-  const heroProgress = useRef(new Animated.Value(0)).current;
-  const detailsProgress = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    let mounted = true;
-    AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
-      if (mounted) setReduceMotionEnabled(enabled);
-    });
-    const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduceMotionEnabled);
-    return () => {
-      mounted = false;
-      subscription.remove();
-    };
-  }, []);
-
-  useEffect(() => {
-    if (reduceMotionEnabled === null) return undefined;
-
-    const values = [overlayOpacity, cardOpacity, cardProgress, heroProgress, detailsProgress];
-    values.forEach((value) => value.stopAnimation());
-
-    if (reduceMotionEnabled) {
-      values.forEach((value) => value.setValue(1));
-      return undefined;
-    }
-
-    values.forEach((value) => value.setValue(0));
-    const entrance = Animated.parallel([
-      Animated.timing(overlayOpacity, {
-        duration: 180,
-        easing: Easing.out(Easing.quad),
-        toValue: 1,
-        useNativeDriver: true,
-      }),
-      Animated.parallel([
-        Animated.timing(cardOpacity, {
-          duration: 260,
-          easing: Easing.out(Easing.cubic),
-          toValue: 1,
-          useNativeDriver: true,
-        }),
-        Animated.timing(cardProgress, {
-          duration: 360,
-          easing: Easing.out(Easing.cubic),
-          toValue: 1,
-          useNativeDriver: true,
-        }),
-      ]),
-      Animated.sequence([
-        Animated.delay(120),
-        Animated.spring(heroProgress, {
-          damping: 13,
-          mass: 0.65,
-          stiffness: 190,
-          toValue: 1,
-          useNativeDriver: true,
-        }),
-      ]),
-      Animated.sequence([
-        Animated.delay(210),
-        Animated.timing(detailsProgress, {
-          duration: 280,
-          easing: Easing.out(Easing.cubic),
-          toValue: 1,
-          useNativeDriver: true,
-        }),
-      ]),
-    ]);
-    entrance.start();
-
-    return () => entrance.stop();
-  }, [cardOpacity, cardProgress, detailsProgress, heroProgress, overlayOpacity, reduceMotionEnabled]);
-
-  const overlayAnimationStyle = { opacity: overlayOpacity };
-  const cardAnimationStyle = {
-    opacity: cardOpacity,
-    transform: [
-      { translateY: cardProgress.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) },
-      { scale: cardProgress.interpolate({ inputRange: [0, 1], outputRange: [0.975, 1] }) },
-    ],
-  };
-  const heroAnimationStyle = {
-    opacity: heroProgress,
-    transform: [{ scale: heroProgress.interpolate({ inputRange: [0, 1], outputRange: [0.84, 1] }) }],
-  };
-  const detailsAnimationStyle = {
-    opacity: detailsProgress,
-    transform: [{ translateY: detailsProgress.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }) }],
-  };
-
-  if (evaluation.success) {
-    return (
-      <Animated.View accessibilityViewIsModal style={[styles.resultOverlay, overlayAnimationStyle]}>
-        <Animated.View style={[styles.resultCard, cardAnimationStyle]}>
-          <Animated.View style={heroAnimationStyle}>
-            <View style={styles.successIconStage}>
-              <View style={styles.successRing} />
-              <Ionicons color="#FFFFFF" name="checkmark" size={40} />
-            </View>
-          </Animated.View>
-          <View style={styles.resultStamp}>
-            <Ionicons color="#FFFFFF" name="star" size={14} />
-            <Text style={styles.resultStampText}>MISSION CLEAR</Text>
-          </View>
-          <Text style={styles.resultEyebrow}>장보기 의뢰 완료</Text>
-          <Text style={styles.resultTitle}>{mission.successMessage}</Text>
-          <Text style={styles.resultDescription}>필요한 물건을 빠뜨리지 않고 예산도 지켰어요.</Text>
-          <Animated.View style={[styles.resultStats, detailsAnimationStyle]}>
-            <View style={styles.resultStat}>
-              <Text style={styles.resultStatValue}>{mission.objectives.length}</Text>
-              <Text style={styles.resultStatLabel}>목록 완료</Text>
-            </View>
-            <View style={styles.resultStatDivider} />
-            <View style={styles.resultStat}>
-              <Text style={styles.resultStatValue}>{formatPrice(evaluation.total)}</Text>
-              <Text style={styles.resultStatLabel}>사용 금액</Text>
-            </View>
-            <View style={styles.resultStatDivider} />
-            <View style={styles.resultStat}>
-              <Text style={styles.resultStatValue}>+30</Text>
-              <Text style={styles.resultStatLabel}>경험치</Text>
-            </View>
-          </Animated.View>
-          <PressScale accessibilityRole="button" onPress={onExit} style={styles.resultPrimaryButton}>
-            <Text style={styles.resultPrimaryButtonText}>마을로 돌아가기</Text>
-          </PressScale>
-        </Animated.View>
-      </Animated.View>
-    );
-  }
-
-  return (
-    <Animated.View accessibilityViewIsModal style={[styles.resultOverlay, overlayAnimationStyle]}>
-      <Animated.View style={[styles.resultCard, cardAnimationStyle]}>
-        <Animated.View style={heroAnimationStyle}>
-          <View style={styles.retryIconStage}><Ionicons color="#9A7045" name="basket-outline" size={34} /></View>
-        </Animated.View>
-        <Text style={styles.resultEyebrow}>한 번 더 확인해요</Text>
-        <Text style={styles.resultTitle}>조금만 고치면 완성할 수 있어요</Text>
-        <Animated.View style={[styles.feedbackList, detailsAnimationStyle]}>
-          {evaluation.missing.length > 0 ? (
-            <FeedbackRow icon="list-outline" text={`목록에 있는 물건 ${evaluation.missing.reduce((sum, item) => sum + item.quantity, 0)}개를 더 찾아보세요.`} />
-          ) : null}
-          {evaluation.extra.length > 0 ? (
-            <FeedbackRow icon="remove-circle-outline" text={`목록에 없는 물건 ${evaluation.extra.reduce((sum, item) => sum + item.quantity, 0)}개가 들어 있어요.`} />
-          ) : null}
-          {evaluation.overBudget > 0 ? (
-            <FeedbackRow icon="wallet-outline" text={`예산보다 ${formatPrice(evaluation.overBudget)} 많아요.`} />
-          ) : null}
-        </Animated.View>
-        <PressScale accessibilityRole="button" onPress={onRetry} style={styles.resultPrimaryButton}>
-          <Text style={styles.resultPrimaryButtonText}>장바구니 고치기</Text>
-        </PressScale>
-      </Animated.View>
-    </Animated.View>
-  );
-}
-
-function FeedbackRow({ icon, text }: { icon: IoniconName; text: string }) {
-  return (
-    <View style={styles.feedbackRow}>
-      <View style={styles.feedbackIcon}><Ionicons color="#9A7045" name={icon} size={19} /></View>
-      <Text style={styles.feedbackText}>{text}</Text>
-    </View>
-  );
-}
 
 const styles = StyleSheet.create({
   root: { backgroundColor: '#D8D1C2', flex: 1 },

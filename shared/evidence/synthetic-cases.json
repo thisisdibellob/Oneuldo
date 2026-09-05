@@ -1,0 +1,471 @@
+[
+  {
+    "case_id": "V01",
+    "synthetic": true,
+    "expert_validated": false,
+    "use": "개발 검토용·정답 학습 금지",
+    "scenario_id": "S01",
+    "observation_ko": "과일과 우유를 찾는 중 같은 통로를 두 번 지났다.",
+    "known_conditions_ko": "첫 매장 방문이고 구역 표지가 화면 밖이었다.",
+    "alternative_explanations_ko": [
+      "다른 물건을 순서대로 찾은 정상 경로",
+      "표지 미노출",
+      "이동 조작 연습"
+    ],
+    "review_target_ko": "경로 사실과 표지 노출 조건을 언급하고, 탐색 전략이나 계획 능력은 단정하지 않는다.",
+    "must_not_conclude_ko": "계획 능력이 낮다.",
+    "source_refs": [
+      "I02",
+      "I10",
+      "R06"
+    ]
+  },
+  {
+    "case_id": "V02",
+    "synthetic": true,
+    "expert_validated": false,
+    "use": "개발 검토용·정답 학습 금지",
+    "scenario_id": "S04",
+    "observation_ko": "달걀 두 상품의 상세 정보를 번갈아 열고 특란을 담았다.",
+    "known_conditions_ko": "일반 달걀과 특란이 같은 진열대에 있고 등급이 목표 조건이었다.",
+    "alternative_explanations_ko": [
+      "조건을 확인하는 비교 전략",
+      "작은 글씨 재확인"
+    ],
+    "review_target_ko": "비교 후 목표 상품을 선택했다는 사실을 보존한다.",
+    "must_not_conclude_ko": "선택이 느리므로 판단력이 부족하다.",
+    "source_refs": [
+      "I02",
+      "P11"
+    ]
+  },
+  {
+    "case_id": "V03",
+    "synthetic": true,
+    "expert_validated": false,
+    "use": "개발 검토용·정답 학습 금지",
+    "scenario_id": "S05",
+    "observation_ko": "우유를 끌어 담으려는 시도가 세 번 취소됐다.",
+    "known_conditions_ko": "드롭 영역이 작고 마지막 시도에는 프레임 지연이 있었다.",
+    "alternative_explanations_ko": [
+      "목표 영역과 조작의 불일치",
+      "기기 지연",
+      "운동 접근성"
+    ],
+    "review_target_ko": "상품 이해와 드래그 조작 실패를 분리하고 대체 담기 조작을 제안한다.",
+    "must_not_conclude_ko": "우유를 구별하지 못한다.",
+    "source_refs": [
+      "I11",
+      "I12",
+      "P14"
+    ]
+  },
+  {
+    "case_id": "V04",
+    "synthetic": true,
+    "expert_validated": false,
+    "use": "개발 검토용·정답 학습 금지",
+    "scenario_id": "S01",
+    "observation_ko": "장보기 목록을 두 번 다시 열고 목표를 완수했다.",
+    "known_conditions_ko": "목록 재열기는 허용된 지원이며 최종 품목·수량이 맞았다.",
+    "alternative_explanations_ko": [
+      "외부 기억 보조를 효과적으로 사용",
+      "완료 전 확인 습관"
+    ],
+    "review_target_ko": "목록 지원을 사용한 성공으로 설명한다.",
+    "must_not_conclude_ko": "작업기억 결함이 있다.",
+    "source_refs": [
+      "P06",
+      "I10",
+      "R06"
+    ]
+  },
+  {
+    "case_id": "V05",
+    "synthetic": true,
+    "expert_validated": false,
+    "use": "개발 검토용·정답 학습 금지",
+    "scenario_id": "S09",
+    "observation_ko": "카레 진열대에서 계산대로 가지 않고 직원에게 갔다.",
+    "known_conditions_ko": "요청 카레가 품절이고 대체품 문의가 허용된 목표였다.",
+    "alternative_explanations_ko": [
+      "품절에 맞춘 적절한 도움 요청"
+    ],
+    "review_target_ko": "품절이라는 환경 조건과 유효한 문의 경로를 연결한다.",
+    "must_not_conclude_ko": "목표를 잊고 엉뚱한 곳으로 갔다.",
+    "source_refs": [
+      "I02",
+      "I09"
+    ]
+  },
+  {
+    "case_id": "V06",
+    "synthetic": true,
+    "expert_validated": false,
+    "use": "개발 검토용·정답 학습 금지",
+    "scenario_id": "S10",
+    "observation_ko": "특란을 사지 않고 예약 확인 후 마트를 나갔다.",
+    "known_conditions_ko": "특란 재고는 0이고 예약이 사전에 제시된 성공 경로였다.",
+    "alternative_explanations_ko": [
+      "현실적인 품절 대응을 마쳤음"
+    ],
+    "review_target_ko": "구매가 없다는 이유만으로 실패로 바꾸지 않는다.",
+    "must_not_conclude_ko": "장보기를 포기했다.",
+    "source_refs": [
+      "I14",
+      "I16"
+    ]
+  },
+  {
+    "case_id": "V07",
+    "synthetic": true,
+    "expert_validated": false,
+    "use": "개발 검토용·정답 학습 금지",
+    "scenario_id": "S08",
+    "observation_ko": "초기 요청인 탄산음료를 담았다.",
+    "known_conditions_ko": "보리차로 바뀐 목표의 수신 확인 기록이 없다.",
+    "alternative_explanations_ko": [
+      "기존에 알고 있던 목표를 따름",
+      "변경 UI가 전달되지 않음"
+    ],
+    "review_target_ko": "목표 변경을 인지했다고 가정하지 않고 비교를 보류한다.",
+    "must_not_conclude_ko": "새 지시를 무시했다.",
+    "source_refs": [
+      "I10",
+      "R06"
+    ]
+  },
+  {
+    "case_id": "V08",
+    "synthetic": true,
+    "expert_validated": false,
+    "use": "개발 검토용·정답 학습 금지",
+    "scenario_id": "S08",
+    "observation_ko": "변경 요청을 확인한 뒤 탄산음료를 빼고 보리차를 담았다.",
+    "known_conditions_ko": "확인 버튼 이후 기록이며 두 상품 모두 구입 가능했다.",
+    "alternative_explanations_ko": [
+      "이 장면에서 변경된 조건에 맞춰 수정"
+    ],
+    "review_target_ko": "이번 목표 변경에 대응했다고 한정한다.",
+    "must_not_conclude_ko": "인지 유연성이 일반인 수준이다.",
+    "source_refs": [
+      "I02",
+      "R06"
+    ]
+  },
+  {
+    "case_id": "V09",
+    "synthetic": true,
+    "expert_validated": false,
+    "use": "개발 검토용·정답 학습 금지",
+    "scenario_id": "S11",
+    "observation_ko": "사과 3개를 담았다가 결제 전 2개로 줄였다.",
+    "known_conditions_ko": "목표는 2개이며 결제 전 수정은 허용된다.",
+    "alternative_explanations_ko": [
+      "목록 또는 장바구니 재검토로 자기수정",
+      "초기 입력 실수"
+    ],
+    "review_target_ko": "초기 선택과 최종 수정 둘 다 기록된 사건으로 설명한다.",
+    "must_not_conclude_ko": "수 개념이 부족하다.",
+    "source_refs": [
+      "P17",
+      "I10"
+    ]
+  },
+  {
+    "case_id": "V10",
+    "synthetic": true,
+    "expert_validated": false,
+    "use": "개발 검토용·정답 학습 금지",
+    "scenario_id": "S07",
+    "observation_ko": "예산을 넘는 조합을 담았다.",
+    "known_conditions_ko": "총액 표시가 잠시 잘렸고 묶음가격 표시도 있었다.",
+    "alternative_explanations_ko": [
+      "총액 미노출",
+      "낱개·묶음 표시 혼동",
+      "계산 지원 필요 가능성"
+    ],
+    "review_target_ko": "표시 접근성을 먼저 확인하고 계산 능력 원인은 보류한다.",
+    "must_not_conclude_ko": "돈을 관리할 능력이 없다.",
+    "source_refs": [
+      "K11",
+      "I10",
+      "R06"
+    ]
+  },
+  {
+    "case_id": "V11",
+    "synthetic": true,
+    "expert_validated": false,
+    "use": "개발 검토용·정답 학습 금지",
+    "scenario_id": "S12",
+    "observation_ko": "2500원 한도에서 작은 흰우유를 선택했다.",
+    "known_conditions_ko": "용량 조건 없이 흰우유 1개가 목표다.",
+    "alternative_explanations_ko": [
+      "허용 범위의 예산 내 선택"
+    ],
+    "review_target_ko": "900mL만 정답이라는 숨은 조건을 추가하지 않는다.",
+    "must_not_conclude_ko": "작은 것을 골랐으므로 잘못 이해했다.",
+    "source_refs": [
+      "I14",
+      "R06"
+    ]
+  },
+  {
+    "case_id": "V12",
+    "synthetic": true,
+    "expert_validated": false,
+    "use": "개발 검토용·정답 학습 금지",
+    "scenario_id": "S14",
+    "observation_ko": "물건을 찾아보기 전에 직원에게 위치를 물었다.",
+    "known_conditions_ko": "직원 문의 자체가 해당 시나리오의 연습 목표다.",
+    "alternative_explanations_ko": [
+      "목표에 맞는 지원 사용"
+    ],
+    "review_target_ko": "목표 맥락을 함께 읽고 도움 사용을 결점으로 보지 않는다.",
+    "must_not_conclude_ko": "의존성이 강하다.",
+    "source_refs": [
+      "I09",
+      "I18"
+    ]
+  },
+  {
+    "case_id": "V13",
+    "synthetic": true,
+    "expert_validated": false,
+    "use": "개발 검토용·정답 학습 금지",
+    "scenario_id": "S15",
+    "observation_ko": "결제 전 구매내역의 사과 수량이 다르다고 직원에게 말했다.",
+    "known_conditions_ko": "목표는 1,200원 사과 2개와 생수 1개다. 게임 사건으로 사과가 하나 더 청구되어 4,400원이 표시됐으나 아직 지불 전이다. 정정 후 금액은 3,200원이다.",
+    "alternative_explanations_ko": [
+      "불일치를 확인하고 정정을 요청"
+    ],
+    "review_target_ko": "사용자 실수가 아니라 연습용 점포 오류임을 구분한다.",
+    "must_not_conclude_ko": "사용자가 계산을 틀렸다.",
+    "source_refs": [
+      "K11",
+      "I09"
+    ]
+  },
+  {
+    "case_id": "V14",
+    "synthetic": true,
+    "expert_validated": false,
+    "use": "개발 검토용·정답 학습 금지",
+    "scenario_id": "S16",
+    "observation_ko": "두 번째 세션의 이동 시간이 늘었다.",
+    "known_conditions_ko": "목록은 같지만 새 seed로 상품 위치가 달라졌다.",
+    "alternative_explanations_ko": [
+      "새 배치를 탐색",
+      "지원 설정 또는 기기 조건 차이"
+    ],
+    "review_target_ko": "서로 다른 과제 조건의 단순 시간 비교를 피한다.",
+    "must_not_conclude_ko": "학습 후 오히려 능력이 낮아졌다.",
+    "source_refs": [
+      "P03",
+      "I02"
+    ]
+  },
+  {
+    "case_id": "V15",
+    "synthetic": true,
+    "expert_validated": false,
+    "use": "개발 검토용·정답 학습 금지",
+    "scenario_id": "S01",
+    "observation_ko": "직접 구매하던 사용자가 종료 버튼을 눌렀다.",
+    "known_conditions_ko": "이유는 묻지 않았으며 종료는 항상 허용된다.",
+    "alternative_explanations_ko": [
+      "피로·휴식",
+      "다른 일정",
+      "원하지 않음",
+      "기술 문제"
+    ],
+    "review_target_ko": "종료 사실만 설명하고 필요시 재개·쉬기 선택을 제안한다.",
+    "must_not_conclude_ko": "불성실하거나 동기가 낮다.",
+    "source_refs": [
+      "I09",
+      "I14",
+      "I22"
+    ]
+  },
+  {
+    "case_id": "V16",
+    "synthetic": true,
+    "expert_validated": false,
+    "use": "개발 검토용·정답 학습 금지",
+    "scenario_id": "S03",
+    "observation_ko": "상품명을 소리 내지 않고 그림 버튼으로 선택했다.",
+    "known_conditions_ko": "음성 응답은 필수가 아니고 그림 선택이 제공돼 있다.",
+    "alternative_explanations_ko": [
+      "자신에게 편한 의사소통 방식 사용"
+    ],
+    "review_target_ko": "의사소통 방식과 의사결정 능력을 분리한다.",
+    "must_not_conclude_ko": "말을 안 하므로 이해하지 못했다.",
+    "source_refs": [
+      "I08",
+      "I15",
+      "K20"
+    ]
+  },
+  {
+    "case_id": "V17",
+    "synthetic": true,
+    "expert_validated": false,
+    "use": "개발 검토용·정답 학습 금지",
+    "scenario_id": "S01",
+    "observation_ko": "지시 재생 버튼을 누른 직후 소리를 껐다.",
+    "known_conditions_ko": "사용자의 이유와 청각 환경은 알 수 없다.",
+    "alternative_explanations_ko": [
+      "공공장소 사용",
+      "음량 불편",
+      "글로 보는 방식 선호"
+    ],
+    "review_target_ko": "소리를 끈 이유를 감각 진단으로 확정하지 않는다.",
+    "must_not_conclude_ko": "청각 과민 증상이 있다.",
+    "source_refs": [
+      "I08",
+      "I12",
+      "R06"
+    ]
+  },
+  {
+    "case_id": "V18",
+    "synthetic": true,
+    "expert_validated": false,
+    "use": "개발 검토용·정답 학습 금지",
+    "scenario_id": "S01",
+    "observation_ko": "입장 뒤 45초 동안 입력이 없었다.",
+    "known_conditions_ko": "백그라운드 전환·네트워크·화면 가림 기록이 누락돼 있다.",
+    "alternative_explanations_ko": [
+      "앱이 비활성 상태",
+      "안내 읽기",
+      "다른 일",
+      "로깅 누락"
+    ],
+    "review_target_ko": "입력 부재를 무반응 상태의 원인으로 해석하지 않는다.",
+    "must_not_conclude_ko": "주의 집중을 못한다.",
+    "source_refs": [
+      "I12",
+      "R02",
+      "R06"
+    ]
+  },
+  {
+    "case_id": "V19",
+    "synthetic": true,
+    "expert_validated": false,
+    "use": "개발 검토용·정답 학습 금지",
+    "scenario_id": "S04",
+    "observation_ko": "한 번의 터치에 담기 사건이 두 번 기록됐다.",
+    "known_conditions_ko": "클라이언트 재전송 가능성이 보고됐고 원본 입력 연결이 불완전하다.",
+    "alternative_explanations_ko": [
+      "중복 기록",
+      "실제 두 번 입력 여부 미확인"
+    ],
+    "review_target_ko": "데이터 품질 문제를 정우 담당 정제 단계로 전달하고 사람 해석을 보류한다.",
+    "must_not_conclude_ko": "충동적으로 반복 클릭한다.",
+    "source_refs": [
+      "R01",
+      "R02"
+    ]
+  },
+  {
+    "case_id": "V20",
+    "synthetic": true,
+    "expert_validated": false,
+    "use": "개발 검토용·정답 학습 금지",
+    "scenario_id": "S01",
+    "observation_ko": "상품이 화면에 2초 표시됐으나 선택되지 않았다.",
+    "known_conditions_ko": "시선 추적이나 실제 주시 확인 자료는 없다.",
+    "alternative_explanations_ko": [
+      "화면에 있었지만 보지 않았음",
+      "다른 상품을 찾는 중",
+      "선택하지 않기로 함"
+    ],
+    "review_target_ko": "화면 노출과 실제로 읽음·봄을 구분한다.",
+    "must_not_conclude_ko": "분명 봤는데 기억하지 못했다.",
+    "source_refs": [
+      "P11",
+      "R06"
+    ]
+  },
+  {
+    "case_id": "V21",
+    "synthetic": true,
+    "expert_validated": false,
+    "use": "개발 검토용·정답 학습 금지",
+    "scenario_id": "S01",
+    "observation_ko": "힌트 제공 뒤 목표 상품을 골랐다.",
+    "known_conditions_ko": "힌트 전후에 시간 경과와 반복 경험도 함께 있었다.",
+    "alternative_explanations_ko": [
+      "힌트가 도움이 됐을 가능성",
+      "반복 경험",
+      "우연한 탐색"
+    ],
+    "review_target_ko": "시간적 순서를 말하되 힌트의 인과 효과로 확정하지 않는다.",
+    "must_not_conclude_ko": "이 힌트가 이 사람에게 반드시 효과적이다.",
+    "source_refs": [
+      "P15",
+      "R06"
+    ]
+  },
+  {
+    "case_id": "V22",
+    "synthetic": true,
+    "expert_validated": false,
+    "use": "개발 검토용·정답 학습 금지",
+    "scenario_id": "S16",
+    "observation_ko": "그림 목록을 켠 채 새 배치에서 장보기를 마쳤다.",
+    "known_conditions_ko": "지원은 계속 사용했고 실생활 관찰은 없다.",
+    "alternative_explanations_ko": [
+      "지원 조건 아래 새 게임 배치에서 성공"
+    ],
+    "review_target_ko": "지원 사용과 게임 환경에 한정한 성과를 설명한다.",
+    "must_not_conclude_ko": "이제 실제 마트에서 도움 없이 장볼 수 있다.",
+    "source_refs": [
+      "P10",
+      "P14",
+      "P22"
+    ]
+  },
+  {
+    "case_id": "V23",
+    "synthetic": true,
+    "expert_validated": false,
+    "use": "개발 검토용·정답 학습 금지",
+    "scenario_id": "S06",
+    "observation_ko": "한 성인은 음성 목록보다 그림 목록을 선호한다고 말했다.",
+    "known_conditions_ko": "한 사람의 현재 선호이며 다른 이용자 자료가 없다.",
+    "alternative_explanations_ko": [
+      "이 사용자의 이 상황에서의 선호"
+    ],
+    "review_target_ko": "선호를 존중하되 전체 집단의 필수 방식으로 확대하지 않는다.",
+    "must_not_conclude_ko": "발달장애인은 모두 음성보다 그림을 좋아한다.",
+    "source_refs": [
+      "I12",
+      "P06",
+      "P16"
+    ]
+  },
+  {
+    "case_id": "V24",
+    "synthetic": true,
+    "expert_validated": false,
+    "use": "개발 검토용·정답 학습 금지",
+    "scenario_id": "S03",
+    "observation_ko": "사용자가 목록을 바꾸고 싶다고 말했다.",
+    "known_conditions_ko": "기존 목록을 이해 못 했는지는 확인되지 않았고 원하는 대안은 아직 묻지 않았다.",
+    "alternative_explanations_ko": [
+      "선호 표현",
+      "목표 협의 요청",
+      "경험·생활 맥락과 다른 과제"
+    ],
+    "review_target_ko": "가능한 선택지를 설명하고 본인 의사를 확인한다.",
+    "must_not_conclude_ko": "지시 불이행이므로 강제로 원래 목록을 수행시킨다.",
+    "source_refs": [
+      "I14",
+      "I16",
+      "K15"
+    ]
+  }
+]

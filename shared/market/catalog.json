@@ -1,0 +1,1050 @@
+{
+  "content_version": "oneuldo-shopping-content-2026-09-04-v2",
+  "disclaimer_ko": "모든 가격·브랜드·재고는 게임용 가상 설정이며 실제 가격, 상표, 식품보관 안내가 아니다.",
+  "product_count": 60,
+  "currency": "KRW_game_units",
+  "quantity_semantics_ko": "수량은 구매 단위 수다. 달걀 10개입 1팩은 SKU 1종·구매수량 1이다.",
+  "storage_semantics_ko": "보관 구분은 이 가상 매장의 호환 슬롯 검증용이다. 실제 상품의 보관 지침을 대체하지 않는다.",
+  "categories": [
+    {
+      "id": "fresh",
+      "candidate_count": 15,
+      "display_count_per_session": 6
+    },
+    {
+      "id": "produce",
+      "candidate_count": 15,
+      "display_count_per_session": 6
+    },
+    {
+      "id": "meal",
+      "candidate_count": 15,
+      "display_count_per_session": 6
+    },
+    {
+      "id": "drink",
+      "candidate_count": 15,
+      "display_count_per_session": 6
+    }
+  ],
+  "products": [
+    {
+      "id": "milk",
+      "legacy_id": "milk",
+      "category_id": "fresh",
+      "name": "흰 우유",
+      "detail": "900mL",
+      "price_won": 2200,
+      "storage": "chilled",
+      "sales_unit": "개",
+      "attributes": {
+        "kind": "milk",
+        "flavor": "plain",
+        "volume_ml": 900
+      },
+      "content_kind": "fictional_game_product",
+      "visual_asset_status": "기존 에셋 연결은 미구현"
+    },
+    {
+      "id": "eggs",
+      "legacy_id": "eggs",
+      "category_id": "fresh",
+      "name": "달걀",
+      "detail": "10개입",
+      "price_won": 3600,
+      "storage": "chilled",
+      "sales_unit": "팩",
+      "attributes": {
+        "kind": "eggs",
+        "pack_count": 10,
+        "egg_grade": "기본"
+      },
+      "content_kind": "fictional_game_product",
+      "visual_asset_status": "기존 에셋 연결은 미구현"
+    },
+    {
+      "id": "premium-eggs",
+      "legacy_id": "premium-eggs",
+      "category_id": "fresh",
+      "name": "해뜰 특란",
+      "detail": "무항생제 · 10구",
+      "price_won": 5200,
+      "storage": "chilled",
+      "sales_unit": "팩",
+      "attributes": {
+        "kind": "eggs",
+        "brand": "해뜰",
+        "pack_count": 10,
+        "egg_grade": "특란"
+      },
+      "content_kind": "fictional_game_product",
+      "visual_asset_status": "기존 에셋 연결은 미구현"
+    },
+    {
+      "id": "sausage",
+      "legacy_id": "sausage",
+      "category_id": "fresh",
+      "name": "소시지",
+      "detail": "200g",
+      "price_won": 3200,
+      "storage": "chilled",
+      "sales_unit": "팩",
+      "attributes": {
+        "kind": "sausage",
+        "weight_g": 200
+      },
+      "content_kind": "fictional_game_product",
+      "visual_asset_status": "기존 에셋 연결은 미구현"
+    },
+    {
+      "id": "brand-sausage",
+      "legacy_id": "brand-sausage",
+      "category_id": "fresh",
+      "name": "튼튼 소시지",
+      "detail": "오리지널 · 300g",
+      "price_won": 4800,
+      "storage": "chilled",
+      "sales_unit": "팩",
+      "attributes": {
+        "kind": "sausage",
+        "brand": "튼튼",
+        "flavor": "original",
+        "weight_g": 300
+      },
+      "content_kind": "fictional_game_product",
+      "visual_asset_status": "기존 에셋 연결은 미구현"
+    },
+    {
+      "id": "tofu",
+      "legacy_id": "tofu",
+      "category_id": "fresh",
+      "name": "부침 두부",
+      "detail": "300g",
+      "price_won": 1900,
+      "storage": "chilled",
+      "sales_unit": "개",
+      "attributes": {
+        "kind": "tofu",
+        "tofu_type": "firm",
+        "weight_g": 300
+      },
+      "content_kind": "fictional_game_product",
+      "visual_asset_status": "기존 에셋 연결은 미구현"
+    },
+    {
+      "id": "apple",
+      "legacy_id": "apple",
+      "category_id": "produce",
+      "name": "사과",
+      "detail": "1개",
+      "price_won": 1200,
+      "storage": "ambient",
+      "sales_unit": "개",
+      "attributes": {
+        "kind": "apple",
+        "variety": "red",
+        "pack_count": 1,
+        "pack_unit": "개"
+      },
+      "content_kind": "fictional_game_product",
+      "visual_asset_status": "기존 에셋 연결은 미구현"
+    },
+    {
+      "id": "watermelon",
+      "legacy_id": "watermelon",
+      "category_id": "produce",
+      "name": "수박",
+      "detail": "1통",
+      "price_won": 9800,
+      "storage": "ambient",
+      "sales_unit": "통",
+      "attributes": {
+        "kind": "watermelon",
+        "pack_count": 1,
+        "pack_unit": "통"
+      },
+      "content_kind": "fictional_game_product",
+      "visual_asset_status": "기존 에셋 연결은 미구현"
+    },
+    {
+      "id": "banana",
+      "legacy_id": "banana",
+      "category_id": "produce",
+      "name": "바나나",
+      "detail": "1송이",
+      "price_won": 3600,
+      "storage": "ambient",
+      "sales_unit": "송이",
+      "attributes": {
+        "kind": "banana",
+        "pack_count": 1,
+        "pack_unit": "송이"
+      },
+      "content_kind": "fictional_game_product",
+      "visual_asset_status": "기존 에셋 연결은 미구현"
+    },
+    {
+      "id": "tomato",
+      "legacy_id": "tomato",
+      "category_id": "produce",
+      "name": "토마토",
+      "detail": "4개입",
+      "price_won": 4500,
+      "storage": "ambient",
+      "sales_unit": "팩",
+      "attributes": {
+        "kind": "tomato",
+        "pack_count": 4,
+        "pack_unit": "팩"
+      },
+      "content_kind": "fictional_game_product",
+      "visual_asset_status": "기존 에셋 연결은 미구현"
+    },
+    {
+      "id": "onion",
+      "legacy_id": "onion",
+      "category_id": "produce",
+      "name": "양파",
+      "detail": "1kg",
+      "price_won": 3300,
+      "storage": "ambient",
+      "sales_unit": "봉",
+      "attributes": {
+        "kind": "onion",
+        "weight_g": 1000,
+        "pack_unit": "봉"
+      },
+      "content_kind": "fictional_game_product",
+      "visual_asset_status": "기존 에셋 연결은 미구현"
+    },
+    {
+      "id": "carrot",
+      "legacy_id": "carrot",
+      "category_id": "produce",
+      "name": "당근",
+      "detail": "3개입",
+      "price_won": 2800,
+      "storage": "ambient",
+      "sales_unit": "봉",
+      "attributes": {
+        "kind": "carrot",
+        "pack_count": 3,
+        "pack_unit": "봉"
+      },
+      "content_kind": "fictional_game_product",
+      "visual_asset_status": "기존 에셋 연결은 미구현"
+    },
+    {
+      "id": "curry",
+      "legacy_id": "curry",
+      "category_id": "meal",
+      "name": "순한 카레",
+      "detail": "4인분",
+      "price_won": 2800,
+      "storage": "ambient",
+      "sales_unit": "개",
+      "attributes": {
+        "kind": "curry",
+        "flavor": "mild",
+        "servings": 4
+      },
+      "content_kind": "fictional_game_product",
+      "visual_asset_status": "기존 에셋 연결은 미구현"
+    },
+    {
+      "id": "ramen",
+      "legacy_id": "ramen",
+      "category_id": "meal",
+      "name": "매운 라면",
+      "detail": "1봉",
+      "price_won": 1400,
+      "storage": "ambient",
+      "sales_unit": "개",
+      "attributes": {
+        "kind": "ramen",
+        "flavor": "spicy",
+        "pack_count": 1
+      },
+      "content_kind": "fictional_game_product",
+      "visual_asset_status": "기존 에셋 연결은 미구현"
+    },
+    {
+      "id": "brand-curry",
+      "legacy_id": "brand-curry",
+      "category_id": "meal",
+      "name": "오늘카레 순한맛",
+      "detail": "고형 · 4인분",
+      "price_won": 3900,
+      "storage": "ambient",
+      "sales_unit": "개",
+      "attributes": {
+        "kind": "curry",
+        "brand": "오늘카레",
+        "flavor": "mild",
+        "servings": 4
+      },
+      "content_kind": "fictional_game_product",
+      "visual_asset_status": "기존 에셋 연결은 미구현"
+    },
+    {
+      "id": "mild-ramen",
+      "legacy_id": "mild-ramen",
+      "category_id": "meal",
+      "name": "순한 라면",
+      "detail": "5개입",
+      "price_won": 4700,
+      "storage": "ambient",
+      "sales_unit": "개",
+      "attributes": {
+        "kind": "ramen",
+        "flavor": "mild",
+        "pack_count": 5
+      },
+      "content_kind": "fictional_game_product",
+      "visual_asset_status": "기존 에셋 연결은 미구현"
+    },
+    {
+      "id": "instant-rice",
+      "legacy_id": "instant-rice",
+      "category_id": "meal",
+      "name": "즉석밥",
+      "detail": "210g · 3개입",
+      "price_won": 4500,
+      "storage": "ambient",
+      "sales_unit": "개",
+      "attributes": {
+        "kind": "rice",
+        "weight_g": 210,
+        "pack_count": 3
+      },
+      "content_kind": "fictional_game_product",
+      "visual_asset_status": "기존 에셋 연결은 미구현"
+    },
+    {
+      "id": "dumpling",
+      "legacy_id": "dumpling",
+      "category_id": "meal",
+      "name": "고기 만두",
+      "detail": "냉동 · 400g",
+      "price_won": 6200,
+      "storage": "frozen",
+      "sales_unit": "개",
+      "attributes": {
+        "kind": "dumpling",
+        "flavor": "meat",
+        "weight_g": 400
+      },
+      "content_kind": "fictional_game_product",
+      "visual_asset_status": "기존 에셋 연결은 미구현"
+    },
+    {
+      "id": "juice",
+      "legacy_id": "juice",
+      "category_id": "drink",
+      "name": "오렌지 주스",
+      "detail": "1L",
+      "price_won": 3200,
+      "storage": "ambient",
+      "sales_unit": "개",
+      "attributes": {
+        "kind": "juice",
+        "flavor": "orange",
+        "volume_ml": 1000
+      },
+      "content_kind": "fictional_game_product",
+      "visual_asset_status": "기존 에셋 연결은 미구현"
+    },
+    {
+      "id": "soda",
+      "legacy_id": "soda",
+      "category_id": "drink",
+      "name": "탄산음료",
+      "detail": "500mL",
+      "price_won": 1900,
+      "storage": "ambient",
+      "sales_unit": "개",
+      "attributes": {
+        "kind": "soda",
+        "flavor": "original",
+        "volume_ml": 500
+      },
+      "content_kind": "fictional_game_product",
+      "visual_asset_status": "기존 에셋 연결은 미구현"
+    },
+    {
+      "id": "water",
+      "legacy_id": "water",
+      "category_id": "drink",
+      "name": "생수",
+      "detail": "500mL",
+      "price_won": 800,
+      "storage": "ambient",
+      "sales_unit": "개",
+      "attributes": {
+        "kind": "water",
+        "volume_ml": 500
+      },
+      "content_kind": "fictional_game_product",
+      "visual_asset_status": "기존 에셋 연결은 미구현"
+    },
+    {
+      "id": "sparkling-water",
+      "legacy_id": "sparkling-water",
+      "category_id": "drink",
+      "name": "탄산수",
+      "detail": "레몬 · 500mL",
+      "price_won": 1600,
+      "storage": "ambient",
+      "sales_unit": "개",
+      "attributes": {
+        "kind": "sparkling_water",
+        "flavor": "lemon",
+        "volume_ml": 500
+      },
+      "content_kind": "fictional_game_product",
+      "visual_asset_status": "기존 에셋 연결은 미구현"
+    },
+    {
+      "id": "grape-juice",
+      "legacy_id": "grape-juice",
+      "category_id": "drink",
+      "name": "포도 주스",
+      "detail": "무가당 · 1L",
+      "price_won": 3800,
+      "storage": "ambient",
+      "sales_unit": "개",
+      "attributes": {
+        "kind": "juice",
+        "flavor": "grape",
+        "volume_ml": 1000
+      },
+      "content_kind": "fictional_game_product",
+      "visual_asset_status": "기존 에셋 연결은 미구현"
+    },
+    {
+      "id": "barley-tea",
+      "legacy_id": "barley-tea",
+      "category_id": "drink",
+      "name": "보리차",
+      "detail": "1.5L",
+      "price_won": 2100,
+      "storage": "ambient",
+      "sales_unit": "개",
+      "attributes": {
+        "kind": "barley_tea",
+        "volume_ml": 1500
+      },
+      "content_kind": "fictional_game_product",
+      "visual_asset_status": "기존 에셋 연결은 미구현"
+    },
+    {
+      "id": "milk-small",
+      "legacy_id": null,
+      "category_id": "fresh",
+      "name": "작은 흰 우유",
+      "detail": "200mL",
+      "price_won": 1100,
+      "storage": "chilled",
+      "sales_unit": "개",
+      "attributes": {
+        "kind": "milk",
+        "flavor": "plain",
+        "volume_ml": 200
+      },
+      "content_kind": "fictional_game_product",
+      "visual_asset_status": "새 이미지 없음; 라벨 또는 임시 도형으로 검토"
+    },
+    {
+      "id": "chocolate-milk",
+      "legacy_id": null,
+      "category_id": "fresh",
+      "name": "초코 우유",
+      "detail": "200mL",
+      "price_won": 1400,
+      "storage": "chilled",
+      "sales_unit": "개",
+      "attributes": {
+        "kind": "milk",
+        "flavor": "chocolate",
+        "volume_ml": 200
+      },
+      "content_kind": "fictional_game_product",
+      "visual_asset_status": "새 이미지 없음; 라벨 또는 임시 도형으로 검토"
+    },
+    {
+      "id": "haetteul-large-eggs",
+      "legacy_id": null,
+      "category_id": "fresh",
+      "name": "해뜰 대란",
+      "detail": "10구",
+      "price_won": 4800,
+      "storage": "chilled",
+      "sales_unit": "팩",
+      "attributes": {
+        "kind": "eggs",
+        "brand": "해뜰",
+        "egg_grade": "대란",
+        "pack_count": 10
+      },
+      "content_kind": "fictional_game_product",
+      "visual_asset_status": "새 이미지 없음; 라벨 또는 임시 도형으로 검토"
+    },
+    {
+      "id": "premium-eggs-15",
+      "legacy_id": null,
+      "category_id": "fresh",
+      "name": "해뜰 특란",
+      "detail": "15구",
+      "price_won": 6900,
+      "storage": "chilled",
+      "sales_unit": "팩",
+      "attributes": {
+        "kind": "eggs",
+        "brand": "해뜰",
+        "egg_grade": "특란",
+        "pack_count": 15
+      },
+      "content_kind": "fictional_game_product",
+      "visual_asset_status": "새 이미지 없음; 라벨 또는 임시 도형으로 검토"
+    },
+    {
+      "id": "tofu-silken",
+      "legacy_id": null,
+      "category_id": "fresh",
+      "name": "순두부",
+      "detail": "300g",
+      "price_won": 1800,
+      "storage": "chilled",
+      "sales_unit": "개",
+      "attributes": {
+        "kind": "tofu",
+        "tofu_type": "silken",
+        "weight_g": 300
+      },
+      "content_kind": "fictional_game_product",
+      "visual_asset_status": "새 이미지 없음; 라벨 또는 임시 도형으로 검토"
+    },
+    {
+      "id": "yogurt-plain",
+      "legacy_id": null,
+      "category_id": "fresh",
+      "name": "떠먹는 요구르트",
+      "detail": "플레인 · 450g",
+      "price_won": 2700,
+      "storage": "chilled",
+      "sales_unit": "개",
+      "attributes": {
+        "kind": "yogurt",
+        "flavor": "plain",
+        "weight_g": 450
+      },
+      "content_kind": "fictional_game_product",
+      "visual_asset_status": "새 이미지 없음; 라벨 또는 임시 도형으로 검토"
+    },
+    {
+      "id": "yogurt-strawberry",
+      "legacy_id": null,
+      "category_id": "fresh",
+      "name": "딸기 요구르트",
+      "detail": "150g",
+      "price_won": 1400,
+      "storage": "chilled",
+      "sales_unit": "개",
+      "attributes": {
+        "kind": "yogurt",
+        "flavor": "strawberry",
+        "weight_g": 150
+      },
+      "content_kind": "fictional_game_product",
+      "visual_asset_status": "새 이미지 없음; 라벨 또는 임시 도형으로 검토"
+    },
+    {
+      "id": "sliced-cheese",
+      "legacy_id": null,
+      "category_id": "fresh",
+      "name": "슬라이스 치즈",
+      "detail": "180g",
+      "price_won": 3300,
+      "storage": "chilled",
+      "sales_unit": "개",
+      "attributes": {
+        "kind": "cheese",
+        "weight_g": 180
+      },
+      "content_kind": "fictional_game_product",
+      "visual_asset_status": "새 이미지 없음; 라벨 또는 임시 도형으로 검토"
+    },
+    {
+      "id": "milk-large",
+      "legacy_id": null,
+      "category_id": "fresh",
+      "name": "큰 흰 우유",
+      "detail": "1.8L",
+      "price_won": 4100,
+      "storage": "chilled",
+      "sales_unit": "개",
+      "attributes": {
+        "kind": "milk",
+        "flavor": "plain",
+        "volume_ml": 1800
+      },
+      "content_kind": "fictional_game_product",
+      "visual_asset_status": "새 이미지 없음; 라벨 또는 임시 도형으로 검토"
+    },
+    {
+      "id": "apple-green",
+      "legacy_id": null,
+      "category_id": "produce",
+      "name": "초록 사과",
+      "detail": "1개",
+      "price_won": 1500,
+      "storage": "ambient",
+      "sales_unit": "개",
+      "attributes": {
+        "kind": "apple",
+        "variety": "green",
+        "pack_count": 1,
+        "pack_unit": "개"
+      },
+      "content_kind": "fictional_game_product",
+      "visual_asset_status": "새 이미지 없음; 라벨 또는 임시 도형으로 검토"
+    },
+    {
+      "id": "pear",
+      "legacy_id": null,
+      "category_id": "produce",
+      "name": "배",
+      "detail": "1개",
+      "price_won": 1800,
+      "storage": "ambient",
+      "sales_unit": "개",
+      "attributes": {
+        "kind": "pear",
+        "pack_count": 1,
+        "pack_unit": "개"
+      },
+      "content_kind": "fictional_game_product",
+      "visual_asset_status": "새 이미지 없음; 라벨 또는 임시 도형으로 검토"
+    },
+    {
+      "id": "tangerine",
+      "legacy_id": null,
+      "category_id": "produce",
+      "name": "귤",
+      "detail": "500g",
+      "price_won": 2900,
+      "storage": "ambient",
+      "sales_unit": "봉",
+      "attributes": {
+        "kind": "tangerine",
+        "weight_g": 500,
+        "pack_unit": "봉"
+      },
+      "content_kind": "fictional_game_product",
+      "visual_asset_status": "새 이미지 없음; 라벨 또는 임시 도형으로 검토"
+    },
+    {
+      "id": "strawberry",
+      "legacy_id": null,
+      "category_id": "produce",
+      "name": "딸기",
+      "detail": "500g",
+      "price_won": 6500,
+      "storage": "ambient",
+      "sales_unit": "팩",
+      "attributes": {
+        "kind": "strawberry",
+        "weight_g": 500,
+        "pack_unit": "팩"
+      },
+      "content_kind": "fictional_game_product",
+      "visual_asset_status": "새 이미지 없음; 라벨 또는 임시 도형으로 검토"
+    },
+    {
+      "id": "grapes",
+      "legacy_id": null,
+      "category_id": "produce",
+      "name": "포도",
+      "detail": "500g",
+      "price_won": 5200,
+      "storage": "ambient",
+      "sales_unit": "팩",
+      "attributes": {
+        "kind": "grapes",
+        "weight_g": 500,
+        "pack_unit": "팩"
+      },
+      "content_kind": "fictional_game_product",
+      "visual_asset_status": "새 이미지 없음; 라벨 또는 임시 도형으로 검토"
+    },
+    {
+      "id": "potato",
+      "legacy_id": null,
+      "category_id": "produce",
+      "name": "감자",
+      "detail": "1kg",
+      "price_won": 3900,
+      "storage": "ambient",
+      "sales_unit": "봉",
+      "attributes": {
+        "kind": "potato",
+        "weight_g": 1000,
+        "pack_unit": "봉"
+      },
+      "content_kind": "fictional_game_product",
+      "visual_asset_status": "새 이미지 없음; 라벨 또는 임시 도형으로 검토"
+    },
+    {
+      "id": "cucumber",
+      "legacy_id": null,
+      "category_id": "produce",
+      "name": "오이",
+      "detail": "2개입",
+      "price_won": 2100,
+      "storage": "ambient",
+      "sales_unit": "봉",
+      "attributes": {
+        "kind": "cucumber",
+        "pack_count": 2,
+        "pack_unit": "봉"
+      },
+      "content_kind": "fictional_game_product",
+      "visual_asset_status": "새 이미지 없음; 라벨 또는 임시 도형으로 검토"
+    },
+    {
+      "id": "lettuce",
+      "legacy_id": null,
+      "category_id": "produce",
+      "name": "상추",
+      "detail": "150g",
+      "price_won": 1700,
+      "storage": "ambient",
+      "sales_unit": "봉",
+      "attributes": {
+        "kind": "lettuce",
+        "weight_g": 150,
+        "pack_unit": "봉"
+      },
+      "content_kind": "fictional_game_product",
+      "visual_asset_status": "새 이미지 없음; 라벨 또는 임시 도형으로 검토"
+    },
+    {
+      "id": "banana-single",
+      "legacy_id": null,
+      "category_id": "produce",
+      "name": "낱개 바나나",
+      "detail": "1개",
+      "price_won": 1000,
+      "storage": "ambient",
+      "sales_unit": "개",
+      "attributes": {
+        "kind": "banana",
+        "pack_count": 1,
+        "pack_unit": "개"
+      },
+      "content_kind": "fictional_game_product",
+      "visual_asset_status": "새 이미지 없음; 라벨 또는 임시 도형으로 검토"
+    },
+    {
+      "id": "curry-spicy",
+      "legacy_id": null,
+      "category_id": "meal",
+      "name": "매운 카레",
+      "detail": "4인분",
+      "price_won": 3000,
+      "storage": "ambient",
+      "sales_unit": "개",
+      "attributes": {
+        "kind": "curry",
+        "flavor": "spicy",
+        "servings": 4
+      },
+      "content_kind": "fictional_game_product",
+      "visual_asset_status": "새 이미지 없음; 라벨 또는 임시 도형으로 검토"
+    },
+    {
+      "id": "curry-one-mild",
+      "legacy_id": null,
+      "category_id": "meal",
+      "name": "1인분 순한 카레",
+      "detail": "1인분",
+      "price_won": 1800,
+      "storage": "ambient",
+      "sales_unit": "개",
+      "attributes": {
+        "kind": "curry",
+        "flavor": "mild",
+        "servings": 1
+      },
+      "content_kind": "fictional_game_product",
+      "visual_asset_status": "새 이미지 없음; 라벨 또는 임시 도형으로 검토"
+    },
+    {
+      "id": "ramen-cheese",
+      "legacy_id": null,
+      "category_id": "meal",
+      "name": "치즈 라면",
+      "detail": "1봉",
+      "price_won": 1700,
+      "storage": "ambient",
+      "sales_unit": "개",
+      "attributes": {
+        "kind": "ramen",
+        "flavor": "cheese",
+        "pack_count": 1
+      },
+      "content_kind": "fictional_game_product",
+      "visual_asset_status": "새 이미지 없음; 라벨 또는 임시 도형으로 검토"
+    },
+    {
+      "id": "ramen-mild-single",
+      "legacy_id": null,
+      "category_id": "meal",
+      "name": "낱봉 순한 라면",
+      "detail": "1봉",
+      "price_won": 1200,
+      "storage": "ambient",
+      "sales_unit": "개",
+      "attributes": {
+        "kind": "ramen",
+        "flavor": "mild",
+        "pack_count": 1
+      },
+      "content_kind": "fictional_game_product",
+      "visual_asset_status": "새 이미지 없음; 라벨 또는 임시 도형으로 검토"
+    },
+    {
+      "id": "instant-rice-single",
+      "legacy_id": null,
+      "category_id": "meal",
+      "name": "낱개 즉석밥",
+      "detail": "210g · 1개입",
+      "price_won": 1600,
+      "storage": "ambient",
+      "sales_unit": "개",
+      "attributes": {
+        "kind": "rice",
+        "weight_g": 210,
+        "pack_count": 1
+      },
+      "content_kind": "fictional_game_product",
+      "visual_asset_status": "새 이미지 없음; 라벨 또는 임시 도형으로 검토"
+    },
+    {
+      "id": "seaweed",
+      "legacy_id": null,
+      "category_id": "meal",
+      "name": "도시락 김",
+      "detail": "3개입",
+      "price_won": 2000,
+      "storage": "ambient",
+      "sales_unit": "개",
+      "attributes": {
+        "kind": "seaweed",
+        "pack_count": 3
+      },
+      "content_kind": "fictional_game_product",
+      "visual_asset_status": "새 이미지 없음; 라벨 또는 임시 도형으로 검토"
+    },
+    {
+      "id": "porridge-beef",
+      "legacy_id": null,
+      "category_id": "meal",
+      "name": "쇠고기 죽",
+      "detail": "280g",
+      "price_won": 2700,
+      "storage": "ambient",
+      "sales_unit": "개",
+      "attributes": {
+        "kind": "porridge",
+        "flavor": "beef",
+        "weight_g": 280
+      },
+      "content_kind": "fictional_game_product",
+      "visual_asset_status": "새 이미지 없음; 라벨 또는 임시 도형으로 검토"
+    },
+    {
+      "id": "vegetable-dumpling",
+      "legacy_id": null,
+      "category_id": "meal",
+      "name": "채소 만두",
+      "detail": "냉동 · 400g",
+      "price_won": 5900,
+      "storage": "frozen",
+      "sales_unit": "개",
+      "attributes": {
+        "kind": "dumpling",
+        "flavor": "vegetable",
+        "weight_g": 400
+      },
+      "content_kind": "fictional_game_product",
+      "visual_asset_status": "새 이미지 없음; 라벨 또는 임시 도형으로 검토"
+    },
+    {
+      "id": "frozen-fried-rice",
+      "legacy_id": null,
+      "category_id": "meal",
+      "name": "채소 볶음밥",
+      "detail": "냉동 · 450g",
+      "price_won": 4900,
+      "storage": "frozen",
+      "sales_unit": "개",
+      "attributes": {
+        "kind": "fried_rice",
+        "flavor": "vegetable",
+        "weight_g": 450
+      },
+      "content_kind": "fictional_game_product",
+      "visual_asset_status": "새 이미지 없음; 라벨 또는 임시 도형으로 검토"
+    },
+    {
+      "id": "water-large",
+      "legacy_id": null,
+      "category_id": "drink",
+      "name": "큰 생수",
+      "detail": "2L",
+      "price_won": 1500,
+      "storage": "ambient",
+      "sales_unit": "개",
+      "attributes": {
+        "kind": "water",
+        "volume_ml": 2000
+      },
+      "content_kind": "fictional_game_product",
+      "visual_asset_status": "새 이미지 없음; 라벨 또는 임시 도형으로 검토"
+    },
+    {
+      "id": "water-small",
+      "legacy_id": null,
+      "category_id": "drink",
+      "name": "작은 생수",
+      "detail": "330mL",
+      "price_won": 600,
+      "storage": "ambient",
+      "sales_unit": "개",
+      "attributes": {
+        "kind": "water",
+        "volume_ml": 330
+      },
+      "content_kind": "fictional_game_product",
+      "visual_asset_status": "새 이미지 없음; 라벨 또는 임시 도형으로 검토"
+    },
+    {
+      "id": "orange-juice-small",
+      "legacy_id": null,
+      "category_id": "drink",
+      "name": "작은 오렌지 주스",
+      "detail": "250mL",
+      "price_won": 1000,
+      "storage": "ambient",
+      "sales_unit": "개",
+      "attributes": {
+        "kind": "juice",
+        "flavor": "orange",
+        "volume_ml": 250
+      },
+      "content_kind": "fictional_game_product",
+      "visual_asset_status": "새 이미지 없음; 라벨 또는 임시 도형으로 검토"
+    },
+    {
+      "id": "apple-juice",
+      "legacy_id": null,
+      "category_id": "drink",
+      "name": "사과 주스",
+      "detail": "1L",
+      "price_won": 3500,
+      "storage": "ambient",
+      "sales_unit": "개",
+      "attributes": {
+        "kind": "juice",
+        "flavor": "apple",
+        "volume_ml": 1000
+      },
+      "content_kind": "fictional_game_product",
+      "visual_asset_status": "새 이미지 없음; 라벨 또는 임시 도형으로 검토"
+    },
+    {
+      "id": "cola",
+      "legacy_id": null,
+      "category_id": "drink",
+      "name": "콜라",
+      "detail": "500mL",
+      "price_won": 1800,
+      "storage": "ambient",
+      "sales_unit": "개",
+      "attributes": {
+        "kind": "soda",
+        "flavor": "cola",
+        "volume_ml": 500
+      },
+      "content_kind": "fictional_game_product",
+      "visual_asset_status": "새 이미지 없음; 라벨 또는 임시 도형으로 검토"
+    },
+    {
+      "id": "barley-tea-small",
+      "legacy_id": null,
+      "category_id": "drink",
+      "name": "작은 보리차",
+      "detail": "500mL",
+      "price_won": 1200,
+      "storage": "ambient",
+      "sales_unit": "개",
+      "attributes": {
+        "kind": "barley_tea",
+        "volume_ml": 500
+      },
+      "content_kind": "fictional_game_product",
+      "visual_asset_status": "새 이미지 없음; 라벨 또는 임시 도형으로 검토"
+    },
+    {
+      "id": "grape-soda",
+      "legacy_id": null,
+      "category_id": "drink",
+      "name": "포도맛 탄산음료",
+      "detail": "500mL",
+      "price_won": 1900,
+      "storage": "ambient",
+      "sales_unit": "개",
+      "attributes": {
+        "kind": "soda",
+        "flavor": "grape",
+        "volume_ml": 500
+      },
+      "content_kind": "fictional_game_product",
+      "visual_asset_status": "새 이미지 없음; 라벨 또는 임시 도형으로 검토"
+    },
+    {
+      "id": "soy-drink",
+      "legacy_id": null,
+      "category_id": "drink",
+      "name": "두유",
+      "detail": "190mL",
+      "price_won": 1000,
+      "storage": "ambient",
+      "sales_unit": "개",
+      "attributes": {
+        "kind": "soy_drink",
+        "volume_ml": 190
+      },
+      "content_kind": "fictional_game_product",
+      "visual_asset_status": "새 이미지 없음; 라벨 또는 임시 도형으로 검토"
+    },
+    {
+      "id": "peach-tea",
+      "legacy_id": null,
+      "category_id": "drink",
+      "name": "복숭아차",
+      "detail": "500mL",
+      "price_won": 1700,
+      "storage": "ambient",
+      "sales_unit": "개",
+      "attributes": {
+        "kind": "tea",
+        "flavor": "peach",
+        "volume_ml": 500
+      },
+      "content_kind": "fictional_game_product",
+      "visual_asset_status": "새 이미지 없음; 라벨 또는 임시 도형으로 검토"
+    }
+  ]
+}

@@ -17,9 +17,10 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
-@SpringBootTest
+@SpringBootTest(properties = "spring.datasource.url=jdbc:h2:mem:legacy-admin;MODE=PostgreSQL;DB_CLOSE_DELAY=-1")
 @AutoConfigureMockMvc
 @Transactional
+@org.springframework.test.context.ActiveProfiles("legacy-rule-analysis")
 class BehaviorNormalizationAdminControllerTest {
 
     @Autowired private MockMvc mockMvc;

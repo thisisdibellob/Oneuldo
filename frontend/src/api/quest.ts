@@ -36,7 +36,7 @@ export type QuestDetail = QuestSummary & {
 export type QuestSession = {
   id: string;
   questId: string;
-  status: 'IN_PROGRESS' | 'COMPLETED' | 'ABANDONED';
+  status: 'IN_PROGRESS' | 'COMPLETED' | 'ABANDONED' | 'SUBMITTED';
   questDifficulty: QuestDifficulty;
   totalSteps: number;
   completedSteps: number;
@@ -48,6 +48,7 @@ export type QuestSession = {
 };
 
 export type QuestEventRequest = {
+  presentedContent?: { goal: string; situation: string; instruction: string; hint: string | null; choices: Array<{ id: string; label: string }> };
   stepId: string;
   choiceId: string;
   attemptNumber: number;
@@ -58,7 +59,7 @@ export type QuestEventRequest = {
 export type QuestEventResult = {
   eventId: number;
   attemptNumber: number;
-  correct: boolean;
+  correct: boolean | null;
   feedback: string;
   completedSteps: number;
   totalSteps: number;

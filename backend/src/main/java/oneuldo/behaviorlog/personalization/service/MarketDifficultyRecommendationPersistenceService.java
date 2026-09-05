@@ -19,8 +19,8 @@ public class MarketDifficultyRecommendationPersistenceService {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public MarketDifficultyRecommendation save(Member member, BehaviorAnalysisInputSnapshot analysisInput,
-            String version, MarketPersonalizationDecision decision) {
+            java.util.UUID analysisId, String version, MarketPersonalizationDecision decision) {
         return repository.save(new MarketDifficultyRecommendation(
-                member, analysisInput, version, decision, Instant.now()));
+                member, analysisInput, analysisId, version, decision, Instant.now()));
     }
 }

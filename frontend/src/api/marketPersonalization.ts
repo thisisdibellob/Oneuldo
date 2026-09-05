@@ -1,11 +1,14 @@
+import { resolveMarketAiMission } from '../game/scenarios';
+
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL;
 
 export type MarketDifficultyRecommendation = {
   recommendationId: string;
   analysisInputSnapshotId: string | null;
+  analysisId: string;
   gameId: 'MARKET_SIMULATION';
   recommendedDifficulty: 1 | 2 | 3;
-  personalizationMode: 'NO_PROFILE' | 'INSUFFICIENT_EVIDENCE' | 'BEHAVIOR_INFORMED';
+  personalizationMode: 'AI_ANALYSIS';
   adjustments: {
     itemCount: 2 | 3 | 4;
     quantityComplexity: 'LOW' | 'MEDIUM' | 'HIGH';
@@ -20,6 +23,7 @@ export type MarketDifficultyRecommendation = {
 export async function getMarketDifficultyRecommendation(accessToken: string) {
   if (!API_BASE_URL) throw new Error('EXPO_PUBLIC_API_URL이 설정되지 않았습니다.');
   const response = await fetch(`${API_BASE_URL}/api/market-personalization/recommendation`, {
+    method: 'POST',
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   if (!response.ok) {
@@ -30,13 +34,17 @@ export async function getMarketDifficultyRecommendation(accessToken: string) {
 
 export type MarketAiQuestResponse = {
   generationId: string;
-  source: 'AI' | 'RULE_FALLBACK';
+  analysisId: string;
+  source: 'AI';
   model: string | null;
   latencyMs: number;
-  personalizationMode: 'NO_PROFILE' | 'STALE_PROFILE' | 'INSUFFICIENT_EVIDENCE' | 'BEHAVIOR_INFORMED';
+  personalizationMode: 'AI_ANALYSIS';
   promptVersion: string;
   quest: {
     id: string;
+    scenarioId: string;
+    catalogVersion: string;
+    scenarioVersion: string;
     difficulty: 1 | 2 | 3;
     title: string;
     description: string;
@@ -53,8 +61,10 @@ export type MarketAiQuestResponse = {
 export async function getMarketAiQuest(accessToken: string) {
   if (!API_BASE_URL) throw new Error('EXPO_PUBLIC_API_URL이 설정되지 않았습니다.');
   const response = await fetch(`${API_BASE_URL}/api/market-personalization/quest`, {
+    method: 'POST',
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   if (!response.ok) throw new Error(`AI 맞춤 장보기 퀘스트 생성 실패: ${response.status}`);
-  return response.json() as Promise<MarketAiQuestResponse>;
+  const result = await response.json() as MarketAiQuestResponse;
+  return { ...result, quest: { ...result.quest, ...resolveMarketAiMission(result.quest) } };
 }

@@ -544,6 +544,7 @@ public class BehaviorEventRegistry {
         if (type == null) return null;
         return switch (type) {
             case PASSIVE_PLAY -> oneuldo.behaviorlog.domain.payload.PassivePlayBehaviorPayload.class;
+            case TRANSPORT -> oneuldo.behaviorlog.domain.payload.TransportBehaviorPayload.class;
             case SHOPPING -> oneuldo.behaviorlog.domain.payload.ShoppingBehaviorPayload.class;
             case COOKING -> oneuldo.behaviorlog.domain.payload.CookingBehaviorPayload.class;
             case HYGIENE_CLOTHING -> oneuldo.behaviorlog.domain.payload.HygieneClothingBehaviorPayload.class;

@@ -35,7 +35,8 @@ public class QuestSessionService {
     private final QuestChoiceRepository questChoiceRepository;
     private final QuestSessionRepository questSessionRepository;
     private final QuestEventRepository questEventRepository;
-    private final DifficultyAdjustmentService difficultyAdjustmentService;
+    private final oneuldo.behaviorlog.service.BehaviorLogService behaviorLogs;
+    private final tools.jackson.databind.ObjectMapper mapper;
 
     @Transactional
     public QuestSessionResponse start(UUID memberId, UUID questId) {
@@ -94,9 +95,6 @@ public class QuestSessionService {
             return toEventResponse(event, session);
         }
 
-        if (questEventRepository.existsBySessionIdAndStepIdAndCorrectTrue(sessionId, step.getId())) {
-            throw conflict("이미 완료한 단계입니다.");
-        }
 
         int expectedAttempt = Math.toIntExact(
                 questEventRepository.countBySessionIdAndStepId(sessionId, step.getId()) + 1
@@ -113,9 +111,30 @@ public class QuestSessionService {
                 request.hintUsed(),
                 request.responseTimeMs()
         ));
-        if (event.isCorrect()) {
-            session.completeStep();
-        }
+        if (expectedAttempt == 1) session.completeStep(); // submitted-step count, not successful-step count
+        var content = request.presentedContent();
+        if (content != null && mapper.writeValueAsString(content).length() > 16000)
+            throw badRequest("표시 문맥이 너무 큽니다.");
+        var raw = new java.util.LinkedHashMap<String, Object>();
+        long sequence = questEventRepository.findAllBySessionIdOrderByCreatedAtAsc(sessionId).size();
+        raw.put("metadata", java.util.Map.of("clientEventId", UUID.nameUUIDFromBytes(("transport:" + event.getId()).getBytes(java.nio.charset.StandardCharsets.UTF_8)),
+                "eventSequence", sequence, "eventSchemaVersion", "behavior-event-v1", "appVersion", "transport-observation-v1",
+                "contentVersion", "transport-client-snapshot-v1", "occurredAt", event.getCreatedAt()));
+        raw.put("identity", java.util.Map.of("sessionId", sessionId));
+        raw.put("task", java.util.Map.of("gameId", "TRANSPORT_QUEST", "taskId", session.getQuest().getId(),
+                "taskVersion", "transport-observation-v1", "difficulty", session.getQuestDifficulty().ordinal(),
+                "scenarioVariant", session.getQuest().getCode(), "evidenceContext", "TRAINING_TASK"));
+        raw.put("action", java.util.Map.of("eventCode", "TRANSPORT.CHOICE_SUBMITTED", "microActionId", "SELECT_CHOICE",
+                "stepId", step.getId(), "stepOrder", step.getStepOrder()));
+        raw.put("accessibility", java.util.Map.of("instructionMode", "TEXT", "textLevel", "STANDARD",
+                "audioEnabled", false, "symbolSupport", false, "controllerMode", "OTHER"));
+        var payload = new java.util.LinkedHashMap<String, Object>();
+        payload.put("type", "TRANSPORT"); payload.put("presentedContent", content);
+        payload.put("selectedChoiceId", choice.getId().toString()); payload.put("attemptNumber", request.attemptNumber());
+        payload.put("hintUsed", request.hintUsed()); payload.put("responseTimeMs", request.responseTimeMs());
+        payload.put("observationScope", content == null ? "Displayed scene unavailable; do not substitute current DB wording." : "Client-reported wording; viewport/comprehension not observed.");
+        raw.put("payload", payload);
+        behaviorLogs.record(memberId, mapper.convertValue(raw, oneuldo.behaviorlog.domain.BehaviorLogRequest.class));
 
         return toEventResponse(event, session);
     }
@@ -128,9 +147,7 @@ public class QuestSessionService {
             throw conflict("모든 단계를 완료한 뒤 세션을 완료할 수 있습니다.");
         }
 
-        session.complete(session.getQuest().getRewardPoints());
-        // 종료된 수행 기록으로 사용자별 난이도를 서버 규칙이 다시 평가한다.
-        difficultyAdjustmentService.recordTerminalSession(session);
+        session.submit();
         return QuestSessionResponse.from(session);
     }
 
@@ -139,7 +156,6 @@ public class QuestSessionService {
         QuestSession session = findOwnedSession(memberId, sessionId);
         requireInProgress(session);
         session.abandon(reason == null || reason.isBlank() ? "USER_EXIT" : reason.trim());
-        difficultyAdjustmentService.recordTerminalSession(session);
         return QuestSessionResponse.from(session);
     }
 
@@ -158,8 +174,8 @@ public class QuestSessionService {
         return new QuestEventResponse(
                 event.getId(),
                 event.getAttemptNumber(),
-                event.isCorrect(),
-                event.getChoice().getFeedback(),
+                event.getCorrect(),
+                "선택을 기록했습니다. 수행 판단은 AI 검토에서 확인하세요.",
                 session.getCompletedSteps(),
                 session.getTotalSteps()
         );

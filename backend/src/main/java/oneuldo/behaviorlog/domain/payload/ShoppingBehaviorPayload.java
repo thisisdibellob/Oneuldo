@@ -59,7 +59,11 @@ public record ShoppingBehaviorPayload(
         @PositiveOrZero Integer quantityAfter,
         Boolean isObjectiveItem,
         Boolean blocked,
-        List<ShoppingObjective> objectives
+        List<ShoppingObjective> objectives,
+        String catalogVersion,
+        String scenarioId,
+        String scenarioVersion,
+        java.util.Map<String, Object> marketContent
 ) implements BehaviorPayload {
 
     /** 기존 서버 내부 생성 코드가 사용하던 payload 생성 계약을 유지한다. */
@@ -91,7 +95,8 @@ public record ShoppingBehaviorPayload(
                 null, null, null, null, null, null, null, null, null, null,
                 null, null, null, null, null, null, null, null, null, null,
                 null, null, null, null, null, null, null, null, null, null,
-                null, null, null, null, null);
+                null, null, null, null, null,
+                null, null, null, null);
     }
 
     public record ShoppingObjective(

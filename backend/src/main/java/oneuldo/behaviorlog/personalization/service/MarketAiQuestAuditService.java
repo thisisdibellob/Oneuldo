@@ -35,7 +35,7 @@ public class MarketAiQuestAuditService {
                 analysisInputSnapshotId, memberId).orElseThrow(() ->
                 new ResponseStatusException(HttpStatus.NOT_FOUND, "행동 분석 입력을 찾을 수 없습니다."));
         generationRepository.save(new MarketAiQuestGeneration(
-                response.generationId(), member, analysisInput, response.source(), response.model(),
+                response.generationId(), member, analysisInput, response.analysisId(), response.source(), response.model(),
                 response.latencyMs(), response.personalizationMode(), response.promptVersion(),
                 attempts, validatedQuest, failureReason, Instant.now()));
     }

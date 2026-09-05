@@ -40,6 +40,9 @@ public class MarketDifficultyRecommendation {
     @JoinColumn(name = "analysis_input_snapshot_id", updatable = false)
     private BehaviorAnalysisInputSnapshot analysisInputSnapshot;
 
+    @Column(name = "analysis_id", updatable = false)
+    private UUID analysisId;
+
     @Column(name = "policy_version", nullable = false, length = 50, updatable = false)
     private String policyVersion;
 
@@ -69,9 +72,10 @@ public class MarketDifficultyRecommendation {
     private Instant generatedAt;
 
     public MarketDifficultyRecommendation(Member member, BehaviorAnalysisInputSnapshot analysisInputSnapshot,
-            String policyVersion, MarketPersonalizationDecision decision, Instant generatedAt) {
+            UUID analysisId, String policyVersion, MarketPersonalizationDecision decision, Instant generatedAt) {
         this.member = member;
         this.analysisInputSnapshot = analysisInputSnapshot;
+        this.analysisId = analysisId;
         this.policyVersion = policyVersion;
         this.recommendedDifficulty = decision.recommendedDifficulty();
         this.personalizationMode = decision.personalizationMode();

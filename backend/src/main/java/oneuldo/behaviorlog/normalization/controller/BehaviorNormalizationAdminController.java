@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
 @RestController
+@org.springframework.context.annotation.Profile("legacy-rule-analysis")
 @RequestMapping("/api/admin/behavior-normalization")
 @RequiredArgsConstructor
 public class BehaviorNormalizationAdminController {

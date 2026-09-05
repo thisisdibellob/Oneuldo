@@ -12,6 +12,8 @@ import org.springframework.data.repository.query.Param;
 
 public interface BehaviorLogRepository extends JpaRepository<BehaviorLog, UUID> {
 
+    List<BehaviorLog> findAllByMemberIdAndSessionIdOrderByEventSequence(UUID memberId, UUID sessionId);
+
     Optional<BehaviorLog> findByMemberIdAndClientEventId(UUID memberId, UUID clientEventId);
 
     Optional<BehaviorLog> findByMemberIdAndSessionIdAndEventSequence(

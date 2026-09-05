@@ -4,6 +4,7 @@ import java.util.List;
 
 public record MarketAiQuestDraft(
         int difficulty,
+        String scenarioId,
         String title,
         String description,
         int budget,

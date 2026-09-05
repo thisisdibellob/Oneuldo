@@ -7,8 +7,9 @@ import type {
   BehaviorStepOutcome,
 } from '../api/behaviorLog';
 import type { MarketCart, MarketEvaluation, MarketMission } from '../game/scenarios';
-import { getCartQuantity, getMarketCartTotal, getMarketProduct } from '../game/scenarios';
-import { enqueueBehaviorEvents, flushBehaviorEventQueue } from './behaviorEventQueue';
+import { getObjectiveProductIds, getObjectiveQuantity, getMarketCartTotal, getMarketProduct, marketProducts } from '../game/scenarios';
+import { MARKET_CATALOG_VERSION, MARKET_SCENARIO_VERSION, MARKET_INITIAL_STOCK, MARKET_SUPPORT_OPTIONS } from '../game/marketContent';
+import { enqueueBehaviorEvents, flushBehaviorEventQueue, assertBehaviorEventsAcknowledged } from './behaviorEventQueue';
 import {
   MarketMovementDetector,
   type MarketMovementEventDraft,
@@ -18,7 +19,7 @@ import {
 } from './marketMovementDetector';
 
 const MARKET_TASK_ID = '30000000-0000-0000-0000-000000000003';
-const CONTENT_VERSION = 'market-micro-behavior-v1';
+const CONTENT_VERSION = 'market-micro-behavior-v2-content';
 const DETECTION_RULE_VERSION = 'market-detection-rules-v1';
 const APP_VERSION = '1.0.0';
 const PERSIST_DELAY_MS = 1000;
@@ -75,16 +76,30 @@ export class MarketBehaviorTracker {
     private readonly difficulty = 2,
     simulation?: Omit<BehaviorSimulationContext, 'simulationStarted'>,
   ) {
-    this.questInstanceId = simulation?.questInstanceId ?? randomUUID();
+    this.questInstanceId = mission.scene?.questInstanceId ?? simulation?.questInstanceId ?? randomUUID();
     this.contentSource = simulation?.contentSource ?? 'STATIC';
     this.track({
       eventCode: 'SHOP.SESSION_STARTED',
       microActionId: 'START_MARKET_SESSION',
       payload: {
         budgetAmount: mission.budget,
+        marketContent: {
+          sceneSnapshot: mission.scene,
+          title: mission.title,
+          description: mission.description,
+          objectiveConstraints: mission.objectives.map((objective) => ({
+            productId: objective.productId, quantity: objective.quantity,
+            label: objective.label ?? `${this.product(objective.productId)?.name} ${this.product(objective.productId)?.detail}`,
+            acceptedProductIds: getObjectiveProductIds(objective),
+            salesUnit: this.product(objective.productId)?.salesUnit,
+          })),
+          availableProductIds: this.products.map((product) => product.id),
+          initialStockPerSku: MARKET_INITIAL_STOCK,
+          supportedOptions: MARKET_SUPPORT_OPTIONS,
+        },
         objectiveCount: mission.objectives.length,
         objectives: mission.objectives.map(({ productId, quantity }) => {
-          const product = getMarketProduct(productId);
+          const product = this.product(productId);
           return {
             categoryId: product?.categoryId,
             itemId: productId,
@@ -104,6 +119,9 @@ export class MarketBehaviorTracker {
     });
   }
 
+  private get products() { return this.mission.scene?.products ?? marketProducts; }
+  private product(id: string) { return getMarketProduct(id, this.products); }
+
   track(input: TrackInput) {
     if (this.closed && !input.finalContext) return;
     const occurredAt = input.occurredAt ?? new Date().toISOString();
@@ -122,7 +140,7 @@ export class MarketBehaviorTracker {
       metadata: {
         appVersion: APP_VERSION,
         clientEventId: randomUUID(),
-        contentVersion: CONTENT_VERSION,
+        contentVersion: this.mission.catalogVersion ?? MARKET_CATALOG_VERSION,
         eventSchemaVersion: 'behavior-event-v1',
         eventSequence: this.sequence,
         occurredAt,
@@ -133,7 +151,7 @@ export class MarketBehaviorTracker {
         difficulty: this.difficulty,
         evidenceContext: 'ASSESSMENT_TASK',
         gameId: 'MARKET_SIMULATION',
-        scenarioVariant: 'BASELINE',
+        scenarioVariant: this.mission.scenarioId ?? 'CUSTOM',
         taskId: MARKET_TASK_ID,
         taskVersion: CONTENT_VERSION,
       },
@@ -145,7 +163,7 @@ export class MarketBehaviorTracker {
           ? Math.max(0, occurredAtMs - this.startedAt)
           : undefined,
         stepOrder: this.sequence,
-        stepOutcome: input.outcome,
+        
       },
       accessibility: {
         audioEnabled: false,
@@ -154,11 +172,15 @@ export class MarketBehaviorTracker {
         symbolSupport: true,
         textLevel: 'STANDARD',
       },
-      error: input.error,
+
       payload: {
         type: 'SHOPPING',
+        catalogVersion: this.mission.catalogVersion ?? MARKET_CATALOG_VERSION,
+        scenarioId: this.mission.scenarioId ?? 'CUSTOM',
+        scenarioVersion: this.mission.scenarioVersion ?? MARKET_SCENARIO_VERSION,
         thresholdRuleVersion: DETECTION_RULE_VERSION,
         ...input.payload,
+        marketContent: { ...(input.payload?.marketContent as object ?? {}), sceneRef: this.questInstanceId, layoutVersion: this.mission.scene?.layoutVersion, seed: this.mission.scene?.seed },
       },
       presentation: {
         foregroundDurationMs: Math.max(0, occurredAtMs - this.startedAt - this.interruptionTimeMs),
@@ -199,9 +221,16 @@ export class MarketBehaviorTracker {
     this.movementDetector.markShelfOpened(station);
     const target = this.targetZoneIds().has(station);
     this.track({
-      eventCode: target ? 'SHOP.SHELF_OPENED' : 'SHOP.NON_TARGET_SHELF_OPENED',
+      eventCode: 'SHOP.SHELF_OPENED',
       microActionId: `OPEN_SHELF_${station}`,
-      payload: { isTargetZone: target, stationId: station },
+      payload: {
+        stationId: station,
+        marketContent: { displayedProducts: this.products.filter((product) => product.categoryId === station).map(
+          ({ id, name, detail, price, salesUnit, attributes, initialStock }) => ({
+            id, name, detail, price, salesUnit, attributes, remainingStock: initialStock - (this.latestCart[id] ?? 0),
+          })),
+        },
+      },
       priority: target ? 'high' : 'normal',
     });
   }
@@ -212,18 +241,15 @@ export class MarketBehaviorTracker {
     openedAt: number,
   ) {
     const targetItems = this.mission.objectives
-      .filter(({ productId }) => getMarketProduct(productId)?.categoryId === station);
+      .filter(({ productId }) => this.product(productId)?.categoryId === station);
     const hasRemainingTarget = targetItems.some(
-      ({ productId, quantity }) => getCartQuantity(cart, productId) < quantity,
+      (objective) => getObjectiveQuantity(cart, objective) < objective.quantity,
     );
     this.track({
-      eventCode: hasRemainingTarget
-        ? 'SHOP.TARGET_SHELF_LEFT_WITHOUT_SELECTION'
-        : 'SHOP.SHELF_CLOSED',
+      eventCode: 'SHOP.SHELF_CLOSED',
       microActionId: `CLOSE_SHELF_${station}`,
       payload: {
         durationMs: Math.max(0, Date.now() - openedAt),
-        hasRemainingTarget,
         stationId: station,
       },
       priority: hasRemainingTarget ? 'high' : 'normal',
@@ -258,15 +284,17 @@ export class MarketBehaviorTracker {
   }
 
   quantityChanged(productId: string, before: number, after: number, cartAfter: MarketCart) {
-    const objective = this.mission.objectives.find((item) => item.productId === productId);
+    const objective = this.mission.objectives.find((item) => getObjectiveProductIds(item).includes(productId));
+    const selectedForObjective = objective ? getObjectiveQuantity(cartAfter, objective) : after;
+    const beforeForObjective = selectedForObjective - after + before;
     this.track({
       eventCode: 'SHOP.QUANTITY_CHANGED',
       microActionId: `${after > before ? 'ADD' : 'REMOVE'}_${productId}`,
-      outcome: objective && after === objective.quantity ? 'SUCCESS' : undefined,
+      outcome: objective && selectedForObjective === objective.quantity ? 'SUCCESS' : undefined,
       payload: {
-        cartTotalAmount: getMarketCartTotal(cartAfter),
-        isObjectiveItem: Boolean(objective),
+        cartTotalAmount: getMarketCartTotal(cartAfter, this.products),
         itemId: productId,
+        marketContent: { item: this.product(productId), purchaseUnit: this.product(productId)?.salesUnit },
         quantityAfter: after,
         quantityBefore: before,
         requiredQuantity: objective?.quantity ?? 0,
@@ -274,63 +302,21 @@ export class MarketBehaviorTracker {
       },
       priority: 'high',
     });
-    if (before === 0 && after > 0) {
-      this.track({
-        eventCode: objective ? 'SHOP.ITEM_SELECTED' : 'SHOP.WRONG_ITEM_SELECTED',
-        microActionId: `SELECT_${productId}`,
-        outcome: objective ? 'SUCCESS' : 'FAILURE',
-        payload: {
-          itemId: productId,
-          priceAmount: getMarketProduct(productId)?.price,
-          requiredQuantity: objective?.quantity ?? 0,
-          selectedQuantity: after,
-        },
-        priority: 'high',
-        error: objective ? undefined : { wrongActionCount: 1 },
-      });
-    }
-    if (objective && after === objective.quantity) {
-      this.track({
-        eventCode: 'SHOP.QUANTITY_MATCHED',
-        microActionId: `MATCH_QUANTITY_${productId}`,
-        outcome: 'SUCCESS',
-        payload: { itemId: productId, requiredQuantity: objective.quantity, selectedQuantity: after },
-        priority: 'high',
-      });
-    } else if (objective && before <= objective.quantity && after > objective.quantity) {
-      this.track({
-        eventCode: 'SHOP.QUANTITY_OVERSHOT',
-        microActionId: `OVERSHOOT_QUANTITY_${productId}`,
-        outcome: 'FAILURE',
-        payload: { itemId: productId, requiredQuantity: objective.quantity, selectedQuantity: after },
-        priority: 'high',
-      });
-    }
   }
 
   checkoutEntered(cart: MarketCart) {
     const missing = this.remainingObjectives(cart);
     this.track({
-      eventCode: missing.length > 0 ? 'SHOP.EARLY_CHECKOUT_APPROACH' : 'SHOP.CHECKOUT_ENTERED',
+      eventCode: 'SHOP.CHECKOUT_ENTERED',
       microActionId: 'ENTER_CHECKOUT',
-      payload: { ...this.cartPayload(cart), missingItemIds: missing.map(({ productId }) => productId) },
+      payload: this.cartPayload(cart),
       priority: 'high',
     });
   }
 
-  checkoutSubmitted(cart: MarketCart, evaluation: MarketEvaluation) {
-    this.track({
-      eventCode: 'SHOP.CHECKOUT_SUBMITTED',
-      microActionId: 'SUBMIT_CHECKOUT',
-      outcome: evaluation.success ? 'SUCCESS' : 'FAILURE',
-      payload: {
-        ...this.cartPayload(cart),
-        missingItemIds: evaluation.missing.map(({ productId }) => productId),
-        overBudgetAmount: evaluation.overBudget,
-        wrongItemIds: evaluation.extra.map(({ productId }) => productId),
-      },
-      priority: 'critical',
-    });
+  checkoutSubmitted(cart: MarketCart, _legacyEvaluation?: MarketEvaluation) {
+    this.track({ eventCode: 'SHOP.CHECKOUT_SUBMITTED', microActionId: 'SUBMIT_CHECKOUT',
+      payload: this.cartPayload(cart), priority: 'critical' });
   }
 
   correctionStarted(cart: MarketCart) {
@@ -368,59 +354,23 @@ export class MarketBehaviorTracker {
     });
   }
 
-  async complete(cart: MarketCart, evaluation: MarketEvaluation) {
-    if (this.closed) return;
-    this.trackMovementEvents(this.movementDetector.finish(this.targetZoneIds()));
-    this.closed = true;
-    this.track({
-      eventCode: 'SHOP.SESSION_COMPLETED',
-      microActionId: 'COMPLETE_MARKET_SESSION',
-      outcome: 'SUCCESS',
-      payload: this.cartPayload(cart),
-      priority: 'critical',
-      finalContext: {
-        sessionEnd: {
-          interruptionCount: this.interruptionCount,
-          interruptionTimeMs: this.interruptionTimeMs,
-          reason: 'COMPLETED',
-        },
-        taskResult: {
-          completionQuality: evaluation.success ? 100 : 0,
-          completionTimeMs: Date.now() - this.startedAt - this.interruptionTimeMs,
-          taskCompleted: evaluation.success,
-        },
-      },
-    });
-    this.clearTimers();
-    await this.flushNow();
-  }
+  async complete(cart: MarketCart, _legacyEvaluation?: MarketEvaluation) { await this.abort(cart); }
 
   async abort(cart: MarketCart) {
     if (this.closed) return;
     this.trackMovementEvents(this.movementDetector.finish(this.targetZoneIds()));
     this.closed = true;
-    this.track({
-      eventCode: 'COMMON.ABORT',
-      microActionId: 'EXIT_MARKET',
-      outcome: 'INCOMPLETE',
-      payload: this.cartPayload(cart),
-      priority: 'critical',
-      error: { postErrorAction: 'ABORT_AFTER_ERROR' },
-      finalContext: {
-        sessionEnd: {
-          interruptionCount: this.interruptionCount,
-          interruptionTimeMs: this.interruptionTimeMs,
-          reason: 'USER_ABORTED',
-        },
-        taskResult: {
-          completionQuality: 0,
-          completionTimeMs: Date.now() - this.startedAt - this.interruptionTimeMs,
-          taskCompleted: false,
-        },
-      },
-    });
+    this.track({ eventCode: 'SHOP.SESSION_ENDED', microActionId: 'EXIT_MARKET',
+      payload: this.cartPayload(cart), priority: 'critical',
+      finalContext: { sessionEnd: { interruptionCount: this.interruptionCount,
+        interruptionTimeMs: this.interruptionTimeMs, reason: 'USER_ABORTED' } } });
     this.clearTimers();
     await this.flushNow();
+  }
+
+  async flushConfirmed() {
+    await this.flushNow();
+    await assertBehaviorEventsAcknowledged(this.accessToken, this.sessionId, this.sequence);
   }
 
   async flushNow() {
@@ -429,16 +379,19 @@ export class MarketBehaviorTracker {
   }
 
   private trackMovementEvents(events: MarketMovementEventDraft[]) {
-    events.forEach((event) => this.track({
+    const derivedOnly = new Set(['SHOP.TARGET_SHELF_APPROACHED', 'SHOP.WRONG_AISLE_ENTERED', 'SHOP.TARGET_PASSED', 'SHOP.OFF_TARGET_DWELL']);
+    // Raw movement/proximity events remain. Do not publish additional target-based judgments.
+    events.filter(event => !derivedOnly.has(event.eventCode)).forEach((event) => this.track({
       ...event,
+      eventCode: event.eventCode === 'SHOP.TARGET_SHELF_REVISITED' ? 'SHOP.SHELF_REVISITED' : event.eventCode,
       priority: event.priority ?? 'normal',
     }));
   }
 
   private targetZoneIds() {
     const zones = this.mission.objectives
-      .filter(({ productId, quantity }) => getCartQuantity(this.latestCart, productId) < quantity)
-      .map(({ productId }) => getMarketProduct(productId)?.categoryId)
+      .filter((objective) => getObjectiveQuantity(this.latestCart, objective) < objective.quantity)
+      .map(({ productId }) => this.product(productId)?.categoryId)
       .filter((zone): zone is NonNullable<typeof zone> => zone !== undefined);
     return new Set<MarketTelemetryStation>(zones);
   }
@@ -451,17 +404,17 @@ export class MarketBehaviorTracker {
 
   private remainingObjectives(cart: MarketCart) {
     return this.mission.objectives.filter(
-      ({ productId, quantity }) => getCartQuantity(cart, productId) < quantity,
+      (objective) => getObjectiveQuantity(cart, objective) < objective.quantity,
     );
   }
 
   private cartPayload(cart: MarketCart) {
-    const total = getMarketCartTotal(cart);
+    const total = getMarketCartTotal(cart, this.products);
     return {
       cartItemCount: Object.values(cart).reduce((sum, quantity) => sum + quantity, 0),
       cartTotalAmount: total,
       remainingBudgetAmount: this.mission.budget - total,
-      remainingObjectiveCount: this.remainingObjectives(cart).length,
+      marketContent: { cart: { ...cart } },
     };
   }
 

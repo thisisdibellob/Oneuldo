@@ -1,3 +1,4 @@
+import { createSessionBehaviorAnalysis } from '../api/behaviorAnalysis';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
@@ -120,7 +121,7 @@ export function useNpcTransportQuest({
   const selectChoice = useCallback((choiceId: string) => {
     const step = quest?.steps[stepIndex];
     const choice = step?.choices.find((item) => item.id === choiceId);
-    if (!step || !choice || submittedChoice?.correct) return;
+    if (!step || !choice || submittedChoice !== null) return;
 
     const attemptNumber = (attemptsRef.current[step.id] ?? 0) + 1;
     attemptsRef.current[step.id] = attemptNumber;
@@ -138,15 +139,17 @@ export function useNpcTransportQuest({
         hintUsed: false,
         responseTimeMs: Math.max(0, Date.now() - stepStartedAtRef.current),
         stepId: step.id,
+        presentedContent: { goal: quest!.goal, situation: step.situation, instruction: step.instruction,
+          hint: null, choices: step.choices.map(({ id, label }) => ({ id, label })) },
       },
     });
     void flushQuestEventQueue().then(() => {
       setSyncNotice(getQueuedQuestEventCount() === 0 ? null : '선택 기록을 임시 저장했어요.');
     });
-  }, [accessToken, quest, stepIndex, submittedChoice?.correct]);
+  }, [accessToken, quest, stepIndex, submittedChoice !== null]);
 
   const advance = useCallback(() => {
-    if (!quest || !submittedChoice?.correct) return;
+    if (!quest || submittedChoice === null) return;
     if (stepIndex < quest.steps.length - 1) {
       setStepIndex((current) => current + 1);
       setSelectedChoiceId(null);
@@ -157,7 +160,7 @@ export function useNpcTransportQuest({
 
     completionRequestedRef.current = true;
     setStage('result');
-    onCompleted();
+    setSyncNotice('AI 수행 검토 중이에요. 보상은 자동 지급하지 않아요.');
     evictQuestGenerationSnapshot(quest.id);
     const sessionId = sessionIdRef.current;
     if (!accessToken || !sessionId) return;
@@ -167,12 +170,14 @@ export function useNpcTransportQuest({
         if (getQueuedQuestEventCount() > 0) throw new Error('기록 전송 대기 중');
         await completeQuestSession(sessionId, accessToken);
         sessionIdRef.current = null;
-        setSyncNotice(null);
+        const review = await createSessionBehaviorAnalysis(accessToken, sessionId);
+        const assessment = review.analysis?.sessionAssessments.find(item => item.sessionId === sessionId);
+        setSyncNotice(assessment ? 'AI 검토: ' + assessment.explanation : 'AI 판단 보류 · 보상 미지급');
       } catch {
         setSyncNotice('완료 기록을 아직 전송하지 못했어요.');
       }
     })();
-  }, [accessToken, onCompleted, quest, stepIndex, submittedChoice?.correct]);
+  }, [accessToken, onCompleted, quest, stepIndex, submittedChoice !== null]);
 
   const close = useCallback(() => {
     requestSequenceRef.current += 1;

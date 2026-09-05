@@ -13,6 +13,7 @@ import org.springframework.data.domain.PageRequest;
 
 @Slf4j
 @Component
+@org.springframework.context.annotation.Profile("legacy-rule-analysis")
 @RequiredArgsConstructor
 public class BehaviorNormalizationRecoveryJob {
 

@@ -41,8 +41,11 @@ public class QuestEvent {
     @Column(name = "attempt_number", nullable = false)
     private int attemptNumber;
 
-    @Column(nullable = false)
-    private boolean correct;
+    @Column
+    private Boolean correct;
+
+    /** Historical rule replay only; null is unassessed, not false. */
+    public boolean isCorrect() { return Boolean.TRUE.equals(correct); }
 
     @Column(name = "hint_used", nullable = false)
     private boolean hintUsed;
@@ -65,7 +68,7 @@ public class QuestEvent {
         this.step = step;
         this.choice = choice;
         this.attemptNumber = attemptNumber;
-        this.correct = choice.isCorrect();
+        this.correct = null;
         this.hintUsed = hintUsed;
         this.responseTimeMs = responseTimeMs;
         this.createdAt = Instant.now();

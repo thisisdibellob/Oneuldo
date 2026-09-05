@@ -60,6 +60,7 @@ public class BehaviorAnalysisInputService {
     private final BehaviorAnalysisInputSnapshotRepository snapshotRepository;
     private final BehaviorAnalysisInputEventLinkRepository linkRepository;
     private final String subjectSalt;
+    private final oneuldo.behaviorlog.normalization.service.BehaviorSessionIntegrityService sessionIntegrityService;
 
     public BehaviorAnalysisInputService(
             MemberRepository memberRepository,
@@ -69,6 +70,7 @@ public class BehaviorAnalysisInputService {
             BehaviorSessionIntegrityRepository integrityRepository,
             BehaviorAnalysisInputSnapshotRepository snapshotRepository,
             BehaviorAnalysisInputEventLinkRepository linkRepository,
+            oneuldo.behaviorlog.normalization.service.BehaviorSessionIntegrityService sessionIntegrityService,
             @Value("${security.jwt.secret}") String subjectSalt
     ) {
         this.memberRepository = memberRepository;
@@ -78,11 +80,17 @@ public class BehaviorAnalysisInputService {
         this.integrityRepository = integrityRepository;
         this.snapshotRepository = snapshotRepository;
         this.linkRepository = linkRepository;
+        this.sessionIntegrityService = sessionIntegrityService;
         this.subjectSalt = subjectSalt;
     }
 
     @Transactional
     public BehaviorAnalysisInputResponse create(UUID memberId, BehaviorAnalysisInputRequest request) {
+        return createForSession(memberId, request, null);
+    }
+
+    @Transactional
+    public BehaviorAnalysisInputResponse createForSession(UUID memberId, BehaviorAnalysisInputRequest request, UUID sessionIdFilter) {
         Member member = memberRepository.findById(memberId).orElseThrow(MemberNotFoundException::new);
         Instant generatedAt = Instant.now();
         Instant from = request == null || request.analysisFrom() == null
@@ -94,7 +102,12 @@ public class BehaviorAnalysisInputService {
                     HttpStatus.BAD_REQUEST, "analysisFrom은 analysisTo보다 늦을 수 없습니다.");
         }
 
-        List<BehaviorLog> logs = logRepository.findAnalysisInputLogs(memberId, from, to);
+        List<BehaviorLog> logs = sessionIdFilter == null ? logRepository.findAnalysisInputLogs(memberId, from, to)
+                : logRepository.findAllByMemberIdAndSessionIdOrderByEventSequence(memberId, sessionIdFilter);
+        if (sessionIdFilter != null && logs.isEmpty()) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "수행 기록을 찾을 수 없습니다.");
+        // 로그 전달 무결성만 갱신한다. 의미 정규화나 사용자 판정은 실행하지 않는다.
+        logs.stream().map(BehaviorLog::getSessionId).distinct()
+                .forEach(sessionId -> sessionIntegrityService.reconcile(memberId, sessionId));
         Map<UUID, NormalizedBehaviorEvent> normalizedByLog = normalizedByLog(logs);
         Map<UUID, List<NormalizedBehaviorMeasurement>> measurementsByEvent =
                 measurementsByEvent(normalizedByLog.values());

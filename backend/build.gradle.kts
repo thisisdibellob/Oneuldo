@@ -38,3 +38,15 @@ dependencies {
 tasks.withType<Test> {
 	useJUnitPlatform()
 }
+
+// 프론트와 서버가 같은 콘텐츠 원본을 읽는다. 실행 파일에도 포함한다.
+tasks.processResources {
+	from(rootProject.projectDir.resolve("../shared/evidence")) {
+		into("evidence")
+		include("*.json")
+	}
+	from(rootProject.projectDir.resolve("../shared/market")) {
+		into("market")
+		include("*.json")
+	}
+}

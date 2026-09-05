@@ -1,3 +1,4 @@
+import { createSessionBehaviorAnalysis } from '../api/behaviorAnalysis';
 import { useEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
@@ -84,8 +85,8 @@ export function QuestPracticeScreen({
   }
 
   const step = variation.step ?? quest.steps[stepIndex];
-  const wrong = submittedChoice !== null && !submittedChoice.correct;
-  const correct = submittedChoice?.correct === true;
+  const wrong = false;
+  const correct = submittedChoice !== null;
 
   const sendEvent = async (request: QuestEventRequest) => {
     if (!accessToken || !sessionId) return;
@@ -106,11 +107,13 @@ export function QuestPracticeScreen({
       hintUsed,
       responseTimeMs: Math.max(0, Date.now() - stepStartedAt.current),
       stepId: step.id,
+      presentedContent: { goal: quest.goal, situation: step.situation, instruction: step.instruction,
+        hint: hintUsed ? step.hint : null, choices: step.choices.map(({ id, label }) => ({ id, label })) },
     };
 
     setAttempts((current) => ({ ...current, [step.id]: attemptNumber }));
     setSubmittedChoice(choice);
-    if (choice.correct) setCorrectCount((count) => count + 1);
+    setCorrectCount((count) => count + 1);
     void sendEvent(request);
   };
 
@@ -140,7 +143,8 @@ export function QuestPracticeScreen({
       }
       await completeQuestSession(sessionId, accessToken);
       sessionCompleted.current = true;
-      setSyncNotice(null);
+      const review = await createSessionBehaviorAnalysis(accessToken, sessionId);
+      setSyncNotice(review.analysis?.sessionAssessments.find(item => item.sessionId === sessionId)?.explanation ?? 'AI 판단 보류');
     } catch {
       setSyncNotice('완료 기록을 아직 전송하지 못했어요.');
     }
@@ -170,7 +174,7 @@ export function QuestPracticeScreen({
   };
 
   const buttonLabel = !submittedChoice
-    ? '정답 확인'
+    ? '선택 제출'
     : wrong
       ? '다시 고르기'
       : stepIndex === quest.steps.length - 1
@@ -178,7 +182,7 @@ export function QuestPracticeScreen({
         : '다음으로';
 
   if (showResult) {
-    return <QuestResult correctCount={correctCount} onBack={closePractice} quest={quest} />;
+    return <QuestResult correctCount={correctCount} onBack={closePractice} quest={quest} review={syncNotice} />;
   }
 
   if (variation.isPreparing) {
@@ -230,7 +234,7 @@ export function QuestPracticeScreen({
           </View>
           {submittedChoice ? (
             <View style={[styles.feedback, correct && styles.correctFeedback]}>
-              <Text style={[styles.feedbackText, correct && styles.correctFeedbackText]}>{submittedChoice.feedback}</Text>
+              <Text style={[styles.feedbackText, correct && styles.correctFeedbackText]}>{'선택을 기록했어요. AI가 전체 수행을 검토해요.'}</Text>
             </View>
           ) : null}
         </View>
@@ -276,7 +280,7 @@ export function QuestPracticeScreen({
   );
 }
 
-function QuestResult({ correctCount, onBack, quest }: { correctCount: number; onBack: () => void; quest: QuestDetail }) {
+function QuestResult({ correctCount, onBack, quest, review }: { correctCount: number; onBack: () => void; quest: QuestDetail; review: string | null }) {
   const iconProgress = useRef(new Animated.Value(0)).current;
   const copyProgress = useRef(new Animated.Value(0)).current;
   const summaryProgress = useRef(new Animated.Value(0)).current;
@@ -318,7 +322,7 @@ function QuestResult({ correctCount, onBack, quest }: { correctCount: number; on
           </Animated.View>
           <Animated.View style={{ opacity: copyProgress }}>
             <Text style={styles.resultTitle}>{quest.title} 연습을 마쳤어요!</Text>
-            <Text style={styles.resultDescription}>{correctCount}개의 단계를 완료했어요.</Text>
+            <Text style={styles.resultDescription}>{correctCount}개의 단계에 선택을 제출했어요. {review ?? 'AI 검토 대기 · 보상 미지급'}</Text>
           </Animated.View>
           <Animated.View style={[styles.resultSummary, { opacity: summaryProgress }]}>
             <View style={styles.resultSummaryRow}>
@@ -328,7 +332,7 @@ function QuestResult({ correctCount, onBack, quest }: { correctCount: number; on
             <View style={styles.resultDivider} />
             <View style={styles.resultSummaryRow}>
               <Text style={styles.resultSummaryLabel}>받은 경험치</Text>
-              <Text style={styles.resultXp}>+{quest.rewardPoints} XP</Text>
+              <Text style={styles.resultXp}>보상 미지급</Text>
             </View>
           </Animated.View>
         </View>

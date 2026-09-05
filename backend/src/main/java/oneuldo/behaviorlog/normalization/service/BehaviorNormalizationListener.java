@@ -9,6 +9,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 
 @Slf4j
 @Component
+@org.springframework.context.annotation.Profile("legacy-rule-analysis")
 @RequiredArgsConstructor
 public class BehaviorNormalizationListener {
 

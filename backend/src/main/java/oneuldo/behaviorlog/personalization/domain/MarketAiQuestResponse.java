@@ -5,6 +5,7 @@ import java.util.UUID;
 
 public record MarketAiQuestResponse(
         UUID generationId,
+        UUID analysisId,
         String source,
         String model,
         long latencyMs,
@@ -16,6 +17,9 @@ public record MarketAiQuestResponse(
 ) {
     public record Quest(
             String id,
+            String scenarioId,
+            String catalogVersion,
+            String scenarioVersion,
             int difficulty,
             String title,
             String description,
@@ -26,13 +30,16 @@ public record MarketAiQuestResponse(
             String successMessage
     ) {}
 
-    public static MarketAiQuestResponse from(UUID generationId, String source, String model,
+    public static MarketAiQuestResponse from(UUID generationId, UUID analysisId, String source, String model,
             long latencyMs, String personalizationMode, String promptVersion,
             MarketAiQuestDraft draft) {
         return new MarketAiQuestResponse(
-                generationId, source, model, latencyMs, personalizationMode, promptVersion,
+                generationId, analysisId, source, model, latencyMs, personalizationMode, promptVersion,
                 new Quest(
                         "market-ai-" + generationId,
+                        draft.scenarioId(),
+                        oneuldo.behaviorlog.personalization.service.MarketQuestCatalog.VERSION,
+                        oneuldo.behaviorlog.personalization.service.MarketQuestCatalog.SCENARIO_VERSION,
                         draft.difficulty(), draft.title(), draft.description(), draft.budget(),
                         List.copyOf(draft.objectives()), List.copyOf(draft.briefing()),
                         List.copyOf(draft.checkoutDialogue()), draft.successMessage()),

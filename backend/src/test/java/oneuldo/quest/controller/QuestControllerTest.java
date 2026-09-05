@@ -130,7 +130,7 @@ class QuestControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.correct").value(true))
+                .andExpect(jsonPath("$.correct").doesNotExist())
                 .andExpect(jsonPath("$.completedSteps").value(1));
     }
 }

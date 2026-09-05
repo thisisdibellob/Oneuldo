@@ -76,6 +76,7 @@ import {
   MarketCategoryId,
   marketCategories,
   marketMission,
+  buildMarketScenarioMission,
 } from '../game/scenarios';
 import {
   clampWorldZoom,
@@ -581,6 +582,8 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
   const [busStopNearby, setBusStopNearby] = useState(false);
   const [marketScenarioLocked, setMarketScenarioLocked] = useState(false);
   const [personalizedMarketMission, setPersonalizedMarketMission] = useState(marketMission);
+  const [marketAiStatus, setMarketAiStatus] = useState<'loading' | 'ready' | 'error' | 'baseline' | 'choose'>('loading');
+  const [marketAiRequestToken, setMarketAiRequestToken] = useState<string | null | undefined>(undefined);
   const [marketDifficulty, setMarketDifficulty] = useState(2);
   const [marketSimulation, setMarketSimulation] = useState<
     Omit<BehaviorSimulationContext, 'simulationStarted'> | undefined
@@ -666,12 +669,14 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
     infoPanel !== null ||
     fridgeMenuOpen ||
     cookingOpen ||
-    marketScenarioLocked;
+    marketScenarioLocked || (worldMap === 'market' && (marketAiRequestToken !== accessToken || !['ready', 'baseline'].includes(marketAiStatus)));
 
   useEffect(() => {
     let active = true;
 
     if (!accessToken) {
+      setMarketAiRequestToken(accessToken);
+      setMarketAiStatus('choose');
       setPersonalizedMarketMission(marketMission);
       setMarketDifficulty(2);
       setMarketSimulation(undefined);
@@ -686,20 +691,23 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
       };
     }
 
+    setMarketAiStatus('loading');
+    setMarketAiRequestToken(accessToken);
     getMarketAiQuest(accessToken)
       .then((generation) => {
         if (!active) return;
+        setMarketAiStatus('ready');
         setPersonalizedMarketMission(generation.quest);
         setMarketDifficulty(generation.quest.difficulty);
         setMarketSimulation({
-          contentSource: generation.source === 'AI' ? 'GENERATED' : 'FALLBACK',
+          contentSource: 'GENERATED',
           questInstanceId: generation.generationId,
         });
         if (__DEV__) {
           console.info('[market-personalization] AI quest applied', {
             generationId: generation.generationId,
             source: generation.source,
-            contentSource: generation.source === 'AI' ? 'GENERATED' : 'FALLBACK',
+            contentSource: 'GENERATED',
             model: generation.model,
             difficulty: generation.quest.difficulty,
             mode: generation.personalizationMode,
@@ -710,11 +718,9 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
       })
       .catch((error: unknown) => {
         if (!active) return;
-        setPersonalizedMarketMission(marketMission);
-        setMarketDifficulty(2);
-        setMarketSimulation(undefined);
+        setMarketAiStatus('error');
         if (__DEV__) {
-          console.warn('[market-personalization] baseline fallback', error);
+          console.warn('[market-personalization] AI unavailable; waiting for user choice', error);
         }
       });
 
@@ -963,6 +969,7 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
   const handleEnterMarket = useCallback(() => {
     if (nearbyPortalIdRef.current !== 'market') return;
     prepareMapTransition();
+    setMarketAiStatus('loading');
     setMarketScenarioLocked(true);
     worldMapRef.current = 'market';
     setWorldMap('market');
@@ -2576,7 +2583,41 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
         />
       ) : null}
 
-      {worldMap === 'market' ? (
+      {worldMap === 'market' && (marketAiRequestToken !== accessToken || !['ready', 'baseline'].includes(marketAiStatus)) ? (
+        <View style={styles.interactionOverlay}>
+          <View style={styles.fridgeMenuSheet}>
+            <Text style={styles.fridgeMenuTitle}>
+              {marketAiStatus === 'loading' ? '행동을 분석하고 연습을 준비하고 있어요' : marketAiStatus === 'choose' ? '관찰용 연습을 골라요' : 'AI 맞춤 연습을 준비하지 못했어요'}
+            </Text>
+            {marketAiStatus === 'loading' ? <ActivityIndicator /> : (
+              <>
+                <Text style={styles.fridgeMenuSubtitle}>직접 고르는 관찰용 연습이에요. AI 맞춤 결과가 아니며 가격과 재고는 게임용 가상 설정이에요.</Text>
+                {(['S01', 'S02'] as const).map((id) => (
+                  <Pressable key={id} accessibilityRole="button" onPress={() => {
+                    setPersonalizedMarketMission(buildMarketScenarioMission(id));
+                    setMarketDifficulty(2);
+                    setMarketSimulation(undefined);
+                    setMarketAiStatus('baseline');
+                  }}>
+                    <Text style={styles.fridgeMenuTitle}>{id === 'S01' ? 'S01 아침 준비' : 'S02 공원 간식'}</Text>
+                  </Pressable>
+                ))}
+                <Pressable accessibilityRole="button" onPress={() => {
+                  setPersonalizedMarketMission(marketMission);
+                  setMarketDifficulty(2);
+                  setMarketSimulation(undefined);
+                  setMarketAiStatus('baseline');
+                }}><Text style={styles.fridgeMenuTitle}>기본 관찰용 연습 시작</Text></Pressable>
+              </>
+            )}
+            <Pressable accessibilityRole="button" onPress={handleLeaveMarket}>
+              <Text style={styles.fridgeMenuTitle}>마을로 돌아가기</Text>
+            </Pressable>
+          </View>
+        </View>
+      ) : null}
+
+      {worldMap === 'market' && marketAiRequestToken === accessToken && (marketAiStatus === 'ready' || marketAiStatus === 'baseline') ? (
         <MarketSimulationScreen
           accessToken={accessToken}
           difficulty={marketDifficulty}
@@ -2945,10 +2986,10 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
                       accessibilityLiveRegion="polite"
                       style={[
                         styles.quizFeedback,
-                        transportQuiz.submittedChoice.correct && styles.quizFeedbackCorrect,
+                        false && styles.quizFeedbackCorrect,
                       ]}
                     >
-                      {transportQuiz.submittedChoice.feedback}
+                      {'선택을 기록했어요. AI가 전체 수행을 검토해요.'}
                     </Text>
                   ) : null}
                   <Animated.View
@@ -2985,12 +3026,12 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
                 >
                   {transportQuiz.step.choices.map((choice) => {
                     const selected = transportQuiz.selectedChoiceId === choice.id;
-                    const wrong = selected && transportQuiz.submittedChoice?.correct === false;
+                    const wrong = false;
                     return (
                       <PressScale
                         accessibilityRole="radio"
                         accessibilityState={{ checked: selected }}
-                        disabled={transportQuiz.submittedChoice?.correct === true}
+                        disabled={transportQuiz.submittedChoice !== null}
                         key={choice.id}
                         onPress={() => transportQuiz.selectChoice(choice.id)}
                         style={[
@@ -3011,7 +3052,7 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
                     );
                   })}
                 </Animated.View>
-                {transportQuiz.submittedChoice?.correct ? (
+                {transportQuiz.submittedChoice ? (
                   <PressScale
                     accessibilityRole="button"
                     onPress={transportQuiz.advance}
@@ -3097,11 +3138,11 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
                 >
                   <Text style={styles.resultTitle}>{transportQuiz.quest.title} 퀴즈를 마쳤어요!</Text>
                   <Text style={styles.resultDescription}>
-                    {transportQuiz.quest.steps.length}개의 대중교통 안전 단계를 완료했어요.
+                    {transportQuiz.quest.steps.length}개의 단계에 선택을 제출했어요. AI 검토를 확인해 주세요.
                   </Text>
                   <View style={styles.xpCard}>
                     <Text style={styles.xpLabel}>받은 경험치</Text>
-                    <Text style={styles.xpValue}>+{transportQuiz.quest.rewardPoints} XP</Text>
+                    <Text style={styles.xpValue}>보상 미지급</Text>
                   </View>
                   {transportQuiz.syncNotice ? (
                     <Text style={styles.quizSyncNotice}>{transportQuiz.syncNotice}</Text>

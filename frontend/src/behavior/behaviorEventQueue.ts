@@ -136,3 +136,16 @@ export async function getQueuedBehaviorEventCount(accessToken: string) {
   const key = await storageKey(QUEUE_PREFIX, accessToken);
   return (await readQueue(key)).length;
 }
+/** The upload loop can defer/reject a batch. Only a server receipt confirms complete delivery. */
+export async function assertBehaviorEventsAcknowledged(accessToken: string, sessionId: string, sequence: number) {
+  const key = await storageKey(QUEUE_PREFIX, accessToken);
+  await operations.get(key);
+  await flushBehaviorEventQueue(accessToken);
+  const response = await fetch(process.env.EXPO_PUBLIC_API_URL + '/api/behavior-analyses/sessions/' + sessionId + '/receipt', {
+    headers: { Authorization: 'Bearer ' + accessToken },
+  });
+  if (!response.ok) throw new Error('기록 전송을 확인하지 못했어요. AI 판단을 보류해요.');
+  const receipt = await response.json() as { sequences: number[] };
+  const received = new Set(receipt.sequences);
+  for (let i = 1; i <= sequence; i++) if (!received.has(i)) throw new Error('일부 기록이 전송 대기 중이에요. 다시 확인해 주세요.');
+}

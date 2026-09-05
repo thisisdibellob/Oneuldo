@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -49,7 +50,7 @@ class QuestSessionServiceTest {
     @Autowired private QuestSessionService sessionService;
 
     @Test
-    void 선택을_서버에서_판정하고_반복_시도와_완료를_기록한다() {
+    void 선택은_판정없이_반복기록하고_보상없이_제출한다() {
         Fixture fixture = createFixture();
         QuestSessionResponse session = sessionService.start(
                 fixture.member().getId(),
@@ -90,9 +91,9 @@ class QuestSessionServiceTest {
                 )
         );
 
-        assertFalse(firstWrong.correct());
-        assertFalse(secondWrong.correct());
-        assertTrue(firstCorrect.correct());
+        assertNull(firstWrong.correct());
+        assertNull(secondWrong.correct());
+        assertNull(firstCorrect.correct());
         assertEquals(1, firstCorrect.completedSteps());
 
         List<QuestEvent> events = eventRepository
@@ -132,9 +133,9 @@ class QuestSessionServiceTest {
                 session.id()
         );
 
-        assertEquals("COMPLETED", completed.status());
+        assertEquals("SUBMITTED", completed.status());
         assertEquals(2, completed.completedSteps());
-        assertEquals(20, completed.rewardPoints());
+        assertEquals(0, completed.rewardPoints());
     }
 
     @Test

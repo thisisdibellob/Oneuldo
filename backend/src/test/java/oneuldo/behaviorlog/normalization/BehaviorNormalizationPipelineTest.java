@@ -33,8 +33,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.annotation.DirtiesContext;
 
-@SpringBootTest
+@SpringBootTest(properties = "spring.datasource.url=jdbc:h2:mem:legacy-pipeline;MODE=PostgreSQL;DB_CLOSE_DELAY=-1")
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
+@org.springframework.test.context.ActiveProfiles("legacy-rule-analysis")
 class BehaviorNormalizationPipelineTest {
 
     @Autowired private BehaviorLogService behaviorLogService;

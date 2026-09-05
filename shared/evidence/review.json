@@ -1,0 +1,316 @@
+{
+  "version": "evidence-review-2026-09-05-v1",
+  "purpose": "Development-only accessibility support suggestions; not clinical assessment",
+  "expertValidated": false,
+  "productionApproved": false,
+  "cards": [
+    {
+      "cardId": "K13-C1",
+      "status": "PENDING_CONTENT_RIGHTS_REVIEW",
+      "scope": "not_available_to_model",
+      "reviewer": "none",
+      "reviewedAt": null
+    },
+    {
+      "cardId": "I10-C1",
+      "status": "DEVELOPMENT_APPROVED",
+      "scope": "interface_support_only",
+      "reviewer": "Codex source/notice comparison; not an expert",
+      "reviewedAt": "2026-09-05"
+    },
+    {
+      "cardId": "I10-C2",
+      "status": "DEVELOPMENT_APPROVED",
+      "scope": "interface_support_only",
+      "reviewer": "Codex source/notice comparison; not an expert",
+      "reviewedAt": "2026-09-05"
+    },
+    {
+      "cardId": "I12-C1",
+      "status": "PENDING_CONTENT_RIGHTS_REVIEW",
+      "scope": "not_available_to_model",
+      "reviewer": "none",
+      "reviewedAt": null
+    },
+    {
+      "cardId": "I12-C2",
+      "status": "PENDING_CONTENT_RIGHTS_REVIEW",
+      "scope": "not_available_to_model",
+      "reviewer": "none",
+      "reviewedAt": null
+    },
+    {
+      "cardId": "I26-C1",
+      "status": "PENDING_CONTENT_RIGHTS_REVIEW",
+      "scope": "not_available_to_model",
+      "reviewer": "none",
+      "reviewedAt": null
+    },
+    {
+      "cardId": "I26-C2",
+      "status": "PENDING_CONTENT_RIGHTS_REVIEW",
+      "scope": "not_available_to_model",
+      "reviewer": "none",
+      "reviewedAt": null
+    },
+    {
+      "cardId": "I27-C1",
+      "status": "PENDING_CONTENT_RIGHTS_REVIEW",
+      "scope": "not_available_to_model",
+      "reviewer": "none",
+      "reviewedAt": null
+    },
+    {
+      "cardId": "I28-C1",
+      "status": "PENDING_CONTENT_RIGHTS_REVIEW",
+      "scope": "not_available_to_model",
+      "reviewer": "none",
+      "reviewedAt": null
+    },
+    {
+      "cardId": "I28-C2",
+      "status": "PENDING_CONTENT_RIGHTS_REVIEW",
+      "scope": "not_available_to_model",
+      "reviewer": "none",
+      "reviewedAt": null
+    },
+    {
+      "cardId": "I29-C1",
+      "status": "PENDING_CONTENT_RIGHTS_REVIEW",
+      "scope": "not_available_to_model",
+      "reviewer": "none",
+      "reviewedAt": null
+    },
+    {
+      "cardId": "I30-C1",
+      "status": "PENDING_CONTENT_RIGHTS_REVIEW",
+      "scope": "not_available_to_model",
+      "reviewer": "none",
+      "reviewedAt": null
+    },
+    {
+      "cardId": "I31-C1",
+      "status": "PENDING_CONTENT_RIGHTS_REVIEW",
+      "scope": "not_available_to_model",
+      "reviewer": "none",
+      "reviewedAt": null
+    },
+    {
+      "cardId": "I39-C1",
+      "status": "PENDING_CONTENT_RIGHTS_REVIEW",
+      "scope": "not_available_to_model",
+      "reviewer": "none",
+      "reviewedAt": null
+    },
+    {
+      "cardId": "I42-C1",
+      "status": "PENDING_CONTENT_RIGHTS_REVIEW",
+      "scope": "not_available_to_model",
+      "reviewer": "none",
+      "reviewedAt": null
+    },
+    {
+      "cardId": "I42-C2",
+      "status": "PENDING_CONTENT_RIGHTS_REVIEW",
+      "scope": "not_available_to_model",
+      "reviewer": "none",
+      "reviewedAt": null
+    },
+    {
+      "cardId": "I43-C1",
+      "status": "PENDING_CONTENT_RIGHTS_REVIEW",
+      "scope": "not_available_to_model",
+      "reviewer": "none",
+      "reviewedAt": null
+    },
+    {
+      "cardId": "P10-C1",
+      "status": "PENDING_CONTENT_RIGHTS_REVIEW",
+      "scope": "not_available_to_model",
+      "reviewer": "none",
+      "reviewedAt": null
+    },
+    {
+      "cardId": "P10-C2",
+      "status": "PENDING_CONTENT_RIGHTS_REVIEW",
+      "scope": "not_available_to_model",
+      "reviewer": "none",
+      "reviewedAt": null
+    },
+    {
+      "cardId": "P11-C1",
+      "status": "PENDING_CONTENT_RIGHTS_REVIEW",
+      "scope": "not_available_to_model",
+      "reviewer": "none",
+      "reviewedAt": null
+    },
+    {
+      "cardId": "P14-C1",
+      "status": "PENDING_CONTENT_RIGHTS_REVIEW",
+      "scope": "not_available_to_model",
+      "reviewer": "none",
+      "reviewedAt": null
+    },
+    {
+      "cardId": "P14-C2",
+      "status": "PENDING_CONTENT_RIGHTS_REVIEW",
+      "scope": "not_available_to_model",
+      "reviewer": "none",
+      "reviewedAt": null
+    },
+    {
+      "cardId": "P21-C1",
+      "status": "PENDING_CONTENT_RIGHTS_REVIEW",
+      "scope": "not_available_to_model",
+      "reviewer": "none",
+      "reviewedAt": null
+    },
+    {
+      "cardId": "P21-C2",
+      "status": "PENDING_CONTENT_RIGHTS_REVIEW",
+      "scope": "not_available_to_model",
+      "reviewer": "none",
+      "reviewedAt": null
+    },
+    {
+      "cardId": "P22-C1",
+      "status": "PENDING_CONTENT_RIGHTS_REVIEW",
+      "scope": "not_available_to_model",
+      "reviewer": "none",
+      "reviewedAt": null
+    },
+    {
+      "cardId": "P22-C2",
+      "status": "PENDING_CONTENT_RIGHTS_REVIEW",
+      "scope": "not_available_to_model",
+      "reviewer": "none",
+      "reviewedAt": null
+    },
+    {
+      "cardId": "P24-C1",
+      "status": "PENDING_CONTENT_RIGHTS_REVIEW",
+      "scope": "not_available_to_model",
+      "reviewer": "none",
+      "reviewedAt": null
+    },
+    {
+      "cardId": "P24-C2",
+      "status": "PENDING_CONTENT_RIGHTS_REVIEW",
+      "scope": "not_available_to_model",
+      "reviewer": "none",
+      "reviewedAt": null
+    },
+    {
+      "cardId": "P26-C1",
+      "status": "PENDING_CONTENT_RIGHTS_REVIEW",
+      "scope": "not_available_to_model",
+      "reviewer": "none",
+      "reviewedAt": null
+    },
+    {
+      "cardId": "P27-C1",
+      "status": "PENDING_CONTENT_RIGHTS_REVIEW",
+      "scope": "not_available_to_model",
+      "reviewer": "none",
+      "reviewedAt": null
+    },
+    {
+      "cardId": "P28-C1",
+      "status": "PENDING_CONTENT_RIGHTS_REVIEW",
+      "scope": "not_available_to_model",
+      "reviewer": "none",
+      "reviewedAt": null
+    },
+    {
+      "cardId": "P29-C1",
+      "status": "PENDING_CONTENT_RIGHTS_REVIEW",
+      "scope": "not_available_to_model",
+      "reviewer": "none",
+      "reviewedAt": null
+    },
+    {
+      "cardId": "P30-C1",
+      "status": "PENDING_CONTENT_RIGHTS_REVIEW",
+      "scope": "not_available_to_model",
+      "reviewer": "none",
+      "reviewedAt": null
+    },
+    {
+      "cardId": "P31-C1",
+      "status": "PENDING_CONTENT_RIGHTS_REVIEW",
+      "scope": "not_available_to_model",
+      "reviewer": "none",
+      "reviewedAt": null
+    },
+    {
+      "cardId": "P32-C1",
+      "status": "PENDING_CONTENT_RIGHTS_REVIEW",
+      "scope": "not_available_to_model",
+      "reviewer": "none",
+      "reviewedAt": null
+    },
+    {
+      "cardId": "P33-C1",
+      "status": "PENDING_CONTENT_RIGHTS_REVIEW",
+      "scope": "not_available_to_model",
+      "reviewer": "none",
+      "reviewedAt": null
+    },
+    {
+      "cardId": "P34-C1",
+      "status": "PENDING_CONTENT_RIGHTS_REVIEW",
+      "scope": "not_available_to_model",
+      "reviewer": "none",
+      "reviewedAt": null
+    },
+    {
+      "cardId": "P35-C1",
+      "status": "PENDING_CONTENT_RIGHTS_REVIEW",
+      "scope": "not_available_to_model",
+      "reviewer": "none",
+      "reviewedAt": null
+    },
+    {
+      "cardId": "P36-C1",
+      "status": "PENDING_CONTENT_RIGHTS_REVIEW",
+      "scope": "not_available_to_model",
+      "reviewer": "none",
+      "reviewedAt": null
+    },
+    {
+      "cardId": "P37-C1",
+      "status": "PENDING_CONTENT_RIGHTS_REVIEW",
+      "scope": "not_available_to_model",
+      "reviewer": "none",
+      "reviewedAt": null
+    },
+    {
+      "cardId": "P51-C1",
+      "status": "PENDING_CONTENT_RIGHTS_REVIEW",
+      "scope": "not_available_to_model",
+      "reviewer": "none",
+      "reviewedAt": null
+    },
+    {
+      "cardId": "R01-C1",
+      "status": "PENDING_CONTENT_RIGHTS_REVIEW",
+      "scope": "not_available_to_model",
+      "reviewer": "none",
+      "reviewedAt": null
+    },
+    {
+      "cardId": "R02-C1",
+      "status": "PENDING_CONTENT_RIGHTS_REVIEW",
+      "scope": "not_available_to_model",
+      "reviewer": "none",
+      "reviewedAt": null
+    },
+    {
+      "cardId": "R02-C2",
+      "status": "PENDING_CONTENT_RIGHTS_REVIEW",
+      "scope": "not_available_to_model",
+      "reviewer": "none",
+      "reviewedAt": null
+    }
+  ]
+}

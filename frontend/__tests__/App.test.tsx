@@ -314,7 +314,7 @@ describe('오늘도 앱', () => {
     }
 
     expect(screen.getByText('혼자 버스 타기 퀴즈를 마쳤어요!')).toBeTruthy();
-    expect(screen.getByText('+20 XP')).toBeTruthy();
+    expect(screen.getByText('보상 미지급')).toBeTruthy();
     fireEvent.press(screen.getByRole('button', { name: '마을로 돌아가기' }));
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 220));
@@ -322,8 +322,9 @@ describe('오늘도 앱', () => {
     expect(screen.getByRole('button', { name: '민수와 대화 또는 의뢰 선택하기' })).toBeTruthy();
     expect(screen.getByLabelText('이동 조이스틱')).toBeTruthy();
     fireEvent.press(screen.getByRole('button', { name: '수첩 열기' }));
-    expect(screen.getByLabelText('오늘 1/4 완료')).toBeTruthy();
-  }, 10_000);
+    expect(screen.getByLabelText('오늘 0/4 완료')).toBeTruthy();
+  // 실제 대화 애니메이션 대기를 포함하는 전체 흐름이다. 느린 테스트 호스트에서도 정리 전에 완료되도록 여유를 둔다.
+  }, 20_000);
 
   it('터치 이동 모드에서 바닥과 NPC를 직접 눌러 이동한다', async () => {
     const screen = render(<App />);
@@ -547,6 +548,7 @@ describe('오늘도 앱', () => {
     }
     expect(screen.getByTestId('market-proximity-cloud', { includeHiddenElements: true })).toBeTruthy();
     fireEvent.press(screen.getByRole('button', { name: '하늘마트 들어가기' }));
+    fireEvent.press(await screen.findByText('기본 관찰용 연습 시작'));
 
     expect(screen.getByText('안녕하세요. 오늘 저녁에 필요한 물건을 같이 골라볼까요?')).toBeTruthy();
     fireEvent.press(screen.getByText('다음'));
@@ -584,8 +586,8 @@ describe('오늘도 앱', () => {
     fireEvent.press(await screen.findByRole('button', { name: '계산대에서 계산하기' }));
     fireEvent.press(screen.getByText('목록 확인'));
 
-    expect(screen.getByText('목록에 맞게 장보기를 마쳤어요!')).toBeTruthy();
-    expect(screen.getByText('+30')).toBeTruthy();
+    expect(screen.getByText('AI 수행 검토')).toBeTruthy();
+    expect(screen.queryByText('+30')).toBeNull();
     fireEvent.press(screen.getByText('마을로 돌아가기'));
     fireEvent.press(screen.getByRole('button', { name: '수첩 열기' }));
     expect(screen.getByLabelText('오늘 0/4 완료')).toBeTruthy();
@@ -597,8 +599,8 @@ describe('오늘도 앱', () => {
     fireEvent.press(screen.getByRole('button', { name: 'Google로 시작하기' }));
     fireEvent.press(screen.getByRole('tab', { name: '분석 탭' }));
 
-    expect(screen.getByText('나의 능력 분석')).toBeTruthy();
-    expect(screen.getByText('로그인하면 나의 능력 분석을 볼 수 있어요.')).toBeTruthy();
+    expect(screen.getByText('나의 행동 분석')).toBeTruthy();
+    expect(screen.getByText('로그인하면 나의 행동 분석을 볼 수 있어요.')).toBeTruthy();
     expect(screen.queryByLabelText('AI 친구에게 메시지 보내기')).toBeNull();
   });
 
@@ -611,22 +613,22 @@ describe('오늘도 앱', () => {
 
     await waitFor(() => expect(screen.getByText('목적지가 적힌 노선의 버스 번호를 확인한다.')).toBeTruthy());
     fireEvent.press(screen.getByText('목적지가 적힌 노선의 버스 번호를 확인한다.'));
-    fireEvent.press(screen.getByRole('button', { name: '정답 확인' }));
-    expect(screen.getByText('좋아요!')).toBeTruthy();
+    fireEvent.press(screen.getByRole('button', { name: '선택 제출' }));
+    expect(screen.getByText('선택을 기록했어요. AI가 전체 수행을 검토해요.')).toBeTruthy();
     fireEvent.press(screen.getByRole('button', { name: '다음으로' }));
 
     fireEvent.press(screen.getByText('버스 앞 번호와 확인한 번호를 비교한다.'));
-    fireEvent.press(screen.getByRole('button', { name: '정답 확인' }));
+    fireEvent.press(screen.getByRole('button', { name: '선택 제출' }));
     fireEvent.press(screen.getByRole('button', { name: '다음으로' }));
     fireEvent.press(screen.getByText('교통카드를 단말기에 댄다.'));
-    fireEvent.press(screen.getByRole('button', { name: '정답 확인' }));
+    fireEvent.press(screen.getByRole('button', { name: '선택 제출' }));
     fireEvent.press(screen.getByRole('button', { name: '다음으로' }));
     fireEvent.press(screen.getByText('하차 버튼을 누르고 버스가 멈출 때까지 기다린다.'));
-    fireEvent.press(screen.getByRole('button', { name: '정답 확인' }));
+    fireEvent.press(screen.getByRole('button', { name: '선택 제출' }));
     fireEvent.press(screen.getByRole('button', { name: '결과 보기' }));
 
     expect(screen.getByText('혼자 버스 타기 연습을 마쳤어요!')).toBeTruthy();
-    expect(screen.getByText('+20 XP')).toBeTruthy();
+    expect(screen.getByText('보상 미지급')).toBeTruthy();
     fireEvent.press(screen.getByRole('button', { name: '퀘스트 목록으로' }));
     expect(screen.getByText('추천 퀘스트')).toBeTruthy();
   });

@@ -37,6 +37,9 @@ public class MarketAiQuestGeneration {
     @JoinColumn(name = "analysis_input_snapshot_id", updatable = false)
     private BehaviorAnalysisInputSnapshot analysisInputSnapshot;
 
+    @Column(name = "analysis_id", updatable = false)
+    private UUID analysisId;
+
     @Column(nullable = false, length = 20, updatable = false)
     private String source;
 
@@ -57,7 +60,7 @@ public class MarketAiQuestGeneration {
     private List<Attempt> attempts;
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "validated_quest", nullable = false, columnDefinition = "jsonb", updatable = false)
+    @Column(name = "validated_quest", columnDefinition = "jsonb", updatable = false)
     private MarketAiQuestDraft validatedQuest;
 
     @Column(name = "failure_reason", columnDefinition = "text", updatable = false)
@@ -67,13 +70,14 @@ public class MarketAiQuestGeneration {
     private Instant createdAt;
 
     public MarketAiQuestGeneration(UUID id, Member member,
-            BehaviorAnalysisInputSnapshot analysisInputSnapshot, String source, String model,
+            BehaviorAnalysisInputSnapshot analysisInputSnapshot, UUID analysisId, String source, String model,
             long latencyMs, String personalizationMode, String promptVersion,
             List<Attempt> attempts, MarketAiQuestDraft validatedQuest,
             String failureReason, Instant createdAt) {
         this.id = id;
         this.member = member;
         this.analysisInputSnapshot = analysisInputSnapshot;
+        this.analysisId = analysisId;
         this.source = source;
         this.model = model;
         this.latencyMs = latencyMs;
