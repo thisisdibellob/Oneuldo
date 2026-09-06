@@ -16,6 +16,7 @@ import tools.jackson.databind.ObjectMapper;
 @Service
 @RequiredArgsConstructor
 public class AiBehaviorAnalysisService {
+    private static final org.slf4j.Logger log=org.slf4j.LoggerFactory.getLogger(AiBehaviorAnalysisService.class);
     private final BehaviorAnalysisInputService inputs;
     private final AiBehaviorAnalysisRepository repository;
     private final AiBehaviorAnalysisPromptFactory prompts;
@@ -24,6 +25,7 @@ public class AiBehaviorAnalysisService {
     private final ObjectMapper mapper;
     private final AnalysisTokenBudget budget;
     private final AnalysisCallPacer pacer;
+    private final oneuldo.behaviorlog.profile.service.AiUserProfileService userProfiles;
     @Value("${ai.behavior-analysis.max-chunks:64}")
     private int maxChunks = 64;
     @Value("${ai.groq.model:qwen/qwen3.6-27b}") private String configuredModel="qwen/qwen3.6-27b";
@@ -39,7 +41,17 @@ public class AiBehaviorAnalysisService {
     }
 
     public AiBehaviorAnalysisResponse analyzeSession(UUID memberId, UUID sessionId) {
-        return requests.run(memberId+":session:"+sessionId,()->analyzeShared(memberId, inputs.createForSession(memberId, null, sessionId)));
+        return requests.run(memberId+":session:"+sessionId,()->{
+            var result=analyzeShared(memberId, inputs.createForSession(memberId, null, sessionId));
+            if ("READY".equals(result.status())) {
+                try { userProfiles.updateFromSession(memberId, sessionId, result); }
+                catch (RuntimeException failure) {
+                    log.warn("Session analysis succeeded but user profile update failed: member={}, session={}",
+                            memberId, sessionId, failure);
+                }
+            }
+            return result;
+        });
     }
 
     public AiBehaviorAnalysisResponse analyzeSnapshot(UUID memberId, UUID datasetId) {

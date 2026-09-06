@@ -1,22 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import {
-  createBehaviorAnalysis, getLatestBehaviorAnalysis, type AiBehaviorAnalysisResponse,
+  getCurrentUserProfile, refreshCurrentUserProfile, type AiUserProfileResponse,
 } from '../api/behaviorAnalysis';
 import { PressScale } from '../components/PressScale';
 import { BrandHeader } from '../components/ui';
 import { colors, fonts } from '../theme';
 
-const stateCopy = {
-  NO_HISTORY: '아직 관찰할 행동 기록이 없어요. 기본 연습을 한 뒤 분석해 주세요.',
-  FAILED: 'AI 분석에 실패했어요. 능력이나 성공·실패를 대신 판정하지 않았어요.',
-  INPUT_TOO_LARGE: '전체 행동 기록이 현재 입력 한도를 넘었어요. 기록을 잘라서 분석하지 않았어요.',
-  READY: '',
-};
 const judgmentCopy = { SUCCESS: '성공으로 해석', FAILURE: '실패로 해석', UNDETERMINED: '판단 보류' };
 
 export function AbilityAnalysisScreen({ accessToken }: { accessToken: string | null }) {
-  const [result, setResult] = useState<AiBehaviorAnalysisResponse | null>(null);
+  const [result, setResult] = useState<AiUserProfileResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showEvidence, setShowEvidence] = useState(false);
@@ -29,7 +23,7 @@ export function AbilityAnalysisScreen({ accessToken }: { accessToken: string | n
     setResult(null); setError(null); setShowEvidence(false);
     if (!accessToken) { setLoading(false); return; }
     setLoading(true);
-    getLatestBehaviorAnalysis(accessToken).then((value) => {
+    getCurrentUserProfile(accessToken).then((value) => {
       if (requestId.current === id && tokenRef.current === accessToken) setResult(value);
     }).catch(() => {
       if (requestId.current === id && tokenRef.current === accessToken) setError('분석 기록을 불러오지 못했어요.');
@@ -39,43 +33,43 @@ export function AbilityAnalysisScreen({ accessToken }: { accessToken: string | n
     return () => { requestId.current++; };
   }, [accessToken]);
 
-  async function analyze() {
+  async function refreshProfile() {
     if (!accessToken || loading) return;
     const id = ++requestId.current;
     setLoading(true); setError(null); setResult(null);
     try {
-      const next = await createBehaviorAnalysis(accessToken);
+      const next = await refreshCurrentUserProfile(accessToken);
       if (requestId.current === id && tokenRef.current === accessToken) setResult(next);
     } catch {
-      if (requestId.current === id && tokenRef.current === accessToken) setError('AI 분석 요청을 완료하지 못했어요. 잠시 후 다시 시도해 주세요.');
+      if (requestId.current === id && tokenRef.current === accessToken) setError('사용자 프로필을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
     } finally {
       if (requestId.current === id && tokenRef.current === accessToken) setLoading(false);
     }
   }
 
-  const analysis = result?.status === 'READY' ? result.analysis : null;
+  const analysis = result?.status === 'READY' ? result.profile : null;
   return (
     <View style={styles.root}>
       <BrandHeader />
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.title}>나의 행동 분석</Text>
-        <Text style={styles.note}>AI가 행동의 맥락을 살펴보고 다음 연습을 제안해요. 의료 진단이나 확정된 능력 평가가 아니에요.</Text>
+        <Text style={styles.note}>새 플레이가 끝날 때 AI가 직전 프로필과 그 플레이 기록만 합쳐 갱신해요. 의료 진단이나 확정된 능력 평가가 아니에요.</Text>
         {!accessToken ? <Text style={styles.body}>로그인하면 나의 행동 분석을 볼 수 있어요.</Text> : (
           <>
-            <PressScale accessibilityRole="button" disabled={loading} onPress={() => void analyze()} style={styles.button}>
-              <Text style={styles.buttonText}>{loading ? '분석 기록 확인 중…' : '새 행동 분석하기'}</Text>
+            <PressScale accessibilityRole="button" disabled={loading} onPress={() => void refreshProfile()} style={styles.button}>
+              <Text style={styles.buttonText}>{loading ? '최신 플레이 반영 중…' : '최신 플레이 반영하기'}</Text>
             </PressScale>
-            {loading ? <ActivityIndicator accessibilityLabel="AI 분석 로딩" color={colors.mint} /> : null}
+            {loading ? <ActivityIndicator accessibilityLabel="사용자 프로필 로딩" color={colors.mint} /> : null}
             {error ? <Text accessibilityRole="alert" style={styles.body}>{error}</Text> : null}
-            {!loading && !error && !result ? <Text style={styles.body}>아직 AI 분석 결과가 없어요. 분석 버튼을 눌러 주세요.</Text> : null}
-            {result && result.status !== 'READY' ? <Text style={styles.body}>{stateCopy[result.status]}</Text> : null}
+            {!loading && !error && !result ? <Text style={styles.body}>아직 누적 프로필이 없어요. 장보기 연습을 한 번 완료해 주세요.</Text> : null}
+            {result && result.status !== 'READY' ? <Text style={styles.body}>최근 프로필 갱신에 실패했어요. 이전에 완료된 프로필은 유지돼요.</Text> : null}
             {analysis && result ? (
               <>
                 <View style={styles.card}>
-                  <Text style={styles.heading}>AI 관찰 요약</Text>
+                  <Text style={styles.heading}>AI 누적 프로필</Text>
                   <Text style={styles.body}>{analysis.summary}</Text>
-                  <Text style={styles.note}>기록 {result.eventCount}개 · 처리 {(result.latencyMs / 1000).toFixed(1)}초</Text>
-                  <Text selectable style={styles.note}>근거 버전: {result.evidenceVersion} · 사용한 카드: {analysis.usedEvidenceCardIds?.join(', ') || '없음'}</Text>
+                  <Text style={styles.note}>프로필 버전 {result.profileVersion} · 최근 갱신 {(result.latencyMs / 1000).toFixed(1)}초</Text>
+                  <Text selectable style={styles.note}>프롬프트: {result.promptVersion} · 사용한 카드: {analysis.usedEvidenceCardIds?.join(', ') || '없음'}</Text>
                   <Text style={styles.note}>{new Date(result.createdAt).toLocaleString()} · {result.model}</Text>
                 </View>
                 {analysis.findings.map((finding) => (
@@ -113,7 +107,7 @@ export function AbilityAnalysisScreen({ accessToken }: { accessToken: string | n
                         <Text selectable style={styles.note}>세션 {session.sessionId} · 근거 {session.evidenceEventIds.join(', ')}</Text>
                       </View>
                     ))}
-                    <Text selectable style={styles.note}>분석 {result.analysisId} / 입력 {result.datasetId}</Text>
+                    <Text selectable style={styles.note}>프로필 {result.profileId} / 최근 세션 {result.sourceSessionId} / 분석 {result.sourceAnalysisId}</Text>
                   </View>
                 ) : null}
               </>

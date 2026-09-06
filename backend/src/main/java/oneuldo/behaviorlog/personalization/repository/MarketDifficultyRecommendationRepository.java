@@ -10,4 +10,5 @@ public interface MarketDifficultyRecommendationRepository
     Optional<MarketDifficultyRecommendation> findFirstByMemberIdOrderByGeneratedAtDesc(UUID memberId);
     Optional<MarketDifficultyRecommendation> findByMemberIdAndAnalysisInputSnapshotId(
             UUID memberId, UUID analysisInputSnapshotId);
+    Optional<MarketDifficultyRecommendation> findByMemberIdAndProfileId(UUID memberId, UUID profileId);
 }

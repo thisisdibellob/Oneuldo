@@ -42,6 +42,9 @@ public class MarketAiQuestGeneration {
     @Column(name = "analysis_id", updatable = false)
     private UUID analysisId;
 
+    @Column(name = "profile_id", updatable = false)
+    private UUID profileId;
+
     @Column(nullable = false, length = 20, updatable = false)
     private String source;
 
@@ -72,7 +75,7 @@ public class MarketAiQuestGeneration {
     private Instant createdAt;
 
     public MarketAiQuestGeneration(UUID id, Member member,
-            BehaviorAnalysisInputSnapshot analysisInputSnapshot, UUID analysisId, String source, String model,
+            BehaviorAnalysisInputSnapshot analysisInputSnapshot, UUID analysisId, UUID profileId, String source, String model,
             long latencyMs, String personalizationMode, String promptVersion,
             List<Attempt> attempts, MarketAiQuestDraft validatedQuest,
             String failureReason, Instant createdAt) {
@@ -80,6 +83,7 @@ public class MarketAiQuestGeneration {
         this.member = member;
         this.analysisInputSnapshot = analysisInputSnapshot;
         this.analysisId = analysisId;
+        this.profileId = profileId;
         this.source = source;
         this.model = model;
         this.latencyMs = latencyMs;
@@ -92,10 +96,10 @@ public class MarketAiQuestGeneration {
     }
 
     public MarketAiQuestGeneration(UUID id, Member member,
-            BehaviorAnalysisInputSnapshot input, UUID analysisId, String source, String model,
+            BehaviorAnalysisInputSnapshot input, UUID analysisId, UUID profileId, String source, String model,
             long latencyMs, String mode, String promptVersion,List<Attempt> attempts,
             MarketAiQuestDraft quest,String failure,Instant createdAt,String requestKey) {
-        this(id,member,input,analysisId,source,model,latencyMs,mode,promptVersion,attempts,quest,failure,createdAt);
+        this(id,member,input,analysisId,profileId,source,model,latencyMs,mode,promptVersion,attempts,quest,failure,createdAt);
         this.requestKey=requestKey;
     }
 }

@@ -34,7 +34,7 @@ public class MarketAiQuestAuditService {
     @Transactional(readOnly=true)
     public java.util.Optional<MarketAiQuestResponse> findReusable(UUID memberId,String requestKey) {
         return generationRepository.findFirstByMemberIdAndRequestKeyAndSourceOrderByCreatedAtDesc(memberId,requestKey,"AI")
-                .filter(g->g.getValidatedQuest()!=null).map(g->MarketAiQuestResponse.from(g.getId(),g.getAnalysisId(),g.getSource(),g.getModel(),
+                .filter(g->g.getValidatedQuest()!=null).map(g->MarketAiQuestResponse.from(g.getId(),g.getAnalysisId(),g.getProfileId(),g.getSource(),g.getModel(),
                         g.getLatencyMs(),g.getPersonalizationMode(),g.getPromptVersion(),g.getValidatedQuest()));
     }
 
@@ -49,7 +49,7 @@ public class MarketAiQuestAuditService {
                 analysisInputSnapshotId, memberId).orElseThrow(() ->
                 new ResponseStatusException(HttpStatus.NOT_FOUND, "행동 분석 입력을 찾을 수 없습니다."));
         generationRepository.save(new MarketAiQuestGeneration(
-                response.generationId(), member, analysisInput, response.analysisId(), response.source(), response.model(),
+                response.generationId(), member, analysisInput, response.analysisId(), response.profileId(), response.source(), response.model(),
                 response.latencyMs(), response.personalizationMode(), response.promptVersion(),
                 attempts, validatedQuest, failureReason, Instant.now(),requestKey));
     }

@@ -26,7 +26,8 @@ class AiBehaviorAnalysisTest {
     private final AiBehaviorAnalysisPromptFactory prompts = new AiBehaviorAnalysisPromptFactory(mapper);
     private final AiBehaviorAnalysisValidator validator = new AiBehaviorAnalysisValidator(new MarketAiDifficultyValidator());
     private final AnalysisTokenBudget budget = new AnalysisTokenBudget();
-    private final AiBehaviorAnalysisService service = new AiBehaviorAnalysisService(inputs, repository, prompts, validator, client, mapper, budget, mock(AnalysisCallPacer.class));
+    private final AiBehaviorAnalysisService service = new AiBehaviorAnalysisService(inputs, repository, prompts, validator, client, mapper, budget,
+            mock(AnalysisCallPacer.class), mock(oneuldo.behaviorlog.profile.service.AiUserProfileService.class));
     private final UUID memberId = UUID.randomUUID();
     private final UUID datasetId = UUID.randomUUID();
     private final UUID sessionId = UUID.randomUUID();
@@ -121,7 +122,7 @@ class AiBehaviorAnalysisTest {
                 .thenReturn(new GroqChatClient.GroqChatResult(mapper.writeValueAsString(valid("UNDETERMINED")), "mock-qwen"));
         var response = service.analyze(memberId, new BehaviorAnalysisInputRequest(null, null));
         assertThat(response.status()).isEqualTo("READY");
-        verify(client).complete(anyString(), anyString(), eq(900), anyDouble());
+        verify(client).complete(anyString(), anyString(), eq(1200), anyDouble());
     }
 
     @Test

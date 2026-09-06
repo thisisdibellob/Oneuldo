@@ -19,8 +19,11 @@ public class MarketDifficultyRecommendationPersistenceService {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public MarketDifficultyRecommendation save(Member member, BehaviorAnalysisInputSnapshot analysisInput,
-            java.util.UUID analysisId, String version, MarketPersonalizationDecision decision) {
+            java.util.UUID analysisId, java.util.UUID profileId, long profileVersion,
+            String version, MarketPersonalizationDecision decision) {
+        var existing = repository.findByMemberIdAndProfileId(member.getId(), profileId);
+        if (existing.isPresent()) return existing.get();
         return repository.save(new MarketDifficultyRecommendation(
-                member, analysisInput, analysisId, version, decision, Instant.now()));
+                member, analysisInput, analysisId, profileId, profileVersion, version, decision, Instant.now()));
     }
 }

@@ -8,6 +8,8 @@ public record MarketDifficultyRecommendationResponse(
         UUID recommendationId,
         UUID analysisInputSnapshotId,
         UUID analysisId,
+        UUID profileId,
+        long profileVersion,
         String gameId,
         int recommendedDifficulty,
         String personalizationMode,
@@ -30,6 +32,8 @@ public record MarketDifficultyRecommendationResponse(
                 recommendation.getAnalysisInputSnapshot() == null
                         ? null : recommendation.getAnalysisInputSnapshot().getId(),
                 recommendation.getAnalysisId(),
+                recommendation.getProfileId(),
+                recommendation.getProfileVersion(),
                 "MARKET_SIMULATION",
                 recommendation.getRecommendedDifficulty(),
                 recommendation.getPersonalizationMode(),

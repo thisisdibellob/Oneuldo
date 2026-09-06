@@ -6,6 +6,7 @@ import java.util.UUID;
 public record MarketAiQuestResponse(
         UUID generationId,
         UUID analysisId,
+        UUID profileId,
         String source,
         String model,
         long latencyMs,
@@ -30,11 +31,11 @@ public record MarketAiQuestResponse(
             String successMessage
     ) {}
 
-    public static MarketAiQuestResponse from(UUID generationId, UUID analysisId, String source, String model,
+    public static MarketAiQuestResponse from(UUID generationId, UUID analysisId, UUID profileId, String source, String model,
             long latencyMs, String personalizationMode, String promptVersion,
             MarketAiQuestDraft draft) {
         return new MarketAiQuestResponse(
-                generationId, analysisId, source, model, latencyMs, personalizationMode, promptVersion,
+                generationId, analysisId, profileId, source, model, latencyMs, personalizationMode, promptVersion,
                 new Quest(
                         "market-ai-" + generationId,
                         draft.scenarioId(),

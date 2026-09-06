@@ -60,6 +60,19 @@ public interface BehaviorLogRepository extends JpaRepository<BehaviorLog, UUID> 
     );
 
     @Query("""
+            select log.sessionId
+            from BehaviorLog log
+            where log.member.id = :memberId
+              and log.sessionEndContext is not null
+            group by log.sessionId
+            order by max(log.receivedAt) desc
+            """)
+    List<UUID> findLatestCompletedSessionIds(
+            @Param("memberId") UUID memberId,
+            Pageable pageable
+    );
+
+    @Query("""
             select log.id
             from BehaviorLog log
             where not exists (

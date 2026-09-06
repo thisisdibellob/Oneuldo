@@ -42,6 +42,8 @@ class AiAnalysisChainIntegrationTest {
     @Autowired private BehaviorLogService logs;
     @Autowired private AiBehaviorAnalysisService analyses;
     @Autowired private AiBehaviorAnalysisRepository runs;
+    @Autowired private oneuldo.behaviorlog.profile.service.AiUserProfileService profiles;
+    @Autowired private oneuldo.behaviorlog.personalization.service.MarketDifficultyRecommendationService recommendations;
     @Autowired private MarketAiQuestService quests;
     @Autowired private MarketAiQuestGenerationRepository generations;
     @Autowired private NormalizedBehaviorEventRepository normalized;
@@ -55,9 +57,25 @@ class AiAnalysisChainIntegrationTest {
     @Test
     void 원본에서_AI분석과_연습목표를_거쳐_퀘스트까지_연결하고_영속화한다() throws Exception {
         var member = member();
-        UUID eventId = log(member);
+        UUID sessionId=UUID.randomUUID();
+        UUID eventId = log(member,sessionId,1);
         stubAnalysisAndQuest(false);
         long normalizedBefore = normalized.count();
+        var sessionAnalysis=analyses.analyzeSession(member.getId(),sessionId);
+        assertThat(sessionAnalysis.status()).isEqualTo("READY");
+        var profile=profiles.requireCurrent(member.getId());
+        assertThat(profile.profileVersion()).isEqualTo(1);
+        assertThat(profile.sourceAnalysisId()).isEqualTo(sessionAnalysis.analysisId());
+        var token = tokens.createAccessToken(member);
+        mvc.perform(get("/api/user-profiles/current").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.profileId").value(profile.profileId().toString()))
+                .andExpect(jsonPath("$.profileVersion").value(1))
+                .andExpect(jsonPath("$.sourceSessionId").value(sessionId.toString()))
+                .andExpect(jsonPath("$.profile.practicePlan.goal").value("목록과 수량 비교 연습"));
+        var recommendation = recommendations.recommend(member.getId());
+        assertThat(recommendations.recommend(member.getId()).recommendationId())
+                .isEqualTo(recommendation.recommendationId());
         var quest = quests.generate(member.getId());
         var run = runs.findById(quest.analysisId()).orElseThrow();
         assertThat(quest.source()).isEqualTo("AI");
@@ -65,10 +83,13 @@ class AiAnalysisChainIntegrationTest {
         assertThat(run.getResult().practicePlan().goal()).isEqualTo("목록과 수량 비교 연습");
         assertThat(run.getResult().findings().getFirst().evidenceEventIds()).containsExactly(eventId);
         assertThat(generations.findById(quest.generationId()).orElseThrow().getAnalysisId()).isEqualTo(run.getId());
+        assertThat(generations.findById(quest.generationId()).orElseThrow().getProfileId()).isEqualTo(profile.profileId());
+        assertThat(quest.profileId()).isEqualTo(profile.profileId());
+        assertThat(recommendation.profileId()).isEqualTo(profile.profileId());
+        assertThat(quest.personalizationMode()).isEqualTo("AI_PROFILE");
         assertThat(normalized.count()).isEqualTo(normalizedBefore);
         assertThat(context.getBeansOfType(BehaviorNormalizationListener.class)).isEmpty();
         verify(client).complete(anyString(), contains("목록과 수량 비교 연습"), eq(900), anyDouble());
-        var token = tokens.createAccessToken(member);
         mvc.perform(get("/api/behavior-analyses/" + run.getId()).header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.analysisId").value(run.getId().toString()))
                 .andExpect(jsonPath("$.analysis.practicePlan.goal").value("목록과 수량 비교 연습"))
@@ -80,7 +101,8 @@ class AiAnalysisChainIntegrationTest {
 
     @Test
     void 퀘스트_API실패를_감사기록으로_남기고_규칙형미션을_반환하지_않는다() {
-        var member = member(); log(member); stubAnalysisAndQuest(true);
+        var member = member();var session=UUID.randomUUID();log(member,session,1); stubAnalysisAndQuest(true);
+        analyses.analyzeSession(member.getId(),session);
         long before = generations.count();
         assertThatThrownBy(() -> quests.generate(member.getId())).isInstanceOf(ResponseStatusException.class);
         assertThat(generations.count()).isEqualTo(before + 1);
@@ -98,13 +120,41 @@ class AiAnalysisChainIntegrationTest {
         mvc.perform(post("/api/behavior-analyses").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("NO_HISTORY"));
         mvc.perform(post("/api/behavior-analyses")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/user-profiles/current").header("Authorization", "Bearer " + token))
+                .andExpect(status().isNoContent());
+        mvc.perform(get("/api/user-profiles/current")).andExpect(status().isUnauthorized());
         assertThatThrownBy(() -> quests.generate(member.getId())).isInstanceOf(ResponseStatusException.class);
+        assertThat(profiles.current(member.getId())).isEmpty();
+        verifyNoInteractions(client);
+    }
+
+    @Test
+    void 프로필_갱신_API는_전체이력대신_가장최근_완료세션_하나만_반영한다() throws Exception {
+        var member = member();
+        UUID older = UUID.randomUUID(), latest = UUID.randomUUID();
+        completedLog(member, older, Instant.now().minusSeconds(10));
+        completedLog(member, latest, Instant.now());
+        stubAnalysisAndQuest(false);
+        String token = tokens.createAccessToken(member);
+
+        mvc.perform(post("/api/user-profiles/current/refresh").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.profileVersion").value(1))
+                .andExpect(jsonPath("$.sourceSessionId").value(latest.toString()));
+        assertThat(analyses.latest(member.getId()).eventCount()).isEqualTo(1);
+
+        clearInvocations(client);
+        mvc.perform(post("/api/user-profiles/current/refresh").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sourceSessionId").value(latest.toString()));
         verifyNoInteractions(client);
     }
 
     private void stubAnalysisAndQuest(boolean questFails) {
         when(client.complete(anyString(), anyString(), anyInt(), anyDouble())).thenAnswer(invocation -> {
-            if (((String) invocation.getArgument(0)).contains("퀘스트 설계자")) {
+            String system=(String)invocation.getArgument(0);
+            String prompt=(String)invocation.getArgument(1);
+            if (system.contains("퀘스트 설계자")) {
                 if (questFails) throw new IllegalStateException("test provider error");
                 return new GroqChatClient.GroqChatResult("""
                         {"difficulty":1,"scenarioId":"CUSTOM","title":"수량 비교 연습","description":"목록을 보고 물건을 담아요.","budget":4000,
@@ -113,8 +163,20 @@ class AiAnalysisChainIntegrationTest {
                          "successMessage":"연습을 마쳤어요.","adaptationSummary":"수량 비교 관찰에 따른 연습","reasonCodes":["QUANTITY_PRACTICE"]}
                         """, "mock-qwen");
             }
+            if (system.contains("사용자 프로필을 갱신")) {
+                var input=mapper.readTree(prompt.substring(0,prompt.lastIndexOf('}')+1));
+                String evidence=input.path("newSessionAnalysis").path("findings").get(0).path("evidenceEventIds").get(0).asString();
+                return new GroqChatClient.GroqChatResult("""
+                        {"summary":"목록 확인 행동이 누적 관찰되었습니다.","findings":[{"id":"F1","skill":"수량 확인","observation":"목록을 열었습니다.",
+                        "interpretation":"수량을 확인했을 가능성이 있습니다.","alternativeExplanations":["단순 탐색일 수도 있습니다."],
+                        "evidenceEventIds":["%s"],"suggestedSupport":"목록을 함께 읽습니다."}],"uncertainties":["실생활 수행은 알 수 없습니다."],
+                        "practicePlan":{"targetFindingIds":["F1"],"goal":"목록과 수량 비교 연습","rationale":"누적 관찰과 연결",
+                        "recommendedDifficulty":1,"itemCount":2,"quantityComplexity":"LOW","budgetPressure":"LOW","textSupport":"SIMPLIFIED",
+                        "reasonCodes":["QUANTITY_PRACTICE"]},"usedEvidenceCardIds":[]}
+                        """.formatted(evidence),"mock-qwen");
+            }
             var session = new oneuldo.behaviorlog.analysis.service.CompactBehaviorTimeline(mapper)
-                    .decodeWithTables(mapper.readTree((String) invocation.getArgument(1)).path("behaviorTimeline")).path("sessions").get(0);
+                    .decodeWithTables(mapper.readTree(prompt).path("behaviorTimeline")).path("sessions").get(0);
             String eventAlias = session.path("events").get(0).path("behaviorLogId").asString();
             String sessionAlias = session.path("sessionId").asString();
             var eventId = UUID.randomUUID();
@@ -179,6 +241,8 @@ class AiAnalysisChainIntegrationTest {
     @Test void 퀘스트_동시3요청과_재진입은_분석과_퀘스트를_각1회만_호출한다() throws Exception {
         var owner=member();var session=UUID.randomUUID();log(owner,session,1);
         stubAnalysisAndQuest(false);
+        analyses.analyzeSession(owner.getId(),session);
+        clearInvocations(client);
         var entered=new java.util.concurrent.CountDownLatch(1);var release=new java.util.concurrent.CountDownLatch(1);
         // Block before the actual analysis path so the other two callers must join the active generation.
         var calls=new java.util.concurrent.atomic.AtomicInteger();
@@ -190,9 +254,10 @@ class AiAnalysisChainIntegrationTest {
                 return super.userPrompt(a,r);
             }
         };
-        var service=new MarketAiQuestService(analyses,gatedPrompts,new oneuldo.behaviorlog.personalization.service.MarketAiQuestValidator(),
+        var service=new MarketAiQuestService(gatedPrompts,new oneuldo.behaviorlog.personalization.service.MarketAiQuestValidator(),
                 context.getBean(oneuldo.behaviorlog.personalization.service.MarketDifficultyRecommendationService.class),
-                context.getBean(oneuldo.behaviorlog.personalization.service.MarketAiQuestAuditService.class),client,mapper);
+                context.getBean(oneuldo.behaviorlog.personalization.service.MarketAiQuestAuditService.class),
+                context.getBean(oneuldo.behaviorlog.profile.service.AiUserProfileService.class),client,mapper);
         var first=new java.util.concurrent.FutureTask<>(()->service.generate(owner.getId()));Thread.ofPlatform().start(first);
         assertThat(entered.await(10,java.util.concurrent.TimeUnit.SECONDS)).isTrue();
         var second=new java.util.concurrent.FutureTask<>(()->service.generate(owner.getId()));var t2=Thread.ofPlatform().start(second);
@@ -202,7 +267,7 @@ class AiAnalysisChainIntegrationTest {
         assertThat(second.get(10,java.util.concurrent.TimeUnit.SECONDS).generationId()).isEqualTo(result.generationId());
         assertThat(third.get(10,java.util.concurrent.TimeUnit.SECONDS).generationId()).isEqualTo(result.generationId());
         assertThat(calls).hasValue(1);
-        verify(client,times(2)).complete(anyString(),anyString(),anyInt(),anyDouble());
+        verify(client,times(1)).complete(anyString(),anyString(),anyInt(),anyDouble());
         clearInvocations(client);
         // A separate service object has no in-flight state: completed reuse must come from the database.
         var replay=quests.generate(owner.getId());
@@ -210,11 +275,14 @@ class AiAnalysisChainIntegrationTest {
         assertThat(replay.analysisId()).isEqualTo(result.analysisId());
         verifyNoInteractions(client);
         log(owner,session,2);
+        analyses.analyzeSession(owner.getId(),session);
         var updated=quests.generate(owner.getId());
         assertThat(updated.generationId()).isNotEqualTo(result.generationId());
         assertThat(updated.analysisId()).isNotEqualTo(result.analysisId());
         assertThat(analyses.find(owner.getId(),updated.analysisId()).eventCount()).isEqualTo(2);
-        verify(client,times(2)).complete(anyString(),anyString(),anyInt(),anyDouble());
+        assertThat(profiles.requireCurrent(owner.getId()).profileVersion()).isEqualTo(2);
+        assertThat(updated.profileId()).isEqualTo(profiles.requireCurrent(owner.getId()).profileId());
+        verify(client,times(3)).complete(anyString(),anyString(),anyInt(),anyDouble());
     }
 
     @Test void 실패한_분석도_동일스냅샷으로_재시도하며_READY만_재사용한다() {
@@ -276,6 +344,21 @@ class AiAnalysisChainIntegrationTest {
                 new ActionContext("SHOP.LIST_OPENED", "LIST", null, StepOutcome.SUCCESS, 1, null, null),
                 new AccessibilityContext(InstructionMode.TEXT, TextLevel.STANDARD, false, true, ControllerMode.TOUCH),
                 null, null, null, null, null, null, null, null, null,
+                mapper.readValue("{\"type\":\"SHOPPING\",\"listOpenCount\":1}", BehaviorPayload.class));
+        return logs.record(member.getId(), request).id();
+    }
+
+    private UUID completedLog(Member member, UUID sessionId, Instant occurredAt) {
+        var request = new BehaviorLogRequest(
+                new EventMetadata(UUID.randomUUID(), 1L, BehaviorLogService.SUPPORTED_SCHEMA_VERSION,
+                        "test", "market-v1", false, null, occurredAt),
+                new IdentityContext(sessionId),
+                new TaskContext("MARKET_SIMULATION", UUID.randomUUID(), "market-v1", 2,
+                        "BASELINE", EvidenceContext.ASSESSMENT_TASK),
+                new ActionContext("SHOP.PRICE_CHECKED", "CHECKOUT", null, null, 1, null, null),
+                new AccessibilityContext(InstructionMode.TEXT, TextLevel.STANDARD, false, true, ControllerMode.TOUCH),
+                null, null, null, null, null, null, null,
+                new SessionEndContext(SessionEndReason.COMPLETED, 0, 0L), null,
                 mapper.readValue("{\"type\":\"SHOPPING\",\"listOpenCount\":1}", BehaviorPayload.class));
         return logs.record(member.getId(), request).id();
     }

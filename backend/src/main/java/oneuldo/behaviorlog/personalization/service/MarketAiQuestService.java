@@ -5,7 +5,6 @@ import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import oneuldo.ai.client.GroqChatClient;
-import oneuldo.behaviorlog.analysis.service.AiBehaviorAnalysisService;
 import oneuldo.behaviorlog.personalization.domain.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -15,11 +14,11 @@ import tools.jackson.databind.ObjectMapper;
 @Service
 @RequiredArgsConstructor
 public class MarketAiQuestService {
-    private final AiBehaviorAnalysisService analysisService;
     private final MarketAiQuestPromptFactory promptFactory;
     private final MarketAiQuestValidator validator;
     private final MarketDifficultyRecommendationService recommendationService;
     private final MarketAiQuestAuditService auditService;
+    private final oneuldo.behaviorlog.profile.service.AiUserProfileService profileService;
     private final GroqChatClient groqChatClient;
     private final ObjectMapper objectMapper;
     private final oneuldo.ai.service.SingleFlight<UUID,MarketAiQuestResponse> activeRequests=new oneuldo.ai.service.SingleFlight<>();
@@ -32,7 +31,8 @@ public class MarketAiQuestService {
 
     private MarketAiQuestResponse generateOnce(UUID memberId) {
         var recommendation = recommendationService.recommend(memberId);
-        var analysis = analysisService.find(memberId, recommendation.analysisId());
+        var profile = profileService.find(memberId, recommendation.profileId());
+        var analysis = profile.asAnalysisResponse();
         UUID generationId = UUID.randomUUID();
         List<MarketAiQuestGeneration.Attempt> attempts = new ArrayList<>();
         String model = null;
@@ -42,7 +42,7 @@ public class MarketAiQuestService {
         // Recommendation IDs/times change on every read; only its AI plan/settings affect generation.
         var semanticPrompt=(tools.jackson.databind.node.ObjectNode)new oneuldo.behaviorlog.analysis.service.LosslessTables(objectMapper).decode(objectMapper.readTree(userPrompt));
         if(semanticPrompt.path("aiDifficultyRecommendation") instanceof tools.jackson.databind.node.ObjectNode rec)
-            rec.remove(List.of("recommendationId","generatedAt"));
+            rec.remove(List.of("recommendationId","profileId","generatedAt"));
         if(semanticPrompt.path("aiUserAnalysis") instanceof tools.jackson.databind.node.ObjectNode record)
             record.remove(List.of("createdAt","latencyMs"));
         String requestKey=oneuldo.ai.service.AiRequestFingerprint.of(objectMapper,memberId,configuredModel,promptFactory.systemPrompt(),semanticPrompt,900,0.2,"quest-reuse-v1");
@@ -73,13 +73,13 @@ public class MarketAiQuestService {
         }
         long latency = (System.nanoTime() - startedAt) / 1_000_000L;
         if (draft == null) {
-            var failed = new MarketAiQuestResponse(generationId, analysis.analysisId(), "FAILED", model, latency,
+            var failed = new MarketAiQuestResponse(generationId, analysis.analysisId(), profile.profileId(), "FAILED", model, latency,
                     recommendation.personalizationMode(), MarketAiQuestPromptFactory.PROMPT_VERSION,
                     null, null, List.of());
             auditService.record(memberId, recommendation.analysisInputSnapshotId(), failed, null, attempts, "AI_QUEST_FAILED",requestKey);
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "AI 퀘스트 생성 실패. 대체 판정이나 미션을 만들지 않았습니다.");
         }
-        var response = MarketAiQuestResponse.from(generationId, analysis.analysisId(), "AI", model, latency,
+        var response = MarketAiQuestResponse.from(generationId, analysis.analysisId(), profile.profileId(), "AI", model, latency,
                 recommendation.personalizationMode(), MarketAiQuestPromptFactory.PROMPT_VERSION, draft);
         auditService.record(memberId, recommendation.analysisInputSnapshotId(), response, draft, attempts, null,requestKey);
         return response;

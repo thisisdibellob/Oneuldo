@@ -1,4 +1,4 @@
-import { marketCatalogProducts, getEnabledMarketScenario, MARKET_CATALOG_VERSION, MARKET_SCENARIO_VERSION } from './marketContent';
+import { enabledMarketScenarios, marketCatalogProducts, getEnabledMarketScenario, MARKET_CATALOG_VERSION, MARKET_SCENARIO_VERSION } from './marketContent';
 
 export type SimulationId = 'market' | 'laundry' | 'cooking' | 'transit';
 export type SimulationStatus = 'playable' | 'planned';
@@ -205,6 +205,18 @@ export function buildMarketScenarioMission(scenarioId: string): MarketMission {
     briefing: [`${scenario.title}에 필요한 물건을 골라요.`, '상품의 규격과 구매 단위를 보고 목록과 비교해요.'],
     successMessage: '장보기 연습을 마쳤어요!',
   };
+}
+
+/** 사용자가 고르지 않아도 현재 실행 가능한 관찰용 시나리오 하나를 균등하게 선택한다. */
+export function buildRandomMarketScenarioMission(random: () => number = Math.random): MarketMission {
+  if (enabledMarketScenarios.length === 0) {
+    throw new Error('실행 가능한 장보기 시나리오가 없습니다.');
+  }
+  const index = Math.min(
+    enabledMarketScenarios.length - 1,
+    Math.max(0, Math.floor(random() * enabledMarketScenarios.length)),
+  );
+  return buildMarketScenarioMission(enabledMarketScenarios[index].id);
 }
 
 /** 서버와 앱 콘텐츠 버전이 다르면 현재 가격으로 몰래 바꿔 실행하지 않는다. */

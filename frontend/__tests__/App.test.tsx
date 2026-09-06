@@ -533,6 +533,7 @@ describe('오늘도 앱', () => {
   });
 
   it('의뢰를 받지 않고 마트 연습을 마치면 일일 완료 수에는 반영하지 않는다', async () => {
+    const random = jest.spyOn(Math, 'random').mockReturnValue(0);
     const screen = render(<App />);
     fireEvent.press(screen.getByRole('button', { name: 'Google로 시작하기' }));
     fireEvent.press(screen.getByRole('tab', { name: '게임 탭' }));
@@ -548,9 +549,8 @@ describe('오늘도 앱', () => {
     }
     expect(screen.getByTestId('market-proximity-cloud', { includeHiddenElements: true })).toBeTruthy();
     fireEvent.press(screen.getByRole('button', { name: '하늘마트 들어가기' }));
-    fireEvent.press(await screen.findByText('기본 관찰용 연습 시작'));
 
-    expect(screen.getByText('안녕하세요. 오늘 저녁에 필요한 물건을 같이 골라볼까요?')).toBeTruthy();
+    expect(await screen.findByText('아침 준비에 필요한 물건을 골라요.')).toBeTruthy();
     fireEvent.press(screen.getByText('다음'));
     fireEvent.press(screen.getByText('장보기 시작'));
     const marketMap = screen.getByLabelText('하늘마트 내부 월드');
@@ -568,21 +568,14 @@ describe('오늘도 앱', () => {
 
     moveInsideMarket('moveRight', 4);
     fireEvent.press(await screen.findByRole('button', { name: '과일 살펴보기' }));
-    fireEvent.press(screen.getByRole('button', { name: '사과 담기' }));
-    fireEvent.press(screen.getByLabelText('사과 한 개 더 담기'));
+    fireEvent.press(screen.getByRole('button', { name: '바나나 담기' }));
     fireEvent.press(screen.getAllByRole('button', { name: '진열대 닫기' })[0]);
 
-    moveInsideMarket('moveLeft', 4);
-    moveInsideMarket('moveDown', 5);
-    fireEvent.press(await screen.findByRole('button', { name: '간편 식품 살펴보기' }));
-    fireEvent.press(screen.getByRole('button', { name: '순한 카레 담기' }));
-    fireEvent.press(screen.getAllByRole('button', { name: '진열대 닫기' })[0]);
-
-    fireEvent.press(screen.getByRole('button', { name: '장바구니 4개' }));
-    expect(screen.getByText('7,400원')).toBeTruthy();
+    fireEvent.press(screen.getByRole('button', { name: '장바구니 2개' }));
+    expect(screen.getByText('5,800원')).toBeTruthy();
     fireEvent.press(screen.getByText('가방 닫기'));
-    moveInsideMarket('moveRight', 2);
-    moveInsideMarket('moveUp', 8);
+    moveInsideMarket('moveLeft', 2);
+    moveInsideMarket('moveUp', 3);
     fireEvent.press(await screen.findByRole('button', { name: '계산대에서 계산하기' }));
     fireEvent.press(screen.getByText('목록 확인'));
 
@@ -592,6 +585,7 @@ describe('오늘도 앱', () => {
     fireEvent.press(screen.getByRole('button', { name: '수첩 열기' }));
     expect(screen.getByLabelText('오늘 0/4 완료')).toBeTruthy();
     expect(screen.getByLabelText('하늘마트의 지영을 찾아보세요.')).toBeTruthy();
+    random.mockRestore();
   });
 
   it('기존 AI 탭 대신 사용자 능력 분석 화면을 보여준다', () => {

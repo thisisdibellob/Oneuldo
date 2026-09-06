@@ -1,5 +1,5 @@
 import { marketCatalogProducts, enabledMarketScenarios, marketScenarioDefinitions, MARKET_CATALOG_VERSION, MARKET_SCENARIO_VERSION } from '../src/game/marketContent';
-import { buildMarketScenarioMission, resolveMarketAiMission, getMarketProduct, getMarketCartTotal, evaluateMarketCart, getObjectiveQuantity } from '../src/game/scenarios';
+import { buildMarketScenarioMission, buildRandomMarketScenarioMission, resolveMarketAiMission, getMarketProduct, getMarketCartTotal, evaluateMarketCart, getObjectiveQuantity } from '../src/game/scenarios';
 import { MarketBehaviorTracker } from '../src/behavior/marketBehaviorTracker';
 import { enqueueBehaviorEvents, flushBehaviorEventQueue } from '../src/behavior/behaviorEventQueue';
 import type { BehaviorLogRequest } from '../src/api/behaviorLog';
@@ -29,6 +29,11 @@ it('16개 정의 중 S01/S02만 실행하고 원문 예산과 조건을 보존�
     { productId: 'water', quantity: 1 },
   ] });
   expect(() => buildMarketScenarioMission('S09')).toThrow();
+});
+
+it('첫 관찰 플레이는 실행 가능한 시나리오 중 하나를 자동 선택한다', () => {
+  expect(buildRandomMarketScenarioMission(() => 0).scenarioId).toBe('S01');
+  expect(buildRandomMarketScenarioMission(() => 0.999999).scenarioId).toBe('S02');
 });
 
 it('초록 사과를 목록 수량에 포함하고 작은 우유를 900mL로 취급하지 않는다', () => {

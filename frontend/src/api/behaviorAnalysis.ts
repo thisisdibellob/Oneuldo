@@ -46,6 +46,22 @@ export type AiBehaviorAnalysisResponse = {
   analysis: AiBehaviorAnalysis | null;
 };
 
+export type AiUserProfileResponse = {
+  profileId: string;
+  profileVersion: number;
+  previousProfileId: string | null;
+  sourceAnalysisId: string;
+  sourceDatasetId: string;
+  sourceSessionId: string;
+  status: 'READY' | 'FAILED';
+  model: string | null;
+  promptVersion: string;
+  latencyMs: number;
+  createdAt: string;
+  errorCode: string | null;
+  profile: AiBehaviorAnalysis | null;
+};
+
 async function request(accessToken: string, method: 'GET' | 'POST') {
   if (!API_BASE_URL) throw new Error('EXPO_PUBLIC_API_URL이 설정되지 않았습니다.');
   const response = await fetch(`${API_BASE_URL}/api/behavior-analyses${method === 'GET' ? '/latest' : ''}`, {
@@ -59,6 +75,28 @@ async function request(accessToken: string, method: 'GET' | 'POST') {
 
 export const getLatestBehaviorAnalysis = (accessToken: string) => request(accessToken, 'GET');
 export const createBehaviorAnalysis = (accessToken: string) => request(accessToken, 'POST');
+
+export async function getCurrentUserProfile(accessToken: string): Promise<AiUserProfileResponse | null> {
+  if (!API_BASE_URL) throw new Error('EXPO_PUBLIC_API_URL이 설정되지 않았습니다.');
+  const response = await fetch(`${API_BASE_URL}/api/user-profiles/current`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (response.status === 204) return null;
+  if (!response.ok) throw new Error(`사용자 프로필 조회 실패: ${response.status}`);
+  return response.json() as Promise<AiUserProfileResponse>;
+}
+
+export async function refreshCurrentUserProfile(accessToken: string): Promise<AiUserProfileResponse | null> {
+  if (!API_BASE_URL) throw new Error('EXPO_PUBLIC_API_URL이 설정되지 않았습니다.');
+  const response = await fetch(`${API_BASE_URL}/api/user-profiles/current/refresh`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (response.status === 204) return null;
+  if (!response.ok) throw new Error(`사용자 프로필 갱신 실패: ${response.status}`);
+  return response.json() as Promise<AiUserProfileResponse>;
+}
+
 export async function createSessionBehaviorAnalysis(accessToken: string, sessionId: string): Promise<AiBehaviorAnalysisResponse> {
   if (!API_BASE_URL) throw new Error('EXPO_PUBLIC_API_URL이 설정되지 않았습니다.');
   const response = await fetch(API_BASE_URL + '/api/behavior-analyses/sessions/' + encodeURIComponent(sessionId), {

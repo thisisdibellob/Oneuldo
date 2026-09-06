@@ -76,7 +76,8 @@ class FinalAnalysisQuestLiveTest {
         });
         // The provider wrapper handles pacing for live requests only; cached responses do not consume quota.
         var analysis=new AiBehaviorAnalysisService(inputs,repository,factory,
-                new AiBehaviorAnalysisValidator(new MarketAiDifficultyValidator()),new LiveClient(),mapper,new AnalysisTokenBudget(),mock(AnalysisCallPacer.class));
+                new AiBehaviorAnalysisValidator(new MarketAiDifficultyValidator()),new LiveClient(),mapper,new AnalysisTokenBudget(),mock(AnalysisCallPacer.class),
+                mock(oneuldo.behaviorlog.profile.service.AiUserProfileService.class));
         var checkpointRepository=mock(oneuldo.behaviorlog.analysis.repository.AiAnalysisCheckpointRepository.class);
         Map<String,AiAnalysisCheckpoint> persisted=new LinkedHashMap<>();
         when(checkpointRepository.findById(anyString())).thenAnswer(c->Optional.ofNullable(persisted.get(c.getArgument(0))));
@@ -107,7 +108,8 @@ class FinalAnalysisQuestLiveTest {
 
             // These are in-memory persistence boundaries, not invented AI responses or a rule-based recommendation.
             var plan=result.analysis().practicePlan();
-            var recommendation=new MarketDifficultyRecommendationResponse(UUID.randomUUID(),DATASET,result.analysisId(),
+            UUID profileId=UUID.randomUUID();
+            var recommendation=new MarketDifficultyRecommendationResponse(UUID.randomUUID(),DATASET,result.analysisId(),profileId,1,
                     "MARKET_SIMULATION",plan.recommendedDifficulty(),"AI_ANALYSIS",
                     new MarketDifficultyRecommendationResponse.Adjustments(plan.itemCount(),plan.quantityComplexity(),plan.budgetPressure(),plan.textSupport()),
                     plan.reasonCodes(),result.promptVersion(),Instant.now());
@@ -115,14 +117,18 @@ class FinalAnalysisQuestLiveTest {
             when(recommendations.recommend(MEMBER)).thenReturn(recommendation);
             var analysisLookup=mock(AiBehaviorAnalysisService.class);
             when(analysisLookup.find(MEMBER,result.analysisId())).thenReturn(result);
+            var profiles=mock(oneuldo.behaviorlog.profile.service.AiUserProfileService.class);
+            when(profiles.find(MEMBER,profileId)).thenReturn(new oneuldo.behaviorlog.profile.domain.AiUserProfileResponse(
+                    profileId,1,null,result.analysisId(),DATASET,UUID.randomUUID(),"READY",result.model(),result.promptVersion(),
+                    result.latencyMs(),result.createdAt(),null,result.analysis()));
             var questAudit=mock(MarketAiQuestAuditService.class);
             doAnswer(call->{
                 report.set("questAuditResponse",mapper.valueToTree(call.getArgument(2)));
                 report.set("questAttempts",mapper.valueToTree(call.getArgument(4)));
                 report.set("questError",mapper.valueToTree(call.getArgument(5)));write();return null;
             }).when(questAudit).record(any(),any(),any(),any(),any(),any(),any());
-            var quests=new MarketAiQuestService(analysisLookup,new MarketAiQuestPromptFactory(mapper),new MarketAiQuestValidator(),
-                    recommendations,questAudit,new LiveClient(),mapper);
+            var quests=new MarketAiQuestService(new MarketAiQuestPromptFactory(mapper),new MarketAiQuestValidator(),
+                    recommendations,questAudit,profiles,new LiveClient(),mapper);
             report.set("recommendation",mapper.valueToTree(recommendation));write();
             var quest=quests.generate(MEMBER);
             report.set("questResponse",mapper.valueToTree(quest));

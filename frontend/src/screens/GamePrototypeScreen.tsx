@@ -76,7 +76,7 @@ import {
   MarketCategoryId,
   marketCategories,
   marketMission,
-  buildMarketScenarioMission,
+  buildRandomMarketScenarioMission,
 } from '../game/scenarios';
 import {
   clampWorldZoom,
@@ -582,7 +582,7 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
   const [busStopNearby, setBusStopNearby] = useState(false);
   const [marketScenarioLocked, setMarketScenarioLocked] = useState(false);
   const [personalizedMarketMission, setPersonalizedMarketMission] = useState(marketMission);
-  const [marketAiStatus, setMarketAiStatus] = useState<'loading' | 'ready' | 'error' | 'baseline' | 'choose'>('loading');
+  const [marketAiStatus, setMarketAiStatus] = useState<'loading' | 'ready' | 'baseline'>('loading');
   const [marketAiRequestToken, setMarketAiRequestToken] = useState<string | null | undefined>(undefined);
   const [marketDifficulty, setMarketDifficulty] = useState(2);
   const [marketSimulation, setMarketSimulation] = useState<
@@ -674,18 +674,25 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
   useEffect(() => {
     let active = true;
 
-    if (!accessToken) {
-      setMarketAiRequestToken(accessToken);
-      setMarketAiStatus('choose');
-      setPersonalizedMarketMission(marketMission);
-      setMarketDifficulty(2);
-      setMarketSimulation(undefined);
+    if (worldMap !== 'market') {
       return () => {
         active = false;
       };
     }
 
-    if (worldMap !== 'market') {
+    if (!accessToken) {
+      const randomMission = buildRandomMarketScenarioMission();
+      setMarketAiRequestToken(accessToken);
+      setMarketAiStatus('baseline');
+      setPersonalizedMarketMission(randomMission);
+      setMarketDifficulty(2);
+      setMarketSimulation(undefined);
+      if (__DEV__) {
+        console.info('[market-personalization] random baseline applied', {
+          contentSource: 'STATIC',
+          scenarioId: randomMission.scenarioId,
+        });
+      }
       return () => {
         active = false;
       };
@@ -718,9 +725,17 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
       })
       .catch((error: unknown) => {
         if (!active) return;
-        setMarketAiStatus('error');
+        const randomMission = buildRandomMarketScenarioMission();
+        setPersonalizedMarketMission(randomMission);
+        setMarketDifficulty(2);
+        setMarketSimulation(undefined);
+        setMarketAiStatus('baseline');
         if (__DEV__) {
-          console.warn('[market-personalization] AI unavailable; waiting for user choice', error);
+          console.warn('[market-personalization] AI unavailable; random baseline applied', {
+            error,
+            contentSource: 'STATIC',
+            scenarioId: randomMission.scenarioId,
+          });
         }
       });
 
@@ -2583,33 +2598,11 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
         />
       ) : null}
 
-      {worldMap === 'market' && (marketAiRequestToken !== accessToken || !['ready', 'baseline'].includes(marketAiStatus)) ? (
+      {worldMap === 'market' && (marketAiRequestToken !== accessToken || marketAiStatus === 'loading') ? (
         <View style={styles.interactionOverlay}>
           <View style={styles.fridgeMenuSheet}>
-            <Text style={styles.fridgeMenuTitle}>
-              {marketAiStatus === 'loading' ? '행동을 분석하고 연습을 준비하고 있어요' : marketAiStatus === 'choose' ? '관찰용 연습을 골라요' : 'AI 맞춤 연습을 준비하지 못했어요'}
-            </Text>
-            {marketAiStatus === 'loading' ? <ActivityIndicator /> : (
-              <>
-                <Text style={styles.fridgeMenuSubtitle}>직접 고르는 관찰용 연습이에요. AI 맞춤 결과가 아니며 가격과 재고는 게임용 가상 설정이에요.</Text>
-                {(['S01', 'S02'] as const).map((id) => (
-                  <Pressable key={id} accessibilityRole="button" onPress={() => {
-                    setPersonalizedMarketMission(buildMarketScenarioMission(id));
-                    setMarketDifficulty(2);
-                    setMarketSimulation(undefined);
-                    setMarketAiStatus('baseline');
-                  }}>
-                    <Text style={styles.fridgeMenuTitle}>{id === 'S01' ? 'S01 아침 준비' : 'S02 공원 간식'}</Text>
-                  </Pressable>
-                ))}
-                <Pressable accessibilityRole="button" onPress={() => {
-                  setPersonalizedMarketMission(marketMission);
-                  setMarketDifficulty(2);
-                  setMarketSimulation(undefined);
-                  setMarketAiStatus('baseline');
-                }}><Text style={styles.fridgeMenuTitle}>기본 관찰용 연습 시작</Text></Pressable>
-              </>
-            )}
+            <Text style={styles.fridgeMenuTitle}>행동을 분석하고 연습을 준비하고 있어요</Text>
+            <ActivityIndicator />
             <Pressable accessibilityRole="button" onPress={handleLeaveMarket}>
               <Text style={styles.fridgeMenuTitle}>마을로 돌아가기</Text>
             </Pressable>

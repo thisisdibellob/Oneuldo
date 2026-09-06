@@ -6,9 +6,11 @@ export type MarketDifficultyRecommendation = {
   recommendationId: string;
   analysisInputSnapshotId: string | null;
   analysisId: string;
+  profileId: string;
+  profileVersion: number;
   gameId: 'MARKET_SIMULATION';
   recommendedDifficulty: 1 | 2 | 3;
-  personalizationMode: 'AI_ANALYSIS';
+  personalizationMode: 'AI_ANALYSIS' | 'AI_PROFILE';
   adjustments: {
     itemCount: 2 | 3 | 4;
     quantityComplexity: 'LOW' | 'MEDIUM' | 'HIGH';
@@ -35,10 +37,11 @@ export async function getMarketDifficultyRecommendation(accessToken: string) {
 export type MarketAiQuestResponse = {
   generationId: string;
   analysisId: string;
+  profileId: string;
   source: 'AI';
   model: string | null;
   latencyMs: number;
-  personalizationMode: 'AI_ANALYSIS';
+  personalizationMode: 'AI_ANALYSIS' | 'AI_PROFILE';
   promptVersion: string;
   quest: {
     id: string;
