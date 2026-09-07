@@ -65,7 +65,7 @@ public class BehaviorEventRegistry {
                 "SHOP.SHELF_PROXIMITY_ENTERED", "SHOP.SHELF_PROXIMITY_EXITED",
                 "SHOP.CHECKOUT_PROXIMITY_ENTERED", "SHOP.CHECKOUT_PROXIMITY_EXITED",
                 "SHOP.TARGET_SHELF_APPROACHED", "SHOP.SHELF_REVISITED",
-                "SHOP.MOVEMENT_BLOCKED", "SHOP.MOVEMENT_SAMPLED");
+                "SHOP.MOVEMENT_BLOCKED", "SHOP.MOVEMENT_UNBLOCKED", "SHOP.MOVEMENT_SAMPLED");
         addContext(map, p, BehaviorDomain.SHOPPING, WAIT, NEUTRAL, NONE,
                 "SELF_REGULATION", "SHOP.MOVEMENT_STOPPED", "SHOP.IDLE_STARTED",
                 "SHOP.IDLE_ENDED", "SHOP.APP_BACKGROUNDED", "SHOP.APP_FOREGROUNDED");
@@ -257,6 +257,7 @@ public class BehaviorEventRegistry {
                 "pathDistance", "straightDistance", "travelDistance");
         require(map, "SHOP.MOVEMENT_STOPPED", "controlMode", "durationMs", "travelDistance");
         require(map, "SHOP.MOVEMENT_BLOCKED", "controlMode", "x", "y");
+        require(map, "SHOP.MOVEMENT_UNBLOCKED", "controlMode", "durationMs");
         require(map, "SHOP.MOVEMENT_SAMPLED", "controlMode", "x", "y", "blocked");
         require(map, "SHOP.MOVEMENT_BLOCKED_REPEATEDLY", "blockedCount", "observationWindowMs");
         require(map, "SHOP.SHELF_PROXIMITY_ENTERED", "stationId", "visitIndex", "isTargetZone");

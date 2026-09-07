@@ -41,7 +41,7 @@ export function createMarketScene(mission: MarketMission, seed: number, questIns
     catalogVersion: MARKET_CATALOG_VERSION, scenarioVersion: MARKET_SCENARIO_VERSION, mission: original, products,
     slots: products.map((p, index) => ({ slotId: p.categoryId + '-' + (index % 6 + 1), stationId: p.categoryId, productId: p.id, storage: p.storage })),
     startingConditions: { cart: {}, player: { x: 450, y: 860 },
-      supportOptions: ['목록 다시 보기', '글 정보', '잠시 쉬기', '거절/중단'],
+      supportOptions: ['목록 다시 보기', '글 정보', '거절/중단'],
       geometry: 'existing-market-900x1000-v1; fixed fixtures; storage-tagged virtual list slots',
       exposureMeaning: 'Shelf rows are offered in this order; no viewport or comprehension inference.' },
   }));

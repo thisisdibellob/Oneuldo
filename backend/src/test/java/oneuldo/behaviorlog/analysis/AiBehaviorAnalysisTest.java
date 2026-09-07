@@ -122,7 +122,7 @@ class AiBehaviorAnalysisTest {
                 .thenReturn(new GroqChatClient.GroqChatResult(mapper.writeValueAsString(valid("UNDETERMINED")), "mock-qwen"));
         var response = service.analyze(memberId, new BehaviorAnalysisInputRequest(null, null));
         assertThat(response.status()).isEqualTo("READY");
-        verify(client).complete(anyString(), anyString(), eq(1200), anyDouble());
+        verify(client).complete(anyString(), anyString(), eq(900), anyDouble());
     }
 
     @Test

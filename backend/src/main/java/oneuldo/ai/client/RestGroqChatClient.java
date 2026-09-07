@@ -40,61 +40,66 @@ public class RestGroqChatClient implements GroqChatClient {
         if (!properties.available()) {
             throw new CloudAiUnavailableException("Groq API가 활성화되지 않았습니다.");
         }
-        var reservation=pacer.acquire(oneuldo.behaviorlog.analysis.service.QwenTokenCounter.inputTokens(systemPrompt,userPrompt),maxCompletionTokens);
         long started=System.nanoTime();
-        try {
-            var entity = restClient.post()
-                    .uri("/openai/v1/chat/completions")
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + properties.apiKey())
-                    .body(new GroqRequest(
-                            properties.model(),
-                            List.of(
-                                    new Message("system", systemPrompt),
-                                    new Message("user", userPrompt)
-                            ),
-                            maxCompletionTokens,
-                            temperature,
-                            0.8,
-                            "none",
-                            "hidden",
-                            false
-                    ))
-                    .retrieve()
-                    .toEntity(GroqResponse.class);
-            GroqResponse response=entity.getBody();
-            pacer.completed(reservation,response==null||response.usage()==null?null:response.usage().prompt_tokens(),
-                    response==null||response.usage()==null?null:response.usage().completion_tokens(),entity.getHeaders().toSingleValueMap());
-            if (response == null || response.choices() == null || response.choices().isEmpty()
-                    || response.choices().getFirst().message() == null
-                    || response.choices().getFirst().message().content() == null
-                    || response.choices().getFirst().message().content().isBlank()) {
-                throw new CloudAiUnavailableException("Groq API가 빈 결과를 반환했습니다.");
-            }
-            return new GroqChatResult(
-                    response.choices().getFirst().message().content(),
-                    response.model() == null ? properties.model() : response.model(),
-                    response.choices().getFirst().finish_reason(), response.usage()==null?null:response.usage().prompt_tokens(),
-                    response.usage()==null?null:response.usage().completion_tokens(),(System.nanoTime()-started)/1000000
-            );
-        } catch (RestClientResponseException exception) {
-            if (exception.getStatusCode().value() == 429) {
-                pacer.limited(exception.getResponseHeaders()==null?java.util.Map.of():exception.getResponseHeaders().toSingleValueMap(),exception.getResponseBodyAsString());
-                log.warn("Groq HTTP 429: {}", rateLimitDetails(exception));
-                throw new CloudAiRateLimitException(
-                        exception.getResponseHeaders() == null
-                                ? null
-                                : exception.getResponseHeaders().getFirst("retry-after"),
+        for (int rateRetry=0; ; rateRetry++) {
+            var reservation=pacer.acquire(oneuldo.behaviorlog.analysis.service.QwenTokenCounter.inputTokens(systemPrompt,userPrompt),maxCompletionTokens);
+
+            try {
+                var entity = restClient.post()
+                        .uri("/openai/v1/chat/completions")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + properties.apiKey())
+                        .body(new GroqRequest(
+                                properties.model(),
+                                List.of(
+                                        new Message("system", systemPrompt),
+                                        new Message("user", userPrompt)
+                                ),
+                                maxCompletionTokens,
+                                temperature,
+                                0.8,
+                                "none",
+                                "hidden",
+                                false
+                        ))
+                        .retrieve()
+                        .toEntity(GroqResponse.class);
+                GroqResponse response=entity.getBody();
+                pacer.completed(reservation,response==null||response.usage()==null?null:response.usage().prompt_tokens(),
+                        response==null||response.usage()==null?null:response.usage().completion_tokens(),entity.getHeaders().toSingleValueMap());
+                if (response == null || response.choices() == null || response.choices().isEmpty()
+                        || response.choices().getFirst().message() == null
+                        || response.choices().getFirst().message().content() == null
+                        || response.choices().getFirst().message().content().isBlank()) {
+                    throw new CloudAiUnavailableException("Groq API가 빈 결과를 반환했습니다.");
+                }
+                return new GroqChatResult(
+                        response.choices().getFirst().message().content(),
+                        response.model() == null ? properties.model() : response.model(),
+                        response.choices().getFirst().finish_reason(), response.usage()==null?null:response.usage().prompt_tokens(),
+                        response.usage()==null?null:response.usage().completion_tokens(),(System.nanoTime()-started)/1000000
+                );
+            } catch (RestClientResponseException exception) {
+                if (exception.getStatusCode().value() == 429) {
+                    pacer.limited(exception.getResponseHeaders()==null?java.util.Map.of():exception.getResponseHeaders().toSingleValueMap(),exception.getResponseBodyAsString());
+                    log.warn("Groq HTTP 429: {}", rateLimitDetails(exception));
+                    if (rateRetry < 3) continue; // Retry the identical request, preserving successful pipeline checkpoints.
+                    throw new CloudAiRateLimitException(
+                            exception.getResponseHeaders() == null
+                                    ? null
+                                    : exception.getResponseHeaders().getFirst("retry-after"),
+                            exception
+                    );
+                }
+                throw new CloudAiUnavailableException(
+                        "Groq API 호출에 실패했습니다: " + exception.getStatusCode().value(),
                         exception
                 );
+            } catch (ResourceAccessException exception) {
+                throw new CloudAiUnavailableException("Groq API 응답 시간이 초과되었습니다.", exception);
             }
-            throw new CloudAiUnavailableException(
-                    "Groq API 호출에 실패했습니다: " + exception.getStatusCode().value(),
-                    exception
-            );
-        } catch (ResourceAccessException exception) {
-            throw new CloudAiUnavailableException("Groq API 응답 시간이 초과되었습니다.", exception);
         }
     }
+
 
     // Log only allowlisted limit metadata, never prompts, credentials or the raw provider response.
     static String rateLimitDetails(RestClientResponseException exception) {

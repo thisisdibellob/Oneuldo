@@ -12,7 +12,7 @@ import tools.jackson.databind.node.ObjectNode;
 /** 원본 스냅샷은 변경하지 않고 기존 판정 필드만 AI 입력에서 분리한다. */
 @Component
 public class AiBehaviorAnalysisPromptFactory {
-    public static final String VERSION = "behavior-analysis-v11-movement";
+    public static final String VERSION = "behavior-analysis-v13-broader-observations";
     public static final String EVIDENCE_VERSION = EvidenceIndex.VERSION;
     private final ObjectMapper mapper;
     @org.springframework.beans.factory.annotation.Value("${ai.behavior-analysis.movement-max-error:0}")
@@ -129,7 +129,7 @@ public class AiBehaviorAnalysisPromptFactory {
                           "recommendedDifficulty":2,"itemCount":2,"quantityComplexity":"LOW",
                           "budgetPressure":"LOW","textSupport":"SIMPLIFIED","reasonCodes":["OBSERVATION_PRACTICE"]}}
                         findings는 최대 12개, sessionAssessments는 모든 입력 세션을 한 번씩 포함.
-                        출력 예산 안에서 핵심 finding 1~2개를 우선하고 각 설명은 짧게 쓴다. JSON을 완성하고 근거·다른 설명·불확실성을 빼지 않는다.
+                        서로 다른 근거가 있으면 finding 2~3개를 작성하고, 관찰된 행동과 해석 이유를 각각 완결된 문장으로 설명한다. 항목 수를 채우려고 사실을 만들지 않는다. JSON을 완성하고 근거·다른 설명·불확실성을 빼지 않는다.
                         observation/interpretation/alternativeExplanations/suggestedSupport는 관찰과 가설을 구분.
                         모든 finding은 실제 사건을 참조. targetFindingIds는 반환한 finding만 참조.
                         findings가 없으면 targetFindingIds도 빈 배열, uncertainties에 불확실성을 기재.
@@ -171,19 +171,15 @@ public class AiBehaviorAnalysisPromptFactory {
             catalog.set("products", retained); catalog.remove("enabledScenarios");
             catalog.put("sourceNote", "보충 목록에 없는 상품의 원 관측 속성은 behaviorTimeline의 sceneSnapshot.products를 참조. 현재 목록으로 과거 값을 덮지 말 것.");
         }
-        return pack(root);
+        return pack(new ObservationInputCompactor(mapper).compact(root,full));
     }
     public String digestContract() {
-        return "{\"summary\":\"관찰 범위 요약\",\"observations\":[{\"observation\":\"사실\",\"interpretation\":\"가설\",\"alternativeExplanations\":[\"다른 설명\"],\"evidenceEventIds\":[\"제공 사건 ID\"]}],\"uncertainties\":[\"한계\"]} "
-                + "핵심 관찰 1~3개, 각 설명은 짧게 쓴다. 모든 관찰에 실제 사건 근거와 다른 설명을 넣고 빈 관찰이면 불확실성을 명시한다. JSON을 완성한다.";
+        return "JSON: {s:요약,o:[[사실,가설,[다른설명],[사건ID]]],u:[한계]}. 키는 따옴표를 쓴다. "
+                + "서로 다른 행동을 3~5개 관찰하되 근거가 적으면 그보다 적게 쓴다. 같은 행동의 반복은 합치고 수량 조정·목록 확인·가격 비교·도움·이동 중 실제로 기록된 서로 다른 행동과 반증을 보존한다. 각 관찰은 구체적인 사실과 가능한 해석을 완결된 문장으로 설명하고 근거1~3개와 대안1개를 포함한다. 출력 상한 안에서 중복 표현을 줄여 JSON을 완성하며 개수를 채우려고 관찰을 만들지 않는다. "
+                + "반증/도움/자료 한계를 숨기지 않는다. 관찰이 없으면 u에 이유. 구간 밖 사실은 쓰지 않는다.";
     }
     public String reductionContract() {
-        return "{\"summary\":\"요약\",\"observations\":[{\"observation\":\"사실\",\"interpretation\":\"가설\",\"alternativeExplanations\":[\"다른 설명\"],\"evidenceEventIds\":[\"제공 사건 ID\"]}],\"uncertainties\":[\"한계\"]} "
-                + "출력은 650토큰 이내를 목표로 완결한다. 요약과 각 문장은 60자 정도, 관찰은 1~2개, 다른 설명은 관찰마다 1개, 불확실성은 1~2개를 권장한다. "
-                + "분량은 권장치이며 핵심 근거·반증을 빼서 맞추지 않는다. 근거는 입력 해석에 인용된 ID만 사용한다. "
-                + "여러 사실을 한 문장으로 묶었다면 모든 사실을 뒷받침하는 근거를 인용한다. 뒷받침할 수 없는 사실은 확정하지 않는다. "
-                + "AI가 관련 관찰을 묶고 근거를 선택하되 반증·상충·도움·자료 한계를 숨기지 않는다. 압축 중 빠진 내용이나 확인 불가 사항은 uncertainties에 명시한다. "
-                + "서로 다른 행동을 인과관계로 단정하지 말고 JSON을 끝까지 닫는다.";
+        return digestContract()+" 근거는 자식 관찰에 인용된 ID만 사용한다. u는 필수이며 축약으로 빠진 관찰과 상충을 명시한다. 인과를 지어내지 않는다.";
     }
     /** Replace instructions only; the saved child interpretations remain byte-for-byte JSON-equivalent. */
     public String compactReductionPrompt(String json) {

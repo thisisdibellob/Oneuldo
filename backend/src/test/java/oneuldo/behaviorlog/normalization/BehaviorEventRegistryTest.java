@@ -16,6 +16,14 @@ class BehaviorEventRegistryTest {
     private final BehaviorEventRegistry registry = new BehaviorEventRegistry();
 
     @Test
+    void 막힘_종료는_새_충돌로_집계하지_않는다() {
+        var end = registry.find("SHOP.MOVEMENT_UNBLOCKED").orElseThrow();
+        assertEquals(java.util.Set.of("controlMode", "durationMs"), end.requiredPayloadFields());
+        assertEquals(EvidencePolicy.CONTEXT_ONLY, end.evidencePolicy());
+        assertTrue(end.measurementRules().stream().noneMatch(rule -> rule.metricCode().equals("blockedMovementCount")));
+    }
+
+    @Test
     void 모든_행동_영역의_대표_이벤트를_명시적으로_정의한다() {
         Map<String, BehaviorDomain> representatives = Map.of(
                 "SHOP.ITEM_SELECTED", BehaviorDomain.SHOPPING,

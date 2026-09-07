@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, AppState, ScrollView, StyleSheet, Text, View } from 'react-native';
 import {
-  getCurrentUserProfile, refreshCurrentUserProfile, type AiUserProfileResponse,
+  getCurrentUserProfile, getCurrentAnalysisJob, startLatestAnalysisJob, type AiUserProfileResponse, type AnalysisJob,
 } from '../api/behaviorAnalysis';
 import { PressScale } from '../components/PressScale';
 import { BrandHeader } from '../components/ui';
@@ -13,40 +13,68 @@ export function AbilityAnalysisScreen({ accessToken }: { accessToken: string | n
   const [result, setResult] = useState<AiUserProfileResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [job, setJob] = useState<AnalysisJob | null>(null);
+  const [revision, setRevision] = useState(0);
+  const active = job?.status === 'QUEUED' || job?.status === 'RUNNING';
   const [showEvidence, setShowEvidence] = useState(false);
   const requestId = useRef(0);
   const tokenRef = useRef(accessToken);
   tokenRef.current = accessToken;
 
+  useEffect(() => { setResult(null); setJob(null); setError(null); setShowEvidence(false); }, [accessToken]);
   useEffect(() => {
     const id = ++requestId.current;
-    setResult(null); setError(null); setShowEvidence(false);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let disposed = false;
+    let pollNumber = 0;
     if (!accessToken) { setLoading(false); return; }
-    setLoading(true);
-    getCurrentUserProfile(accessToken).then((value) => {
-      if (requestId.current === id && tokenRef.current === accessToken) setResult(value);
-    }).catch(() => {
-      if (requestId.current === id && tokenRef.current === accessToken) setError('분석 기록을 불러오지 못했어요.');
-    }).finally(() => {
-      if (requestId.current === id && tokenRef.current === accessToken) setLoading(false);
-    });
-    return () => { requestId.current++; };
-  }, [accessToken]);
+    const valid = () => !disposed && requestId.current === id && tokenRef.current === accessToken;
+    const poll = async () => {
+      const number = ++pollNumber;
+      const currentPoll = () => valid() && number === pollNumber;
+      clearTimeout(timer);
+      try {
+        const nextJob = await getCurrentAnalysisJob(accessToken);
+        if (!currentPoll()) return;
+        // READY is written after the profile commits; read the profile after that status.
+        const profile = await getCurrentUserProfile(accessToken);
+        if (!currentPoll()) return;
+        setResult(profile); setJob(nextJob); setError(null);
+        if (nextJob?.status === 'QUEUED' || nextJob?.status === 'RUNNING') timer = setTimeout(poll, 3000);
+      } catch {
+        if (currentPoll()) {
+          setError('서버 연결을 확인하고 있어요. 저장된 분석은 유지됩니다.');
+          timer = setTimeout(poll, 5000);
+        }
+      } finally { if (currentPoll()) setLoading(false); }
+    };
+    setLoading(true); void poll();
+    const listener = AppState.addEventListener('change', state => { if (state === 'active' && valid()) void poll(); });
+    return () => { disposed = true; clearTimeout(timer); listener.remove(); requestId.current++; };
+  }, [accessToken, revision]);
 
   async function refreshProfile() {
-    if (!accessToken || loading) return;
-    const id = ++requestId.current;
-    setLoading(true); setError(null); setResult(null);
+    if (!accessToken || loading || active) return;
+    const token = accessToken;
+    setLoading(true); setError(null);
     try {
-      const next = await refreshCurrentUserProfile(accessToken);
-      if (requestId.current === id && tokenRef.current === accessToken) setResult(next);
-    } catch {
-      if (requestId.current === id && tokenRef.current === accessToken) setError('사용자 프로필을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
-    } finally {
-      if (requestId.current === id && tokenRef.current === accessToken) setLoading(false);
-    }
+      const next = await startLatestAnalysisJob(token);
+      if (tokenRef.current === token) { setJob(next); setRevision(value => value + 1); }
+    } catch (error) {
+      if (tokenRef.current === token) setError(error instanceof Error ? error.message : '분석을 접수하지 못했어요.');
+    } finally { if (tokenRef.current === token) setLoading(false); }
   }
 
+  const stages: Record<string, string> = { QUEUED: '분석 순서를 기다리고 있어요.', PREPARING: '분석 기록을 준비하고 있어요.',
+    OBSERVING: '플레이 구간을 분석하고 있어요.', REDUCING: '구간 결과를 정리하고 있어요.', FINALIZING: '최종 분석을 작성하고 있어요.',
+    PROFILE: '누적 프로필에 반영하고 있어요.', RECOVERING: '저장한 지점부터 다시 처리하고 있어요.' };
+  const jobErrors: Record<string, string> = {
+    AI_RATE_LIMITED: 'AI 서비스의 사용 한도에 도달했어요.',
+    OUTPUT_TRUNCATED: 'AI 응답이 끝까지 작성되지 않았어요.',
+    INVALID_AI_ANALYSIS: 'AI 응답의 형식이나 근거를 확인하지 못했어요.',
+    FINAL_EVIDENCE_EXCEEDS_LIMIT: '통합할 근거의 양이 처리 한도를 넘었어요.',
+    PROFILE_UPDATE_FAILED: '플레이 분석은 저장했지만 누적 프로필 반영을 완료하지 못했어요.',
+  };
   const analysis = result?.status === 'READY' ? result.profile : null;
   return (
     <View style={styles.root}>
@@ -56,12 +84,19 @@ export function AbilityAnalysisScreen({ accessToken }: { accessToken: string | n
         <Text style={styles.note}>새 플레이가 끝날 때 AI가 직전 프로필과 그 플레이 기록만 합쳐 갱신해요. 의료 진단이나 확정된 능력 평가가 아니에요.</Text>
         {!accessToken ? <Text style={styles.body}>로그인하면 나의 행동 분석을 볼 수 있어요.</Text> : (
           <>
-            <PressScale accessibilityRole="button" disabled={loading} onPress={() => void refreshProfile()} style={styles.button}>
-              <Text style={styles.buttonText}>{loading ? '최신 플레이 반영 중…' : '최신 플레이 반영하기'}</Text>
+            <PressScale accessibilityRole="button" disabled={loading || active} onPress={() => void refreshProfile()} style={styles.button}>
+              <Text style={styles.buttonText}>{active ? '최신 플레이 반영 중…' : loading ? '기록 확인 중…' : '최신 플레이 반영하기'}</Text>
             </PressScale>
-            {loading ? <ActivityIndicator accessibilityLabel="사용자 프로필 로딩" color={colors.mint} /> : null}
+            {loading || active ? <ActivityIndicator accessibilityLabel="사용자 프로필 로딩" color={colors.mint} /> : null}
+            {active && job ? <View accessibilityLiveRegion="polite" style={styles.card}>
+              <Text style={styles.body}>{stages[job.stage] ?? '분석 중이에요.'}</Text>
+              {job.total > 0 ? <Text style={styles.note}>{job.total}개 구간 중 {job.completed}개 완료</Text> : null}
+              {job.waitUntil && Date.parse(job.waitUntil) > Date.now() ? <Text style={styles.note}>AI 호출 한도 대기 중 · 약 {Math.ceil((Date.parse(job.waitUntil) - Date.now()) / 1000)}초 후 재개</Text> : null}
+              <Text style={styles.note}>앱을 닫아도 서버에서 계속 진행해요. 완료 전까지 이전 프로필을 볼 수 있어요.</Text>
+            </View> : null}
+            {job?.status === 'FAILED' ? <Text accessibilityRole="alert" style={styles.body}>최근 분석을 완료하지 못했어요. {jobErrors[job.errorCode ?? ''] ?? '잠시 후 다시 시도해 주세요.'} 이전 프로필은 유지됩니다. 최신 플레이 반영하기로 다시 시도할 수 있어요.</Text> : null}
             {error ? <Text accessibilityRole="alert" style={styles.body}>{error}</Text> : null}
-            {!loading && !error && !result ? <Text style={styles.body}>아직 누적 프로필이 없어요. 장보기 연습을 한 번 완료해 주세요.</Text> : null}
+            {!loading && !active && !error && !result ? <Text style={styles.body}>아직 누적 프로필이 없어요. 장보기 연습을 한 번 완료해 주세요.</Text> : null}
             {result && result.status !== 'READY' ? <Text style={styles.body}>최근 프로필 갱신에 실패했어요. 이전에 완료된 프로필은 유지돼요.</Text> : null}
             {analysis && result ? (
               <>

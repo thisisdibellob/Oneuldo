@@ -71,11 +71,24 @@ describe('장보기 이동 의미 이벤트 판정', () => {
       .toMatchObject({ durationMs: 9000, stationId: 'drink' });
   });
 
-  it('고빈도 좌표 입력을 샘플 간격 안에서는 무시한다', () => {
+  it('고빈도 좌표도 수집 축약기에 전달하되 근접 이벤트는 중복하지 않는다', () => {
     const detector = new MarketMovementDetector(stations, 30);
 
     expect(observe(detector, 50, 1000)).not.toHaveLength(0);
-    expect(observe(detector, 51, 1100)).toHaveLength(0);
+    expect(observe(detector, 51, 1100).map(e => e.eventCode)).toEqual(['SHOP.MOVEMENT_SAMPLED']);
+  });
+
+  it('연속 막힘은 시작과 종료만 기록하고 서로 다른 막힘 시도만 센다', () => {
+    const detector = new MarketMovementDetector(stations, 30);
+    const sample = (time: number, blocked: boolean) => detector.observe({
+      point: { x: 50, y: 50 }, occurredAt: time, controlMode: 'joystick', targetZoneIds: new Set(), blocked,
+    });
+    const events = [...sample(1000, true), ...sample(1010, true), ...sample(1300, true), ...sample(1400, false)];
+    expect(events.filter(e => e.eventCode === 'SHOP.MOVEMENT_BLOCKED')).toHaveLength(1);
+    expect(events.find(e => e.eventCode === 'SHOP.MOVEMENT_UNBLOCKED')?.payload.durationMs).toBe(400);
+    expect(events.some(e => e.eventCode === 'SHOP.MOVEMENT_BLOCKED_REPEATEDLY')).toBe(false);
+    sample(1500, true); detector.stop(1600);
+    expect(sample(1700, true).some(e => e.eventCode === 'SHOP.MOVEMENT_BLOCKED_REPEATEDLY')).toBe(true);
   });
 
   it('수집기로 받아들인 모든 위치 샘플을 원시 이동 이벤트로 남긴다', () => {

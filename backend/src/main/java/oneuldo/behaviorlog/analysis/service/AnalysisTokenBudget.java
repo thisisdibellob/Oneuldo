@@ -10,8 +10,8 @@ public class AnalysisTokenBudget {
     private int requestTokens = 7000;
     @Value("${ai.behavior-analysis.chunk-output-tokens:900}")
     private int chunkOutputTokens = 900;
-    @Value("${ai.behavior-analysis.final-output-tokens:1200}")
-    private int finalOutputTokens = 1200;
+    @Value("${ai.behavior-analysis.final-output-tokens:900}")
+    private int finalOutputTokens = 900;
     @Value("${ai.groq.model:qwen/qwen3.6-27b}")
     private String model = "qwen/qwen3.6-27b";
     public int requestTokens() { return requestTokens; }

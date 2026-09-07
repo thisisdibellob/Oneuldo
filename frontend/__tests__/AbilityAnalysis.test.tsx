@@ -1,10 +1,11 @@
-import { fireEvent, render, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { AbilityAnalysisScreen } from '../src/screens/AbilityAnalysisScreen';
-import { getCurrentUserProfile, refreshCurrentUserProfile, type AiUserProfileResponse } from '../src/api/behaviorAnalysis';
+import { getCurrentUserProfile, startLatestAnalysisJob, getCurrentAnalysisJob, type AiUserProfileResponse, type AnalysisJob } from '../src/api/behaviorAnalysis';
 
 jest.mock('../src/api/behaviorAnalysis', () => ({
   getCurrentUserProfile: jest.fn(),
-  refreshCurrentUserProfile: jest.fn(),
+  startLatestAnalysisJob: jest.fn(),
+  getCurrentAnalysisJob: jest.fn(),
 }));
 jest.mock('../src/components/ui', () => ({ BrandHeader: () => null }));
 jest.mock('../src/components/PressScale', () => ({
@@ -12,7 +13,7 @@ jest.mock('../src/components/PressScale', () => ({
 }));
 
 const current = jest.mocked(getCurrentUserProfile);
-const refresh = jest.mocked(refreshCurrentUserProfile);
+const refresh = jest.mocked(startLatestAnalysisJob);
 const ready: AiUserProfileResponse = {
   profileId: 'profile-2', profileVersion: 2, previousProfileId: 'profile-1',
   sourceAnalysisId: 'analysis-1', sourceDatasetId: 'input-1', sourceSessionId: 'session-1',
@@ -30,18 +31,19 @@ const ready: AiUserProfileResponse = {
   },
 };
 
-beforeEach(() => { jest.clearAllMocks(); current.mockResolvedValue(null); refresh.mockResolvedValue(null); });
+beforeEach(() => { jest.clearAllMocks(); current.mockResolvedValue(null); refresh.mockResolvedValue(null); jest.mocked(getCurrentAnalysisJob).mockResolvedValue(null); });
 
 it('누적 프로필을 조회하고 버튼은 최신 완료 세션 하나를 프로필에 반영한다', async () => {
   current.mockResolvedValue(ready);
-  refresh.mockResolvedValue(ready);
+  refresh.mockResolvedValue(null);
   const screen = render(<AbilityAnalysisScreen accessToken="token" />);
   await waitFor(() => expect(screen.getByText('수량 비교 연습')).toBeTruthy());
   expect(current).toHaveBeenCalledTimes(1);
   expect(screen.getByText('프로필 버전 2 · 최근 갱신 1.2초')).toBeTruthy();
   fireEvent.press(screen.getByText('최신 플레이 반영하기'));
   await waitFor(() => expect(refresh).toHaveBeenCalledWith('token'));
-  expect(current).toHaveBeenCalledTimes(1);
+  await waitFor(() => expect(current).toHaveBeenCalledTimes(2));
+  await waitFor(() => expect(screen.getByText('최신 플레이 반영하기')).toBeTruthy());
   expect(screen.getByText('조작을 연습했을 수도 있어요.')).toBeTruthy();
   fireEvent.press(screen.getByText('판단 근거 보기'));
   expect(screen.getByText('판단 보류')).toBeTruthy();
@@ -66,8 +68,27 @@ it('이전 계정의 늦은 응답을 새 계정에 표시하지 않는다', asy
   let resolveOld!: (value: AiUserProfileResponse) => void;
   current.mockImplementationOnce(() => new Promise((resolve) => { resolveOld = resolve; }));
   const screen = render(<AbilityAnalysisScreen accessToken="old" />);
+  await waitFor(() => expect(current).toHaveBeenCalledWith('old'));
   screen.rerender(<AbilityAnalysisScreen accessToken="new" />);
   await waitFor(() => expect(screen.getByText('최신 플레이 반영하기')).toBeTruthy());
-  resolveOld(ready);
+  await act(async () => { resolveOld(ready); });
   await waitFor(() => expect(screen.queryByText('수량 비교 연습')).toBeNull());
+});
+
+const running: AnalysisJob = { id: 'job1', sessionId: 'session-1', datasetId: 'data', status: 'RUNNING', stage: 'OBSERVING', completed: 1, total: 3, waitUntil: '2099-01-01T00:00:00Z', analysisId: null, errorCode: null, createdAt: '', updatedAt: '' };
+it('다시 연 분석 탭에서 서버 작업을 복원하고 이전 프로필을 유지한다', async () => {
+  current.mockResolvedValue(ready); jest.mocked(getCurrentAnalysisJob).mockResolvedValue(running);
+  const screen = render(<AbilityAnalysisScreen accessToken="token" />);
+  await waitFor(() => expect(screen.getByText('3개 구간 중 1개 완료')).toBeTruthy());
+  expect(screen.getByText('수량 비교 연습')).toBeTruthy();
+  expect(screen.getByText(/AI 호출 한도 대기 중/)).toBeTruthy();
+  fireEvent.press(screen.getByText('최신 플레이 반영 중…'));
+  expect(refresh).not.toHaveBeenCalled();
+  screen.unmount();
+});
+it('실패 작업도 기존 프로필을 지우지 않고 재시도 안내를 표시한다', async () => {
+  current.mockResolvedValue(ready); jest.mocked(getCurrentAnalysisJob).mockResolvedValue({ ...running, status: 'FAILED', errorCode: 'OUTPUT_TRUNCATED' });
+  const screen = render(<AbilityAnalysisScreen accessToken="token" />);
+  await waitFor(() => expect(screen.getByText(/최근 분석을 완료하지 못했어요/)).toBeTruthy());
+  expect(screen.getByText('수량 비교 연습')).toBeTruthy();screen.unmount();
 });

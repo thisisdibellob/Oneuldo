@@ -53,6 +53,7 @@ public final class AnalysisReferences {
     }
     public AiBehaviorAnalysis read(String raw) {
         JsonNode root = mapper.reader().with(DeserializationFeature.FAIL_ON_TRAILING_TOKENS).readTree(raw);
+        if(root.has("s")) root=expandFinal((ObjectNode)root);
         for (var finding : root.path("findings")) restoreEvidence(finding);
         for (var assessment : root.path("sessionAssessments")) {
             if (assessment instanceof ObjectNode object && object.path("sessionId").isString())
@@ -64,6 +65,20 @@ public final class AnalysisReferences {
     }
     public AiObservationDigest readDigest(String raw) {
         JsonNode root = mapper.reader().with(DeserializationFeature.FAIL_ON_TRAILING_TOKENS).readTree(raw);
+        if(root.has("s")) {
+            ObjectNode compact=(ObjectNode)root;
+            var expanded=mapper.createObjectNode();
+            expanded.set("summary",compact.get("s"));expanded.set("uncertainties",compact.get("u"));
+            var observations=expanded.putArray("observations");
+            for(var row:compact.path("o")) {
+                requireRow(row,4);
+                var o=observations.addObject();o.set("observation",row.get(0));o.set("interpretation",row.get(1));
+                o.set("alternativeExplanations",row.get(2));o.set("evidenceEventIds",row.get(3));
+            }
+            if(compact.has("requestedSegmentIds")) expanded.set("requestedSegmentIds",compact.get("requestedSegmentIds"));
+            if(!Set.of("s","o","u","requestedSegmentIds").containsAll(compact.propertyNames()) || !compact.path("o").isArray()) throw new IllegalArgumentException("INVALID_COMPACT_DIGEST");
+            root=expanded;
+        }
         for (var observation : root.path("observations")) restoreEvidence(observation);
         if(root.path("requestedSegmentIds") instanceof ArrayNode ids) {
             for(int i=0;i<ids.size();i++) ids.set(i,mapper.valueToTree(restore(ids.get(i).asString(),"E")));
@@ -77,6 +92,18 @@ public final class AnalysisReferences {
                 ids.set(i, mapper.valueToTree(restore(ids.get(i).asString(), "E")));
             }
         }
+    }
+    private void requireRow(JsonNode row,int length) {if(!row.isArray()||row.size()!=length)throw new IllegalArgumentException("INVALID_COMPACT_ROW");}
+    private ObjectNode expandFinal(ObjectNode source) {
+        if(!Set.of("s","f","a","u","p","c").equals(source.propertyNames())||!source.path("f").isArray()||!source.path("a").isArray()) throw new IllegalArgumentException("INVALID_COMPACT_FINAL");
+        var root=mapper.createObjectNode();root.set("summary",source.get("s"));root.set("uncertainties",source.get("u"));root.set("usedEvidenceCardIds",source.get("c"));
+        var findings=root.putArray("findings");
+        for(var row:source.path("f")) {requireRow(row,7);var item=findings.addObject();int i=0;for(String key:List.of("id","skill","observation","interpretation","alternativeExplanations","evidenceEventIds","suggestedSupport")) item.set(key,row.get(i++));}
+        var assessments=root.putArray("sessionAssessments");
+        for(var row:source.path("a")) {requireRow(row,4);var item=assessments.addObject();int i=0;for(String key:List.of("sessionId","judgment","explanation","evidenceEventIds")) item.set(key,row.get(i++));}
+        var plan=source.path("p");requireRow(plan,9);var item=root.putObject("practicePlan");int i=0;
+        for(String key:List.of("targetFindingIds","goal","rationale","recommendedDifficulty","itemCount","quantityComplexity","budgetPressure","textSupport","reasonCodes"))item.set(key,plan.get(i++));
+        return root;
     }
     private String restore(String reference, String prefix) {
         if (reference.startsWith(prefix) && originals.containsKey(reference)) return originals.get(reference);

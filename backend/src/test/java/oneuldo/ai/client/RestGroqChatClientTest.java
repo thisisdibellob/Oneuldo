@@ -20,6 +20,41 @@ import org.springframework.web.client.RestClient;
 class RestGroqChatClientTest {
 
     @Test
+    void retriesOnlyTheRejectedRequestAndPreservesItsBody() {
+        var builder = RestClient.builder().baseUrl("https://api.groq.com");
+        var server = MockRestServiceServer.bindTo(builder).build();
+        var pacer = org.mockito.Mockito.mock(oneuldo.behaviorlog.analysis.service.AnalysisCallPacer.class);
+        var client = new RestGroqChatClient(builder.build(), new GroqProperties(true,"test-key",
+                "https://api.groq.com","qwen/qwen3.6-27b",Duration.ofSeconds(20)),pacer);
+        boolean rejected=false;
+        for (String prompt : new String[]{"first", "second", "second"}) {
+            var request = server.expect(requestTo("https://api.groq.com/openai/v1/chat/completions"))
+                    .andExpect(content().json("{\"messages\":[{\"role\":\"system\",\"content\":\"system\"},{\"role\":\"user\",\"content\":\""+prompt+"\"}],\"max_completion_tokens\":900}",false));
+            if (prompt.equals("first")) request.andRespond(withSuccess("{\"choices\":[{\"message\":{\"content\":\"ok\"}}]}",MediaType.APPLICATION_JSON));
+            else if (!rejected) { request.andRespond(org.springframework.test.web.client.response.MockRestResponseCreators
+                    .withStatus(org.springframework.http.HttpStatus.TOO_MANY_REQUESTS).header("retry-after","2").body("tokens per minute")); rejected=true; }
+            else request.andRespond(withSuccess("{\"choices\":[{\"message\":{\"content\":\"ok\"}}]}",MediaType.APPLICATION_JSON));
+        }
+        client.complete("system","first",900,0.2);
+        assertEquals("ok",client.complete("system","second",900,0.2).text());
+        server.verify();
+        org.mockito.Mockito.verify(pacer).limited(org.mockito.ArgumentMatchers.anyMap(),org.mockito.ArgumentMatchers.eq("tokens per minute"));
+        org.mockito.Mockito.verify(pacer,org.mockito.Mockito.times(3)).acquire(org.mockito.ArgumentMatchers.anyInt(),org.mockito.ArgumentMatchers.eq(900));
+    }
+
+    @Test
+    void repeated429StopsAfterThreeRetries() {
+        var builder=RestClient.builder().baseUrl("https://api.groq.com");
+        var server=MockRestServiceServer.bindTo(builder).build();
+        var pacer=org.mockito.Mockito.mock(oneuldo.behaviorlog.analysis.service.AnalysisCallPacer.class);
+        var client=new RestGroqChatClient(builder.build(),new GroqProperties(true,"test-key","https://api.groq.com","qwen/qwen3.6-27b",Duration.ofSeconds(20)),pacer);
+        server.expect(org.springframework.test.web.client.ExpectedCount.times(4),requestTo("https://api.groq.com/openai/v1/chat/completions"))
+                .andRespond(org.springframework.test.web.client.response.MockRestResponseCreators.withStatus(org.springframework.http.HttpStatus.TOO_MANY_REQUESTS).header("retry-after","1"));
+        org.junit.jupiter.api.Assertions.assertThrows(oneuldo.ai.exception.CloudAiRateLimitException.class,()->client.complete("system","same"));
+        server.verify();
+    }
+
+    @Test
     void 한도진단은_숫자와_허용헤더만_노출한다() {
         var headers = new org.springframework.http.HttpHeaders();
         headers.add("retry-after", "30");

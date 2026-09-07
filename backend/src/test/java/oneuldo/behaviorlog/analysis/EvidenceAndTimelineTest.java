@@ -40,7 +40,7 @@ class EvidenceAndTimelineTest {
         var pipeline = new TimelineAnalysisPipeline(prompts, new AiBehaviorAnalysisValidator(new MarketAiDifficultyValidator()),
                 mock(GroqChatClient.class), mapper);
         var single=input(1);
-        int limit = new AnalysisTokenBudget().total(prompts.observationSystem(), new AnalysisReferences(mapper, single).encode(prompts.observationPrompt(single,single)),900) + 100;
+        int limit = new AnalysisTokenBudget().total(prompts.observationSystem(), new AnalysisReferences(mapper, single).encode(prompts.observationPrompt(single,single)),900) + 300;
         var chunks = pipeline.partition(input, limit);
         assertThat(chunks.size()).isGreaterThan(1);
         assertThat(chunks.stream().flatMap(c -> c.input().sessions().stream()).flatMap(s -> s.events().stream())
@@ -55,7 +55,7 @@ class EvidenceAndTimelineTest {
         var client = mock(GroqChatClient.class);
         var validator = new AiBehaviorAnalysisValidator(new MarketAiDifficultyValidator());
         var single = input(1);
-        int limit = new AnalysisTokenBudget().total(prompts.observationSystem(), new AnalysisReferences(mapper, single).encode(prompts.observationPrompt(single,single)),900) + 100;
+        int limit = new AnalysisTokenBudget().total(prompts.observationSystem(), new AnalysisReferences(mapper, single).encode(prompts.observationPrompt(single,single)),900) + 300;
         var oldPipeline = new TimelineAnalysisPipeline(prompts, validator, client, mapper, 16);
         assertThatThrownBy(() -> oldPipeline.partition(input, limit)).hasMessage("CHUNK_CALL_BUDGET_EXCEEDED");
         var expanded = new TimelineAnalysisPipeline(prompts, validator, client, mapper, 64);
@@ -177,13 +177,13 @@ class EvidenceAndTimelineTest {
         var first=new TimelineAnalysisPipeline(prompts,validator,client,mapper).withCheckpoints(checkpoints);
         assertThat(first.partition(data,18000)).hasSize(6);
         assertThatThrownBy(()->first.analyze(data,18000,new ArrayList<>())).hasMessage("AI_UNAVAILABLE");
-        assertThat(largestBatch.get()).isEqualTo(6);
-        assertThat(cache).hasSize(7);
+        assertThat(largestBatch.get()).isZero(); // Synthesis no longer repeats raw source text.
+        assertThat(cache).hasSize(6);
         clearInvocations(client);
         var audit=new ArrayList<AiBehaviorAnalysisRun.Attempt>();
         var result=new TimelineAnalysisPipeline(prompts,validator,client,mapper).withCheckpoints(checkpoints).analyze(data,18000,audit);
         assertThat(result.sessionAssessments().getFirst().judgment()).isEqualTo("UNDETERMINED");
-        assertThat(audit.stream().filter(a->"CHECKPOINT".equals(a.source())).count()).isEqualTo(7);
+        assertThat(audit.stream().filter(a->"CHECKPOINT".equals(a.source())).count()).isEqualTo(6);
         verify(client,times(1)).complete(anyString(),anyString(),anyInt(),anyDouble());
     }
 

@@ -10,6 +10,7 @@ import type { MarketCart, MarketEvaluation, MarketMission } from '../game/scenar
 import { getObjectiveProductIds, getObjectiveQuantity, getMarketCartTotal, getMarketProduct, marketProducts } from '../game/scenarios';
 import { MARKET_CATALOG_VERSION, MARKET_SCENARIO_VERSION, MARKET_INITIAL_STOCK, MARKET_SUPPORT_OPTIONS } from '../game/marketContent';
 import { enqueueBehaviorEvents, flushBehaviorEventQueue, assertBehaviorEventsAcknowledged } from './behaviorEventQueue';
+import { MovementLogReducer, MOVEMENT_SAMPLING } from './movementLogReducer';
 import {
   MarketMovementDetector,
   type MarketMovementEventDraft,
@@ -69,6 +70,11 @@ export class MarketBehaviorTracker {
   private readonly contentSource: BehaviorSimulationContext['contentSource'];
   private uploadTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly movementDetector = new MarketMovementDetector(MARKET_STATIONS, 105);
+  private readonly movementLogs = new MovementLogReducer<TrackInput>((event, span) => ({
+    ...event, payload: { ...event.payload, marketContent: {
+      ...(event.payload?.marketContent as object ?? {}), movementSpan: span,
+    } },
+  }));
 
   constructor(
     private readonly accessToken: string,
@@ -124,6 +130,14 @@ export class MarketBehaviorTracker {
 
   track(input: TrackInput) {
     if (this.closed && !input.finalContext) return;
+    const payload = input.payload;
+    const reading = input.eventCode === 'SHOP.MOVEMENT_SAMPLED' && typeof payload?.x === 'number' && typeof payload?.y === 'number'
+      ? { time: Date.parse(input.occurredAt!), x: payload.x, y: payload.y,
+        blocked: payload.blocked === true, controlMode: String(payload.controlMode) } : null;
+    this.movementLogs.push(input, reading).forEach(event => this.record(event));
+  }
+
+  private record(input: TrackInput) {
     const occurredAt = input.occurredAt ?? new Date().toISOString();
     const occurredAtMs = Date.parse(occurredAt);
     if (input.eventCode !== 'SHOP.IDLE_STARTED'
@@ -182,8 +196,7 @@ export class MarketBehaviorTracker {
         ...input.payload,
         marketContent: { ...(input.payload?.marketContent as object ?? {}), sceneRef: this.questInstanceId, layoutVersion: this.mission.scene?.layoutVersion, seed: this.mission.scene?.seed,
           movementContext: { coordinateSpace: 'market-world', stations: MARKET_STATIONS, interactionRadius: 105,
-            samplingVersion: 'market-movement-v1', intervalMs: 250, distanceThreshold: 12,
-            samplingRule: 'elapsed >= intervalMs OR distance >= distanceThreshold OR blocked; event frequency is not collision count' } },
+            ...MOVEMENT_SAMPLING } },
       },
       presentation: {
         foregroundDurationMs: Math.max(0, occurredAtMs - this.startedAt - this.interruptionTimeMs),
@@ -335,6 +348,7 @@ export class MarketBehaviorTracker {
     if (this.interruptionStartedAt !== null) return;
     this.interruptionStartedAt = Date.now();
     this.interruptionCount += 1;
+    this.trackMovementEvents(this.movementDetector.stop(this.interruptionStartedAt, this.controlMode));
     this.track({
       eventCode: 'SHOP.APP_BACKGROUNDED',
       microActionId: 'BACKGROUND_MARKET',
@@ -438,6 +452,7 @@ export class MarketBehaviorTracker {
   }
 
   private async persist() {
+    this.movementLogs.flush().forEach(event => this.record(event));
     if (this.persistTimer) {
       clearTimeout(this.persistTimer);
       this.persistTimer = null;

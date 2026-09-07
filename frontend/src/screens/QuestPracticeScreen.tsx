@@ -1,4 +1,4 @@
-import { createSessionBehaviorAnalysis } from '../api/behaviorAnalysis';
+import { startSessionAnalysisJob } from '../api/behaviorAnalysis';
 import { useEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
@@ -143,8 +143,8 @@ export function QuestPracticeScreen({
       }
       await completeQuestSession(sessionId, accessToken);
       sessionCompleted.current = true;
-      const review = await createSessionBehaviorAnalysis(accessToken, sessionId);
-      setSyncNotice(review.analysis?.sessionAssessments.find(item => item.sessionId === sessionId)?.explanation ?? 'AI 판단 보류');
+      await startSessionAnalysisJob(accessToken, sessionId);
+      setSyncNotice('분석을 접수했어요. 분석 탭에서 진행 상태와 결과를 확인할 수 있어요.');
     } catch {
       setSyncNotice('완료 기록을 아직 전송하지 못했어요.');
     }

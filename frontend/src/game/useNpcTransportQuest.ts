@@ -1,4 +1,4 @@
-import { createSessionBehaviorAnalysis } from '../api/behaviorAnalysis';
+import { startSessionAnalysisJob } from '../api/behaviorAnalysis';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
@@ -170,9 +170,8 @@ export function useNpcTransportQuest({
         if (getQueuedQuestEventCount() > 0) throw new Error('기록 전송 대기 중');
         await completeQuestSession(sessionId, accessToken);
         sessionIdRef.current = null;
-        const review = await createSessionBehaviorAnalysis(accessToken, sessionId);
-        const assessment = review.analysis?.sessionAssessments.find(item => item.sessionId === sessionId);
-        setSyncNotice(assessment ? 'AI 검토: ' + assessment.explanation : 'AI 판단 보류 · 보상 미지급');
+        await startSessionAnalysisJob(accessToken, sessionId);
+        setSyncNotice('분석을 접수했어요. 분석 탭에서 진행 상태와 결과를 확인할 수 있어요.');
       } catch {
         setSyncNotice('완료 기록을 아직 전송하지 못했어요.');
       }

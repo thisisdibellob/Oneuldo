@@ -19,6 +19,8 @@ public final class TimelineAnalysisPipeline {
     private final AnalysisCallPacer pacer;
     private String model;
     private boolean movementDetailLimited;
+    private int completedObservations;
+    private int plannedObservations;
     private AnalysisCheckpoints checkpoints=AnalysisCheckpoints.NONE;
     public TimelineAnalysisPipeline withCheckpoints(AnalysisCheckpoints store) {checkpoints=store;return this;}
     private static final String RETRY = "\n구조와 실제 사건 참조를 수정하세요. JSON 하나만 출력하세요.";
@@ -37,23 +39,22 @@ public final class TimelineAnalysisPipeline {
     public List<BehaviorAnalysisInputResponse> partition(BehaviorAnalysisInputResponse input,int limit) {
         List<BehaviorAnalysisInputResponse> chunks=new ArrayList<>();
         var refs=new AnalysisReferences(mapper,input);
-        split(input,input,limit,chunks,refs);
-        // Fill unused capacity left by recursive splits; never discard an event to fit.
-        List<BehaviorAnalysisInputResponse> packed=new ArrayList<>();
-        for(var next:chunks) {
-            if(!packed.isEmpty()) {
-                Set<UUID> ids=new LinkedHashSet<>();
-                packed.getLast().input().sessions().forEach(s->s.events().forEach(e->ids.add(e.behaviorLogId())));
-                next.input().sessions().forEach(s->s.events().forEach(e->ids.add(e.behaviorLogId())));
-                var merged=select(input,ids);
-                if(observationCost(merged,input,refs)<=limit) {packed.set(packed.size()-1,merged);continue;}
+        int from=0;
+        while(from<input.eventCount()) {
+            if(chunks.size()>=maxChunks)throw new IllegalArgumentException("CHUNK_CALL_BUDGET_EXCEEDED");
+            int low=from+1,high=input.eventCount(),best=from;
+            while(low<=high) {
+                int end=(low+high)/2;
+                if(observationCost(slice(input,from,end),input,refs)<=limit) {best=end;low=end+1;}
+                else high=end-1;
             }
-            packed.add(next);
+            if(best==from)throw new IllegalArgumentException("SINGLE_EVENT_EXCEEDS_LIMIT: required="+observationCost(slice(input,from,from+1),input,refs)+", limit="+limit);
+            chunks.add(slice(input,from,best));from=best;
         }
-        return packed;
+        return chunks;
     }
     private int observationCost(BehaviorAnalysisInputResponse part,BehaviorAnalysisInputResponse full,AnalysisReferences refs) {
-        return budget.total(prompts.observationSystem(),refs.encode(observationPrompt(part,full))+suffix(maxChunks,maxChunks)+RETRY,budget.chunkOutputTokens());
+        return budget.total(prompts.observationSystem(),refs.encode(observationPrompt(part,full))+suffix(maxChunks,maxChunks)+RETRY,budget.chunkOutputTokens())+200;
     }
     private String observationPrompt(BehaviorAnalysisInputResponse part,BehaviorAnalysisInputResponse full) {
         if(prompts.movementMaxError()==0) return prompts.observationPrompt(part,full);
@@ -96,16 +97,22 @@ public final class TimelineAnalysisPipeline {
     public AiBehaviorAnalysis analyze(BehaviorAnalysisInputResponse input,int limit,List<AiBehaviorAnalysisRun.Attempt> audit) {
         var refs=new AnalysisReferences(mapper,input);
         String whole=refs.encode(prompts.userPrompt(input));
-        if(budget.total(prompts.systemPrompt(),whole+RETRY,budget.finalOutputTokens())<=limit)
-            return call(prompts.systemPrompt(),whole,budget.finalOutputTokens(),limit,audit,raw->validator.validate(refs.read(raw),input));
+        if(budget.total(prompts.systemPrompt(),whole+RETRY,budget.finalOutputTokens())+200<=limit) {
+            AnalysisProgress.stage("FINALIZING",0,1);
+            var result=call(prompts.systemPrompt(),whole,budget.finalOutputTokens(),limit,audit,raw->validator.validate(refs.read(raw),input));
+            AnalysisProgress.stage("FINALIZING",1,1);return result;
+        }
         var chunks=partition(input,limit);
         log.info("AI analysis partition: events={}, chunks={}",input.eventCount(),chunks.size());
         List<Group> groups=new ArrayList<>();
+        plannedObservations=chunks.size();
+        AnalysisProgress.stage("OBSERVING",0,plannedObservations);
         for(int i=0;i<chunks.size();i++) {
             var chunk=chunks.get(i);
-            groups.add(new Group(chunk,observe(chunk,input,refs,i+1,chunks.size(),limit,audit)));
+            groups.addAll(observeBounded(chunk,input,refs,limit,audit));
         }
         while(true) {
+            AnalysisProgress.stage("FINALIZING",completedObservations,plannedObservations);
             String finalPrompt=finalPrompt(input,groups,refs);
             String finalSystem=FinalAnalysisPromptCompactor.systemPrompt();
             log.info("AI final assembly: groups={}, reservedTokens={}, limit={}",groups.size(),budget.total(finalSystem,finalPrompt+RETRY,budget.finalOutputTokens()),limit);
@@ -116,12 +123,13 @@ public final class TimelineAnalysisPipeline {
                 audit.add(new AiBehaviorAnalysisRun.Attempt(audit.size()+1,finalPrompt,null,"FINAL_EVIDENCE_EXCEEDS_LIMIT","PREFLIGHT",finalSystem,budget.finalOutputTokens(),null,null,null,0L));
                 throw new IllegalArgumentException("FINAL_EVIDENCE_EXCEEDS_LIMIT");
             }
+            AnalysisProgress.stage("REDUCING",completedObservations,plannedObservations);
             List<Group> reduced=new ArrayList<>();
             for(int i=0;i<groups.size();) {
                 if(i+1==groups.size()) {reduced.add(groups.get(i));i++;continue;}
                 int end=i+2;
                 budget.requireFits(prompts.observationSystem(),mergePrompt(groups.subList(i,end),refs)+RETRY,budget.chunkOutputTokens(),limit,"REDUCE_INPUT_EXCEEDS_LIMIT");
-                while(end<groups.size() && budget.total(prompts.observationSystem(),mergePrompt(groups.subList(i,end+1),refs)+RETRY,budget.chunkOutputTokens())<=limit) end++;
+                while(end<groups.size() && end-i<4 && budget.total(prompts.observationSystem(),mergePrompt(groups.subList(i,end+1),refs)+RETRY,budget.chunkOutputTokens())<=limit) end++;
                 var pair=groups.subList(i,end);
                 Set<UUID> covered=new HashSet<>();pair.forEach(g->g.scope.input().sessions().forEach(s->s.events().forEach(e->covered.add(e.behaviorLogId()))));
                 var scope=select(input,covered);
@@ -132,6 +140,22 @@ public final class TimelineAnalysisPipeline {
                 i=end;
             }
             groups=reduced;
+        }
+    }
+    private List<Group> observeBounded(BehaviorAnalysisInputResponse chunk,BehaviorAnalysisInputResponse full,AnalysisReferences refs,
+            int limit,List<AiBehaviorAnalysisRun.Attempt> audit) {
+        try {
+            var digest=observe(chunk,full,refs,completedObservations+1,plannedObservations,limit,audit);
+            completedObservations++;AnalysisProgress.stage("OBSERVING",completedObservations,plannedObservations);
+            return List.of(new Group(chunk,digest));
+        } catch(IllegalStateException failure) {
+            if(!"OUTPUT_TRUNCATED".equals(failure.getMessage()) || chunk.eventCount()<2 || plannedObservations>=maxChunks) throw failure;
+            plannedObservations++;AnalysisProgress.stage("OBSERVING",completedObservations,plannedObservations);
+            int half=chunk.eventCount()/2;
+            var result=new ArrayList<Group>();
+            result.addAll(observeBounded(slice(chunk,0,half),full,refs,limit,audit));
+            result.addAll(observeBounded(slice(chunk,half,chunk.eventCount()),full,refs,limit,audit));
+            return result;
         }
     }
     private AiObservationDigest observe(BehaviorAnalysisInputResponse chunk,BehaviorAnalysisInputResponse full,AnalysisReferences refs,
@@ -174,12 +198,10 @@ public final class TimelineAnalysisPipeline {
     }
     private AiBehaviorAnalysis validateFinal(AiBehaviorAnalysis value,BehaviorAnalysisInputResponse input,String prompt) {
         validator.validate(value,input);
-        // Every final citation must be a raw event actually supplied in final assembly.
+        if(!value.usedEvidenceCardIds().isEmpty())throw new IllegalArgumentException("FINAL_CARD_NOT_SUPPLIED");
         var root=new LosslessTables(mapper).decode(mapper.readTree(prompt));
-        var timeline=root.path("behaviorTimeline");
-        var decoded=timeline.has("encoding")?new CompactBehaviorTimeline(mapper).decodeExpanded(timeline):timeline;
         Set<String> supplied=new HashSet<>();
-        decoded.path("sessions").forEach(s->s.path("events").forEach(e->supplied.add(e.path("behaviorLogId").asString())));
+        root.path("evidenceReferences").forEach(e->supplied.add(e.path("id").asString()));
         var refs=new AnalysisReferences(mapper,input);
         Set<UUID> citations=new HashSet<>();
         value.findings().forEach(f->citations.addAll(f.evidenceEventIds()));
@@ -204,22 +226,7 @@ public final class TimelineAnalysisPipeline {
         return refs.encode(mapper.writeValueAsString(merge));
     }
     private String finalPrompt(BehaviorAnalysisInputResponse input,List<Group> groups,AnalysisReferences refs) {
-        Set<UUID> evidence=new LinkedHashSet<>();
-        groups.forEach(g->g.digest.observations().forEach(o->evidence.addAll(o.evidenceEventIds())));
-        // Even an undetermined session needs a supplied raw anchor, not an invented citation.
-        input.input().sessions().forEach(s->{if(!s.events().isEmpty()) evidence.add(s.events().getFirst().behaviorLogId());});
-        var selected=select(input,evidence);
-        // Raw evidence is selected by AI citations, not a server importance rule. Never truncate to fit.
-        ObjectNode root=(ObjectNode)new LosslessTables(mapper).decode(mapper.readTree(prompts.userPrompt(selected)));
-        root.remove(List.of("matchingContentCatalog","availablePracticeScenarios","excludedLegacyFields"));
-        root.set("taskContext",prompts.tasks(input));
-        root.put("movementDetailLimited",movementDetailLimited);
-        root.put("stage","FINAL: 구간 AI가 전달된 관측을 읽었다. 축약 및 원본 미확인 한계는 chunkAnalyses.uncertainties에 있다. 해당 한계를 최종 uncertainties에도 유지하라. 중간 해석은 손실 가능하다. 함께 제공된 AI 인용 원문으로 근거를 재검토하라. 원문이 부족하면 불확실성을 명시하고 판단을 보류하라. 다수결·평균으로 성패를 만들지 말라. 최종 사용자 분석과 지원·연습 계획을 작성하라.");
-        root.set("chunkAnalyses",mapper.valueToTree(groups.stream().map(Group::digest).toList()));
-        root.set("coverage",mapper.valueToTree(input.input().sessions().stream().map(s->Map.of("sessionId",s.sessionId(),"eventCount",s.events().size())).toList()));
-        // Alias complete UUID values before the reversible string/column encoding.
-        ObjectNode aliased=(ObjectNode)new LosslessTables(mapper).decode(mapper.readTree(refs.encode(prompts.pack(root))));
-        return new FinalAnalysisPromptCompactor(mapper).compact(aliased);
+        return AnalysisSynthesisPrompt.build(mapper,prompts,input,groups.stream().map(Group::digest).toList(),refs,movementDetailLimited);
     }
     private static String suffix(int n,int count) {return "\n구간 "+n+"/"+count+": 세션 일부이며 구간 밖 행동을 가정하지 마세요.";}
     private <T> T call(String system,String prompt,int output,int limit,List<AiBehaviorAnalysisRun.Attempt> audit,Function<String,T> parse) {
@@ -233,7 +240,7 @@ public final class TimelineAnalysisPipeline {
                 model=response.model();audit.add(attempt(audit.size()+1,system,prompt,output,response,null,"CHECKPOINT"));return result;
             } catch(RuntimeException invalid) {log.warn("Ignoring checkpoint that fails current validation");}
         }
-        String correction="";
+        String correction="", lastFailure="INVALID_AI_ANALYSIS";
         for(int attempt=0;attempt<2;attempt++) {
             if(audit.size()>=maxChunks*2+1) throw new IllegalArgumentException("TOTAL_CALL_BUDGET_EXCEEDED");
             String submitted=prompt+(attempt==0?"":RETRY+correction),raw=null;
@@ -252,14 +259,15 @@ public final class TimelineAnalysisPipeline {
                 audit.add(attempt(audit.size()+1,system,submitted,output,response,error,"LIVE"));
                 if(raw==null) throw new IllegalStateException(error,failure);
                 String reason=failure.getMessage();
-                correction="\n검사 오류: "+(reason!=null&&reason.matches("[A-Z0-9_:= .-]{1,120}")?reason:"INVALID_JSON_OR_CONTRACT")+". 해당 오류를 수정하고 근거 없는 내용을 추가하지 마세요.";
+                lastFailure="OUTPUT_TRUNCATED".equals(reason)?reason:"INVALID_AI_ANALYSIS";
+                correction="\n재시도: 서로 다른 관찰과 근거·불확실성을 유지하고 중복 표현을 줄이세요. JSON을 끝까지 닫으세요. 검사 오류: "+(reason!=null&&reason.matches("[A-Z0-9_:= .-]{1,120}")?reason:"INVALID_JSON_OR_CONTRACT")+". 해당 오류를 수정하고 근거 없는 내용을 추가하지 마세요.";
                 continue;
             }
             audit.add(attempt(audit.size()+1,system,submitted,output,response,null,"LIVE"));
             checkpoints.save(system,prompt,output,response);
             return result;
         }
-        throw new IllegalStateException("INVALID_AI_ANALYSIS");
+        throw new IllegalStateException(lastFailure);
     }
     private AiBehaviorAnalysisRun.Attempt attempt(int number,String system,String prompt,int output,GroqChatClient.GroqChatResult response,String error,String source) {
         return new AiBehaviorAnalysisRun.Attempt(number,prompt,response==null?null:response.text(),error,source,system,output,

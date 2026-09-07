@@ -105,3 +105,26 @@ export async function createSessionBehaviorAnalysis(accessToken: string, session
   if (!response.ok) throw new Error('AI 수행 검토 요청 실패: ' + response.status);
   return response.json();
 }
+
+export type AnalysisJob = {
+  id: string; sessionId: string; datasetId: string;
+  status: 'QUEUED' | 'RUNNING' | 'READY' | 'FAILED';
+  stage: string; completed: number; total: number; waitUntil: string | null;
+  analysisId: string | null; errorCode: string | null; createdAt: string; updatedAt: string;
+};
+async function analysisJobRequest(token: string, path: string, method = 'GET'): Promise<AnalysisJob | null> {
+  if (!API_BASE_URL) throw new Error('서버 연결 주소가 없습니다.');
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/analysis-jobs/${path}`, {
+      method, headers: { Authorization: `Bearer ${token}` }, signal: controller.signal,
+    });
+    if (response.status === 204) return null;
+    if (!response.ok) throw new Error(response.status === 404 ? '완료된 플레이 기록이 없어요.' : '분석 상태를 확인하지 못했어요.');
+    return await response.json();
+  } finally { clearTimeout(timeout); }
+}
+export const getCurrentAnalysisJob = (token: string) => analysisJobRequest(token, 'current');
+export const startLatestAnalysisJob = (token: string) => analysisJobRequest(token, 'latest', 'POST');
+export const startSessionAnalysisJob = (token: string, sessionId: string) => analysisJobRequest(token, `sessions/${encodeURIComponent(sessionId)}`, 'POST');

@@ -36,6 +36,9 @@ const BLOCK_REPEAT_COUNT = 3;
 export class MarketMovementDetector {
   private activeVisit: Visit | null = null;
   private blockedAt: number[] = [];
+  private blockedSince: number | null = null;
+  private blockedSample: MarketMovementSample | null = null;
+  private lastControlMode: MarketTelemetryControlMode | null = null;
   private lastAcceptedAt = 0;
   private lastPoint: MarketTelemetryPoint | null = null;
   private lastVisitEndedAt = new Map<MarketTelemetryStation, number>();
@@ -57,16 +60,19 @@ export class MarketMovementDetector {
     const distance = this.lastPoint
       ? Math.hypot(sample.point.x - this.lastPoint.x, sample.point.y - this.lastPoint.y)
       : Number.POSITIVE_INFINITY;
-    if (now - this.lastAcceptedAt < SAMPLE_INTERVAL_MS && distance < SAMPLE_DISTANCE && !sample.blocked) {
-      return events;
-    }
-
     events.push(this.event('SHOP.MOVEMENT_SAMPLED', 'SAMPLE_MARKET_POSITION', now, {
       blocked: Boolean(sample.blocked),
       controlMode: sample.controlMode,
       x: this.round(sample.point.x),
       y: this.round(sample.point.y),
     }, 'low'));
+
+    // The acquisition reducer sees every callback, including short reversals.
+    // Only proximity/segment bookkeeping uses the older coarse sampling cadence.
+    const blockedChanged = Boolean(sample.blocked) !== (this.blockedSince !== null);
+    if (now - this.lastAcceptedAt < SAMPLE_INTERVAL_MS && distance < SAMPLE_DISTANCE
+      && !blockedChanged && sample.controlMode === this.lastControlMode) return events;
+    this.lastControlMode = sample.controlMode;
 
     if (this.lastPoint) this.segmentDistance += distance;
     else {
@@ -98,7 +104,10 @@ export class MarketMovementDetector {
       }, 'high'));
     }
 
-    if (sample.blocked) events.push(...this.recordBlocked(now, sample));
+    if (sample.blocked && this.blockedSince === null) {
+      this.blockedSince = now; this.blockedSample = sample;
+      events.push(...this.recordBlocked(now, sample));
+    } else if (!sample.blocked) events.push(...this.endBlocked(now));
     if (now - this.segmentStartedAt >= SEGMENT_DURATION_MS) {
       events.push(this.summarizeSegment(now, sample.controlMode));
       this.segmentStartedAt = now;
@@ -114,7 +123,7 @@ export class MarketMovementDetector {
 
   stop(occurredAt = Date.now(), controlMode: MarketTelemetryControlMode = 'joystick') {
     if (!this.lastPoint) return [];
-    const events: MarketMovementEventDraft[] = [];
+    const events: MarketMovementEventDraft[] = this.endBlocked(occurredAt);
     if (this.segmentDistance > 0) events.push(this.summarizeSegment(occurredAt, controlMode));
     events.push(this.event('SHOP.MOVEMENT_STOPPED', 'MOVE_IN_MARKET', occurredAt, {
       controlMode,
@@ -125,6 +134,7 @@ export class MarketMovementDetector {
     this.segmentDistance = 0;
     this.segmentStartedAt = 0;
     this.segmentStartPoint = null;
+    this.lastControlMode = null;
     return events;
   }
 
@@ -247,6 +257,8 @@ export class MarketMovementDetector {
   private recordBlocked(now: number, sample: MarketMovementSample) {
     this.blockedAt = [...this.blockedAt.filter((at) => now - at <= BLOCK_REPEAT_WINDOW_MS), now];
     const events = [this.event('SHOP.MOVEMENT_BLOCKED', 'MOVE_BLOCKED', now, {
+      blocked: true,
+      marketContent: { blockedPhase: 'start' },
       controlMode: sample.controlMode,
       x: sample.point.x,
       y: sample.point.y,
@@ -258,6 +270,18 @@ export class MarketMovementDetector {
       }, 'normal'));
     }
     return events;
+  }
+
+  private endBlocked(now: number): MarketMovementEventDraft[] {
+    if (this.blockedSince === null || !this.blockedSample) return [];
+    const sample = this.blockedSample;
+    const event = this.event('SHOP.MOVEMENT_UNBLOCKED', 'MOVE_BLOCKED_END', now, {
+      blocked: false, controlMode: sample.controlMode,
+      durationMs: Math.max(0, now - this.blockedSince),
+      marketContent: { blockedPhase: 'end' },
+    }, 'low');
+    this.blockedSince = null; this.blockedSample = null;
+    return [event];
   }
 
   private summarizeSegment(now: number, controlMode: MarketTelemetryControlMode) {

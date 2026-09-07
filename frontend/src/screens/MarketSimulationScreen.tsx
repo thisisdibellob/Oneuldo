@@ -41,7 +41,7 @@ import {
   marketProducts,
 } from '../game/scenarios';
 import { createMarketScene, restoreMarketScene } from '../game/marketScene';
-import { createSessionBehaviorAnalysis } from '../api/behaviorAnalysis';
+import { startSessionAnalysisJob } from '../api/behaviorAnalysis';
 import { colors, fonts } from '../theme';
 
 type MarketPhase = 'briefing' | 'shopping' | 'checkout' | 'result';
@@ -154,8 +154,6 @@ function MarketSimulationContent({
 }: MarketSimulationScreenProps) {
   const sceneProducts = useContext(SceneProducts);
   const getMarketProduct = (id: string) => sceneProducts.find(p => p.id === id);
-  const [paused, setPaused] = useState(false);
-  const pauseStarted = useRef(0);
   const [review, setReview] = useState('');
   const reviewing = useRef(false);
   const mounted = useRef(true);
@@ -307,7 +305,7 @@ function MarketSimulationContent({
   };
 
   useEffect(() => {
-    if (paused || !embedded || !interactionRequest || phase !== 'shopping') return;
+    if (!embedded || !interactionRequest || phase !== 'shopping') return;
     if (handledInteractionId.current === interactionRequest.id) return;
     handledInteractionId.current = interactionRequest.id;
     if (interactionRequest.station === 'checkout') {
@@ -323,8 +321,8 @@ function MarketSimulationContent({
 
   useEffect(() => {
     if (!embedded || !onLockChange) return;
-    onLockChange(phase !== 'shopping' || activeCategory !== null || cartOpen || paused);
-  }, [activeCategory, cartOpen, embedded, onLockChange, phase, paused]);
+    onLockChange(phase !== 'shopping' || activeCategory !== null || cartOpen);
+  }, [activeCategory, cartOpen, embedded, onLockChange, phase]);
 
   const checkCart = async () => {
     if (reviewing.current) return;
@@ -336,10 +334,8 @@ function MarketSimulationContent({
       if (!tracker || !accessToken) throw new Error('로그인 후 AI 검토를 사용할 수 있어요.');
       tracker.checkoutSubmitted(cart);
       await tracker.flushConfirmed();
-      const result = await createSessionBehaviorAnalysis(accessToken, tracker.sessionId);
-      const assessment = result.analysis?.sessionAssessments.find(item => item.sessionId === tracker.sessionId);
-      if (result.status !== 'READY' || !assessment) throw new Error('AI가 판단을 완료하지 못했어요. 결과와 보상은 보류돼요.');
-      if (mounted.current) setReview('AI 검토: ' + ({ SUCCESS: '목표 수행', FAILURE: '다시 연습할 부분 있음', UNDETERMINED: '판단 보류' }[assessment.judgment]) + '\n' + assessment.explanation + '\n성공 보상 자동 지급은 아직 사용하지 않아요.');
+      await startSessionAnalysisJob(accessToken, tracker.sessionId);
+      if (mounted.current) setReview('분석을 접수했어요. 다른 화면으로 이동해도 계속 진행됩니다. 분석 탭에서 진행 상태와 결과를 확인해 주세요.');
     } catch (error) {
       if (mounted.current) setReview(error instanceof Error ? error.message : '검토를 완료하지 못했어요. 판단 보류 상태예요.');
     } finally { reviewing.current = false; }
@@ -485,27 +481,6 @@ function MarketSimulationContent({
         </PressScale>
       ) : null}
 
-      {phase === 'shopping' && !activeCategory && !cartOpen ? (
-        <View style={{ position: 'absolute', top: 108, right: 12, gap: 6, zIndex: 55 }}>
-          <PressScale accessibilityRole="button" onPress={() => {
-            pauseStarted.current = Date.now(); setPaused(true);
-            behaviorTracker.current?.track({ eventCode: 'SHOP.PAUSE_REQUESTED', microActionId: 'REQUEST_PAUSE', payload: {} });
-          }} style={styles.checkoutBackButton}><Text>잠시 쉬기</Text></PressScale>
-          <PressScale accessibilityRole="button" onPress={() => {
-            const message = mission.description;
-            behaviorTracker.current?.track({ eventCode: 'SHOP.STAFF_QUESTION_REQUESTED', microActionId: 'ASK_LIST',
-              payload: { marketContent: { question: '목록을 다시 알려주세요', response: message, responseSource: 'mission_text' } } });
-            showNotice(message);
-          }} style={styles.checkoutBackButton}><Text>목록 물어보기</Text></PressScale>
-        </View>
-      ) : null}
-      {paused ? <View style={styles.resultOverlay}><View style={styles.resultCard}>
-        <Text style={styles.resultTitle}>쉬는 중이에요</Text>
-        <PressScale accessibilityRole="button" onPress={() => {
-          behaviorTracker.current?.track({ eventCode: 'SHOP.PAUSE_ENDED', microActionId: 'RESUME',
-            payload: { durationMs: Date.now() - pauseStarted.current } }); setPaused(false);
-        }} style={styles.resultPrimaryButton}><Text>다시 시작하기</Text></PressScale>
-      </View></View> : null}
       {phase === 'briefing' ? (
         <NpcDialogueCard
           aiGenerated={aiGenerated}
