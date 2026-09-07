@@ -49,6 +49,8 @@ public class SecurityConfig {
                         // 퀘스트 정의 데이터는 로그인 전에도 조회할 수 있다.
                         .requestMatchers(HttpMethod.GET, "/api/quest/**").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
+                        // 새 사용자는 JWT가 없으므로 회원가입 요청만 공개한다.
+                        .requestMatchers(HttpMethod.POST, "/api/members").permitAll()
                         .anyRequest().authenticated()
                 )
                 .oauth2ResourceServer(oauth -> oauth.jwt(Customizer.withDefaults()))

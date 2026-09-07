@@ -47,6 +47,9 @@ importers:
       expo-linear-gradient:
         specifier: ~15.0.8
         version: 15.0.8(expo@54.0.37)(react-native@0.81.5(@babel/core@7.29.7(supports-color@8.1.1))(@types/react@19.1.17)(react@19.1.0)(supports-color@8.1.1))(react@19.1.0)
+      expo-splash-screen:
+        specifier: ~31.0.13
+        version: 31.0.13(expo@54.0.37)(supports-color@8.1.1)(typescript@5.9.3)
       expo-status-bar:
         specifier: ~3.0.9
         version: 3.0.9(react-native@0.81.5(@babel/core@7.29.7(supports-color@8.1.1))(@types/react@19.1.17)(react@19.1.0)(supports-color@8.1.1))(react@19.1.0)
@@ -1865,6 +1868,11 @@ packages:
   expo-server@1.0.7:
     resolution: {integrity: sha512-mcmyML3oXcqFUXUxtdtCL1O00ztNI2v76d+MdniXRUgHNxIcHZ05zo+DqBaOOT6LQnPk4vA4YHqQl7iGUfRb3g==}
     engines: {node: '>=20.16.0'}
+
+  expo-splash-screen@31.0.13:
+    resolution: {integrity: sha512-1epJLC1cDlwwj089R2h8cxaU5uk4ONVAC+vzGiTZH4YARQhL4Stlz1MbR6yAS173GMosvkE6CAeihR7oIbCkDA==}
+    peerDependencies:
+      expo: '*'
 
   expo-status-bar@3.0.9:
     resolution: {integrity: sha512-xyYyVg6V1/SSOZWh4Ni3U129XHCnFHBTcUo0dhWtFDrZbNp/duw5AGsQfb2sVeU0gxWHXSY1+5F0jnKYC7WuOw==}
@@ -4562,7 +4570,7 @@ snapshots:
       metro-resolver: 0.83.3
       metro-runtime: 0.83.3
       metro-source-map: 0.83.3(supports-color@8.1.1)
-      metro-symbolicate: 0.83.3(supports-color@8.1.1)
+      metro-symbolicate: 0.83.3
       metro-transform-plugins: 0.83.3(supports-color@8.1.1)
       metro-transform-worker: 0.83.3(supports-color@8.1.1)
     transitivePeerDependencies:
@@ -5934,6 +5942,14 @@ snapshots:
 
   expo-server@1.0.7: {}
 
+  expo-splash-screen@31.0.13(expo@54.0.37)(supports-color@8.1.1)(typescript@5.9.3):
+    dependencies:
+      '@expo/prebuild-config': 54.0.9(expo@54.0.37)(supports-color@8.1.1)(typescript@5.9.3)
+      expo: 54.0.37(@babel/core@7.29.7(supports-color@8.1.1))(@expo/dom-webview@57.0.1)(@expo/metro-runtime@6.1.2)(react-native@0.81.5(@babel/core@7.29.7(supports-color@8.1.1))(@types/react@19.1.17)(react@19.1.0)(supports-color@8.1.1))(react@19.1.0)(supports-color@8.1.1)(typescript@5.9.3)
+    transitivePeerDependencies:
+      - supports-color
+      - typescript
+
   expo-status-bar@3.0.9(react-native@0.81.5(@babel/core@7.29.7(supports-color@8.1.1))(@types/react@19.1.17)(react@19.1.0)(supports-color@8.1.1))(react@19.1.0):
     dependencies:
       react: 19.1.0
@@ -7026,7 +7042,7 @@ snapshots:
       '@babel/types': 7.29.8
       flow-enums-runtime: 0.0.6
       invariant: 2.2.4
-      metro-symbolicate: 0.83.3(supports-color@8.1.1)
+      metro-symbolicate: 0.83.3
       nullthrows: 1.1.1
       ob1: 0.83.3
       source-map: 0.5.7
@@ -7040,7 +7056,7 @@ snapshots:
       '@babel/types': 7.29.8
       flow-enums-runtime: 0.0.6
       invariant: 2.2.4
-      metro-symbolicate: 0.83.7(supports-color@8.1.1)
+      metro-symbolicate: 0.83.7
       nullthrows: 1.1.1
       ob1: 0.83.7
       source-map: 0.5.7
@@ -7048,7 +7064,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  metro-symbolicate@0.83.3(supports-color@8.1.1):
+  metro-symbolicate@0.83.3:
     dependencies:
       flow-enums-runtime: 0.0.6
       invariant: 2.2.4
@@ -7056,10 +7072,8 @@ snapshots:
       nullthrows: 1.1.1
       source-map: 0.5.7
       vlq: 1.0.1
-    transitivePeerDependencies:
-      - supports-color
 
-  metro-symbolicate@0.83.7(supports-color@8.1.1):
+  metro-symbolicate@0.83.7:
     dependencies:
       flow-enums-runtime: 0.0.6
       invariant: 2.2.4
@@ -7067,8 +7081,6 @@ snapshots:
       nullthrows: 1.1.1
       source-map: 0.5.7
       vlq: 1.0.1
-    transitivePeerDependencies:
-      - supports-color
 
   metro-transform-plugins@0.83.3(supports-color@8.1.1):
     dependencies:
@@ -7164,7 +7176,7 @@ snapshots:
       metro-resolver: 0.83.3
       metro-runtime: 0.83.3
       metro-source-map: 0.83.3(supports-color@8.1.1)
-      metro-symbolicate: 0.83.3(supports-color@8.1.1)
+      metro-symbolicate: 0.83.3
       metro-transform-plugins: 0.83.3(supports-color@8.1.1)
       metro-transform-worker: 0.83.3(supports-color@8.1.1)
       mime-types: 2.1.35
@@ -7210,7 +7222,7 @@ snapshots:
       metro-resolver: 0.83.7
       metro-runtime: 0.83.7
       metro-source-map: 0.83.7(supports-color@8.1.1)
-      metro-symbolicate: 0.83.7(supports-color@8.1.1)
+      metro-symbolicate: 0.83.7
       metro-transform-plugins: 0.83.7(supports-color@8.1.1)
       metro-transform-worker: 0.83.7(supports-color@8.1.1)
       mime-types: 3.0.2

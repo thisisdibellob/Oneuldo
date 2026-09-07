@@ -10,6 +10,7 @@ import {
   Image,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
   StyleProp,
   StyleSheet,
   Text,
@@ -21,12 +22,12 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { images } from '../assets';
-import { login } from '../api/auth';
+import { login, signUp } from '../api/auth';
 import { PressScale } from '../components/PressScale';
 import { colors, fonts } from '../theme';
 
-type LoginStep = 'welcome' | 'credentials';
-type FocusedField = 'id' | 'password' | null;
+type LoginStep = 'welcome' | 'credentials' | 'signup';
+type FocusedField = 'id' | 'loginId' | 'name' | 'email' | 'birthDate' | 'password' | 'passwordConfirm' | null;
 
 export function OnboardingScreen({ active = true, onEnter }: { active?: boolean; onEnter: (accessToken?: string) => void }) {
   const { height } = useWindowDimensions();
@@ -151,8 +152,15 @@ export function OnboardingScreen({ active = true, onEnter }: { active?: boolean;
       <Animated.View style={[styles.screenFrame, animatedScreen]}>
         {step === 'welcome' ? (
           <WelcomeScreen compact={compact} onEnter={() => onEnter()} onOpenCredentials={() => changeStep('credentials', 1)} />
+        ) : step === 'credentials' ? (
+          <CredentialsScreen
+            compact={compact}
+            onBack={() => changeStep('welcome', -1)}
+            onEnter={onEnter}
+            onOpenSignup={() => changeStep('signup', 1)}
+          />
         ) : (
-          <CredentialsScreen compact={compact} onBack={() => changeStep('welcome', -1)} onEnter={onEnter} />
+          <SignUpScreen onBack={() => changeStep('credentials', -1)} onEnter={onEnter} />
         )}
       </Animated.View>
       <PressScale
@@ -266,7 +274,7 @@ function WelcomeScreen({ compact, onEnter, onOpenCredentials }: { compact: boole
   );
 }
 
-function CredentialsScreen({ compact, onBack, onEnter }: { compact: boolean; onBack: () => void; onEnter: (accessToken?: string) => void }) {
+function CredentialsScreen({ compact, onBack, onEnter, onOpenSignup }: { compact: boolean; onBack: () => void; onEnter: (accessToken?: string) => void; onOpenSignup: () => void }) {
   const [id, setId] = useState('');
   const [password, setPassword] = useState('');
   const [passwordVisible, setPasswordVisible] = useState(false);
@@ -355,7 +363,7 @@ function CredentialsScreen({ compact, onBack, onEnter }: { compact: boolean; onB
       {loginError ? <Text style={styles.loginError}>{loginError}</Text> : null}
 
       <View style={[styles.credentialActions, compact && styles.credentialActionsCompact]}>
-        <PressScale accessibilityRole="button" onPress={() => undefined}>
+        <PressScale accessibilityRole="button" onPress={onOpenSignup}>
           <GlassSurface interactive muted radius={24} style={styles.secondaryActionSurface}>
             <Text style={styles.secondaryActionLabel}>회원가입</Text>
           </GlassSurface>
@@ -367,6 +375,114 @@ function CredentialsScreen({ compact, onBack, onEnter }: { compact: boolean; onB
           </LinearGradient>
         </PressScale>
       </View>
+    </KeyboardAvoidingView>
+  );
+}
+
+function SignUpScreen({ onBack, onEnter }: { onBack: () => void; onEnter: (accessToken?: string) => void }) {
+  const [loginId, setLoginId] = useState('');
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [birthDate, setBirthDate] = useState('');
+  const [password, setPassword] = useState('');
+  const [passwordConfirm, setPasswordConfirm] = useState('');
+  const [focused, setFocused] = useState<FocusedField>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSignUp = async () => {
+    if (![loginId, name, email, birthDate, password, passwordConfirm].every((value) => value.trim())) {
+      setError('모든 항목을 입력해 주세요.');
+      return;
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(birthDate)) {
+      setError('생년월일을 YYYY-MM-DD 형식으로 입력해 주세요.');
+      return;
+    }
+    if (password.length < 8) {
+      setError('비밀번호는 8자 이상이어야 해요.');
+      return;
+    }
+    if (password !== passwordConfirm) {
+      setError('비밀번호가 일치하지 않아요.');
+      return;
+    }
+
+    setSubmitting(true);
+    setError(null);
+    try {
+      const normalizedEmail = email.trim().toLowerCase();
+      await signUp({
+        birthDate,
+        email: normalizedEmail,
+        loginId: loginId.trim(),
+        name: name.trim(),
+        password,
+        passwordConfirm,
+      });
+      const response = await login(normalizedEmail, password);
+      onEnter(response.accessToken);
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : '회원가입하지 못했어요.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const field = (
+    key: Exclude<FocusedField, null>,
+    label: string,
+    value: string,
+    onChangeText: (value: string) => void,
+    options: { secure?: boolean; keyboardType?: 'default' | 'email-address' | 'numbers-and-punctuation' } = {},
+  ) => (
+    <GlassSurface radius={24} style={[styles.signupInputSurface, focused === key && styles.inputSurfaceFocused]}>
+      <TextInput
+        accessibilityLabel={label}
+        autoCapitalize={key === 'name' ? 'words' : 'none'}
+        autoCorrect={false}
+        keyboardType={options.keyboardType}
+        onBlur={() => setFocused(null)}
+        onChangeText={onChangeText}
+        onFocus={() => setFocused(key)}
+        placeholder={label}
+        placeholderTextColor="#9A9A9A"
+        secureTextEntry={options.secure}
+        style={styles.signupInput}
+        value={value}
+      />
+    </GlassSurface>
+  );
+
+  return (
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.credentials}>
+      <View style={styles.loginHeader}>
+        <PressScale accessibilityLabel="로그인 화면으로 돌아가기" accessibilityRole="button" hitSlop={8} onPress={onBack}>
+          <GlassSurface contentStyle={styles.backContent} interactive radius={23} style={styles.backSurface}>
+            <Ionicons color={colors.ink} name="chevron-back" size={32} />
+          </GlassSurface>
+        </PressScale>
+        <Text style={styles.loginTitle}>회원가입</Text>
+        <View style={styles.headerBalance} />
+      </View>
+      <ScrollView
+        contentContainerStyle={styles.signupFields}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        {field('loginId', '아이디', loginId, setLoginId)}
+        {field('name', '이름', name, setName)}
+        {field('email', '이메일', email, setEmail, { keyboardType: 'email-address' })}
+        {field('birthDate', '생년월일 (YYYY-MM-DD)', birthDate, setBirthDate, { keyboardType: 'numbers-and-punctuation' })}
+        {field('password', '비밀번호 (8자 이상)', password, setPassword, { secure: true })}
+        {field('passwordConfirm', '비밀번호 확인', passwordConfirm, setPasswordConfirm, { secure: true })}
+        {error ? <Text accessibilityRole="alert" style={styles.loginError}>{error}</Text> : null}
+        <PressScale accessibilityRole="button" disabled={submitting} onPress={() => void handleSignUp()} style={[styles.primaryAction, submitting && styles.loginSubmitting]}>
+          <LinearGradient colors={['#00C795', '#00B983']} end={{ x: 1, y: 1 }} start={{ x: 0, y: 0 }} style={styles.primaryGradient}>
+            <Text style={styles.primaryActionLabel}>{submitting ? '가입 중...' : '가입하고 시작하기'}</Text>
+          </LinearGradient>
+        </PressScale>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }
@@ -494,6 +610,9 @@ const styles = StyleSheet.create({
   inputSurface: { height: 60 },
   inputSurfaceFocused: { borderColor: colors.mint, borderWidth: 2 },
   input: { color: '#777777', flex: 1, fontFamily: fonts.laundry, fontSize: 18, height: '100%', letterSpacing: -0.3, marginLeft: 12, paddingVertical: 0 },
+  signupFields: { gap: 11, paddingBottom: 30, paddingHorizontal: 4, paddingTop: 12 },
+  signupInputSurface: { height: 52 },
+  signupInput: { color: '#777777', flex: 1, fontFamily: fonts.laundry, fontSize: 16, height: '100%', paddingVertical: 0 },
   credentialActions: { gap: 12 },
   credentialActionsCompact: { gap: 9 },
   secondaryActionLabel: { color: '#999999', fontFamily: fonts.laundryBold, fontSize: 18 },
