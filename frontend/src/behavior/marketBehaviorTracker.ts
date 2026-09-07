@@ -180,7 +180,10 @@ export class MarketBehaviorTracker {
         scenarioVersion: this.mission.scenarioVersion ?? MARKET_SCENARIO_VERSION,
         thresholdRuleVersion: DETECTION_RULE_VERSION,
         ...input.payload,
-        marketContent: { ...(input.payload?.marketContent as object ?? {}), sceneRef: this.questInstanceId, layoutVersion: this.mission.scene?.layoutVersion, seed: this.mission.scene?.seed },
+        marketContent: { ...(input.payload?.marketContent as object ?? {}), sceneRef: this.questInstanceId, layoutVersion: this.mission.scene?.layoutVersion, seed: this.mission.scene?.seed,
+          movementContext: { coordinateSpace: 'market-world', stations: MARKET_STATIONS, interactionRadius: 105,
+            samplingVersion: 'market-movement-v1', intervalMs: 250, distanceThreshold: 12,
+            samplingRule: 'elapsed >= intervalMs OR distance >= distanceThreshold OR blocked; event frequency is not collision count' } },
       },
       presentation: {
         foregroundDurationMs: Math.max(0, occurredAtMs - this.startedAt - this.interruptionTimeMs),

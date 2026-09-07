@@ -12,9 +12,48 @@ import tools.jackson.databind.node.ObjectNode;
 /** 원본 스냅샷은 변경하지 않고 기존 판정 필드만 AI 입력에서 분리한다. */
 @Component
 public class AiBehaviorAnalysisPromptFactory {
-    public static final String VERSION = "behavior-analysis-v10-resumable";
+    public static final String VERSION = "behavior-analysis-v11-movement";
     public static final String EVIDENCE_VERSION = EvidenceIndex.VERSION;
     private final ObjectMapper mapper;
+    @org.springframework.beans.factory.annotation.Value("${ai.behavior-analysis.movement-max-error:0}")
+    private double movementMaxError=0;
+    public double movementMaxError() {return movementMaxError;}
+
+    public MovementProjection movementProjection(BehaviorAnalysisInputResponse input) {
+        if(!Double.isFinite(movementMaxError) || movementMaxError<0) throw new IllegalArgumentException("INVALID_MOVEMENT_TOLERANCE");
+        return new MovementProjection(mapper,input,movementMaxError);
+    }
+
+    public String projectedObservationPrompt(BehaviorAnalysisInputResponse visible,BehaviorAnalysisInputResponse full,
+            MovementProjection projection, boolean allowRequests) {
+        ObjectNode root=(ObjectNode)new LosslessTables(mapper).decode(mapper.readTree(observationPrompt(visible,full)));
+        root.put("movementProjectionVersion",MovementProjection.VERSION);
+        root.put("movementMaxError",movementMaxError);
+        var segments=root.putArray("movementSegments");
+        Set<java.util.UUID> visibleIds=new java.util.HashSet<>();
+        visible.input().sessions().forEach(s->s.events().forEach(e->visibleIds.add(e.behaviorLogId())));
+        for(var segment:projection.segments()) {
+            if(visibleIds.containsAll(segment.sourceEventIds())) continue;
+            var node=segments.addObject();
+            node.put("segmentId",segment.segmentId().toString());node.put("sessionId",segment.sessionId().toString());
+            node.put("sourceSampleCount",segment.sourceEventIds().size());node.put("retainedSampleCount",segment.retainedEventIds().size());
+            node.set("retainedEventIds",mapper.valueToTree(segment.retainedEventIds()));
+            node.put("observedDistance",segment.observedDistance());node.put("maxTimedPositionError",segment.maxTimedPositionError());
+            node.put("spatialErrorUpperBound",segment.maxTimedPositionError());
+            var segmentEvents=full.input().sessions().stream().flatMap(s->s.events().stream())
+                    .filter(e->segment.retainedEventIds().contains(e.behaviorLogId())).toList();
+            if(!segmentEvents.isEmpty()) {
+                node.put("startMs",segmentEvents.getFirst().elapsedFromSessionStartMs());
+                node.put("endMs",segmentEvents.getLast().elapsedFromSessionStartMs());
+            }
+        }
+        root.put("movementRules","이동 구간은 보존된 사건의 시각과 x,y를 순서대로 읽는다. observedDistance는 원본 샘플 간 거리 합으로 실제 연속 이동 거리와 다를 수 있다. "
+                +"축약 구간의 미제공 세부 움직임은 단정하지 말고 uncertainties에 한계를 쓴다. 같은 위치라도 시각은 다르다. "
+                +"정지/왕복/도움 요청만으로 능력 부족을 판단하지 않는다. 근거에는 실제 제공된 사건 ID만 인용한다. "
+                +(allowRequests?"원본 확인이 필요하면 requestedSegmentIds에 제공된 segmentId를 최대8개 요청할 수 있다. 없으면 빈 배열.":"추가 요청 예산은 없다. requestedSegmentIds는 빈 배열. 남은 의문은 uncertainties에 명시한다."));
+        root.put("outputContract",digestContract()+" requestedSegmentIds:[원본이 필요한 제공 segmentId; 없으면 빈 배열]를 추가할 수 있다.");
+        return pack(root);
+    }
 
     public AiBehaviorAnalysisPromptFactory(ObjectMapper mapper) { this.mapper = mapper; }
 

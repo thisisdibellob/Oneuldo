@@ -7,7 +7,7 @@ import oneuldo.behaviorlog.analysis.domain.*;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-/** Every raw event reaches an observation call. Only AI interprets/reduces; failures stop the run. */
+/** Every event is preserved by default; opt-in projections explicitly disclose their coverage. */
 public final class TimelineAnalysisPipeline {
     private static final org.slf4j.Logger log=org.slf4j.LoggerFactory.getLogger(TimelineAnalysisPipeline.class);
     private final AiBehaviorAnalysisPromptFactory prompts;
@@ -18,6 +18,7 @@ public final class TimelineAnalysisPipeline {
     private final AnalysisTokenBudget budget;
     private final AnalysisCallPacer pacer;
     private String model;
+    private boolean movementDetailLimited;
     private AnalysisCheckpoints checkpoints=AnalysisCheckpoints.NONE;
     public TimelineAnalysisPipeline withCheckpoints(AnalysisCheckpoints store) {checkpoints=store;return this;}
     private static final String RETRY = "\n구조와 실제 사건 참조를 수정하세요. JSON 하나만 출력하세요.";
@@ -35,15 +36,44 @@ public final class TimelineAnalysisPipeline {
     public String model() { return model; }
     public List<BehaviorAnalysisInputResponse> partition(BehaviorAnalysisInputResponse input,int limit) {
         List<BehaviorAnalysisInputResponse> chunks=new ArrayList<>();
-        split(input,input,limit,chunks,new AnalysisReferences(mapper,input)); return chunks;
+        var refs=new AnalysisReferences(mapper,input);
+        split(input,input,limit,chunks,refs);
+        // Fill unused capacity left by recursive splits; never discard an event to fit.
+        List<BehaviorAnalysisInputResponse> packed=new ArrayList<>();
+        for(var next:chunks) {
+            if(!packed.isEmpty()) {
+                Set<UUID> ids=new LinkedHashSet<>();
+                packed.getLast().input().sessions().forEach(s->s.events().forEach(e->ids.add(e.behaviorLogId())));
+                next.input().sessions().forEach(s->s.events().forEach(e->ids.add(e.behaviorLogId())));
+                var merged=select(input,ids);
+                if(observationCost(merged,input,refs)<=limit) {packed.set(packed.size()-1,merged);continue;}
+            }
+            packed.add(next);
+        }
+        return packed;
+    }
+    private int observationCost(BehaviorAnalysisInputResponse part,BehaviorAnalysisInputResponse full,AnalysisReferences refs) {
+        return budget.total(prompts.observationSystem(),refs.encode(observationPrompt(part,full))+suffix(maxChunks,maxChunks)+RETRY,budget.chunkOutputTokens());
+    }
+    private String observationPrompt(BehaviorAnalysisInputResponse part,BehaviorAnalysisInputResponse full) {
+        if(prompts.movementMaxError()==0) return prompts.observationPrompt(part,full);
+        var projection=prompts.movementProjection(part);
+        return prompts.projectedObservationPrompt(projection.visible(),full,projection,true);
     }
     private void split(BehaviorAnalysisInputResponse part,BehaviorAnalysisInputResponse full,int limit,
             List<BehaviorAnalysisInputResponse> out,AnalysisReferences refs) {
         if(out.size()>=maxChunks) throw new IllegalArgumentException("CHUNK_CALL_BUDGET_EXCEEDED");
-        int required=budget.total(prompts.observationSystem(),refs.encode(prompts.observationPrompt(part,full))+suffix(maxChunks,maxChunks)+RETRY,budget.chunkOutputTokens());
+        int required=observationCost(part,full,refs);
         if(required<=limit) {out.add(part);return;}
         if(part.eventCount()<=1) throw new IllegalArgumentException("SINGLE_EVENT_EXCEEDS_LIMIT: required="+required+", limit="+limit);
         int half=part.eventCount()/2;
+        var events=part.input().sessions().stream().flatMap(s->s.events().stream()).toList();
+        // Prefer an interaction boundary near the midpoint, protecting adjacent movement samples.
+        for(int offset=0;offset<Math.max(1,events.size()/4);offset++) {
+            int candidate=half+offset;
+            if(candidate>0 && candidate<events.size() && events.get(candidate).action()!=null
+                    && !"SHOP.MOVEMENT_SAMPLED".equals(events.get(candidate).action().eventCode())) {half=candidate;break;}
+        }
         split(slice(part,0,half),full,limit,out,refs);split(slice(part,half,part.eventCount()),full,limit,out,refs);
     }
     private BehaviorAnalysisInputResponse select(BehaviorAnalysisInputResponse input,Set<UUID> ids) {
@@ -73,9 +103,7 @@ public final class TimelineAnalysisPipeline {
         List<Group> groups=new ArrayList<>();
         for(int i=0;i<chunks.size();i++) {
             var chunk=chunks.get(i);
-            String prompt=refs.encode(prompts.observationPrompt(chunk,input))+suffix(i+1,chunks.size());
-            groups.add(new Group(chunk,call(prompts.observationSystem(),prompt,budget.chunkOutputTokens(),limit,audit,
-                    raw->validator.validateDigest(refs.readDigest(raw),chunk))));
+            groups.add(new Group(chunk,observe(chunk,input,refs,i+1,chunks.size(),limit,audit)));
         }
         while(true) {
             String finalPrompt=finalPrompt(input,groups,refs);
@@ -83,7 +111,7 @@ public final class TimelineAnalysisPipeline {
             log.info("AI final assembly: groups={}, reservedTokens={}, limit={}",groups.size(),budget.total(finalSystem,finalPrompt+RETRY,budget.finalOutputTokens()),limit);
             if(budget.total(finalSystem,finalPrompt+RETRY,budget.finalOutputTokens())<=limit)
                 return call(finalSystem,finalPrompt,budget.finalOutputTokens(),limit,audit,
-                        raw->validator.validate(refs.read(raw),input));
+                        raw->validateFinal(refs.read(raw),input,finalPrompt));
             if(groups.size()<=1) {
                 audit.add(new AiBehaviorAnalysisRun.Attempt(audit.size()+1,finalPrompt,null,"FINAL_EVIDENCE_EXCEEDS_LIMIT","PREFLIGHT",finalSystem,budget.finalOutputTokens(),null,null,null,0L));
                 throw new IllegalArgumentException("FINAL_EVIDENCE_EXCEEDS_LIMIT");
@@ -99,12 +127,74 @@ public final class TimelineAnalysisPipeline {
                 var scope=select(input,covered);
                 log.info("AI reduction batch: children={}",pair.size());
                 var digest=call(prompts.observationSystem(),mergePrompt(pair,refs),budget.chunkOutputTokens(),limit,audit,
-                        raw->validator.validateReduction(refs.readDigest(raw),scope,pair.stream().map(Group::digest).toList()));
+                        raw->{var value=refs.readDigest(raw);noRequests(value);return validator.validateReduction(value,scope,pair.stream().map(Group::digest).toList());});
                 reduced.add(new Group(scope,digest));
                 i=end;
             }
             groups=reduced;
         }
+    }
+    private AiObservationDigest observe(BehaviorAnalysisInputResponse chunk,BehaviorAnalysisInputResponse full,AnalysisReferences refs,
+            int number,int total,int limit,List<AiBehaviorAnalysisRun.Attempt> audit) {
+        var projection=prompts.movementProjection(chunk);
+        var visible=projection.visible();
+        log.info("AI movement observation: chunk={}/{}, sourceEvents={}, visibleEvents={}, simplifiedSegments={}, maxError={}",
+                number,total,chunk.eventCount(),visible.eventCount(),projection.segments().size(),prompts.movementMaxError());
+        String prompt=refs.encode(observationPrompt(chunk,full))+suffix(number,total);
+        var digest=call(prompts.observationSystem(),prompt,budget.chunkOutputTokens(),limit,audit,raw->{
+            var value=refs.readDigest(raw);
+            projection.expand(value.requestedSegmentIds()); // reject fabricated/cross-session segment requests
+            return validator.validateDigest(value,visible);
+        });
+        if(digest.requestedSegmentIds().isEmpty()) return disclose(digest,projection,visible);
+        var expanded=projection.expand(digest.requestedSegmentIds());
+        String detail=refs.encode(prompts.projectedObservationPrompt(expanded,full,projection,false))+suffix(number,total);
+        if(budget.total(prompts.observationSystem(),detail+RETRY,budget.chunkOutputTokens())>limit || audit.size()+2>=maxChunks*2+1) {
+            movementDetailLimited=true;
+            var limits=new ArrayList<>(digest.uncertainties());limits.add("요청한 이동 원본은 추가 호출 예산을 초과하여 확인하지 못했습니다. 해당 세부 이동 해석은 보류해야 합니다.");
+            // Do not retain unverified interpretations after the model explicitly requested missing evidence.
+            return new AiObservationDigest("추가 원본 확인이 필요한 이동 구간",List.of(),limits);
+        }
+        var result=call(prompts.observationSystem(),detail,budget.chunkOutputTokens(),limit,audit,raw->{
+            var value=refs.readDigest(raw);noRequests(value);return validator.validateDigest(value,expanded);
+        });
+        return disclose(result,projection,expanded);
+    }
+    private void noRequests(AiObservationDigest digest) {
+        if(!digest.requestedSegmentIds().isEmpty()) throw new IllegalArgumentException("MOVEMENT_REQUEST_NOT_ALLOWED");
+    }
+    private AiObservationDigest disclose(AiObservationDigest digest,MovementProjection projection,BehaviorAnalysisInputResponse visible) {
+        Set<UUID> ids=new HashSet<>();visible.input().sessions().forEach(s->s.events().forEach(e->ids.add(e.behaviorLogId())));
+        long omitted=projection.segments().stream().flatMap(s->s.sourceEventIds().stream()).filter(id->!ids.contains(id)).count();
+        if(omitted==0) return new AiObservationDigest(digest.summary(),digest.observations(),digest.uncertainties());
+        movementDetailLimited=true;
+        var limits=new ArrayList<>(digest.uncertainties());
+        limits.add("이동 관측점 "+omitted+"개는 시간별 위치 오차 "+prompts.movementMaxError()+" 게임 좌표 단위 이내로 축약되었습니다. 생략된 미세 이동은 확인하지 않았습니다.");
+        return new AiObservationDigest(digest.summary(),digest.observations(),limits);
+    }
+    private AiBehaviorAnalysis validateFinal(AiBehaviorAnalysis value,BehaviorAnalysisInputResponse input,String prompt) {
+        validator.validate(value,input);
+        // Every final citation must be a raw event actually supplied in final assembly.
+        var root=new LosslessTables(mapper).decode(mapper.readTree(prompt));
+        var timeline=root.path("behaviorTimeline");
+        var decoded=timeline.has("encoding")?new CompactBehaviorTimeline(mapper).decodeExpanded(timeline):timeline;
+        Set<String> supplied=new HashSet<>();
+        decoded.path("sessions").forEach(s->s.path("events").forEach(e->supplied.add(e.path("behaviorLogId").asString())));
+        var refs=new AnalysisReferences(mapper,input);
+        Set<UUID> citations=new HashSet<>();
+        value.findings().forEach(f->citations.addAll(f.evidenceEventIds()));
+        value.sessionAssessments().forEach(s->citations.addAll(s.evidenceEventIds()));
+        for(UUID id:citations) {
+            String alias=mapper.readTree(refs.encode(mapper.writeValueAsString(Map.of("id",id)))).path("id").asString();
+            if(!supplied.contains(alias)) throw new IllegalArgumentException("FINAL_EVIDENCE_NOT_SUPPLIED");
+        }
+        boolean limited=root.path("movementDetailLimited").asBoolean();
+        if(limited) {
+            var limits=new ArrayList<>(value.uncertainties());
+            limits.add("일부 이동점은 허용 오차 내 축약되었거나 추가 원본 확인이 제한되었습니다. 미확인 세부 이동은 판단 근거로 확정할 수 없습니다.");
+            value=new AiBehaviorAnalysis(value.summary(),value.findings(),value.sessionAssessments(),limits,value.practicePlan(),value.usedEvidenceCardIds());
+        }
+        return validator.validate(value,input);
     }
     private String mergePrompt(List<Group> groups,AnalysisReferences refs) {
         ObjectNode merge=mapper.createObjectNode();
@@ -116,12 +206,15 @@ public final class TimelineAnalysisPipeline {
     private String finalPrompt(BehaviorAnalysisInputResponse input,List<Group> groups,AnalysisReferences refs) {
         Set<UUID> evidence=new LinkedHashSet<>();
         groups.forEach(g->g.digest.observations().forEach(o->evidence.addAll(o.evidenceEventIds())));
+        // Even an undetermined session needs a supplied raw anchor, not an invented citation.
+        input.input().sessions().forEach(s->{if(!s.events().isEmpty()) evidence.add(s.events().getFirst().behaviorLogId());});
         var selected=select(input,evidence);
         // Raw evidence is selected by AI citations, not a server importance rule. Never truncate to fit.
         ObjectNode root=(ObjectNode)new LosslessTables(mapper).decode(mapper.readTree(prompts.userPrompt(selected)));
         root.remove(List.of("matchingContentCatalog","availablePracticeScenarios","excludedLegacyFields"));
         root.set("taskContext",prompts.tasks(input));
-        root.put("stage","FINAL: 전체 관측은 구간 AI가 읽었다. 중간 해석은 손실 가능하다. 함께 제공된 AI 인용 원문으로 근거를 재검토하라. 원문이 부족하면 불확실성을 명시하고 판단을 보류하라. 다수결·평균으로 성패를 만들지 말라. 최종 사용자 분석과 지원·연습 계획을 작성하라.");
+        root.put("movementDetailLimited",movementDetailLimited);
+        root.put("stage","FINAL: 구간 AI가 전달된 관측을 읽었다. 축약 및 원본 미확인 한계는 chunkAnalyses.uncertainties에 있다. 해당 한계를 최종 uncertainties에도 유지하라. 중간 해석은 손실 가능하다. 함께 제공된 AI 인용 원문으로 근거를 재검토하라. 원문이 부족하면 불확실성을 명시하고 판단을 보류하라. 다수결·평균으로 성패를 만들지 말라. 최종 사용자 분석과 지원·연습 계획을 작성하라.");
         root.set("chunkAnalyses",mapper.valueToTree(groups.stream().map(Group::digest).toList()));
         root.set("coverage",mapper.valueToTree(input.input().sessions().stream().map(s->Map.of("sessionId",s.sessionId(),"eventCount",s.events().size())).toList()));
         // Alias complete UUID values before the reversible string/column encoding.

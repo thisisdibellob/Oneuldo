@@ -44,7 +44,7 @@ public final class CompactBehaviorTimeline {
                 extractSection(event, context, "payload", PAYLOAD_CONTEXT);
                 if (event.path("payload") instanceof ObjectNode payload && payload.path("marketContent") instanceof ObjectNode content) {
                     ObjectNode shared = mapper.createObjectNode();
-                    moveFields(content, shared, List.of("sceneRef", "layoutVersion", "seed"));
+                    moveFields(content, shared, List.of("sceneRef", "layoutVersion", "seed", "movementContext"));
                     if (!shared.isEmpty()) object(context, "payload").set("marketContent", shared);
                 }
                 String ref = contextIds.get(context);
@@ -81,6 +81,8 @@ public final class CompactBehaviorTimeline {
     }
     /** Use after the enclosing prompt's table layer has already been decoded. */
     public ObjectNode decodeExpanded(JsonNode compact) {
+        if (LosslessEventColumns.FORMAT.equals(compact.path("encoding").asString()))
+            return new LosslessEventColumns(mapper).decode(compact);
         ObjectNode result = ((ObjectNode) compact).deepCopy();
         if (!FORMAT.equals(result.path("encoding").asString())) throw new IllegalArgumentException("Unknown timeline encoding");
         result.remove(List.of("encoding", "movementColumns", "encodingRules"));

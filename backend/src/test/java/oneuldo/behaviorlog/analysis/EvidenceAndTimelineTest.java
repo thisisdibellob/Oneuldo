@@ -84,7 +84,8 @@ class EvidenceAndTimelineTest {
     @Test void 구간과_통합에서_같은_짧은_ID를_유지하고_응답은_UUID로_저장한다() {
         var tree = mapper.valueToTree(input(2));
         for (var event : tree.path("input").path("sessions").get(0).path("events"))
-            ((tools.jackson.databind.node.ObjectNode) event.path("payload").path("marketContent")).put("rawText", "복도 걸음 정지 ".repeat(1500));
+            // Distinct source values are required: identical text now correctly factors to one copy.
+            ((tools.jackson.databind.node.ObjectNode) event.path("payload").path("marketContent")).put("rawText", event.path("sequence").asString()+"복도 걸음 정지 ".repeat(1500));
         var data = mapper.convertValue(tree, BehaviorAnalysisInputResponse.class);
         var prompts = new AiBehaviorAnalysisPromptFactory(mapper);
         var budget = new AnalysisTokenBudget();

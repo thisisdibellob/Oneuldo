@@ -71,7 +71,8 @@ public class AiBehaviorAnalysisService {
         String requestKey=oneuldo.ai.service.AiRequestFingerprint.of(mapper,memberId,input.id(),configuredModel,
                 system,mapper.readTree(prompt),prompts.observationSystem(),prompts.digestContract(),prompts.reductionContract(),
                 FinalAnalysisPromptCompactor.systemPrompt(),FinalAnalysisPromptCompactor.VERSION,
-                budget.requestTokens(),budget.chunkOutputTokens(),budget.finalOutputTokens(),maxChunks,0.2,"analysis-reuse-v1");
+                budget.requestTokens(),budget.chunkOutputTokens(),budget.finalOutputTokens(),maxChunks,0.2,
+                MovementProjection.VERSION,prompts.movementMaxError(),MovementInputEncoder.VERSION,"analysis-reuse-v2");
         var reusable=repository.findFirstByMemberIdAndDatasetIdAndRequestKeyAndStatusOrderByCreatedAtDesc(memberId,input.id(),requestKey,"READY");
         if(reusable.isPresent()) {
             try {
