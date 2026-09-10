@@ -13,6 +13,7 @@ export type VillageNpcId = 'minsu' | 'driver' | 'jiyoung' | 'sujin';
 
 export type VillageNpcDefinition = {
   accentColor: string;
+  activityLabel?: string;
   id: VillageNpcId;
   name: string;
   point: Point;
@@ -96,6 +97,18 @@ export const MARKET_ENTRANCE_POINT: Point = { x: 1265, y: 600 };
 export const MARKET_RETURN_POINT: Point = { x: 1265, y: 640 };
 export const MARKET_PLAYER_POINT: Point = { x: 450, y: 820 };
 export const MARKET_EXIT_POINT: Point = { x: 450, y: 950 };
+
+// The checkout footprint is shared by both the village-embedded market and its
+// standalone preview. Leave a real staff aisle between the back wall and counter.
+export const MARKET_CHECKOUT_RECT: Rect = { height: 35, width: 250, x: 325, y: 300 };
+export const MARKET_CHECKOUT_POINT: Point = { x: 450, y: 395 };
+export const MARKET_CASHIER_POINT: Point = { x: 485, y: 250 };
+export const MARKET_CASHIER_COLLIDER: Rect = {
+  height: 32,
+  width: 48,
+  x: MARKET_CASHIER_POINT.x - 24,
+  y: MARKET_CASHIER_POINT.y - 24,
+};
 
 export const HOUSE_ENTRANCE_POINT: Point = { x: 2050, y: 1210 };
 export const HOUSE_RETURN_POINT: Point = { x: 1890, y: 1210 };
@@ -451,6 +464,7 @@ export const VILLAGE_NPCS: readonly VillageNpcDefinition[] = [
   },
   {
     accentColor: '#78A386',
+    activityLabel: '계산 알바',
     id: 'jiyoung',
     name: '지영',
     point: { x: 1390, y: 610 },

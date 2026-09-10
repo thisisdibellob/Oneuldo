@@ -20,6 +20,13 @@ import {
 import { icons } from '../assets';
 import { DirectionalAvatar } from '../components/game/DirectionalAvatar';
 import { GameHud } from '../components/game/GameHud';
+import { MinsuDialoguePortrait } from '../components/game/MinsuDialoguePortrait';
+import {
+  MarketCategoryFixture,
+  MarketCheckoutFixture,
+  MarketExitMarker,
+  MarketInteriorBackdrop,
+} from '../components/game/MarketInteriorLayer';
 import { MODULAR_CHARACTER_CANVAS } from '../components/game/ModularCharacter';
 import {
   ExpandedVillageLayer,
@@ -42,7 +49,6 @@ import {
   type AvatarMotion,
 } from '../game/avatarAnimation';
 import { freshPlayerAvatar } from '../game/freshPlayerAvatar';
-import { marketGameArt } from '../game/gameAssets';
 import {
   BUS_STOP_POINT,
   HOME_EXIT_POINT,
@@ -52,6 +58,9 @@ import {
   HOUSE_ENTRANCE_POINT,
   HOUSE_RETURN_POINT,
   INITIAL_PLAYER_POINT,
+  MARKET_CASHIER_COLLIDER,
+  MARKET_CHECKOUT_POINT,
+  MARKET_CHECKOUT_RECT,
   MARKET_ENTRANCE_POINT,
   MARKET_EXIT_POINT,
   MARKET_PLAYER_POINT,
@@ -83,10 +92,9 @@ import {
   MarketSimulationScreen,
   MarketStationId,
 } from './MarketSimulationScreen';
+import { CashierSimulationScreen } from './CashierSimulationScreen';
 import { CookingSimulationScreen } from './CookingSimulationScreen';
 
-const MARKET_WORLD_WIDTH = 900;
-const MARKET_WORLD_HEIGHT = 1000;
 const PLAYER_RADIUS = 22;
 const PLAYER_ART_SCALE = 0.5;
 const PLAYER_ART_HEIGHT = MODULAR_CHARACTER_CANVAS.height * PLAYER_ART_SCALE;
@@ -124,7 +132,7 @@ const WEB_MOVEMENT_KEYS: Record<string, Point> = {
 };
 
 const MARKET_STATIONS: Record<MarketStationId | 'exit', Point> = {
-  checkout: { x: 450, y: 250 },
+  checkout: MARKET_CHECKOUT_POINT,
   fresh: { x: 350, y: 400 },
   produce: { x: 550, y: 400 },
   meal: { x: 350, y: 680 },
@@ -140,12 +148,13 @@ const MARKET_SHELVES: Record<MarketCategoryId, Rect> = {
 };
 
 const marketObstacles: Rect[] = [
-  { height: 105, width: 250, x: 325, y: 92 },
+  MARKET_CHECKOUT_RECT,
+  MARKET_CASHIER_COLLIDER,
   ...Object.values(MARKET_SHELVES),
 ];
 
 type DailyConversationChoice = 'fun' | 'tired';
-type NpcInteractionChoice = 'npc-quest' | 'npc-talk';
+type NpcInteractionChoice = 'npc-cashier' | 'npc-quest' | 'npc-talk';
 type DialogueChoice = DailyConversationChoice | NpcInteractionChoice;
 type DialogueStep =
   | { kind: 'line'; text: string }
@@ -155,7 +164,10 @@ type DialogueStep =
       purpose: 'conversation' | 'npc-action';
       text: string;
     }
-  | { kind: 'response'; responses: Record<DailyConversationChoice, string> };
+  | {
+      kind: 'response';
+      responses: Record<DailyConversationChoice, string>;
+    };
 
 const quizAnswers = ['초록불인지 확인해요', '차가 오기 전에 빨리 건너요'];
 
@@ -180,7 +192,10 @@ const dialogueSteps = [
   },
   { kind: 'line', text: '그럼 우리 같이 조금 걸을까?' },
   { kind: 'line', text: '좋아! 저기 횡단보도까지 가 보자.' },
-  { kind: 'line', text: '가는 길에 안전하게 건너는 방법도 같이 떠올려 보자.' },
+  {
+    kind: 'line',
+    text: '가는 길에 안전하게 건너는 방법도 같이 떠올려 보자.',
+  },
 ] as const satisfies readonly DialogueStep[];
 
 function resolveDialogueText(
@@ -393,12 +408,7 @@ function MarketWorldLayer({
 }) {
   return (
     <>
-      <Image
-        accessibilityIgnoresInvertColors
-        resizeMode="stretch"
-        source={marketGameArt.base}
-        style={styles.marketArtBase}
-      />
+      <MarketInteriorBackdrop />
 
       {tapTargetMarker && controlMode === 'touch' ? (
         <View
@@ -412,26 +422,12 @@ function MarketWorldLayer({
         accessibilityLabel={controlMode === 'touch' ? '계산대로 이동' : '계산대'}
         accessibilityRole={controlMode === 'touch' ? 'button' : undefined}
         disabled={controlMode !== 'touch'}
+        hitSlop={{ bottom: 28, left: 24, right: 24, top: 84 }}
         onPress={(event) => onStationPress(event, 'checkout')}
         scaleTo={0.98}
-        style={[
-          styles.marketCounter,
-          styles.marketCounterIllustrated,
-          nearbyStation === 'checkout' && styles.marketObjectActive,
-        ]}
+        style={styles.marketCounter}
       >
-        <Image
-          accessibilityIgnoresInvertColors
-          resizeMode="contain"
-          source={marketGameArt.checkout}
-          style={styles.marketCounterArt}
-        />
-        {nearbyStation === 'checkout' ? (
-          <View pointerEvents="none" style={styles.marketCounterNameplate}>
-            <Ionicons color="#3F725B" name="card-outline" size={14} />
-            <Text style={styles.marketCounterText}>계산대</Text>
-          </View>
-        ) : null}
+        <MarketCheckoutFixture active={nearbyStation === 'checkout'} />
       </PressScale>
 
       {marketCategories.map((category) => {
@@ -441,28 +437,16 @@ function MarketWorldLayer({
             accessibilityLabel={controlMode === 'touch' ? `${category.label} 진열대로 이동` : `${category.label} 진열대`}
             accessibilityRole={controlMode === 'touch' ? 'button' : undefined}
             disabled={controlMode !== 'touch'}
+            hitSlop={{ bottom: 30, left: 30, right: 30, top: 64 }}
             key={category.id}
             onPress={(event) => onStationPress(event, category.id)}
             scaleTo={0.98}
             style={[
               styles.marketShelf,
-              styles.marketShelfIllustrated,
               { height: shelf.height, left: shelf.x, top: shelf.y, width: shelf.width },
-              nearbyStation === category.id && styles.marketObjectActive,
             ]}
           >
-            <Image
-              accessibilityIgnoresInvertColors
-              resizeMode="contain"
-              source={marketGameArt.shelves[category.id]}
-              style={styles.marketShelfArt}
-            />
-            {nearbyStation === category.id ? (
-              <View pointerEvents="none" style={[styles.marketShelfLabel, { backgroundColor: category.color }]}>
-                <Ionicons color="#FFFFFF" name={category.icon as 'leaf' | 'fish' | 'fast-food' | 'water'} size={15} />
-                <Text style={styles.marketShelfLabelText}>{category.label}</Text>
-              </View>
-            ) : null}
+            <MarketCategoryFixture active={nearbyStation === category.id} category={category} />
           </PressScale>
         );
       })}
@@ -473,18 +457,9 @@ function MarketWorldLayer({
         disabled={controlMode !== 'touch'}
         onPress={(event) => onStationPress(event, 'exit')}
         scaleTo={0.98}
-        style={[
-          styles.marketExit,
-          nearbyStation !== 'exit' && styles.marketExitInactive,
-          nearbyStation === 'exit' && styles.marketObjectActive,
-        ]}
+        style={styles.marketExit}
       >
-        {nearbyStation === 'exit' ? (
-          <>
-            <Ionicons color="#627269" name="exit-outline" size={20} />
-            <Text style={styles.marketExitText}>마을로 나가기</Text>
-          </>
-        ) : null}
+        <MarketExitMarker active={nearbyStation === 'exit'} />
       </PressScale>
     </>
   );
@@ -576,6 +551,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
     useState<MarketInteractionRequest | null>(null);
   const [fridgeMenuOpen, setFridgeMenuOpen] = useState(false);
   const [cookingOpen, setCookingOpen] = useState(false);
+  const [cashierOpen, setCashierOpen] = useState(false);
   const [worldMap, setWorldMap] = useState<WorldMapId>('village');
   const [audioModeReady, setAudioModeReady] = useState(false);
   const [reduceMotionEnabled, setReduceMotionEnabled] = useState(false);
@@ -632,6 +608,12 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
   const renderedDialogueStep = activeDialogueSteps[renderedDialogueIndex];
   const renderedDialogue = resolveDialogueText(renderedDialogueStep, selectedDailyChoice);
   const dialogueSpeakerName = VILLAGE_NPC_BY_ID[dialogueNpcId].name;
+  const dialoguePortraitExpression =
+    dialogueNpcId === 'minsu'
+      ? dialogueMode === 'minsu-quest'
+        ? 'ready'
+        : 'attentive'
+      : null;
   const dialogueChoiceVisible =
     currentDialogueStep?.kind === 'choice' &&
     visibleDialogueCharacters >= currentDialogue.length;
@@ -647,6 +629,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
     infoPanel !== null ||
     fridgeMenuOpen ||
     cookingOpen ||
+    cashierOpen ||
     marketScenarioLocked;
 
   useEffect(() => {
@@ -1741,6 +1724,9 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
               : '완료한 퀘스트',
       });
     }
+    if (npcId === 'jiyoung') {
+      options.push({ id: 'npc-cashier', label: '계산 알바 연습' });
+    }
     startDialogue(
       npcId,
       [
@@ -2157,6 +2143,14 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
     }
 
     if (currentDialogueStep.purpose === 'npc-action') {
+      if (choice === 'npc-cashier' && dialogueNpcId === 'jiyoung') {
+        stopMovement();
+        setDialogueIndex(null);
+        setDialogueMode(null);
+        setSelectedDailyChoice(null);
+        setCashierOpen(true);
+        return;
+      }
       if (choice === 'npc-talk') {
         startSmallTalk(dialogueNpcId, true);
         return;
@@ -2299,7 +2293,13 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
     !quizPanelMounted &&
     !fridgeMenuOpen &&
     !cookingOpen &&
+    !cashierOpen &&
     !marketScenarioLocked;
+
+  if (cashierOpen) {
+    return <CashierSimulationScreen onExit={() => setCashierOpen(false)} />;
+  }
+
   return (
     <View
       onLayout={handleViewportLayout}
@@ -2663,11 +2663,42 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
               />
             ) : null}
           </Animated.View>
+          {dialoguePortraitExpression && !quizPanelMounted ? (
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.dialoguePortraitAnchor,
+                renderedDialogueStep?.kind === 'choice' && styles.dialoguePortraitAnchorRaised,
+                {
+                  opacity: dialoguePanelProgress,
+                  transform: [
+                    {
+                      translateY: dialoguePanelProgress.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [14, 0],
+                      }),
+                    },
+                    {
+                      scale: dialoguePanelProgress.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0.97, 1],
+                      }),
+                    },
+                  ],
+                },
+              ]}
+            >
+              <MinsuDialoguePortrait expression={dialoguePortraitExpression} />
+            </Animated.View>
+          ) : null}
           <Animated.View
             pointerEvents={dialogueIndex !== null ? 'auto' : 'none'}
             style={[
               styles.dialogueBox,
               currentDialogueStep?.kind === 'choice' && styles.dialogueChoiceBox,
+              currentDialogueStep?.kind === 'choice' &&
+                currentDialogueStep.options.length > 2 &&
+                styles.dialogueChoiceBoxTall,
               {
                 opacity: dialoguePanelProgress,
                 transform: [
@@ -2781,6 +2812,32 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
       {quizPanelMounted ? (
         <View style={styles.quizOverlay}>
           <Animated.View style={[styles.dim, { opacity: quizPanelProgress }]} />
+          {renderedQuizStep === 'question' ? (
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.dialoguePortraitAnchor,
+                styles.dialoguePortraitAnchorRaised,
+                styles.quizPortraitAnchor,
+                {
+                  opacity: quizPanelProgress,
+                  transform: [
+                    {
+                      translateY: quizPanelProgress.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [14, 0],
+                      }),
+                    },
+                  ],
+                },
+              ]}
+            >
+              <MinsuDialoguePortrait
+                expression="curious"
+                testID="minsu-quiz-portrait"
+              />
+            </Animated.View>
+          ) : null}
           <Animated.View
             style={[
               styles.quizSheet,
@@ -2992,114 +3049,32 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 0,
   },
-  marketArtBase: {
-    ...StyleSheet.absoluteFillObject,
-    height: MARKET_WORLD_HEIGHT,
-    width: MARKET_WORLD_WIDTH,
-  },
-  marketCounterIllustrated: {
-    backgroundColor: 'transparent',
-    borderWidth: 0,
-    overflow: 'visible',
-    padding: 0,
-  },
-  marketCounterArt: {
-    height: 168,
-    left: -6,
-    position: 'absolute',
-    top: -58,
-    width: 252,
-  },
-  marketCounterNameplate: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,253,248,0.94)',
-    borderColor: 'rgba(63,114,91,0.24)',
-    borderRadius: 12,
-    borderWidth: 1,
-    bottom: 6,
-    flexDirection: 'row',
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    position: 'absolute',
-  },
-  marketShelfIllustrated: {
-    backgroundColor: 'transparent',
-    borderWidth: 0,
-    overflow: 'visible',
-    padding: 0,
-  },
-  marketShelfArt: {
-    bottom: -6,
-    height: 148,
-    left: 0,
-    position: 'absolute',
-    width: 220,
-  },
   marketCounter: {
     alignItems: 'center',
-    backgroundColor: '#A97C59',
-    borderColor: '#77563F',
-    borderRadius: 12,
-    borderWidth: 2,
-    height: 105,
+    backgroundColor: 'transparent',
+    height: MARKET_CHECKOUT_RECT.height,
     justifyContent: 'center',
-    left: 325,
+    left: MARKET_CHECKOUT_RECT.x,
+    overflow: 'visible',
     position: 'absolute',
-    top: 92,
-    width: 250,
+    top: MARKET_CHECKOUT_RECT.y,
+    width: MARKET_CHECKOUT_RECT.width,
     zIndex: 5,
   },
-  marketCounterText: { color: '#FFF4DE', fontFamily: fonts.bold, fontSize: 15 },
   marketShelf: {
-    backgroundColor: '#9B7456',
-    borderColor: '#6F503B',
-    borderRadius: 12,
-    borderWidth: 2,
-    paddingHorizontal: 14,
-    paddingTop: 16,
+    backgroundColor: 'transparent',
+    overflow: 'visible',
     position: 'absolute',
     zIndex: 5,
   },
-  marketObjectActive: {
-    borderColor: '#F3CE62',
-    borderWidth: 4,
-    shadowColor: '#5C482D',
-    shadowOffset: { height: 4, width: 0 },
-    shadowOpacity: 0.22,
-    shadowRadius: 7,
-  },
-  marketShelfLabel: {
-    alignItems: 'center',
-    borderRadius: 9,
-    flexDirection: 'row',
-    gap: 5,
-    left: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    position: 'absolute',
-    top: 13,
-    zIndex: 3,
-  },
-  marketShelfLabelText: { color: '#FFFFFF', fontFamily: fonts.semibold, fontSize: 10 },
   marketExit: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.76)',
-    borderColor: '#B9B0A2',
-    borderRadius: 16,
-    borderStyle: 'dashed',
-    borderWidth: 2,
-    flexDirection: 'row',
-    gap: 7,
+    backgroundColor: 'transparent',
     height: 58,
-    justifyContent: 'center',
     left: 375,
     position: 'absolute',
     top: 900,
     width: 150,
   },
-  marketExitInactive: { backgroundColor: 'transparent', borderColor: 'transparent' },
-  marketExitText: { color: '#647168', fontFamily: fonts.bold, fontSize: 13 },
   ground: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: '#DDE4D5',
@@ -3728,6 +3703,16 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(49,50,46,0.15)',
     zIndex: 26,
   },
+  dialoguePortraitAnchor: {
+    bottom: 215,
+    height: 238,
+    left: '50%',
+    marginLeft: -174,
+    position: 'absolute',
+    width: 174,
+    zIndex: 27,
+  },
+  dialoguePortraitAnchorRaised: { bottom: 342 },
   dialogueBox: {
     alignSelf: 'center',
     backgroundColor: 'rgba(75,75,75,0.90)',
@@ -3745,6 +3730,7 @@ const styles = StyleSheet.create({
     zIndex: 27,
   },
   dialogueChoiceBox: { bottom: 258 },
+  dialogueChoiceBoxTall: { bottom: 318 },
   dialogueSpeakerTag: {
     alignItems: 'center',
     backgroundColor: '#D4C498',
@@ -3802,10 +3788,12 @@ const styles = StyleSheet.create({
   },
   quizOverlay: { ...StyleSheet.absoluteFillObject, justifyContent: 'flex-end', zIndex: 30 },
   dim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(49,50,46,0.18)' },
+  quizPortraitAnchor: { zIndex: 0 },
   quizSheet: {
     alignSelf: 'center',
     maxWidth: 700,
     width: '100%',
+    zIndex: 1,
   },
   quizChoiceStage: {
     ...StyleSheet.absoluteFillObject,

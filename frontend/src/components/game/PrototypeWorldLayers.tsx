@@ -435,7 +435,9 @@ function VillageNpc({
       accessibilityHint={
         controlMode === 'touch'
           ? nearby
-            ? '대화하거나 부탁을 확인합니다'
+            ? npc.activityLabel
+              ? `대화하거나 ${npc.activityLabel}를 시작합니다`
+              : '대화하거나 부탁을 확인합니다'
             : '가까이 이동한 뒤 대화합니다'
           : undefined
       }
@@ -457,7 +459,7 @@ function VillageNpc({
       <View style={styles.npcCloudAnchor}>
         <InteractionCloud
           icon="chatbubble"
-          label={npc.name}
+          label={npc.activityLabel ? `${npc.name} · ${npc.activityLabel}` : npc.name}
           testID={`npc-proximity-cloud-${npc.id}`}
           visible={nearby}
         />

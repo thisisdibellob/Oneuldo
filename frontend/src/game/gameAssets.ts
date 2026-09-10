@@ -1,18 +1,25 @@
 import type { ImageSourcePropType } from 'react-native';
 
+import type { MinsuPortraitSheetId } from './minsuDialoguePortraits';
 import type { MarketCategoryId } from './scenarios';
 import type { VillageDecorationKind } from './prototypeWorld';
 
+export const minsuDialoguePortraitSheets = {
+  'sheet-01': require('../../assets/images/game/characters/dialogue/minsu_dialogue_sheet_01.png'),
+  'sheet-02': require('../../assets/images/game/characters/dialogue/minsu_dialogue_sheet_02.png'),
+  'sheet-03': require('../../assets/images/game/characters/dialogue/minsu_dialogue_sheet_03.png'),
+} satisfies Record<MinsuPortraitSheetId, ImageSourcePropType>;
+
 const marketShelves = {
-  drink: require('../../assets/images/game/props/mart/prop_shelf_drink_v1.png'),
-  fresh: require('../../assets/images/game/props/mart/prop_shelf_fresh_v1.png'),
-  meal: require('../../assets/images/game/props/mart/prop_shelf_meal_v1.png'),
-  produce: require('../../assets/images/game/props/mart/prop_shelf_produce_v1.png'),
+  drink: require('../../assets/images/game/market/interior/shelf_drink_v2.png'),
+  fresh: require('../../assets/images/game/market/interior/shelf_fresh_v2.png'),
+  meal: require('../../assets/images/game/market/interior/shelf_meal_v2.png'),
+  produce: require('../../assets/images/game/market/interior/shelf_produce_v2.png'),
 } satisfies Record<MarketCategoryId, ImageSourcePropType>;
 
 export const marketGameArt = {
-  base: require('../../assets/images/game/scenes/mart/scene_mart_base_day_v1.png'),
-  checkout: require('../../assets/images/game/props/mart/prop_checkout_counter_v1.png'),
+  base: require('../../assets/images/game/market/interior/market_floor_parallel_v3.png'),
+  checkout: require('../../assets/images/game/market/interior/checkout_front_v2.png'),
   shelves: marketShelves,
 };
 

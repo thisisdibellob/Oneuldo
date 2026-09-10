@@ -39,6 +39,7 @@ jest.mock('expo-glass-effect', () => {
 jest.mock('react-native-safe-area-context', () => {
   const { View } = jest.requireActual('react-native');
   return {
+    ...jest.requireActual('react-native-safe-area-context'),
     SafeAreaProvider: ({ children }: { children: React.ReactNode }) => <View>{children}</View>,
     SafeAreaView: ({ children }: { children: React.ReactNode }) => <View>{children}</View>,
   };
@@ -231,6 +232,8 @@ describe('오늘도 앱', () => {
     );
 
     expect(screen.getByText('횡단보도를 건너기 전에', { exact: false })).toBeTruthy();
+    expect(screen.queryByTestId('minsu-dialogue-portrait')).toBeNull();
+    expect(screen.getByTestId('minsu-quiz-portrait')).toBeTruthy();
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 210));
     });
@@ -340,6 +343,8 @@ describe('오늘도 앱', () => {
       screen.getByRole('button', { name: '연습 모드로 바나나 요거트 컵 만들기 시작' }),
     );
 
+    fireEvent.press(screen.getByRole('button', { name: '그릇 선택' }));
+    fireEvent.press(screen.getByRole('button', { name: '숟가락 선택' }));
     fireEvent(screen.getByRole('button', { name: /바나나, 바구니로 끌기/ }), 'accessibilityAction', {
       nativeEvent: { actionName: 'activate' },
     });
@@ -385,6 +390,40 @@ describe('오늘도 앱', () => {
         { nativeEvent: { actionName: 'activate' } },
       );
     }
+    fireEvent.press(screen.getByRole('button', { name: '다음 요리 단계' }));
+
+    fireEvent(
+      screen.getByRole('button', { name: '완성한 그릇 식탁에 차리기' }),
+      'accessibilityAction',
+      { nativeEvent: { actionName: 'activate' } },
+    );
+    fireEvent.press(screen.getByRole('button', { name: '다음 요리 단계' }));
+
+    fireEvent(
+      screen.getByRole('button', { name: '바나나 껍질 음식물 통에 넣기' }),
+      'accessibilityAction',
+      { nativeEvent: { actionName: 'activate' } },
+    );
+    fireEvent(
+      screen.getByRole('button', { name: '빈 요거트 컵 재활용 통에 넣기' }),
+      'accessibilityAction',
+      { nativeEvent: { actionName: 'activate' } },
+    );
+    fireEvent(
+      screen.getByRole('button', { name: '사용한 숟가락 싱크대에 넣기' }),
+      'accessibilityAction',
+      { nativeEvent: { actionName: 'activate' } },
+    );
+    fireEvent(
+      screen.getByRole('button', { name: '사용한 그릇 싱크대에 넣기' }),
+      'accessibilityAction',
+      { nativeEvent: { actionName: 'activate' } },
+    );
+    fireEvent(
+      screen.getByRole('button', { name: '행주로 흘린 요거트 닦기' }),
+      'accessibilityAction',
+      { nativeEvent: { actionName: 'activate' } },
+    );
     fireEvent.press(screen.getByRole('button', { name: '요리 완성하기' }));
 
     expect(screen.getByText('첫 요리 완성!')).toBeTruthy();
@@ -486,18 +525,21 @@ describe('오늘도 앱', () => {
     fireEvent.press(await screen.findByRole('button', { name: '냉장 식품 살펴보기' }));
     fireEvent.press(screen.getByRole('button', { name: '흰 우유 담기' }));
     fireEvent.press(screen.getAllByRole('button', { name: '진열대 닫기' })[0]);
+    await waitFor(() => expect(screen.queryAllByRole('button', { name: '진열대 닫기' })).toHaveLength(0));
 
     moveInsideMarket('moveRight', 4);
     fireEvent.press(await screen.findByRole('button', { name: '과일 살펴보기' }));
     fireEvent.press(screen.getByRole('button', { name: '사과 담기' }));
     fireEvent.press(screen.getByLabelText('사과 한 개 더 담기'));
     fireEvent.press(screen.getAllByRole('button', { name: '진열대 닫기' })[0]);
+    await waitFor(() => expect(screen.queryAllByRole('button', { name: '진열대 닫기' })).toHaveLength(0));
 
     moveInsideMarket('moveLeft', 4);
     moveInsideMarket('moveDown', 5);
     fireEvent.press(await screen.findByRole('button', { name: '간편 식품 살펴보기' }));
     fireEvent.press(screen.getByRole('button', { name: '순한 카레 담기' }));
     fireEvent.press(screen.getAllByRole('button', { name: '진열대 닫기' })[0]);
+    await waitFor(() => expect(screen.queryAllByRole('button', { name: '진열대 닫기' })).toHaveLength(0));
 
     fireEvent.press(screen.getByRole('button', { name: '장바구니 4개' }));
     expect(screen.getByText('7,400원')).toBeTruthy();
@@ -508,8 +550,9 @@ describe('오늘도 앱', () => {
     fireEvent.press(screen.getByText('목록 확인'));
 
     expect(screen.getByText('목록에 맞게 장보기를 마쳤어요!')).toBeTruthy();
-    expect(screen.getByText('+30')).toBeTruthy();
-    fireEvent.press(screen.getByText('마을로 돌아가기'));
+    expect(screen.getByText('목록 정확')).toBeTruthy();
+    fireEvent.press(screen.getByText('출구로 이동하기'));
+    await waitFor(() => expect(screen.queryByText('장보기 의뢰 완료')).toBeNull(), { timeout: 2000 });
     fireEvent.press(screen.getByRole('button', { name: '수첩 열기' }));
     expect(screen.getByLabelText('오늘 0/4 완료')).toBeTruthy();
     expect(screen.getByLabelText('하늘마트의 지영을 찾아보세요.')).toBeTruthy();
