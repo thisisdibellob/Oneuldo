@@ -12,15 +12,27 @@ export const minsuDialoguePortraitSheets = {
 
 const marketShelves = {
   drink: require('../../assets/images/game/market/interior/shelf_drink_v2.png'),
-  fresh: require('../../assets/images/game/market/interior/shelf_fresh_v2.png'),
+  fresh: require('../../assets/images/game/market/interior/shelf_fresh_ortho_v1.png'),
   meal: require('../../assets/images/game/market/interior/shelf_meal_v2.png'),
-  produce: require('../../assets/images/game/market/interior/shelf_produce_v2.png'),
+  produce: require('../../assets/images/game/market/interior/shelf_produce_ortho_v1.png'),
+  household: require('../../assets/images/game/market/interior/shelf_household_ortho_v1.png'),
+} satisfies Record<MarketCategoryId, ImageSourcePropType>;
+
+const marketShelfVariants = {
+  drink: require('../../assets/images/game/market/interior/shelf_drink_variant_v1.png'),
+  fresh: require('../../assets/images/game/market/interior/shelf_fresh_variant_ortho_v1.png'),
+  meal: require('../../assets/images/game/market/interior/shelf_meal_variant_v1.png'),
+  produce: require('../../assets/images/game/market/interior/shelf_produce_variant_ortho_v1.png'),
+  household: require('../../assets/images/game/market/interior/shelf_household_variant_ortho_v1.png'),
 } satisfies Record<MarketCategoryId, ImageSourcePropType>;
 
 export const marketGameArt = {
   base: require('../../assets/images/game/market/interior/market_floor_parallel_v3.png'),
-  checkout: require('../../assets/images/game/market/interior/checkout_front_v2.png'),
+  checkout: require('../../assets/images/game/market/interior/checkout_vertical_ortho_v1.png'),
+  elevator: require('../../assets/images/game/market/interior/elevator_front_ortho_v1.png'),
+  atm: require('../../assets/images/game/market/interior/atm_front_ortho_v1.png'),
   shelves: marketShelves,
+  shelfVariants: marketShelfVariants,
 };
 
 export const villageBuildingArt: Partial<Record<string, ImageSourcePropType>> = {

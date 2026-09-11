@@ -66,7 +66,7 @@ export function GameScreen({ onEnter }: GameScreenProps) {
             <View style={styles.featuredTitleCopy}>
               <Text style={styles.questLocation}>{market.location}</Text>
               <Text style={styles.featuredTitle}>저녁 장을 준비해요</Text>
-              <Text style={styles.featuredDescription}>목록과 예산을 챙겨 마트에 다녀오세요.</Text>
+              <Text style={styles.featuredDescription}>목록을 챙겨 마트에 다녀오세요.</Text>
             </View>
           </View>
 

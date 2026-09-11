@@ -63,7 +63,7 @@ const styles = StyleSheet.create({
     width: FRAME_WIDTH,
   },
   cropWindow: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     overflow: 'hidden',
   },
   sheet: {

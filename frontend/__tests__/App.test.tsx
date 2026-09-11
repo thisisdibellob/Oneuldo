@@ -2,6 +2,8 @@ import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 
 import App from '../App';
 import { GamePrototypeScreen } from '../src/screens/GamePrototypeScreen';
+import { MarketSimulationScreen } from '../src/screens/MarketSimulationScreen';
+import { isMarketEnvironmentBlocked, type MarketEnvironmentStationId, type MarketEnvironment } from '../src/game/marketEnvironment';
 
 jest.mock('expo-font', () => ({
   isLoaded: () => true,
@@ -494,7 +496,9 @@ describe('오늘도 앱', () => {
   });
 
   it('의뢰를 받지 않고 마트 연습을 마치면 일일 완료 수에는 반영하지 않는다', async () => {
+    jest.useFakeTimers();
     const screen = render(<App />);
+    try {
     fireEvent.press(screen.getByRole('button', { name: 'Google로 시작하기' }));
     fireEvent.press(screen.getByRole('tab', { name: '게임 탭' }));
     fireEvent.press(screen.getByRole('button', { name: '마을에서 마트 장보기 시작' }));
@@ -510,52 +514,117 @@ describe('오늘도 앱', () => {
     expect(screen.getByTestId('market-proximity-cloud', { includeHiddenElements: true })).toBeTruthy();
     fireEvent.press(screen.getByRole('button', { name: '하늘마트 들어가기' }));
 
-    expect(screen.getByText('안녕하세요. 오늘 저녁에 필요한 물건을 같이 골라볼까요?')).toBeTruthy();
+    expect(screen.getByText('마트에서 장보기')).toBeTruthy();
+    fireEvent.press(screen.getByRole('button', { name: '연습 환경 설정' }));
+    fireEvent.press(screen.getByRole('button', { name: '연구용 상세 설정 · JSON 가져오기' }));
+    fireEvent.changeText(screen.getByLabelText('장보기 설정 JSON'), JSON.stringify({
+      seed: 'app-smoke-fixed-layout',
+      environment: {
+        shelfOrder: ['produce', 'fresh', 'household', 'meal', 'drink'], employeeCount: 1, customerCount: 1,
+        employeeSlotIds: ['staff-northwest'], customerSlotIds: ['customer-west'],
+        cashierCount: 2, pillarCount: 0, chairCount: 0, kioskPresent: false,
+      },
+    }));
+    fireEvent.press(screen.getByRole('button', { name: '설정 적용' }));
     fireEvent.press(screen.getByText('다음'));
     fireEvent.press(screen.getByText('장보기 시작'));
+    // Movement remains locked while the briefing's last frame fades out.
+    await act(async () => { jest.advanceTimersByTime(300); await Promise.resolve(); });
+    await waitFor(() => expect(screen.queryByTestId('market-panel-transition', { includeHiddenElements: true })).toBeNull());
+    await waitFor(() => expect(screen.getByLabelText('이동 조이스틱')).toBeTruthy());
     const marketMap = screen.getByLabelText('하늘마트 내부 월드');
-    const moveInsideMarket = (actionName: string, steps: number) => {
-      for (let step = 0; step < steps; step += 1) {
-        fireEvent(marketMap, 'accessibilityAction', { nativeEvent: { actionName } });
+    const moveInsideMarket = (stationId: MarketEnvironmentStationId, approachDistance = 85) => {
+      // Plan on the public environment, then use real directional controls for every step.
+      // Never write the position ref or inject session inventory/answers.
+      const simulation = screen.UNSAFE_getByType(MarketSimulationScreen);
+      const environment = simulation.props.environment as MarketEnvironment;
+      const start = { ...simulation.props.playerPositionRef.current } as { x: number; y: number };
+      const target = environment.stations[stationId];
+      const key = (point: { x: number; y: number }) => `${point.x},${point.y}`;
+      const queue = [start], parents = new Map<string, { parent: string; actionName: string } | null>([[key(start), null]]);
+      let finish: string | null = null;
+      for (let index = 0; index < queue.length; index++) {
+        const current = queue[index], distance = Math.hypot(current.x - target.x, current.y - target.y);
+        const closest = Object.entries(environment.stations).sort(([, a], [, b]) =>
+          Math.hypot(current.x - a.x, current.y - a.y) - Math.hypot(current.x - b.x, current.y - b.y))[0][0];
+        if (distance < approachDistance && closest === stationId) { finish = key(current); break; }
+        for (const [dx, dy, actionName] of [[58, 0, 'moveRight'], [-58, 0, 'moveLeft'], [0, 58, 'moveDown'], [0, -58, 'moveUp']] as const) {
+          const next = { x: current.x + dx, y: current.y + dy };
+          if (parents.has(key(next))) continue;
+          let blocked = false;
+          for (let step = 1; step <= 15; step++) {
+            if (isMarketEnvironmentBlocked(environment, { x: current.x + dx * step / 15, y: current.y + dy * step / 15 })) { blocked = true; break; }
+          }
+          if (blocked) continue;
+          parents.set(key(next), { parent: key(current), actionName }); queue.push(next);
+        }
       }
+      expect(finish).not.toBeNull();
+      const actions: string[] = [];
+      for (let cursor = finish!; parents.get(cursor); cursor = parents.get(cursor)!.parent) actions.unshift(parents.get(cursor)!.actionName);
+      for (const actionName of actions) fireEvent(marketMap, 'accessibilityAction', { nativeEvent: { actionName } });
+      expect(Math.hypot(simulation.props.playerPositionRef.current.x - target.x, simulation.props.playerPositionRef.current.y - target.y)).toBeLessThan(approachDistance);
     };
 
-    moveInsideMarket('moveUp', 8);
-    moveInsideMarket('moveLeft', 2);
+    moveInsideMarket('fresh');
     fireEvent.press(await screen.findByRole('button', { name: '냉장 식품 살펴보기' }));
-    fireEvent.press(screen.getByRole('button', { name: '흰 우유 담기' }));
+    fireEvent.press(screen.getAllByRole('button', { name: '흰 우유 담기' })[0]);
+    fireEvent.press(screen.getAllByLabelText('흰 우유 한 개 더 담기')[0]);
     fireEvent.press(screen.getAllByRole('button', { name: '진열대 닫기' })[0]);
     await waitFor(() => expect(screen.queryAllByRole('button', { name: '진열대 닫기' })).toHaveLength(0));
 
-    moveInsideMarket('moveRight', 4);
-    fireEvent.press(await screen.findByRole('button', { name: '과일 살펴보기' }));
-    fireEvent.press(screen.getByRole('button', { name: '사과 담기' }));
-    fireEvent.press(screen.getByLabelText('사과 한 개 더 담기'));
+    moveInsideMarket('produce');
+    fireEvent.press(await screen.findByRole('button', { name: '과일/채소 살펴보기' }));
+    fireEvent.press(screen.getAllByRole('button', { name: '사과 담기' })[0]);
+    fireEvent.press(screen.getAllByLabelText('사과 한 개 더 담기')[0]);
     fireEvent.press(screen.getAllByRole('button', { name: '진열대 닫기' })[0]);
     await waitFor(() => expect(screen.queryAllByRole('button', { name: '진열대 닫기' })).toHaveLength(0));
 
-    moveInsideMarket('moveLeft', 4);
-    moveInsideMarket('moveDown', 5);
+    moveInsideMarket('meal');
     fireEvent.press(await screen.findByRole('button', { name: '간편 식품 살펴보기' }));
-    fireEvent.press(screen.getByRole('button', { name: '순한 카레 담기' }));
+    fireEvent.press(screen.getAllByRole('button', { name: '순한 카레 담기' })[0]);
     fireEvent.press(screen.getAllByRole('button', { name: '진열대 닫기' })[0]);
     await waitFor(() => expect(screen.queryAllByRole('button', { name: '진열대 닫기' })).toHaveLength(0));
 
-    fireEvent.press(screen.getByRole('button', { name: '장바구니 4개' }));
-    expect(screen.getByText('7,400원')).toBeTruthy();
-    fireEvent.press(screen.getByText('가방 닫기'));
-    moveInsideMarket('moveRight', 2);
-    moveInsideMarket('moveUp', 8);
-    fireEvent.press(await screen.findByRole('button', { name: '계산대에서 계산하기' }));
-    fireEvent.press(screen.getByText('목록 확인'));
+    const environment = screen.UNSAFE_getByType(MarketSimulationScreen).props.environment as MarketEnvironment;
+    moveInsideMarket(`staff:${environment.employees[0].id}`);
+    fireEvent.press(await screen.findByRole('button', { name: '종업원에게 도움 요청하기' }));
+    fireEvent.press(screen.getByRole('button', { name: '물건 제자리에 놓기 도움 요청' }));
+    fireEvent.press(screen.getByRole('button', { name: '흰 우유 1개 반납 부탁하기' }));
+    expect(screen.getByText('흰 우유 1개를 제자리에 놓아드렸어요.')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: '흰 우유 전부 반납 부탁하기' })).toBeNull();
+    fireEvent.press(screen.getByRole('button', { name: '감사합니다' }));
+    await act(async () => { jest.advanceTimersByTime(300); await Promise.resolve(); });
+    await waitFor(() => expect(screen.queryByTestId('market-panel-transition', { includeHiddenElements: true })).toBeNull());
 
-    expect(screen.getByText('목록에 맞게 장보기를 마쳤어요!')).toBeTruthy();
-    expect(screen.getByText('목록 정확')).toBeTruthy();
-    fireEvent.press(screen.getByText('출구로 이동하기'));
+    fireEvent.press(screen.getByRole('button', { name: '장바구니 열기' }));
+    expect(screen.getByText('담은 물건 4개 · 합계 7,400원')).toBeTruthy();
+    fireEvent.press(screen.getByText('계속 고르기'));
+    await act(async () => { jest.advanceTimersByTime(300); await Promise.resolve(); });
+    await waitFor(() => expect(screen.queryByTestId('market-panel-transition', { includeHiddenElements: true })).toBeNull());
+    await waitFor(() => expect(screen.getByLabelText('이동 조이스틱')).toBeTruthy());
+    moveInsideMarket('entrance', 10);
+    // A real control-driven out-and-back trip completes before the 500ms position sampler.
+    fireEvent(marketMap, 'accessibilityAction', { nativeEvent: { actionName: 'moveDown' } });
+    fireEvent(marketMap, 'accessibilityAction', { nativeEvent: { actionName: 'moveUp' } });
+    expect(screen.getByLabelText('현재 점수 90점')).toBeTruthy();
+    moveInsideMarket('checkout');
+    fireEvent.press(await screen.findByRole('button', { name: '계산대에서 계산하기' }));
+    fireEvent.press(screen.getByText('구매 확정'));
+
+    expect(screen.getByText('장보기에 성공했어요!')).toBeTruthy();
+    expect(screen.getByText('구매 시도 1회')).toBeTruthy();
+    expect(screen.getByText('최종 점수 90점 · 경보기 감점 10점 (1회)')).toBeTruthy();
+    fireEvent.press(screen.getByText('평가 건너뛰기'));
+    fireEvent.press(screen.getByText('마트 나가기'));
     await waitFor(() => expect(screen.queryByText('장보기 의뢰 완료')).toBeNull(), { timeout: 2000 });
     fireEvent.press(screen.getByRole('button', { name: '수첩 열기' }));
     expect(screen.getByLabelText('오늘 0/4 완료')).toBeTruthy();
     expect(screen.getByLabelText('하늘마트의 지영을 찾아보세요.')).toBeTruthy();
+    } finally {
+      screen.unmount();
+      jest.useRealTimers();
+    }
   });
 
   it('AI 입력 표시 뒤 답변을 추가하고 여러 대화를 누적한다', async () => {

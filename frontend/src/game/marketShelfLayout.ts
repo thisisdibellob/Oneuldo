@@ -4,7 +4,7 @@
  */
 export function getMarketShelfLayout(width: number, height: number, productCount: number, safeHeight = 0) {
   const bayWidth = Math.min(Math.max(width, 1), 1240);
-  const columns = bayWidth >= 760 ? 4 : 3;
+  const columns = 4;
   const rowCount = Math.max(1, Math.ceil(productCount / columns));
   const rowHeight = Math.max(252, Math.min(304, 132 + bayWidth * 760 / 1536, (height - 224 - safeHeight) / rowCount));
   const surfaceY = rowHeight - 132;

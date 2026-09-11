@@ -721,9 +721,9 @@ const styles = StyleSheet.create({
   },
   toolbarButton: { height: 76, width: 76 },
   toolbarIcon: { height: 76, width: 76 },
-  overlay: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', zIndex: 50 },
+  overlay: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center', zIndex: 50 },
   referenceOverlay: { justifyContent: 'flex-end', paddingBottom: 108, zIndex: 23 },
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(26,31,27,0.38)' },
+  backdrop: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(26,31,27,0.38)' },
   referenceBackdrop: { backgroundColor: 'transparent' },
   blobPanel: {
     backgroundColor: '#FFF7DC',
@@ -874,7 +874,7 @@ const styles = StyleSheet.create({
     right: 0,
   },
   inventoryDashedOutline: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     borderColor: 'rgba(75,75,75,0.25)',
     borderRadius: 4,
     borderStyle: 'dashed',
@@ -990,7 +990,7 @@ const styles = StyleSheet.create({
     right: 0,
   },
   questDashedOutline: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     borderColor: 'rgba(75,75,75,0.25)',
     borderRadius: 4,
     borderStyle: 'dashed',

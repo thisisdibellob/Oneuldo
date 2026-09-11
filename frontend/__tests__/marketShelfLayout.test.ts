@@ -13,13 +13,13 @@ describe('진열대 화면 비례', () => {
     expect(layout.sideInset).toBeGreaterThan(layout.bayWidth * 32 / 1536);
     expect(layout.artworkSize).toBeLessThanOrEqual(layout.itemWidth - 12);
     expect(layout.artworkSize).toBeLessThanOrEqual(layout.surfaceY - 24);
-    expect(layout.artworkSize).toBeGreaterThan(70);
+    expect(layout.artworkSize).toBeGreaterThan(60);
     // Two-line names cannot push the products or quantity buttons off the shelf.
     expect(layout.surfaceY + 78 + 4 + 44 + 6).toBeCloseTo(layout.rowHeight);
   });
 
-  it('모바일에는 한 줄에 세 상품, 큰 화면에는 네 상품을 배치한다', () => {
-    expect(getMarketShelfLayout(375, 812, 6).columns).toBe(3);
+  it('모든 화면에서 한 줄 네 상품을 배치한다', () => {
+    expect(getMarketShelfLayout(375, 812, 12).columns).toBe(4);
     expect(getMarketShelfLayout(1024, 768, 6).columns).toBe(4);
   });
 });

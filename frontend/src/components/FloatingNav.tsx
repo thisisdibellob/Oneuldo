@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { BlurView } from 'expo-blur';
-import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
+import { GlassView, isGlassEffectAPIAvailable, isLiquidGlassAvailable } from 'expo-glass-effect';
 import {
   AccessibilityInfo,
   Animated,
@@ -42,7 +42,7 @@ export function FloatingNav({
       ))}
     </View>
   );
-  const useLiquidGlass = Platform.OS === 'ios' && isLiquidGlassAvailable();
+  const useLiquidGlass = Platform.OS === 'ios' && isLiquidGlassAvailable() && isGlassEffectAPIAvailable();
 
   return (
     <View pointerEvents="box-none" style={styles.outer}>
@@ -152,17 +152,17 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   surfaceClip: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     borderRadius: 31,
     overflow: 'hidden',
   },
   surface: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   fallbackGlass: { backgroundColor: 'rgba(255,255,255,0.72)' },
   webGlass: { backgroundColor: 'rgba(255,255,255,0.88)' },
   surfaceBorder: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     borderColor: 'rgba(255,255,255,0.96)',
     borderRadius: 31,
     borderWidth: 1,

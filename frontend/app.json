@@ -6,11 +6,6 @@
     "orientation": "portrait",
     "icon": "./assets/images/source/Logo.png",
     "userInterfaceStyle": "light",
-    "splash": {
-      "backgroundColor": "#FFFFFF",
-      "resizeMode": "contain",
-      "image": "./assets/images/source/Logo.png"
-    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.onuldo.app"
@@ -28,7 +23,27 @@
       "bundler": "metro"
     },
     "plugins": [
-      "expo-font"
+      "expo-font",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": false,
+          "recordAudioAndroid": false,
+          "enableBackgroundRecording": false,
+          "enableBackgroundPlayback": false
+        }
+      ],
+      "expo-status-bar",
+      "expo-asset",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#FFFFFF",
+          "resizeMode": "contain",
+          "image": "./assets/images/source/Logo.png",
+          "imageWidth": 208
+        }
+      ]
     ]
   }
 }

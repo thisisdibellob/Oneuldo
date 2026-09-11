@@ -2193,7 +2193,7 @@ export function CookingSimulationScreen({ onClose, onComplete }: CookingSimulati
 
 const styles = StyleSheet.create({
   root: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: '#F4F0E6',
     cursor: 'auto',
     zIndex: 80,
@@ -3020,7 +3020,7 @@ const styles = StyleSheet.create({
   secondaryButton: { alignItems: 'center', backgroundColor: '#E7EFE8', borderRadius: 19, flexDirection: 'row', gap: 7, height: 52, justifyContent: 'center', marginTop: 9, maxWidth: 580, width: '100%' },
   secondaryButtonText: { color: '#4E735F', fontFamily: fonts.bold, fontSize: 14 },
   countdownOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     alignItems: 'center',
     backgroundColor: 'rgba(39,49,43,0.38)',
     justifyContent: 'center',
@@ -3043,7 +3043,7 @@ const styles = StyleSheet.create({
   countdownNumber: { color: '#4F7F67', fontFamily: fonts.laundryBold, fontSize: 78, lineHeight: 88 },
   countdownHint: { color: '#766E61', fontFamily: fonts.regular, fontSize: 11, marginTop: 2 },
   timeOverOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     alignItems: 'center',
     backgroundColor: 'rgba(39,49,43,0.46)',
     justifyContent: 'center',
@@ -3080,8 +3080,8 @@ const styles = StyleSheet.create({
     marginTop: 6,
     textAlign: 'center',
   },
-  confirmationOverlay: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', zIndex: 90 },
-  confirmationDim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(42,47,43,0.42)' },
+  confirmationOverlay: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center', zIndex: 90 },
+  confirmationDim: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(42,47,43,0.42)' },
   confirmationSheet: {
     alignItems: 'center',
     backgroundColor: '#FFFDF8',

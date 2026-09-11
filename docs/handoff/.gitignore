@@ -1,0 +1,3 @@
+# Local transfer artifacts; the notebook now receives source through Git.
+notebook-file-manifest-*.json
+create-notebook-package.ps1

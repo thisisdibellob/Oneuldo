@@ -1,125 +1,111 @@
 import { render } from '@testing-library/react-native';
 import { Image, StyleSheet, View } from 'react-native';
-
 import {
-  MarketCategoryFixture,
-  MarketCheckoutFixture,
-  MarketExitMarker,
-  MarketInteriorBackdrop,
+  MarketCategoryFixture, MarketCheckoutFixture, MarketEnvironmentObjects,
+  MarketExitMarker, MarketInteriorBackdrop, MarketPersonFixture,
 } from '../src/components/game/MarketInteriorLayer';
 import { marketCategories } from '../src/game/scenarios';
-import {
-  MARKET_CASHIER_COLLIDER,
-  MARKET_CASHIER_POINT,
-  MARKET_CHECKOUT_POINT,
-  MARKET_CHECKOUT_RECT,
-  MARKET_WORLD_HEIGHT,
-  MARKET_WORLD_WIDTH,
-} from '../src/game/prototypeWorld';
+import { createMarketEnvironment, isMarketEnvironmentBlocked } from '../src/game/marketEnvironment';
+import { MARKET_WORLD_HEIGHT, MARKET_WORLD_WIDTH } from '../src/game/prototypeWorld';
+import { MARKET_PERSON_HEIGHT, MARKET_PERSON_WIDTH } from '../src/game/marketPersonLayout';
+import { getMarketPersonAppearance, MARKET_CUSTOMER_APPEARANCES, MARKET_EMPLOYEE_APPEARANCES } from '../src/game/marketPeople';
+import { marketPeopleArt } from '../src/game/marketPeopleArt';
 
-jest.mock('expo-font', () => ({
-  isLoaded: () => true,
-  loadAsync: () => Promise.resolve(),
-}));
+jest.mock('expo-font', () => ({ isLoaded: () => true, loadAsync: () => Promise.resolve() }));
 
-it('마트의 모든 진열대는 접근하기 전에도 카테고리 이름을 보여준다', () => {
-  const screen = render(
-    <View>
-      {marketCategories.map((category) => (
-        <MarketCategoryFixture active={false} category={category} key={category.id} />
-      ))}
-    </View>,
-  );
-
+it('다섯 분류는 다른 그림 두 개와 하나의 이름표를 공유한다', () => {
+  const environment = createMarketEnvironment();
+  const screen = render(<View>{marketCategories.map(category => <MarketCategoryFixture key={category.id}
+    active={false} category={category} orientation={environment.shelves[category.id].orientation} />)}</View>);
+  expect(screen.UNSAFE_getAllByType(Image)).toHaveLength(10);
   for (const category of marketCategories) {
-    expect(screen.getByText(category.label)).toBeTruthy();
+    const first = screen.getByTestId('market-shelf-art-' + category.id + '-1');
+    const second = screen.getByTestId('market-shelf-art-' + category.id + '-2');
+    expect(first.props.source).not.toEqual(second.props.source);
+    expect(screen.getAllByText(category.label)).toHaveLength(1);
   }
-  expect(screen.UNSAFE_getAllByType(Image)).toHaveLength(4);
 });
 
-it('마트 배경은 이동 조작의 터치를 가로채지 않는다', () => {
+it('직사각형 바닥과 벽은 게임 입력을 가로채지 않으며 원근 배경을 늘려 쓰지 않는다', () => {
   const screen = render(<MarketInteriorBackdrop />);
-
-  expect(screen.UNSAFE_getByType(View).props.pointerEvents).toBe('none');
-  const image = screen.UNSAFE_getByType(Image);
-  expect(image.props.accessible).toBe(false);
-  expect(image.props.resizeMode).toBe('stretch');
-  expect(StyleSheet.flatten(image.props.style)).toEqual(expect.objectContaining({
-    width: MARKET_WORLD_WIDTH,
-    height: MARKET_WORLD_HEIGHT,
-  }));
+  const root = screen.UNSAFE_getAllByType(View)[0];
+  expect(root.props.pointerEvents).toBe('none');
+  expect(screen.UNSAFE_queryAllByType(Image)).toHaveLength(0);
+  expect(StyleSheet.flatten(root.props.style)).toEqual(expect.objectContaining({ width: MARKET_WORLD_WIDTH, height: MARKET_WORLD_HEIGHT }));
 });
 
-it('선택 강조에도 진열대 아트 크기와 발 위치는 바뀌지 않는다', () => {
-  const category = marketCategories[0];
-  const screen = render(<MarketCategoryFixture active={false} category={category} />);
-  const resting = StyleSheet.flatten(screen.UNSAFE_getByType(Image).props.style);
-
-  screen.rerender(<MarketCategoryFixture active category={category} />);
-
-  expect(StyleSheet.flatten(screen.UNSAFE_getByType(Image).props.style)).toEqual(resting);
-  expect(resting.width).toBeGreaterThan(220);
-  expect(resting.bottom).toBe(-8);
+it('가로와 세로 묶음 모두 선택 강조로 가구 크기와 발 위치가 움직이지 않는다', () => {
+  for (const orientation of ['horizontal', 'vertical'] as const) {
+    const category = marketCategories[0];
+    const screen = render(<MarketCategoryFixture active={false} category={category} orientation={orientation} />);
+    const before = screen.UNSAFE_getAllByType(Image).map(image => StyleSheet.flatten(image.props.style));
+    screen.rerender(<MarketCategoryFixture active category={category} orientation={orientation} />);
+    expect(screen.UNSAFE_getAllByType(Image).map(image => StyleSheet.flatten(image.props.style))).toEqual(before);
+    before.forEach(style => expect(style).toEqual(expect.objectContaining({ width: 141, height: 94 })));
+    screen.unmount();
+  }
 });
 
-it('계산대와 출구를 항상 알아볼 수 있고 출구에 접근하면 행선지를 알려준다', () => {
-  const screen = render(
-    <View>
-      <MarketCheckoutFixture active={false} />
-      <MarketExitMarker active={false} />
-    </View>,
-  );
+it('두 세로 계산대는 각 번호와 계산원을 따로 표시하며 같은 접근 통로를 사용한다', () => {
+  const environment = createMarketEnvironment({ cashierCount: 2 });
+  const screen = render(<View>{environment.checkouts.map((counter, index) => <MarketCheckoutFixture key={counter.id}
+    counter={counter} index={index} active={false} cashierPresent={counter.cashierPresent} />)}</View>);
+  expect(screen.getByText('1번 계산대')).toBeTruthy();
+  expect(screen.getByText('2번 계산대')).toBeTruthy();
+  expect(screen.getAllByTestId('market-cashier')).toHaveLength(2);
+  environment.checkouts.forEach((counter, index) => {
+    const style = StyleSheet.flatten(screen.getAllByTestId('market-cashier')[index].props.style);
+    expect(style.left + style.width / 2 + counter.rect.x).toBe(counter.cashierPoint.x);
+    expect(style.top + style.height + counter.rect.y).toBe(counter.cashierPoint.y);
+    const appearance = getMarketPersonAppearance('employee', counter.cashierAppearance!);
+    expect(screen.getByTestId(`market-cashier-art-${index + 1}`).props.source).toEqual(marketPeopleArt[appearance.id]);
+    expect(counter.rect.height).toBeGreaterThan(counter.rect.width * 2);
+    expect(isMarketEnvironmentBlocked(environment, counter.point)).toBe(false);
+  });
+  screen.rerender(<View>{environment.checkouts.map((counter, index) => <MarketCheckoutFixture key={counter.id}
+    counter={counter} index={index} active={false} cashierPresent={index === 1} />)}</View>);
+  expect(screen.getAllByTestId('market-cashier')).toHaveLength(1);
+});
 
-  expect(screen.getByText('계산대')).toBeTruthy();
+it('입구 경보기와 출구는 서로 구별되고 둘 다 퇴장할 수 있음을 알린다', () => {
+  const screen = render(<View><MarketExitMarker active={false} entrance /><MarketExitMarker active={false} /></View>);
+  expect(screen.getByText('입구 · 경보기')).toBeTruthy();
   expect(screen.getByText('출구')).toBeTruthy();
-  screen.rerender(
-    <View>
-      <MarketCheckoutFixture active={false} />
-      <MarketExitMarker active />
-    </View>,
-  );
-  expect(screen.getByText('마을로 나가기')).toBeTruthy();
+  screen.rerender(<View><MarketExitMarker active entrance /><MarketExitMarker active /></View>);
+  expect(screen.getAllByText('마을로 나가기')).toHaveLength(2);
 });
 
-it('계산대 뒤 직원 공간과 계산원을 보여주되 이동 입력을 가로채지 않는다', () => {
-  const screen = render(<MarketCheckoutFixture active={false} />);
-  const cashier = screen.getByTestId('market-cashier');
-  const workspace = screen.getByTestId('market-cashier-workspace');
-  const cashierStyle = StyleSheet.flatten(cashier.props.style);
-
-  expect(cashier.props.pointerEvents).toBe('none');
-  expect(screen.getByLabelText('계산대 뒤에서 기다리는 직원')).toBeTruthy();
-  expect(workspace).toBeTruthy();
-  expect(cashierStyle.top + cashierStyle.height + MARKET_CHECKOUT_RECT.y).toBe(MARKET_CASHIER_POINT.y);
-  expect(cashierStyle.left + cashierStyle.width / 2 + MARKET_CHECKOUT_RECT.x).toBe(MARKET_CASHIER_POINT.x);
-  // The 1536×1024 counter image has its worktop at source y336. Keep the
-  // employee's whole face above it; only the lower torso should be occluded.
-  const counterArt = StyleSheet.flatten(screen.getByTestId('market-checkout-art').props.style);
-  const counterImageTop = MARKET_CHECKOUT_RECT.y + MARKET_CHECKOUT_RECT.height - counterArt.bottom - counterArt.height;
-  const worktopY = counterImageTop + 336 / 1024 * counterArt.height;
-  expect(MARKET_CHECKOUT_RECT.y + cashierStyle.top + 53).toBeLessThan(worktopY);
-
-  const fixtureTree = JSON.stringify(screen.toJSON());
-  const cashierIndex = fixtureTree.indexOf('"testID":"market-cashier"');
-  const counterIndex = fixtureTree.indexOf('"testID":"market-checkout-art"');
-  expect(cashierIndex).toBeGreaterThan(-1);
-  expect(counterIndex).toBeGreaterThan(cashierIndex);
+it('휴게석 두 묶음과 엘리베이터·ATM은 장식으로 남고 버튼을 만들지 않는다', () => {
+  const screen = render(<MarketEnvironmentObjects environment={createMarketEnvironment({ cashierCount: 0, chairCount: 4 })} />);
+  expect(screen.getAllByLabelText('의자 · 원형 테이블 · 의자 휴게석')).toHaveLength(2);
+  expect(screen.getAllByLabelText('엘리베이터 · 장식')).toHaveLength(2);
+  expect(screen.getByLabelText('ATM · 이용 준비 중')).toBeTruthy();
+  expect(screen.queryAllByRole('button')).toHaveLength(0);
 });
 
-it('직원은 계산대 뒤, 고객 접근점은 앞에 있으며 중앙 고객 통로가 막히지 않는다', () => {
-  const counterBottom = MARKET_CHECKOUT_RECT.y + MARKET_CHECKOUT_RECT.height;
-  const cashierBottom = MARKET_CASHIER_COLLIDER.y + MARKET_CASHIER_COLLIDER.height;
-  const playerRadius = 22;
-
-  expect(cashierBottom).toBeLessThan(MARKET_CHECKOUT_RECT.y);
-  expect(MARKET_CASHIER_POINT.y - 104).toBeGreaterThan(110);
-  expect(MARKET_CHECKOUT_POINT.y - playerRadius).toBeGreaterThan(counterBottom);
-  expect(MARKET_CHECKOUT_POINT.x).toBeGreaterThan(310 + playerRadius);
-  expect(MARKET_CHECKOUT_POINT.x).toBeLessThan(590 - playerRadius);
-  for (const point of [MARKET_CHECKOUT_POINT, MARKET_CASHIER_POINT]) {
-    expect(point.x).toBeGreaterThan(playerRadius);
-    expect(point.x).toBeLessThan(MARKET_WORLD_WIDTH - playerRadius);
-    expect(point.y).toBeGreaterThan(playerRadius);
-    expect(point.y).toBeLessThan(MARKET_WORLD_HEIGHT - playerRadius);
+it('16개 인물은 각 PNG를 표시하고 어린이 크기와 선택 강조가 발 좌표·터치 영역을 바꾸지 않는다', () => {
+  const environment = createMarketEnvironment();
+  for (const kind of ['employee', 'customer'] as const) {
+    const pool = kind === 'employee' ? MARKET_EMPLOYEE_APPEARANCES : MARKET_CUSTOMER_APPEARANCES;
+    const base = kind === 'employee' ? environment.employees[0] : environment.customers[0];
+    pool.forEach((variant, appearance) => {
+      const person = { ...base, appearance, appearanceId: variant.id };
+      const screen = render(<MarketPersonFixture person={person} />);
+      const picture = screen.getByTestId(`market-person-art-${person.id}`);
+      const root = screen.getByTestId(`market-person-${person.id}`);
+      const style = StyleSheet.flatten(picture.props.style);
+      const frame = StyleSheet.flatten(root.props.style);
+      expect(picture.props.source).toEqual(marketPeopleArt[variant.id]);
+      expect(style.bottom).toBe(0);
+      expect(style.left + style.width / 2).toBe(MARKET_PERSON_WIDTH / 2);
+      expect(style.height).toBeCloseTo(MARKET_PERSON_HEIGHT * (variant.age === 'child' ? 0.76 : 1));
+      expect(frame.height).toBe(MARKET_PERSON_HEIGHT);
+      expect(frame.width).toBe(MARKET_PERSON_WIDTH);
+      screen.rerender(<MarketPersonFixture person={person} active />);
+      expect(StyleSheet.flatten(screen.getByTestId(`market-person-art-${person.id}`).props.style)).toEqual(style);
+      expect(StyleSheet.flatten(screen.getByTestId(`market-person-${person.id}`).props.style)).toEqual(frame);
+      if (kind === 'employee') expect(screen.getByText(person.label)).toBeTruthy();
+      screen.unmount();
+    });
   }
 });

@@ -1,7 +1,7 @@
-import { ReactNode, useEffect, useRef, useState } from 'react';
+import { createContext, ReactNode, RefObject, useContext, useEffect, useRef, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
-import { BlurView } from 'expo-blur';
-import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
+import { BlurTargetView, BlurView } from 'expo-blur';
+import { GlassView, isGlassEffectAPIAvailable, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
   AccessibilityInfo,
@@ -26,6 +26,7 @@ import { colors, fonts } from '../theme';
 
 type LoginStep = 'welcome' | 'credentials';
 type FocusedField = 'id' | 'password' | null;
+const BackgroundBlurTarget = createContext<RefObject<View | null> | undefined>(undefined);
 
 export function OnboardingScreen({ active = true, onEnter }: { active?: boolean; onEnter: () => void }) {
   const { height } = useWindowDimensions();
@@ -36,6 +37,7 @@ export function OnboardingScreen({ active = true, onEnter }: { active?: boolean;
   const screenTranslateY = useRef(new Animated.Value(18)).current;
   const screenScale = useRef(new Animated.Value(0.992)).current;
   const transitioning = useRef(false);
+  const backgroundBlurTarget = useRef<View | null>(null);
   const compact = height < 720;
 
   useEffect(() => {
@@ -145,26 +147,30 @@ export function OnboardingScreen({ active = true, onEnter }: { active?: boolean;
   };
 
   return (
-    <SafeAreaView edges={['top', 'bottom']} style={styles.safe}>
-      <AnimatedBackground enabled={gradientEnabled} motionEnabled={active} />
-      <Animated.View style={[styles.screenFrame, animatedScreen]}>
-        {step === 'welcome' ? (
-          <WelcomeScreen compact={compact} onEnter={onEnter} onOpenCredentials={() => changeStep('credentials', 1)} />
-        ) : (
-          <CredentialsScreen compact={compact} onBack={() => changeStep('welcome', -1)} onEnter={onEnter} />
-        )}
-      </Animated.View>
-      <PressScale
-        accessibilityLabel={gradientEnabled ? '배경 그라데이션 끄기' : '배경 그라데이션 켜기'}
-        accessibilityRole="button"
-        hitSlop={4}
-        onPress={() => setGradientEnabled((enabled) => !enabled)}
-        scaleTo={0.94}
-        style={styles.gradientToggle}
-      >
-        <View style={styles.gradientToggleHitArea} />
-      </PressScale>
-    </SafeAreaView>
+    <BackgroundBlurTarget.Provider value={backgroundBlurTarget}>
+      <SafeAreaView edges={['top', 'bottom']} style={styles.safe}>
+        <BlurTargetView pointerEvents="none" ref={backgroundBlurTarget} style={StyleSheet.absoluteFill}>
+          <AnimatedBackground enabled={gradientEnabled} motionEnabled={active} />
+        </BlurTargetView>
+        <Animated.View style={[styles.screenFrame, animatedScreen]}>
+          {step === 'welcome' ? (
+            <WelcomeScreen compact={compact} onEnter={onEnter} onOpenCredentials={() => changeStep('credentials', 1)} />
+          ) : (
+            <CredentialsScreen compact={compact} onBack={() => changeStep('welcome', -1)} onEnter={onEnter} />
+          )}
+        </Animated.View>
+        <PressScale
+          accessibilityLabel={gradientEnabled ? '배경 그라데이션 끄기' : '배경 그라데이션 켜기'}
+          accessibilityRole="button"
+          hitSlop={4}
+          onPress={() => setGradientEnabled((enabled) => !enabled)}
+          scaleTo={0.94}
+          style={styles.gradientToggle}
+        >
+          <View style={styles.gradientToggleHitArea} />
+        </PressScale>
+      </SafeAreaView>
+    </BackgroundBlurTarget.Provider>
   );
 }
 
@@ -363,7 +369,8 @@ function GlassSurface({
   radius?: number;
   style?: StyleProp<ViewStyle>;
 }) {
-  const useLiquidGlass = Platform.OS === 'ios' && isLiquidGlassAvailable();
+  const blurTarget = useContext(BackgroundBlurTarget);
+  const useLiquidGlass = Platform.OS === 'ios' && isLiquidGlassAvailable() && isGlassEffectAPIAvailable();
   const curve = { borderCurve: 'continuous' as const, borderRadius: radius };
   const overlayColors = muted
     ? ['rgba(255,255,255,0.34)', 'rgba(255,255,255,0.10)'] as const
@@ -382,7 +389,8 @@ function GlassSurface({
           />
         ) : (
           <BlurView
-            experimentalBlurMethod={Platform.OS === 'android' ? 'dimezisBlurView' : 'none'}
+            blurMethod={Platform.OS === 'android' ? 'dimezisBlurView' : 'none'}
+            blurTarget={blurTarget}
             intensity={muted ? 50 : 72}
             style={StyleSheet.absoluteFill}
             tint="extraLight"
@@ -445,9 +453,9 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   glassSurfaceMuted: { backgroundColor: 'rgba(255,255,255,0.25)', boxShadow: '0 8px 40px rgba(0,0,0,0.08)' },
-  glassClip: { ...StyleSheet.absoluteFillObject, overflow: 'hidden' },
-  glassBaseLayer: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(253,253,253,0.24)' },
-  glassEffectOutline: { ...StyleSheet.absoluteFillObject, borderColor: 'rgba(255,255,255,0.96)', borderWidth: 2 },
+  glassClip: { ...StyleSheet.absoluteFill, overflow: 'hidden' },
+  glassBaseLayer: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(253,253,253,0.24)' },
+  glassEffectOutline: { ...StyleSheet.absoluteFill, borderColor: 'rgba(255,255,255,0.96)', borderWidth: 2 },
   glassInnerRefraction: { bottom: 2, borderColor: 'rgba(255,255,255,0.42)', borderWidth: 1, left: 2, position: 'absolute', right: 2, top: 2 },
   glassShine: { backgroundColor: 'rgba(255,255,255,0.76)', height: 1, left: 20, position: 'absolute', right: 20, top: 2 },
   glassContent: { alignItems: 'center', flex: 1, flexDirection: 'row', justifyContent: 'center', paddingHorizontal: 22 },

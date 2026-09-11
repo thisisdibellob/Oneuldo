@@ -759,9 +759,9 @@ export function HomeWorldLayer({
 }
 
 const styles = StyleSheet.create({
-  layer: { ...StyleSheet.absoluteFillObject },
+  layer: { ...StyleSheet.absoluteFill },
   villageGround: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: '#E9E5D8',
     borderColor: '#C7C1AF',
     borderWidth: 12,
@@ -1177,7 +1177,7 @@ const styles = StyleSheet.create({
     fontSize: 8,
     marginTop: 1,
   },
-  homeOutside: { ...StyleSheet.absoluteFillObject, backgroundColor: '#C9D2C2' },
+  homeOutside: { ...StyleSheet.absoluteFill, backgroundColor: '#C9D2C2' },
   homeFloor: {
     backgroundColor: '#EEE2CD',
     borderColor: '#A88E72',

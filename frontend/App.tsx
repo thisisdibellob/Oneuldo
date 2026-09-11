@@ -5,6 +5,7 @@ import {
   ActivityIndicator,
   Animated,
   Easing,
+  Platform,
   StyleSheet,
   Text,
   View,
@@ -16,9 +17,12 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { getQuests, QuestSummary } from './src/api/quest';
 import { AppShell } from './src/screens/AppShell';
 import { OnboardingScreen } from './src/screens/OnboardingScreen';
+import { MarketSimulationScreen } from './src/screens/MarketSimulationScreen';
 import { colors, fonts } from './src/theme';
 
 export default function App() {
+  const [marketLabVisit, setMarketLabVisit] = useState(0);
+  const marketLab = __DEV__ && Platform.OS === 'web' && typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('marketLab') === '1';
   const [entered, setEntered] = useState(false);
 
   // 퀘스트 정보 받아오기
@@ -27,6 +31,7 @@ export default function App() {
   const [questsError, setQuestsError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (marketLab) { setQuestsLoading(false); return; }
     const loadQuests = async () => {
       try {
         const data = await getQuests();
@@ -93,7 +98,8 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <StatusBar style="dark" />
-      {entered ? (
+      {marketLab ? <MarketSimulationScreen key={marketLabVisit} onExit={() => setMarketLabVisit(visit => visit + 1)} /> :
+      entered ? (
         <AppShell
           quests={quests}
           questsError={questsError}
@@ -108,7 +114,7 @@ export default function App() {
 
 const styles = StyleSheet.create({
   app: { backgroundColor: colors.white, flex: 1 },
-  layer: { ...StyleSheet.absoluteFillObject },
+  layer: { ...StyleSheet.absoluteFill },
   loading: { alignItems: 'center', backgroundColor: colors.white, flex: 1, justifyContent: 'center' },
   loadingText: { color: colors.sage, fontFamily: fonts.regular, fontSize: 13, marginTop: 14 },
 });

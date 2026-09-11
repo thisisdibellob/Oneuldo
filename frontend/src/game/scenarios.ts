@@ -1,3 +1,5 @@
+import { supplementalMarketProducts } from './marketCatalog';
+
 export type SimulationId = 'market' | 'laundry' | 'cooking' | 'transit';
 export type SimulationStatus = 'playable' | 'planned';
 
@@ -21,7 +23,7 @@ export const simulationScenarios: SimulationScenario[] = [
     id: 'market',
     title: '마트에서 장보기',
     shortTitle: '장보기',
-    description: '목록과 예산을 확인하고 필요한 물건만 골라요.',
+    description: '목록과 개수를 확인하고 필요한 물건을 골라요.',
     location: '하늘마트',
     npcName: '수진',
     npcRole: '마트 직원',
@@ -75,22 +77,23 @@ export const simulationScenarios: SimulationScenario[] = [
   },
 ];
 
-export type MarketCategoryId = 'fresh' | 'produce' | 'meal' | 'drink';
+export type MarketCategoryId = 'fresh' | 'produce' | 'meal' | 'drink' | 'household';
 
 export type MarketCategory = {
   id: MarketCategoryId;
   label: string;
   helper: string;
-  icon: 'snow-outline' | 'leaf-outline' | 'restaurant-outline' | 'cafe-outline';
+  icon: 'snow-outline' | 'leaf-outline' | 'restaurant-outline' | 'cafe-outline' | 'home-outline';
   color: string;
   softColor: string;
 };
 
 export const marketCategories: MarketCategory[] = [
   { id: 'fresh', label: '냉장 식품', helper: '우유 · 달걀', icon: 'snow-outline', color: '#4C8FBA', softColor: '#E8F5FD' },
-  { id: 'produce', label: '과일', helper: '사과 · 수박', icon: 'leaf-outline', color: '#4B9560', softColor: '#EAF7EC' },
+  { id: 'produce', label: '과일/채소', helper: '사과 · 수박 · 당근 · 양파', icon: 'leaf-outline', color: '#4B9560', softColor: '#EAF7EC' },
   { id: 'meal', label: '간편 식품', helper: '카레 · 라면', icon: 'restaurant-outline', color: '#BF783E', softColor: '#FFF1DF' },
   { id: 'drink', label: '음료', helper: '주스 · 탄산', icon: 'cafe-outline', color: '#8D65A8', softColor: '#F5ECFA' },
+  { id: 'household', label: '생활용품', helper: '슬리퍼 · 건전지 · 세제 · 문구', icon: 'home-outline', color: '#89754E', softColor: '#F4EFDF' },
 ];
 
 export type MarketProduct = {
@@ -114,9 +117,13 @@ export type MarketProduct = {
     | 'beer-outline';
   color: string;
   packageColor: string;
+  /** Family matching accepts any variant; exact matching accepts only this product ID. */
+  familyId?: string;
+  familyLabel?: string;
+  variantLabel?: string;
 };
 
-export const marketProducts: MarketProduct[] = [
+const originalMarketProducts: MarketProduct[] = [
   { id: 'milk', categoryId: 'fresh', name: '흰 우유', detail: '900mL', price: 2200, icon: 'water-outline', color: '#4A86B5', packageColor: '#EAF6FF' },
   { id: 'eggs', categoryId: 'fresh', name: '달걀', detail: '10개입', price: 3600, icon: 'ellipse-outline', color: '#A26A3E', packageColor: '#FFF1D2' },
   { id: 'premium-eggs', categoryId: 'fresh', name: '해뜰 특란', detail: '무항생제 · 10구', price: 5200, icon: 'ellipse-outline', color: '#8B613F', packageColor: '#F8E4B8' },
@@ -143,6 +150,41 @@ export const marketProducts: MarketProduct[] = [
   { id: 'barley-tea', categoryId: 'drink', name: '보리차', detail: '1.5L', price: 2100, icon: 'cafe-outline', color: '#997343', packageColor: '#F3E6CD' },
 ];
 
+const originalProductFamilies: Record<string, [string, string, string]> = {
+  milk: ['milk', '우유', '흰 우유'],
+  eggs: ['eggs', '달걀', '일반'],
+  'premium-eggs': ['eggs', '달걀', '특란'],
+  sausage: ['sausage', '소시지', '일반'],
+  'brand-sausage': ['sausage', '소시지', '튼튼 오리지널'],
+  tofu: ['tofu', '두부', '부침용'],
+  apple: ['apple', '사과', '빨간 사과'],
+  watermelon: ['watermelon', '수박', '일반'],
+  banana: ['banana', '바나나', '일반'],
+  tomato: ['tomato', '토마토', '일반'],
+  onion: ['onion', '양파', '일반'],
+  carrot: ['carrot', '당근', '일반'],
+  curry: ['curry', '카레', '순한맛'],
+  ramen: ['ramen', '라면', '매운맛'],
+  'brand-curry': ['curry', '카레', '오늘카레 순한맛'],
+  'mild-ramen': ['ramen', '라면', '순한맛'],
+  'instant-rice': ['rice', '즉석밥', '백미'],
+  dumpling: ['dumpling', '만두', '고기'],
+  juice: ['juice', '주스', '오렌지'],
+  soda: ['soda', '탄산음료', '일반'],
+  water: ['water', '생수', '일반'],
+  'sparkling-water': ['sparkling-water', '탄산수', '레몬'],
+  'grape-juice': ['juice', '주스', '포도'],
+  'barley-tea': ['tea', '차', '보리'],
+};
+
+export const marketProducts: MarketProduct[] = [
+  ...originalMarketProducts.map((product) => {
+    const [familyId, familyLabel, variantLabel] = originalProductFamilies[product.id];
+    return { ...product, familyId, familyLabel, variantLabel };
+  }),
+  ...supplementalMarketProducts,
+];
+
 export type MarketObjective = { productId: string; quantity: number };
 
 export type MarketMission = {
@@ -159,7 +201,7 @@ export type MarketMission = {
 export const marketMission: MarketMission = {
   id: 'market-basic-shopping',
   title: '저녁 장보기',
-  description: '목록에 있는 물건만 예산 안에서 골라요.',
+  description: '목록에 있는 물건을 필요한 개수만큼 골라요.',
   budget: 10000,
   objectives: [
     { productId: 'milk', quantity: 1 },
@@ -168,11 +210,11 @@ export const marketMission: MarketMission = {
   ],
   briefing: [
     '안녕하세요. 오늘 저녁에 필요한 물건을 같이 골라볼까요?',
-    '목록과 남은 예산은 화면 위에서 언제든 확인할 수 있어요.',
+    '사야 할 목록은 화면 위에서, 담은 물건은 장바구니에서 확인해요.',
   ],
   checkoutDialogue: [
     '장보기를 마쳤군요. 목록과 장바구니를 같이 확인해 볼게요.',
-    '필요한 물건과 예산을 모두 지켰는지 살펴봐요.',
+    '최종 구매를 결정하면 목록과 개수가 맞는지 확인할 수 있어요.',
   ],
   successMessage: '목록에 맞게 장보기를 마쳤어요!',
 };

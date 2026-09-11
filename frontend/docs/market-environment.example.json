@@ -1,0 +1,31 @@
+{
+  "seed": "market-handoff-example-001",
+  "sessionId": "synthetic-smoke-001",
+  "startedAt": "2026-09-11T09:00:00.000Z",
+  "difficulty": "exact",
+  "objectives": [
+    { "productId": "low-fat-milk", "quantity": 2 },
+    { "productId": "apple", "quantity": 1 },
+    { "productId": "zero-cola", "quantity": 1 },
+    { "productId": "aa-batteries", "quantity": 2 }
+  ],
+  "stockPerProduct": 6,
+  "alarmPenaltyPoints": 10,
+  "stockOverrides": { "low-fat-milk": 3 },
+  "environment": {
+    "employeeCount": { "min": 1, "max": 3 },
+    "customerCount": { "min": 1, "max": 5 },
+    "pillarCount": 2,
+    "chairCount": 0,
+    "cashierCount": 0,
+    "kioskPresent": true,
+    "shelfOrder": ["produce", "fresh", "household", "meal", "drink"]
+  },
+  "provenance": {
+    "source": "synthetic",
+    "agentModel": "deterministic-contract-smoke-v1-no-llm",
+    "personaId": "software-validation-only",
+    "personaVersion": "1",
+    "notes": "실제 장애인 또는 검증된 페르소나 데이터가 아닌 소프트웨어 계약 검증용 실행입니다."
+  }
+}
