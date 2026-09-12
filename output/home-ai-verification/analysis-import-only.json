@@ -1,0 +1,385 @@
+{
+  "synthetic": true,
+  "scope": "Real app backend HTTP APIs, not UI interaction",
+  "startedAt": "2026-09-12T09:44:52.691984+00:00",
+  "memberId": "1785687e-c98e-4670-a06f-7212479c9b95",
+  "sessionId": "bf748546-af7c-45ff-b7ba-8023012c4e73",
+  "events": [
+    {
+      "metadata": {
+        "clientEventId": "d7cc3cd8-737d-4e67-bdd5-d3ef3330634a",
+        "eventSequence": 1,
+        "eventSchemaVersion": "behavior-event-v1",
+        "appVersion": "synthetic-home-https-check",
+        "contentVersion": "market-micro-behavior-v1",
+        "offlineQueued": false,
+        "occurredAt": "2026-09-12T09:41:53.019180+00:00"
+      },
+      "identity": {
+        "sessionId": "bf748546-af7c-45ff-b7ba-8023012c4e73"
+      },
+      "task": {
+        "gameId": "MARKET_SIMULATION",
+        "taskId": "978817c3-ad06-4c94-ab28-28caa18946f4",
+        "taskVersion": "market-micro-behavior-v1",
+        "difficulty": 1,
+        "scenarioVariant": "SYNTHETIC_HOME_HTTPS_TEST",
+        "evidenceContext": "TRAINING_TASK"
+      },
+      "action": {
+        "eventCode": "SHOP.SESSION_STARTED",
+        "microActionId": "START_MARKET",
+        "stepOrder": 1
+      },
+      "accessibility": {
+        "instructionMode": "TEXT",
+        "textLevel": "EASY",
+        "audioEnabled": false,
+        "symbolSupport": true,
+        "controllerMode": "TOUCH"
+      },
+      "payload": {
+        "type": "SHOPPING",
+        "itemId": "milk",
+        "requiredQuantity": 1,
+        "priceAmount": 2000,
+        "budgetAmount": 5000,
+        "objectives": [
+          {
+            "itemId": "milk",
+            "categoryId": "dairy",
+            "requiredQuantity": 1,
+            "priceAmount": 2000
+          }
+        ],
+        "marketContent": {
+          "synthetic": true,
+          "item": {
+            "name": "우유"
+          },
+          "testDescription": "개발용 합성 기록. 우유 1개 구매 목표, 2개를 담았다가 1개로 수정 후 구매 제출."
+        }
+      }
+    },
+    {
+      "metadata": {
+        "clientEventId": "f5eb1407-1fef-445a-992e-031c5dae29a7",
+        "eventSequence": 2,
+        "eventSchemaVersion": "behavior-event-v1",
+        "appVersion": "synthetic-home-https-check",
+        "contentVersion": "market-micro-behavior-v1",
+        "offlineQueued": false,
+        "occurredAt": "2026-09-12T09:42:13.019180+00:00"
+      },
+      "identity": {
+        "sessionId": "bf748546-af7c-45ff-b7ba-8023012c4e73"
+      },
+      "task": {
+        "gameId": "MARKET_SIMULATION",
+        "taskId": "978817c3-ad06-4c94-ab28-28caa18946f4",
+        "taskVersion": "market-micro-behavior-v1",
+        "difficulty": 1,
+        "scenarioVariant": "SYNTHETIC_HOME_HTTPS_TEST",
+        "evidenceContext": "TRAINING_TASK"
+      },
+      "action": {
+        "eventCode": "SHOP.QUANTITY_CHANGED",
+        "microActionId": "ADD_MILK",
+        "stepOrder": 2
+      },
+      "accessibility": {
+        "instructionMode": "TEXT",
+        "textLevel": "EASY",
+        "audioEnabled": false,
+        "symbolSupport": true,
+        "controllerMode": "TOUCH"
+      },
+      "payload": {
+        "type": "SHOPPING",
+        "itemId": "milk",
+        "requiredQuantity": 1,
+        "priceAmount": 2000,
+        "budgetAmount": 5000,
+        "objectives": [
+          {
+            "itemId": "milk",
+            "categoryId": "dairy",
+            "requiredQuantity": 1,
+            "priceAmount": 2000
+          }
+        ],
+        "marketContent": {
+          "synthetic": true,
+          "item": {
+            "name": "우유"
+          },
+          "testDescription": "개발용 합성 기록. 우유 1개 구매 목표, 2개를 담았다가 1개로 수정 후 구매 제출."
+        },
+        "quantityBefore": 0,
+        "quantityAfter": 2,
+        "selectedQuantity": 2
+      }
+    },
+    {
+      "metadata": {
+        "clientEventId": "42cdab90-1681-4da3-b8ee-64e1fdce4736",
+        "eventSequence": 3,
+        "eventSchemaVersion": "behavior-event-v1",
+        "appVersion": "synthetic-home-https-check",
+        "contentVersion": "market-micro-behavior-v1",
+        "offlineQueued": false,
+        "occurredAt": "2026-09-12T09:42:33.019180+00:00"
+      },
+      "identity": {
+        "sessionId": "bf748546-af7c-45ff-b7ba-8023012c4e73"
+      },
+      "task": {
+        "gameId": "MARKET_SIMULATION",
+        "taskId": "978817c3-ad06-4c94-ab28-28caa18946f4",
+        "taskVersion": "market-micro-behavior-v1",
+        "difficulty": 1,
+        "scenarioVariant": "SYNTHETIC_HOME_HTTPS_TEST",
+        "evidenceContext": "TRAINING_TASK"
+      },
+      "action": {
+        "eventCode": "SHOP.QUANTITY_CHANGED",
+        "microActionId": "REMOVE_MILK",
+        "stepOrder": 3
+      },
+      "accessibility": {
+        "instructionMode": "TEXT",
+        "textLevel": "EASY",
+        "audioEnabled": false,
+        "symbolSupport": true,
+        "controllerMode": "TOUCH"
+      },
+      "payload": {
+        "type": "SHOPPING",
+        "itemId": "milk",
+        "requiredQuantity": 1,
+        "priceAmount": 2000,
+        "budgetAmount": 5000,
+        "objectives": [
+          {
+            "itemId": "milk",
+            "categoryId": "dairy",
+            "requiredQuantity": 1,
+            "priceAmount": 2000
+          }
+        ],
+        "marketContent": {
+          "synthetic": true,
+          "item": {
+            "name": "우유"
+          },
+          "testDescription": "개발용 합성 기록. 우유 1개 구매 목표, 2개를 담았다가 1개로 수정 후 구매 제출."
+        },
+        "quantityBefore": 2,
+        "quantityAfter": 1,
+        "selectedQuantity": 1
+      }
+    },
+    {
+      "metadata": {
+        "clientEventId": "86cad862-5d22-4a3c-9fb7-55538af7ed94",
+        "eventSequence": 4,
+        "eventSchemaVersion": "behavior-event-v1",
+        "appVersion": "synthetic-home-https-check",
+        "contentVersion": "market-micro-behavior-v1",
+        "offlineQueued": false,
+        "occurredAt": "2026-09-12T09:42:53.019180+00:00"
+      },
+      "identity": {
+        "sessionId": "bf748546-af7c-45ff-b7ba-8023012c4e73"
+      },
+      "task": {
+        "gameId": "MARKET_SIMULATION",
+        "taskId": "978817c3-ad06-4c94-ab28-28caa18946f4",
+        "taskVersion": "market-micro-behavior-v1",
+        "difficulty": 1,
+        "scenarioVariant": "SYNTHETIC_HOME_HTTPS_TEST",
+        "evidenceContext": "TRAINING_TASK"
+      },
+      "action": {
+        "eventCode": "SHOP.CHECKOUT_SUBMITTED",
+        "microActionId": "SUBMIT_CHECKOUT",
+        "stepOrder": 4
+      },
+      "accessibility": {
+        "instructionMode": "TEXT",
+        "textLevel": "EASY",
+        "audioEnabled": false,
+        "symbolSupport": true,
+        "controllerMode": "TOUCH"
+      },
+      "payload": {
+        "type": "SHOPPING",
+        "itemId": "milk",
+        "requiredQuantity": 1,
+        "priceAmount": 2000,
+        "budgetAmount": 5000,
+        "objectives": [
+          {
+            "itemId": "milk",
+            "categoryId": "dairy",
+            "requiredQuantity": 1,
+            "priceAmount": 2000
+          }
+        ],
+        "marketContent": {
+          "synthetic": true,
+          "item": {
+            "name": "우유"
+          },
+          "testDescription": "개발용 합성 기록. 우유 1개 구매 목표, 2개를 담았다가 1개로 수정 후 구매 제출."
+        },
+        "cartItemCount": 1,
+        "cartTotalAmount": 2000,
+        "remainingObjectiveCount": 0,
+        "missingItemIds": [],
+        "wrongItemIds": []
+      }
+    },
+    {
+      "metadata": {
+        "clientEventId": "7b621311-769a-48ac-b919-84492dfd9d1d",
+        "eventSequence": 5,
+        "eventSchemaVersion": "behavior-event-v1",
+        "appVersion": "synthetic-home-https-check",
+        "contentVersion": "market-micro-behavior-v1",
+        "offlineQueued": false,
+        "occurredAt": "2026-09-12T09:43:13.019180+00:00"
+      },
+      "identity": {
+        "sessionId": "bf748546-af7c-45ff-b7ba-8023012c4e73"
+      },
+      "task": {
+        "gameId": "MARKET_SIMULATION",
+        "taskId": "978817c3-ad06-4c94-ab28-28caa18946f4",
+        "taskVersion": "market-micro-behavior-v1",
+        "difficulty": 1,
+        "scenarioVariant": "SYNTHETIC_HOME_HTTPS_TEST",
+        "evidenceContext": "TRAINING_TASK"
+      },
+      "action": {
+        "eventCode": "SHOP.SESSION_ENDED",
+        "microActionId": "EXIT_MARKET",
+        "stepOrder": 5
+      },
+      "accessibility": {
+        "instructionMode": "TEXT",
+        "textLevel": "EASY",
+        "audioEnabled": false,
+        "symbolSupport": true,
+        "controllerMode": "TOUCH"
+      },
+      "payload": {
+        "type": "SHOPPING",
+        "itemId": "milk",
+        "requiredQuantity": 1,
+        "priceAmount": 2000,
+        "budgetAmount": 5000,
+        "objectives": [
+          {
+            "itemId": "milk",
+            "categoryId": "dairy",
+            "requiredQuantity": 1,
+            "priceAmount": 2000
+          }
+        ],
+        "marketContent": {
+          "synthetic": true,
+          "item": {
+            "name": "우유"
+          },
+          "testDescription": "개발용 합성 기록. 우유 1개 구매 목표, 2개를 담았다가 1개로 수정 후 구매 제출."
+        },
+        "cartItemCount": 1,
+        "cartTotalAmount": 2000
+      },
+      "sessionEnd": {
+        "reason": "COMPLETED",
+        "interruptionCount": 0,
+        "interruptionTimeMs": 0
+      }
+    }
+  ],
+  "ingestion": {
+    "batchId": "cb6fdf21-9cba-45b0-ad55-4c9fc958918d",
+    "events": [
+      {
+        "id": "3947adaf-77f3-41fc-b7fe-4b62242971c1",
+        "clientEventId": "d7cc3cd8-737d-4e67-bdd5-d3ef3330634a",
+        "eventSequence": 1,
+        "status": "ACCEPTED",
+        "receivedAt": "2026-09-12T09:44:53.076194Z"
+      },
+      {
+        "id": "b49bf905-0a00-41ea-b1ee-d94f207212f2",
+        "clientEventId": "f5eb1407-1fef-445a-992e-031c5dae29a7",
+        "eventSequence": 2,
+        "status": "ACCEPTED",
+        "receivedAt": "2026-09-12T09:44:53.089879Z"
+      },
+      {
+        "id": "c61ff4db-ff6a-48f0-99aa-b597622de376",
+        "clientEventId": "42cdab90-1681-4da3-b8ee-64e1fdce4736",
+        "eventSequence": 3,
+        "status": "ACCEPTED",
+        "receivedAt": "2026-09-12T09:44:53.093247Z"
+      },
+      {
+        "id": "892c418f-6725-4432-80a6-6bf059308e52",
+        "clientEventId": "86cad862-5d22-4a3c-9fb7-55538af7ed94",
+        "eventSequence": 4,
+        "status": "ACCEPTED",
+        "receivedAt": "2026-09-12T09:44:53.096263Z"
+      },
+      {
+        "id": "3d3c9136-1715-4339-83bf-d1861b9db3dd",
+        "clientEventId": "7b621311-769a-48ac-b919-84492dfd9d1d",
+        "eventSequence": 5,
+        "status": "ACCEPTED",
+        "receivedAt": "2026-09-12T09:44:53.100372Z"
+      }
+    ]
+  },
+  "receipt": {
+    "sequences": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ]
+  },
+  "job": {
+    "id": "2e75e80a-24de-4d56-8f56-777bfd8327c1",
+    "sessionId": "bf748546-af7c-45ff-b7ba-8023012c4e73",
+    "datasetId": "df3eaad4-3b35-4535-be1e-397564d4c0bb",
+    "status": "FAILED",
+    "stage": "FAILED",
+    "completed": 0,
+    "total": 1,
+    "waitUntil": null,
+    "analysisId": "8d71b999-bd9e-4b90-b401-b900bcd3fd2c",
+    "errorCode": "AI_UNAVAILABLE",
+    "createdAt": "2026-09-12T09:44:53.133159Z",
+    "updatedAt": "2026-09-12T09:44:54.414811Z"
+  },
+  "elapsedSeconds": 15.1,
+  "analysis": {
+    "analysisId": "8d71b999-bd9e-4b90-b401-b900bcd3fd2c",
+    "datasetId": "df3eaad4-3b35-4535-be1e-397564d4c0bb",
+    "status": "FAILED",
+    "model": null,
+    "promptVersion": "behavior-analysis-v13-broader-observations",
+    "evidenceVersion": "evidence-review-2026-09-05-v1",
+    "eventCount": 5,
+    "latencyMs": 604,
+    "createdAt": "2026-09-12T09:44:54.447784Z",
+    "errorCode": "AI_UNAVAILABLE",
+    "analysis": null
+  },
+  "status": "FAILED"
+}
