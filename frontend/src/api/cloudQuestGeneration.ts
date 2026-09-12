@@ -1,4 +1,7 @@
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL;
+const configuredTimeoutMs = Number(process.env.EXPO_PUBLIC_AI_TIMEOUT_MS);
+const AI_TIMEOUT_MS = Number.isFinite(configuredTimeoutMs) && configuredTimeoutMs > 0
+  ? configuredTimeoutMs : 25_000;
 
 export type CloudQuestGenerationInput = {
   questId: string;
@@ -31,7 +34,7 @@ export async function generateCloudQuestText(
   input: CloudQuestGenerationInput,
 ): Promise<CloudQuestGenerationResult> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 25_000);
+  const timeout = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
   try {
     const response = await fetch(`${API_BASE_URL}/api/ai/quest-step/generate`, {
       method: 'POST',

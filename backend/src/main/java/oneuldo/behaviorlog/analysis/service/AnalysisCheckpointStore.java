@@ -13,7 +13,7 @@ import tools.jackson.databind.ObjectMapper;
 public class AnalysisCheckpointStore {
     private final AiAnalysisCheckpointRepository repository;
     private final ObjectMapper mapper;
-    @Value("${ai.groq.model:qwen/qwen3.6-27b}") private String model="qwen/qwen3.6-27b";
+    @Value("${ai.cache-identity:${ai.groq.model:qwen/qwen3.6-27b}}") private String model="qwen/qwen3.6-27b";
     public AnalysisCheckpointStore(AiAnalysisCheckpointRepository repository,ObjectMapper mapper) {this.repository=repository;this.mapper=mapper;}
     public AnalysisCheckpoints scope(UUID member,UUID dataset) {
         return new AnalysisCheckpoints() {

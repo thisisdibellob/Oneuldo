@@ -12,7 +12,7 @@ public class AnalysisTokenBudget {
     private int chunkOutputTokens = 900;
     @Value("${ai.behavior-analysis.final-output-tokens:900}")
     private int finalOutputTokens = 900;
-    @Value("${ai.groq.model:qwen/qwen3.6-27b}")
+    @Value("${ai.model:${ai.groq.model:qwen/qwen3.6-27b}}")
     private String model = "qwen/qwen3.6-27b";
     public int requestTokens() { return requestTokens; }
     public int chunkOutputTokens() { return chunkOutputTokens; }
@@ -21,7 +21,7 @@ public class AnalysisTokenBudget {
         return total(system, user, finalOutputTokens);
     }
     public int total(String system, String user, int reservedOutput) {
-        if (!"qwen/qwen3.6-27b".equals(model)) throw new IllegalArgumentException("TOKENIZER_MODEL_MISMATCH");
+        if (!"qwen/qwen3.6-27b".equals(model) && !"qwen3.6:27b-q4_K_M".equals(model)) throw new IllegalArgumentException("TOKENIZER_MODEL_MISMATCH");
         if (reservedOutput < 1 || requestTokens <= reservedOutput) throw new IllegalArgumentException("INVALID_TOKEN_BUDGET");
         return Math.addExact(QwenTokenCounter.inputTokens(system, user), reservedOutput);
     }

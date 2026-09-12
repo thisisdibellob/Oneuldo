@@ -13,6 +13,7 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 
 @Component
+@org.springframework.context.annotation.Profile("!ollama")
 public class RestGroqChatClient implements GroqChatClient {
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(RestGroqChatClient.class);
 

@@ -187,6 +187,52 @@ class EvidenceAndTimelineTest {
         verify(client,times(1)).complete(anyString(),anyString(),anyInt(),anyDouble());
     }
 
+    @Test void 출력잘림은_최종에서_중간요약으로_내리고_4개를_2개로_나눠_완료한다() {
+        var tree=mapper.valueToTree(input(6));
+        for(var event:tree.path("input").path("sessions").get(0).path("events"))
+            ((tools.jackson.databind.node.ObjectNode)event.path("payload").path("marketContent")).put("rawText",event.path("sequence").asString()+"복도 걸음 정지 ".repeat(1500));
+        var data=mapper.convertValue(tree,BehaviorAnalysisInputResponse.class);
+        var prompts=new AiBehaviorAnalysisPromptFactory(mapper);
+        var validator=new AiBehaviorAnalysisValidator(new MarketAiDifficultyValidator());
+        var client=mock(GroqChatClient.class);
+        var batches=new ArrayList<Integer>();
+        var observed=new java.util.concurrent.atomic.AtomicInteger();
+        var compact=new java.util.concurrent.atomic.AtomicInteger();
+        var finalCalls=new java.util.concurrent.atomic.AtomicInteger();
+        when(client.complete(anyString(),anyString(),anyInt(),anyDouble())).thenAnswer(call->{
+            String prompt=call.getArgument(1);
+            var root=mapper.readTree(prompt.substring(0,prompt.lastIndexOf('}')+1));
+            String id="E1";
+            if(root.path("stage").asString().startsWith("OBSERVE:")) {
+                observed.incrementAndGet();
+                var expanded=new CompactBehaviorTimeline(mapper).decodeWithTables(root.path("behaviorTimeline"));
+                id=expanded.path("sessions").get(0).path("events").get(0).path("behaviorLogId").asString();
+            } else if(root.path("stage").asString().startsWith("REDUCE:")) {
+                batches.add(root.path("chunkAnalyses").size());
+                if(!root.path("outputContract").asString().contains("핵심 관찰 1~2개"))
+                    return new GroqChatClient.GroqChatResult("{","mock","length",100,900,1L);
+                compact.incrementAndGet();
+                id=root.path("chunkAnalyses").get(0).path("observations").get(0).path("evidenceEventIds").get(0).asString();
+            } else {
+                if(finalCalls.incrementAndGet()<=2)
+                    return new GroqChatClient.GroqChatResult("{","mock","length",100,900,1L);
+                return new GroqChatClient.GroqChatResult("""
+                    {"summary":"부분 관찰","findings":[],"sessionAssessments":[{"sessionId":"S1","judgment":"UNDETERMINED","explanation":"근거 부족","evidenceEventIds":["E1"]}],
+                    "uncertainties":["축약 관찰의 한계"],"usedEvidenceCardIds":[],"practicePlan":{"targetFindingIds":[],"goal":"관찰 연습","rationale":"관찰용 과제","recommendedDifficulty":1,"itemCount":2,
+                    "quantityComplexity":"LOW","budgetPressure":"LOW","textSupport":"SIMPLIFIED","reasonCodes":["OBSERVATION_PRACTICE"]}}
+                    ""","mock");
+            }
+            return new GroqChatClient.GroqChatResult("{\"s\":\"관찰\",\"o\":[[\"이동\",\"탐색 가능\",[\"조작 연습\"],[\""+id+"\"]]],\"u\":[\"일부 관찰은 요약에 담지 못함\"]}","mock");
+        });
+        var audit=new ArrayList<AiBehaviorAnalysisRun.Attempt>();
+        var result=new TimelineAnalysisPipeline(prompts,validator,client,mapper).analyze(data,18000,audit);
+        assertThat(result.sessionAssessments().getFirst().judgment()).isEqualTo("UNDETERMINED");
+        assertThat(observed.get()).isEqualTo(6);
+        assertThat(batches).contains(4,2);
+        assertThat(compact.get()).isEqualTo(3);
+        assertThat(audit).anyMatch(a->"length".equals(a.finishReason()));
+    }
+
     private BehaviorAnalysisInputResponse input(int count) {
         UUID dataset = UUID.randomUUID(), session = UUID.randomUUID();
         var now = Instant.parse("2026-09-05T00:00:00Z");

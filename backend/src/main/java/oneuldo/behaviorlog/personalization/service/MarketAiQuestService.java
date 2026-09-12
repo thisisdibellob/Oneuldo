@@ -22,7 +22,7 @@ public class MarketAiQuestService {
     private final GroqChatClient groqChatClient;
     private final ObjectMapper objectMapper;
     private final oneuldo.ai.service.SingleFlight<UUID,MarketAiQuestResponse> activeRequests=new oneuldo.ai.service.SingleFlight<>();
-    @org.springframework.beans.factory.annotation.Value("${ai.groq.model:qwen/qwen3.6-27b}")
+    @org.springframework.beans.factory.annotation.Value("${ai.cache-identity:${ai.groq.model:qwen/qwen3.6-27b}}")
     private String configuredModel="qwen/qwen3.6-27b";
 
     public MarketAiQuestResponse generate(UUID memberId) {

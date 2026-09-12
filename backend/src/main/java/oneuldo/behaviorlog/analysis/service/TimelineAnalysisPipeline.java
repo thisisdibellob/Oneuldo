@@ -116,9 +116,15 @@ public final class TimelineAnalysisPipeline {
             String finalPrompt=finalPrompt(input,groups,refs);
             String finalSystem=FinalAnalysisPromptCompactor.systemPrompt();
             log.info("AI final assembly: groups={}, reservedTokens={}, limit={}",groups.size(),budget.total(finalSystem,finalPrompt+RETRY,budget.finalOutputTokens()),limit);
-            if(budget.total(finalSystem,finalPrompt+RETRY,budget.finalOutputTokens())<=limit)
-                return call(finalSystem,finalPrompt,budget.finalOutputTokens(),limit,audit,
-                        raw->validateFinal(refs.read(raw),input,finalPrompt));
+            if(budget.total(finalSystem,finalPrompt+RETRY,budget.finalOutputTokens())<=limit) {
+                try {
+                    return call(finalSystem,finalPrompt,budget.finalOutputTokens(),limit,audit,
+                            raw->validateFinal(refs.read(raw),input,finalPrompt));
+                } catch(IllegalStateException failure) {
+                    if(!"OUTPUT_TRUNCATED".equals(failure.getMessage()) || groups.size()<=1) throw failure;
+                    log.info("AI final output truncated; reducing saved observations before retry");
+                }
+            }
             if(groups.size()<=1) {
                 audit.add(new AiBehaviorAnalysisRun.Attempt(audit.size()+1,finalPrompt,null,"FINAL_EVIDENCE_EXCEEDS_LIMIT","PREFLIGHT",finalSystem,budget.finalOutputTokens(),null,null,null,0L));
                 throw new IllegalArgumentException("FINAL_EVIDENCE_EXCEEDS_LIMIT");
@@ -130,17 +136,47 @@ public final class TimelineAnalysisPipeline {
                 int end=i+2;
                 budget.requireFits(prompts.observationSystem(),mergePrompt(groups.subList(i,end),refs)+RETRY,budget.chunkOutputTokens(),limit,"REDUCE_INPUT_EXCEEDS_LIMIT");
                 while(end<groups.size() && end-i<4 && budget.total(prompts.observationSystem(),mergePrompt(groups.subList(i,end+1),refs)+RETRY,budget.chunkOutputTokens())<=limit) end++;
-                var pair=groups.subList(i,end);
-                Set<UUID> covered=new HashSet<>();pair.forEach(g->g.scope.input().sessions().forEach(s->s.events().forEach(e->covered.add(e.behaviorLogId()))));
-                var scope=select(input,covered);
-                log.info("AI reduction batch: children={}",pair.size());
-                var digest=call(prompts.observationSystem(),mergePrompt(pair,refs),budget.chunkOutputTokens(),limit,audit,
-                        raw->{var value=refs.readDigest(raw);noRequests(value);return validator.validateReduction(value,scope,pair.stream().map(Group::digest).toList());});
-                reduced.add(new Group(scope,digest));
+                reduced.addAll(reduceBounded(groups.subList(i,end),input,refs,limit,audit));
                 i=end;
             }
             groups=reduced;
         }
+    }
+    private List<Group> reduceBounded(List<Group> children,BehaviorAnalysisInputResponse input,AnalysisReferences refs,
+            int limit,List<AiBehaviorAnalysisRun.Attempt> audit) {
+        if(children.size()==1) return List.of(children.getFirst());
+        Set<UUID> covered=new HashSet<>();
+        children.forEach(g->g.scope.input().sessions().forEach(s->s.events().forEach(e->covered.add(e.behaviorLogId()))));
+        var scope=select(input,covered);
+        String prompt=mergePrompt(children,refs);
+        try {
+            log.info("AI reduction batch: children={}",children.size());
+            return List.of(reduceOnce(children,scope,refs,prompt,limit,audit));
+        } catch(IllegalStateException failure) {
+            if(!"OUTPUT_TRUNCATED".equals(failure.getMessage())) throw failure;
+            if(children.size()>2) {
+                int middle=children.size()/2;
+                log.info("AI reduction output truncated; splitting children={} into {}+{}",children.size(),middle,children.size()-middle);
+                List<Group> result=new ArrayList<>(reduceBounded(children.subList(0,middle),input,refs,limit,audit));
+                result.addAll(reduceBounded(children.subList(middle,children.size()),input,refs,limit,audit));
+                return result;
+            }
+            // A pair cannot be split into smaller merges. Ask the model for a compact,
+            // explicitly limited digest; never trim JSON or drop child inputs in Java.
+            var brief=mapper.readTree(prompt).deepCopy();
+            ((ObjectNode)brief).put("outputContract", "JSON {s:요약,o:[[사실,가설,[다른 설명],[사건 ID]]],u:[한계]}. "
+                    + "따옴표를 사용하고 JSON을 완결한다. 핵심 관찰 1~2개, 각 설명은 짧은 한 문장으로 작성한다. "
+                    + "양쪽 구간의 서로 다른 행동·상충·도움을 고려하고 근거는 자식이 인용한 ID만 사용한다. "
+                    + "요약에 담지 못한 관찰과 불확실성을 u에 명시한다. 누락을 성패나 능력 부족으로 바꾸지 않는다.");
+            log.info("AI pair output truncated; retrying compact digest with both child inputs");
+            return List.of(reduceOnce(children,scope,refs,mapper.writeValueAsString(brief),limit,audit));
+        }
+    }
+    private Group reduceOnce(List<Group> children,BehaviorAnalysisInputResponse scope,AnalysisReferences refs,
+            String prompt,int limit,List<AiBehaviorAnalysisRun.Attempt> audit) {
+        var digest=call(prompts.observationSystem(),prompt,budget.chunkOutputTokens(),limit,audit,
+                raw->{var value=refs.readDigest(raw);noRequests(value);return validator.validateReduction(value,scope,children.stream().map(Group::digest).toList());});
+        return new Group(scope,digest);
     }
     private List<Group> observeBounded(BehaviorAnalysisInputResponse chunk,BehaviorAnalysisInputResponse full,AnalysisReferences refs,
             int limit,List<AiBehaviorAnalysisRun.Attempt> audit) {

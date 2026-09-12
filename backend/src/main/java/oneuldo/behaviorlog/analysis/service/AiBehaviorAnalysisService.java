@@ -28,7 +28,7 @@ public class AiBehaviorAnalysisService {
     private final oneuldo.behaviorlog.profile.service.AiUserProfileService userProfiles;
     @Value("${ai.behavior-analysis.max-chunks:64}")
     private int maxChunks = 64;
-    @Value("${ai.groq.model:qwen/qwen3.6-27b}") private String configuredModel="qwen/qwen3.6-27b";
+    @Value("${ai.cache-identity:${ai.groq.model:qwen/qwen3.6-27b}}") private String configuredModel="qwen/qwen3.6-27b";
     private final oneuldo.ai.service.SingleFlight<String,AiBehaviorAnalysisResponse> requests=new oneuldo.ai.service.SingleFlight<>();
     private final oneuldo.ai.service.SingleFlight<String,AiBehaviorAnalysisResponse> datasets=new oneuldo.ai.service.SingleFlight<>();
     private AnalysisCheckpointStore checkpointStore;
@@ -72,7 +72,7 @@ public class AiBehaviorAnalysisService {
                 system,mapper.readTree(prompt),prompts.observationSystem(),prompts.digestContract(),prompts.reductionContract(),
                 FinalAnalysisPromptCompactor.systemPrompt(),FinalAnalysisPromptCompactor.VERSION,
                 budget.requestTokens(),budget.chunkOutputTokens(),budget.finalOutputTokens(),maxChunks,0.2,
-                MovementProjection.VERSION,prompts.movementMaxError(),MovementInputEncoder.VERSION,"analysis-reuse-v2");
+                MovementProjection.VERSION,prompts.movementMaxError(),MovementInputEncoder.VERSION,"analysis-reuse-v3-bounded-reduction");
         var reusable=repository.findFirstByMemberIdAndDatasetIdAndRequestKeyAndStatusOrderByCreatedAtDesc(memberId,input.id(),requestKey,"READY");
         if(reusable.isPresent()) {
             try {
