@@ -17,7 +17,7 @@ require.extensions['.ts'] = (module, filename) => {
 };
 
 const { createMarketAgentAdapter } = require('../src/game/marketSession.ts');
-const { isMarketEnvironmentBlocked } = require('../src/game/marketEnvironment.ts');
+const { isMarketEnvironmentBlocked, isNearMarketStation } = require('../src/game/marketEnvironment.ts');
 const args = process.argv.slice(2);
 const option = (name) => { const index = args.indexOf(name); if (index >= 0 && !args[index + 1]) throw new Error(`${name} requires a path.`); return index < 0 ? undefined : args[index + 1]; };
 const configPath = option('--config') || path.resolve(__dirname, '../docs/market-environment.example.json');
@@ -46,7 +46,7 @@ function routeTo(stationId) {
   let finish;
   for (let index = 0; index < queue.length; index++) {
     const current = queue[index];
-    if (Math.hypot(current.x - target.x, current.y - target.y) <= 60) { finish = current; break; }
+    if (isNearMarketStation(environment, stationId, current, undefined, cashierCalled)) { finish = current; break; }
     for (const [dx, dy] of [[20, 0], [-20, 0], [0, 20], [0, -20]]) {
       const next = { x: current.x + dx, y: current.y + dy };
       if (parents.has(key(next))) continue;

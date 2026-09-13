@@ -28,7 +28,7 @@ const marketShelfVariants = {
 
 export const marketGameArt = {
   base: require('../../assets/images/game/market/interior/market_floor_parallel_v3.png'),
-  checkout: require('../../assets/images/game/market/interior/checkout_vertical_ortho_v1.png'),
+  checkout: require('../../assets/images/game/market/interior/retail-v4/checkout.png'),
   elevator: require('../../assets/images/game/market/interior/elevator_front_ortho_v1.png'),
   atm: require('../../assets/images/game/market/interior/atm_front_ortho_v1.png'),
   shelves: marketShelves,

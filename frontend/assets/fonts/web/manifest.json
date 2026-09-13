@@ -1,0 +1,148 @@
+{
+  "format": "WOFF2",
+  "generator": "fontTools 4.65.0",
+  "subset": false,
+  "transformedTables": [],
+  "containerOnlyChanges": [
+    "head.checkSumAdjustment",
+    "head.flags bit 11 (lossless font conversion)",
+    "DSIG removed when present"
+  ],
+  "sourceBytes": 19418688,
+  "webBytes": 7449340,
+  "reductionPercent": 61.64,
+  "files": [
+    {
+      "source": "Cafe24Ssurround.otf",
+      "web": "Cafe24Ssurround.woff2",
+      "sourceBytes": 1609932,
+      "webBytes": 796360,
+      "sourceSha256": "6729ca473ab04f145b5246fa66128c474749e06b62ae07e94eab7b7850cf0b23",
+      "webSha256": "d92e5e554b739884b62dcc1799b785179d7403d0ea3f59e4ed62e36099242ede",
+      "glyphs": 11441,
+      "unicodeCodepoints": 11440,
+      "hangulSyllables": 11172,
+      "verified": "All original Unicode mappings, glyph order, and rendering tables identical; no subsetting"
+    },
+    {
+      "source": "Cafe24SsurroundAir.otf",
+      "web": "Cafe24SsurroundAir.woff2",
+      "sourceBytes": 1266476,
+      "webBytes": 547084,
+      "sourceSha256": "7049851a7e8eadaf6bdabe95facc696cf7d06a05028ccc322053836e4f930946",
+      "webSha256": "1595d3895b8d89ee6e6993831002c3ce71370313ff5488bd81fc93248c5b86bd",
+      "glyphs": 11438,
+      "unicodeCodepoints": 11437,
+      "hangulSyllables": 11172,
+      "verified": "All original Unicode mappings, glyph order, and rendering tables identical; no subsetting"
+    },
+    {
+      "source": "Griun_InaDoongdoong-Rg.ttf",
+      "web": "Griun_InaDoongdoong-Rg.woff2",
+      "sourceBytes": 1154056,
+      "webBytes": 679600,
+      "sourceSha256": "9fb5ba1d7a3954048364e745109e43c4288ae7dbe46121bce51e7aaca71caf7d",
+      "webSha256": "e1bedf72e76b7aba68ff1411bb46c48fdbe571e39957d1dc56f9a3b11f9828dd",
+      "glyphs": 2947,
+      "unicodeCodepoints": 2945,
+      "hangulSyllables": 2780,
+      "verified": "All original Unicode mappings, glyph order, and rendering tables identical; no subsetting"
+    },
+    {
+      "source": "KyoboHandwriting2019.otf",
+      "web": "KyoboHandwriting2019.woff2",
+      "sourceBytes": 5074980,
+      "webBytes": 578880,
+      "sourceSha256": "a45b6743b0947f4bb854fc161ef0a1ed550581e41d6e92b490dbedae65a79ffd",
+      "webSha256": "8872d5a9e4631b0fe35efc3228e835e3e39d4b04f66e6b8146470bb6913b0d37",
+      "glyphs": 12258,
+      "unicodeCodepoints": 12300,
+      "hangulSyllables": 11172,
+      "verified": "All original Unicode mappings, glyph order, and rendering tables identical; no subsetting"
+    },
+    {
+      "source": "LaundryGothic-Bold.otf",
+      "web": "LaundryGothic-Bold.woff2",
+      "sourceBytes": 1015296,
+      "webBytes": 216828,
+      "sourceSha256": "8630d6f0406d32ec2a5d5e09ef7a114b602126e63620ac4322bf4f502ebb5104",
+      "webSha256": "080e4f6b805fd043a15a93bdde6882d2f062bb6eee3e2c2a88449d0618aa291c",
+      "glyphs": 12257,
+      "unicodeCodepoints": 12258,
+      "hangulSyllables": 11172,
+      "verified": "All original Unicode mappings, glyph order, and rendering tables identical; no subsetting"
+    },
+    {
+      "source": "LaundryGothic-Regular.otf",
+      "web": "LaundryGothic-Regular.woff2",
+      "sourceBytes": 1015964,
+      "webBytes": 206716,
+      "sourceSha256": "70dee36a68c84f576245ba3b5c7ace33c6dc76326d6e8fcbc7a0b1c995863156",
+      "webSha256": "7c1384e51431bc5a956d493d665d7b040beeaee0789cac56ffa3b327ae190e49",
+      "glyphs": 12257,
+      "unicodeCodepoints": 12258,
+      "hangulSyllables": 11172,
+      "verified": "All original Unicode mappings, glyph order, and rendering tables identical; no subsetting"
+    },
+    {
+      "source": "Pretendard-Bold.otf",
+      "web": "Pretendard-Bold.woff2",
+      "sourceBytes": 1655440,
+      "webBytes": 890724,
+      "sourceSha256": "03a5b0e86f4de0a25b65544336cf653ef4489418802ec789deacff9b8524eb55",
+      "webSha256": "bdfb1e2d36af00423fa7b5b6da1a3ef9768611e51b5204ccc2fc0c5a17a477f2",
+      "glyphs": 14705,
+      "unicodeCodepoints": 14336,
+      "hangulSyllables": 11172,
+      "verified": "All original Unicode mappings, glyph order, and rendering tables identical; no subsetting"
+    },
+    {
+      "source": "Pretendard-ExtraBold.otf",
+      "web": "Pretendard-ExtraBold.woff2",
+      "sourceBytes": 1646960,
+      "webBytes": 896532,
+      "sourceSha256": "e95562e417055e3992780ffddb070b486584a4fe1449d0305041c177bf9b5311",
+      "webSha256": "1e20373d1d4e15cf27b76977e327a0b798801de0213ecb82ba5ef376a9b05fff",
+      "glyphs": 14705,
+      "unicodeCodepoints": 14336,
+      "hangulSyllables": 11172,
+      "verified": "All original Unicode mappings, glyph order, and rendering tables identical; no subsetting"
+    },
+    {
+      "source": "Pretendard-Medium.otf",
+      "web": "Pretendard-Medium.woff2",
+      "sourceBytes": 1663544,
+      "webBytes": 877164,
+      "sourceSha256": "675f1de626324c36f87da71406d57aeb19921f038f71838045bd56457f71fd6b",
+      "webSha256": "a22a5639da861108a4bd44a2334979dfc6f273d8165fd0339697b561cd3e1a38",
+      "glyphs": 14705,
+      "unicodeCodepoints": 14336,
+      "hangulSyllables": 11172,
+      "verified": "All original Unicode mappings, glyph order, and rendering tables identical; no subsetting"
+    },
+    {
+      "source": "Pretendard-Regular.otf",
+      "web": "Pretendard-Regular.woff2",
+      "sourceBytes": 1654020,
+      "webBytes": 872156,
+      "sourceSha256": "7228007b7fc42fd281d9a6d863e77e0da154c6628a7527bd6e2068f631ff4952",
+      "webSha256": "f33149ecb35dfef5da7f4c2ee75be9754b16ab6984dc902d871ff406ca8db167",
+      "glyphs": 14705,
+      "unicodeCodepoints": 14336,
+      "hangulSyllables": 11172,
+      "verified": "All original Unicode mappings, glyph order, and rendering tables identical; no subsetting"
+    },
+    {
+      "source": "Pretendard-SemiBold.otf",
+      "web": "Pretendard-SemiBold.woff2",
+      "sourceBytes": 1662020,
+      "webBytes": 887296,
+      "sourceSha256": "eac28ccfd1f74e7a2c01b0ed1a654b4bae50de97b394679d2ad19dcfc3449f01",
+      "webSha256": "692a9383cdf46797bff5558e688339a24ce2b0d253f8bc1cfa5aa4408d32d76c",
+      "glyphs": 14705,
+      "unicodeCodepoints": 14336,
+      "hangulSyllables": 11172,
+      "verified": "All original Unicode mappings, glyph order, and rendering tables identical; no subsetting"
+    }
+  ]
+}

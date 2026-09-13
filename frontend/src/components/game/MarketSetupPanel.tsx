@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Platform, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
 import { PressScale } from '../PressScale';
 import { MarketSessionConfig, parseMarketSessionConfig } from '../../game/marketSession';
-import { MarketCount } from '../../game/marketEnvironment';
+import { MARKET_LAYOUT_OPTIONS, type MarketCount } from '../../game/marketEnvironment';
 import { fonts } from '../../theme';
 
 /** Configuration is applied atomically before an episode, never halfway through an attempt. */
@@ -97,10 +97,24 @@ export function MarketSetupPanel({ config, onApply, onClose }: {
           update({ ...draft, seed, environment: { ...draft.environment, seed, shelfOrder: 'random' } });
         }}
       />
+      <Text style={s.label}>매장 배치</Text>
+      <View style={s.options}>
+        {MARKET_LAYOUT_OPTIONS.map(layout => <Choice key={layout.id} text={layout.label}
+          selected={(draft.environment.layoutId ?? 'classic') === layout.id}
+          onPress={() => env({ layoutId: layout.id })} />)}
+      </View>
+      <Text style={s.label}>매장 입구 공사</Text>
+      <View style={s.options}>
+        <Choice text="공사 없음" selected={!draft.environment.entranceConstruction}
+          onPress={() => env({ entranceConstruction: false })} />
+        <Choice text="입구 공사 중" selected={draft.environment.entranceConstruction === true}
+          onPress={() => env({ entranceConstruction: true })} />
+      </View>
+      <Text style={s.description}>매장 안쪽 입구 하나를 펜스로 막아요. 공동 출입문은 열려 있고, 옆 출입문이나 출구로 돌아갈 수 있어요.</Text>
       {count('매장 종업원', 'employeeCount', 1, 3)}
       {count('손님', 'customerCount', 1, 5)}
       {count('기둥', 'pillarCount', 0, 4)}
-      <Text style={s.description}>휴게석은 의자 · 원형 테이블 · 의자 두 묶음으로 고정해요. 엘리베이터와 ATM은 장식이며 이용할 수 없어요.</Text>
+      <Text style={s.description}>매장과 공용 로비에는 의자 · 원형 테이블 · 의자 휴게석이 두 묶음씩 있어요. 엘리베이터와 ATM은 장식이며 이용할 수 없어요.</Text>
       <Text style={s.label}>유인 계산대 2개 · 계산원</Text>
       <View style={s.options}>
         {(['random', 0, 1, 2] as const).map(value => <Choice
@@ -132,11 +146,11 @@ export function MarketSetupPanel({ config, onApply, onClose }: {
           onPress={() => env({ shelfOrder: ['produce', 'fresh', 'household', 'meal', 'drink'] })}
         />
       </View>
-      <Text style={s.label}>입구 경보기 감점</Text>
-      <TextInput accessibilityLabel="입구 경보기 감점" keyboardType="number-pad"
+      <Text style={s.label}>출입 경보기 감점</Text>
+      <TextInput accessibilityLabel="출입 경보기 감점" keyboardType="number-pad"
         value={String(draft.alarmPenaltyPoints)}
         onChangeText={text => update({ ...draft, alarmPenaltyPoints: Number(text) })} style={s.input} />
-      <Text style={s.description}>100점에서 시작해요. 계산하지 않은 물건을 담고 빨간 입구 경보기를 나갈 때 적용돼요.</Text>
+      <Text style={s.description}>100점에서 시작해요. 계산하지 않은 물건을 담고 입구·출구·측면 출입문의 빨간 경보기를 지나 매장 밖으로 나갈 때 적용돼요.</Text>
       <Text style={s.label}>상품 고르기 조건</Text>
       <View style={s.options}>
         <Choice
@@ -166,11 +180,11 @@ export function MarketSetupPanel({ config, onApply, onClose }: {
         onChangeText={text => update({ ...draft, stockPerProduct: Number(text) })}
         style={s.input}
       />
-      <Text style={s.description}>각 진열대는 9종을 골라 12칸에 놓아요. 중복 진열된 상품도 같은 재고를 사용해요. 목표 상품은 구매할 수 있도록 포함됩니다.</Text>
+      <Text style={s.description}>각 진열대는 서로 다른 12종을 골라 12칸에 놓아요. 목표 상품은 구매할 수 있도록 포함됩니다.</Text>
       <Choice text={advanced ? '상세 설정 접기' : '연구용 상세 설정 · JSON 가져오기'} onPress={() => setAdvanced(!advanced)} />
       {advanced
         ? <>
-          <Text style={s.description}>목표 상품 ID·개수·판정 조건, 9종 상품 직접 지정, 상품별 재고, 진열대 순서와 사람·오브젝트 후보 위치, 사람/AI 데이터 구분을 설정합니다. 저장한 JSON을 아래에 붙여 넣을 수 있어요.</Text>
+          <Text style={s.description}>목표 상품 ID·개수·판정 조건, 12종 상품 직접 지정, 상품별 재고, 진열대 순서와 사람·오브젝트 후보 위치, 사람/AI 데이터 구분을 설정합니다. 저장한 JSON을 아래에 붙여 넣을 수 있어요.</Text>
           <TextInput
             accessibilityLabel="장보기 설정 JSON"
             value={json}

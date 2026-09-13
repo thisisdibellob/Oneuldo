@@ -67,7 +67,7 @@ export type VillageRoadDefinition = Rect & {
 export const VILLAGE_WORLD_WIDTH = 2200;
 export const VILLAGE_WORLD_HEIGHT = 1700;
 export const MARKET_WORLD_WIDTH = 1100;
-export const MARKET_WORLD_HEIGHT = 1200;
+export const MARKET_WORLD_HEIGHT = 1500;
 export const HOME_WORLD_WIDTH = 900;
 export const HOME_WORLD_HEIGHT = 1000;
 
@@ -95,26 +95,29 @@ export const INITIAL_PLAYER_POINT: Point = { x: 650, y: 920 };
 export const NPC_POINT: Point = { x: 800, y: 920 };
 export const MARKET_ENTRANCE_POINT: Point = { x: 1265, y: 600 };
 export const MARKET_RETURN_POINT: Point = { x: 1265, y: 640 };
-export const MARKET_PLAYER_POINT: Point = { x: 470, y: 970 };
-export const MARKET_INTERIOR_ENTRANCE_POINT: Point = { x: 470, y: 1030 };
-export const MARKET_EXIT_POINT: Point = { x: 870, y: 1030 };
+export const MARKET_FRONT_WALL_Y = 1020;
+export const MARKET_PLAYER_POINT: Point = { x: 710, y: 1350 };
+export const MARKET_INTERIOR_ENTRANCE_POINT: Point = { x: 480, y: MARKET_FRONT_WALL_Y + 10 };
+export const MARKET_EXIT_POINT: Point = { x: 930, y: MARKET_FRONT_WALL_Y + 10 };
+export const MARKET_COMMON_DOOR_POINT: Point = { x: 710, y: 1430 };
 
 // The checkout footprint is shared by both the village-embedded market and its
 // standalone preview. Leave a real staff aisle between the back wall and counter.
-export const MARKET_CHECKOUT_SCALE = 0.7;
-// Scale around the center of its front floor edge, keeping the customer approach.
-export const MARKET_CHECKOUT_RECT: Rect = { x: 720, y: 790, width: 64, height: 156 };
-export const MARKET_CHECKOUT_POINT: Point = { x: 827, y: 860 };
-export const MARKET_CASHIER_POINT: Point = { x: 684, y: 850 };
+export const MARKET_CHECKOUT_SCALE = 0.7 * 0.75;
+// Retain the original front floor edge when reducing both counters to 75%.
+export const MARKET_CHECKOUT_FRONT_Y = 946;
+export const MARKET_CHECKOUT_RECT: Rect = { x: 720, y: MARKET_CHECKOUT_FRONT_Y - 117, width: 48, height: 117 };
+export const MARKET_CHECKOUT_POINT: Point = { x: 807, y: MARKET_CHECKOUT_RECT.y + 60 };
+export const MARKET_CASHIER_POINT: Point = { x: 684, y: MARKET_CHECKOUT_POINT.y };
 export const MARKET_CASHIER_COLLIDER: Rect = {
   height: 18,
   width: 26,
   x: MARKET_CASHIER_POINT.x - 13,
   y: MARKET_CASHIER_POINT.y - 10,
 };
-export const MARKET_SECOND_CHECKOUT_RECT: Rect = { x: 930, y: 790, width: 64, height: 156 };
-export const MARKET_SECOND_CHECKOUT_POINT: Point = { x: 886, y: 880 };
-export const MARKET_SECOND_CASHIER_POINT: Point = { x: 1020, y: 850 };
+export const MARKET_SECOND_CHECKOUT_RECT: Rect = { x: 925, y: MARKET_CHECKOUT_FRONT_Y - 117, width: 48, height: 117 };
+export const MARKET_SECOND_CHECKOUT_POINT: Point = { x: 1012, y: MARKET_SECOND_CHECKOUT_RECT.y + 60 };
+export const MARKET_SECOND_CASHIER_POINT: Point = { x: 889, y: MARKET_SECOND_CHECKOUT_POINT.y };
 
 export const HOUSE_ENTRANCE_POINT: Point = { x: 2050, y: 1210 };
 export const HOUSE_RETURN_POINT: Point = { x: 1890, y: 1210 };

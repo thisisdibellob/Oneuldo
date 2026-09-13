@@ -4,6 +4,8 @@ import { BackHandler, Image, Platform, ScrollView, Share, StyleSheet, Text, View
 import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
 import { PressScale } from '../components/PressScale';
 import { MarketMap } from '../components/game/MarketMap';
+import { MarketHud, type MarketHudControlMode } from '../components/game/MarketHud';
+import { MarketStaffDialogue, MarketStaffDialogueChoice } from '../components/game/MarketStaffDialogue';
 import { MarketPanelTransition } from '../components/game/MarketPanelTransition';
 import { MarketShelfScene } from '../components/game/MarketShelfScene';
 import { MarketSetupPanel } from '../components/game/MarketSetupPanel';
@@ -23,7 +25,7 @@ import { listMarketEpisodes, saveMarketEpisode, MarketStoredEpisode } from '../g
 export type MarketStationId = MarketEnvironmentStationId;
 export type MarketInteractionRequest = {
   id: number;
-  station: MarketStationId;
+  station: MarketStationId | 'give-up';
 };
 export type MarketProductDropDecision = {
   accepted: boolean;
@@ -38,6 +40,10 @@ type Point = {
 };
 export type MarketSimulationScreenProps = {
   embedded?: boolean;
+  externalMenuOpen?: boolean;
+  hudTopInset?: number;
+  controlMode?: MarketHudControlMode;
+  onControlModeChange?: (mode: MarketHudControlMode) => void;
   interactionRequest?: MarketInteractionRequest | null;
   environment?: MarketEnvironment;
   initialConfig?: Partial<MarketSessionConfig>;
@@ -54,6 +60,10 @@ const price = (value: number) => value.toLocaleString('ko-KR') + '원';
 
 export function MarketSimulationScreen({
   embedded = false,
+  externalMenuOpen = false,
+  hudTopInset,
+  controlMode,
+  onControlModeChange,
   interactionRequest = null,
   environment,
   initialConfig,
@@ -108,10 +118,14 @@ export function MarketSimulationScreen({
   }, [position]);
   const syncMovementSegment = useCallback((previous: Point, next: Point) => {
     if (briefing || live.current.phase !== 'shopping') return;
-    const { alarmBoundaryY, rearmY } = live.current.environment.entrance;
-    const crossesAlarm = (previous.y < alarmBoundaryY) !== (next.y < alarmBoundaryY);
-    const rearmsAlarm = previous.y > rearmY && next.y <= rearmY;
-    if (!crossesAlarm && !rearmsAlarm) return;
+    const env = live.current.environment;
+    const gates = env.alarmGates ?? [{ axis: 'y' as const, boundary: env.entrance.alarmBoundaryY, rearm: env.entrance.rearmY }];
+    const crossesGate = gates.some(gate => {
+      const from = previous[gate.axis], to = next[gate.axis];
+      return from !== to && [gate.boundary, gate.rearm].some(line =>
+        Math.min(from, to) <= line && Math.max(from, to) >= line);
+    });
+    if (!crossesGate) return;
     // Keep both ends of a gate crossing even when an out-and-back trip falls between log samples.
     dispatch({ type: 'setPosition', point: { ...previous } });
     dispatch({ type: 'setPosition', point: { ...next } });
@@ -133,6 +147,7 @@ export function MarketSimulationScreen({
     dispatch({ type: 'giveUp' }, live.current.phase === 'shopping');
   }, [dispatch]);
   const interact = useCallback((station: MarketStationId) => {
+    if (externalMenuOpen) return;
     const next = dispatch({ type: 'interact', station }, true);
     if (station.startsWith('staff:') && !next.lastActionError) {
       setStaffMessage(true);
@@ -141,12 +156,18 @@ export function MarketSimulationScreen({
     }
     setCartOpen(false);
     setHelpOpen(false);
-  }, [dispatch, giveUp]);
+  }, [dispatch, giveUp, externalMenuOpen]);
   useEffect(() => {
-    if (briefing || session.phase !== 'shopping' || !interactionRequest || handled.current === interactionRequest.id) return;
+    if (!interactionRequest || handled.current === interactionRequest.id || session.phase === 'finished') return;
+    if (externalMenuOpen && interactionRequest.station !== 'give-up') {
+      handled.current = interactionRequest.id;
+      return;
+    }
+    if (interactionRequest.station !== 'give-up' && (briefing || session.phase !== 'shopping')) return;
     handled.current = interactionRequest.id;
-    interact(interactionRequest.station);
-  }, [briefing, interactionRequest, interact, session.phase]);
+    if (interactionRequest.station === 'give-up') giveUp();
+    else interact(interactionRequest.station);
+  }, [briefing, interactionRequest, interact, giveUp, session.phase, externalMenuOpen]);
   useEffect(() => {
     onLockChange?.(locked);
   }, [locked, onLockChange]);
@@ -185,6 +206,7 @@ export function MarketSimulationScreen({
   }, [briefing, session.phase, dispatch, position]);
   useEffect(() => {
     const back = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (externalMenuOpen) return false;
       if (panelPresent && !panelVisible) return true;
       if (historyOpen) {
         setHistoryOpen(false);
@@ -198,13 +220,21 @@ export function MarketSimulationScreen({
       } else if (helpOpen) {
         dispatch({ type: 'closeView' });
         setHelpOpen(false);
+      } else if (staffMessage) {
+        setStaffResponse('');
+        if (staffReturnHelp) setStaffReturnHelp(false);
+        else {
+          dispatch({ type: 'closeStation' });
+          setStaffMessage(false);
+          setStaffReturnHelp(false);
+        }
       }
       else if (session.phase !== 'finished') giveUp();
       else return false;
       return true;
     });
     return () => back.remove();
-  }, [shelf, settings, historyOpen, cartOpen, helpOpen, session.phase, giveUp, dispatch, panelPresent, panelVisible]);
+  }, [shelf, settings, historyOpen, cartOpen, helpOpen, staffMessage, staffReturnHelp, session.phase, giveUp, dispatch, panelPresent, panelVisible, externalMenuOpen]);
   const configure = (config: Partial<MarketSessionConfig>) => {
     const next = createMarketSession({ ...config, startedAt: new Date().toISOString() });
     live.current = next;
@@ -293,7 +323,7 @@ export function MarketSimulationScreen({
         environment={session.environment}
         cashierCalled={session.cashierAvailability}
         hintedStation={null}
-        interactive={!locked}
+        interactive={!locked && !externalMenuOpen}
         nearbyStation={nearby}
         onNearbyStationChange={setNearby}
         onPositionChange={point => {
@@ -303,62 +333,30 @@ export function MarketSimulationScreen({
         }}
       />
       : null}
-    {!briefing && session.phase === 'shopping' && !shelf && !cartOpen && !helpOpen && !staffMessage
-      ? <View
-        pointerEvents="box-none"
-        style={[s.hud, { top: embedded ? 105 : Math.max(12, insets?.top ?? 0) }]}
-      >
-        <View style={s.hudTitle}>
-          <Text style={s.eyebrow}>하늘마트 · 장보기</Text>
-          <Text accessibilityLabel={`현재 점수 ${session.score}점`} style={s.score}>{session.score}점</Text>
-          <Button
-            text="포기"
-            label="장보기 포기"
-            quiet
-            onPress={giveUp}
-          />
-        </View>
-        <View testID="market-shopping-list" style={s.listCard}>
-          <Text style={s.listTitle}>사야 할 물품</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={s.objectives}
-          >
-            {session.objectives.map(o => <View key={o.id} style={s.objective}>
-              <Text style={s.objectiveName}>
-                {o.label}
-              </Text>
-              <Text style={s.objectiveQuantity}>{o.quantity}개</Text>
-            </View>)}
-          </ScrollView>
-        </View>
-        <View style={s.hudActions}>
-          <Button
-            text="이용 방법"
-            quiet
-            onPress={() => {
-              dispatch({ type: 'viewHelp' });
-              setHelpOpen(true);
-            }}
-          />
-          <Button
-            text="장바구니"
-            label="장바구니 열기"
-            onPress={() => {
-              dispatch({ type: 'viewCart' });
-              setCartOpen(true);
-            }}
-          />
-        </View>
-      </View>
+    {!externalMenuOpen && !briefing && session.phase === 'shopping' && !shelf && !cartOpen && !helpOpen && !staffMessage
+      ? <MarketHud
+        objectives={session.objectives}
+        score={session.score}
+        topInset={hudTopInset ?? (embedded ? Math.max(112, (insets?.top ?? 0) + 64) : Math.max(12, insets?.top ?? 0))}
+        controlMode={embedded ? undefined : controlMode}
+        onControlModeChange={embedded ? undefined : onControlModeChange}
+        onGiveUp={giveUp}
+        onOpenHelp={() => {
+          dispatch({ type: 'viewHelp' });
+          setHelpOpen(true);
+        }}
+        onOpenCart={() => {
+          dispatch({ type: 'viewCart' });
+          setCartOpen(true);
+        }}
+      />
       : null}
-    {!embedded && !locked && nearby
+    {!embedded && !externalMenuOpen && !locked && nearby
       ? <View style={s.stationAction}>
         <Button
           text={nearby === 'checkout' || nearby === 'checkout-2'
             ? '계산대 살펴보기'
-            : nearby === 'exit' || nearby === 'entrance' ? '나가기' : nearby.startsWith('staff:') ? '직원에게 말 걸기' : '진열대 살펴보기'}
+            : nearby === 'common-door' ? '마을로 나가기' : nearby.startsWith('staff:') ? '직원에게 말 걸기' : '진열대 살펴보기'}
           onPress={() => interact(nearby)}
         />
       </View>
@@ -382,7 +380,7 @@ export function MarketSimulationScreen({
         <Text style={s.body}>
           {briefingStep === 0
             ? '목록을 보고 필요한 물건을 골라 보세요. 물건의 이름과 종류를 천천히 살펴봐요.'
-            : `다 골랐다면 출구 옆 계산대로 가요. 계산하지 않은 물건을 담고 빨간 입구 경보기를 지나 나가면 ${session.config.alarmPenaltyPoints}점이 줄어요. 원하면 다시 해보거나 언제든 그만둘 수 있어요.`}
+            : `다 골랐다면 출구 옆 계산대로 가요. 계산하지 않은 물건을 담고 입구·출구·측면 출입문의 빨간 경보기를 지나 매장 밖으로 나가면 ${session.config.alarmPenaltyPoints}점이 줄어요. 원하면 다시 해보거나 언제든 그만둘 수 있어요.`}
         </Text>
         <View style={s.choices}>
           <Button
@@ -463,7 +461,7 @@ export function MarketSimulationScreen({
     {cartOpen && !isFinished
       ? modal('장바구니', <>
         <CartContents cart={session.cart} showReturnLocation />
-        <Text style={s.body}>담은 물건 {cartCount}개 · 합계 {price(getMarketCartTotal(session.cart))}</Text>
+        <Text style={s.body}>담은 물건 {cartCount}개</Text>
         <Text style={s.small}>물건을 내려놓으려면 그 물건의 진열대로 돌아가요. 어렵다면 매장 종업원에게 도움을 청할 수 있어요.</Text>
         <Button text="계속 고르기" onPress={() => {
           dispatch({ type: 'closeView' });
@@ -476,7 +474,7 @@ export function MarketSimulationScreen({
       : null}
     {helpOpen
       ? modal('이렇게 이용해요', <>
-        <Text style={s.body}>1. 사야 할 물품과 개수를 읽어요.{'\n\n'}2. 진열대 가까이 가서 물건을 살펴봐요.{'\n\n'}3. 장바구니를 눌러 담은 물건을 확인해요.{'\n\n'}4. 내려놓을 물건은 그 물건의 진열대로 돌아가 장바구니를 펼쳐 내려놓아요. 어렵다면 종업원에게 제자리에 놓아 달라고 부탁해요.{'\n\n'}5. 출구 옆 두 계산대 중 하나에서 구매를 확정해요. 계산원이 없으면 매장 직원을 찾아 말을 걸어요.{'\n\n'}6. 계산하지 않은 물건을 담고 빨간 입구 경보기를 나가면 {session.config.alarmPenaltyPoints}점이 줄어요. 입구와 출구 모두 나갈 수 있어요.</Text>
+        <Text style={s.body}>1. 사야 할 물품과 개수를 읽어요.{'\n\n'}2. 진열대 가까이 가서 물건을 살펴봐요.{'\n\n'}3. 장바구니를 눌러 담은 물건을 확인해요.{'\n\n'}4. 내려놓을 물건은 그 물건의 진열대로 돌아가 장바구니를 펼쳐 내려놓아요. 어렵다면 종업원에게 제자리에 놓아 달라고 부탁해요.{'\n\n'}5. 출구 옆 두 계산대 중 하나에서 구매를 확정해요. 계산원이 없으면 매장 직원을 찾아 말을 걸어요.{'\n\n'}6. 계산하지 않은 물건을 담고 입구·출구·측면 출입문의 빨간 경보기를 지나 매장 밖으로 나가면 {session.config.alarmPenaltyPoints}점이 줄어요. 입구와 출구는 공용 복도로 이어져요. 복도 끝 공동 출입문에서 마을로 나갈 수 있어요.</Text>
         <Button text="알겠어요" onPress={() => {
           dispatch({ type: 'closeView' });
           setHelpOpen(false);
@@ -487,24 +485,26 @@ export function MarketSimulationScreen({
       })
       : null}
     {staffMessage
-      ? modal(staffReturnHelp ? '물건 내려놓기 도움' : '매장 직원', <>
-        <Text style={s.body}>{staffReturnHelp ? '어떤 물건을 제자리에 놓아드릴까요? 내려놓고 싶은 물건과 개수를 골라 주세요.' : '무엇을 도와드릴까요?'}</Text>
-        {staffResponse ? <Text accessibilityLiveRegion="polite" style={s.body}>{staffResponse}</Text> : null}
+      ? <MarketStaffDialogue
+        name={session.environment.employees.find(employee => `staff:${employee.id}` === session.activeStation)?.label ?? '매장 직원'}
+        message={staffReturnHelp ? '어떤 물건을 제자리에 놓아드릴까요? 내려놓고 싶은 물건과 개수를 골라 주세요.' : '무엇을 도와드릴까요?'}
+        response={staffResponse}
+        bottomInset={embedded ? Math.max(132, (insets?.bottom ?? 0) + 112) : Math.max(24, insets?.bottom ?? 0)}
+      >
         {staffReturnHelp ? <>
-          <CartContents cart={session.cart} onRequestReturn={requestProductReturn} />
-          <Button text="직원 대화로 돌아가기" quiet onPress={() => { setStaffReturnHelp(false); setStaffResponse(''); }} />
+          <CartContents cart={session.cart} onRequestReturn={requestProductReturn} dialogue />
+          <MarketStaffDialogueChoice text="직원 대화로 돌아가기" onPress={() => { setStaffReturnHelp(false); setStaffResponse(''); }} />
         </> : <>
           {session.environment.checkouts.filter(counter => !session.cashierAvailability[counter.id]).map(counter =>
-            <Button key={counter.id} text={`${counter.id === 'checkout' ? 1 : 2}번 계산대 계산을 부탁드려요`}
+            <MarketStaffDialogueChoice key={counter.id} text={`${counter.id === 'checkout' ? 1 : 2}번 계산대 계산을 부탁드려요`}
               onPress={() => {
                 const next = dispatch({ type: 'requestCashier', checkoutId: counter.id }, true);
                 if (!next.lastActionError) setStaffResponse(`${counter.id === 'checkout' ? 1 : 2}번 계산대로 와 주세요. 계산을 도와드릴게요.`);
               }} />)}
-          {cartCount > 0 ? <Button text="물건 제자리에 놓기 도움 요청" onPress={() => { setStaffReturnHelp(true); setStaffResponse(''); }} /> : null}
+          {cartCount > 0 ? <MarketStaffDialogueChoice text="물건 제자리에 놓기 도움 요청" onPress={() => { setStaffReturnHelp(true); setStaffResponse(''); }} /> : null}
         </>}
-        <Button text="감사합니다" onPress={closeStation} />
-        {quit}
-      </>, '종업원에게 부탁하기')
+        <MarketStaffDialogueChoice text="아니에요, 감사합니다." onPress={closeStation} />
+      </MarketStaffDialogue>
       : null}
     {!briefing && session.phase === 'checkout'
       ? modal(session.cashierAvailable ? '이대로 구매할까요?' : '계산원이 자리를 비웠어요', <>
@@ -606,7 +606,7 @@ export function MarketSimulationScreen({
     </MarketPanelTransition>
     {alarmNotice !== null ? <View pointerEvents="none" style={[s.notice, s.alarmNotice]}>
       <Text accessibilityRole="alert" accessibilityLiveRegion="assertive" style={s.alarmNoticeText}>
-        입구 경보기가 울렸어요. 계산하지 않은 물건이 있어요. −{alarmNotice}점
+        경보기가 울렸어요. 계산하지 않은 물건이 있어요. −{alarmNotice}점
       </Text>
     </View> : null}
     {session.lastActionError
@@ -618,16 +618,17 @@ export function MarketSimulationScreen({
       : null}
   </View>;
 }
-function CartContents({ cart, onRequestReturn, showReturnLocation = false }: {
+function CartContents({ cart, onRequestReturn, showReturnLocation = false, dialogue = false }: {
   cart: MarketCart;
   onRequestReturn?: (productId: string, quantity: number) => void;
   showReturnLocation?: boolean;
+  dialogue?: boolean;
 }) {
   return <View testID="market-cart-contents">
     {Object.entries(cart).filter(([, q]) => q > 0).map(([id, quantity]) => {
       const product = getMarketProduct(id);
       if (!product) return null;
-      return <View key={id}>
+      return <View key={id} style={dialogue ? s.staffReturnProduct : undefined}>
       <View style={s.cartRow}>
         <Image
           source={getMarketProductImage(id)}
@@ -645,14 +646,19 @@ function CartContents({ cart, onRequestReturn, showReturnLocation = false }: {
         </View>
         <Text style={s.quantity}>{quantity}개</Text>
       </View>
-      {onRequestReturn ? <View style={s.returnChoices}>
-        <Button text="1개 부탁하기" label={`${product.name} 1개 반납 부탁하기`} quiet onPress={() => onRequestReturn(id, 1)} />
-        {quantity > 1 ? <Button text={`${quantity}개 모두 부탁하기`} label={`${product.name} 전부 반납 부탁하기`} quiet onPress={() => onRequestReturn(id, quantity)} /> : null}
+      {onRequestReturn ? <View style={dialogue ? s.staffReturnChoices : s.returnChoices}>
+        {dialogue ? <>
+          <MarketStaffDialogueChoice text="1개 부탁하기" label={`${product.name} 1개 반납 부탁하기`} onPress={() => onRequestReturn(id, 1)} />
+          {quantity > 1 ? <MarketStaffDialogueChoice text={`${quantity}개 모두 부탁하기`} label={`${product.name} 전부 반납 부탁하기`} onPress={() => onRequestReturn(id, quantity)} /> : null}
+        </> : <>
+          <Button text="1개 부탁하기" label={`${product.name} 1개 반납 부탁하기`} quiet onPress={() => onRequestReturn(id, 1)} />
+          {quantity > 1 ? <Button text={`${quantity}개 모두 부탁하기`} label={`${product.name} 전부 반납 부탁하기`} quiet onPress={() => onRequestReturn(id, quantity)} /> : null}
+        </>}
       </View> : null}
       </View>;
     })}
     {!Object.values(cart).some(q => q > 0)
-      ? <Text style={s.body}>아직 담은 물건이 없어요.</Text>
+      ? <Text style={[s.body, dialogue && s.staffEmptyCart]}>아직 담은 물건이 없어요.</Text>
       : null}
   </View>;
 }
@@ -700,8 +706,8 @@ export function ModalCard({ title, eyebrow, children, onClose }: {
       contentContainerStyle={s.modalContent}
       keyboardShouldPersistTaps="handled"
     >
-      <View style={s.row}>
-        <View style={{ flex: 1 }}>
+      <View style={s.modalHeader}>
+        <View style={[s.modalHeading, onClose ? s.modalHeadingWithClose : undefined]}>
           {eyebrow
             ? <Text style={s.eyebrow}>
               {eyebrow}
@@ -716,7 +722,7 @@ export function ModalCard({ title, eyebrow, children, onClose }: {
             accessibilityRole="button"
             accessibilityLabel={title + ' 닫기'}
             onPress={onClose}
-            style={s.remove}
+            style={[s.remove, s.modalClose]}
           >
             <Ionicons
               name="close"
@@ -762,36 +768,8 @@ function Stars({ title, hint, value, onChange }: {
   </View>;
 }
 const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#EAE8DF' },
+  root: { flex: 1, backgroundColor: '#F7F4EC' },
   embeddedRoot: { ...StyleSheet.absoluteFill, zIndex: 28 },
-  hud: {
-    position: 'absolute',
-    left: 12,
-    right: 12,
-    zIndex: 30,
-    gap: 6
-  },
-  hudTitle: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingLeft: 8,
-    backgroundColor: '#FAF8EF',
-    borderRadius: 12
-  },
-  listCard: {
-    backgroundColor: '#FFFBF0',
-    borderRadius: 14,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#DAD2BD'
-  },
-  listTitle: { fontFamily: fonts.bold, fontSize: 14, color: '#455545' },
-  objectives: { gap: 18, paddingTop: 8 },
-  objective: { minWidth: 70, maxWidth: 160, gap: 3 },
-  objectiveName: { fontFamily: fonts.medium, fontSize: 13, color: '#534E41' },
-  objectiveQuantity: { fontFamily: fonts.bold, fontSize: 15, color: '#445D49' },
-  hudActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8 },
   stationAction: {
     position: 'absolute',
     bottom: 100,
@@ -800,7 +778,7 @@ const s = StyleSheet.create({
   },
   overlay: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(31,42,34,0.58)',
+    backgroundColor: 'rgba(29,45,51,0.58)',
     justifyContent: 'center',
     padding: 16,
     zIndex: 80
@@ -812,9 +790,19 @@ const s = StyleSheet.create({
     maxWidth: 560,
     alignSelf: 'center',
     borderRadius: 24,
-    backgroundColor: '#FFFDF5'
+    backgroundColor: '#F7F4EC',
+    borderWidth: 1,
+    borderColor: '#DCD7C8',
+    ...Platform.select({ web: { boxShadow: '0 18px 60px rgba(22,39,44,0.22)' }, default: { elevation: 10 } })
   },
   modalContent: { padding: 22, gap: 14 },
+  modalHeader: { position: 'relative', justifyContent: 'center', minHeight: 44 },
+  modalHeading: { alignItems: 'center' },
+  modalHeadingWithClose: { paddingHorizontal: 44 },
+  modalClose: { position: 'absolute', right: 0, top: 0 },
+  staffReturnProduct: { backgroundColor: '#F7F4EC', padding: 12, borderRadius: 20, marginBottom: 10 },
+  staffReturnChoices: { gap: 8, paddingTop: 10 },
+  staffEmptyCart: { backgroundColor: '#F7F4EC', borderRadius: 20, padding: 16, textAlign: 'center' },
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -822,32 +810,36 @@ const s = StyleSheet.create({
     gap: 10
   },
   title: {
-    fontFamily: fonts.cafe24Ssurround,
+    textAlign: 'center',
+    fontFamily: fonts.laundryBold,
     fontSize: 25,
     lineHeight: 34,
-    color: '#344D3C'
+    color: '#304B54'
   },
   eyebrow: {
+    textAlign: 'center',
     fontFamily: fonts.semibold,
     fontSize: 11,
-    color: '#788571',
+    color: '#93673F',
     marginBottom: 4
   },
   body: {
     fontFamily: fonts.medium,
     fontSize: 15,
     lineHeight: 23,
-    color: '#4B5548'
+    color: '#3E5158'
   },
   small: {
     fontFamily: fonts.regular,
     fontSize: 12,
     lineHeight: 19,
-    color: '#7C806E'
+    color: '#667278'
   },
-  quantity: { fontFamily: fonts.bold, fontSize: 16, color: '#49634C' },
+  quantity: { fontFamily: fonts.bold, fontSize: 16, color: '#587565' },
   requirements: {
-    backgroundColor: '#F0F1E5',
+    backgroundColor: '#EEEBE1',
+    borderLeftWidth: 3,
+    borderLeftColor: '#C48B57',
     borderRadius: 12,
     padding: 12,
     gap: 7
@@ -858,14 +850,14 @@ const s = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderRadius: 16,
-    backgroundColor: '#557D61',
+    backgroundColor: '#587565',
     alignItems: 'center',
     justifyContent: 'center'
   },
   buttonText: { fontFamily: fonts.bold, fontSize: 14, color: '#FFFFFF' },
-  quiet: { backgroundColor: '#EEF0E4' },
-  quietText: { color: '#4F6752' },
-  selected: { borderWidth: 2, borderColor: '#5D8966' },
+  quiet: { backgroundColor: '#E5EBDD' },
+  quietText: { color: '#304B54' },
+  selected: { borderWidth: 2, borderColor: '#587565' },
   disabled: { opacity: 0.4 },
   cartRow: {
     flexDirection: 'row',
@@ -873,7 +865,7 @@ const s = StyleSheet.create({
     gap: 8,
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#EBE9DC'
+    borderBottomColor: '#DDD8CB'
   },
   productArt: { width: 44, height: 52 },
   cartName: { flex: 1 },
@@ -888,10 +880,12 @@ const s = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     gap: 8,
-    backgroundColor: '#F0F3E7',
+    backgroundColor: '#E5EDDF',
+    borderWidth: 1,
+    borderColor: '#D1DDC9',
     borderRadius: 16
   },
-  resultText: { fontFamily: fonts.cafe24Ssurround, fontSize: 24, color: '#50715B' },
+  resultText: { fontFamily: fonts.laundryBold, fontSize: 24, color: '#304B54' },
   stars: { gap: 4 },
   starRow: { flexDirection: 'row' },
   star: {
@@ -907,11 +901,10 @@ const s = StyleSheet.create({
     right: 20,
     zIndex: 100,
     padding: 12,
-    backgroundColor: '#4F5E50',
+    backgroundColor: '#304B54',
     borderRadius: 12
   },
   noticeText: { fontFamily: fonts.medium, fontSize: 13, color: '#FFFFFF' },
-  score: { color: '#526F57', fontFamily: fonts.bold, fontSize: 13, marginLeft: 'auto', marginRight: 12 },
   alarmNotice: { backgroundColor: '#A63E39', bottom: 150, zIndex: 110 },
   alarmNoticeText: { fontFamily: fonts.bold, fontSize: 14, lineHeight: 21, color: '#FFFFFF' },
 });

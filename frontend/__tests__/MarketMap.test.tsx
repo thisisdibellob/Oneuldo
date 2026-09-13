@@ -1,9 +1,19 @@
 import { act, fireEvent, render } from '@testing-library/react-native';
-import { Animated, BackHandler, PanResponder, Platform } from 'react-native';
+import { Animated, BackHandler, PanResponder, Platform, StyleSheet } from 'react-native';
 
 import { MarketMap } from '../src/components/game/MarketMap';
-import { createMarketEnvironment, isMarketEnvironmentBlocked, type MarketCashierAvailability } from '../src/game/marketEnvironment';
+import { createMarketEnvironment, isMarketEnvironmentBlocked, MARKET_ENVIRONMENT_PLAYER_RADIUS, type MarketCashierAvailability } from '../src/game/marketEnvironment';
 import { MarketSimulationScreen } from '../src/screens/MarketSimulationScreen';
+
+
+jest.mock('expo-audio', () => ({
+  setAudioModeAsync: jest.fn(() => Promise.resolve()),
+  useAudioPlayer: () => {
+    const React = jest.requireActual('react');
+    return React.useRef({ pause: jest.fn(), play: jest.fn(), seekTo: jest.fn(() => Promise.resolve()), setPlaybackRate: jest.fn(), volume: 1 }).current;
+  },
+  useAudioPlayerStatus: () => ({ isLoaded: true }),
+}));
 
 jest.mock('expo-font', () => ({ isLoaded: () => true, loadAsync: () => Promise.resolve() }));
 
@@ -24,7 +34,9 @@ it('처음 만들어진 조이스틱 핸들러도 호출된 계산원의 새 충
   const responder = jest.spyOn(PanResponder, 'create').mockImplementation(handlers => {
     firstHandlers ??= handlers; return { panHandlers: {} };
   });
-  const environment = cleanEnvironment(); environment.spawn = { x: 684, y: 740 };
+  const environment = cleanEnvironment();
+  const counter = environment.checkouts[0];
+  environment.spawn = { x: counter.cashierPoint.x, y: counter.cashierPoint.y - 100 };
   const onPositionChange = jest.fn(), onNearbyStationChange = jest.fn();
   const element = (cashierCalled: Partial<MarketCashierAvailability>) => <MarketMap environment={environment} cashierCalled={cashierCalled}
     interactive hintedStation={null} nearbyStation={null} onPositionChange={onPositionChange} onNearbyStationChange={onNearbyStationChange} />;
@@ -41,12 +53,13 @@ it('처음 만들어진 조이스틱 핸들러도 호출된 계산원의 새 충
       firstHandlers!.onPanResponderMove!({} as never, { dx: 0, dy: 34 } as never);
     });
     advance(2);
-    expect(onPositionChange.mock.calls.at(-1)![0].y).toBeGreaterThan(740);
+    expect(onPositionChange.mock.calls.at(-1)![0].y).toBeGreaterThan(environment.spawn.y);
     screen.rerender(element({ checkout: true })); expect(screen.getByTestId('market-cashier')).toBeTruthy();
     advance(30);
     const latest = onPositionChange.mock.calls.at(-1)![0];
-    expect(latest.y).toBeLessThanOrEqual(818);
-    expect(latest.y).toBeGreaterThan(780);
+    const collisionBoundary = counter.cashierCollider.y - MARKET_ENVIRONMENT_PLAYER_RADIUS;
+    expect(latest.y).toBeLessThanOrEqual(collisionBoundary);
+    expect(latest.y).toBeGreaterThan(collisionBoundary - 8);
     expect(isMarketEnvironmentBlocked(environment, latest, { checkout: true })).toBe(false);
   } finally {
     screen.unmount(); responder.mockRestore(); cancel.mockRestore(); raf.mockRestore();
@@ -111,4 +124,66 @@ it('이전 기록을 보다가 Android 뒤로 가기를 누르면 게임을 포�
     expect(screen.queryByRole('header', { name: '이전 게임 기록' })).toBeNull();
     expect(screen.queryByText('실패 (포기)')).toBeNull();
   } finally { screen.unmount(); listener.mockRestore(); }
+});
+
+it('나란한 진열대 사이에서는 실제 가까운 진열대를 선택하고 떨어지면 안내를 숨긴다', () => {
+  const environment = cleanEnvironment();
+  const shelf = environment.shelves.household;
+  environment.spawn = { x: shelf.x + shelf.width + 20, y: shelf.y + shelf.height - 50 };
+  const onNearbyStationChange = jest.fn();
+  const screen = render(<MarketMap environment={environment} interactive hintedStation={null} nearbyStation={null}
+    onNearbyStationChange={onNearbyStationChange} />);
+  try {
+    const map = screen.getByLabelText('하늘마트 매장');
+    const moveRight = () => fireEvent(map, 'accessibilityAction', { nativeEvent: { actionName: 'moveRight' } });
+    moveRight(); expect(onNearbyStationChange).toHaveBeenLastCalledWith('household');
+    moveRight(); expect(onNearbyStationChange).toHaveBeenLastCalledWith(null);
+    moveRight(); expect(onNearbyStationChange).toHaveBeenLastCalledWith('meal');
+  } finally { screen.unmount(); }
+});
+
+it('플레이어는 진열대와 같은 월드 안에서 발 위치의 깊이로 렌더링되며 이동 시 함께 갱신된다', () => {
+  const environment = cleanEnvironment();
+  const screen = render(<MarketMap environment={environment} interactive hintedStation={null} nearbyStation={null} onNearbyStationChange={jest.fn()} />);
+  try {
+    const player = screen.getByTestId('market-player-world');
+    const world = screen.getByTestId('market-world');
+    let parent = player.parent;
+    while (parent && parent !== world) parent = parent.parent;
+    expect(parent).toBe(world);
+    const style = () => require('react-native').StyleSheet.flatten(player.props.style);
+    const readAnimated = (value: number | { __getValue: () => number }) => typeof value === 'number' ? value : value.__getValue();
+    expect(readAnimated(style().zIndex)).toBe(10 + environment.spawn.y);
+    expect(style()).toMatchObject({ left: 0, top: 0 });
+    fireEvent(screen.getByLabelText('하늘마트 매장'), 'accessibilityAction', { nativeEvent: { actionName: 'moveDown' } });
+    expect(readAnimated(style().zIndex)).toBe(10 + environment.spawn.y + 24);
+    expect(readAnimated(style().transform[1].translateY)).toBe(environment.spawn.y + 24);
+  } finally { screen.unmount(); }
+});
+
+
+it('모퉁이 지점은 자체 월드 크기·공동문 스폰을 사용하고 이전 매장 오른쪽 경계를 넘어 이동한다', () => {
+  const environment = createMarketEnvironment({ layoutId: 'corner', seed: 'corner-camera', employeeCount: 1,
+    customerCount: 1, pillarCount: 0, chairCount: 0, cashierCount: 0, kioskPresent: false });
+  const onPositionChange = jest.fn();
+  const screen = render(<MarketMap environment={environment} interactive hintedStation={null} nearbyStation={null}
+    onPositionChange={onPositionChange} onNearbyStationChange={jest.fn()} />);
+  try {
+    expect(StyleSheet.flatten(screen.getByTestId('market-world').props.style)).toEqual(expect.objectContaining(environment.world));
+    const map = screen.getByLabelText('하늘마트 매장');
+    fireEvent(map, 'layout', { nativeEvent: { layout: { x: 0, y: 0, width: 375, height: 812 } } });
+    const player = StyleSheet.flatten(screen.getByTestId('market-player-world').props.style);
+    const read = (value: number | { __getValue: () => number }) => typeof value === 'number' ? value : value.__getValue();
+    expect(read(player.transform![0].translateX)).toBe(environment.spawn.x);
+    expect(read(player.transform![1].translateY)).toBe(environment.spawn.y);
+    for (let step = 0; step < 4; step++) fireEvent(map, 'accessibilityAction', { nativeEvent: { actionName: 'moveRight' } });
+    const moved = onPositionChange.mock.calls.at(-1)![0];
+    expect(moved.x).toBe(environment.spawn.x + 96);
+    expect(moved.x).toBeGreaterThan(1100);
+    expect(isMarketEnvironmentBlocked(environment, moved)).toBe(false);
+    const world = StyleSheet.flatten(screen.getByTestId('market-world').props.style);
+    const expected = require('../src/game/worldZoom').getWorldCameraFrame(moved, { width: 375, height: 812 }, 1.3, environment.world);
+    expect(read(world.transform![0].translateX)).toBeCloseTo(expected.translation.x);
+    expect(read(world.transform![1].translateY)).toBeCloseTo(expected.translation.y);
+  } finally { screen.unmount(); }
 });

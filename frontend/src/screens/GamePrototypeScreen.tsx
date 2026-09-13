@@ -1,3 +1,7 @@
+import { DIALOGUE_CHARACTER_DELAY, DIALOGUE_CLEAR_VOLUME, isSilentGamePreview } from '../game/dialogueFeedback';
+import { useDialogueAudio } from '../components/game/useDialogueAudio';
+import { getMarketNavigationPath } from '../game/marketNavigation';
+import { getMarketRecoveryPoint } from '../game/marketRecovery';
 import { Ionicons } from '@expo/vector-icons';
 import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { StatusBar } from 'expo-status-bar';
@@ -22,7 +26,7 @@ import { DirectionalAvatar } from '../components/game/DirectionalAvatar';
 import { GameHud } from '../components/game/GameHud';
 import { MinsuDialoguePortrait } from '../components/game/MinsuDialoguePortrait';
 import {
-  MarketCategoryFixture,
+  MarketShelfTarget,
   MarketCheckoutFixture,
   MarketExitMarker,
   MarketInteriorBackdrop,
@@ -31,7 +35,6 @@ import {
 } from '../components/game/MarketInteriorLayer';
 import { MODULAR_CHARACTER_CANVAS } from '../components/game/ModularCharacter';
 import { getMarketPersonFrame } from '../game/marketPersonLayout';
-import { MARKET_SHELF_PAIR_HIT_SLOP } from '../game/marketFixtureLayout';
 import {
   ExpandedVillageLayer,
   HomeWorldLayer,
@@ -53,7 +56,7 @@ import {
   type AvatarMotion,
 } from '../game/avatarAnimation';
 import { freshPlayerAvatar } from '../game/freshPlayerAvatar';
-import { createMarketEnvironment, isMarketEnvironmentBlocked, type MarketEnvironment, type MarketEnvironmentStationId, type MarketCashierAvailability } from '../game/marketEnvironment';
+import { getMarketRenderDepth, getNearestMarketStation, getMarketStationApproachPoint, MARKET_ENVIRONMENT_PLAYER_RADIUS, createMarketEnvironment, isMarketEnvironmentBlocked, type MarketEnvironment, type MarketEnvironmentStationId, type MarketCashierAvailability } from '../game/marketEnvironment';
 import {
   BUS_STOP_POINT,
   HOME_EXIT_POINT,
@@ -65,7 +68,6 @@ import {
   INITIAL_PLAYER_POINT,
   MARKET_CHECKOUT_RECT,
   MARKET_ENTRANCE_POINT,
-  MARKET_PLAYER_POINT,
   MARKET_RETURN_POINT,
   VILLAGE_NPC_BY_ID,
   VILLAGE_NPC_EXIT_DISTANCE,
@@ -82,6 +84,7 @@ import {
 import { marketCategories } from '../game/scenarios';
 import {
   clampWorldZoom,
+  getWorldCameraFrame,
   MARKET_DEFAULT_ZOOM,
   screenPointToWorld,
   WORLD_ZOOM_MIN,
@@ -96,6 +99,9 @@ import {
 import { CashierSimulationScreen } from './CashierSimulationScreen';
 import { CookingSimulationScreen } from './CookingSimulationScreen';
 
+// Add ?muteAudio=1 to developer preview URLs for silent interaction checks.
+const DEVELOPMENT_AUDIO_MUTED = isSilentGamePreview();
+
 const PLAYER_RADIUS = 22;
 const PLAYER_ART_SCALE = 0.5;
 const PLAYER_ART_HEIGHT = MODULAR_CHARACTER_CANVAS.height * PLAYER_ART_SCALE;
@@ -105,17 +111,11 @@ const MOVE_SPEED = 190;
 const RUN_SPEED_MULTIPLIER = 1.55;
 const BACKGROUND_MUSIC_VOLUME = 0.5;
 const BACKGROUND_MUSIC_DUCKED_VOLUME = 0.25;
-const DIALOGUE_BLIP_VOLUME = 0.18;
-const DIALOGUE_BLIP_MIN_GAP = 92;
-const DIALOGUE_BLIP_PLAYBACK_RATES = [0.9, 0.96, 1.02] as const;
-const CLEAR_SOUND_VOLUME = 0.32;
 const ACCESSIBILITY_STEP = 58;
 const JOYSTICK_RADIUS = 34;
 const JOYSTICK_SIZE = 110;
 const JOYSTICK_ZONE_HEIGHT = 270;
-const DIALOGUE_CHARACTER_DELAY = 34;
 const DIALOGUE_READ_DELAY = 360;
-const MARKET_STATION_INTERACTION_DISTANCE = 105;
 
 function touchDistance(touches: readonly { pageX: number; pageY: number }[]): number {
   if (touches.length < 2) return 0;
@@ -206,8 +206,8 @@ const NPC_QUEST_IDS: Partial<Record<VillageNpcId, DailyQuestId>> = {
   jiyoung: 'market-shopping',
   minsu: 'minsu-safety',
 };
-function getWorldBounds(worldMap: WorldMapId) {
-  return WORLD_BOUNDS[worldMap];
+function getWorldBounds(worldMap: WorldMapId, environment?: MarketEnvironment) {
+  return worldMap === 'market' && environment ? environment.world : WORLD_BOUNDS[worldMap];
 }
 
 function isBlocked(point: Point, worldMap: WorldMapId, environment: MarketEnvironment, cashierCalled: Partial<MarketCashierAvailability> = {}) {
@@ -222,16 +222,17 @@ function isBlocked(point: Point, worldMap: WorldMapId, environment: MarketEnviro
   );
 }
 
-function clampPoint(point: Point, worldMap: WorldMapId): Point {
-  const { height, width } = getWorldBounds(worldMap);
+function clampPoint(point: Point, worldMap: WorldMapId, environment?: MarketEnvironment): Point {
+  const { height, width } = getWorldBounds(worldMap, environment);
+  const radius = worldMap === 'market' ? MARKET_ENVIRONMENT_PLAYER_RADIUS : PLAYER_RADIUS;
   return {
-    x: Math.max(PLAYER_RADIUS, Math.min(point.x, width - PLAYER_RADIUS)),
-    y: Math.max(PLAYER_RADIUS, Math.min(point.y, height - PLAYER_RADIUS)),
+    x: Math.max(radius, Math.min(point.x, width - radius)),
+    y: Math.max(radius, Math.min(point.y, height - radius)),
   };
 }
 
 function findReachableTarget(current: Point, desired: Point, worldMap: WorldMapId, environment: MarketEnvironment, cashierCalled: Partial<MarketCashierAvailability> = {}): Point {
-  const clamped = clampPoint(desired, worldMap);
+  const clamped = clampPoint(desired, worldMap, environment);
   for (let step = 12; step >= 0; step -= 1) {
     const ratio = step / 12;
     const candidate = {
@@ -400,7 +401,7 @@ function MarketWorldLayer({
           accessibilityRole={person.kind === 'employee' && controlMode === 'touch' ? 'button' : 'image'}
           disabled={person.kind !== 'employee' || controlMode !== 'touch'}
           onPress={(event) => onStationPress(event, `staff:${person.id}`)}
-          style={{ position: 'absolute', ...getMarketPersonFrame(person.point), zIndex: 6 }}>
+          style={{ position: 'absolute', ...getMarketPersonFrame(person.point), zIndex: getMarketRenderDepth(person.point.y) }}>
           <MarketPersonFixture person={person} active={nearbyStation === `staff:${person.id}`} />
         </PressScale>
       ))}
@@ -421,44 +422,30 @@ function MarketWorldLayer({
         hitSlop={{ bottom: 12, left: 12, right: 12, top: 20 }}
         onPress={(event) => onStationPress(event, counter.id)}
         scaleTo={0.98}
-        style={[styles.marketCounter, { left: counter.rect.x, top: counter.rect.y, width: counter.rect.width, height: counter.rect.height }]}
+        style={[styles.marketCounter, { left: counter.rect.x, top: counter.rect.y, width: counter.rect.width, height: counter.rect.height, zIndex: getMarketRenderDepth(counter.rect.y + counter.rect.height) }]}
       >
         <MarketCheckoutFixture counter={counter} index={index} active={nearbyStation === counter.id} cashierPresent={cashierCalled[counter.id] ?? counter.cashierPresent} />
       </PressScale>)}
 
-      {marketCategories.map((category) => {
-        const shelf = environment.shelves[category.id];
-        return (
-          <PressScale
-            accessibilityLabel={controlMode === 'touch' ? `${category.label} 진열대로 이동` : `${category.label} 진열대`}
-            accessibilityRole={controlMode === 'touch' ? 'button' : undefined}
-            disabled={controlMode !== 'touch'}
-            hitSlop={MARKET_SHELF_PAIR_HIT_SLOP}
-            key={category.id}
-            onPress={(event) => onStationPress(event, category.id)}
-            scaleTo={0.98}
-            style={[
-              styles.marketShelf,
-              { height: shelf.height, left: shelf.x, top: shelf.y, width: shelf.width },
-            ]}
-          >
-            <MarketCategoryFixture active={nearbyStation === category.id} category={category} orientation={shelf.orientation} />
-          </PressScale>
-        );
-      })}
-
-      {(['entrance', 'exit'] as const).map(station => <PressScale
-        key={station}
-        accessibilityLabel={`마트 ${station === 'entrance' ? '입구' : '출구'}${controlMode === 'touch' ? '로 이동' : ''}`}
-        accessibilityRole={controlMode === 'touch' ? 'button' : undefined}
-        disabled={controlMode !== 'touch'}
-        onPress={(event) => onStationPress(event, station)}
-        scaleTo={0.98}
+      {marketCategories.map(category => <MarketShelfTarget
+        key={category.id} placement={environment.shelves[category.id]} categoryId={category.id}
+        active={nearbyStation === category.id} disabled={controlMode !== 'touch'}
+        accessibilityLabel={controlMode === 'touch' ? `${category.label} 진열대로 이동` : `${category.label} 진열대`}
+        onPress={event => onStationPress(event, category.id)}
+      />)}
+      {(['entrance', 'exit'] as const).map(station => <View key={station} pointerEvents="none"
         style={[styles.marketExit, { left: environment.stations[station].x - 64,
-          top: environment.stations[station].y - (station === 'entrance' ? 15 : 28), width: 128, height: station === 'entrance' ? 96 : 56 }]}
-      >
-        <MarketExitMarker entrance={station === 'entrance'} active={nearbyStation === station} />
-      </PressScale>)}
+          top: environment.stations[station].y + 24, width: 128, height: 46 }]}>
+        <MarketExitMarker kind={station} active={false}
+            blocked={environment.constructionZones?.some(zone => zone.gateId === station)} />
+      </View>)}
+      {environment.commonDoor ? <PressScale
+        accessibilityLabel="마트 공동 출입문으로 이동" accessibilityRole="button"
+        disabled={controlMode !== 'touch'} onPress={event => onStationPress(event, 'common-door')}
+        style={[styles.marketExit, { left: environment.commonDoor.point.x - 64,
+          top: environment.commonDoor.point.y - 54, width: 128, height: 46 }]}>
+        <MarketExitMarker kind="common-door" active={nearbyStation === 'common-door'} />
+      </PressScale> : null}
     </>
   );
 }
@@ -468,28 +455,19 @@ type GamePrototypeScreenProps = {
 };
 
 export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
-  const backgroundMusic = useAudioPlayer(require('../../assets/audio/apple-cider.wav'), {
-    downloadFirst: true,
-    keepAudioSessionActive: true,
-  });
-  const dialogueBlipOne = useAudioPlayer(require('../../assets/audio/dialogue-blip-1.wav'), {
-    downloadFirst: true,
-    keepAudioSessionActive: true,
-  });
-  const dialogueBlipTwo = useAudioPlayer(require('../../assets/audio/dialogue-blip-2.wav'), {
-    downloadFirst: true,
-    keepAudioSessionActive: true,
-  });
-  const dialogueBlipThree = useAudioPlayer(require('../../assets/audio/dialogue-blip-3.wav'), {
+  // A null source keeps silent previews from downloading or decoding audio at all.
+  // Keep every hook mounted so audio-enabled visits retain the same lifecycle.
+  const backgroundMusic = useAudioPlayer(DEVELOPMENT_AUDIO_MUTED ? null : require('../../assets/audio/apple-cider.m4a'), {
     downloadFirst: true,
     keepAudioSessionActive: true,
   });
   const backgroundMusicStatus = useAudioPlayerStatus(backgroundMusic);
-  const dialogueBlipOneStatus = useAudioPlayerStatus(dialogueBlipOne);
-  const dialogueBlipTwoStatus = useAudioPlayerStatus(dialogueBlipTwo);
-  const dialogueBlipThreeStatus = useAudioPlayerStatus(dialogueBlipThree);
   const viewportNode = useRef<View | null>(null);
   const camera = useRef(new Animated.ValueXY()).current;
+  const playerCameraOffset = useRef(new Animated.ValueXY()).current;
+  const marketPlayerPosition = useRef(new Animated.ValueXY(INITIAL_PLAYER_POINT)).current;
+  const marketPlayerDepth = useRef(new Animated.Value(getMarketRenderDepth(INITIAL_PLAYER_POINT.y))).current;
+  const cameraCenter = useRef<Point>({ ...INITIAL_PLAYER_POINT });
   const worldZoom = useRef(new Animated.Value(WORLD_ZOOM_MIN)).current;
   const joystickKnob = useRef(new Animated.ValueXY()).current;
   const dialoguePanelProgress = useRef(new Animated.Value(0)).current;
@@ -517,6 +495,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
   const pressedMovementKeys = useRef(new Set<string>());
   const speedMultiplier = useRef(1);
   const tapTarget = useRef<Point | null>(null);
+  const tapWaypoints = useRef<Point[]>([]);
   const pendingNpcInteraction = useRef<VillageNpcId | null>(null);
   const pendingPortalInteraction = useRef<PendingPortal>(null);
   const pendingMarketStationInteraction = useRef<NearbyMarketStation>(null);
@@ -525,9 +504,6 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
   const joystickEngaged = useRef(false);
   const touchHoldActivated = useRef(false);
   const clearSoundTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
-  const dialogueBlipCursor = useRef(0);
-  const lastDialogueBlipAt = useRef(0);
-  const previousDialogueCharacterCount = useRef(0);
   const animationFrame = useRef<number | null>(null);
   const previousFrame = useRef<number | null>(null);
   const nearbyNpcIdRef = useRef<VillageNpcId | null>(null);
@@ -614,6 +590,11 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
   const currentDialogueStep =
     dialogueIndex === null ? undefined : activeDialogueSteps[dialogueIndex];
   const currentDialogue = resolveDialogueText(currentDialogueStep, selectedDailyChoice);
+  const dialogueAudio = useDialogueAudio({
+    active: dialogueIndex !== null && !reduceMotionEnabled,
+    ready: audioModeReady,
+    turnKey: `${dialogueNpcId}:${dialogueIndex}:${currentDialogue}`,
+  });
   const renderedDialogueStep = activeDialogueSteps[renderedDialogueIndex];
   const renderedDialogue = resolveDialogueText(renderedDialogueStep, selectedDailyChoice);
   const dialogueSpeakerName = VILLAGE_NPC_BY_ID[dialogueNpcId].name;
@@ -658,12 +639,17 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
 
   const updateCamera = useCallback(
     (point: Point) => {
-      camera.setValue({
-        x: viewport.current.width / 2 - point.x,
-        y: viewport.current.height / 2 - point.y,
-      });
+      const frame = getWorldCameraFrame(point, viewport.current, worldZoomCurrentRef.current,
+        worldMapRef.current === 'market' ? marketEnvironmentRef.current.world : undefined);
+      cameraCenter.current = frame.center;
+      camera.setValue(frame.translation);
+      playerCameraOffset.setValue(frame.playerOffset);
+      if (worldMapRef.current === 'market') {
+        marketPlayerPosition.setValue(point);
+        marketPlayerDepth.setValue(getMarketRenderDepth(point.y));
+      }
     },
-    [camera],
+    [camera, playerCameraOffset, marketPlayerPosition, marketPlayerDepth],
   );
 
   const updateNpcProximity = useCallback((point: Point) => {
@@ -694,17 +680,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
       setPortal(null);
       setHomeStation(null);
       setBusStop(false);
-      let closest: NearbyMarketStation = null;
-      let closestDistance = Number.POSITIVE_INFINITY;
-      (Object.entries(marketEnvironmentRef.current.stations) as Array<[MarketEnvironmentStationId, Point]>).forEach(
-        ([station, stationPoint]) => {
-          const distance = Math.hypot(point.x - stationPoint.x, point.y - stationPoint.y);
-          if (distance <= MARKET_STATION_INTERACTION_DISTANCE && distance < closestDistance) {
-            closest = station;
-            closestDistance = distance;
-          }
-        },
-      );
+      const closest = getNearestMarketStation(marketEnvironmentRef.current, point, marketCashierCalledRef.current)?.id ?? null;
       if (closest !== marketStationNearbyRef.current) {
         marketStationNearbyRef.current = closest;
         setMarketStationNearby(closest);
@@ -799,11 +775,14 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
       let next = current;
       const activeMap = worldMapRef.current;
 
-      const xCandidate = clampPoint({ x: current.x + dx, y: current.y }, activeMap);
-      if (!isBlocked(xCandidate, activeMap, marketEnvironmentRef.current, marketCashierCalledRef.current)) next = xCandidate;
-
-      const yCandidate = clampPoint({ x: next.x, y: next.y + dy }, activeMap);
-      if (!isBlocked(yCandidate, activeMap, marketEnvironmentRef.current, marketCashierCalledRef.current)) next = yCandidate;
+      // Sample large accessibility steps so they cannot cross a thin wall.
+      const steps = Math.max(1, Math.ceil(Math.max(Math.abs(dx), Math.abs(dy)) / 6));
+      for (let index = 0; index < steps; index += 1) {
+        const xCandidate = clampPoint({ x: next.x + dx / steps, y: next.y }, activeMap, marketEnvironmentRef.current);
+        if (!isBlocked(xCandidate, activeMap, marketEnvironmentRef.current, marketCashierCalledRef.current)) next = xCandidate;
+        const yCandidate = clampPoint({ x: next.x, y: next.y + dy / steps }, activeMap, marketEnvironmentRef.current);
+        if (!isBlocked(yCandidate, activeMap, marketEnvironmentRef.current, marketCashierCalledRef.current)) next = yCandidate;
+      }
 
       playerPoint.current = next;
       if (activeMap === 'market') marketMovementListener.current?.(current, next);
@@ -821,6 +800,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
     pressedMovementKeys.current.clear();
     joystickEngaged.current = false;
     tapTarget.current = null;
+    tapWaypoints.current = [];
     pendingNpcInteraction.current = null;
     pendingPortalInteraction.current = null;
     pendingMarketStationInteraction.current = null;
@@ -846,7 +826,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
   const handleExit = useCallback(() => {
     stopMovement();
     if (worldMapRef.current === 'market') {
-      setMarketInteractionRequest((request) => ({ id: (request?.id ?? 0) + 1, station: 'exit' }));
+      setMarketInteractionRequest((request) => ({ id: (request?.id ?? 0) + 1, station: 'give-up' }));
       return;
     }
     if (backgroundMusicStatus.isLoaded) {
@@ -935,13 +915,10 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
   const handleEmergencyExit = useCallback(() => {
     prepareMapTransition();
     const activeMap = worldMapRef.current;
-    playerPoint.current = {
-      ...(activeMap === 'market'
-        ? MARKET_PLAYER_POINT
-        : activeMap === 'home'
-          ? HOME_PLAYER_POINT
-          : INITIAL_PLAYER_POINT),
-    };
+    playerPoint.current = activeMap === 'market'
+      ? getMarketRecoveryPoint(marketEnvironmentRef.current, playerPoint.current, marketCashierCalledRef.current)
+        ?? { ...playerPoint.current }
+      : { ...(activeMap === 'home' ? HOME_PLAYER_POINT : INITIAL_PLAYER_POINT) };
     updateCamera(playerPoint.current);
     updateNpcProximity(playerPoint.current);
   }, [prepareMapTransition, updateCamera, updateNpcProximity]);
@@ -1005,6 +982,12 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
         const busStopInteractionReached =
           pendingBusStopInteraction.current && busStopNearbyRef.current;
 
+        if (distance <= 3 && tapWaypoints.current.length && !marketStationInteractionReached) {
+          movePlayer(dx, dy);
+          tapTarget.current = tapWaypoints.current.shift()!;
+          animationFrame.current = requestAnimationFrame(runMovement);
+          return;
+        }
         if (
           distance <= 3 ||
           npcInteractionReached ||
@@ -1330,11 +1313,16 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
       return undefined;
     }
 
+    if (reduceMotionEnabled) {
+      setVisibleDialogueCharacters(currentDialogue.length);
+      return undefined;
+    }
     const timer = setTimeout(() => {
+      dialogueAudio.playCharacter(currentDialogue[visibleDialogueCharacters]);
       setVisibleDialogueCharacters((count) => Math.min(count + 1, currentDialogue.length));
     }, DIALOGUE_CHARACTER_DELAY);
     return () => clearTimeout(timer);
-  }, [currentDialogue, dialogueIndex, visibleDialogueCharacters]);
+  }, [currentDialogue, dialogueAudio.playCharacter, dialogueIndex, reduceMotionEnabled, visibleDialogueCharacters]);
 
   useEffect(() => {
     dailyChoiceProgress.stopAnimation();
@@ -1380,12 +1368,13 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
   useEffect(() => {
     const listenerId = worldZoom.addListener(({ value }) => {
       worldZoomCurrentRef.current = value;
+      updateCamera(playerPoint.current);
     });
     return () => {
       worldZoom.removeListener(listenerId);
       worldZoom.stopAnimation();
     };
-  }, [worldZoom]);
+  }, [worldZoom, updateCamera]);
 
   useEffect(() => {
     const previousMap = previousZoomMapRef.current;
@@ -1405,6 +1394,11 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
   }, [reduceMotionEnabled, worldMap, worldZoom]);
 
   useEffect(() => {
+    if (DEVELOPMENT_AUDIO_MUTED) {
+      backgroundMusic.volume = 0;
+      backgroundMusic.pause();
+      return;
+    }
     if (!audioModeReady || !backgroundMusicStatus.isLoaded) return;
     backgroundMusic.loop = true;
     backgroundMusic.volume = BACKGROUND_MUSIC_VOLUME;
@@ -1413,113 +1407,37 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
 
   useEffect(() => {
     if (!backgroundMusicStatus.isLoaded) return;
-    backgroundMusic.volume = dialoguePanelMounted || quizPanelMounted
+    backgroundMusic.volume = DEVELOPMENT_AUDIO_MUTED ? 0 : dialoguePanelMounted || quizPanelMounted
       ? BACKGROUND_MUSIC_DUCKED_VOLUME
       : BACKGROUND_MUSIC_VOLUME;
   }, [backgroundMusic, backgroundMusicStatus.isLoaded, dialoguePanelMounted, quizPanelMounted]);
 
   useEffect(() => {
-    if (dialogueIndex === null || visibleDialogueCharacters === 0) {
-      previousDialogueCharacterCount.current = visibleDialogueCharacters;
-      lastDialogueBlipAt.current = 0;
-      return;
-    }
-
-    const previousCharacterCount = previousDialogueCharacterCount.current;
-    previousDialogueCharacterCount.current = visibleDialogueCharacters;
-    if (
-      !audioModeReady ||
-      visibleDialogueCharacters !== previousCharacterCount + 1
-    ) {
-      return;
-    }
-
-    const lastCharacter = currentDialogue[visibleDialogueCharacters - 1];
-    if (!lastCharacter || /[\s.,!?…]/.test(lastCharacter)) return;
-
-    const now = Date.now();
-    if (now - lastDialogueBlipAt.current < DIALOGUE_BLIP_MIN_GAP) return;
-
-    const players = [
-      {
-        isLoaded: dialogueBlipOneStatus.isLoaded,
-        player: dialogueBlipOne,
-        rate: DIALOGUE_BLIP_PLAYBACK_RATES[0],
-      },
-      {
-        isLoaded: dialogueBlipTwoStatus.isLoaded,
-        player: dialogueBlipTwo,
-        rate: DIALOGUE_BLIP_PLAYBACK_RATES[1],
-      },
-      {
-        isLoaded: dialogueBlipThreeStatus.isLoaded,
-        player: dialogueBlipThree,
-        rate: DIALOGUE_BLIP_PLAYBACK_RATES[2],
-      },
-    ];
-    const playerIndex =
-      (dialogueBlipCursor.current + lastCharacter.charCodeAt(0)) % players.length;
-    dialogueBlipCursor.current = (dialogueBlipCursor.current + 1) % players.length;
-    const { isLoaded, player, rate } = players[playerIndex];
-    if (!isLoaded) return;
-    lastDialogueBlipAt.current = now;
-    player.volume = DIALOGUE_BLIP_VOLUME;
-    player.shouldCorrectPitch = false;
-    player.setPlaybackRate(rate);
-    void player
-      .seekTo(0)
-      .then(() => player.play())
-      .catch(() => undefined);
-  }, [
-    audioModeReady,
-    currentDialogue,
-    dialogueBlipOne,
-    dialogueBlipOneStatus.isLoaded,
-    dialogueBlipThree,
-    dialogueBlipThreeStatus.isLoaded,
-    dialogueBlipTwo,
-    dialogueBlipTwoStatus.isLoaded,
-    dialogueIndex,
-    visibleDialogueCharacters,
-  ]);
-
-  useEffect(() => {
     clearSoundTimers.current.forEach(clearTimeout);
     clearSoundTimers.current = [];
-    if (!audioModeReady || quizStep !== 'result') return undefined;
-
-    const notes = [
-      { delay: 0, isLoaded: dialogueBlipOneStatus.isLoaded, player: dialogueBlipOne },
-      { delay: 85, isLoaded: dialogueBlipTwoStatus.isLoaded, player: dialogueBlipTwo },
-      { delay: 170, isLoaded: dialogueBlipThreeStatus.isLoaded, player: dialogueBlipThree },
-    ];
+    if (DEVELOPMENT_AUDIO_MUTED || !audioModeReady || quizStep !== 'result') return undefined;
+    let cancelled = false;
+    const notes = dialogueAudio.voices.map((voice, index) => ({ ...voice, delay: index * 85 }));
     clearSoundTimers.current = notes.map(({ delay, isLoaded, player }) =>
       setTimeout(() => {
-        if (!isLoaded) return;
-        player.volume = CLEAR_SOUND_VOLUME;
+        if (cancelled || DEVELOPMENT_AUDIO_MUTED || !isLoaded) return;
+        player.volume = DIALOGUE_CLEAR_VOLUME;
         player.shouldCorrectPitch = false;
         player.setPlaybackRate(1);
-        void player
-          .seekTo(0)
-          .then(() => player.play())
-          .catch(() => undefined);
+        void player.seekTo(0).then(() => {
+          if (!cancelled && !DEVELOPMENT_AUDIO_MUTED) player.play();
+        }).catch(() => undefined);
       }, delay),
     );
-
     return () => {
+      cancelled = true;
       clearSoundTimers.current.forEach(clearTimeout);
       clearSoundTimers.current = [];
+      notes.forEach(({ player }) => {
+        try { player.pause(); } catch { /* The player may already be released. */ }
+      });
     };
-  }, [
-    audioModeReady,
-    dialogueBlipOne,
-    dialogueBlipOneStatus.isLoaded,
-    dialogueBlipThree,
-    dialogueBlipThreeStatus.isLoaded,
-    dialogueBlipTwo,
-    dialogueBlipTwoStatus.isLoaded,
-    quizStep,
-  ]);
+  }, [audioModeReady, dialogueAudio.voices, quizStep]);
 
   useEffect(() => {
     resultCelebration.stopAnimation();
@@ -1812,7 +1730,12 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
     stopMovement();
     const target = findReachableTarget(playerPoint.current, desired, worldMapRef.current, marketEnvironmentRef.current, marketCashierCalledRef.current);
     if (Math.hypot(target.x - playerPoint.current.x, target.y - playerPoint.current.y) < 2) return;
-    tapTarget.current = target;
+    const path = worldMapRef.current === 'market'
+      ? getMarketNavigationPath(marketEnvironmentRef.current, playerPoint.current, target, marketCashierCalledRef.current)
+      : [target];
+    if (!path?.length) return;
+    tapTarget.current = path[0];
+    tapWaypoints.current = path.slice(1);
     pendingNpcInteraction.current = interaction.npcId ?? null;
     pendingPortalInteraction.current = interaction.portalId ?? null;
     pendingMarketStationInteraction.current = interaction.marketStation ?? null;
@@ -1823,7 +1746,6 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
   };
 
   const getTouchedWorldPoint = (event: GestureResponderEvent) => {
-    const current = playerPoint.current;
     const { locationX, locationY, pageX, pageY } = event.nativeEvent;
     const localX = Number.isFinite(pageX) ? pageX - viewportOrigin.current.x : locationX;
     const localY = Number.isFinite(pageY) ? pageY - viewportOrigin.current.y : locationY;
@@ -1831,7 +1753,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
     const safeY = Math.max(0, Math.min(localY, viewport.current.height));
     return screenPointToWorld(
       { x: safeX, y: safeY },
-      current,
+      cameraCenter.current,
       viewport.current,
       worldZoomCurrentRef.current,
     );
@@ -2013,20 +1935,9 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
       }));
       return;
     }
-    const stationPoint = marketEnvironmentRef.current.stations[station];
-    if (!stationPoint) return;
-    const current = playerPoint.current;
-    const dx = current.x - stationPoint.x;
-    const dy = current.y - stationPoint.y;
-    const distance = Math.max(Math.hypot(dx, dy), 1);
-    const approachDistance = MARKET_STATION_INTERACTION_DISTANCE - 18;
-    startTapMovement(
-      {
-        x: stationPoint.x + (dx / distance) * approachDistance,
-        y: stationPoint.y + (dy / distance) * approachDistance,
-      },
-      { marketStation: station },
-    );
+    const target = getMarketStationApproachPoint(marketEnvironmentRef.current, station,
+      playerPoint.current, marketCashierCalledRef.current);
+    if (target) startTapMovement(target, { marketStation: station });
   };
 
   const selectControlMode = (mode: ControlMode) => {
@@ -2100,6 +2011,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
     if (quizStep) return;
     if (dialogueIndex !== null) {
       if (visibleDialogueCharacters < currentDialogue.length) {
+        dialogueAudio.stop();
         setVisibleDialogueCharacters(currentDialogue.length);
         dialogueReadyAt.current = Date.now() + DIALOGUE_READ_DELAY;
         return;
@@ -2261,7 +2173,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
     worldMap === 'market'
       ? (marketStationNearby === 'checkout' || marketStationNearby === 'checkout-2')
         ? '계산대에서 계산하기'
-        : (marketStationNearby === 'exit' || marketStationNearby === 'entrance')
+        : marketStationNearby === 'common-door'
           ? '마트에서 마을로 나가기'
           : marketStationNearby?.startsWith('staff:')
         ? '종업원에게 도움 요청하기'
@@ -2289,7 +2201,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
     worldMap === 'market'
       ? (marketStationNearby === 'checkout' || marketStationNearby === 'checkout-2')
         ? 'card-outline'
-        : (marketStationNearby === 'exit' || marketStationNearby === 'entrance')
+        : marketStationNearby === 'common-door'
           ? 'exit-outline'
           : 'search'
       : worldMap === 'home'
@@ -2309,7 +2221,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
     worldMap === 'market'
       ? (marketStationNearby === 'checkout' || marketStationNearby === 'checkout-2')
         ? '계산'
-        : (marketStationNearby === 'exit' || marketStationNearby === 'entrance')
+        : marketStationNearby === 'common-door'
           ? '나가기'
           : marketStationNearby?.startsWith('staff:')
             ? '대화'
@@ -2341,6 +2253,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
 
   const joystickControlsVisible =
     controlMode === 'joystick' &&
+    !hudMenuOpen &&
     !dialoguePanelMounted &&
     !quizPanelMounted &&
     !fridgeMenuOpen &&
@@ -2394,9 +2307,9 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
           style={[
             styles.world,
             {
-              height: WORLD_BOUNDS[worldMap].height,
+              height: worldMap === 'market' ? marketEnvironment.world.height : WORLD_BOUNDS[worldMap].height,
               transform: camera.getTranslateTransform(),
-              width: WORLD_BOUNDS[worldMap].width,
+              width: worldMap === 'market' ? marketEnvironment.world.width : WORLD_BOUNDS[worldMap].width,
             },
           ]}
         >
@@ -2453,9 +2366,17 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
               tapTargetMarker={tapTargetMarker}
             />
           )}
+          {worldMap === 'market' ? <Animated.View accessibilityLabel="내 캐릭터" pointerEvents="none"
+            testID="market-world-player"
+            style={[styles.player, { left: 0, top: 0, zIndex: marketPlayerDepth,
+              transform: marketPlayerPosition.getTranslateTransform() }]}>
+            <DirectionalAvatar facing={playerAvatarPose.facing} manifest={freshPlayerAvatar}
+              motion={playerAvatarPose.motion} reduceMotion={reduceMotionEnabled} scale={PLAYER_ART_SCALE} />
+          </Animated.View> : null}
         </Animated.View>
 
-        <View accessibilityLabel="내 캐릭터" pointerEvents="none" style={styles.player}>
+        {worldMap !== 'market' ? <Animated.View accessibilityLabel="내 캐릭터" pointerEvents="none"
+          style={[styles.player, { transform: playerCameraOffset.getTranslateTransform() }]}>
           <DirectionalAvatar
             facing={playerAvatarPose.facing}
             manifest={freshPlayerAvatar}
@@ -2463,7 +2384,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
             reduceMotion={reduceMotionEnabled}
             scale={PLAYER_ART_SCALE}
           />
-        </View>
+        </Animated.View> : null}
       </Animated.View>
 
 
@@ -2546,7 +2467,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
       </View>
       ) : null}
 
-      {!cookingOpen && !(worldMap === 'market' && marketScenarioLocked) ? (
+      {!cookingOpen && (worldMap !== 'market' || !marketScenarioLocked) ? (
         <GameHud
           controlMode={controlMode}
           dailyQuests={dailyQuests}
@@ -2559,6 +2480,9 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
 
       {worldMap === 'market' ? (
         <MarketSimulationScreen
+          externalMenuOpen={hudMenuOpen}
+          controlMode={controlMode}
+          onControlModeChange={selectControlMode}
           environment={marketEnvironment}
           onEnvironmentChange={handleMarketEnvironmentChange}
           onCashierCalled={handleMarketCashierCalled}

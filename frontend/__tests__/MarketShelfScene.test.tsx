@@ -1,16 +1,27 @@
+jest.mock('expo-audio', () => ({
+  setAudioModeAsync: jest.fn(() => Promise.resolve()),
+  useAudioPlayer: () => {
+    const React = jest.requireActual('react');
+    return React.useRef({ pause: jest.fn(), play: jest.fn(), seekTo: jest.fn(() => Promise.resolve()), setPlaybackRate: jest.fn(), volume: 1 }).current;
+  },
+  useAudioPlayerStatus: () => ({ isLoaded: true }),
+}));
 import { act, fireEvent, render } from '@testing-library/react-native';
 import {
   AccessibilityInfo,
   Animated,
   BackHandler,
+  Dimensions,
   GestureResponderEvent,
+  Modal,
   PanResponder,
   PanResponderGestureState,
   Platform,
   StyleSheet,
+  View,
 } from 'react-native';
 
-import { MarketShelfScene, MarketShelfSceneProps } from '../src/components/game/MarketShelfScene';
+import { MarketShelfScene, MarketShelfSceneProps, MARKET_PRODUCT_HOLD_MS } from '../src/components/game/MarketShelfScene';
 import { marketCategories, marketProducts } from '../src/game/scenarios';
 import { createMarketSession } from '../src/game/marketSession';
 
@@ -49,7 +60,7 @@ function renderEmbeddedMarket() {
     fireEvent.press(screen.getByText('장보기 시작'));
     await advanceTransition();
   };
-  const open = async (nextRequest: MarketInteractionRequest) => {
+  const open = async (nextRequest: MarketInteractionRequest & { station: Exclude<MarketInteractionRequest['station'], 'give-up'> }) => {
     playerPositionRef.current = fixture.environment.stations[nextRequest.station];
     request = nextRequest;
     screen.rerender(renderScreen());
@@ -160,6 +171,13 @@ describe('몰입형 진열대 진입과 매장 복귀', () => {
   });
 });
 
+function mockShelfMeasurements() {
+  return jest.spyOn(View.prototype, 'measureInWindow').mockImplementation(function (this: View, callback) {
+    if (this.props.testID === 'market-shelf-basket-dock') callback(0, 720, 375, 80);
+    else callback(0, 0, 375, 812);
+  });
+}
+
 function shelfProps(overrides: Partial<MarketShelfSceneProps> = {}): MarketShelfSceneProps {
   return {
     cart: {},
@@ -174,6 +192,7 @@ function shelfProps(overrides: Partial<MarketShelfSceneProps> = {}): MarketShelf
 describe('진열대 전체 화면 구성과 뒤로가기', () => {
   beforeEach(() => {
     jest.useFakeTimers();
+    jest.spyOn(AccessibilityInfo, 'isReduceMotionEnabled').mockResolvedValue(false);
   });
 
   afterEach(() => {
@@ -181,26 +200,79 @@ describe('진열대 전체 화면 구성과 뒤로가기', () => {
     jest.useRealTimers();
   });
 
-  it('진열대 장바구니는 부드럽게 펼치고 접는 동안 수량을 보존하며 숨긴 버튼을 차단한다', async () => {
+
+  it('가로 장바구니 팝업은 12개 상품 배치를 유지하며 닫는 동안 뒤의 버튼을 차단한다', async () => {
     const onCartVisibilityChange = jest.fn();
     const onChangeQuantity = jest.fn();
     const screen = render(<MarketShelfScene {...shelfProps({ cart: { milk: 2 }, onCartVisibilityChange, onChangeQuantity })} />);
     try {
       await advanceTransition();
+      const rowsBefore = screen.getAllByTestId(/^market-shelf-row-/).map(row => StyleSheet.flatten(row.props.style));
+      const dockBefore = StyleSheet.flatten(screen.getByTestId('market-shelf-basket-dock').props.style);
       expect(screen.queryByRole('button', { name: '흰 우유 냉장 식품 진열대에 1개 내려놓기' })).toBeNull();
       fireEvent.press(screen.getByRole('button', { name: '진열대 장바구니 보기' }));
       await advanceTransition();
-      expect(screen.getByText('2개')).toBeTruthy();
+      expect(screen.getByText('담은 수량 2개')).toBeTruthy();
+      expect(screen.getByText('개당 2,200원')).toBeTruthy();
+      expect(screen.queryByText('4,400원')).toBeNull();
+      expect(screen.getByTestId('market-shelf-cart-items').props.horizontal).toBe(true);
       expect(screen.getByRole('button', { name: '흰 우유 냉장 식품 진열대에 1개 내려놓기' })).toBeTruthy();
-      fireEvent.press(screen.getByRole('button', { name: '진열대 장바구니 보기' }));
-      expect(screen.getByTestId('market-shelf-cart-reveal', { includeHiddenElements: true }).props.pointerEvents).toBe('none');
+      expect(screen.queryByRole('button', { name: '흰 우유 한 개 더 담기' })).toBeNull();
+      expect(screen.getAllByTestId(/^market-shelf-row-/, { includeHiddenElements: true }).map(row => StyleSheet.flatten(row.props.style))).toEqual(rowsBefore);
+      expect(StyleSheet.flatten(screen.getByTestId('market-shelf-basket-dock', { includeHiddenElements: true }).props.style)).toEqual(dockBefore);
+      expect(screen.getAllByTestId(/^market-product-drag-/, { includeHiddenElements: true })).toHaveLength(12);
+      expect(screen.getByTestId('market-shelf-scroll', { includeHiddenElements: true }).findAllByProps({ testID: 'market-shelf-cart-popup' })).toHaveLength(0);
+
+      fireEvent.press(screen.getByRole('button', { name: '진열대 장바구니 닫기' }));
+      expect(screen.getByTestId('market-shelf-cart-popup', { includeHiddenElements: true }).props.pointerEvents).toBe('none');
+      expect(screen.getByTestId('market-shelf-surface', { includeHiddenElements: true }).props.pointerEvents).toBe('none');
       expect(screen.queryByRole('button', { name: '흰 우유 냉장 식품 진열대에 1개 내려놓기' })).toBeNull();
       await advanceTransition();
+      expect(screen.queryByTestId('market-shelf-cart-popup')).toBeNull();
+      expect(screen.getByRole('button', { name: '흰 우유 한 개 더 담기' })).toBeTruthy();
       fireEvent.press(screen.getByRole('button', { name: '진열대 장바구니 보기' }));
       await advanceTransition();
-      expect(screen.getByText('2개')).toBeTruthy();
+      expect(screen.getByText('담은 수량 2개')).toBeTruthy();
       expect(onCartVisibilityChange.mock.calls.map(call => call[0])).toEqual([true, false, true]);
       expect(onChangeQuantity).not.toHaveBeenCalled();
+    } finally { screen.unmount(); }
+  });
+
+  it.each(['바깥', 'Android 뒤로가기', '접근성 닫기'] as const)('%s는 장바구니 팝업만 닫고 진열대에 남는다', async method => {
+    const onClose = jest.fn();
+    const onCartVisibilityChange = jest.fn();
+    const screen = render(<MarketShelfScene {...shelfProps({ onClose, onCartVisibilityChange })} />);
+    try {
+      await advanceTransition();
+      fireEvent.press(screen.getByRole('button', { name: '진열대 장바구니 보기' }));
+      await advanceTransition();
+      expect(screen.getByText('아직 담은 상품이 없어요')).toBeTruthy();
+      if (method === '바깥') fireEvent.press(screen.getByTestId('market-shelf-cart-backdrop'));
+      else if (method === 'Android 뒤로가기') fireEvent(screen.UNSAFE_getByType(Modal), 'requestClose');
+      else fireEvent(screen.getByTestId('market-shelf-cart-popup'), 'accessibilityEscape');
+      await advanceTransition();
+      expect(screen.queryByTestId('market-shelf-cart-popup')).toBeNull();
+      expect(screen.getByRole('button', { name: '흰 우유 담기' })).toBeTruthy();
+      expect(onCartVisibilityChange.mock.calls).toEqual([[true], [false]]);
+      expect(onClose).not.toHaveBeenCalled();
+    } finally { screen.unmount(); }
+  });
+
+  it('모션 감소와 작은 세로 공간에서도 팝업 닫기는 지연 없이 되고 본문만 스크롤할 수 있다', async () => {
+    jest.spyOn(AccessibilityInfo, 'isReduceMotionEnabled').mockResolvedValue(true);
+    const onClose = jest.fn();
+    const screen = render(<MarketShelfScene {...shelfProps({ onClose, cart: { milk: 1, apple: 2 } })} />);
+    try {
+      fireEvent(screen.getByTestId('market-shelf-scene'), 'layout', { nativeEvent: { layout: { width: 844, height: 320 } } });
+      await advanceTransition();
+      fireEvent.press(screen.getByRole('button', { name: '진열대 장바구니 보기' }));
+      const popup = screen.getByTestId('market-shelf-cart-popup');
+      expect(StyleSheet.flatten(popup.props.style).maxHeight).toBeLessThanOrEqual(288);
+      expect(screen.getByTestId('market-shelf-cart-body').props.nestedScrollEnabled).toBe(true);
+      expect(screen.getByTestId('market-shelf-cart-items').props.horizontal).toBe(true);
+      fireEvent.press(screen.getByRole('button', { name: '진열대 장바구니 닫기' }));
+      expect(screen.queryByTestId('market-shelf-cart-popup')).toBeNull();
+      expect(onClose).not.toHaveBeenCalled();
     } finally { screen.unmount(); }
   });
 
@@ -234,7 +306,7 @@ describe('진열대 전체 화면 구성과 뒤로가기', () => {
       expect(screen.getAllByRole('button', { name: /진열대에 1개 내려놓기$/ })).toHaveLength(1);
       fireEvent.press(screen.getByRole('button', { name: 'AA 건전지 4개입 생활용품 진열대에 1개 내려놓기' }));
       expect(onChangeQuantity.mock.calls).toEqual([['milk', -1], ['aa-batteries', -1]]);
-      expect(screen.getByText('3개')).toBeTruthy();
+      expect(screen.getByText('담은 수량 3개')).toBeTruthy();
     } finally { screen.unmount(); }
   });
 
@@ -260,7 +332,9 @@ describe('진열대 전체 화면 구성과 뒤로가기', () => {
     }
   });
 
-  it('각 코너의 9종 상품을 4열 3행 12칸에 표시하며 장바구니는 상품 스크롤 밖에 고정한다', async () => {
+  it('각 코너의 서로 다른 12종 상품을 4열 3행 12칸에 표시하며 장바구니는 상품 스크롤 밖에 고정한다', async () => {
+    const readDimensions = Dimensions.get;
+    jest.spyOn(Dimensions, 'get').mockImplementation(name => ({ ...readDimensions(name), fontScale: 1 }));
     const fixture = createMarketSession({seed:'shelf-layout'});
     const visibleProducts = new Set<string>();
     for (const category of marketCategories) {
@@ -277,6 +351,12 @@ describe('진열대 전체 화면 구성과 뒤로가기', () => {
         expect(screen.getByTestId('market-shelf-basket-dock')).toBeTruthy();
         expect(screen.getAllByTestId(/^market-shelf-row-/)).toHaveLength(3);
         expect(screen.getAllByTestId(/^market-product-drag-/)).toHaveLength(12);
+        expect(new Set(slots).size).toBe(12);
+        expect(productScroll.props.scrollEnabled).toBe(false);
+        expect(StyleSheet.flatten(screen.getByTestId('market-shelf-surface').props.style).backgroundColor).toBe('#FBF5E9');
+        expect(StyleSheet.flatten(screen.getByTestId('market-shelf-material').props.style)).toMatchObject({ top: 0, bottom: 0, backgroundColor: '#FBF5E9' });
+        expect(StyleSheet.flatten(screen.getByTestId('market-shelf-header').props.style).backgroundColor).toBe('transparent');
+
 
         for (const product of marketProducts.filter(item => slots.includes(item.id))) {
           expect(screen.getAllByRole('button', { name: `${product.name} 담기` }).length).toBeGreaterThan(0);
@@ -287,7 +367,7 @@ describe('진열대 전체 화면 구성과 뒤로가기', () => {
         screen.unmount();
       }
     }
-    expect(visibleProducts.size).toBe(45);
+    expect(visibleProducts.size).toBe(60);
   });
 
   it('Android 뒤로가기는 진열대만 닫으며 연속 입력과 리스너 정리를 처리한다', async () => {
@@ -314,7 +394,7 @@ describe('진열대 전체 화면 구성과 뒤로가기', () => {
     expect(remove).toHaveBeenCalledTimes(1);
   });
 
-  it('모바일 세로 스크롤은 가로채지 않고 길게 잡은 상품을 끌 때만 스크롤을 잠근다', async () => {
+  it('모바일 스와이프는 즉시 스크롤하고 350ms 길게 누른 드래그만 점유한다', async () => {
     const platformDescriptor = Object.getOwnPropertyDescriptor(Platform, 'OS');
     Object.defineProperty(Platform, 'OS', { configurable: true, value: 'ios' });
     const responders: Parameters<typeof PanResponder.create>[0][] = [];
@@ -324,35 +404,143 @@ describe('진열대 전체 화면 구성과 뒤로가기', () => {
       return createResponder(config);
     });
     const onDropProduct = jest.fn(() => true);
+    const measured = mockShelfMeasurements();
     const screen = render(<MarketShelfScene {...shelfProps({ onDropProduct })} />);
     try {
       await advanceTransition();
+      fireEvent(screen.getByTestId('market-shelf-scroll'), 'layout', { nativeEvent: { layout: { height: 300 } } });
       const product = screen.getByTestId('market-product-drag-milk');
       const event = { nativeEvent: { pageX: 70, pageY: 180 } } as GestureResponderEvent;
       const gesture = { dx: 1, dy: 30, moveX: 70, moveY: 210 } as PanResponderGestureState;
       const responder = responders[0];
 
-      // Drive native callbacks directly to control hold time and responder negotiation separately.
       act(() => product.props.onTouchStart(event));
       expect(responder.onMoveShouldSetPanResponder?.(event, gesture)).toBe(false);
-      await advanceTransition(200);
+      await advanceTransition(500);
       expect(responder.onMoveShouldSetPanResponder?.(event, gesture)).toBe(false);
       expect(screen.getByTestId('market-shelf-scroll').props.scrollEnabled).toBe(true);
 
       act(() => product.props.onTouchStart(event));
-      await advanceTransition(200);
+      await advanceTransition(MARKET_PRODUCT_HOLD_MS - 1);
+      expect(screen.getByTestId('market-shelf-scroll').props.scrollEnabled).toBe(true);
+      await advanceTransition(1);
       expect(responder.onMoveShouldSetPanResponder?.(event, gesture)).toBe(true);
       act(() => responder.onPanResponderGrant?.(event, gesture));
       expect(screen.getByTestId('market-shelf-scroll').props.scrollEnabled).toBe(false);
 
-      act(() => responder.onPanResponderTerminate?.(event, gesture));
-      await advanceTransition();
+      const basketEvent = { nativeEvent: { pageX: 100, pageY: 760 } } as GestureResponderEvent;
+      act(() => responder.onPanResponderMove?.(basketEvent, gesture));
+      expect(measured).toHaveBeenCalled();
+      expect(screen.getByText('여기에 놓아요!')).toBeTruthy();
+      act(() => responder.onPanResponderRelease?.(basketEvent, gesture));
+      act(() => product.props.onTouchEnd(basketEvent));
+      expect(onDropProduct.mock.calls).toEqual([['milk']]);
+      // Scroll unlocks before the returning/fading ghost has finished animating.
       expect(screen.getByTestId('market-shelf-scroll').props.scrollEnabled).toBe(true);
-      expect(onDropProduct).not.toHaveBeenCalled();
+
+      act(() => product.props.onTouchStart(event));
+      await advanceTransition(MARKET_PRODUCT_HOLD_MS);
+      act(() => responder.onPanResponderTerminate?.(event, gesture));
+      expect(screen.getByTestId('market-shelf-scroll').props.scrollEnabled).toBe(true);
+      expect(onDropProduct).toHaveBeenCalledTimes(1);
     } finally {
       screen.unmount();
       if (platformDescriptor) Object.defineProperty(Platform, 'OS', platformDescriptor);
     }
+  });
+
+  it('웹 길게 누르기는 실제 바구니 측정 좌표에 놓고 스와이프·취소·해제 시 리스너를 정리한다', async () => {
+    const platformDescriptor = Object.getOwnPropertyDescriptor(Platform, 'OS');
+    const windowDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'window');
+    const listeners = new Map<string, Set<(event: unknown) => void>>();
+    const addEventListener = jest.fn((name: string, callback: (event: unknown) => void) => {
+      const group = listeners.get(name) ?? new Set(); group.add(callback); listeners.set(name, group);
+    });
+    const removeEventListener = jest.fn((name: string, callback: (event: unknown) => void) => {
+      listeners.get(name)?.delete(callback);
+    });
+    const emit = (name: string, event: unknown) => act(() => {
+      [...(listeners.get(name) ?? [])].forEach(callback => callback(event));
+    });
+    Object.defineProperty(Platform, 'OS', { configurable: true, value: 'web' });
+    Object.defineProperty(globalThis, 'window', { configurable: true, value: { addEventListener, removeEventListener } });
+    const onDropProduct = jest.fn(() => true);
+    const measured = mockShelfMeasurements();
+    const screen = render(<MarketShelfScene {...shelfProps({ onDropProduct })} />);
+    const capture = jest.fn(), release = jest.fn();
+    const startPointer = () => fireEvent(screen.getByTestId('market-product-drag-milk'), 'pointerDown', {
+      nativeEvent: { button: 0, pointerId: 7, clientX: 70, clientY: 180, pointerType: 'touch', isPrimary: true },
+      currentTarget: { setPointerCapture: capture, releasePointerCapture: release },
+    });
+    try {
+      await advanceTransition();
+      fireEvent(screen.getByTestId('market-shelf-scroll'), 'layout', { nativeEvent: { layout: { height: 300 } } });
+      startPointer();
+      const ordinarySwipe = { cancelable: true, preventDefault: jest.fn() };
+      emit('touchmove', ordinarySwipe);
+      expect(ordinarySwipe.preventDefault).not.toHaveBeenCalled();
+      emit('pointermove', { pointerId: 7, clientX: 70, clientY: 210, cancelable: true, preventDefault: jest.fn() });
+      await advanceTransition(500);
+      expect(capture).not.toHaveBeenCalled();
+      expect(screen.getByTestId('market-shelf-scroll').props.scrollEnabled).toBe(true);
+      expect(listeners.get('pointermove')?.size).toBe(0);
+
+      startPointer();
+      await advanceTransition(MARKET_PRODUCT_HOLD_MS - 1);
+      expect(capture).not.toHaveBeenCalled();
+      await advanceTransition(1);
+      expect(capture).toHaveBeenCalledWith(7);
+      expect(screen.getByTestId('market-shelf-scroll').props.scrollEnabled).toBe(false);
+      const heldTouch = { cancelable: true, preventDefault: jest.fn() };
+      emit('touchmove', heldTouch);
+      expect(heldTouch.preventDefault).toHaveBeenCalledTimes(1);
+      expect(addEventListener.mock.calls.find(call => call[0] === 'touchmove')).toEqual([
+        'touchmove', expect.any(Function), { passive: false, capture: true },
+      ]);
+      emit('pointermove', { pointerId: 7, clientX: 100, clientY: 760, cancelable: true, preventDefault: jest.fn() });
+      expect(measured).toHaveBeenCalled();
+      expect(screen.getByText('여기에 놓아요!')).toBeTruthy();
+      emit('pointerup', { pointerId: 7, clientX: 100, clientY: 760, type: 'pointerup' });
+      expect(onDropProduct.mock.calls).toEqual([['milk']]);
+      expect(screen.getByTestId('market-shelf-scroll').props.scrollEnabled).toBe(true);
+      expect(release).toHaveBeenCalledWith(7);
+      expect(listeners.get('touchmove')?.size).toBe(0);
+
+      startPointer(); await advanceTransition(MARKET_PRODUCT_HOLD_MS);
+      emit('pointercancel', { pointerId: 7, clientX: 100, clientY: 760, type: 'pointercancel' });
+      expect(onDropProduct).toHaveBeenCalledTimes(1);
+      expect(screen.getByTestId('market-shelf-scroll').props.scrollEnabled).toBe(true);
+      startPointer();
+      screen.unmount();
+      await advanceTransition(MARKET_PRODUCT_HOLD_MS + 1);
+      expect(onDropProduct).toHaveBeenCalledTimes(1);
+      for (const name of ['pointermove', 'pointerup', 'pointercancel', 'touchmove', 'blur']) {
+        expect(listeners.get(name)?.size).toBe(0);
+      }
+    } finally {
+      screen.unmount();
+      if (platformDescriptor) Object.defineProperty(Platform, 'OS', platformDescriptor);
+      if (windowDescriptor) Object.defineProperty(globalThis, 'window', windowDescriptor);
+      else Reflect.deleteProperty(globalThis, 'window');
+    }
+  });
+
+  it('진열대 헤더는 균형 있게 중앙에 있고 합계·포기·부가 안내 없이 상품 단가만 표시한다', async () => {
+    const screen = render(<MarketShelfScene {...shelfProps({ slots: ['milk'], cart: { milk: 2 }, onGiveUp: jest.fn() })} />);
+    try {
+      await advanceTransition();
+      expect(screen.queryByRole('button', { name: '장보기 포기' })).toBeNull();
+      expect(screen.queryByText('하늘마트')).toBeNull();
+      expect(screen.queryByText('담은 금액')).toBeNull();
+      expect(screen.queryByText(/상품을 담거나/)).toBeNull();
+      expect(screen.getByText('2,200원')).toBeTruthy();
+      expect(screen.queryByText('4,400원')).toBeNull();
+      const header = screen.getByTestId('market-shelf-header');
+      expect(StyleSheet.flatten(header.children[0].props.style).width).toBe(72);
+      expect(StyleSheet.flatten(header.children[2].props.style).width).toBe(72);
+      const label = screen.getByTestId('market-product-label-milk');
+      expect(StyleSheet.flatten(label.props.style)).toMatchObject({ backgroundColor: '#FFFBEF', borderRadius: 8 });
+    } finally { screen.unmount(); }
   });
 
   it('모션 줄이기 설정에서는 접근성 탈출 동작으로 지연 없이 닫는다', async () => {

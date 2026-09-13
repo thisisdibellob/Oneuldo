@@ -1,0 +1,85 @@
+{
+  "asset": "checkout",
+  "date": "2026-09-13",
+  "mode": "builtin-imagegen",
+  "inputs": [
+    {
+      "role": "edit-target",
+      "path": "frontend/assets/images/game/market/interior/checkout_vertical_ortho_v1.png"
+    },
+    {
+      "role": "style-reference-only",
+      "path": "frontend/assets/images/game/characters/player/fresh-v1/chr_player_fresh_front_idle_f00_v2@2x.png"
+    }
+  ],
+  "passes": [
+    {
+      "purpose": "style-transfer",
+      "prompt": "Use case: style-transfer. Asset type: transparent 2D grocery checkout sprite for a mobile game.\nInput image 1 is the exact checkout object to restyle. Keep its single long, vertical, orthographic footprint and major layout: customer-facing card terminal beside register at the TOP, narrow charcoal conveyor running vertically, modest enclosed cabinet/plinth at BOTTOM. Input image 2 is ONLY the playable character style reference; do not include the person.\nRestyle the checkout into a refined, coherent warm neighborhood-market fixture that belongs with the delicate hand-drawn character: thin warm slate outlines, restrained soft hand-painted shading, subtle edge wear, warm ivory enamel #F7F4EC cabinet panels, muted sage #587565 edge trim, dark ink #304B54 structural details, soft black rubber belt with fine texture, brushed-metal compact card reader and scanner, tiny warm brass #C48B57 hardware. Include a small cool muted #7193A5 screen. Avoid the old orange/yellow plastic dominance, thick black cartoon outlines, exaggerated glossy highlights and oversaturation.\nCOMPOSITION INVARIANTS: exactly ONE counter, upright vertical long axis, all left/right outer edges parallel, no vanishing point, no isometric rotation, no perspective taper. Keep the slender silhouette of the input, no extra side tables or big extensions. The register is at the upper end, lower cabinet at bottom. The two bottom feet and full outer edges must be intact. Designed for an unchanged 72 × 142.5 world-pixel contain display above a 48 × 117 ground collision rectangle. Center the object tightly with a little clear margin in a tall portrait image.\nOUTPUT BACKGROUND: genuinely transparent PNG with actual alpha=0 outside the checkout silhouette. Preserve real alpha like input image 1. NO checkerboard pixels, no white or color background, no floor, no backdrop, no ambient halo or cast shadow outside the object. Do not draw a transparency grid. No people, no labels, no letters, no price signs, no logos, no watermark. The object must be a clean cutout ready to overlay on an existing floor.",
+      "rawPath": "C:/Users/PC/.codex/generated_images/01a09619-fb4e-7242-8a70-109d5d449476/exec-772ed1f4-80f6-4a45-a388-edfc7378f99c.png",
+      "accepted": false,
+      "reason": "RGB with baked checkerboard, rejected"
+    },
+    {
+      "purpose": "background-extraction",
+      "prompt": "Use case: background-extraction. Precise edit of the supplied checkout image. Keep EVERY pixel of the checkout object unchanged: same tall orthographic silhouette, ivory cabinet, muted sage trim, slate outlines, dark conveyor, small displays and brass detail. The gray checkerboard surrounding it is an erroneous painted background and MUST be REMOVED. Deliver a genuinely transparent PNG with a real RGBA alpha channel, with alpha ZERO everywhere outside the checkout's opaque silhouette. Keep delicate antialiased edge alpha. Do not simulate transparency with white, gray, black, magenta, any checker pattern or any other opaque pixels. No floor or shadow. The output must contain one isolated checkout cutout on actual transparency, ready for compositing over any colored game floor. Change only the erroneous checkerboard background; do not repaint or redesign the checkout.",
+      "rawPath": "C:/Users/PC/.codex/generated_images/01a09619-fb4e-7242-8a70-109d5d449476/exec-903da0f7-dbb4-4e8a-98ea-b4da065f8115.png",
+      "accepted": true
+    }
+  ],
+  "normalization": {
+    "method": "alpha-derived crop, resize, transparent padding only; no alpha thresholding, chroma replacement, or pixel repainting",
+    "crop": {
+      "left": 162,
+      "top": 0,
+      "width": 564,
+      "height": 1774
+    },
+    "resize": {
+      "width": 388,
+      "height": 1019,
+      "fit": "fill"
+    },
+    "padding": {
+      "left": 4,
+      "right": 4,
+      "top": 3,
+      "bottom": 2
+    },
+    "runtimeCanvas": {
+      "width": 396,
+      "height": 1024
+    },
+    "referenceAlphaBounds": {
+      "canvas": [
+        198,
+        512
+      ],
+      "bounds": [
+        3,
+        3,
+        192,
+        506
+      ]
+    },
+    "notes": "Tiny alpha=1 residue outside the tightly cropped asset is excluded by cropping. Original generated alpha within the crop is preserved and interpolated on resize. Crop/resize align the opaque art with the previous frame; world display and 48×117 physics unchanged."
+  },
+  "runtime": "frontend/assets/images/game/market/interior/retail-v4/checkout.png",
+  "master": "docs/design-concepts/2026-09-13-market-retail/checkout-master.png",
+  "qa": {
+    "width": 396,
+    "height": 1024,
+    "hasAlpha": true,
+    "alphaZeroPixels": 37085,
+    "partialAlphaPixels": 366609,
+    "alpha32Bounds": [
+      5,
+      6,
+      385,
+      1013
+    ],
+    "bytes": 724296,
+    "sha256": "5e089bdb5077345902e83a89a80b328c559a447f21f278079ce49588cbf89e07",
+    "normalization": "crop-resize-padding-only"
+  }
+}

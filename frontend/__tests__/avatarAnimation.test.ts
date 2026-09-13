@@ -76,7 +76,7 @@ describe('avatarAnimation', () => {
     expect(resolveAvatarFrame(withFallback, 'left', 'walk', 2)).toBe(13);
   });
 
-  test('keeps every facing mounted while the active direction changes', () => {
+  test('loads the correct diagonal animation without keeping unrelated directions mounted', () => {
     const screen = render(
       createElement(DirectionalAvatar, {
         facing: 'front',
@@ -98,7 +98,7 @@ describe('avatarAnimation', () => {
       }),
     );
 
-    expect(before).toHaveLength(25);
-    expect(mountedSources()).toEqual(before);
+    expect(before).toEqual([11, 12, 13]);
+    expect(mountedSources()).toEqual([61, 62]);
   });
 });

@@ -1,0 +1,24 @@
+{
+  "mode": "built-in image_gen",
+  "production": "frontend/assets/images/game/market/interior/retail-v4/gondola-empty.png",
+  "master": "gondola-master.png",
+  "references": [
+    "shelf_meal_v2.png",
+    "chr_player_fresh_front_idle_f00_v2@2x.png"
+  ],
+  "direction": "Empty orthographic two-level gondola; ivory enamel, sage rails, pale oak, fine gray linework, brass fasteners; landscape 3:2.",
+  "prompts": [
+    "Create a premium EMPTY two-level modular supermarket gondola sprite, preserving front orthographic parallel sides and landscape3:2 silhouette from the shelf reference. Refined hand-painted anime/storybook finish matching the slim illustrated player. Ivory enamel, sage narrow edge rails, fine deep-gray outlines, brass fasteners, pale oak back panels. Two clear empty compartments for runtime products. True transparent PNG, no background/checkerboard/ground/bloom/shadow/text. Fixture occupies88%width andheight, feet at94%canvasheight. No perspective/isometric.",
+    "Extract exactly this EMPTY supermarket shelf as a production game sprite. Delete painted checkerboard outside silhouette; actual alpha=0. Preserve shelf pixels, texture, colors and proportions.",
+    "Use case: background-extraction. Remove the background of this shelf. Return a true transparent RGBA PNG cutout with the entire background removed. The grey checkerboard shown is an erroneous painted background and MUST be REMOVED. The background pixels must be alpha 0. Keep the wooden and metal shelf unchanged. Isolate just the shelf. No checkerboard, no background image. Transparent background is mandatory."
+  ],
+  "qa": {
+    "width": 768,
+    "height": 512,
+    "hasAlpha": true,
+    "sourceTransparentPixels": 412988,
+    "allCornersAlpha": 0
+  },
+  "packaging": "Selected master resized to768×512 with alpha preserved. First two RGB outputs rejected. No painted masking or background substitution.",
+  "promptRecordNote": "First two prompts are reconstructed briefs from work history, not exact verbatim records. The final extraction prompt is recorded verbatim."
+}

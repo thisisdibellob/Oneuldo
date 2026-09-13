@@ -1,5 +1,7 @@
-import { ReactNode, useEffect, useRef, useState } from 'react';
+import { createContext, ReactNode, useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, Animated, Easing, Platform, StyleSheet, View } from 'react-native';
+
+export const MarketPanelActivityContext = createContext(true);
 
 const MOTION_QUERY = '(prefers-reduced-motion: reduce)';
 const browserMotion = () => Platform.OS === 'web' && typeof window !== 'undefined' && typeof window.matchMedia === 'function'
@@ -74,9 +76,11 @@ export function MarketPanelTransition({ visible, transitionKey, children, onPres
     onStartShouldSetResponder={() => !visible}
     style={[styles.fill, { opacity }]}
   >
-    <View pointerEvents={visible ? 'box-none' : 'none'} style={StyleSheet.absoluteFill}>
-      {visible ? children : retained.current}
-    </View>
+    <MarketPanelActivityContext.Provider value={visible}>
+      <View pointerEvents={visible ? 'box-none' : 'none'} style={StyleSheet.absoluteFill}>
+        {visible ? children : retained.current}
+      </View>
+    </MarketPanelActivityContext.Provider>
   </Animated.View>;
 }
 

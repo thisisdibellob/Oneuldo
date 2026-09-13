@@ -62,12 +62,9 @@ describe('configurable market session', () => {
     expect(ended.events.filter(event => event.type === 'entrance_alarm').map(event => event.payload.delta)).toEqual([-10, -10]);
   });
 
-  it('never alarms at the exit or with an empty/paid basket and never reduces score below zero', () => {
+  it('never alarms with an empty/paid basket and never reduces score below zero', () => {
     let empty = applyMarketAction(session(), { type: 'setPosition', point: { x: 470, y: 1060 } });
     expect(empty.alarmCount).toBe(0);
-    let exit = add(session(), 'milk');
-    exit = applyMarketAction(exit, { type: 'setPosition', point: { x: 870, y: 1060 } });
-    expect(exit.alarmCount).toBe(0);
     let game = add(session({ alarmPenaltyPoints: 65 }), 'milk');
     for (let index = 0; index < 3; index++) {
       game = applyMarketAction(game, { type: 'setPosition', point: { x: 470, y: 970 } });
@@ -80,14 +77,31 @@ describe('configurable market session', () => {
     expect(applyMarketAction(paid, { type: 'setPosition', point: { x: 470, y: 1060 } }).alarmCount).toBe(0);
   });
 
-  it('requires proximity for entrance departure and records its unpaid penalty only once', () => {
+  it('inner entrance and exit are passive passages; only the shared outside door ends the trip', () => {
     let game = add(session(), 'milk');
     expect(applyMarketAction(game, { type: 'interact', station: 'entrance' }).lastActionError).toContain('가까이');
-    game = applyMarketAction(game, { type: 'setPosition', point: { x: 470, y: 1030 } });
+    game = applyMarketAction(game, { type: 'setPosition', point: game.environment.stations.entrance });
     game = applyMarketAction(game, { type: 'interact', station: 'entrance' });
+    expect(game).toMatchObject({ phase: 'shopping', outcome: null, activeStation: null, alarmCount: 1, score: 90 });
+    game = visit(game, 'exit');
+    expect(game).toMatchObject({ phase: 'shopping', outcome: null, activeStation: null });
+    game = visit(game, 'common-door');
     expect(game).toMatchObject({ phase: 'finished', outcome: 'gave-up', alarmCount: 1, score: 90 });
     expect(game.events.filter(event => event.type === 'entrance_alarm')).toHaveLength(1);
-    expect(game.events.at(-1)?.payload.station).toBe('entrance');
+    expect(game.events.at(-1)?.payload.station).toBe('common-door');
+  });
+
+  it('alarms at the upper side doorway but not while walking the shared lobby or west corridor', () => {
+    let game = add(session(), 'milk');
+    game = applyMarketAction(game, { type: 'setPosition', point: { x: 340, y: 315 } });
+    game = applyMarketAction(game, { type: 'setPosition', point: { x: 285, y: 315 } });
+    expect(game).toMatchObject({ score: 90, alarmCount: 1, alarmArmed: false });
+    expect([...game.events].reverse().find(event => event.type === 'entrance_alarm')?.payload.gateId).toBe('west-door');
+    for (const point of [{ x: 240, y: 315 }, { x: 240, y: 1280 }, { x: 930, y: 1280 }, { x: 710, y: 1370 }]) {
+      game = applyMarketAction(game, { type: 'setPosition', point });
+      expect(game.lastActionError).toBeNull();
+      expect(game.alarmCount).toBe(1);
+    }
   });
 
   it('replays the same configuration without nondeterministic layout, shelves, or log timestamps', () => {
@@ -99,16 +113,16 @@ describe('configurable market session', () => {
     expect(() => createMarketSession({ seed: 'mismatched' }, original.environment)).toThrow('seed');
   });
 
-  it('places nine distinct products in twelve slots per shelf with a shared stock ledger', () => {
+  it('places twelve unique products in twelve slots while multiple purchases still share SKU stock', () => {
     const game = session();
     expect(applyMarketAction(game, null as never).lastActionError).toContain('알 수 없는');
     for (const slots of Object.values(game.shelfSlots)) {
       expect(slots).toHaveLength(12);
-      expect(new Set(slots).size).toBe(9);
+      expect(new Set(slots).size).toBe(12);
       for (const id of slots) expect(game.stock[id]).toBe(6);
     }
-    expect(Object.keys(game.stock)).toHaveLength(45);
-    const duplicate = game.shelfSlots.fresh.find((id, index, values) => values.indexOf(id) !== index)!;
+    expect(Object.keys(game.stock)).toHaveLength(60);
+    const duplicate = game.shelfSlots.fresh[0];
     const changed = add(game, duplicate, 2);
     expect(changed.stock[duplicate]).toBe(4);
     expect(changed.cart[duplicate]).toBe(2);
@@ -200,7 +214,7 @@ describe('configurable market session', () => {
       expect(rejected.cart).toEqual(current.cart);
       expect(rejected.stock).toEqual(current.stock);
       expect(rejected.events.at(-1)?.type).toBe('action_rejected');
-      expect(rejected.score).toBe(100);
+      expect(rejected.score).toBe(current.score);
     }
   });
 
@@ -399,13 +413,13 @@ describe('configurable market session', () => {
     game = add(game, 'milk');
     const shelf = getMarketObservation(game);
     expect(Object.keys(shelf.shelfSlots)).toEqual(['fresh']);
-    expect(shelf.products).toHaveLength(9);
+    expect(shelf.products).toHaveLength(12);
     expect(shelf.products.every((product) => product.categoryId === 'fresh')).toBe(true);
     expect(shelf.cart).toBeNull();
     expect(shelf.stock.milk).toBe(5);
     game = applyMarketAction(game, { type: 'viewCart' });
     expect(getMarketObservation(game)).toMatchObject({ view: 'cart', cart: { milk: 1 } });
-    expect(getMarketObservation(game).products).toHaveLength(9);
+    expect(getMarketObservation(game).products).toHaveLength(12);
     expect(game.events.at(-1)?.type).toBe('cart_viewed');
     const blocked = applyMarketAction(game, { type: 'move', dx: 0, dy: 10 });
     expect(blocked.playerPosition).toEqual(game.playerPosition);
@@ -441,15 +455,89 @@ describe('configurable market session', () => {
     expect(applyMarketAction(game, { type: 'add', productId: 'milk' }).lastActionError).toContain('진열대');
   });
 
-  it('ends a physical exit as giving up and rejects remote exit interaction', () => {
+  it('ends a physical shared-door departure as giving up and rejects remote departure', () => {
     const game = session();
-    const remote = applyMarketAction(game, { type: 'interact', station: 'exit' });
+    const remote = applyMarketAction(game, { type: 'interact', station: 'common-door' });
     expect(remote.lastActionError).toContain('가까이');
     expect(remote.outcome).toBeNull();
-    const left = visit(game, 'exit');
+    const left = visit(game, 'common-door');
     expect(left.outcome).toBe('gave-up');
     expect(left.attempts).toBe(0);
     expect(left.phase).toBe('finished');
     expect(left.events.at(-1)?.payload).toMatchObject({ reason: 'player_left_market', outcome: 'gave-up' });
   });
+});
+
+it('deducts at the exit once per outward crossing after rearm and records its gate ID', () => {
+  let game = add(session(), 'milk');
+  game = applyMarketAction(game, { type: 'setPosition', point: { x: 930, y: 1018 } });
+  game = applyMarketAction(game, { type: 'move', dx: 0, dy: 24 });
+  expect(game.lastActionError).toBeNull();
+  expect(game).toMatchObject({ score: 90, penaltyPoints: 10, alarmCount: 1, alarmArmed: false, phase: 'shopping' });
+  expect([...game.events].reverse().find(event => event.type === 'entrance_alarm')?.payload).toMatchObject({ gateId: 'exit', delta: -10, trigger: 'boundary-crossed' });
+  for (let index = 0; index < 4; index++) {
+    game = applyMarketAction(game, { type: 'move', dx: 0, dy: -20 });
+    expect(game.lastActionError).toBeNull();
+    game = applyMarketAction(game, { type: 'move', dx: 0, dy: 20 });
+    expect(game.lastActionError).toBeNull();
+  }
+  expect(game.alarmCount).toBe(1);
+  for (const point of [{ x: 470, y: 1100 }, { x: 930, y: 1280 }, { x: 710, y: 1370 }]) {
+    game = applyMarketAction(game, { type: 'setPosition', point });
+    expect(game.lastActionError).toBeNull();
+    expect(game.alarmCount).toBe(1);
+  }
+  game = applyMarketAction(game, { type: 'setPosition', point: { x: 930, y: 970 } });
+  expect(game.lastActionError).toBeNull();
+  expect(game.alarmArmed).toBe(true);
+  game = applyMarketAction(game, { type: 'setPosition', point: { x: 930, y: 1018 } });
+  game = applyMarketAction(game, { type: 'move', dx: 0, dy: 24 });
+  expect(game).toMatchObject({ score: 80, penaltyPoints: 20, alarmCount: 2 });
+  expect(game.events.filter(event => event.type === 'entrance_alarm').map(event => event.payload.gateId)).toEqual(['exit', 'exit']);
+  expect(exportMarketEpisode(applyMarketAction(game, { type: 'giveUp' }))).toMatchObject({ score: 80, alarmCount: 2, penaltyPoints: 20 });
+});
+
+it.each(['entrance', 'exit', 'west-door'] as const)('%s exempts empty and already-paid baskets on an actual outward crossing', gateId => {
+  for (const hasPaidBasket of [false, true]) {
+    // A paid walking snapshot also exercises the paid guard independently of the finished-phase movement guard.
+    let game: MarketSession = hasPaidBasket ? { ...add(session(), 'milk'), paid: true } : session();
+    const gate = game.environment.alarmGates.find(candidate => candidate.id === gateId)!;
+    const inside = gate.axis === 'x' ? { x: gate.boundary + 12, y: gate.gate.y + gate.gate.height / 2 }
+      : { x: gate.gate.x + gate.gate.width / 2, y: gate.boundary - 12 };
+    game = applyMarketAction(game, { type: 'setPosition', point: inside });
+    expect(game.lastActionError).toBeNull();
+    game = applyMarketAction(game, { type: 'move', dx: gate.axis === 'x' ? -24 : 0, dy: gate.axis === 'y' ? 24 : 0 });
+    expect(game.lastActionError).toBeNull();
+    expect(game).toMatchObject({ score: 100, penaltyPoints: 0, alarmCount: 0, alarmArmed: false });
+  }
+});
+
+it('bounded player movement cannot step into the elevator wall gap', () => {
+  const game = applyMarketAction(session(), { type: 'setPosition', point: { x: 165, y: 260 } });
+  expect(game.lastActionError).toBeNull();
+  const blocked = applyMarketAction(game, { type: 'move', dx: 0, dy: -20 });
+  expect(blocked.lastActionError).toContain('장애물');
+  expect(blocked.playerPosition).toEqual(game.playerPosition);
+});
+
+
+it('preserves a fixed twelve-product assortment and upgrades old nine-product presets without duplicate slots', () => {
+  const original = session();
+  const fixed = [...original.shelfSlots.fresh];
+  const twelve = session({ inventoryProductIds: { fresh: fixed } });
+  expect(twelve.shelfSlots.fresh).toEqual(fixed);
+  const legacy = ['milk', ...fixed.filter(id => id !== 'milk')].slice(0, 9);
+  const upgraded = session({ inventoryProductIds: { fresh: legacy } });
+  expect(upgraded.shelfSlots.fresh.slice(0, 9)).toEqual(legacy);
+  expect(new Set(upgraded.shelfSlots.fresh).size).toBe(12);
+  expect(upgraded.config.inventoryProductIds?.fresh).toEqual(upgraded.shelfSlots.fresh);
+  expect(createMarketSession(upgraded.config)).toEqual(upgraded);
+  expect(() => session({ inventoryProductIds: { fresh: [...fixed.slice(0, 11), fixed[0]] } })).toThrow('서로 다른');
+});
+
+it('never repeats a product in any category over one hundred seeds', () => {
+  for (let seed = 0; seed < 100; seed++) {
+    const generated = session({ seed });
+    for (const slots of Object.values(generated.shelfSlots)) expect(new Set(slots).size).toBe(12);
+  }
 });
