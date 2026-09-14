@@ -1,3 +1,4 @@
+import { randomUUID } from 'expo-crypto';
 import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, BackHandler, Image, Platform, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
@@ -124,6 +125,8 @@ export function MarketSimulationScreen({
   // Missions from the application always use AI assessment. The standalone marketLab
   // keeps the incoming deterministic research preview, never used as an AI verdict.
   const aiAssessment = !!mission;
+  const briefingPages = mission?.briefing.length ? mission.briefing : null;
+  const lastBriefingStep = (briefingPages?.length ?? 2) - 1;
   const [review, setReview] = useState<string | null>(null);
   const reviewing = useRef(false);
   const mounted = useRef(true);
@@ -139,7 +142,7 @@ export function MarketSimulationScreen({
     const { scene: ignored, ...base } = original;
     const products = Object.values(session.shelfSlots).flat().map(id => ({ ...getMarketProduct(id)!, initialStock: session.initialStock[id] }));
     return { ...base, objectives: mission?.objectives ?? session.config.objectives, scene: {
-      schemaVersion: 'market-scene-v1', questInstanceId: simulation?.questInstanceId ?? session.id,
+      schemaVersion: 'market-scene-v1', questInstanceId: simulation?.questInstanceId ?? mission?.scene?.questInstanceId ?? randomUUID(),
       seed: session.config.seed,
       layoutVersion: 'market-retail-layout-v3', catalogVersion: base.catalogVersion ?? MARKET_CATALOG_VERSION,
       scenarioVersion: base.scenarioVersion ?? MARKET_SCENARIO_VERSION, mission: { ...base, objectives: mission?.objectives ?? session.config.objectives }, products,
@@ -492,10 +495,11 @@ export function MarketSimulationScreen({
     {review === null && briefing && !settings && !historyOpen
       ? modal('마트에서 장보기', <>
         <Text style={s.body}>
-          {briefingStep === 0
+          {briefingPages ? briefingPages[briefingStep] : briefingStep === 0
             ? mission?.description ?? '목록을 보고 필요한 물건을 골라 보세요. 물건의 이름과 종류를 천천히 살펴봐요.'
             : aiAssessment ? '다 골랐다면 계산대로 가서 AI 검토를 요청해 주세요. 언제든 그만둘 수 있어요.' : `다 골랐다면 출구 옆 계산대로 가요. 계산하지 않은 물건을 담고 입구·출구·측면 출입문의 빨간 경보기를 지나 매장 밖으로 나가면 ${session.config.alarmPenaltyPoints}점이 줄어요. 원하면 다시 해보거나 언제든 그만둘 수 있어요.`}
         </Text>
+        {mission && briefingStep === 0 ? <Text style={s.body}>{mission.description}</Text> : null}
         {!aiAssessment && <View style={s.choices}>
           <Button
             text="연습 모드"
@@ -524,8 +528,8 @@ export function MarketSimulationScreen({
           </View>)}
         </View>
         <Button
-          text={briefingStep === 0 ? '다음' : '장보기 시작'}
-          onPress={() => { tracker.current?.briefingAdvanced(briefingStep, Date.now()-briefingShownAt.current); briefingShownAt.current=Date.now(); briefingStep === 0 ? setBriefingStep(1) : start(); }}
+          text={briefingStep < lastBriefingStep ? '다음' : '장보기 시작'}
+          onPress={() => { tracker.current?.briefingAdvanced(briefingStep, Date.now()-briefingShownAt.current); briefingShownAt.current=Date.now(); briefingStep < lastBriefingStep ? setBriefingStep(step => step + 1) : start(); }}
         />
         <Button
           text="연습 환경 설정"
@@ -626,6 +630,7 @@ export function MarketSimulationScreen({
         <Text style={s.body}>합계 {price(getMarketCartTotal(session.cart))}</Text>
         {session.cashierAvailable
           ? <>
+            {mission?.checkoutDialogue.map((line, index) => <Text key={index} style={s.body}>{line}</Text>)}
             <Text style={s.small}>구매를 확정하면 이번 시도가 기록되고 결과가 나와요.</Text>
             <Button text="구매 확정" onPress={() => { void submitForReview(); }} />
           </>

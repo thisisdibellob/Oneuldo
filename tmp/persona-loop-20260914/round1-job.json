@@ -1,0 +1,14 @@
+{
+  "id": "96fa16cf-d1d1-4586-b200-60b2f8f4ca1d",
+  "sessionId": "4f73861e-2769-49b3-a883-684f1c60db0a",
+  "datasetId": "b535c5c0-4c1d-49c2-aa9d-d8420560939b",
+  "status": "READY",
+  "stage": "READY",
+  "completed": 2,
+  "total": 2,
+  "waitUntil": null,
+  "analysisId": "c9393408-f5a0-42af-a342-90badd3aa9d4",
+  "errorCode": null,
+  "createdAt": "2026-09-14T05:35:49.921947Z",
+  "updatedAt": "2026-09-14T06:13:25.219653Z"
+}

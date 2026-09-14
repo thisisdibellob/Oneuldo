@@ -1,0 +1,43 @@
+{
+  "generationId": "1ed2f645-f560-4d2d-bc4a-a3ed13c51c05",
+  "analysisId": "c9393408-f5a0-42af-a342-90badd3aa9d4",
+  "profileId": "c9d0f51e-09f8-4453-a876-2c4b1efeb32f",
+  "source": "AI",
+  "model": "qwen3.6:27b-q4_K_M",
+  "latencyMs": 89788,
+  "personalizationMode": "AI_PROFILE",
+  "promptVersion": "market-ai-quest-v4-lossless",
+  "quest": {
+    "id": "market-ai-1ed2f645-f560-4d2d-bc4a-a3ed13c51c05",
+    "scenarioId": "S02",
+    "catalogVersion": "oneuldo-shopping-content-2026-09-04-v2",
+    "scenarioVersion": "market-runtime-phase2-v1",
+    "difficulty": 2,
+    "title": "공원 간식 구매",
+    "description": "사과 2개와 생수 1개를 구매하여 공원 간식 준비를 완료합니다.",
+    "budget": 4000,
+    "objectives": [
+      {
+        "productId": "apple",
+        "quantity": 2
+      },
+      {
+        "productId": "water",
+        "quantity": 1
+      }
+    ],
+    "briefing": [
+      "오늘은 공원에서 먹을 간식을 사러 갑니다.",
+      "목록을 보고 필요한 물건을 찾아보세요."
+    ],
+    "checkoutDialogue": [
+      "사과 2개와 생수 1개를 선택하셨습니다.",
+      "구매가 완료되었습니다. 감사합니다."
+    ],
+    "successMessage": "목록에 있는 사과와 생수를 모두 찾았습니다."
+  },
+  "adaptationSummary": "이전 세션에서 목록 확인 행동을 보였으므로, 동일한 목표와 낮은 난이도로 연습을 반복합니다.",
+  "reasonCodes": [
+    "OBSERVATION_PRACTICE"
+  ]
+}

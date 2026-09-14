@@ -28,15 +28,19 @@ final class AiUserProfileReferences {
         collect(previous.getProfile(), events, sessions);
         collect(current.analysis(), events, sessions);
         int number = 0;
-        for (var id : events) add(id.toString(), "E" + (++number));
+        for (var id : events) add(id.toString(), "R" + (++number));
         number = 0;
         for (var id : sessions) add(id.toString(), "S" + (++number));
     }
 
     String encode(String json) {
         ObjectNode root = (ObjectNode) replace(mapper.readTree(json));
-        root.put("referenceEncoding", "E숫자는 제공된 근거 사건, S숫자는 제공된 세션의 별칭이다. "
-                + "evidenceEventIds에는 제공된 E 별칭만 그대로 사용하고 UUID를 만들거나 수정하지 않는다.");
+        root.set("allowedEvidenceEventIds", mapper.valueToTree(originals.keySet().stream()
+                .filter(alias -> alias.startsWith("R")).toList()));
+        root.put("referenceEncoding", "R숫자는 이번 요청의 근거 사건, S숫자는 세션의 별칭이다. "
+                + "evidenceEventIds에는 allowedEvidenceEventIds에 있는 R 별칭만 사용한다. "
+                + "입력 문장 속 E숫자는 이전 분석의 표기라 이번 인용 번호와 다르다. 문장 속 번호를 복사하지 말고 "
+                + "해당 finding/sessionAssessment의 evidenceEventIds 배열에 있는 R 번호에서 선택한다. UUID나 새 번호를 만들지 않는다.");
         return mapper.writeValueAsString(root);
     }
 
@@ -53,7 +57,7 @@ final class AiUserProfileReferences {
         for (int i = 0; i < ids.size(); i++) {
             if (!ids.get(i).isString()) throw new IllegalArgumentException("INVALID_EVENT_REFERENCE");
             String original = originals.get(ids.get(i).asString());
-            if (original == null || !ids.get(i).asString().startsWith("E"))
+            if (original == null || !ids.get(i).asString().startsWith("R"))
                 throw new IllegalArgumentException("UNKNOWN_PROFILE_EVENT_REFERENCE");
             ids.set(i, mapper.valueToTree(original));
         }
