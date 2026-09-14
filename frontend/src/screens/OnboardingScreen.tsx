@@ -30,9 +30,13 @@ type LoginStep = 'welcome' | 'credentials' | 'signup';
 type FocusedField = 'id' | 'loginId' | 'name' | 'email' | 'birthDate' | 'password' | 'passwordConfirm' | null;
 const BackgroundBlurTarget = createContext<RefObject<View | null> | undefined>(undefined);
 
-export function OnboardingScreen({ active = true, onEnter }: { active?: boolean; onEnter: (accessToken?: string) => void }) {
+export function OnboardingScreen({ active = true, initialStep = 'welcome', onEnter }: {
+  active?: boolean;
+  initialStep?: LoginStep;
+  onEnter: (accessToken?: string) => void;
+}) {
   const { height } = useWindowDimensions();
-  const [step, setStep] = useState<LoginStep>('welcome');
+  const [step, setStep] = useState<LoginStep>(initialStep);
   const [gradientEnabled, setGradientEnabled] = useState(true);
   const [reduceMotion, setReduceMotion] = useState(false);
   const screenOpacity = useRef(new Animated.Value(0.78)).current;

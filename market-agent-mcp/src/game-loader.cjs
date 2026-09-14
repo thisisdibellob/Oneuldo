@@ -26,6 +26,7 @@ function installGameTypeScriptLoader() {
         target: ts.ScriptTarget.ES2022,
         module: ts.ModuleKind.CommonJS,
         moduleResolution: ts.ModuleResolutionKind.Node10,
+        ignoreDeprecations: '6.0',
         esModuleInterop: true,
         allowSyntheticDefaultImports: true,
         resolveJsonModule: true,

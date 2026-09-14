@@ -2,6 +2,10 @@
 const readline = require('node:readline');
 const { MarketAgentRuntime } = require('./src/runtime.cjs');
 
+if (process.env.ONEULDO_MARKET_RUNTIME !== 'local') {
+  process.stderr.write('[oneuldoMarket] STDIO_BROWSER_MODE_REMOVED: npm start로 공유 HTTP 서비스를 실행하고 Codex MCP URL을 http://127.0.0.1:8765/mcp 로 변경하세요.\n');
+  process.exit(78);
+}
 const runtime = new MarketAgentRuntime();
 
 const sessionIdProperty = { type: 'string', minLength: 1, description: 'market_start가 반환한 세션 ID' };
@@ -68,7 +72,7 @@ const tools = [
             { type: 'object', additionalProperties: false, required: ['type', 'station'], properties: { type: { const: 'interact' }, station: { type: 'string' }, at: { type: 'string', format: 'date-time' } } },
             { type: 'object', additionalProperties: false, required: ['type', 'productId'], properties: { type: { enum: ['add', 'remove', 'requestReturn'] }, productId: { type: 'string' }, quantity: { type: 'integer', minimum: 1, maximum: 99 }, at: { type: 'string', format: 'date-time' } } },
             { type: 'object', additionalProperties: false, required: ['type'], properties: { type: { enum: ['checkout', 'requestCashier'] }, checkoutId: { enum: ['checkout', 'checkout-2'] }, at: { type: 'string', format: 'date-time' } } },
-            { type: 'object', additionalProperties: false, required: ['type'], properties: { type: { enum: ['submit', 'retry', 'giveUp', 'skipRating', 'closeStation', 'viewCart', 'viewHelp', 'closeView'] }, at: { type: 'string', format: 'date-time' } } },
+            { type: 'object', additionalProperties: false, required: ['type'], properties: { type: { enum: ['submit', 'retry', 'giveUp', 'skipRating', 'closeStation', 'viewCart', 'viewHelp', 'closeView', 'continueBriefing'] }, at: { type: 'string', format: 'date-time' } } },
             { type: 'object', additionalProperties: false, required: ['type', 'difficulty', 'interest'], properties: { type: { const: 'rate' }, difficulty: { type: 'integer', minimum: 1, maximum: 5 }, interest: { type: 'integer', minimum: 1, maximum: 5 }, at: { type: 'string', format: 'date-time' } } },
           ],
         },
@@ -109,7 +113,7 @@ function toolFailure(error) {
   return { ...toolResult(value), isError: true };
 }
 
-function callTool(name, args) {
+async function callTool(name, args) {
   if (name === 'market_start') return runtime.start(args);
   if (name === 'market_observe') return runtime.observe(args);
   if (name === 'market_move') return runtime.move(args);
@@ -141,7 +145,7 @@ async function handle(message) {
   }
   if (message.method === 'tools/call') {
     try {
-      success(message.id, toolResult(callTool(message.params?.name, message.params?.arguments ?? {})));
+      success(message.id, toolResult(await callTool(message.params?.name, message.params?.arguments ?? {})));
     } catch (error) {
       success(message.id, toolFailure(error));
     }

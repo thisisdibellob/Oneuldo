@@ -1,6 +1,6 @@
 export type MarketTelemetryPoint = { x: number; y: number };
 export type MarketTelemetryStation = 'fresh' | 'produce' | 'meal' | 'drink' | 'household' | 'checkout' | 'checkout-2';
-export type MarketTelemetryControlMode = 'joystick' | 'touch' | 'accessibility';
+export type MarketTelemetryControlMode = 'joystick' | 'touch' | 'accessibility' | 'agent';
 
 export type MarketMovementEventDraft = {
   eventCode: string;

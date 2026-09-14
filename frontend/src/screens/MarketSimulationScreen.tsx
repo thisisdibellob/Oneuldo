@@ -29,6 +29,8 @@ import { marketMission, marketProducts } from '../game/scenarios';
 import { MARKET_CATALOG_VERSION, MARKET_SCENARIO_VERSION, enabledMarketScenarios } from '../game/marketContent';
 import { fonts } from '../theme';
 import { listMarketEpisodes, saveMarketEpisode, MarketStoredEpisode } from '../game/marketEpisodeStore';
+import { buildMarketAgentObservation, type MarketAgentUiState } from '../game/marketAgentObservation';
+import type { MarketAgentAction, MarketAgentActionInput, MarketAgentController } from '../agent/marketAgentProtocol';
 
 /** Preserve the mission's offered alternatives while using the new shelf layout. */
 function createMissionSession(config: Partial<MarketSessionConfig>, mission?: MarketMission, environment?: MarketEnvironment) {
@@ -94,6 +96,12 @@ export type MarketSimulationScreenProps = {
   onExit: () => void;
   onLockChange?: (locked: boolean) => void;
   onMissionComplete?: () => void;
+  agentControl?: {
+    maxSteps: number;
+    onReady: (controller: MarketAgentController | null) => void;
+    provenance: { agentModel: string; personaId: string; personaVersion?: string };
+    sessionId: string;
+  };
 };
 const price = (value: number) => value.toLocaleString('ko-KR') + '원';
 
@@ -114,7 +122,8 @@ export function MarketSimulationScreen({
   onEpisodeComplete,
   onExit,
   onLockChange,
-  onMissionComplete
+  onMissionComplete,
+  agentControl,
 }: MarketSimulationScreenProps) {
   const insets = useContext(SafeAreaInsetsContext);
   const [session, setSession] = useState(() => createMissionSession({
@@ -132,6 +141,8 @@ export function MarketSimulationScreen({
   const mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const tracker = useRef<MarketBehaviorTracker | null>(null);
+  const trackerFinalized = useRef(false);
+  const finalization = useRef<Promise<void> | null>(null);
   const shelfOpenedAt = useRef(Date.now());
   const cartOpenedAt = useRef(Date.now());
   const briefingShownAt = useRef(Date.now());
@@ -153,11 +164,18 @@ export function MarketSimulationScreen({
   }, [session.id, mission, simulation?.questInstanceId]);
   useEffect(() => {
     if (!accessToken) return;
-    const current = new MarketBehaviorTracker(accessToken, trackedMission, difficulty, simulation, session.environment.stations);
+    const current = new MarketBehaviorTracker(accessToken, trackedMission, difficulty, simulation, session.environment.stations,
+      agentControl ? {
+        sessionId: agentControl.sessionId,
+        initialControlMode: 'agent',
+        agentContext: agentControl.provenance,
+      } : undefined);
+    trackerFinalized.current = false;
+    finalization.current = null;
     tracker.current = current;
     void current.flushNow().catch(() => undefined);
     return () => { void current.abort(live.current.cart).catch(() => undefined); tracker.current = null; };
-  }, [accessToken, trackedMission, difficulty, simulation]);
+  }, [accessToken, trackedMission, difficulty, simulation, agentControl?.sessionId]);
   useEffect(() => {
     const subscription = AppState.addEventListener('change', state => state === 'active' ? tracker.current?.appForegrounded() : tracker.current?.appBackgrounded());
     return () => subscription.remove();
@@ -185,10 +203,22 @@ export function MarketSimulationScreen({
   const handled = useRef<number | null>(null),
     completed = useRef(false),
     emitted = useRef(false);
+  const agentRevision = useRef(0);
+  const agentStepCount = useRef(0);
+  const agentActionResults = useRef(new Map<string, unknown>());
   const position = playerPositionRef ?? localPosition;
   const shelf = marketCategories.find(category => category.id === session.activeStation);
   const panelVisible = review !== null || briefing || settings || historyOpen || session.phase !== 'shopping' || cartOpen || helpOpen || staffMessage;
   const locked = panelVisible || panelPresent || !!shelf;
+  const briefingText = briefingPages ? briefingPages[briefingStep] : briefingStep === 0
+    ? mission?.description ?? '목록을 보고 필요한 물건을 골라 보세요. 물건의 이름과 종류를 천천히 살펴봐요.'
+    : aiAssessment ? '다 골랐다면 계산대로 가서 AI 검토를 요청해 주세요. 언제든 그만둘 수 있어요.'
+      : `다 골랐다면 출구 옆 계산대로 가요. 계산하지 않은 물건을 담고 입구·출구·측면 출입문의 빨간 경보기를 지나 매장 밖으로 나가면 ${session.config.alarmPenaltyPoints}점이 줄어요. 원하면 다시 해보거나 언제든 그만둘 수 있어요.`;
+  const agentUi = useRef<MarketAgentUiState>({} as MarketAgentUiState);
+  agentUi.current = {
+    briefing, briefingStep, briefingText: briefing ? briefingText : null, cartOpen, helpOpen, staffMessage,
+    staffReturnHelp, staffResponse, settingsOpen: settings, historyOpen, reviewMessage: review,
+  };
   const dispatch = useCallback((action: MarketAction, sync = false) => {
     let current = live.current;
     const at = new Date().toISOString();
@@ -295,6 +325,14 @@ export function MarketSimulationScreen({
     setExportMessage(saved.persisted ? '이 브라우저에 기록을 저장했어요. 시작 화면에서 다시 내보낼 수 있어요.' : '앱을 닫기 전에 게임 기록 저장을 눌러 보관해 주세요.');
   }, [session.outcome, session.ratings, session.ratingSkipped]);
   useEffect(() => {
+    if (session.phase !== 'finished' || !tracker.current || trackerFinalized.current) return;
+    trackerFinalized.current = true;
+    const current = tracker.current;
+    finalization.current = (session.outcome === 'success' ? current.complete(session.cart) : current.abort(session.cart))
+      .then(() => current.flushConfirmed());
+    void finalization.current.catch(() => undefined);
+  }, [session.phase, session.outcome]);
+  useEffect(() => {
     if (briefing || session.phase === 'finished') return;
     const timer = setInterval(() => {
       const old = live.current.playerPosition,
@@ -371,6 +409,20 @@ export function MarketSimulationScreen({
     setSession(next);
     setBriefing(false);
   };
+  const advanceBriefing = () => {
+    tracker.current?.briefingAdvanced(briefingStep, Date.now() - briefingShownAt.current);
+    briefingShownAt.current = Date.now();
+    if (briefingStep < lastBriefingStep) {
+      const nextStep = briefingStep + 1;
+      agentUi.current = { ...agentUi.current, briefingStep: nextStep,
+        briefingText: briefingPages?.[nextStep] ?? (nextStep === 0 ? briefingText
+          : `다 골랐다면 출구 옆 계산대로 가요. 계산하지 않은 물건을 담고 입구·출구·측면 출입문의 빨간 경보기를 지나 매장 밖으로 나가면 ${session.config.alarmPenaltyPoints}점이 줄어요. 원하면 다시 해보거나 언제든 그만둘 수 있어요.`) };
+      setBriefingStep(nextStep);
+    } else {
+      agentUi.current = { ...agentUi.current, briefing: false, briefingText: null };
+      start();
+    }
+  };
   const finishRating = (rate: boolean) => {
     const next = rate
       ? dispatch({ type: 'rate', difficulty: difficultyRating, interest: interestRating })
@@ -406,6 +458,100 @@ export function MarketSimulationScreen({
     const next = dispatch({ type: 'requestReturn', productId, quantity }, true);
     if (!next.lastActionError) setStaffResponse(`${getMarketProduct(productId)?.name} ${quantity}개를 제자리에 놓아드렸어요.`);
   };
+  const observeForAgent = useCallback(() => buildMarketAgentObservation(
+    live.current,
+    agentRevision.current,
+    agentStepCount.current,
+    agentControl?.maxSteps ?? 2000,
+    agentUi.current,
+  ), [agentControl?.maxSteps]);
+  const executeAgentAction = useCallback(async (input: MarketAgentActionInput) => {
+    if (!agentControl || input.sessionId !== agentControl.sessionId) throw Object.assign(new Error('AI 세션을 찾을 수 없습니다.'), { code: 'SESSION_NOT_FOUND' });
+    const duplicate = agentActionResults.current.get(input.actionId);
+    if (duplicate) return duplicate;
+    if (input.expectedRevision !== agentRevision.current) throw Object.assign(new Error(`expectedRevision=${input.expectedRevision}, currentRevision=${agentRevision.current}`), { code: 'STALE_REVISION' });
+    if (agentStepCount.current >= agentControl.maxSteps) throw Object.assign(new Error('최대 행동 수에 도달했습니다.'), { code: 'STEP_LIMIT_REACHED' });
+    const action: MarketAgentAction = input.action;
+    const allowed = new Set(['move', 'interact', 'add', 'remove', 'requestReturn', 'checkout', 'requestCashier', 'submit', 'retry',
+      'giveUp', 'skipRating', 'closeStation', 'viewCart', 'viewHelp', 'closeView', 'rate', 'continueBriefing']);
+    if (!action || !allowed.has(action.type) || (action as { type: string }).type === 'setPosition') {
+      throw Object.assign(new Error('AI에게 허용되지 않은 행동입니다.'), { code: 'ACTION_NOT_ALLOWED' });
+    }
+    let next = live.current;
+    if (action.type === 'continueBriefing') {
+      if (!agentUi.current.briefing) throw Object.assign(new Error('현재 브리핑 화면이 아닙니다.'), { code: 'ACTION_REJECTED' });
+      advanceBriefing();
+    } else {
+      if (action.type === 'submit') tracker.current?.checkoutSubmitted(live.current.cart);
+      next = dispatch(action);
+      if (!next.lastActionError) {
+        if (action.type === 'move') {
+          position.current = { ...next.playerPosition };
+          tracker.current?.observeMovement({ point: next.playerPosition, controlMode: 'agent', targetZoneIds: new Set() });
+        }
+        if (action.type === 'interact') {
+          setCartOpen(false); setHelpOpen(false);
+          if (action.station.startsWith('staff:')) { setStaffMessage(true); setStaffReturnHelp(false); setStaffResponse(''); }
+        }
+        if (action.type === 'viewCart') setCartOpen(true);
+        if (action.type === 'viewHelp') setHelpOpen(true);
+        if (action.type === 'closeView') { setCartOpen(false); setHelpOpen(false); }
+        if (action.type === 'closeStation') { setStaffMessage(false); setStaffReturnHelp(false); setStaffResponse(''); }
+        if (action.type === 'requestReturn') setStaffResponse(`${getMarketProduct(action.productId)?.name} ${action.quantity ?? 1}개를 제자리에 놓아드렸어요.`);
+        if (action.type === 'requestCashier') setStaffResponse(`${action.checkoutId === 'checkout-2' ? 2 : 1}번 계산대로 와 주세요. 계산을 도와드릴게요.`);
+        if (action.type === 'giveUp') { setBriefing(false); setSettings(false); setHistoryOpen(false); setCartOpen(false); setHelpOpen(false); setStaffMessage(false); }
+      }
+    }
+    agentStepCount.current += 1;
+    agentRevision.current += 1;
+    await new Promise<void>(resolve => setTimeout(resolve, 0));
+    const result = {
+      schemaVersion: 'oneuldo.market.agent-action-response.v1', sessionId: agentControl.sessionId,
+      actionId: input.actionId, revision: agentRevision.current, accepted: !next.lastActionError, action,
+      error: next.lastActionError ? { code: 'ACTION_REJECTED', message: next.lastActionError, recoverable: true } : null,
+      requestedAt: new Date().toISOString(), appliedAt: new Date().toISOString(), observation: observeForAgent(),
+    };
+    agentActionResults.current.set(input.actionId, result);
+    return result;
+  }, [agentControl, dispatch, observeForAgent, position, briefingStep, lastBriefingStep]);
+  useEffect(() => {
+    if (!agentControl) return;
+    const controller: MarketAgentController = {
+      sessionId: agentControl.sessionId,
+      observe: () => ({
+        schemaVersion: 'oneuldo.market.agent-action-response.v1', sessionId: agentControl.sessionId,
+        actionId: null, revision: agentRevision.current, accepted: true, action: null, error: null,
+        requestedAt: null, appliedAt: new Date().toISOString(), observation: observeForAgent(),
+      }),
+      execute: executeAgentAction,
+      exportEpisode: async () => {
+        if (live.current.phase !== 'finished') throw Object.assign(new Error('게임이 종료된 후 행동 기록을 내보낼 수 있습니다.'), { code: 'SESSION_NOT_FINISHED' });
+        await finalization.current;
+        const episode = exportMarketEpisode(live.current);
+        return { schemaVersion: 'oneuldo.market.agent-episode-response.v1', sessionId: agentControl.sessionId,
+          revision: agentRevision.current, stepCount: agentStepCount.current, episode };
+      },
+      stop: async (reason?: string) => {
+        let stopped = live.current;
+        if (stopped.phase !== 'finished') {
+          stopped = dispatch({ type: 'giveUp' }, stopped.phase === 'shopping');
+          setBriefing(false); setSettings(false); setHistoryOpen(false); setCartOpen(false); setHelpOpen(false); setStaffMessage(false);
+        }
+        const currentTracker = tracker.current;
+        if (currentTracker && !trackerFinalized.current) {
+          trackerFinalized.current = true;
+          finalization.current = currentTracker.abort(stopped.cart).then(() => currentTracker.flushConfirmed());
+        }
+        await finalization.current;
+        return {
+          schemaVersion: 'oneuldo.market.agent-stop-response.v1', sessionId: agentControl.sessionId,
+          stopped: true, outcome: stopped.outcome, reason: reason ?? null,
+        };
+      },
+    };
+    agentControl.onReady(controller);
+    return () => agentControl.onReady(null);
+  }, [agentControl, dispatch, executeAgentAction, observeForAgent]);
   const cartCount = Object.values(session.cart).reduce((a, b) => a + b, 0);
   const isFinished = session.phase === 'finished',
     ratingDone = !!session.ratings || session.ratingSkipped;
@@ -432,14 +578,15 @@ export function MarketSimulationScreen({
     onPress={giveUp}
   />;
 
-  return <View pointerEvents={embedded ? 'box-none' : 'auto'} style={embedded ? s.embeddedRoot : s.root}>
+  return <View pointerEvents={agentControl ? 'none' : embedded ? 'box-none' : 'auto'} style={embedded ? s.embeddedRoot : s.root}>
     {!embedded
       ? <MarketMap
         key={JSON.stringify(session.environment.config)}
         environment={session.environment}
         cashierCalled={session.cashierAvailability}
+        controlledPlayerPosition={agentControl ? session.playerPosition : undefined}
         hintedStation={null}
-        interactive={!locked && !externalMenuOpen}
+        interactive={!agentControl && !locked && !externalMenuOpen}
         nearbyStation={nearby}
         onNearbyStationChange={setNearby}
         onPositionChange={point => {
@@ -495,9 +642,7 @@ export function MarketSimulationScreen({
     {review === null && briefing && !settings && !historyOpen
       ? modal('마트에서 장보기', <>
         <Text style={s.body}>
-          {briefingPages ? briefingPages[briefingStep] : briefingStep === 0
-            ? mission?.description ?? '목록을 보고 필요한 물건을 골라 보세요. 물건의 이름과 종류를 천천히 살펴봐요.'
-            : aiAssessment ? '다 골랐다면 계산대로 가서 AI 검토를 요청해 주세요. 언제든 그만둘 수 있어요.' : `다 골랐다면 출구 옆 계산대로 가요. 계산하지 않은 물건을 담고 입구·출구·측면 출입문의 빨간 경보기를 지나 매장 밖으로 나가면 ${session.config.alarmPenaltyPoints}점이 줄어요. 원하면 다시 해보거나 언제든 그만둘 수 있어요.`}
+          {briefingText}
         </Text>
         {mission && briefingStep === 0 ? <Text style={s.body}>{mission.description}</Text> : null}
         {!aiAssessment && <View style={s.choices}>
@@ -529,7 +674,7 @@ export function MarketSimulationScreen({
         </View>
         <Button
           text={briefingStep < lastBriefingStep ? '다음' : '장보기 시작'}
-          onPress={() => { tracker.current?.briefingAdvanced(briefingStep, Date.now()-briefingShownAt.current); briefingShownAt.current=Date.now(); briefingStep < lastBriefingStep ? setBriefingStep(step => step + 1) : start(); }}
+          onPress={advanceBriefing}
         />
         <Button
           text="연습 환경 설정"

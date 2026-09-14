@@ -1,12 +1,17 @@
 {
   "name": "oneuldo-market-agent-mcp",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "private": true,
   "description": "Standalone MCP server for embodied AI control of the Oneuldo market simulation",
   "type": "commonjs",
   "scripts": {
-    "start": "node server.cjs",
+    "start": "node http-server.cjs",
+    "start:local-runtime": "ONEULDO_MARKET_RUNTIME=local node server.cjs",
     "test": "node --test test/*.test.cjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "ws": "^8.18.3"
   },
   "engines": {
     "node": ">=20"

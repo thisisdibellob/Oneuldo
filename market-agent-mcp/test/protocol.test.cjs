@@ -20,7 +20,10 @@ function request(child, message) {
 }
 
 test('MCP lists only explicit movement and game action tools', async (context) => {
-  const child = spawn(process.execPath, [path.resolve(__dirname, '../server.cjs')], { stdio: ['pipe', 'pipe', 'pipe'] });
+  const child = spawn(process.execPath, [path.resolve(__dirname, '../server.cjs')], {
+    env: { ...process.env, ONEULDO_MARKET_RUNTIME: 'local' },
+    stdio: ['pipe', 'pipe', 'pipe'],
+  });
   context.after(() => child.kill());
   const initialized = await request(child, { jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18' } });
   assert.equal(initialized.result.serverInfo.name, 'oneuldo-market-agent');
