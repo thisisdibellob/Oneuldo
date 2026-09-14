@@ -122,3 +122,18 @@ ai.ollama.timeout=PT30M
 키를 폐기하려면 `/etc/oneuldo-ai/keys.properties`에서 해당 팀의 해시 행을 삭제하고 서비스를 재시작한다.
 키를 교체할 때는 새 이름으로 발급해 적용 확인 후 옛 키를 폐기한다. 재시작하면 진행 중 요청이 끊길 수 있으므로 사용하지 않을 때 적용한다.
 서버 재부팅 후 Ollama/Caddy/게이트웨이 상태와 외부 접속을 다시 확인한다.
+
+### 구간 관찰의 구조화 출력
+
+`/api/chat`의 선택적 `format`에는 공유 클래스 `ObservationOutputSchema.VALUE`와 동일한 JSON Schema만 허용한다. 게이트웨이는 검증한 스키마를 Ollama의 `format`으로 전달한다. 임의 스키마와 `format: "json"`은 400으로 거부한다. `format`이 없는 기존 호출은 그대로 동작한다.
+
+스키마는 `summary`, `observations`, `uncertainties`, `requestedSegmentIds`를 필수로 하고, 각 관찰에는 `observation`, `interpretation`, `alternativeExplanations`, `evidenceEventIds`를 사용한다. ID 형식은 `E`와 양의 정수로 제한한다. 실제 입력에 포함된 ID인지, 요청 구간의 근거인지, 문자열 길이 및 내용의 타당성은 백엔드 검사 책임이다. 긴 문자열의 `maxLength`는 현재 서버의 문법 복잡도 한도를 초과하므로 생성 스키마에 넣지 않는다. 출력 토큰 상한과 백엔드의 2,000자 검사는 유지한다.
+
+적용 범위는 구간 관찰·중간 통합·추가 이동 상세 관찰이다. 최종 분석 및 퀘스트 생성은 기존 출력 계약을 유지한다. 이 변경은 필드 혼동을 줄이기 위한 것이며 사실 정확성을 보장하지 않는다.
+
+운영 교체는 검증한 jar와 SHA-256 파일, `deploy/update-schema.sh`를 같은 디렉터리에 둔 뒤 `sudo bash update-schema.sh`로 수행한다. 기존 jar를 백업하고 서비스 재시작 후 상태 확인이 실패하면 복원한다. 키·Caddy·포트포워딩·Ollama 설정은 이 스크립트에서 수정하지 않는다.
+
+
+### 큰 문맥 요청
+
+`options.num_ctx`는 8192(기본값) 또는 18432를 지원합니다. 입력과 예약 출력의 합은 선택한 문맥에서 256토큰을 뺀 값 이하이어야 합니다. `num_predict` 상한 1800과 추론 동시 실행 1개는 유지됩니다. 기존 클라이언트는 8192로 계속 사용할 수 있으며, 큰 문맥은 업데이트된 게이트웨이 설치 후 명시적으로 요청해야 합니다.

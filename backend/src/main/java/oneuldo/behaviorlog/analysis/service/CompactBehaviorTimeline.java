@@ -81,6 +81,8 @@ public final class CompactBehaviorTimeline {
     }
     /** Use after the enclosing prompt's table layer has already been decoded. */
     public ObjectNode decodeExpanded(JsonNode compact) {
+        if ("event-groups-v1".equals(compact.path("encoding").asString()))
+            return new GroupedEventInput(mapper).decode((ObjectNode)compact);
         if (LosslessEventColumns.FORMAT.equals(compact.path("encoding").asString()))
             return new LosslessEventColumns(mapper).decode(compact);
         ObjectNode result = ((ObjectNode) compact).deepCopy();

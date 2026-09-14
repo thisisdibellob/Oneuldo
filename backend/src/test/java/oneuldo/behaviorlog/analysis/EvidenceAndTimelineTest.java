@@ -38,11 +38,18 @@ class EvidenceAndTimelineTest {
         var input = input(12);
         var prompts = new AiBehaviorAnalysisPromptFactory(mapper);
         var pipeline = new TimelineAnalysisPipeline(prompts, new AiBehaviorAnalysisValidator(new MarketAiDifficultyValidator()),
-                mock(GroqChatClient.class), mapper);
+                mock(GroqChatClient.class, inv -> inv.getMethod().getName().equals("completeDigest")
+                ? inv.callRealMethod() : org.mockito.Answers.RETURNS_DEFAULTS.answer(inv)), mapper);
         var single=input(1);
         int limit = new AnalysisTokenBudget().total(prompts.observationSystem(), new AnalysisReferences(mapper, single).encode(prompts.observationPrompt(single,single)),900) + 300;
         var chunks = pipeline.partition(input, limit);
         assertThat(chunks.size()).isGreaterThan(1);
+        for (var chunk : chunks) {
+            var scope = new LosslessTables(mapper).decode(mapper.readTree(prompts.observationPrompt(chunk, input))).path("observationScope");
+            assertThat(scope.path("providedEventCount").asInt()).isEqualTo(chunk.eventCount());
+            assertThat(scope.path("fullEventCount").asInt()).isEqualTo(input.eventCount());
+            assertThat(scope.path("partial").asBoolean()).isTrue();
+        }
         assertThat(chunks.stream().flatMap(c -> c.input().sessions().stream()).flatMap(s -> s.events().stream())
                 .map(BehaviorAnalysisInput.EventTimeline::behaviorLogId).toList())
                 .containsExactlyElementsOf(input.input().sessions().getFirst().events().stream().map(BehaviorAnalysisInput.EventTimeline::behaviorLogId).toList());
@@ -52,7 +59,8 @@ class EvidenceAndTimelineTest {
     @Test void 구간제한을_늘려도_모든_원본사건을_변경없이_유지한다() {
         var input = input(64);
         var prompts = new AiBehaviorAnalysisPromptFactory(mapper);
-        var client = mock(GroqChatClient.class);
+        var client = mock(GroqChatClient.class, inv -> inv.getMethod().getName().equals("completeDigest")
+                ? inv.callRealMethod() : org.mockito.Answers.RETURNS_DEFAULTS.answer(inv));
         var validator = new AiBehaviorAnalysisValidator(new MarketAiDifficultyValidator());
         var single = input(1);
         int limit = new AnalysisTokenBudget().total(prompts.observationSystem(), new AnalysisReferences(mapper, single).encode(prompts.observationPrompt(single,single)),900) + 300;
@@ -70,7 +78,8 @@ class EvidenceAndTimelineTest {
 
     @Test void 공급자한도는_재시도하지_않고_감사기록에_남긴다() {
         var prompts = new AiBehaviorAnalysisPromptFactory(mapper);
-        var client = mock(GroqChatClient.class);
+        var client = mock(GroqChatClient.class, inv -> inv.getMethod().getName().equals("completeDigest")
+                ? inv.callRealMethod() : org.mockito.Answers.RETURNS_DEFAULTS.answer(inv));
         when(client.complete(anyString(), anyString(), anyInt(), anyDouble()))
                 .thenThrow(new oneuldo.ai.exception.CloudAiRateLimitException("60", null));
         var pipeline = new TimelineAnalysisPipeline(prompts, new AiBehaviorAnalysisValidator(new MarketAiDifficultyValidator()), client, mapper);
@@ -89,7 +98,8 @@ class EvidenceAndTimelineTest {
         var data = mapper.convertValue(tree, BehaviorAnalysisInputResponse.class);
         var prompts = new AiBehaviorAnalysisPromptFactory(mapper);
         var budget = new AnalysisTokenBudget();
-        var client = mock(GroqChatClient.class);
+        var client = mock(GroqChatClient.class, inv -> inv.getMethod().getName().equals("completeDigest")
+                ? inv.callRealMethod() : org.mockito.Answers.RETURNS_DEFAULTS.answer(inv));
         var pacer = mock(AnalysisCallPacer.class);
         var pipeline = new TimelineAnalysisPipeline(prompts, new AiBehaviorAnalysisValidator(new MarketAiDifficultyValidator()), client, mapper, 64, budget, pacer);
         var chunks = pipeline.partition(data, 18000);
@@ -147,7 +157,8 @@ class EvidenceAndTimelineTest {
         var data=mapper.convertValue(tree,BehaviorAnalysisInputResponse.class);
         var prompts=new AiBehaviorAnalysisPromptFactory(mapper);
         var validator=new AiBehaviorAnalysisValidator(new MarketAiDifficultyValidator());
-        var client=mock(GroqChatClient.class);
+        var client=mock(GroqChatClient.class, inv -> inv.getMethod().getName().equals("completeDigest")
+                ? inv.callRealMethod() : org.mockito.Answers.RETURNS_DEFAULTS.answer(inv));
         var cache=new HashMap<String,GroqChatClient.GroqChatResult>();
         AnalysisCheckpoints checkpoints=new AnalysisCheckpoints() {
             public Optional<GroqChatClient.GroqChatResult> find(String s,String p,int o) {return Optional.ofNullable(cache.get(s+p+o));}
@@ -194,7 +205,8 @@ class EvidenceAndTimelineTest {
         var data=mapper.convertValue(tree,BehaviorAnalysisInputResponse.class);
         var prompts=new AiBehaviorAnalysisPromptFactory(mapper);
         var validator=new AiBehaviorAnalysisValidator(new MarketAiDifficultyValidator());
-        var client=mock(GroqChatClient.class);
+        var client=mock(GroqChatClient.class, inv -> inv.getMethod().getName().equals("completeDigest")
+                ? inv.callRealMethod() : org.mockito.Answers.RETURNS_DEFAULTS.answer(inv));
         var batches=new ArrayList<Integer>();
         var observed=new java.util.concurrent.atomic.AtomicInteger();
         var compact=new java.util.concurrent.atomic.AtomicInteger();

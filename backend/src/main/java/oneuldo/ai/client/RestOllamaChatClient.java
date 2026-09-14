@@ -35,6 +35,15 @@ public class RestOllamaChatClient implements GroqChatClient {
 
     @Override
     public GroqChatResult complete(String systemPrompt, String userPrompt, int output, double temperature) {
+        return execute(systemPrompt, userPrompt, output, temperature, null);
+    }
+
+    @Override
+    public GroqChatResult completeDigest(String systemPrompt, String userPrompt, int output, double temperature) {
+        return execute(systemPrompt, userPrompt, output, temperature, ObservationOutputSchema.VALUE);
+    }
+
+    private GroqChatResult execute(String systemPrompt, String userPrompt, int output, double temperature, Object format) {
         // Reserve output space before sending: Ollama must not silently discard input to fit.
         if (output < 1 || Math.addExact(QwenTokenCounter.inputTokens(systemPrompt, userPrompt), output)
                 > properties.contextLength() - 256) {
@@ -54,7 +63,7 @@ public class RestOllamaChatClient implements GroqChatClient {
                     })
                     .body(new Request(properties.model(), List.of(new Message("system", systemPrompt),
                             new Message("user", userPrompt)), false, false, properties.keepAlive(),
-                            new Options(properties.contextLength(), output, temperature, 0.8)))
+                            new Options(properties.contextLength(), output, temperature, 0.8), format))
                     .retrieve().body(Response.class);
             if (response == null || response.error() != null || !Boolean.TRUE.equals(response.done())
                     || response.message() == null || response.message().content() == null
@@ -78,8 +87,9 @@ public class RestOllamaChatClient implements GroqChatClient {
 
     private record Message(String role, String content) {}
     private record Options(int num_ctx, int num_predict, double temperature, double top_p) {}
+    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
     private record Request(String model, List<Message> messages, boolean think, boolean stream,
-            String keep_alive, Options options) {}
+            String keep_alive, Options options, Object format) {}
     private record Response(String model, Message message, Boolean done, String done_reason,
             Integer prompt_eval_count, Integer eval_count, String error) {}
 }

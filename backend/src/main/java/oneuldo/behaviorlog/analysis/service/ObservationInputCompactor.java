@@ -36,7 +36,7 @@ public final class ObservationInputCompactor {
         }
         for(var session:timeline.path("sessions")) for(var n:session.path("events")) {
             ObjectNode event=(ObjectNode)n;
-            event.remove(List.of("receivedAt","occurredAt","eventSchemaVersion","appVersion","contentVersion","offlineQueued"));
+            event.remove(List.of("clientEventId","batchId","normalizedEventId","receivedAt","occurredAt","eventSchemaVersion","appVersion","contentVersion","offlineQueued"));
             if(event.path("action") instanceof ObjectNode action) action.remove("stepOrder");
             if(event.path("payload").path("marketContent") instanceof ObjectNode content) {
                 content.remove(List.of("movementReplay","availableProductIds"));

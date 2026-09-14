@@ -5,6 +5,8 @@ import java.net.http.HttpClient;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.HashMap;
+import oneuldo.ai.client.ObservationOutputSchema;
 import jakarta.servlet.http.HttpServletRequest;
 import oneuldo.behaviorlog.analysis.service.QwenTokenCounter;
 import org.springframework.http.HttpStatus;
@@ -43,14 +45,16 @@ public class ChatController {
         try { body = mapper.readTree(bytes); } catch (RuntimeException e) { throw error(HttpStatus.BAD_REQUEST, "INVALID_JSON"); }
         validate(body);
         var options = body.path("options");
+        int context = options.has("num_ctx") ? options.path("num_ctx").asInt() : 8192;
         int output = options.has("num_predict") ? options.path("num_predict").asInt() : 1800;
         long tokens = 64 + output;
         for (var message : body.path("messages")) tokens += QwenTokenCounter.count(message.path("content").asString()) + 16L;
-        if (tokens > 7936) throw error(HttpStatus.BAD_REQUEST, "CONTEXT_LIMIT_EXCEEDED");
+        if (tokens > context - 256) throw error(HttpStatus.BAD_REQUEST, "CONTEXT_LIMIT_EXCEEDED");
         double temperature = options.has("temperature") ? options.path("temperature").asDouble() : 0.2;
         // Rebuild from allowlisted fields. No client-supplied tools, images, templates, URLs or model-loading options.
-        var wire = Map.of("model", MODEL, "messages", body.path("messages"), "think", false, "stream", false,
-                "keep_alive", "10m", "options", Map.of("num_ctx", 8192, "num_predict", output, "temperature", temperature, "top_p", 0.8));
+        var wire = new HashMap<String,Object>(Map.of("model", MODEL, "messages", body.path("messages"), "think", false, "stream", false,
+                "keep_alive", "10m", "options", Map.of("num_ctx", context, "num_predict", output, "temperature", temperature, "top_p", 0.8)));
+        if (body.has("format")) wire.put("format", ObservationOutputSchema.VALUE);
         return gate.run((String)request.getAttribute(ApiKeyFilter.IDENTITY), () -> {
             try {
                 JsonNode result = upstream.post().uri("/api/chat").body(wire).retrieve().body(JsonNode.class);
@@ -63,6 +67,8 @@ public class ChatController {
         if (body == null || !body.isObject() || !MODEL.equals(body.path("model").asString())
                 || (body.has("stream") && (!body.path("stream").isBoolean() || body.path("stream").asBoolean()))
                 || (body.has("think") && (!body.path("think").isBoolean() || body.path("think").asBoolean()))) throw error(HttpStatus.BAD_REQUEST, "UNSUPPORTED_REQUEST");
+        if (body.has("format") && !body.path("format").equals(mapper.valueToTree(ObservationOutputSchema.VALUE)))
+            throw error(HttpStatus.BAD_REQUEST, "UNSUPPORTED_OUTPUT_SCHEMA");
         var messages = body.path("messages");
         if (!messages.isArray() || messages.isEmpty() || messages.size() > 32) throw error(HttpStatus.BAD_REQUEST, "INVALID_MESSAGES");
         for (var message : messages) {
@@ -71,7 +77,7 @@ public class ChatController {
         }
         var options = body.path("options");
         if (body.has("options") && !options.isObject()) throw error(HttpStatus.BAD_REQUEST, "INVALID_OPTIONS");
-        if (options.has("num_ctx") && (!options.path("num_ctx").isIntegralNumber() || options.path("num_ctx").asInt() != 8192)) throw error(HttpStatus.BAD_REQUEST, "CONTEXT_MUST_BE_8192");
+        if (options.has("num_ctx") && (!options.path("num_ctx").isIntegralNumber() || !List.of(8192,18432).contains(options.path("num_ctx").asInt()))) throw error(HttpStatus.BAD_REQUEST, "UNSUPPORTED_CONTEXT_LENGTH");
         if (options.has("num_predict") && (!options.path("num_predict").isIntegralNumber()
                 || options.path("num_predict").asLong() < 1 || options.path("num_predict").asLong() > 1800)) throw error(HttpStatus.BAD_REQUEST, "INVALID_OUTPUT_LIMIT");
         if (options.has("temperature") && (!options.path("temperature").isNumber()

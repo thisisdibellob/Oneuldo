@@ -29,6 +29,11 @@ class OllamaLocalConfigTest {
                     assertThat(properties.baseUrl()).isEqualTo("https://ai.example.com");
                     assertThat(properties.apiKey()).isEqualTo("test-local-key");
                     assertThat(properties.timeout()).isEqualTo(Duration.ofMinutes(30));
+                    assertThat(context.getEnvironment().getProperty("ai.behavior-analysis.chunk-output-tokens", Integer.class)).isEqualTo(1800);
+                    assertThat(context.getEnvironment().getProperty("ai.behavior-analysis.final-output-tokens", Integer.class)).isEqualTo(1800);
+                    int requestBudget = context.getEnvironment().getProperty("ai.behavior-analysis.request-token-budget", Integer.class);
+                    assertThat(requestBudget).isEqualTo(7800);
+                    assertThat(requestBudget + 32).isLessThanOrEqualTo(properties.contextLength() - 256);
                 });
     }
 }

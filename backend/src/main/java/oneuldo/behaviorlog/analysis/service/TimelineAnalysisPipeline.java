@@ -96,6 +96,15 @@ public final class TimelineAnalysisPipeline {
     private record Group(BehaviorAnalysisInputResponse scope,AiObservationDigest digest) {}
     public AiBehaviorAnalysis analyze(BehaviorAnalysisInputResponse input,int limit,List<AiBehaviorAnalysisRun.Attempt> audit) {
         var refs=new AnalysisReferences(mapper,input);
+        // Larger context is opt-in; retain the existing 8K path for older gateways.
+        if(limit>8192) {
+            String source=refs.encode(prompts.wholeSourcePrompt(input));
+            if(budget.total(prompts.wholeSourceSystem(),source+RETRY,budget.finalOutputTokens())+200<=limit) {
+                AnalysisProgress.stage("FINALIZING",0,1);
+                var result=call(prompts.wholeSourceSystem(),source,budget.finalOutputTokens(),limit,audit,raw->validator.validate(refs.read(raw),input));
+                AnalysisProgress.stage("FINALIZING",1,1);return result;
+            }
+        }
         String whole=refs.encode(prompts.userPrompt(input));
         if(budget.total(prompts.systemPrompt(),whole+RETRY,budget.finalOutputTokens())+200<=limit) {
             AnalysisProgress.stage("FINALIZING",0,1);
@@ -164,17 +173,15 @@ public final class TimelineAnalysisPipeline {
             // A pair cannot be split into smaller merges. Ask the model for a compact,
             // explicitly limited digest; never trim JSON or drop child inputs in Java.
             var brief=mapper.readTree(prompt).deepCopy();
-            ((ObjectNode)brief).put("outputContract", "JSON {s:요약,o:[[사실,가설,[다른 설명],[사건 ID]]],u:[한계]}. "
-                    + "따옴표를 사용하고 JSON을 완결한다. 핵심 관찰 1~2개, 각 설명은 짧은 한 문장으로 작성한다. "
-                    + "양쪽 구간의 서로 다른 행동·상충·도움을 고려하고 근거는 자식이 인용한 ID만 사용한다. "
-                    + "요약에 담지 못한 관찰과 불확실성을 u에 명시한다. 누락을 성패나 능력 부족으로 바꾸지 않는다.");
+            ((ObjectNode)brief).put("outputContract", prompts.reductionContract()
+                    + " 핵심 관찰 1~2개로 줄이고 설명은 짧게 쓴다. 담지 못한 관찰은 uncertainties에 명시한다.");
             log.info("AI pair output truncated; retrying compact digest with both child inputs");
             return List.of(reduceOnce(children,scope,refs,mapper.writeValueAsString(brief),limit,audit));
         }
     }
     private Group reduceOnce(List<Group> children,BehaviorAnalysisInputResponse scope,AnalysisReferences refs,
             String prompt,int limit,List<AiBehaviorAnalysisRun.Attempt> audit) {
-        var digest=call(prompts.observationSystem(),prompt,budget.chunkOutputTokens(),limit,audit,
+        var digest=callDigest(prompts.observationSystem(),prompt,budget.chunkOutputTokens(),limit,audit,
                 raw->{var value=refs.readDigest(raw);noRequests(value);return validator.validateReduction(value,scope,children.stream().map(Group::digest).toList());});
         return new Group(scope,digest);
     }
@@ -201,7 +208,7 @@ public final class TimelineAnalysisPipeline {
         log.info("AI movement observation: chunk={}/{}, sourceEvents={}, visibleEvents={}, simplifiedSegments={}, maxError={}",
                 number,total,chunk.eventCount(),visible.eventCount(),projection.segments().size(),prompts.movementMaxError());
         String prompt=refs.encode(observationPrompt(chunk,full))+suffix(number,total);
-        var digest=call(prompts.observationSystem(),prompt,budget.chunkOutputTokens(),limit,audit,raw->{
+        var digest=callDigest(prompts.observationSystem(),prompt,budget.chunkOutputTokens(),limit,audit,raw->{
             var value=refs.readDigest(raw);
             projection.expand(value.requestedSegmentIds()); // reject fabricated/cross-session segment requests
             return validator.validateDigest(value,visible);
@@ -215,7 +222,7 @@ public final class TimelineAnalysisPipeline {
             // Do not retain unverified interpretations after the model explicitly requested missing evidence.
             return new AiObservationDigest("추가 원본 확인이 필요한 이동 구간",List.of(),limits);
         }
-        var result=call(prompts.observationSystem(),detail,budget.chunkOutputTokens(),limit,audit,raw->{
+        var result=callDigest(prompts.observationSystem(),detail,budget.chunkOutputTokens(),limit,audit,raw->{
             var value=refs.readDigest(raw);noRequests(value);return validator.validateDigest(value,expanded);
         });
         return disclose(result,projection,expanded);
@@ -266,6 +273,12 @@ public final class TimelineAnalysisPipeline {
     }
     private static String suffix(int n,int count) {return "\n구간 "+n+"/"+count+": 세션 일부이며 구간 밖 행동을 가정하지 마세요.";}
     private <T> T call(String system,String prompt,int output,int limit,List<AiBehaviorAnalysisRun.Attempt> audit,Function<String,T> parse) {
+        return call(system,prompt,output,limit,audit,parse,false);
+    }
+    private <T> T callDigest(String system,String prompt,int output,int limit,List<AiBehaviorAnalysisRun.Attempt> audit,Function<String,T> parse) {
+        return call(system,prompt,output,limit,audit,parse,true);
+    }
+    private <T> T call(String system,String prompt,int output,int limit,List<AiBehaviorAnalysisRun.Attempt> audit,Function<String,T> parse,boolean digest) {
         budget.requireFits(system,prompt+RETRY,output,limit,"ANALYSIS_INPUT_EXCEEDS_LIMIT");
         var cached=checkpoints.find(system,prompt,output);
         if(cached.isPresent()) {
@@ -286,7 +299,7 @@ public final class TimelineAnalysisPipeline {
             try {
                 long started=System.nanoTime();
                 log.info("AI analysis request: attempt={}, inputTokens={}, outputMax={}",audit.size()+1,QwenTokenCounter.inputTokens(system,submitted),output);
-                response=client.complete(system,submitted,output,0.2);raw=response.text();model=response.model();
+                response=digest?client.completeDigest(system,submitted,output,0.2):client.complete(system,submitted,output,0.2);raw=response.text();model=response.model();
                 if("length".equals(response.finishReason())) throw new IllegalArgumentException("OUTPUT_TRUNCATED");
                 result=parse.apply(raw);
                 log.info("AI analysis response: attempt={}, latencyMs={}",audit.size()+1,(System.nanoTime()-started)/1000000);

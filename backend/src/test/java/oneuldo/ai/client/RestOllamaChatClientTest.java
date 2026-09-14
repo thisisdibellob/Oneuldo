@@ -48,6 +48,17 @@ class RestOllamaChatClientTest {
         server.verify();
     }
 
+    @Test void digestUsesNamedSchemaButOrdinaryRequestsRemainUnconstrained() {
+        var builder=RestClient.builder().baseUrl("http://localhost:11435");
+        var server=MockRestServiceServer.bindTo(builder).build();
+        var client=new RestOllamaChatClient(builder.build(),properties(0,Duration.ZERO));
+        server.expect(requestTo("http://localhost:11435/api/chat"))
+                .andExpect(jsonPath("$.format.properties.observations.items.properties.evidenceEventIds.items.pattern").value("^E[1-9][0-9]*$"))
+                .andExpect(jsonPath("$.format.additionalProperties").value(false))
+                .andRespond(withSuccess(RESPONSE,MediaType.APPLICATION_JSON));
+        client.completeDigest("s","u",1800,0.2);
+        server.verify();
+    }
     @Test void preservesLengthSoAnalysisCanSplitTruncatedOutput() {
         var builder = RestClient.builder().baseUrl("http://localhost:11435");
         var server = MockRestServiceServer.bindTo(builder).build();

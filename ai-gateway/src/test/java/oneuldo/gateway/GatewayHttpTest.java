@@ -65,6 +65,30 @@ class GatewayHttpTest {
         assertThat(received.path("options").has("num_gpu")).isFalse();
         assertThat(received.path("options").path("num_ctx").asInt()).isEqualTo(8192);
     }
+    @Test void largeContextIsExplicitAndStillBounded() throws Exception {
+        String request=BODY.replace("8192","18432").replace("한국어 테스트","token ".repeat(9000));
+        mvc.perform(post("/api/chat").header("Authorization","Bearer "+KEY).contentType(MediaType.APPLICATION_JSON).content(request)).andExpect(status().isOk());
+        assertThat(received.path("options").path("num_ctx").asInt()).isEqualTo(18432);
+        count.set(0);
+        mvc.perform(post("/api/chat").header("Authorization","Bearer "+KEY).contentType(MediaType.APPLICATION_JSON)
+                .content(BODY.replace("8192","18432").replace("한국어 테스트","token ".repeat(18500)))).andExpect(status().isBadRequest());
+        assertThat(count.get()).isZero();
+    }
+    @Test void forwardsOnlyTheFixedObservationSchema() throws Exception {
+        var mapper=JsonMapper.builder().build();
+        var body=(tools.jackson.databind.node.ObjectNode)mapper.readTree(BODY);
+        body.set("format",mapper.valueToTree(oneuldo.ai.client.ObservationOutputSchema.VALUE));
+        mvc.perform(post("/api/chat").header("Authorization", "Bearer " + KEY)
+                .contentType(MediaType.APPLICATION_JSON).content(body.toString())).andExpect(status().isOk());
+        assertThat(received.path("format")).isEqualTo(body.path("format"));
+        count.set(0);
+        for(String format: new String[]{"null", "\"json\"", "{\"type\":\"object\"}"}) {
+            body.set("format",mapper.readTree(format));
+            mvc.perform(post("/api/chat").header("Authorization", "Bearer " + KEY)
+                    .contentType(MediaType.APPLICATION_JSON).content(body.toString())).andExpect(status().isBadRequest());
+        }
+        assertThat(count.get()).isZero();
+    }
     @Test void deniesMissingAndWrongKeysAndBlocksManagementEndpoints() throws Exception {
         mvc.perform(post("/api/chat").contentType(MediaType.APPLICATION_JSON).content(BODY)).andExpect(status().isUnauthorized());
         mvc.perform(get("/api/tags").header("Authorization", "Bearer wrong-key-000000000000000000000000"))

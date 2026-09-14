@@ -16,7 +16,7 @@ dependencies {
 // Share the verified tokenizer, without including the application or its DB dependencies.
 sourceSets.main {
     java.srcDir("../backend/src/main/java")
-    java.include("oneuldo/gateway/**", "oneuldo/behaviorlog/analysis/service/QwenTokenCounter.java")
+    java.include("oneuldo/gateway/**", "oneuldo/behaviorlog/analysis/service/QwenTokenCounter.java", "oneuldo/ai/client/ObservationOutputSchema.java")
 }
 tasks.processResources {
     from("../backend/src/main/resources/ai/tokenizers") { into("ai/tokenizers") }

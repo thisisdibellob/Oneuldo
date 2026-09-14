@@ -22,7 +22,8 @@ class AiBehaviorAnalysisTest {
     private final ObjectMapper mapper = JsonMapper.builder().findAndAddModules().build();
     private final BehaviorAnalysisInputService inputs = mock(BehaviorAnalysisInputService.class);
     private final AiBehaviorAnalysisRepository repository = mock(AiBehaviorAnalysisRepository.class);
-    private final GroqChatClient client = mock(GroqChatClient.class);
+    private final GroqChatClient client = mock(GroqChatClient.class, inv -> inv.getMethod().getName().equals("completeDigest")
+                ? inv.callRealMethod() : org.mockito.Answers.RETURNS_DEFAULTS.answer(inv));
     private final AiBehaviorAnalysisPromptFactory prompts = new AiBehaviorAnalysisPromptFactory(mapper);
     private final AiBehaviorAnalysisValidator validator = new AiBehaviorAnalysisValidator(new MarketAiDifficultyValidator());
     private final AnalysisTokenBudget budget = new AnalysisTokenBudget();

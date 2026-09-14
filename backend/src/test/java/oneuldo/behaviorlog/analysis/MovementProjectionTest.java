@@ -63,7 +63,8 @@ class MovementProjectionTest {
     @Test void requested_raw_segment_is_sent_and_only_visible_evidence_is_accepted() {
         var source=input(fixture());var factory=new AiBehaviorAnalysisPromptFactory(mapper);
         ReflectionTestUtils.setField(factory,"movementMaxError",0.1);
-        var client=mock(GroqChatClient.class);var validator=new AiBehaviorAnalysisValidator(new MarketAiDifficultyValidator());
+        var client=mock(GroqChatClient.class, inv -> inv.getMethod().getName().equals("completeDigest")
+                ? inv.callRealMethod() : org.mockito.Answers.RETURNS_DEFAULTS.answer(inv));var validator=new AiBehaviorAnalysisValidator(new MarketAiDifficultyValidator());
         when(client.complete(anyString(),anyString(),anyInt(),anyDouble())).thenAnswer(inv->{
             var root=new LosslessTables(mapper).decode(mapper.readTree(inv.getArgument(1,String.class).split("\\n구간 ")[0]));
             boolean initial=root.path("movementSegments").size()>0;

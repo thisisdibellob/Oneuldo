@@ -79,11 +79,29 @@ public final class AnalysisReferences {
             if(!Set.of("s","o","u","requestedSegmentIds").containsAll(compact.propertyNames()) || !compact.path("o").isArray()) throw new IllegalArgumentException("INVALID_COMPACT_DIGEST");
             root=expanded;
         }
-        for (var observation : root.path("observations")) restoreEvidence(observation);
+        for (var observation : root.path("observations")) {
+            normalizeSingleString(observation, "alternativeExplanations");
+            normalizeSingleString(observation, "evidenceEventIds");
+            restoreEvidence(observation);
+        }
         if(root.path("requestedSegmentIds") instanceof ArrayNode ids) {
             for(int i=0;i<ids.size();i++) ids.set(i,mapper.valueToTree(restore(ids.get(i).asString(),"E")));
         }
         return mapper.readerFor(AiObservationDigest.class).with(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES).readValue(root);
+    }
+    /** Wrap a single value only; never split prose, fabricate references, or repair broken JSON. */
+    private void normalizeSingleString(JsonNode node, String field) {
+        if (!(node instanceof ObjectNode object)) throw new IllegalArgumentException("INVALID_DIGEST_OBSERVATION");
+        JsonNode value = node.path(field);
+        if (value.isString()) {
+            String text = value.asString();
+            if (text.isBlank()) throw new IllegalArgumentException("EMPTY_DIGEST_LIST_VALUE");
+            if (field.equals("evidenceEventIds")) restore(text, "E");
+            object.set(field, mapper.createArrayNode().add(text));
+        } else if (!value.isArray()) {
+            throw new IllegalArgumentException(field.equals("evidenceEventIds")
+                    ? "EVIDENCE_EVENT_IDS_MUST_BE_ARRAY" : "ALTERNATIVE_EXPLANATIONS_MUST_BE_ARRAY");
+        }
     }
     private void restoreEvidence(JsonNode node) {
         if (node.path("evidenceEventIds") instanceof ArrayNode ids) {

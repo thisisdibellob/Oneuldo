@@ -33,10 +33,30 @@ class CompactPipelineTest {
         assertThatThrownBy(()->refs.read(finalJson.replace("E1","E999"))).hasMessage("UNKNOWN_ANALYSIS_REFERENCE");
     }
 
+    @Test void largerContextReadsAllSourcesInOneCallWithoutDigest() {
+        var input=fixture.input(fixture.fixture());
+        var client=mock(GroqChatClient.class);
+        when(client.complete(anyString(),anyString(),anyInt(),anyDouble())).thenReturn(new GroqChatClient.GroqChatResult(finalJson,"test"));
+        var budget=new AnalysisTokenBudget();
+        org.springframework.test.util.ReflectionTestUtils.setField(budget,"requestTokens",18000);
+        org.springframework.test.util.ReflectionTestUtils.setField(budget,"finalOutputTokens",1800);
+        var result=new TimelineAnalysisPipeline(prompts,validator,client,mapper,64,budget,new AnalysisCallPacer()).analyze(input,18000,new ArrayList<>());
+        assertThat(result.summary()).isEqualTo("좌표 이동 관측");
+        var prompt=org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(client).complete(anyString(),prompt.capture(),eq(1800),anyDouble());
+        verify(client,never()).completeDigest(anyString(),anyString(),anyInt(),anyDouble());
+        var root=new LosslessTables(mapper).decode(mapper.readTree(prompt.getValue()));
+        assertThat(root.has("chunkAnalyses")).isFalse();
+        var timeline=new CompactBehaviorTimeline(mapper).decodeExpanded(root.path("behaviorTimeline"));
+        int count=0;for(var session:timeline.path("sessions"))count+=session.path("events").size();
+        assertThat(count).isEqualTo(input.eventCount());
+    }
+
     @Test void output_truncation_splits_only_failed_observation_and_reports_progress() throws Exception {
         var rawInput=fixture.fixture();
         ((tools.jackson.databind.node.ObjectNode)rawInput.path("input").path("sessions").get(0).path("events").get(0)).put("appVersion","x".repeat(70000));
-        var input=fixture.input(rawInput);var client=mock(GroqChatClient.class);var calls=new AtomicInteger();
+        var input=fixture.input(rawInput);var client=mock(GroqChatClient.class, inv -> inv.getMethod().getName().equals("completeDigest")
+                ? inv.callRealMethod() : org.mockito.Answers.RETURNS_DEFAULTS.answer(inv));var calls=new AtomicInteger();
         when(client.complete(anyString(),anyString(),anyInt(),anyDouble())).thenAnswer(inv->{
             String prompt=inv.getArgument(1);
             if(prompt.contains("synthesisVersion"))return new GroqChatClient.GroqChatResult(finalJson,"test");
