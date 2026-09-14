@@ -81,7 +81,7 @@ export class MarketBehaviorTracker {
     private readonly mission: MarketMission,
     private readonly difficulty = 2,
     simulation?: Omit<BehaviorSimulationContext, 'simulationStarted'>,
-    stations = MARKET_STATIONS,
+    private readonly stations = MARKET_STATIONS,
   ) {
     this.movementDetector = new MarketMovementDetector(stations, 105);
     this.questInstanceId = mission.scene?.questInstanceId ?? simulation?.questInstanceId ?? randomUUID();
@@ -197,7 +197,7 @@ export class MarketBehaviorTracker {
         thresholdRuleVersion: DETECTION_RULE_VERSION,
         ...input.payload,
         marketContent: { ...(input.payload?.marketContent as object ?? {}), sceneRef: this.questInstanceId, layoutVersion: this.mission.scene?.layoutVersion, seed: this.mission.scene?.seed,
-          movementContext: { coordinateSpace: 'market-world', stations: MARKET_STATIONS, interactionRadius: 105,
+          movementContext: { coordinateSpace: 'market-world', stations: this.stations, interactionRadius: 105,
             ...MOVEMENT_SAMPLING } },
       },
       presentation: {

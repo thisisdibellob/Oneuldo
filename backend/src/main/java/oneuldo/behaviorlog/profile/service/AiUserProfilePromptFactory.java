@@ -9,7 +9,7 @@ import tools.jackson.databind.ObjectMapper;
 
 @Component
 public class AiUserProfilePromptFactory {
-    public static final String VERSION = "incremental-user-profile-v2-broader";
+    public static final String VERSION = "incremental-user-profile-v4-reanalysis";
     private final ObjectMapper mapper;
 
     public AiUserProfilePromptFactory(ObjectMapper mapper) { this.mapper = mapper; }
@@ -17,21 +17,31 @@ public class AiUserProfilePromptFactory {
     public String systemPrompt() {
         return "생활기술 연습용 사용자 프로필을 갱신하는 AI다. 의료 진단·IQ·장애 등급·능력 점수를 만들지 않는다. "
                 + "이전 프로필은 수정 가능한 가설이며 새 세션과 충돌하면 약화하거나 보류한다. 느림·반복·도움 요청만으로 부족함을 단정하지 않는다. "
-                + "새 세션의 AI 관찰과 다른 설명·불확실성을 함께 반영한다. 사용자의 개인정보를 출력하지 않는다. 한국어 JSON 객체 하나만 출력한다.";
+                + "현재 분석의 AI 관찰과 다른 설명·불확실성을 함께 반영한다. sameSessionReanalysis=true이면 같은 플레이의 해석 정정이며 "
+                + "이전 세션과 이번 세션 사이의 발전이나 새 성공으로 설명하지 않는다. "
+                + "근거는 allowedEvidenceEventIds의 R 번호만 인용한다. 문장 속 옛 E 번호는 인용하지 않는다. "
+                + "사용자의 개인정보를 출력하지 않는다. 한국어 JSON 객체 하나만 출력한다.";
     }
 
     public String userPrompt(AiUserProfile previous, AiBehaviorAnalysisResponse current) {
         Map<String, Object> root = new LinkedHashMap<>();
         root.put("promptVersion", VERSION);
         root.put("previousProfileVersion", previous.getProfileVersion());
+        root.put("previousSourceSessionId", previous.getSourceSessionId());
+        root.put("sameSessionReanalysis", current.analysis().sessionAssessments().stream()
+                .anyMatch(s -> s.sessionId().equals(previous.getSourceSessionId())));
         root.put("previousProfile", Map.of(
                 "summary", previous.getProfile().summary(),
                 "findings", previous.getProfile().findings(),
                 "uncertainties", previous.getProfile().uncertainties(),
                 "practicePlan", previous.getProfile().practicePlan(),
                 "usedEvidenceCardIds", previous.getProfile().usedEvidenceCardIds()));
-        root.put("newSessionAnalysis", current.analysis());
+        root.put("currentAnalysis", current.analysis());
+        root.put("eventSemantics", new oneuldo.behaviorlog.analysis.service.AiBehaviorAnalysisPromptFactory(mapper).marketEventSemantics());
+        root.put("practiceCapabilities", "게임에서 조정 가능한 것은 품목 2~4개, 수량, 예산, 문자 지원이다. "
+                + "시선·미세 동작·인지 처리 과정은 측정하지 않는다. 지원 문장에서 제안하는 품목 수와 practicePlan.itemCount를 일치시킨다.");
         root.put("updateRules", new String[]{
+                "sameSessionReanalysis=true이면 동일 플레이의 분석 정정이다. 새 플레이·추가 성공·교육 효과·능력 향상으로 세지 않는다. 새 분석이 원본 근거로 정정한 기존 해석을 누적 사실로 남기지 말고 정정 또는 보류한다.",
                 "이전 프로필과 새 세션을 함께 반영한 누적 요약을 작성한다.",
                 "기존 판단을 자동 확정하지 않고 유지·강화·약화·보류 가능성을 문장에 명확히 반영한다.",
                 "findings는 서로 다른 근거가 있으면 2~3개 유지한다. 새 플레이의 한 항목으로 기존의 유효한 다른 관찰을 덮지 않는다. 근거가 적으면 항목 수도 줄이며 개수를 채우려고 행동을 만들지 않는다. 각 finding의 evidenceEventIds는 입력에 있는 최근·상충 근거 최대 3개를 사용한다.",
@@ -44,7 +54,7 @@ public class AiUserProfilePromptFactory {
                 "findings", new Object[]{Map.of(
                         "id", "F1", "skill", "관찰된 생활기술", "observation", "누적 관찰 사실",
                         "interpretation", "확인이 필요한 가설", "alternativeExplanations", new String[]{"다른 설명"},
-                        "evidenceEventIds", new String[]{"입력에 있는 실제 UUID"}, "suggestedSupport", "지원 제안")},
+                        "evidenceEventIds", new String[]{"allowedEvidenceEventIds의 R 번호"}, "suggestedSupport", "지원 제안")},
                 "uncertainties", new String[]{"자료 한계"},
                 "practicePlan", Map.of(
                         "targetFindingIds", new String[]{"F1"}, "goal", "다음 연습 목표", "rationale", "근거와 목표 연결",

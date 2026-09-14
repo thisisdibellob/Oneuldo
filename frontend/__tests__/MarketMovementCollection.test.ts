@@ -1,6 +1,7 @@
 import { MarketBehaviorTracker } from '../src/behavior/marketBehaviorTracker';
 import { marketMission } from '../src/game/scenarios';
 import { enqueueBehaviorEvents } from '../src/behavior/behaviorEventQueue';
+import { createMarketEnvironment } from '../src/game/marketEnvironment';
 
 jest.mock('expo-crypto', () => ({ randomUUID: jest.fn(() => String(Math.random())) }));
 jest.mock('../src/behavior/behaviorEventQueue', () => ({
@@ -8,6 +9,20 @@ jest.mock('../src/behavior/behaviorEventQueue', () => ({
   flushBehaviorEventQueue: jest.fn(async () => undefined),
   assertBehaviorEventsAcknowledged: jest.fn(async () => undefined),
 }));
+
+beforeEach(() => jest.clearAllMocks());
+
+test('uploaded movement context uses the actual retail layout including household and checkout stations', async () => {
+  const environment = createMarketEnvironment();
+  const tracker = new MarketBehaviorTracker('test', marketMission, 2, undefined, environment.stations);
+  tracker.cartOpened({});
+  await tracker.abort({});
+  const events = jest.mocked(enqueueBehaviorEvents).mock.calls.flatMap(call => call[1].map(entry => entry.event));
+  expect(events.length).toBeGreaterThan(2);
+  for (const event of events) {
+    expect((event.payload?.marketContent as any).movementContext.stations).toEqual(environment.stations);
+  }
+});
 
 test('pending movement survives interactions, periodic persistence, backgrounding and session close', async () => {
   jest.useFakeTimers();

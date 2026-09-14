@@ -5,7 +5,7 @@ import tools.jackson.databind.ObjectMapper;
 
 /** Synthesizes observations whose source IDs have been checked, without replaying raw scene blobs. */
 public final class AnalysisSynthesisPrompt {
-    public static final String VERSION="synthesis-v2-broader";
+    public static final String VERSION="synthesis-v4-source-crosscheck";
     public static final String CONTRACT="""
         짧은 JSON 객체: {"s":"요약","f":[["F1","기술","사실","가설",["다른설명"],["E1"],"지원"]],
         "a":[["S1","SUCCESS|FAILURE|UNDETERMINED","이유",["E1"]]],"u":["한계"],
@@ -18,12 +18,23 @@ public final class AnalysisSynthesisPrompt {
     public static String build(ObjectMapper mapper,AiBehaviorAnalysisPromptFactory prompts,BehaviorAnalysisInputResponse input,
             List<AiObservationDigest> digests,AnalysisReferences refs,boolean limited) {
         var root=mapper.createObjectNode();root.put("synthesisVersion",VERSION);
-        root.put("stage","FINAL: 원본은 앞선 관측 단계에서 읽었고 여기에는 AI 해석과 참조 검증을 통과한 사건 ID를 제공한다. 참조 검증이 해석의 진실성을 보장하지 않는다. 원문을 다시 읽었다고 주장하지 말 것. 요약의 상충/도움/반증/불확실성을 유지하고 근거 부족시 판단 보류. 사건 이름이나 다수결로 성패를 정하지 않는다.");
+        root.put("stage","FINAL: AI 구간 해석과 원본 사건 값 사본을 함께 제공한다. 참조 ID 검증은 해석의 진실성을 보장하지 않는다. "
+                + "먼저 sourceEventDetails에서 실제 상품·수량·장바구니를 읽고 각 구간 요약과 대조한 뒤 최종 판단하라. "
+                + "기록 존재 여부나 값이 상충하면 원본을 우선하고 잘못된 구간 해석을 사실로 계승하지 말라. "
+                + "사본에 없는 이동 세부를 다시 읽었다고 주장하지 말 것. 사건 이름이나 다수결로 성패를 정하지 않는다.");
+        var details=SourceEventDetails.build(mapper,input);
+        root.set(SourceEventDetails.FIELD,details);
+        root.put("sourceEventDetailsRule",SourceEventDetails.RULE);
+        root.put("eventSemantics",prompts.marketEventSemantics());
+        root.put("interpretationRule","대안 설명의 개수를 채우려고 자동 결제·자동 팝업·시스템 수량 변경 등 입력에 없는 기능을 가정하지 않는다. "
+                + "기록으로 지지되는 대안이 없으면 '이 기록만으로 행동의 동기는 확인할 수 없다'처럼 확인 한계를 명시한다. "
+                + "skill에는 기술 이름을, observation에는 실제 행동을 쓴다. 지원은 다음 플레이에서 할 수 있는 구체적인 행동으로 제안한다.");
         root.set("taskContext",prompts.tasks(input));
         root.set("chunkAnalyses",mapper.valueToTree(digests));
         root.put("movementDetailLimited",limited);
         root.put("practiceCapabilities","장보기 품목2~4개/수량/예산/문자 지원 조정만 가능. 품절·예약·음성·실제 결제 지시 불가.");
         var evidence=new HashSet<UUID>();digests.forEach(d->d.observations().forEach(o->evidence.addAll(o.evidenceEventIds())));
+        details.forEach(e->evidence.add(UUID.fromString(e.path("id").asString())));
         var citations=root.putArray("evidenceReferences");
         var coverage=root.putArray("coverage");
         for(var session:input.input().sessions()) {

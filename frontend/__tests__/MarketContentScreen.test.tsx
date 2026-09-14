@@ -61,6 +61,7 @@ it('새 진열대에서도 규격·재고와 실제 선택을 보존하고 로�
     expect((start.payload?.marketContent as any).sceneSnapshot.startingConditions.geometry).toContain('shelves');
     const snapshot = (start.payload?.marketContent as any).sceneSnapshot;
     expect(snapshot.products).toHaveLength(60);
+    expect(snapshot.questInstanceId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
     expect(snapshot.seed).toBe('merged-content');
     const preset = getEnabledMarketScenario('S01');
     expect(snapshot.products.map((product: {id: string}) => product.id)).toEqual(expect.arrayContaining([...preset.mandatoryProductIds, ...preset.distractorProductIds]));
@@ -78,4 +79,22 @@ it('S02의 허용 상품인 초록 사과 선택을 새 UI와 행동 로그에 �
     expect(events.some(e=>e.action.eventCode==='SHOP.QUANTITY_CHANGED'&&e.payload?.itemId==='apple-green')).toBe(true);
     expect(events.some(e=>e.action.eventCode.includes('WRONG'))).toBe(false);
   } finally {screen.unmount();}
+});
+
+
+it('AI가 작성한 여러 단계 안내와 계산대 안내를 생략하지 않는다', async () => {
+  const mission = { ...buildMarketScenarioMission('S01'), briefing: ['P01: 물건 이름을 먼저 읽어요.', 'P02: 목록과 수량을 비교해요.', 'P03: 장바구니를 확인해요.'], checkoutDialogue: ['C01: 담은 물건을 하나씩 살펴봐요.', 'C02: 준비되면 구매를 확정해요.'] };
+  const env = createMarketEnvironment({ seed: 'ai-instructions', cashierCount: 2 });
+  const screen = render(<MarketSimulationScreen mission={mission} environment={env} playerPositionRef={{ current: env.stations.checkout }} interactionRequest={{id:1,station:'checkout'}} onExit={jest.fn()} />);
+  try {
+    for (const line of mission.briefing.slice(0, 2)) {
+      expect(screen.getByText(line)).toBeTruthy();
+      expect(screen.queryByText('장보기 시작')).toBeNull();
+      fireEvent.press(screen.getByText('다음'));
+    }
+    expect(screen.getByText(mission.briefing[2])).toBeTruthy();
+    fireEvent.press(screen.getByText('장보기 시작'));
+    await act(async () => { jest.advanceTimersByTime(300); await Promise.resolve(); });
+    for (const line of mission.checkoutDialogue) expect(screen.getByText(line)).toBeTruthy();
+  } finally { screen.unmount(); }
 });

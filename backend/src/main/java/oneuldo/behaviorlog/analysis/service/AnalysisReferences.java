@@ -36,8 +36,11 @@ public final class AnalysisReferences {
     /** Baseline mode is for offline comparisons of identical aliases and prompt content. */
     public String encode(String json,boolean compactMovement) {
         ObjectNode root = (ObjectNode) replace(mapper.readTree(json));
+        // Keep the readable source copy as objects after all token-oriented encoders.
+        JsonNode details = new LosslessTables(mapper).decode(root).path(SourceEventDetails.FIELD).deepCopy();
         // Alias complete IDs before factoring strings into prefixes/columns.
         if(compactMovement) root = new MovementInputEncoder(mapper).encode(root);
+        if (details.isArray()) root.set(SourceEventDetails.FIELD, details);
         root.put("referenceEncoding", "E숫자는 사건, S숫자는 세션, U숫자는 기타 원본 UUID의 고정 별칭입니다. 구간 사이에도 같은 ID는 같은 대상입니다. "
                 + "출력의 evidenceEventIds/sessionId에 제공된 짧은 ID를 그대로 쓰세요. UUID를 만들지 마세요.");
         return mapper.writeValueAsString(root);
