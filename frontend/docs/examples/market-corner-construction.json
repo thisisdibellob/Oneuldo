@@ -1,0 +1,40 @@
+{
+  "seed": "corner-construction-2026-09-13",
+  "sessionId": "corner-construction-demo",
+  "startedAt": "2026-09-13T00:00:00.000Z",
+  "difficulty": "exact",
+  "objectives": [
+    {
+      "productId": "milk",
+      "quantity": 1
+    },
+    {
+      "productId": "apple",
+      "quantity": 2
+    },
+    {
+      "productId": "curry",
+      "quantity": 1
+    }
+  ],
+  "stockPerProduct": 6,
+  "alarmPenaltyPoints": 10,
+  "stockOverrides": {},
+  "environment": {
+    "layoutId": "corner",
+    "entranceConstruction": true,
+    "employeeCount": 3,
+    "customerCount": 5,
+    "pillarCount": 4,
+    "chairCount": 0,
+    "cashierCount": 0,
+    "kioskPresent": true,
+    "shelfOrder": "random"
+  },
+  "provenance": {
+    "source": "synthetic",
+    "agentModel": "replace-with-actual-model",
+    "personaId": "replace-with-actual-persona",
+    "personaVersion": "1"
+  }
+}

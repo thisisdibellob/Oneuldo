@@ -29,6 +29,8 @@ type CookingPhase = 'briefing' | 'playing' | 'result';
 type CookingMode = 'challenge' | 'practice';
 type DragDirection = 'down' | 'right' | 'up';
 type IngredientOptionId = 'banana' | 'cereal' | 'juice' | 'milk' | 'yogurt';
+type ToolOptionId = 'bowl' | 'frying-pan' | 'knife' | 'spoon';
+type ChallengeDecisionId = 'mix-now' | 'peel-banana' | 'pour-yogurt';
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
 type CookingSimulationScreenProps = {
@@ -49,11 +51,80 @@ const INGREDIENT_OPTIONS: readonly {
   { color: '#F2B385', icon: 'cafe', id: 'juice', name: '주스' },
 ];
 
+const TOOL_OPTIONS: readonly {
+  color: string;
+  icon: IoniconName;
+  id: ToolOptionId;
+  name: string;
+}[] = [
+  { color: '#DDE9E2', icon: 'ellipse-outline', id: 'bowl', name: '그릇' },
+  { color: '#E6E8E4', icon: 'restaurant', id: 'spoon', name: '숟가락' },
+  { color: '#E8E0D6', icon: 'cut', id: 'knife', name: '칼' },
+  { color: '#E8D9D0', icon: 'flame-outline', id: 'frying-pan', name: '프라이팬' },
+];
+
 const RECIPE_INGREDIENT_IDS = new Set<IngredientOptionId>(['banana', 'cereal', 'yogurt']);
 const REQUIRED_INGREDIENT_IDS = new Set<IngredientOptionId>(['banana', 'yogurt']);
+const REQUIRED_TOOL_IDS = new Set<ToolOptionId>(['bowl', 'spoon']);
+const CHALLENGE_DECISION_OPTIONS: readonly {
+  id: ChallengeDecisionId;
+  label: string;
+}[] = [
+  { id: 'peel-banana', label: '바나나 껍질을 벗긴다' },
+  { id: 'pour-yogurt', label: '요거트를 먼저 모두 붓는다' },
+  { id: 'mix-now', label: '빈 그릇을 먼저 젓는다' },
+];
+
+type CleanupTarget = 'food' | 'recycle' | 'sink' | 'wipe';
+
+const CLEANUP_TASKS: readonly {
+  accessibilityLabel: string;
+  color: string;
+  icon: IoniconName;
+  itemName: string;
+  target: CleanupTarget;
+}[] = [
+  {
+    accessibilityLabel: '바나나 껍질 음식물 통에 넣기',
+    color: '#8A6A35',
+    icon: 'nutrition',
+    itemName: '바나나 껍질',
+    target: 'food',
+  },
+  {
+    accessibilityLabel: '빈 요거트 컵 재활용 통에 넣기',
+    color: '#5D8FA7',
+    icon: 'ice-cream',
+    itemName: '빈 요거트 컵',
+    target: 'recycle',
+  },
+  {
+    accessibilityLabel: '사용한 숟가락 싱크대에 넣기',
+    color: '#667B70',
+    icon: 'restaurant',
+    itemName: '사용한 숟가락',
+    target: 'sink',
+  },
+  {
+    accessibilityLabel: '사용한 그릇 싱크대에 넣기',
+    color: '#6D8177',
+    icon: 'ellipse-outline',
+    itemName: '사용한 그릇',
+    target: 'sink',
+  },
+  {
+    accessibilityLabel: '행주로 흘린 요거트 닦기',
+    color: '#6E907F',
+    icon: 'square-outline',
+    itemName: '깨끗한 행주',
+    target: 'wipe',
+  },
+];
 const STAGE_COLORS: Record<CookingStageId, string> = {
+  cleanup: '#70A095',
   ingredients: '#79A98D',
   mix: '#87A978',
+  plate: '#D58C70',
   peel: '#E2BC4F',
   split: '#DDA66A',
   topping: '#C98E58',
@@ -61,8 +132,10 @@ const STAGE_COLORS: Record<CookingStageId, string> = {
 };
 
 const CHALLENGE_STAGE_SECONDS: Record<CookingStageId, number> = {
+  cleanup: 28,
   ingredients: 30,
   mix: 30,
+  plate: 22,
   peel: 25,
   split: 35,
   topping: 25,
@@ -99,6 +172,7 @@ function DragAction({
   disabled = false,
   onDrop,
   onDragStateChange,
+  onGestureQuality,
   onMiss,
   style,
   threshold = 52,
@@ -110,6 +184,7 @@ function DragAction({
   disabled?: boolean;
   onDrop: () => void;
   onDragStateChange?: (dragging: boolean) => void;
+  onGestureQuality?: (quality: number) => void;
   onMiss: () => void;
   style?: StyleProp<ViewStyle>;
   threshold?: number;
@@ -118,10 +193,12 @@ function DragAction({
   const dragScale = useRef(new Animated.Value(1)).current;
   const onDropRef = useRef(onDrop);
   const onDragStateChangeRef = useRef(onDragStateChange);
+  const onGestureQualityRef = useRef(onGestureQuality);
   const onMissRef = useRef(onMiss);
   const disabledRef = useRef(disabled);
   onDropRef.current = onDrop;
   onDragStateChangeRef.current = onDragStateChange;
+  onGestureQualityRef.current = onGestureQuality;
   onMissRef.current = onMiss;
   disabledRef.current = disabled;
 
@@ -145,7 +222,7 @@ function DragAction({
     });
   };
 
-  const completeDrag = () => {
+  const completeDrag = (quality: number) => {
     onDragStateChangeRef.current?.(false);
     const target = dragTarget(direction, threshold + 30);
     Animated.parallel([
@@ -163,6 +240,7 @@ function DragAction({
     ]).start(() => {
       translation.setValue({ x: 0, y: 0 });
       dragScale.setValue(1);
+      onGestureQualityRef.current?.(quality);
       onDropRef.current();
     });
   };
@@ -187,7 +265,19 @@ function DragAction({
           translation.setValue({ x: gesture.dx, y: gesture.dy });
         },
         onPanResponderRelease: (_, gesture) => {
-          if (dragSucceeded(direction, gesture.dx, gesture.dy, threshold)) completeDrag();
+          if (dragSucceeded(direction, gesture.dx, gesture.dy, threshold)) {
+            const primaryDistance =
+              direction === 'right'
+                ? gesture.dx
+                : direction === 'up'
+                  ? -gesture.dy
+                  : gesture.dy;
+            const crossDistance =
+              direction === 'right' ? Math.abs(gesture.dy) : Math.abs(gesture.dx);
+            const reachScore = Math.min(1, primaryDistance / (threshold + 26));
+            const straightScore = Math.max(0, 1 - crossDistance / (threshold * 1.4));
+            completeDrag(Math.round((reachScore * 0.45 + straightScore * 0.55) * 100));
+          }
           else resetDrag(true);
         },
         onPanResponderTerminate: () => resetDrag(false),
@@ -207,7 +297,10 @@ function DragAction({
       accessibilityState={{ disabled }}
       accessible
       onAccessibilityAction={(event) => {
-        if (event.nativeEvent.actionName === 'activate' && !disabledRef.current) onDropRef.current();
+        if (event.nativeEvent.actionName === 'activate' && !disabledRef.current) {
+          onGestureQualityRef.current?.(100);
+          onDropRef.current();
+        }
       }}
       style={[
         styles.draggable,
@@ -227,6 +320,7 @@ function CircularMixAction({
   disabled,
   onCircle,
   onDragStateChange,
+  onGestureQuality,
   onMiss,
 }: {
   accessibilityLabel: string;
@@ -234,6 +328,7 @@ function CircularMixAction({
   disabled: boolean;
   onCircle: () => void;
   onDragStateChange?: (dragging: boolean) => void;
+  onGestureQuality?: (quality: number) => void;
   onMiss: () => void;
 }) {
   const translation = useRef(new Animated.ValueXY()).current;
@@ -242,10 +337,12 @@ function CircularMixAction({
   const quadrants = useRef(new Set<number>());
   const onCircleRef = useRef(onCircle);
   const onDragStateChangeRef = useRef(onDragStateChange);
+  const onGestureQualityRef = useRef(onGestureQuality);
   const onMissRef = useRef(onMiss);
   const disabledRef = useRef(disabled);
   onCircleRef.current = onCircle;
   onDragStateChangeRef.current = onDragStateChange;
+  onGestureQualityRef.current = onGestureQuality;
   onMissRef.current = onMiss;
   disabledRef.current = disabled;
 
@@ -295,7 +392,14 @@ function CircularMixAction({
         onPanResponderRelease: () => {
           const completed = Math.abs(accumulatedAngle.current) >= Math.PI * 1.45 && quadrants.current.size >= 3;
           reset(!completed);
-          if (completed) onCircleRef.current();
+          if (completed) {
+            const rotationScore = Math.min(1, Math.abs(accumulatedAngle.current) / (Math.PI * 2));
+            const coverageScore = Math.min(1, quadrants.current.size / 4);
+            onGestureQualityRef.current?.(
+              Math.round((rotationScore * 0.55 + coverageScore * 0.45) * 100),
+            );
+            onCircleRef.current();
+          }
         },
         onPanResponderTerminate: () => reset(false),
         onPanResponderTerminationRequest: () => false,
@@ -314,7 +418,10 @@ function CircularMixAction({
       accessibilityState={{ disabled }}
       accessible
       onAccessibilityAction={(event) => {
-        if (event.nativeEvent.actionName === 'activate' && !disabledRef.current) onCircleRef.current();
+        if (event.nativeEvent.actionName === 'activate' && !disabledRef.current) {
+          onGestureQualityRef.current?.(100);
+          onCircleRef.current();
+        }
       }}
       style={[styles.mixDragLayer, { transform: [{ translateX: translation.x }, { translateY: translation.y }] }]}
     >
@@ -461,21 +568,67 @@ function StageProgress({ current, target }: { current: number; target: number })
 function IngredientStage({
   notice,
   onDragStateChange,
+  onGestureQuality,
   onMiss,
   onSelect,
+  onToolSelect,
   selected,
+  selectedTools,
 }: {
   notice: string | null;
   onDragStateChange: (dragging: boolean) => void;
+  onGestureQuality: (quality: number) => void;
   onMiss: () => void;
   onSelect: (id: IngredientOptionId) => void;
+  onToolSelect: (id: ToolOptionId) => void;
   selected: ReadonlySet<IngredientOptionId>;
+  selectedTools: ReadonlySet<ToolOptionId>;
 }) {
   const selectedItems = INGREDIENT_OPTIONS.filter(
     (item) => selected.has(item.id) && RECIPE_INGREDIENT_IDS.has(item.id),
   );
   return (
     <>
+      <View style={styles.toolSelectionSection}>
+        <View style={styles.toolSelectionHeader}>
+          <View>
+            <Text style={styles.toolSelectionTitle}>먼저 쓸 도구를 골라요</Text>
+            <Text style={styles.toolSelectionHint}>이 요리는 불과 칼을 쓰지 않아요</Text>
+          </View>
+          <Text style={styles.toolSelectionCount}>{selectedTools.size}/2</Text>
+        </View>
+        <View style={styles.toolOptionRow}>
+          {TOOL_OPTIONS.map((tool) => {
+            const selectedTool = selectedTools.has(tool.id);
+            return (
+              <PressScale
+                accessibilityHint="바나나 요거트 컵에 쓸 도구인지 골라 보세요"
+                accessibilityLabel={`${tool.name} 선택${selectedTool ? '됨' : ''}`}
+                accessibilityRole="button"
+                accessibilityState={{ selected: selectedTool }}
+                disabled={selectedTool}
+                key={tool.id}
+                onPress={(event) => {
+                  stopPropagation(event);
+                  onToolSelect(tool.id);
+                }}
+                scaleTo={0.95}
+                style={[styles.toolOption, selectedTool && styles.toolOptionSelected]}
+              >
+                <View style={[styles.toolOptionIcon, { backgroundColor: tool.color }]}>
+                  <Ionicons color="#536057" name={tool.icon} size={22} />
+                </View>
+                <Text style={styles.toolOptionName}>{tool.name}</Text>
+                {selectedTool ? (
+                  <View style={styles.toolOptionCheck}>
+                    <Ionicons color="#FFFFFF" name="checkmark" size={11} />
+                  </View>
+                ) : null}
+              </PressScale>
+            );
+          })}
+        </View>
+      </View>
       <View style={styles.ingredientBasket}>
         <View style={styles.ingredientBasketIcon}>
           <Ionicons color="#FFFFFF" name="basket" size={22} />
@@ -505,6 +658,7 @@ function IngredientStage({
               key={item.id}
               onDragStateChange={onDragStateChange}
               onDrop={() => onSelect(item.id)}
+              onGestureQuality={onGestureQuality}
               onMiss={onMiss}
               style={styles.ingredientDragWrap}
               threshold={44}
@@ -534,14 +688,62 @@ function IngredientStage({
   );
 }
 
+function ChallengeDecision({
+  feedback,
+  onSelect,
+}: {
+  feedback: string | null;
+  onSelect: (id: ChallengeDecisionId) => void;
+}) {
+  return (
+    <View accessibilityLabel="다음 요리 순서 고르기" style={styles.challengeDecision}>
+      <View style={styles.challengeDecisionHeader}>
+        <View style={styles.challengeDecisionIcon}>
+          <Ionicons color="#8B653F" name="footsteps" size={20} />
+        </View>
+        <View style={styles.challengeDecisionCopy}>
+          <Text style={styles.challengeDecisionEyebrow}>도전 판단</Text>
+          <Text style={styles.challengeDecisionTitle}>준비가 끝났어요. 다음에는 무엇을 할까요?</Text>
+        </View>
+      </View>
+      <View style={styles.challengeDecisionOptions}>
+        {CHALLENGE_DECISION_OPTIONS.map((option) => (
+          <PressScale
+            accessibilityLabel={option.label}
+            accessibilityRole="button"
+            key={option.id}
+            onPress={(event) => {
+              stopPropagation(event);
+              onSelect(option.id);
+            }}
+            scaleTo={0.97}
+            style={styles.challengeDecisionOption}
+          >
+            <Text style={styles.challengeDecisionOptionText}>{option.label}</Text>
+            <Ionicons color="#698073" name="chevron-forward" size={18} />
+          </PressScale>
+        ))}
+      </View>
+      {feedback ? (
+        <View accessibilityLiveRegion="polite" style={styles.challengeDecisionFeedback}>
+          <Ionicons color="#966743" name="information-circle" size={17} />
+          <Text style={styles.challengeDecisionFeedbackText}>{feedback}</Text>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
 function PeelStage({
   onAction,
   onDragStateChange,
+  onGestureQuality,
   onMiss,
   progress,
 }: {
   onAction: () => void;
   onDragStateChange: (dragging: boolean) => void;
+  onGestureQuality: (quality: number) => void;
   onMiss: () => void;
   progress: number;
 }) {
@@ -554,6 +756,7 @@ function PeelStage({
         disabled={progress >= 3}
         onDragStateChange={onDragStateChange}
         onDrop={onAction}
+        onGestureQuality={onGestureQuality}
         onMiss={onMiss}
         style={styles.peelDragTarget}
         threshold={48}
@@ -579,12 +782,14 @@ function PeelStage({
 function SplitStage({
   onAction,
   onDragStateChange,
+  onGestureQuality,
   onMiss,
   progress,
   target,
 }: {
   onAction: () => void;
   onDragStateChange: (dragging: boolean) => void;
+  onGestureQuality: (quality: number) => void;
   onMiss: () => void;
   progress: number;
   target: number;
@@ -600,6 +805,7 @@ function SplitStage({
               direction="right"
               onDragStateChange={onDragStateChange}
               onDrop={onAction}
+              onGestureQuality={onGestureQuality}
               onMiss={onMiss}
               style={styles.splitPieceDrag}
               threshold={54}
@@ -629,12 +835,14 @@ function SplitStage({
 function YogurtStage({
   onAction,
   onDragStateChange,
+  onGestureQuality,
   onMiss,
   progress,
   target,
 }: {
   onAction: () => void;
   onDragStateChange: (dragging: boolean) => void;
+  onGestureQuality: (quality: number) => void;
   onMiss: () => void;
   progress: number;
   target: number;
@@ -648,6 +856,7 @@ function YogurtStage({
         disabled={progress >= target}
         onDragStateChange={onDragStateChange}
         onDrop={onAction}
+        onGestureQuality={onGestureQuality}
         onMiss={onMiss}
         threshold={54}
       >
@@ -669,6 +878,7 @@ function YogurtStage({
 function ToppingStage({
   onAction,
   onDragStateChange,
+  onGestureQuality,
   onMiss,
   onSkip,
   progress,
@@ -676,6 +886,7 @@ function ToppingStage({
 }: {
   onAction: () => void;
   onDragStateChange: (dragging: boolean) => void;
+  onGestureQuality: (quality: number) => void;
   onMiss: () => void;
   onSkip: () => void;
   progress: number;
@@ -691,6 +902,7 @@ function ToppingStage({
           disabled={progress >= target}
           onDragStateChange={onDragStateChange}
           onDrop={onAction}
+          onGestureQuality={onGestureQuality}
           onMiss={onMiss}
           threshold={54}
         >
@@ -731,6 +943,7 @@ function MixStage({
   hasTopping,
   onAction,
   onDragStateChange,
+  onGestureQuality,
   onMiss,
   progress,
   target,
@@ -738,6 +951,7 @@ function MixStage({
   hasTopping: boolean;
   onAction: () => void;
   onDragStateChange: (dragging: boolean) => void;
+  onGestureQuality: (quality: number) => void;
   onMiss: () => void;
   progress: number;
   target: number;
@@ -757,6 +971,7 @@ function MixStage({
         disabled={progress >= target}
         onCircle={onAction}
         onDragStateChange={onDragStateChange}
+        onGestureQuality={onGestureQuality}
         onMiss={onMiss}
       >
         <View style={styles.mixSpoonHandle}>
@@ -773,26 +988,214 @@ function MixStage({
   );
 }
 
+function PlateStage({
+  hasTopping,
+  onAction,
+  onDragStateChange,
+  onGestureQuality,
+  onMiss,
+  progress,
+}: {
+  hasTopping: boolean;
+  onAction: () => void;
+  onDragStateChange: (dragging: boolean) => void;
+  onGestureQuality: (quality: number) => void;
+  onMiss: () => void;
+  progress: number;
+}) {
+  const plated = progress >= 1;
+  return (
+    <View style={styles.plateStage}>
+      <View style={styles.transferStage}>
+        <View style={styles.plateSource}>
+          {!plated ? (
+            <DragAction
+              accessibilityHint="완성한 그릇을 잡고 오른쪽 식탁 매트 중앙에 놓으세요"
+              accessibilityLabel="완성한 그릇 식탁에 차리기"
+              direction="right"
+              onDragStateChange={onDragStateChange}
+              onDrop={onAction}
+              onGestureQuality={onGestureQuality}
+              onMiss={onMiss}
+              threshold={58}
+            >
+              <RecipeBowl
+                bananaPieces={6}
+                mixCount={3}
+                showSpoon={false}
+                toppingCount={hasTopping ? 4 : 0}
+                yogurtScoops={4}
+              />
+            </DragAction>
+          ) : (
+            <View style={styles.sourceCompleteIcon}>
+              <Ionicons color="#FFFFFF" name="checkmark" size={23} />
+            </View>
+          )}
+        </View>
+        <View style={styles.transferArrow}>
+          <Ionicons color="#789184" name="arrow-forward" size={27} />
+          <Text style={styles.transferCount}>차리기</Text>
+        </View>
+        <View style={[styles.plateMat, plated && styles.plateMatDone]}>
+          {plated ? (
+            <RecipeBowl
+              bananaPieces={6}
+              mixCount={3}
+              showSpoon={false}
+              toppingCount={hasTopping ? 4 : 0}
+              yogurtScoops={4}
+            />
+          ) : (
+            <>
+              <Ionicons color="#789184" name="restaurant-outline" size={30} />
+              <Text style={styles.plateMatText}>여기에 놓아요</Text>
+            </>
+          )}
+        </View>
+      </View>
+      <Text style={styles.sceneCaption}>
+        {plated ? '먹기 좋게 식탁에 차렸어요' : '그릇을 잡아 식탁 매트 가운데에 놓아요'}
+      </Text>
+    </View>
+  );
+}
+
+function CleanupStage({
+  onAction,
+  onDragStateChange,
+  onGestureQuality,
+  onMiss,
+  progress,
+}: {
+  onAction: () => void;
+  onDragStateChange: (dragging: boolean) => void;
+  onGestureQuality: (quality: number) => void;
+  onMiss: () => void;
+  progress: number;
+}) {
+  const complete = progress >= CLEANUP_TASKS.length;
+  const task = CLEANUP_TASKS[Math.min(progress, CLEANUP_TASKS.length - 1)];
+  const sortingWaste = task.target === 'food' || task.target === 'recycle';
+  return (
+    <View style={styles.cleanupStage}>
+      <View style={styles.cleanupCounter}>
+        <Ionicons color="#527665" name="sparkles" size={18} />
+        <Text style={styles.cleanupCounterText}>
+          {complete ? '정리 완료' : `${progress + 1} / ${CLEANUP_TASKS.length} 정리하기`}
+        </Text>
+      </View>
+      <View style={styles.transferStage}>
+        <View style={styles.cleanupSourceCard}>
+          {!complete ? (
+            <DragAction
+              accessibilityHint={
+                task.target === 'wipe'
+                  ? '행주를 잡고 오른쪽 요거트 자국 끝까지 밀어 닦으세요'
+                  : `${task.itemName}을 잡고 오른쪽의 ${task.target === 'sink' ? '싱크대' : '알맞은 통'}로 옮기세요`
+              }
+              accessibilityLabel={task.accessibilityLabel}
+              direction="right"
+              onDragStateChange={onDragStateChange}
+              onDrop={onAction}
+              onGestureQuality={onGestureQuality}
+              onMiss={onMiss}
+              threshold={54}
+            >
+              <View
+                style={[
+                  styles.cleanupItem,
+                  task.target === 'recycle' && styles.cleanupCup,
+                  task.target === 'sink' && styles.cleanupDish,
+                  task.target === 'wipe' && styles.cleanupCloth,
+                ]}
+              >
+                <Ionicons color={task.color} name={task.icon} size={34} />
+                <Text style={styles.cleanupItemText}>{task.itemName}</Text>
+              </View>
+            </DragAction>
+          ) : (
+            <View style={styles.sourceCompleteIcon}>
+              <Ionicons color="#FFFFFF" name="checkmark" size={23} />
+            </View>
+          )}
+        </View>
+        <View style={styles.transferArrow}>
+          <Ionicons color="#789184" name="arrow-forward" size={27} />
+          <Text style={styles.transferCount}>
+            {task.target === 'wipe' ? '닦기' : task.target === 'sink' ? '옮기기' : '분류'}
+          </Text>
+        </View>
+        {complete ? (
+          <View style={styles.cleanupFinished}>
+            <Ionicons color="#5B8B71" name="checkmark-circle" size={35} />
+            <Text style={styles.cleanupFinishedText}>조리대 정리 완료</Text>
+          </View>
+        ) : sortingWaste ? (
+          <View style={styles.cleanupBins}>
+            <View style={[styles.cleanupBin, task.target === 'food' && styles.cleanupBinActiveFood]}>
+              <Ionicons color="#8A6A35" name="leaf" size={25} />
+              <Text style={styles.cleanupBinLabel}>음식물</Text>
+              {progress >= 1 ? <Ionicons color="#5B8B71" name="checkmark-circle" size={17} /> : null}
+            </View>
+            <View style={[styles.cleanupBin, task.target === 'recycle' && styles.cleanupBinActiveRecycle]}>
+              <Ionicons color="#5D8FA7" name="sync" size={25} />
+              <Text style={styles.cleanupBinLabel}>재활용</Text>
+              {progress >= 2 ? <Ionicons color="#5B8B71" name="checkmark-circle" size={17} /> : null}
+            </View>
+          </View>
+        ) : task.target === 'sink' ? (
+          <View style={styles.cleanupSink}>
+            <Ionicons color="#5D8FA7" name="water" size={31} />
+            <View style={styles.cleanupSinkBasin} />
+            <Text style={styles.cleanupSinkText}>싱크대</Text>
+            <Text style={styles.cleanupSinkCount}>{Math.max(0, progress - 2)}/2</Text>
+          </View>
+        ) : (
+          <View style={styles.cleanupSpillArea}>
+            <View style={styles.cleanupSpillDrop} />
+            <View style={[styles.cleanupSpillDrop, styles.cleanupSpillDropSmall]} />
+            <Text style={styles.cleanupSpillText}>흘린 요거트</Text>
+          </View>
+        )}
+      </View>
+      <Text style={styles.sceneCaption}>
+        {complete
+          ? '사용한 도구와 조리대까지 깨끗하게 정리했어요'
+          : task.target === 'wipe'
+            ? '행주를 잡고 요거트 자국을 끝까지 닦아요'
+            : `${task.itemName}을 ${task.target === 'sink' ? '싱크대로 옮겨요' : '알맞은 통에 넣어요'}`}
+      </Text>
+    </View>
+  );
+}
+
 function StageScene({
   notice,
   onAction,
   onDragStateChange,
+  onGestureQuality,
   onIngredientSelect,
   onMiss,
   onToppingSkip,
+  onToolSelect,
   progress,
   selectedIngredients,
+  selectedTools,
   stage,
   toppingSkipped,
 }: {
   notice: string | null;
   onAction: () => void;
   onDragStateChange: (dragging: boolean) => void;
+  onGestureQuality: (quality: number) => void;
   onIngredientSelect: (id: IngredientOptionId) => void;
   onMiss: () => void;
   onToppingSkip: () => void;
+  onToolSelect: (id: ToolOptionId) => void;
   progress: number;
   selectedIngredients: ReadonlySet<IngredientOptionId>;
+  selectedTools: ReadonlySet<ToolOptionId>;
   stage: CookingStageDefinition;
   toppingSkipped: boolean;
 }) {
@@ -802,9 +1205,12 @@ function StageScene({
         <IngredientStage
           notice={notice}
           onDragStateChange={onDragStateChange}
+          onGestureQuality={onGestureQuality}
           onMiss={onMiss}
           onSelect={onIngredientSelect}
+          onToolSelect={onToolSelect}
           selected={selectedIngredients}
+          selectedTools={selectedTools}
         />
       );
     case 'peel':
@@ -812,6 +1218,7 @@ function StageScene({
         <PeelStage
           onAction={onAction}
           onDragStateChange={onDragStateChange}
+          onGestureQuality={onGestureQuality}
           onMiss={onMiss}
           progress={progress}
         />
@@ -821,6 +1228,7 @@ function StageScene({
         <SplitStage
           onAction={onAction}
           onDragStateChange={onDragStateChange}
+          onGestureQuality={onGestureQuality}
           onMiss={onMiss}
           progress={progress}
           target={stage.targetCount}
@@ -831,6 +1239,7 @@ function StageScene({
         <YogurtStage
           onAction={onAction}
           onDragStateChange={onDragStateChange}
+          onGestureQuality={onGestureQuality}
           onMiss={onMiss}
           progress={progress}
           target={stage.targetCount}
@@ -841,6 +1250,7 @@ function StageScene({
         <ToppingStage
           onAction={onAction}
           onDragStateChange={onDragStateChange}
+          onGestureQuality={onGestureQuality}
           onMiss={onMiss}
           onSkip={onToppingSkip}
           progress={progress}
@@ -853,9 +1263,31 @@ function StageScene({
           hasTopping={!toppingSkipped}
           onAction={onAction}
           onDragStateChange={onDragStateChange}
+          onGestureQuality={onGestureQuality}
           onMiss={onMiss}
           progress={progress}
           target={stage.targetCount}
+        />
+      );
+    case 'plate':
+      return (
+        <PlateStage
+          hasTopping={!toppingSkipped}
+          onAction={onAction}
+          onDragStateChange={onDragStateChange}
+          onGestureQuality={onGestureQuality}
+          onMiss={onMiss}
+          progress={progress}
+        />
+      );
+    case 'cleanup':
+      return (
+        <CleanupStage
+          onAction={onAction}
+          onDragStateChange={onDragStateChange}
+          onGestureQuality={onGestureQuality}
+          onMiss={onMiss}
+          progress={progress}
         />
       );
   }
@@ -869,8 +1301,9 @@ export function CookingSimulationScreen({ onClose, onComplete }: CookingSimulati
   const [selectedIngredients, setSelectedIngredients] = useState<ReadonlySet<IngredientOptionId>>(
     new Set(),
   );
+  const [selectedTools, setSelectedTools] = useState<ReadonlySet<ToolOptionId>>(new Set());
   const [notice, setNotice] = useState<string | null>(null);
-  const [hintVisible, setHintVisible] = useState(false);
+  const [hintLevel, setHintLevel] = useState(0);
   const [closeConfirmationVisible, setCloseConfirmationVisible] = useState(false);
   const [reduceMotion, setReduceMotion] = useState(false);
   const [toppingSkipped, setToppingSkipped] = useState(false);
@@ -878,10 +1311,10 @@ export function CookingSimulationScreen({ onClose, onComplete }: CookingSimulati
   const [countdown, setCountdown] = useState<number | null>(null);
   const [timeLeft, setTimeLeft] = useState(CHALLENGE_STAGE_SECONDS.ingredients);
   const [timeOver, setTimeOver] = useState(false);
-  const [score, setScore] = useState(0);
-  const [combo, setCombo] = useState(0);
-  const [bestCombo, setBestCombo] = useState(0);
   const [mistakes, setMistakes] = useState(0);
+  const [usedHelp, setUsedHelp] = useState(false);
+  const [challengeDecisionVisible, setChallengeDecisionVisible] = useState(false);
+  const [challengeDecisionFeedback, setChallengeDecisionFeedback] = useState<string | null>(null);
   const [appActive, setAppActive] = useState(AppState.currentState === 'active');
   const stageEntrance = useRef(new Animated.Value(1)).current;
   const actionPulse = useRef(new Animated.Value(1)).current;
@@ -890,9 +1323,9 @@ export function CookingSimulationScreen({ onClose, onComplete }: CookingSimulati
   const currentStage = BANANA_YOGURT_CUP_RECIPE.stages[stageIndex];
   const stageTimeLimit = CHALLENGE_STAGE_SECONDS[currentStage.id];
   const ingredientCount = [...selectedIngredients].filter((id) => REQUIRED_INGREDIENT_IDS.has(id)).length;
-  const currentProgress = currentStage.id === 'ingredients' ? ingredientCount : progress;
+  const toolCount = [...selectedTools].filter((id) => REQUIRED_TOOL_IDS.has(id)).length;
+  const currentProgress = currentStage.id === 'ingredients' ? ingredientCount + toolCount : progress;
   const stageComplete = currentProgress >= currentStage.targetCount;
-
   const stageLabel = useMemo(
     () => `${stageIndex + 1}/${BANANA_YOGURT_CUP_RECIPE.stages.length} ${currentStage.title}`,
     [currentStage.title, stageIndex],
@@ -984,7 +1417,6 @@ export function CookingSimulationScreen({ onClose, onComplete }: CookingSimulati
       return;
     }
     timerDeadline.current = null;
-    setCombo(0);
     setDragging(false);
     setTimeOver(true);
     AccessibilityInfo.announceForAccessibility('시간이 끝났어요. 현재 단계부터 연습으로 이어갈 수 있어요.');
@@ -995,14 +1427,17 @@ export function CookingSimulationScreen({ onClose, onComplete }: CookingSimulati
       phase !== 'playing' ||
       mode !== 'practice' ||
       stageComplete ||
-      hintVisible ||
+      hintLevel >= currentStage.hints.length ||
       closeConfirmationVisible
     ) {
       return;
     }
-    const timeout = setTimeout(() => setHintVisible(true), 6000);
+    const timeout = setTimeout(
+      () => setHintLevel((current) => Math.min(currentStage.hints.length, current + 1)),
+      hintLevel === 0 ? 5500 : 8500,
+    );
     return () => clearTimeout(timeout);
-  }, [closeConfirmationVisible, hintVisible, mode, phase, stageComplete, stageIndex]);
+  }, [closeConfirmationVisible, currentStage.hints.length, hintLevel, mode, phase, stageComplete, stageIndex]);
 
   useEffect(() => {
     if (phase !== 'playing') return;
@@ -1037,26 +1472,23 @@ export function CookingSimulationScreen({ onClose, onComplete }: CookingSimulati
 
   const recordSuccess = () => {
     animateAction();
-    if (mode !== 'challenge') return;
-    setCombo((current) => {
-      const next = current + 1;
-      setScore((currentScore) => currentScore + 100 + Math.min(current, 4) * 25);
-      setBestCombo((currentBest) => Math.max(currentBest, next));
-      return next;
-    });
+  };
+
+  const handleGestureQuality = (quality: number) => {
+    const safeQuality = Math.max(0, Math.min(100, Math.round(quality)));
+    if (safeQuality >= 90) setNotice('정확하게 놓았어요! 손동작이 아주 안정적이에요.');
+    else if (safeQuality >= 72) setNotice('좋아요. 알맞은 곳에 잘 옮겼어요.');
+    else setNotice('잘 놓았어요. 다음에는 화살표를 따라 조금 더 곧게 움직여 봐요.');
   };
 
   const handleMiss = () => {
     setNotice('조금 더 끝까지 끌어 놓아요. 다시 해도 괜찮아요.');
-    if (mode !== 'challenge') return;
-    setCombo(0);
     setMistakes((current) => current + 1);
   };
 
   const handleAction = () => {
     if (stageComplete || timeOver || countdown !== null) return;
     recordSuccess();
-    setNotice(null);
     setProgress((current) => Math.min(currentStage.targetCount, current + 1));
   };
 
@@ -1068,8 +1500,23 @@ export function CookingSimulationScreen({ onClose, onComplete }: CookingSimulati
       return;
     }
     recordSuccess();
-    setNotice(null);
     setSelectedIngredients((current) => new Set([...current, id]));
+  };
+
+  const handleToolSelect = (id: ToolOptionId) => {
+    if (stageComplete || timeOver || countdown !== null) return;
+    if (!REQUIRED_TOOL_IDS.has(id)) {
+      setMistakes((current) => current + 1);
+      setNotice(
+        id === 'knife'
+          ? '칼 대신 담을 그릇과 섞을 숟가락을 골라요.'
+          : '불을 쓰지 않으니 프라이팬 대신 그릇과 숟가락을 골라요.',
+      );
+      return;
+    }
+    recordSuccess();
+    setSelectedTools((current) => new Set([...current, id]));
+    setNotice(`${TOOL_OPTIONS.find((tool) => tool.id === id)?.name ?? '도구'}을 준비했어요.`);
   };
 
   const skipTopping = () => {
@@ -1083,15 +1530,16 @@ export function CookingSimulationScreen({ onClose, onComplete }: CookingSimulati
     }
     setToppingSkipped(true);
     setProgress(currentStage.targetCount);
+    setNotice('안전 정보와 내 선택을 확인하고 토핑을 넣지 않았어요.');
     AccessibilityInfo.announceForAccessibility('토핑을 넣지 않고 다음 단계로 진행합니다.');
   };
 
-  const advanceStage = () => {
-    if (!stageComplete || timeOver || countdown !== null) return;
-    setHintVisible(false);
+  const moveToNextStage = () => {
+    setHintLevel(0);
     setNotice(null);
     setProgress(0);
-    if (mode === 'challenge') setScore((current) => current + 150 + timeLeft * 5);
+    setChallengeDecisionVisible(false);
+    setChallengeDecisionFeedback(null);
     if (stageIndex >= BANANA_YOGURT_CUP_RECIPE.stages.length - 1) {
       timerDeadline.current = null;
       setPhase('result');
@@ -1109,24 +1557,46 @@ export function CookingSimulationScreen({ onClose, onComplete }: CookingSimulati
     }
   };
 
+  const handleChallengeDecision = (id: ChallengeDecisionId) => {
+    if (id !== 'peel-banana') {
+      setMistakes((current) => current + 1);
+      setChallengeDecisionFeedback('재료를 섞기 전에 바나나 껍질부터 벗겨야 해요.');
+      return;
+    }
+    AccessibilityInfo.announceForAccessibility('맞아요. 바나나 껍질 벗기기로 이동합니다.');
+    moveToNextStage();
+  };
+
+  const advanceStage = () => {
+    if (!stageComplete || timeOver || countdown !== null || challengeDecisionVisible) return;
+    if (mode === 'challenge' && currentStage.id === 'ingredients') {
+      setChallengeDecisionVisible(true);
+      setChallengeDecisionFeedback(null);
+      setNotice(null);
+      return;
+    }
+    moveToNextStage();
+  };
+
   const startCooking = (selectedMode: CookingMode = mode) => {
     setMode(selectedMode);
     setPhase('playing');
     setStageIndex(0);
     setProgress(0);
     setSelectedIngredients(new Set());
+    setSelectedTools(new Set());
     setToppingSkipped(false);
-    setHintVisible(false);
+    setHintLevel(0);
     setNotice(null);
     setDragging(false);
     setCloseConfirmationVisible(false);
     setCountdown(selectedMode === 'challenge' ? 3 : null);
     setTimeLeft(CHALLENGE_STAGE_SECONDS.ingredients);
     setTimeOver(false);
-    setScore(0);
-    setCombo(0);
-    setBestCombo(0);
     setMistakes(0);
+    setUsedHelp(false);
+    setChallengeDecisionVisible(false);
+    setChallengeDecisionFeedback(null);
     timerDeadline.current = null;
   };
 
@@ -1140,7 +1610,6 @@ export function CookingSimulationScreen({ onClose, onComplete }: CookingSimulati
     setCountdown(null);
     setTimeOver(false);
     setTimeLeft(stageTimeLimit);
-    setCombo(0);
     setNotice('시간 제한 없이 지금 단계부터 이어서 연습해요.');
     timerDeadline.current = null;
   };
@@ -1148,13 +1617,17 @@ export function CookingSimulationScreen({ onClose, onComplete }: CookingSimulati
   const retryCurrentStage = () => {
     setTimeOver(false);
     setDragging(false);
-    setCountdown(3);
+    setCountdown(mode === 'challenge' ? 3 : null);
     setTimeLeft(stageTimeLimit);
-    setCombo(0);
-    setHintVisible(false);
-    setNotice(null);
+    setHintLevel(0);
+    setNotice(mode === 'practice' ? '이 단계만 처음부터 다시 연습해요.' : null);
+    setChallengeDecisionVisible(false);
+    setChallengeDecisionFeedback(null);
     timerDeadline.current = null;
-    if (currentStage.id === 'ingredients') setSelectedIngredients(new Set());
+    if (currentStage.id === 'ingredients') {
+      setSelectedIngredients(new Set());
+      setSelectedTools(new Set());
+    }
     else setProgress(0);
     if (currentStage.id === 'topping') setToppingSkipped(false);
   };
@@ -1169,6 +1642,15 @@ export function CookingSimulationScreen({ onClose, onComplete }: CookingSimulati
       timerDeadline.current = null;
     }
     setCloseConfirmationVisible(true);
+  };
+
+  const revealNextHint = () => {
+    if (hintLevel >= currentStage.hints.length) {
+      setHintLevel(0);
+      return;
+    }
+    setUsedHelp(true);
+    setHintLevel((current) => Math.min(currentStage.hints.length, current + 1));
   };
 
   const renderTopBar = () => (
@@ -1197,17 +1679,23 @@ export function CookingSimulationScreen({ onClose, onComplete }: CookingSimulati
       </View>
       {phase === 'playing' ? (
         <PressScale
-          accessibilityLabel={hintVisible ? '도움말 닫기' : '도움말 보기'}
+          accessibilityLabel={
+            hintLevel >= currentStage.hints.length
+              ? '도움말 닫기'
+              : hintLevel > 0
+                ? '다음 도움말 보기'
+                : '도움말 보기'
+          }
           accessibilityRole="button"
-          accessibilityState={{ expanded: hintVisible }}
+          accessibilityState={{ expanded: hintLevel > 0 }}
           onPress={(event) => {
             stopPropagation(event);
-            setHintVisible((visible) => !visible);
+            revealNextHint();
           }}
           scaleTo={0.9}
-          style={[styles.topIconButton, hintVisible && styles.topIconButtonActive]}
+          style={[styles.topIconButton, hintLevel > 0 && styles.topIconButtonActive]}
         >
-          <Ionicons color={hintVisible ? '#FFFFFF' : '#37483F'} name="help" size={22} />
+          <Ionicons color={hintLevel > 0 ? '#FFFFFF' : '#37483F'} name="help" size={22} />
         </PressScale>
       ) : (
         <View style={styles.topIconPlaceholder} />
@@ -1273,7 +1761,7 @@ export function CookingSimulationScreen({ onClose, onComplete }: CookingSimulati
             <View style={styles.allergenNotice}>
               <Ionicons color="#8A633D" name="alert-circle" size={19} />
               <Text style={styles.allergenNoticeText}>
-                알레르기: {BANANA_YOGURT_CUP_RECIPE.allergens.join(', ')}. 실제 조리 전 등록된 안전 정보를 확인해요.
+                알레르기: {BANANA_YOGURT_CUP_RECIPE.allergens.join(', ')}. 실제 조리 전 제품 표시와 함께하는 사람의 안내를 확인해요.
               </Text>
             </View>
           </View>
@@ -1305,7 +1793,7 @@ export function CookingSimulationScreen({ onClose, onComplete }: CookingSimulati
                 ) : null}
               </PressScale>
               <PressScale
-                accessibilityHint="단계마다 새 제한시간을 받고 점수와 연속 성공 기록을 만듭니다"
+                accessibilityHint="단계마다 새 제한시간을 받고 문제 상황을 직접 해결합니다"
                 accessibilityLabel="도전 모드"
                 accessibilityRole="button"
                 accessibilityState={{ selected: mode === 'challenge' }}
@@ -1319,7 +1807,7 @@ export function CookingSimulationScreen({ onClose, onComplete }: CookingSimulati
                   <Ionicons color="#A06833" name="timer" size={24} />
                 </View>
                 <Text style={styles.modeCardTitle}>도전 모드</Text>
-                <Text style={styles.modeCardBody}>단계마다 시간{`\n`}점수 기록하기</Text>
+                <Text style={styles.modeCardBody}>단계마다 시간{`\n`}문제 상황 확인</Text>
                 {mode === 'challenge' ? (
                   <View style={[styles.modeSelectedBadge, styles.modeSelectedBadgeChallenge]}>
                     <Ionicons color="#FFFFFF" name="checkmark" size={13} />
@@ -1372,18 +1860,6 @@ export function CookingSimulationScreen({ onClose, onComplete }: CookingSimulati
                   ]}
                 />
               </View>
-              <View style={styles.scoreGroup}>
-                {combo >= 2 ? (
-                  <View accessibilityLabel={`${combo}회 연속 성공`} style={styles.comboChip}>
-                    <Ionicons color="#A66E30" name="flame" size={15} />
-                    <Text style={styles.comboText}>{combo} 연속</Text>
-                  </View>
-                ) : null}
-                <View accessibilityLabel={`${score}점`} style={styles.scoreChip}>
-                  <Ionicons color="#FFFFFF" name="star" size={15} />
-                  <Text style={styles.scoreText}>{score}</Text>
-                </View>
-              </View>
             </View>
           ) : (
             <View style={styles.practiceBanner}>
@@ -1420,26 +1896,51 @@ export function CookingSimulationScreen({ onClose, onComplete }: CookingSimulati
             <Text style={styles.stageTitle}>{currentStage.title}</Text>
             <Text style={styles.stageInstruction}>{currentStage.instruction}</Text>
             <StageProgress current={currentProgress} target={currentStage.targetCount} />
-            {hintVisible ? (
+            {hintLevel > 0 ? (
               <View accessibilityLiveRegion="polite" style={styles.hintCard}>
                 <Ionicons color="#547060" name="bulb" size={19} />
-                <Text style={styles.hintText}>{currentStage.hint}</Text>
+                <View style={styles.hintCopy}>
+                  <Text style={styles.hintLevelText}>
+                    도움 {hintLevel}/{currentStage.hints.length}
+                  </Text>
+                  <Text style={styles.hintText}>{currentStage.hints[hintLevel - 1]}</Text>
+                </View>
               </View>
             ) : null}
             <View style={styles.stageScene}>
-              <StageScene
-                notice={notice}
-                onAction={handleAction}
-                onDragStateChange={setDragging}
-                onIngredientSelect={handleIngredientSelect}
-                onMiss={handleMiss}
-                onToppingSkip={skipTopping}
-                progress={progress}
-                selectedIngredients={selectedIngredients}
-                stage={currentStage}
-                toppingSkipped={toppingSkipped}
-              />
+              {challengeDecisionVisible ? (
+                <ChallengeDecision
+                  feedback={challengeDecisionFeedback}
+                  onSelect={handleChallengeDecision}
+                />
+              ) : (
+                <StageScene
+                  notice={notice}
+                  onAction={handleAction}
+                  onDragStateChange={setDragging}
+                  onGestureQuality={handleGestureQuality}
+                  onIngredientSelect={handleIngredientSelect}
+                  onMiss={handleMiss}
+                  onToppingSkip={skipTopping}
+                  onToolSelect={handleToolSelect}
+                  progress={progress}
+                  selectedIngredients={selectedIngredients}
+                  selectedTools={selectedTools}
+                  stage={currentStage}
+                  toppingSkipped={toppingSkipped}
+                />
+              )}
             </View>
+            {currentStage.id !== 'ingredients' && notice && !challengeDecisionVisible ? (
+              <View accessibilityLiveRegion="polite" style={styles.gestureNotice}>
+                <Ionicons
+                  color={notice.startsWith('정확하게') ? '#4F856A' : '#8A6849'}
+                  name={notice.startsWith('정확하게') ? 'sparkles' : 'information-circle'}
+                  size={17}
+                />
+                <Text style={styles.gestureNoticeText}>{notice}</Text>
+              </View>
+            ) : null}
             {stageComplete ? (
               <View accessibilityLiveRegion="polite" style={styles.stageCompleteRow}>
                 <View style={styles.stageCompleteIcon}>
@@ -1457,19 +1958,37 @@ export function CookingSimulationScreen({ onClose, onComplete }: CookingSimulati
                   : '다음 요리 단계'
               }
               accessibilityRole="button"
-              accessibilityState={{ disabled: !stageComplete }}
-              disabled={!stageComplete}
+              accessibilityState={{ disabled: !stageComplete || challengeDecisionVisible }}
+              disabled={!stageComplete || challengeDecisionVisible}
               onPress={(event) => {
                 stopPropagation(event);
                 advanceStage();
               }}
-              style={[styles.primaryButton, styles.stageNextButton, !stageComplete && styles.buttonDisabled]}
+              style={[
+                styles.primaryButton,
+                styles.stageNextButton,
+                (!stageComplete || challengeDecisionVisible) && styles.buttonDisabled,
+              ]}
             >
               <Text style={styles.primaryButtonText}>
                 {stageIndex >= BANANA_YOGURT_CUP_RECIPE.stages.length - 1 ? '완성하기' : '다음 단계'}
               </Text>
               <Ionicons color="#FFFFFF" name="arrow-forward" size={20} />
             </PressScale>
+            {currentProgress > 0 || notice ? (
+              <PressScale
+                accessibilityLabel={`${currentStage.title} 단계 처음부터 다시 하기`}
+                accessibilityRole="button"
+                onPress={(event) => {
+                  stopPropagation(event);
+                  retryCurrentStage();
+                }}
+                style={styles.stageRetryButton}
+              >
+                <Ionicons color="#62736A" name="refresh" size={16} />
+                <Text style={styles.stageRetryText}>이 단계만 다시 하기</Text>
+              </PressScale>
+            ) : null}
           </View>
         </ScrollView>
       ) : (
@@ -1501,47 +2020,22 @@ export function CookingSimulationScreen({ onClose, onComplete }: CookingSimulati
             </Text>
             <Text style={styles.resultTitle}>{BANANA_YOGURT_CUP_RECIPE.name}</Text>
             <Text style={styles.resultDescription}>
-              재료를 확인하고, 바나나를 나누고, 요거트를 순서대로 담았어요.
+              재료를 확인하고 차근차근 만든 뒤, 식탁에 차리고 주방까지 정리했어요.
             </Text>
-            {mode === 'challenge' ? (
-              <View style={styles.challengeResult}>
-                <View style={styles.challengeResultMain}>
-                  <Ionicons color="#FFFFFF" name="star" size={20} />
-                  <View>
-                    <Text style={styles.challengeResultLabel}>이번 기록</Text>
-                    <Text accessibilityLabel={`최종 점수 ${score}점`} style={styles.challengeResultScore}>
-                      {score}점
-                    </Text>
-                  </View>
-                </View>
-                <View style={styles.challengeResultDetail}>
-                  <Text style={styles.challengeResultDetailValue}>
-                    {BANANA_YOGURT_CUP_RECIPE.stages.length}/{BANANA_YOGURT_CUP_RECIPE.stages.length}
-                  </Text>
-                  <Text style={styles.challengeResultDetailLabel}>완료 단계</Text>
-                </View>
-                <View style={styles.challengeResultDetail}>
-                  <Text style={styles.challengeResultDetailValue}>{bestCombo}</Text>
-                  <Text style={styles.challengeResultDetailLabel}>최고 연속</Text>
-                </View>
-                <View style={styles.challengeResultDetail}>
-                  <Text style={styles.challengeResultDetailValue}>{mistakes}</Text>
-                  <Text style={styles.challengeResultDetailLabel}>다시 놓기</Text>
-                </View>
-              </View>
-            ) : null}
             <View style={styles.badgeRow}>
               <View style={styles.completionBadge}>
-                <Ionicons color="#4F7B65" name="eye" size={17} />
-                <Text style={styles.completionBadgeText}>확인</Text>
+                <Ionicons color="#4F7B65" name="checkmark-circle" size={17} />
+                <Text style={styles.completionBadgeText}>목표 완료</Text>
               </View>
               <View style={styles.completionBadge}>
-                <Ionicons color="#4F7B65" name="water" size={17} />
-                <Text style={styles.completionBadgeText}>위생</Text>
+                <Ionicons color="#4F7B65" name={mistakes > 0 ? 'refresh' : usedHelp ? 'bulb' : 'hand-left'} size={17} />
+                <Text style={styles.completionBadgeText}>
+                  {mistakes > 0 ? '스스로 수정' : usedHelp ? '도움 활용' : '스스로 진행'}
+                </Text>
               </View>
               <View style={styles.completionBadge}>
-                <Ionicons color="#4F7B65" name="restaurant" size={17} />
-                <Text style={styles.completionBadgeText}>완성</Text>
+                <Ionicons color="#4F7B65" name="sparkles" size={17} />
+                <Text style={styles.completionBadgeText}>주방 정리 완료</Text>
               </View>
             </View>
           </View>
@@ -1624,16 +2118,6 @@ export function CookingSimulationScreen({ onClose, onComplete }: CookingSimulati
             <Text style={styles.timeOverBody}>
               {currentStage.title} 단계에서 잠시 멈췄어요. 이 단계만 다시 도전하거나 시간 없이 이어갈 수 있어요.
             </Text>
-            <View style={styles.timeOverScoreRow}>
-              <View style={styles.timeOverStat}>
-                <Text style={styles.timeOverStatValue}>{score}</Text>
-                <Text style={styles.timeOverStatLabel}>현재 점수</Text>
-              </View>
-              <View style={styles.timeOverStat}>
-                <Text style={styles.timeOverStatValue}>{bestCombo}</Text>
-                <Text style={styles.timeOverStatLabel}>최고 연속</Text>
-              </View>
-            </View>
             <PressScale
               accessibilityLabel="현재 단계부터 연습 모드로 이어서 하기"
               accessibilityRole="button"
@@ -1709,7 +2193,7 @@ export function CookingSimulationScreen({ onClose, onComplete }: CookingSimulati
 
 const styles = StyleSheet.create({
   root: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: '#F4F0E6',
     cursor: 'auto',
     zIndex: 80,
@@ -1969,27 +2453,6 @@ const styles = StyleSheet.create({
   timerFill: { backgroundColor: '#6F9D7E', borderRadius: 4, height: '100%' },
   timerFillWarning: { backgroundColor: '#D5A340' },
   timerFillUrgent: { backgroundColor: '#D55F4B' },
-  scoreGroup: { alignItems: 'center', flexDirection: 'row', gap: 6 },
-  scoreChip: {
-    alignItems: 'center',
-    backgroundColor: '#5F8E75',
-    borderRadius: 17,
-    flexDirection: 'row',
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-  },
-  scoreText: { color: '#FFFFFF', fontFamily: fonts.bold, fontSize: 13 },
-  comboChip: {
-    alignItems: 'center',
-    backgroundColor: '#F8E7CE',
-    borderRadius: 15,
-    flexDirection: 'row',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 7,
-  },
-  comboText: { color: '#96622E', fontFamily: fonts.bold, fontSize: 11 },
   practiceBanner: {
     alignItems: 'center',
     alignSelf: 'center',
@@ -2054,8 +2517,23 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     width: '100%',
   },
-  hintText: { color: '#587061', flex: 1, fontFamily: fonts.medium, fontSize: 12, lineHeight: 18 },
+  hintCopy: { flex: 1 },
+  hintLevelText: { color: '#7A907F', fontFamily: fonts.bold, fontSize: 9, marginBottom: 2 },
+  hintText: { color: '#587061', fontFamily: fonts.medium, fontSize: 12, lineHeight: 18 },
   stageScene: { alignItems: 'center', flex: 1, justifyContent: 'center', marginTop: 4, width: '100%' },
+  gestureNotice: {
+    alignItems: 'center',
+    backgroundColor: '#F4F1E8',
+    borderRadius: 14,
+    flexDirection: 'row',
+    gap: 6,
+    marginBottom: 9,
+    maxWidth: 440,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+    width: '100%',
+  },
+  gestureNoticeText: { color: '#6B6F68', flex: 1, fontFamily: fonts.semibold, fontSize: 11 },
   stageCompleteRow: {
     alignItems: 'center',
     backgroundColor: '#ECF6EE',
@@ -2077,9 +2555,93 @@ const styles = StyleSheet.create({
   stageCompleteText: { color: '#4E735F', fontFamily: fonts.bold, fontSize: 13 },
   playingFooter: { alignItems: 'center', paddingBottom: 18, paddingHorizontal: 18 },
   stageNextButton: { marginTop: 12 },
+  stageRetryButton: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 5,
+    justifyContent: 'center',
+    marginTop: 6,
+    minHeight: 38,
+    paddingHorizontal: 14,
+  },
+  stageRetryText: { color: '#62736A', fontFamily: fonts.semibold, fontSize: 12 },
   buttonDisabled: { backgroundColor: '#B9BDB8', opacity: 0.58 },
   draggable: {},
   draggableDisabled: { opacity: 0.72 },
+  toolSelectionSection: {
+    backgroundColor: '#F3F1E8',
+    borderRadius: 20,
+    marginBottom: 10,
+    maxWidth: 390,
+    padding: 11,
+    width: '100%',
+  },
+  toolSelectionHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
+  toolSelectionTitle: { color: '#3E5147', fontFamily: fonts.bold, fontSize: 13 },
+  toolSelectionHint: { color: '#778078', fontFamily: fonts.regular, fontSize: 10, marginTop: 2 },
+  toolSelectionCount: { color: '#5E7D6C', fontFamily: fonts.bold, fontSize: 11 },
+  toolOptionRow: { flexDirection: 'row', gap: 7, marginTop: 9 },
+  toolOption: {
+    alignItems: 'center',
+    backgroundColor: '#FFFDF8',
+    borderRadius: 15,
+    flex: 1,
+    minHeight: 72,
+    minWidth: 0,
+    paddingHorizontal: 3,
+    paddingVertical: 7,
+    position: 'relative',
+  },
+  toolOptionSelected: { backgroundColor: '#DDEADF' },
+  toolOptionIcon: { alignItems: 'center', borderRadius: 16, height: 34, justifyContent: 'center', width: 34 },
+  toolOptionName: { color: '#4D5A53', fontFamily: fonts.semibold, fontSize: 10, marginTop: 5, textAlign: 'center' },
+  toolOptionCheck: {
+    alignItems: 'center',
+    backgroundColor: '#679779',
+    borderRadius: 8,
+    height: 16,
+    justifyContent: 'center',
+    position: 'absolute',
+    right: 4,
+    top: 4,
+    width: 16,
+  },
+  challengeDecision: { maxWidth: 460, paddingBottom: 13, paddingTop: 9, width: '100%' },
+  challengeDecisionHeader: { alignItems: 'center', flexDirection: 'row' },
+  challengeDecisionIcon: {
+    alignItems: 'center',
+    backgroundColor: '#F1E3CF',
+    borderRadius: 19,
+    height: 38,
+    justifyContent: 'center',
+    width: 38,
+  },
+  challengeDecisionCopy: { flex: 1, marginLeft: 10 },
+  challengeDecisionEyebrow: { color: '#9A7046', fontFamily: fonts.bold, fontSize: 9 },
+  challengeDecisionTitle: { color: '#3A4941', fontFamily: fonts.bold, fontSize: 14, lineHeight: 19, marginTop: 2 },
+  challengeDecisionOptions: { gap: 7, marginTop: 12 },
+  challengeDecisionOption: {
+    alignItems: 'center',
+    backgroundColor: '#F2F4EE',
+    borderRadius: 15,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    minHeight: 45,
+    paddingHorizontal: 13,
+    paddingVertical: 8,
+  },
+  challengeDecisionOptionText: { color: '#4A5B52', flex: 1, fontFamily: fonts.semibold, fontSize: 12 },
+  challengeDecisionFeedback: {
+    alignItems: 'center',
+    backgroundColor: '#F7E9DC',
+    borderRadius: 13,
+    flexDirection: 'row',
+    gap: 6,
+    marginTop: 9,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  challengeDecisionFeedbackText: { color: '#815D43', flex: 1, fontFamily: fonts.medium, fontSize: 11, lineHeight: 16 },
   ingredientBasket: {
     alignItems: 'center',
     backgroundColor: '#E0ECDD',
@@ -2258,6 +2820,95 @@ const styles = StyleSheet.create({
   splitPiece: { backgroundColor: '#FFE68A', borderColor: '#DBBD50', borderRadius: 17, borderWidth: 2, height: 34, width: 34 },
   sceneCaption: { color: '#777F7A', fontFamily: fonts.semibold, fontSize: 12, marginTop: 5 },
   transferStage: { alignItems: 'center', flexDirection: 'row', justifyContent: 'center', width: '100%' },
+  plateStage: { alignItems: 'center', justifyContent: 'center', minHeight: 250, width: '100%' },
+  plateSource: { alignItems: 'center', height: 150, justifyContent: 'center', width: 116 },
+  plateMat: {
+    alignItems: 'center',
+    backgroundColor: '#DFEBDD',
+    borderRadius: 28,
+    height: 150,
+    justifyContent: 'center',
+    width: 138,
+  },
+  plateMatDone: { backgroundColor: '#D5E8D6' },
+  plateMatText: { color: '#6C8174', fontFamily: fonts.bold, fontSize: 10, marginTop: 5 },
+  cleanupStage: { alignItems: 'center', justifyContent: 'center', minHeight: 255, width: '100%' },
+  cleanupCounter: {
+    alignItems: 'center',
+    backgroundColor: '#EAF2EA',
+    borderRadius: 15,
+    flexDirection: 'row',
+    gap: 6,
+    marginBottom: 13,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  cleanupCounterText: { color: '#527665', fontFamily: fonts.bold, fontSize: 11 },
+  cleanupSourceCard: {
+    alignItems: 'center',
+    backgroundColor: '#F8F1E6',
+    borderRadius: 22,
+    height: 124,
+    justifyContent: 'center',
+    width: 112,
+  },
+  cleanupItem: {
+    alignItems: 'center',
+    backgroundColor: '#F3E0A8',
+    borderRadius: 18,
+    height: 88,
+    justifyContent: 'center',
+    width: 88,
+  },
+  cleanupCup: { backgroundColor: '#DDEDF4' },
+  cleanupDish: { backgroundColor: '#E4ECE7' },
+  cleanupCloth: { backgroundColor: '#DCEDE3' },
+  cleanupItemText: { color: '#5F625E', fontFamily: fonts.bold, fontSize: 10, marginTop: 4 },
+  cleanupBins: { flexDirection: 'row', gap: 7 },
+  cleanupBin: {
+    alignItems: 'center',
+    backgroundColor: '#EEEAE0',
+    borderRadius: 17,
+    height: 105,
+    justifyContent: 'center',
+    width: 72,
+  },
+  cleanupBinActiveFood: { backgroundColor: '#F1E5C9' },
+  cleanupBinActiveRecycle: { backgroundColor: '#DDECF2' },
+  cleanupBinLabel: { color: '#626B65', fontFamily: fonts.bold, fontSize: 10, marginVertical: 4 },
+  cleanupSink: {
+    alignItems: 'center',
+    backgroundColor: '#DDECF0',
+    borderRadius: 20,
+    height: 112,
+    justifyContent: 'center',
+    width: 136,
+  },
+  cleanupSinkBasin: { backgroundColor: '#A9C7CF', borderRadius: 16, height: 24, marginTop: 3, width: 88 },
+  cleanupSinkText: { color: '#587680', fontFamily: fonts.bold, fontSize: 10, marginTop: 4 },
+  cleanupSinkCount: { color: '#75909A', fontFamily: fonts.semibold, fontSize: 9, marginTop: 1 },
+  cleanupSpillArea: {
+    alignItems: 'center',
+    backgroundColor: '#E6E2D5',
+    borderRadius: 20,
+    height: 112,
+    justifyContent: 'center',
+    overflow: 'hidden',
+    position: 'relative',
+    width: 136,
+  },
+  cleanupSpillDrop: { backgroundColor: '#F8F3DD', borderRadius: 18, height: 35, transform: [{ rotate: '-8deg' }], width: 68 },
+  cleanupSpillDropSmall: { height: 14, position: 'absolute', right: 19, top: 25, width: 20 },
+  cleanupSpillText: { color: '#777262', fontFamily: fonts.bold, fontSize: 10, marginTop: 7 },
+  cleanupFinished: {
+    alignItems: 'center',
+    backgroundColor: '#DDECE0',
+    borderRadius: 20,
+    height: 112,
+    justifyContent: 'center',
+    width: 136,
+  },
+  cleanupFinishedText: { color: '#557564', fontFamily: fonts.bold, fontSize: 10, marginTop: 6 },
   toppingStage: { alignItems: 'center', justifyContent: 'center', width: '100%' },
   yogurtCup: {
     alignItems: 'center',
@@ -2356,31 +3007,6 @@ const styles = StyleSheet.create({
   resultEyebrow: { color: '#6D947C', fontFamily: fonts.bold, fontSize: 13, marginTop: 15 },
   resultTitle: { color: '#26362E', fontFamily: fonts.laundryBold, fontSize: 27, marginTop: 4 },
   resultDescription: { color: '#6D756F', fontFamily: fonts.regular, fontSize: 14, lineHeight: 21, marginTop: 8, textAlign: 'center' },
-  challengeResult: {
-    alignItems: 'center',
-    backgroundColor: '#F3E6CF',
-    borderRadius: 20,
-    flexDirection: 'row',
-    gap: 10,
-    marginTop: 16,
-    padding: 10,
-    width: '100%',
-  },
-  challengeResultMain: {
-    alignItems: 'center',
-    backgroundColor: '#B77C40',
-    borderRadius: 15,
-    flex: 1,
-    flexDirection: 'row',
-    gap: 8,
-    paddingHorizontal: 11,
-    paddingVertical: 9,
-  },
-  challengeResultLabel: { color: 'rgba(255,255,255,0.82)', fontFamily: fonts.semibold, fontSize: 9 },
-  challengeResultScore: { color: '#FFFFFF', fontFamily: fonts.bold, fontSize: 18 },
-  challengeResultDetail: { alignItems: 'center', minWidth: 58 },
-  challengeResultDetailValue: { color: '#624C33', fontFamily: fonts.bold, fontSize: 14 },
-  challengeResultDetailLabel: { color: '#8A7258', fontFamily: fonts.regular, fontSize: 9, marginTop: 1 },
   badgeRow: { flexDirection: 'row', gap: 8, marginTop: 17 },
   completionBadge: { alignItems: 'center', backgroundColor: '#EDF5ED', borderRadius: 15, flexDirection: 'row', gap: 5, paddingHorizontal: 10, paddingVertical: 7 },
   completionBadgeText: { color: '#4F7B65', fontFamily: fonts.bold, fontSize: 11 },
@@ -2394,7 +3020,7 @@ const styles = StyleSheet.create({
   secondaryButton: { alignItems: 'center', backgroundColor: '#E7EFE8', borderRadius: 19, flexDirection: 'row', gap: 7, height: 52, justifyContent: 'center', marginTop: 9, maxWidth: 580, width: '100%' },
   secondaryButtonText: { color: '#4E735F', fontFamily: fonts.bold, fontSize: 14 },
   countdownOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     alignItems: 'center',
     backgroundColor: 'rgba(39,49,43,0.38)',
     justifyContent: 'center',
@@ -2417,7 +3043,7 @@ const styles = StyleSheet.create({
   countdownNumber: { color: '#4F7F67', fontFamily: fonts.laundryBold, fontSize: 78, lineHeight: 88 },
   countdownHint: { color: '#766E61', fontFamily: fonts.regular, fontSize: 11, marginTop: 2 },
   timeOverOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     alignItems: 'center',
     backgroundColor: 'rgba(39,49,43,0.46)',
     justifyContent: 'center',
@@ -2454,18 +3080,8 @@ const styles = StyleSheet.create({
     marginTop: 6,
     textAlign: 'center',
   },
-  timeOverScoreRow: { flexDirection: 'row', gap: 8, marginTop: 15, width: '100%' },
-  timeOverStat: {
-    alignItems: 'center',
-    backgroundColor: '#F3F0E7',
-    borderRadius: 16,
-    flex: 1,
-    paddingVertical: 10,
-  },
-  timeOverStatValue: { color: '#435248', fontFamily: fonts.bold, fontSize: 18 },
-  timeOverStatLabel: { color: '#858A86', fontFamily: fonts.regular, fontSize: 10, marginTop: 1 },
-  confirmationOverlay: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', zIndex: 90 },
-  confirmationDim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(42,47,43,0.42)' },
+  confirmationOverlay: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center', zIndex: 90 },
+  confirmationDim: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(42,47,43,0.42)' },
   confirmationSheet: {
     alignItems: 'center',
     backgroundColor: '#FFFDF8',

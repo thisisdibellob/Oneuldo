@@ -1,0 +1,1033 @@
+{
+  "version": 1,
+  "date": "2026-09-11",
+  "tool": "built-in image_gen.imagegen",
+  "generation": "One independent PNG per new product; existing 24 assets preserved",
+  "runtimeDirectory": "frontend/assets/images/game/market/products",
+  "sourcePreservation": "Built-in generated originals are retained under CODEX_HOME/generated_images; runtime assets downsampled to max 512px only",
+  "sourceRunDirectory": "generated_images/01a08d30-2074-7a23-905e-87b09bb422cb",
+  "sourceArtifacts": {
+    "low-fat-milk": {
+      "generatedFile": "exec-0276987d-35c7-4b59-b719-61a0d0656d4a.png",
+      "refinedFile": "exec-8c5585b7-4376-4e37-a89d-42c50b053a62.png"
+    },
+    "chocolate-milk": {
+      "generatedFile": "exec-4c0f81f5-e3bf-4b0b-ac81-cd08d75314ee.png"
+    },
+    "strawberry-milk": {
+      "generatedFile": "exec-637212fb-ecc9-4431-8c53-445500942644.png"
+    },
+    "king-eggs": {
+      "generatedFile": "exec-4c4e2dc3-657a-4f39-90c0-0a58cc00fddb.png"
+    },
+    "soft-tofu": {
+      "generatedFile": "exec-920f1416-4012-471c-b37b-dfcaa1cc0d92.png"
+    },
+    "plain-yogurt": {
+      "generatedFile": "exec-2edc835c-d138-40b6-bc19-00548714de89.png"
+    },
+    "strawberry-yogurt": {
+      "generatedFile": "exec-52b1a557-a477-4149-a65b-4402f6130073.png"
+    },
+    "blueberry-yogurt": {
+      "generatedFile": "exec-7913beaf-7e38-49d8-bd5c-7f60abfb1edc.png"
+    },
+    "sliced-cheese": {
+      "generatedFile": "exec-3633d9cc-8106-4c9b-935c-5b2f57f6e077.png"
+    },
+    "mozzarella-cheese": {
+      "generatedFile": "exec-9bbe028b-a9b4-4c75-9192-7a71f5450115.png"
+    },
+    "butter": {
+      "generatedFile": "exec-47a57b37-bceb-4c0f-b708-f5679298356e.png"
+    },
+    "salted-butter": {
+      "generatedFile": "exec-d1677331-2d4e-4307-90d5-91f73b434907.png"
+    },
+    "ham": {
+      "generatedFile": "exec-3c786b72-ffaa-416a-a46d-e6e4cef3f49f.png"
+    },
+    "smoked-ham": {
+      "generatedFile": "exec-1c248f91-6815-47af-b5e4-5865b6b0b7d1.png"
+    },
+    "chicken-breast": {
+      "generatedFile": "exec-8f12a19e-3fec-4ab5-b6de-f40260935613.png"
+    },
+    "smoked-chicken": {
+      "generatedFile": "exec-4d7f97ea-8495-4c68-8ce5-92b118cb5e0e.png"
+    },
+    "crab-stick": {
+      "generatedFile": "exec-a21aac3f-4c8a-47ba-859f-9dbf3991f063.png"
+    },
+    "fish-cake": {
+      "generatedFile": "exec-4474788c-5ba9-449b-ab8b-7b61a1a81865.png"
+    },
+    "green-apple": {
+      "generatedFile": "exec-cf5eec05-0a10-49f2-bf93-0b9cd339a0ed.png"
+    },
+    "cherry-tomato": {
+      "generatedFile": "exec-ad3642ce-5d96-4dad-9884-6bef5016d103.png"
+    },
+    "orange": {
+      "generatedFile": "exec-9b708373-9b4f-4153-a36c-69a13e03308e.png"
+    },
+    "mandarin": {
+      "generatedFile": "exec-261adec3-fd84-4af6-a4d9-f113866e8a86.png"
+    },
+    "lemon": {
+      "generatedFile": "exec-2c4ae777-e0fa-4e0a-8836-a578e83870d0.png"
+    },
+    "pear": {
+      "generatedFile": "exec-b784f08d-5454-40a9-bbf9-85c6ec80ee7f.png"
+    },
+    "peach": {
+      "generatedFile": "exec-8d3c07c0-f566-47b9-a169-0d10bfb480a9.png"
+    },
+    "white-peach": {
+      "generatedFile": "exec-d81cd544-e5cf-42b5-9637-4c7da404844b.png"
+    },
+    "strawberry": {
+      "generatedFile": "exec-952c7731-582f-4031-b850-4725248756a2.png"
+    },
+    "grape": {
+      "generatedFile": "exec-226a3d75-7f2d-44d7-a8e1-add0ac640692.png"
+    },
+    "green-grape": {
+      "generatedFile": "exec-efc14e4b-f473-4c4b-91d0-63dd79ce212b.png"
+    },
+    "kiwi": {
+      "generatedFile": "exec-19c91972-4ff1-49bf-a8aa-9d788b01a8a9.png"
+    },
+    "melon": {
+      "generatedFile": "exec-bdafa51d-6076-4965-b3e8-b7ee2328d66b.png"
+    },
+    "blueberry": {
+      "generatedFile": "exec-7263ffbe-6ac8-4c0b-8283-44e820a47c98.png"
+    },
+    "potato": {
+      "generatedFile": "exec-5d42a8a8-2e53-4bfb-83d9-08873af14e38.png"
+    },
+    "sweet-potato": {
+      "generatedFile": "exec-ea4a71f1-e3d8-4d42-8f00-85a5aca823d2.png"
+    },
+    "broccoli": {
+      "generatedFile": "exec-eb38afa2-ee32-48eb-a2f5-3ccf6bf0f267.png"
+    },
+    "cucumber": {
+      "generatedFile": "exec-5622137d-6cec-43bc-a78c-9708cad50e97.png"
+    },
+    "spicy-curry": {
+      "generatedFile": "exec-ffd0f6bd-32e7-4a44-a0d7-c112fbda41a7.png"
+    },
+    "brown-rice": {
+      "generatedFile": "exec-5119a175-ac86-4f50-97b9-37018cdee59c.png"
+    },
+    "kimchi-dumpling": {
+      "generatedFile": "exec-f98ce20c-357e-47a5-a46c-3194305788f3.png"
+    },
+    "vegetable-dumpling": {
+      "generatedFile": "exec-5587b03c-4cdc-424d-96c6-3f1e40abcb60.png"
+    },
+    "cup-ramen": {
+      "generatedFile": "exec-dd9fff16-8231-4c5c-993c-58d3c08fe12c.png"
+    },
+    "jjajang-ramen": {
+      "generatedFile": "exec-0ad80202-fcd7-4d69-b575-922069e83351.png"
+    },
+    "seaweed-soup": {
+      "generatedFile": "exec-78684876-6986-4137-ad01-18b6eedb03c1.png"
+    },
+    "beef-soup": {
+      "generatedFile": "exec-4b2fe7ec-afa2-445f-990e-27306c932b9e.png"
+    },
+    "tteokbokki": {
+      "generatedFile": "exec-226919c6-1dc2-4753-adb1-ada742abe474.png"
+    },
+    "rose-tteokbokki": {
+      "generatedFile": "exec-2ac0d192-a503-4978-92dc-71c0da2f9e5c.png"
+    },
+    "tuna-can": {
+      "generatedFile": "exec-044df463-a299-4d97-8ffc-c118bea97c31.png"
+    },
+    "spicy-tuna": {
+      "generatedFile": "exec-9d20632c-1ff1-4ab5-b554-d70e52ad1c01.png"
+    },
+    "pumpkin-porridge": {
+      "generatedFile": "exec-df9e1788-9146-4ae1-8e7c-5dba11a930b8.png"
+    },
+    "abalone-porridge": {
+      "generatedFile": "exec-b47b59a1-4783-426a-bc04-8ae76639e812.png"
+    },
+    "frozen-pizza": {
+      "generatedFile": "exec-6a148671-1b65-4e94-9589-2909433ca113.png"
+    },
+    "cheese-pizza": {
+      "generatedFile": "exec-a26b99eb-5cb2-403e-933f-91d772377abb.png"
+    },
+    "spaghetti": {
+      "generatedFile": "exec-80a3644b-f451-473b-9fcb-3b1b6e61bd88.png"
+    },
+    "udon": {
+      "generatedFile": "exec-9307e351-cde5-416d-a68e-18a5182033cf.png"
+    },
+    "cola": {
+      "generatedFile": "exec-5f5e8174-55c3-4327-9a7f-ebc28905ea5f.png"
+    },
+    "zero-cola": {
+      "generatedFile": "exec-6ce79b09-21e4-4985-bdf7-933bb6b6bdff.png"
+    },
+    "lemon-soda": {
+      "generatedFile": "exec-9ebb1684-eccc-4516-9af4-4b363fd44143.png"
+    },
+    "apple-juice": {
+      "generatedFile": "exec-074ea1c3-5a88-44e7-a0d0-5e60e1b86a0e.png"
+    },
+    "peach-juice": {
+      "generatedFile": "exec-0508baf0-526a-4182-8fef-0afc07ce9fa0.png"
+    },
+    "tomato-juice": {
+      "generatedFile": "exec-35b5d82e-00cc-4257-88f0-8443318d7ae9.png"
+    },
+    "iced-coffee": {
+      "generatedFile": "exec-fd294e61-d61d-4f05-a1f7-2727a2d2ec56.png"
+    },
+    "decaf-coffee": {
+      "generatedFile": "exec-5584ecc7-b2c3-432a-8a3c-4d84dc824500.png"
+    },
+    "latte": {
+      "generatedFile": "exec-518241fb-983e-4f37-bad0-346d971013c8.png"
+    },
+    "soy-milk": {
+      "generatedFile": "exec-e2117e2c-412f-47ee-89dc-bf60ec568318.png"
+    },
+    "black-soy-milk": {
+      "generatedFile": "exec-af3fb458-dbef-4f28-8a1e-0ff7d2cea42a.png"
+    },
+    "sports-drink": {
+      "generatedFile": "exec-cdc8988c-ec6b-4c82-9662-2537e17fe1e8.png"
+    },
+    "zero-sports-drink": {
+      "generatedFile": "exec-3ef71a8f-5be8-4360-a623-020bde63a0a1.png"
+    },
+    "green-tea": {
+      "generatedFile": "exec-708374f7-d42b-444f-85a6-e98f188e4a67.png"
+    },
+    "corn-tea": {
+      "generatedFile": "exec-3f388cda-5948-4100-a7d6-82ef6ff643a8.png"
+    },
+    "hot-chocolate": {
+      "generatedFile": "exec-9381db72-d1bc-4025-baa0-007b7bbf4ba4.png"
+    },
+    "grapefruit-sparkling": {
+      "generatedFile": "exec-8635e145-37a7-4cf8-9f85-a98f4e3a84c5.png"
+    },
+    "plain-sparkling": {
+      "generatedFile": "exec-15d23181-11e9-4071-b803-8f92e1446ffe.png"
+    }
+  },
+  "promptTemplates": {
+    "bulk": "Use case: product-mockup. Asset type: single standalone transparent PNG product sprite for a Korean grocery training game. Create exactly ONE {subject}. Style: friendly 2.5D game illustration, warm brown thin outlines, clean cel shading, rounded forms, matching an illustrated Korean grocery catalog. Composition: SQUARE canvas, three-quarter front view, centered entire product with 12% clear margin. Genuine fully transparent alpha outside silhouette. No background scene, no glow, no floor, no cast shadow, no vignette, no checkerboard graphic, no extra unrelated objects, no real brands, no watermark. Recognizable silhouette and color coding at 100 pixels. Korean front label as specified, spelled correctly. Save the one product as a standalone PNG.",
+    "firstBatch": "Use case: product-mockup. Asset type: single standalone transparent PNG product sprite for a Korean grocery training game. Create exactly ONE {subject}. Style: friendly 2.5D game illustration, warm brown thin outlines, clean cel shading, rounded forms, matching a illustrated Korean grocery catalog. Composition: SQUARE canvas, three-quarter front view, centered entire product with 12% clear margin. Genuine fully transparent alpha outside silhouette. No background scene, no glow, no floor, no cast shadow, no vignette, no checkerboard graphic, no extra unrelated objects, no real brands, no watermark. Recognizable silhouette and color coding at 100 pixels. Korean front label as specified, spelled correctly. Save the one product as a standalone PNG.",
+    "lowFatMilk": "Use case: product-mockup. Asset type: single transparent PNG product sprite for a Korean grocery training mobile game. Create exactly ONE carton of low-fat milk, 900 mL. Soft friendly 2.5D game illustration, warm dark-brown thin outlines, subtle cel shading, rounded edges; three-quarter front view. Green and cream milk carton, simple milk-drop symbol and small meadow picture, green screw cap. Exact Korean front label: \"저지방 우유\" with small \"1%\". Genuine transparent background, no floor, no shadow outside object, no extra items, no logos or watermark. Entire carton centered with 8% transparent margin, large and highly legible at 100px. Save this one product as a standalone image."
+  },
+  "assets": [
+    {
+      "id": "milk",
+      "categoryId": "fresh",
+      "name": "흰 우유",
+      "generated": false
+    },
+    {
+      "id": "eggs",
+      "categoryId": "fresh",
+      "name": "달걀",
+      "generated": false
+    },
+    {
+      "id": "premium-eggs",
+      "categoryId": "fresh",
+      "name": "해뜰 특란",
+      "generated": false
+    },
+    {
+      "id": "sausage",
+      "categoryId": "fresh",
+      "name": "소시지",
+      "generated": false
+    },
+    {
+      "id": "brand-sausage",
+      "categoryId": "fresh",
+      "name": "튼튼 소시지",
+      "generated": false
+    },
+    {
+      "id": "tofu",
+      "categoryId": "fresh",
+      "name": "부침 두부",
+      "generated": false
+    },
+    {
+      "id": "apple",
+      "categoryId": "produce",
+      "name": "사과",
+      "generated": false
+    },
+    {
+      "id": "watermelon",
+      "categoryId": "produce",
+      "name": "수박",
+      "generated": false
+    },
+    {
+      "id": "banana",
+      "categoryId": "produce",
+      "name": "바나나",
+      "generated": false
+    },
+    {
+      "id": "tomato",
+      "categoryId": "produce",
+      "name": "토마토",
+      "generated": false
+    },
+    {
+      "id": "onion",
+      "categoryId": "produce",
+      "name": "양파",
+      "generated": false
+    },
+    {
+      "id": "carrot",
+      "categoryId": "produce",
+      "name": "당근",
+      "generated": false
+    },
+    {
+      "id": "curry",
+      "categoryId": "meal",
+      "name": "순한 카레",
+      "generated": false
+    },
+    {
+      "id": "ramen",
+      "categoryId": "meal",
+      "name": "매운 라면",
+      "generated": false
+    },
+    {
+      "id": "brand-curry",
+      "categoryId": "meal",
+      "name": "오늘카레 순한맛",
+      "generated": false
+    },
+    {
+      "id": "mild-ramen",
+      "categoryId": "meal",
+      "name": "순한 라면",
+      "generated": false
+    },
+    {
+      "id": "instant-rice",
+      "categoryId": "meal",
+      "name": "즉석밥",
+      "generated": false
+    },
+    {
+      "id": "dumpling",
+      "categoryId": "meal",
+      "name": "고기 만두",
+      "generated": false
+    },
+    {
+      "id": "juice",
+      "categoryId": "drink",
+      "name": "오렌지 주스",
+      "generated": false
+    },
+    {
+      "id": "soda",
+      "categoryId": "drink",
+      "name": "탄산음료",
+      "generated": false
+    },
+    {
+      "id": "water",
+      "categoryId": "drink",
+      "name": "생수",
+      "generated": false
+    },
+    {
+      "id": "sparkling-water",
+      "categoryId": "drink",
+      "name": "탄산수",
+      "generated": false
+    },
+    {
+      "id": "grape-juice",
+      "categoryId": "drink",
+      "name": "포도 주스",
+      "generated": false
+    },
+    {
+      "id": "barley-tea",
+      "categoryId": "drink",
+      "name": "보리차",
+      "generated": false
+    },
+    {
+      "id": "low-fat-milk",
+      "categoryId": "fresh",
+      "name": "저지방 우유",
+      "generated": true,
+      "promptTemplate": "lowFatMilk",
+      "runtimeFile": "product_low-fat-milk.png"
+    },
+    {
+      "id": "chocolate-milk",
+      "categoryId": "fresh",
+      "name": "초코 우유",
+      "generated": true,
+      "promptTemplate": "firstBatch",
+      "subject": "brown and cream carton with brown cap, chocolate squares and milk splash, front label 초코 우유",
+      "runtimeFile": "product_chocolate-milk.png"
+    },
+    {
+      "id": "strawberry-milk",
+      "categoryId": "fresh",
+      "name": "딸기 우유",
+      "generated": true,
+      "promptTemplate": "firstBatch",
+      "subject": "pink and cream carton with pink cap, strawberry and milk splash, front label 딸기 우유",
+      "runtimeFile": "product_strawberry-milk.png"
+    },
+    {
+      "id": "king-eggs",
+      "categoryId": "fresh",
+      "name": "왕란",
+      "generated": true,
+      "promptTemplate": "firstBatch",
+      "subject": "transparent carton of ten large brown eggs with purple paper band, clear front label 왕란 and 10개",
+      "runtimeFile": "product_king-eggs.png"
+    },
+    {
+      "id": "soft-tofu",
+      "categoryId": "fresh",
+      "name": "찌개 두부",
+      "generated": true,
+      "promptTemplate": "firstBatch",
+      "subject": "sealed rectangular tray of soft white tofu in water with blue lid and front label 찌개 두부",
+      "runtimeFile": "product_soft-tofu.png"
+    },
+    {
+      "id": "plain-yogurt",
+      "categoryId": "fresh",
+      "name": "플레인 요거트",
+      "generated": true,
+      "promptTemplate": "firstBatch",
+      "subject": "small white yogurt cup with blue foil lid, milk swirl, front label 플레인 요거트",
+      "runtimeFile": "product_plain-yogurt.png"
+    },
+    {
+      "id": "strawberry-yogurt",
+      "categoryId": "fresh",
+      "name": "딸기 요거트",
+      "generated": true,
+      "promptTemplate": "firstBatch",
+      "subject": "small pink yogurt cup with pink foil lid and strawberries, label 딸기 요거트",
+      "runtimeFile": "product_strawberry-yogurt.png"
+    },
+    {
+      "id": "blueberry-yogurt",
+      "categoryId": "fresh",
+      "name": "블루베리 요거트",
+      "generated": true,
+      "promptTemplate": "bulk",
+      "subject": "small purple yogurt cup with purple foil lid and blueberries, label 블루베리 요거트",
+      "runtimeFile": "product_blueberry-yogurt.png"
+    },
+    {
+      "id": "sliced-cheese",
+      "categoryId": "fresh",
+      "name": "슬라이스 치즈",
+      "generated": true,
+      "promptTemplate": "bulk",
+      "subject": "flat clear wrapper of ten square yellow cheese slices with orange label 슬라이스 치즈",
+      "runtimeFile": "product_sliced-cheese.png"
+    },
+    {
+      "id": "mozzarella-cheese",
+      "categoryId": "fresh",
+      "name": "모짜렐라 치즈",
+      "generated": true,
+      "promptTemplate": "bulk",
+      "subject": "cream pouch with green top and visible shredded white mozzarella in a clear window, label 모짜렐라 치즈",
+      "runtimeFile": "product_mozzarella-cheese.png"
+    },
+    {
+      "id": "butter",
+      "categoryId": "fresh",
+      "name": "무염 버터",
+      "generated": true,
+      "promptTemplate": "bulk",
+      "subject": "cream and blue wrapped rectangular stick of butter, label 무염 버터",
+      "runtimeFile": "product_butter.png"
+    },
+    {
+      "id": "salted-butter",
+      "categoryId": "fresh",
+      "name": "가염 버터",
+      "generated": true,
+      "promptTemplate": "bulk",
+      "subject": "cream and red wrapped rectangular stick of butter with a salt symbol, label 가염 버터",
+      "runtimeFile": "product_salted-butter.png"
+    },
+    {
+      "id": "ham",
+      "categoryId": "fresh",
+      "name": "슬라이스 햄",
+      "generated": true,
+      "promptTemplate": "bulk",
+      "subject": "flat transparent vacuum packet with pink round ham slices, red edge label 슬라이스 햄",
+      "runtimeFile": "product_ham.png"
+    },
+    {
+      "id": "smoked-ham",
+      "categoryId": "fresh",
+      "name": "훈제 햄",
+      "generated": true,
+      "promptTemplate": "bulk",
+      "subject": "flat vacuum packet with darker pink smoked ham slices and amber paper label 훈제 햄",
+      "runtimeFile": "product_smoked-ham.png"
+    },
+    {
+      "id": "chicken-breast",
+      "categoryId": "fresh",
+      "name": "닭가슴살",
+      "generated": true,
+      "promptTemplate": "bulk",
+      "subject": "sealed white and light blue pouch with clear window showing pale chicken breast, label 닭가슴살",
+      "runtimeFile": "product_chicken-breast.png"
+    },
+    {
+      "id": "smoked-chicken",
+      "categoryId": "fresh",
+      "name": "훈제 닭가슴살",
+      "generated": true,
+      "promptTemplate": "bulk",
+      "subject": "sealed dark orange pouch with clear window showing golden smoked chicken breast, label 훈제 닭가슴살",
+      "runtimeFile": "product_smoked-chicken.png"
+    },
+    {
+      "id": "crab-stick",
+      "categoryId": "fresh",
+      "name": "맛살",
+      "generated": true,
+      "promptTemplate": "bulk",
+      "subject": "sealed clear pack containing red and white imitation crab sticks, blue band and label 맛살",
+      "runtimeFile": "product_crab-stick.png"
+    },
+    {
+      "id": "fish-cake",
+      "categoryId": "fresh",
+      "name": "사각 어묵",
+      "generated": true,
+      "promptTemplate": "bulk",
+      "subject": "sealed transparent rectangular pack of stacked tan fish-cake sheets, orange label 사각 어묵",
+      "runtimeFile": "product_fish-cake.png"
+    },
+    {
+      "id": "green-apple",
+      "categoryId": "produce",
+      "name": "청사과",
+      "generated": true,
+      "promptTemplate": "bulk",
+      "subject": "one round fresh bright green apple with stem and one small green leaf, no label",
+      "runtimeFile": "product_green-apple.png"
+    },
+    {
+      "id": "cherry-tomato",
+      "categoryId": "produce",
+      "name": "방울토마토",
+      "generated": true,
+      "promptTemplate": "bulk",
+      "subject": "clear small rectangular produce tub of red cherry tomatoes with green stems, no label",
+      "runtimeFile": "product_cherry-tomato.png"
+    },
+    {
+      "id": "orange",
+      "categoryId": "produce",
+      "name": "오렌지",
+      "generated": true,
+      "promptTemplate": "bulk",
+      "subject": "one whole orange with pebbled orange skin and one leaf, no label",
+      "runtimeFile": "product_orange.png"
+    },
+    {
+      "id": "mandarin",
+      "categoryId": "produce",
+      "name": "귤",
+      "generated": true,
+      "promptTemplate": "bulk",
+      "subject": "three small squat mandarins as one produce bundle, one peeled showing segments, no label",
+      "runtimeFile": "product_mandarin.png"
+    },
+    {
+      "id": "lemon",
+      "categoryId": "produce",
+      "name": "레몬",
+      "generated": true,
+      "promptTemplate": "bulk",
+      "subject": "one vivid yellow oval lemon with one small leaf, no label",
+      "runtimeFile": "product_lemon.png"
+    },
+    {
+      "id": "pear",
+      "categoryId": "produce",
+      "name": "배",
+      "generated": true,
+      "promptTemplate": "bulk",
+      "subject": "one round Korean Asian pear with golden beige speckled skin and leaf, no label",
+      "runtimeFile": "product_pear.png"
+    },
+    {
+      "id": "peach",
+      "categoryId": "produce",
+      "name": "황도 복숭아",
+      "generated": true,
+      "promptTemplate": "bulk",
+      "subject": "one golden yellow peach with warm coral blush, one half revealing yellow flesh and brown pit, no label",
+      "runtimeFile": "product_peach.png"
+    },
+    {
+      "id": "white-peach",
+      "categoryId": "produce",
+      "name": "백도 복숭아",
+      "generated": true,
+      "promptTemplate": "bulk",
+      "subject": "one pale pink white peach, one half revealing ivory white flesh and brown pit, no label",
+      "runtimeFile": "product_white-peach.png"
+    },
+    {
+      "id": "strawberry",
+      "categoryId": "produce",
+      "name": "딸기",
+      "generated": true,
+      "promptTemplate": "bulk",
+      "subject": "clear small tub of ripe red strawberries with leafy green crowns, no label",
+      "runtimeFile": "product_strawberry.png"
+    },
+    {
+      "id": "grape",
+      "categoryId": "produce",
+      "name": "포도",
+      "generated": true,
+      "promptTemplate": "bulk",
+      "subject": "one full bunch of round dark purple grapes with brown stem and a green grape leaf, no label",
+      "runtimeFile": "product_grape.png"
+    },
+    {
+      "id": "green-grape",
+      "categoryId": "produce",
+      "name": "청포도",
+      "generated": true,
+      "promptTemplate": "bulk",
+      "subject": "one full bunch of plump light green grapes with brown stem and a green leaf, no label",
+      "runtimeFile": "product_green-grape.png"
+    },
+    {
+      "id": "kiwi",
+      "categoryId": "produce",
+      "name": "키위",
+      "generated": true,
+      "promptTemplate": "bulk",
+      "subject": "two fuzzy brown oval kiwis, one sliced half showing vivid green interior black seed ring, no label",
+      "runtimeFile": "product_kiwi.png"
+    },
+    {
+      "id": "melon",
+      "categoryId": "produce",
+      "name": "멜론",
+      "generated": true,
+      "promptTemplate": "bulk",
+      "subject": "one round pale green netted melon with T shaped stem, no label",
+      "runtimeFile": "product_melon.png"
+    },
+    {
+      "id": "blueberry",
+      "categoryId": "produce",
+      "name": "블루베리",
+      "generated": true,
+      "promptTemplate": "bulk",
+      "subject": "clear small produce tub of dusty deep blue blueberries with star shaped crowns, no label",
+      "runtimeFile": "product_blueberry.png"
+    },
+    {
+      "id": "potato",
+      "categoryId": "produce",
+      "name": "감자",
+      "generated": true,
+      "promptTemplate": "bulk",
+      "subject": "three light tan potatoes with tiny brown eyes as one group, no label",
+      "runtimeFile": "product_potato.png"
+    },
+    {
+      "id": "sweet-potato",
+      "categoryId": "produce",
+      "name": "고구마",
+      "generated": true,
+      "promptTemplate": "bulk",
+      "subject": "two elongated purple red sweet potatoes and cut end revealing yellow flesh, no label",
+      "runtimeFile": "product_sweet-potato.png"
+    },
+    {
+      "id": "broccoli",
+      "categoryId": "produce",
+      "name": "브로콜리",
+      "generated": true,
+      "promptTemplate": "bulk",
+      "subject": "one vivid green broccoli head with thick pale green stalk, no label",
+      "runtimeFile": "product_broccoli.png"
+    },
+    {
+      "id": "cucumber",
+      "categoryId": "produce",
+      "name": "오이",
+      "generated": true,
+      "promptTemplate": "bulk",
+      "subject": "two long dark green cucumbers with one round sliced end revealing pale green interior, no label",
+      "runtimeFile": "product_cucumber.png"
+    },
+    {
+      "id": "spicy-curry",
+      "categoryId": "meal",
+      "name": "매운 카레",
+      "generated": true,
+      "promptTemplate": "bulk",
+      "subject": "upright red orange curry box with curry rice illustration, label 매운 카레",
+      "runtimeFile": "product_spicy-curry.png"
+    },
+    {
+      "id": "brown-rice",
+      "categoryId": "meal",
+      "name": "현미 즉석밥",
+      "generated": true,
+      "promptTemplate": "bulk",
+      "subject": "stacked three sealed round rice bowls with warm brown bands and grain symbol, label 현미밥",
+      "runtimeFile": "product_brown-rice.png"
+    },
+    {
+      "id": "kimchi-dumpling",
+      "categoryId": "meal",
+      "name": "김치 만두",
+      "generated": true,
+      "promptTemplate": "bulk",
+      "subject": "orange red frozen dumpling bag with a clear window of dumplings and kimchi image, label 김치 만두",
+      "runtimeFile": "product_kimchi-dumpling.png"
+    },
+    {
+      "id": "vegetable-dumpling",
+      "categoryId": "meal",
+      "name": "야채 만두",
+      "generated": true,
+      "promptTemplate": "bulk",
+      "subject": "green frozen dumpling bag with dumplings and carrot cabbage pictures, label 야채 만두",
+      "runtimeFile": "product_vegetable-dumpling.png"
+    },
+    {
+      "id": "cup-ramen",
+      "categoryId": "meal",
+      "name": "컵라면",
+      "generated": true,
+      "promptTemplate": "bulk",
+      "subject": "upright red instant noodle paper cup with foil lid and noodle illustration, label 컵라면",
+      "runtimeFile": "product_cup-ramen.png"
+    },
+    {
+      "id": "jjajang-ramen",
+      "categoryId": "meal",
+      "name": "짜장 라면",
+      "generated": true,
+      "promptTemplate": "bulk",
+      "subject": "black and olive green noodle pillow pack showing black bean sauce noodles, label 짜장 라면",
+      "runtimeFile": "product_jjajang-ramen.png"
+    },
+    {
+      "id": "seaweed-soup",
+      "categoryId": "meal",
+      "name": "미역국",
+      "generated": true,
+      "promptTemplate": "bulk",
+      "subject": "green and cream retort soup pouch with bowl of seaweed soup, label 미역국",
+      "runtimeFile": "product_seaweed-soup.png"
+    },
+    {
+      "id": "beef-soup",
+      "categoryId": "meal",
+      "name": "소고기국",
+      "generated": true,
+      "promptTemplate": "bulk",
+      "subject": "brown and cream retort soup pouch with bowl of beef radish soup, label 소고기국",
+      "runtimeFile": "product_beef-soup.png"
+    },
+    {
+      "id": "tteokbokki",
+      "categoryId": "meal",
+      "name": "떡볶이",
+      "generated": true,
+      "promptTemplate": "bulk",
+      "subject": "red upright pouch with spicy red cylindrical rice cakes pictured, label 떡볶이",
+      "runtimeFile": "product_tteokbokki.png"
+    },
+    {
+      "id": "rose-tteokbokki",
+      "categoryId": "meal",
+      "name": "로제 떡볶이",
+      "generated": true,
+      "promptTemplate": "bulk",
+      "subject": "pink upright pouch with creamy pink sauce rice cakes pictured, label 로제 떡볶이",
+      "runtimeFile": "product_rose-tteokbokki.png"
+    },
+    {
+      "id": "tuna-can",
+      "categoryId": "meal",
+      "name": "참치 통조림",
+      "generated": true,
+      "promptTemplate": "bulk",
+      "subject": "round low tuna tin with golden lid and blue label, small fish symbol, label 참치",
+      "runtimeFile": "product_tuna-can.png"
+    },
+    {
+      "id": "spicy-tuna",
+      "categoryId": "meal",
+      "name": "고추 참치",
+      "generated": true,
+      "promptTemplate": "bulk",
+      "subject": "round low tuna tin with golden lid and red label, red pepper symbol, label 고추 참치",
+      "runtimeFile": "product_spicy-tuna.png"
+    },
+    {
+      "id": "pumpkin-porridge",
+      "categoryId": "meal",
+      "name": "단호박죽",
+      "generated": true,
+      "promptTemplate": "bulk",
+      "subject": "round instant porridge bowl with yellow orange sealed lid and pumpkin illustration, label 단호박죽",
+      "runtimeFile": "product_pumpkin-porridge.png"
+    },
+    {
+      "id": "abalone-porridge",
+      "categoryId": "meal",
+      "name": "전복죽",
+      "generated": true,
+      "promptTemplate": "bulk",
+      "subject": "round instant porridge bowl with deep green sealed lid and abalone shell illustration, label 전복죽",
+      "runtimeFile": "product_abalone-porridge.png"
+    },
+    {
+      "id": "frozen-pizza",
+      "categoryId": "meal",
+      "name": "콤비네이션 피자",
+      "generated": true,
+      "promptTemplate": "bulk",
+      "subject": "square red frozen pizza box in slight three quarter angle, pizza with peppers salami mushrooms pictured, label 콤비네이션 피자",
+      "runtimeFile": "product_frozen-pizza.png"
+    },
+    {
+      "id": "cheese-pizza",
+      "categoryId": "meal",
+      "name": "치즈 피자",
+      "generated": true,
+      "promptTemplate": "bulk",
+      "subject": "square yellow frozen pizza box in slight three quarter angle, plain golden cheese pizza pictured, label 치즈 피자",
+      "runtimeFile": "product_cheese-pizza.png"
+    },
+    {
+      "id": "spaghetti",
+      "categoryId": "meal",
+      "name": "토마토 스파게티",
+      "generated": true,
+      "promptTemplate": "bulk",
+      "subject": "sealed rectangular ready-meal tray with red sleeve showing spaghetti and tomato sauce, label 토마토 스파게티",
+      "runtimeFile": "product_spaghetti.png"
+    },
+    {
+      "id": "udon",
+      "categoryId": "meal",
+      "name": "우동",
+      "generated": true,
+      "promptTemplate": "bulk",
+      "subject": "cream and dark blue noodle pouch with thick white udon noodle bowl illustration, label 우동",
+      "runtimeFile": "product_udon.png"
+    },
+    {
+      "id": "cola",
+      "categoryId": "drink",
+      "name": "일반 콜라",
+      "generated": true,
+      "promptTemplate": "bulk",
+      "subject": "dark cola in clear plastic bottle with red cap and red label, exact text 일반 콜라",
+      "runtimeFile": "product_cola.png"
+    },
+    {
+      "id": "zero-cola",
+      "categoryId": "drink",
+      "name": "제로 콜라",
+      "generated": true,
+      "promptTemplate": "bulk",
+      "subject": "dark cola in clear plastic bottle with black cap and black silver label, exact text 제로 콜라 and ZERO",
+      "runtimeFile": "product_zero-cola.png"
+    },
+    {
+      "id": "lemon-soda",
+      "categoryId": "drink",
+      "name": "레몬 탄산음료",
+      "generated": true,
+      "promptTemplate": "bulk",
+      "subject": "clear pale yellow soda in green plastic bottle with yellow cap and lemon icon label, text 레몬 탄산",
+      "runtimeFile": "product_lemon-soda.png"
+    },
+    {
+      "id": "apple-juice",
+      "categoryId": "drink",
+      "name": "사과 주스",
+      "generated": true,
+      "promptTemplate": "bulk",
+      "subject": "pale amber juice bottle with red cap and cream label showing a red apple, text 사과 주스",
+      "runtimeFile": "product_apple-juice.png"
+    },
+    {
+      "id": "peach-juice",
+      "categoryId": "drink",
+      "name": "복숭아 주스",
+      "generated": true,
+      "promptTemplate": "bulk",
+      "subject": "peach pink juice carton with pink cap and pink white peach illustration, text 복숭아 주스",
+      "runtimeFile": "product_peach-juice.png"
+    },
+    {
+      "id": "tomato-juice",
+      "categoryId": "drink",
+      "name": "토마토 주스",
+      "generated": true,
+      "promptTemplate": "bulk",
+      "subject": "red tomato juice bottle with green cap and white label showing ripe tomatoes, text 토마토 주스",
+      "runtimeFile": "product_tomato-juice.png"
+    },
+    {
+      "id": "iced-coffee",
+      "categoryId": "drink",
+      "name": "블랙 커피",
+      "generated": true,
+      "promptTemplate": "bulk",
+      "subject": "short brown coffee bottle with black cap and tan label showing coffee beans, text 블랙 커피",
+      "runtimeFile": "product_iced-coffee.png"
+    },
+    {
+      "id": "decaf-coffee",
+      "categoryId": "drink",
+      "name": "디카페인 커피",
+      "generated": true,
+      "promptTemplate": "bulk",
+      "subject": "short brown coffee bottle with purple cap and lavender label showing coffee beans, text 디카페인",
+      "runtimeFile": "product_decaf-coffee.png"
+    },
+    {
+      "id": "latte",
+      "categoryId": "drink",
+      "name": "카페라떼",
+      "generated": true,
+      "promptTemplate": "bulk",
+      "subject": "short creamy beige coffee bottle with cream cap and caramel label showing milk swirl, text 카페라떼",
+      "runtimeFile": "product_latte.png"
+    },
+    {
+      "id": "soy-milk",
+      "categoryId": "drink",
+      "name": "일반 두유",
+      "generated": true,
+      "promptTemplate": "bulk",
+      "subject": "small cream colored rectangular soy milk carton with attached straw and soybean illustration, text 두유",
+      "runtimeFile": "product_soy-milk.png"
+    },
+    {
+      "id": "black-soy-milk",
+      "categoryId": "drink",
+      "name": "검은콩 두유",
+      "generated": true,
+      "promptTemplate": "bulk",
+      "subject": "small black and cream rectangular soy milk carton with attached straw and black soybean illustration, text 검은콩 두유",
+      "runtimeFile": "product_black-soy-milk.png"
+    },
+    {
+      "id": "sports-drink",
+      "categoryId": "drink",
+      "name": "이온 음료",
+      "generated": true,
+      "promptTemplate": "bulk",
+      "subject": "clear sports drink plastic bottle with blue cap and bright blue label, text 이온 음료",
+      "runtimeFile": "product_sports-drink.png"
+    },
+    {
+      "id": "zero-sports-drink",
+      "categoryId": "drink",
+      "name": "제로 이온 음료",
+      "generated": true,
+      "promptTemplate": "bulk",
+      "subject": "clear sports drink plastic bottle with silver cap and white turquoise label, text 제로 이온 and ZERO",
+      "runtimeFile": "product_zero-sports-drink.png"
+    },
+    {
+      "id": "green-tea",
+      "categoryId": "drink",
+      "name": "녹차",
+      "generated": true,
+      "promptTemplate": "bulk",
+      "subject": "pale green tea plastic bottle with green cap and tea leaf illustration label, text 녹차",
+      "runtimeFile": "product_green-tea.png"
+    },
+    {
+      "id": "corn-tea",
+      "categoryId": "drink",
+      "name": "옥수수차",
+      "generated": true,
+      "promptTemplate": "bulk",
+      "subject": "amber tea plastic bottle with yellow cap and corn cob illustration label, text 옥수수차",
+      "runtimeFile": "product_corn-tea.png"
+    },
+    {
+      "id": "hot-chocolate",
+      "categoryId": "drink",
+      "name": "초코 음료",
+      "generated": true,
+      "promptTemplate": "bulk",
+      "subject": "small rich brown aluminum drink can with chocolate square illustration and cream band, text 초코 음료",
+      "runtimeFile": "product_hot-chocolate.png"
+    },
+    {
+      "id": "grapefruit-sparkling",
+      "categoryId": "drink",
+      "name": "자몽 탄산수",
+      "generated": true,
+      "promptTemplate": "bulk",
+      "subject": "clear sparkling water bottle with coral pink cap and grapefruit slice illustration label, text 자몽 탄산수",
+      "runtimeFile": "product_grapefruit-sparkling.png"
+    },
+    {
+      "id": "plain-sparkling",
+      "categoryId": "drink",
+      "name": "플레인 탄산수",
+      "generated": true,
+      "promptTemplate": "bulk",
+      "subject": "clear sparkling water bottle with silver cap and simple pale blue bubble label, text 플레인 탄산수",
+      "runtimeFile": "product_plain-sparkling.png"
+    }
+  ],
+  "refinements": [
+    {
+      "id": "low-fat-milk",
+      "tool": "built-in image_gen.imagegen",
+      "prompt": "Use case: background-extraction. Edit the reference product sprite only to remove ALL haze/glow/background outside the carton. Keep the existing green and cream low-fat milk carton, green cap, Korean label 저지방 우유, 1%, meadow/cow illustration and 900mL text unchanged. Produce a SQUARE transparent PNG sprite with the entire carton centered and 8% clear margin. Outside the crisp carton silhouette every pixel must have alpha=0: no glow, no haze, no vignette, no floor/shadow, no background color. Do not redraw or change the product design."
+    }
+  ]
+}

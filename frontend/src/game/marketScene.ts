@@ -5,7 +5,7 @@ import { MARKET_CATALOG_VERSION, MARKET_SCENARIO_VERSION, getEnabledMarketScenar
 
 export const MARKET_LAYOUT_VERSION = 'market-list-layout-v1';
 export type MarketScene = {
-  schemaVersion: 'market-scene-v1'; questInstanceId: string; seed: number;
+  schemaVersion: 'market-scene-v1'; questInstanceId: string; seed: number | string;
   layoutVersion: string; catalogVersion: string; scenarioVersion: string;
   mission: Omit<MarketMission, 'scene'>; products: MarketProduct[];
   slots: Array<{ slotId: string; stationId: string; productId: string; storage: string }>;

@@ -27,7 +27,7 @@ const PERSIST_DELAY_MS = 1000;
 const UPLOAD_INTERVAL_MS = 10000;
 const IDLE_THRESHOLD_MS = 5000;
 
-const MARKET_STATIONS: Record<MarketTelemetryStation, { x: number; y: number }> = {
+const MARKET_STATIONS: Partial<Record<MarketTelemetryStation, { x: number; y: number }>> = {
   checkout: { x: 450, y: 250 },
   fresh: { x: 350, y: 400 },
   produce: { x: 550, y: 400 },
@@ -69,7 +69,7 @@ export class MarketBehaviorTracker {
   private readonly startedAt = Date.now();
   private readonly contentSource: BehaviorSimulationContext['contentSource'];
   private uploadTimer: ReturnType<typeof setTimeout> | null = null;
-  private readonly movementDetector = new MarketMovementDetector(MARKET_STATIONS, 105);
+  private readonly movementDetector: MarketMovementDetector;
   private readonly movementLogs = new MovementLogReducer<TrackInput>((event, span) => ({
     ...event, payload: { ...event.payload, marketContent: {
       ...(event.payload?.marketContent as object ?? {}), movementSpan: span,
@@ -81,7 +81,9 @@ export class MarketBehaviorTracker {
     private readonly mission: MarketMission,
     private readonly difficulty = 2,
     simulation?: Omit<BehaviorSimulationContext, 'simulationStarted'>,
+    stations = MARKET_STATIONS,
   ) {
+    this.movementDetector = new MarketMovementDetector(stations, 105);
     this.questInstanceId = mission.scene?.questInstanceId ?? simulation?.questInstanceId ?? randomUUID();
     this.contentSource = simulation?.contentSource ?? 'STATIC';
     this.track({

@@ -1,0 +1,1910 @@
+{
+  "checkedAt": "2026-09-10T21:46:03.150Z",
+  "generatedProducts": 72,
+  "totalProducts": 96,
+  "originalBytes": 88184610,
+  "runtimeBytes": 22773204,
+  "savedBytes": 65411406,
+  "reductionPercent": 74.18,
+  "processing": "Generated assets only: contain within 512px, preserve RGBA, PNG compression level 9. No semantic artwork edits. Original generator outputs preserved outside the runtime directory.",
+  "optimized": [
+    {
+      "id": "low-fat-milk",
+      "before": {
+        "bytes": 782628,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 219172,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "chocolate-milk",
+      "before": {
+        "bytes": 1009068,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 259165,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "strawberry-milk",
+      "before": {
+        "bytes": 1138032,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 293724,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "king-eggs",
+      "before": {
+        "bytes": 1237301,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 299598,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "soft-tofu",
+      "before": {
+        "bytes": 1091273,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 278623,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "plain-yogurt",
+      "before": {
+        "bytes": 972590,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 247271,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "strawberry-yogurt",
+      "before": {
+        "bytes": 1144761,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 301059,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "blueberry-yogurt",
+      "before": {
+        "bytes": 1009492,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 276031,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "sliced-cheese",
+      "before": {
+        "bytes": 1314525,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 350464,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "mozzarella-cheese",
+      "before": {
+        "bytes": 1214842,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 332407,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "butter",
+      "before": {
+        "bytes": 905641,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 236095,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "salted-butter",
+      "before": {
+        "bytes": 925570,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 236896,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "ham",
+      "before": {
+        "bytes": 1577354,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 390984,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "smoked-ham",
+      "before": {
+        "bytes": 1757228,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 433249,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "chicken-breast",
+      "before": {
+        "bytes": 1175417,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 312857,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "smoked-chicken",
+      "before": {
+        "bytes": 1477796,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 377904,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "crab-stick",
+      "before": {
+        "bytes": 1436497,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 375505,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "fish-cake",
+      "before": {
+        "bytes": 1472580,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 391556,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "green-apple",
+      "before": {
+        "bytes": 1225639,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 312356,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "cherry-tomato",
+      "before": {
+        "bytes": 1395781,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 362691,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "orange",
+      "before": {
+        "bytes": 1130453,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 288881,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "mandarin",
+      "before": {
+        "bytes": 1286984,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 313250,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "lemon",
+      "before": {
+        "bytes": 943801,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 253039,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "pear",
+      "before": {
+        "bytes": 1415769,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 345129,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "peach",
+      "before": {
+        "bytes": 1529007,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 380485,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "white-peach",
+      "before": {
+        "bytes": 1320340,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 322204,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "strawberry",
+      "before": {
+        "bytes": 1518094,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 392128,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "grape",
+      "before": {
+        "bytes": 1367212,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 366327,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "green-grape",
+      "before": {
+        "bytes": 1192292,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 342016,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "kiwi",
+      "before": {
+        "bytes": 1820067,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 427876,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "melon",
+      "before": {
+        "bytes": 1866803,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 460305,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "blueberry",
+      "before": {
+        "bytes": 1633690,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 399487,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "potato",
+      "before": {
+        "bytes": 1301995,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 315332,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "sweet-potato",
+      "before": {
+        "bytes": 1488359,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 346871,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "broccoli",
+      "before": {
+        "bytes": 1616296,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 439662,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "cucumber",
+      "before": {
+        "bytes": 1334041,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 342545,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "spicy-curry",
+      "before": {
+        "bytes": 1317015,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 347924,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "brown-rice",
+      "before": {
+        "bytes": 1574306,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 384824,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "kimchi-dumpling",
+      "before": {
+        "bytes": 1670704,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 453462,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "vegetable-dumpling",
+      "before": {
+        "bytes": 1538646,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 420373,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "cup-ramen",
+      "before": {
+        "bytes": 1490687,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 391805,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "jjajang-ramen",
+      "before": {
+        "bytes": 1656539,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 414246,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "seaweed-soup",
+      "before": {
+        "bytes": 1307641,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 335621,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "beef-soup",
+      "before": {
+        "bytes": 1419208,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 342053,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "tteokbokki",
+      "before": {
+        "bytes": 1411601,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 357813,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "rose-tteokbokki",
+      "before": {
+        "bytes": 1293605,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 343927,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "tuna-can",
+      "before": {
+        "bytes": 1071253,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 276355,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "spicy-tuna",
+      "before": {
+        "bytes": 1318325,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 350487,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "pumpkin-porridge",
+      "before": {
+        "bytes": 1354482,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 356335,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "abalone-porridge",
+      "before": {
+        "bytes": 1496088,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 381266,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "frozen-pizza",
+      "before": {
+        "bytes": 1864246,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 467872,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "cheese-pizza",
+      "before": {
+        "bytes": 1630524,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 398440,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "spaghetti",
+      "before": {
+        "bytes": 1509591,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 378506,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "udon",
+      "before": {
+        "bytes": 1498690,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 399348,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "cola",
+      "before": {
+        "bytes": 694280,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 195959,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "zero-cola",
+      "before": {
+        "bytes": 750714,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 188698,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "lemon-soda",
+      "before": {
+        "bytes": 725083,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 199104,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "apple-juice",
+      "before": {
+        "bytes": 752460,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 210686,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "peach-juice",
+      "before": {
+        "bytes": 1115052,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 280277,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "tomato-juice",
+      "before": {
+        "bytes": 888842,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 242555,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "iced-coffee",
+      "before": {
+        "bytes": 877598,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 218881,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "decaf-coffee",
+      "before": {
+        "bytes": 837607,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 246866,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "latte",
+      "before": {
+        "bytes": 935262,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 269298,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "soy-milk",
+      "before": {
+        "bytes": 738190,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 188892,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "black-soy-milk",
+      "before": {
+        "bytes": 839259,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 217788,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "sports-drink",
+      "before": {
+        "bytes": 723007,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 205074,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "zero-sports-drink",
+      "before": {
+        "bytes": 787150,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 208782,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "green-tea",
+      "before": {
+        "bytes": 789346,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 216425,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "corn-tea",
+      "before": {
+        "bytes": 774293,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 213313,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "hot-chocolate",
+      "before": {
+        "bytes": 909488,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 251910,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "grapefruit-sparkling",
+      "before": {
+        "bytes": 826825,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 202493,
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "id": "plain-sparkling",
+      "before": {
+        "bytes": 767785,
+        "width": 1254,
+        "height": 1254
+      },
+      "after": {
+        "bytes": 192402,
+        "width": 512,
+        "height": 512
+      }
+    }
+  ],
+  "files": [
+    {
+      "id": "milk",
+      "categoryId": "fresh",
+      "bytes": 666419,
+      "width": 1254,
+      "height": 1254,
+      "alpha": true,
+      "transparentFraction": 0.6328,
+      "sha256": "2a59e541dbf9bef64ff5809aabd0eb826d63d658300ba8257459d43f8d72f557"
+    },
+    {
+      "id": "eggs",
+      "categoryId": "fresh",
+      "bytes": 931277,
+      "width": 1254,
+      "height": 1254,
+      "alpha": true,
+      "transparentFraction": 0.5669,
+      "sha256": "55168952c0e2bd45d4d5e0873d44f6093ce50398aab1e73c4ce9492247b36cfe"
+    },
+    {
+      "id": "premium-eggs",
+      "categoryId": "fresh",
+      "bytes": 1455882,
+      "width": 1254,
+      "height": 1254,
+      "alpha": true,
+      "transparentFraction": 0.5392,
+      "sha256": "6bd71e316697064f2cbe11e8edbde5ba74635c85510706816428bf86e8490213"
+    },
+    {
+      "id": "sausage",
+      "categoryId": "fresh",
+      "bytes": 1013044,
+      "width": 1254,
+      "height": 1254,
+      "alpha": true,
+      "transparentFraction": 0.6288,
+      "sha256": "e7dbc975252be4cbc6ce149d458a9465d1826aa716d82d7480f73d46e7c9b424"
+    },
+    {
+      "id": "brand-sausage",
+      "categoryId": "fresh",
+      "bytes": 1115061,
+      "width": 1254,
+      "height": 1254,
+      "alpha": true,
+      "transparentFraction": 0.5277,
+      "sha256": "2e10d9d81addf3df45dcf13ba363cd9ae8e46e2a8343630fe81c4787e12562c0"
+    },
+    {
+      "id": "tofu",
+      "categoryId": "fresh",
+      "bytes": 1040577,
+      "width": 1254,
+      "height": 1254,
+      "alpha": true,
+      "transparentFraction": 0.6143,
+      "sha256": "6075fd2ccc518cc0096bcfd262e3fc5d7cd5ec8c466b39de7d3785d4d04c0cd9"
+    },
+    {
+      "id": "apple",
+      "categoryId": "produce",
+      "bytes": 906977,
+      "width": 1254,
+      "height": 1254,
+      "alpha": true,
+      "transparentFraction": 0.6279,
+      "sha256": "9fca128439c6ce6377188a5f19f92cc7c83d9424f8921d3f93b7b5219d2ae4fa"
+    },
+    {
+      "id": "watermelon",
+      "categoryId": "produce",
+      "bytes": 929723,
+      "width": 1254,
+      "height": 1254,
+      "alpha": true,
+      "transparentFraction": 0.6483,
+      "sha256": "33e33cad7d16f1bfa77ac13d881a120048049439dd5e55bd4312c9b9f9df12a6"
+    },
+    {
+      "id": "banana",
+      "categoryId": "produce",
+      "bytes": 769291,
+      "width": 1254,
+      "height": 1254,
+      "alpha": true,
+      "transparentFraction": 0.6004,
+      "sha256": "eb7ae5eacf8580e0a8c140c9d2a5c0c0ba6f236e57ca1b6387d77899cc8f071c"
+    },
+    {
+      "id": "tomato",
+      "categoryId": "produce",
+      "bytes": 927729,
+      "width": 1254,
+      "height": 1254,
+      "alpha": true,
+      "transparentFraction": 0.6413,
+      "sha256": "6defb14affe994176ef35ac0ab66c69c4680904e49e0af6046b7e1cd6166ed07"
+    },
+    {
+      "id": "onion",
+      "categoryId": "produce",
+      "bytes": 1073280,
+      "width": 1254,
+      "height": 1254,
+      "alpha": true,
+      "transparentFraction": 0.6229,
+      "sha256": "c3f4e03cdfb631ee5f4fdd72c945b3015fa962e4738e65716b89cc487f50b6b0"
+    },
+    {
+      "id": "carrot",
+      "categoryId": "produce",
+      "bytes": 727451,
+      "width": 1254,
+      "height": 1254,
+      "alpha": true,
+      "transparentFraction": 0.7412,
+      "sha256": "a159a3871221ca98aa895ba3a6abd7414f49ddfcdeeb09713d7a85d5a1ffc475"
+    },
+    {
+      "id": "curry",
+      "categoryId": "meal",
+      "bytes": 1109320,
+      "width": 1254,
+      "height": 1254,
+      "alpha": true,
+      "transparentFraction": 0.5896,
+      "sha256": "347b28da7d0298898d3ec89198920e8dc6896b63698d883c6896f65507aa9799"
+    },
+    {
+      "id": "ramen",
+      "categoryId": "meal",
+      "bytes": 1321416,
+      "width": 1254,
+      "height": 1254,
+      "alpha": true,
+      "transparentFraction": 0.5234,
+      "sha256": "c08d8ddae9e07ceecbeadf1cb1efba142f5cb46a4cc76f24e172eb8294100089"
+    },
+    {
+      "id": "brand-curry",
+      "categoryId": "meal",
+      "bytes": 1107206,
+      "width": 1254,
+      "height": 1254,
+      "alpha": true,
+      "transparentFraction": 0.5693,
+      "sha256": "3e1c2a1d2567445c67c1652e6a51d9ec368f652bc18a7fbfc9094282f1bbf0ba"
+    },
+    {
+      "id": "mild-ramen",
+      "categoryId": "meal",
+      "bytes": 1094454,
+      "width": 1254,
+      "height": 1254,
+      "alpha": true,
+      "transparentFraction": 0.622,
+      "sha256": "337c792345d5bf8779a348945dad600e1fa58969afa8950a8ed026b0796b7e9a"
+    },
+    {
+      "id": "instant-rice",
+      "categoryId": "meal",
+      "bytes": 798939,
+      "width": 1254,
+      "height": 1254,
+      "alpha": true,
+      "transparentFraction": 0.6106,
+      "sha256": "0d9f99da3bcece6e95ec92b4bc2889d86fcd07f90d1cbb37c391501bebbc624c"
+    },
+    {
+      "id": "dumpling",
+      "categoryId": "meal",
+      "bytes": 1357645,
+      "width": 1254,
+      "height": 1254,
+      "alpha": true,
+      "transparentFraction": 0.4989,
+      "sha256": "d2bc8eebb53755993b8dc6521c22f29386511c93f62b909bdc0987fe80d4f9e9"
+    },
+    {
+      "id": "juice",
+      "categoryId": "drink",
+      "bytes": 666670,
+      "width": 1254,
+      "height": 1254,
+      "alpha": true,
+      "transparentFraction": 0.6659,
+      "sha256": "d689f46f0394fc9fd8e7e8583636c23f927717f80d468c804bfd576b16691a04"
+    },
+    {
+      "id": "soda",
+      "categoryId": "drink",
+      "bytes": 507678,
+      "width": 1254,
+      "height": 1254,
+      "alpha": true,
+      "transparentFraction": 0.7949,
+      "sha256": "9eeea21ea2a625c7b26ab72836b4168de059bcfceb8df2e7e59c18eee6fd0c9b"
+    },
+    {
+      "id": "water",
+      "categoryId": "drink",
+      "bytes": 500347,
+      "width": 1254,
+      "height": 1254,
+      "alpha": true,
+      "transparentFraction": 0.7764,
+      "sha256": "a5d8498adcd96cce4203342c3781006b0c601bde05e7d358ace24b36e13bac6b"
+    },
+    {
+      "id": "sparkling-water",
+      "categoryId": "drink",
+      "bytes": 578712,
+      "width": 1254,
+      "height": 1254,
+      "alpha": true,
+      "transparentFraction": 0.7796,
+      "sha256": "3c37ce0d0b90eb07cbfb79a9f9ace1855ed7378095da89221ded433467773853"
+    },
+    {
+      "id": "grape-juice",
+      "categoryId": "drink",
+      "bytes": 837018,
+      "width": 1254,
+      "height": 1254,
+      "alpha": true,
+      "transparentFraction": 0.6712,
+      "sha256": "6db18c355179f25fba0e87f0b3605c64665b7f82ac3be2dc5ed29e9d4ed66dbf"
+    },
+    {
+      "id": "barley-tea",
+      "categoryId": "drink",
+      "bytes": 642884,
+      "width": 1254,
+      "height": 1254,
+      "alpha": true,
+      "transparentFraction": 0.7573,
+      "sha256": "c1cb1ed3ef56e35975a39fc9227ff1c06a5f13cc431e01e4c9ffffc42172cadf"
+    },
+    {
+      "id": "low-fat-milk",
+      "categoryId": "fresh",
+      "bytes": 219172,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.6505,
+      "sha256": "b0187f3385520fe3ce379b419cd678760bd28286c558d66241bf7134dc74d22e"
+    },
+    {
+      "id": "chocolate-milk",
+      "categoryId": "fresh",
+      "bytes": 259165,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.5308,
+      "sha256": "8eb334fafd10e6664a6085ea744da2e6870c9706f10cf2ceee7cae6b4285363a"
+    },
+    {
+      "id": "strawberry-milk",
+      "categoryId": "fresh",
+      "bytes": 293724,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.5073,
+      "sha256": "342bc2cedb2e84c35fede03d8eee56a2fc0582603899dc2e265530f187aa4ae6"
+    },
+    {
+      "id": "king-eggs",
+      "categoryId": "fresh",
+      "bytes": 299598,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.5948,
+      "sha256": "a7c82fcb0753b0939698d93a38d448b977df8bc6f3c2435c03f5f32d431534d9"
+    },
+    {
+      "id": "soft-tofu",
+      "categoryId": "fresh",
+      "bytes": 278623,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.5174,
+      "sha256": "76ae0b104a3b9ec8454e7dbe252723f5079c94b0edbdef8b1d4e3d11cf7f00f2"
+    },
+    {
+      "id": "plain-yogurt",
+      "categoryId": "fresh",
+      "bytes": 247271,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.5651,
+      "sha256": "02f805c6f6e4a21da597eeb2b4a9fae7f92f7300c97bccc89fcd6739a1ae992b"
+    },
+    {
+      "id": "strawberry-yogurt",
+      "categoryId": "fresh",
+      "bytes": 301059,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.5506,
+      "sha256": "a91c260a3b46a8140417dd28f340d2844b058473bb0151443cab18a09b06df63"
+    },
+    {
+      "id": "blueberry-yogurt",
+      "categoryId": "fresh",
+      "bytes": 276031,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.6064,
+      "sha256": "875aa7e92b1036dc40f4c9ae98e822d85d1a010902cfde29bbaebd44eeb0853c"
+    },
+    {
+      "id": "sliced-cheese",
+      "categoryId": "fresh",
+      "bytes": 350464,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.423,
+      "sha256": "9deae48602959feb687c45bf7753fc60835ec35529202d9a2ff8f84b8c92a8e6"
+    },
+    {
+      "id": "mozzarella-cheese",
+      "categoryId": "fresh",
+      "bytes": 332407,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.5059,
+      "sha256": "d512b3ee9543b64cd485c464221b8bf270f0526d19dcc732aad5bbb636976caa"
+    },
+    {
+      "id": "butter",
+      "categoryId": "fresh",
+      "bytes": 236095,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.5802,
+      "sha256": "c0656ae6f74660a206b0bdf74b88e95cd29902de292edd2584348c285014edf5"
+    },
+    {
+      "id": "salted-butter",
+      "categoryId": "fresh",
+      "bytes": 236896,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.5457,
+      "sha256": "5567481a818e2d0debec15fbca260f4770d1cf386fbaa3cc4a1f4a135c93b1d1"
+    },
+    {
+      "id": "ham",
+      "categoryId": "fresh",
+      "bytes": 390984,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.4474,
+      "sha256": "7bcc15929cd80e6a5a7bc98ae043da42e682126cf0fbd42f3373f3d6ea535377"
+    },
+    {
+      "id": "smoked-ham",
+      "categoryId": "fresh",
+      "bytes": 433249,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.4361,
+      "sha256": "0a05e9ce653eedb154f60ec48b637a77773e31efbc17f09075695907800ff699"
+    },
+    {
+      "id": "chicken-breast",
+      "categoryId": "fresh",
+      "bytes": 312857,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.4816,
+      "sha256": "52e52cc8a92326bd1b2934b40e776f4ce088bb6aad010b15df7697c8cbe50f48"
+    },
+    {
+      "id": "smoked-chicken",
+      "categoryId": "fresh",
+      "bytes": 377904,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.4847,
+      "sha256": "a3f69498a65f8d40d2bceb3d5ee29bfdc61dd93bcfbe89a6c69a8b1145509cc7"
+    },
+    {
+      "id": "crab-stick",
+      "categoryId": "fresh",
+      "bytes": 375505,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.5092,
+      "sha256": "84f84948422d413f6f5d345da4c8d10b17a31aede777c4ef4246b8e3a2796842"
+    },
+    {
+      "id": "fish-cake",
+      "categoryId": "fresh",
+      "bytes": 391556,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.4646,
+      "sha256": "bbcf3f0cd44c50520496d11e8aea2e6a2c0f3da1fdec3a74a22c98c49b523e48"
+    },
+    {
+      "id": "green-apple",
+      "categoryId": "produce",
+      "bytes": 312356,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.5157,
+      "sha256": "09d810eb136367519315563c78f2c8957788847091ec58ef5ed744f69c6d0018"
+    },
+    {
+      "id": "cherry-tomato",
+      "categoryId": "produce",
+      "bytes": 362691,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.5505,
+      "sha256": "4b4dfda1f487c628164f0ebb951a4b2b04ed055cc7b9d779db1de6350955c980"
+    },
+    {
+      "id": "orange",
+      "categoryId": "produce",
+      "bytes": 288881,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.5373,
+      "sha256": "054b681ac91f81a1862579e6a2eac2a61fe8eab89b7871b56bc6c8916d7a2737"
+    },
+    {
+      "id": "mandarin",
+      "categoryId": "produce",
+      "bytes": 313250,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.5835,
+      "sha256": "4995eecd4ef75fb2f4cfa3f637ff73f91138f633ea69fd9ceeb26b08a59a4817"
+    },
+    {
+      "id": "lemon",
+      "categoryId": "produce",
+      "bytes": 253039,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.5682,
+      "sha256": "5b687b4d44c6ea1a0622bd563fdfd0ab90747d0638bb50b91c883fac57afb290"
+    },
+    {
+      "id": "pear",
+      "categoryId": "produce",
+      "bytes": 345129,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.4671,
+      "sha256": "821baa0a8959330a8aa7015e0bd13b12f2a1cee6b8eb7c04fa046ee73f4e4813"
+    },
+    {
+      "id": "peach",
+      "categoryId": "produce",
+      "bytes": 380485,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.4915,
+      "sha256": "f8f975f32b8cae6dea63b4111db8f7ab98129746fffceedc819027ba17fab9a2"
+    },
+    {
+      "id": "white-peach",
+      "categoryId": "produce",
+      "bytes": 322204,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.5221,
+      "sha256": "4e15f75818f13c84fdf49eb01ed521a34dd8f7634736a01eea51f057141b638b"
+    },
+    {
+      "id": "strawberry",
+      "categoryId": "produce",
+      "bytes": 392128,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.5568,
+      "sha256": "c0754f64bcb1576f082a9620c07776b147ec0ba43fe89a0035a0363ae70ad36c"
+    },
+    {
+      "id": "grape",
+      "categoryId": "produce",
+      "bytes": 366327,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.5548,
+      "sha256": "bded7c50d1b5d661d1b6eeff76c9cfd4c3920d76269c6ea3f88c0825b65fa4bc"
+    },
+    {
+      "id": "green-grape",
+      "categoryId": "produce",
+      "bytes": 342016,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.5548,
+      "sha256": "9e7d5716c55d8f15ca7441b9d9faa4b4600b1c6b24514512a25bdd8ae0954326"
+    },
+    {
+      "id": "kiwi",
+      "categoryId": "produce",
+      "bytes": 427876,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.4833,
+      "sha256": "3194b40feeb69eee52a94ef4da72eb7690af4895ce04c6ce5b2f036c06fdeac1"
+    },
+    {
+      "id": "melon",
+      "categoryId": "produce",
+      "bytes": 460305,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.4534,
+      "sha256": "c200fec65fcdcfa2fe35cbf7ad69eca25353826ffc6482ac5aff9eef07aeeb07"
+    },
+    {
+      "id": "blueberry",
+      "categoryId": "produce",
+      "bytes": 399487,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.4986,
+      "sha256": "bc380d3dfe4c5d828fb5cebc721ae6b8b7f9615f8866d41c47c9cee116c7a1a4"
+    },
+    {
+      "id": "potato",
+      "categoryId": "produce",
+      "bytes": 315332,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.4912,
+      "sha256": "4536b168e41065bf459af8d295969d140895b0e10fd2df5f0ef39ca532984271"
+    },
+    {
+      "id": "sweet-potato",
+      "categoryId": "produce",
+      "bytes": 346871,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.5598,
+      "sha256": "200a3aa12f4f80814b1aeade1c6070f397560f78c91781765c0fb2b87a096d66"
+    },
+    {
+      "id": "broccoli",
+      "categoryId": "produce",
+      "bytes": 439662,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.4781,
+      "sha256": "c9c45293b3ffb4b09456fb9e9d4ca88b91827f814b1abc59265e24ced98c5ca0"
+    },
+    {
+      "id": "cucumber",
+      "categoryId": "produce",
+      "bytes": 342545,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.5722,
+      "sha256": "185e135064de753aa12510122f854d7c465c1044e998c54e98eccfa10e5e3a27"
+    },
+    {
+      "id": "spicy-curry",
+      "categoryId": "meal",
+      "bytes": 347924,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.4781,
+      "sha256": "7c667d1f0794d7d423b9dc6b85c182ea46d17677bf76482de063c51cb2030231"
+    },
+    {
+      "id": "brown-rice",
+      "categoryId": "meal",
+      "bytes": 384824,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.4585,
+      "sha256": "cda5128862853a12101884d9c6f01f1c6f2ee7c23b5b844df2f92a28b524ddcf"
+    },
+    {
+      "id": "kimchi-dumpling",
+      "categoryId": "meal",
+      "bytes": 453462,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.3689,
+      "sha256": "b459f56cb3cca0a1cee578a67391f1c006eb5619c9ae7eb46f925956be45d9bd"
+    },
+    {
+      "id": "vegetable-dumpling",
+      "categoryId": "meal",
+      "bytes": 420373,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.4261,
+      "sha256": "7570c290eacc7107930c9e00025453a4a01b5f9adc1a077aa335ac1578b7e53e"
+    },
+    {
+      "id": "cup-ramen",
+      "categoryId": "meal",
+      "bytes": 391805,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.4722,
+      "sha256": "4a2f235979c82738a6f2db13852698a8fbdc9d04990860e1556f6e5d6306929d"
+    },
+    {
+      "id": "jjajang-ramen",
+      "categoryId": "meal",
+      "bytes": 414246,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.3486,
+      "sha256": "c1c6e8eba635979d32c45c75416586adbde5bb44d5688dd36c9f20a4b84f96a7"
+    },
+    {
+      "id": "seaweed-soup",
+      "categoryId": "meal",
+      "bytes": 335621,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.4772,
+      "sha256": "93ec7781a80d5cea506b6ef06a22801aadcddb0052bb791f12998e18ceeb1353"
+    },
+    {
+      "id": "beef-soup",
+      "categoryId": "meal",
+      "bytes": 342053,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.4585,
+      "sha256": "481c3b5bc41fc3261a13c51bd8fd779802bd2bfbe7d9ea569cfea6762aea1beb"
+    },
+    {
+      "id": "tteokbokki",
+      "categoryId": "meal",
+      "bytes": 357813,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.4709,
+      "sha256": "8f9288b979855bd151b2115e0e768518ba7b9628343dbba0c48fb84500f4edc9"
+    },
+    {
+      "id": "rose-tteokbokki",
+      "categoryId": "meal",
+      "bytes": 343927,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.4833,
+      "sha256": "4b9b75f9145a04fd29c31acb5ae6046e7af92211810af41483e940c704da77e0"
+    },
+    {
+      "id": "tuna-can",
+      "categoryId": "meal",
+      "bytes": 276355,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.5492,
+      "sha256": "4d9e5ea926c15656fa948991b258a31b91a8819f131ab5ada1ab740b780b6ded"
+    },
+    {
+      "id": "spicy-tuna",
+      "categoryId": "meal",
+      "bytes": 350487,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.4874,
+      "sha256": "e229e1bf7e78fac2f87fe97e0573274363932c0f4efcfab5c62ea841d52b00e2"
+    },
+    {
+      "id": "pumpkin-porridge",
+      "categoryId": "meal",
+      "bytes": 356335,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.4623,
+      "sha256": "008853efd0a8a7deafdf43c39cb8e924a69681f7b5b8d197d0d1f66177f31c9f"
+    },
+    {
+      "id": "abalone-porridge",
+      "categoryId": "meal",
+      "bytes": 381266,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.4391,
+      "sha256": "1e8c7663ffc8ae68d6f232e2580e4dcb47bf14381df489f50cb1471f1b10265f"
+    },
+    {
+      "id": "frozen-pizza",
+      "categoryId": "meal",
+      "bytes": 467872,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.3853,
+      "sha256": "fc9788927672c1614880a4db844cc5c7590462eb1524a17b385256a1bad9c012"
+    },
+    {
+      "id": "cheese-pizza",
+      "categoryId": "meal",
+      "bytes": 398440,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.4468,
+      "sha256": "c9f4ee533b5bd51e34c1a451da1671c1dffb6d9cd6ef23cda2f8d865ecebb6f0"
+    },
+    {
+      "id": "spaghetti",
+      "categoryId": "meal",
+      "bytes": 378506,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.5029,
+      "sha256": "fc2ef992d306daf9552599faf0436908e41d7cdeb1965b072a56646333cb933e"
+    },
+    {
+      "id": "udon",
+      "categoryId": "meal",
+      "bytes": 399348,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.396,
+      "sha256": "7b5cd37c336b555580062d9f398738f1bc78ec58c7ca2fe1f41c2dfec6d3a632"
+    },
+    {
+      "id": "cola",
+      "categoryId": "drink",
+      "bytes": 195959,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.7192,
+      "sha256": "c95043a004570aecafdc7be5220f0705104258a3afaae213daa8778934eefdcf"
+    },
+    {
+      "id": "zero-cola",
+      "categoryId": "drink",
+      "bytes": 188698,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.7295,
+      "sha256": "d42b489adfdfd9127d5c81595365dd53dd9d36473d6b6cc2f806f9f477da3806"
+    },
+    {
+      "id": "lemon-soda",
+      "categoryId": "drink",
+      "bytes": 199104,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.7477,
+      "sha256": "233ddea7a604071bdc6cf765b19c01c1d1af4e6998c9ef6ed102e091417a8db4"
+    },
+    {
+      "id": "apple-juice",
+      "categoryId": "drink",
+      "bytes": 210686,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.6863,
+      "sha256": "b17583adb62f2df9c17f4a8ee66d8fb59c25f04b37f6b823cf432542338b13cf"
+    },
+    {
+      "id": "peach-juice",
+      "categoryId": "drink",
+      "bytes": 280277,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.555,
+      "sha256": "da9624d2b06955a9552c626f1dd5e0a29dc91b33ee0458c41f0fac7190e45de2"
+    },
+    {
+      "id": "tomato-juice",
+      "categoryId": "drink",
+      "bytes": 242555,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.6593,
+      "sha256": "b42c92c83ba0fe7858b528e2b2d9235fd289bd813d4b9b4cf08d8939cd6819e1"
+    },
+    {
+      "id": "iced-coffee",
+      "categoryId": "drink",
+      "bytes": 218881,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.6584,
+      "sha256": "5f6aa554eaa7bffbba0867919c0e4cde68fbaa13066e32e904453bdec51f6e9e"
+    },
+    {
+      "id": "decaf-coffee",
+      "categoryId": "drink",
+      "bytes": 246866,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.6416,
+      "sha256": "2620695603de699960db584d749c12ab98511cca688651e04f7a107265a2f029"
+    },
+    {
+      "id": "latte",
+      "categoryId": "drink",
+      "bytes": 269298,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.5914,
+      "sha256": "0729abf4d09d9631247ef53ec7739f94c7c197d60b35bfe8863c20b5a544c3ac"
+    },
+    {
+      "id": "soy-milk",
+      "categoryId": "drink",
+      "bytes": 188892,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.6709,
+      "sha256": "14b761f10e4e986e9b3cadba34c915b033f1ff7bc8fdb7341d059c0dcb0e37bd"
+    },
+    {
+      "id": "black-soy-milk",
+      "categoryId": "drink",
+      "bytes": 217788,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.6246,
+      "sha256": "3c8b5edd3aeb97ecb7ff9f366129d79e164f5defcc119fdc23a2e640fefb1cd6"
+    },
+    {
+      "id": "sports-drink",
+      "categoryId": "drink",
+      "bytes": 205074,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.7197,
+      "sha256": "9a6c1c39330918196a928e76e05f726d0e454a5c82af6be2b25388fc6d67a9e8"
+    },
+    {
+      "id": "zero-sports-drink",
+      "categoryId": "drink",
+      "bytes": 208782,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.7029,
+      "sha256": "973d23fdb6e542a528a9c9c430db04ff93f80c275891b63802f95390755cdec8"
+    },
+    {
+      "id": "green-tea",
+      "categoryId": "drink",
+      "bytes": 216425,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.7183,
+      "sha256": "a37792df89d8e3dbf67c2784acac071a4dd8d3d8644ede8527e71243106b9938"
+    },
+    {
+      "id": "corn-tea",
+      "categoryId": "drink",
+      "bytes": 213313,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.7202,
+      "sha256": "c743f4d732b6385d73b0219e98cb31f27bb11ca993a6e1d115fa089e83ecc057"
+    },
+    {
+      "id": "hot-chocolate",
+      "categoryId": "drink",
+      "bytes": 251910,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.613,
+      "sha256": "21b49a48ab47ba4db98cfb2b2b35919e879d2fdf4e36289f3b2a557d8e2709a3"
+    },
+    {
+      "id": "grapefruit-sparkling",
+      "categoryId": "drink",
+      "bytes": 202493,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.7114,
+      "sha256": "1bb89e6204be92deb6ed2a44df4a390a2f307dd55b6e346939e554b33389aa1b"
+    },
+    {
+      "id": "plain-sparkling",
+      "categoryId": "drink",
+      "bytes": 192402,
+      "width": 512,
+      "height": 512,
+      "alpha": true,
+      "transparentFraction": 0.7251,
+      "sha256": "3a446aea756fdeb3e160e08cef4e546e2d77acf7f8f002a418c5f8b6555d5140"
+    }
+  ]
+}

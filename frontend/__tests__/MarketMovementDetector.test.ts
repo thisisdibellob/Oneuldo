@@ -3,7 +3,7 @@ import {
   type MarketTelemetryStation,
 } from '../src/behavior/marketMovementDetector';
 
-const stations: Record<MarketTelemetryStation, { x: number; y: number }> = {
+const stations: Partial<Record<MarketTelemetryStation, { x: number; y: number }>> = {
   checkout: { x: 0, y: 0 },
   fresh: { x: 100, y: 0 },
   produce: { x: 200, y: 0 },

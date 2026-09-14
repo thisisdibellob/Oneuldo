@@ -1,5 +1,5 @@
 export type MarketTelemetryPoint = { x: number; y: number };
-export type MarketTelemetryStation = 'fresh' | 'produce' | 'meal' | 'drink' | 'checkout';
+export type MarketTelemetryStation = 'fresh' | 'produce' | 'meal' | 'drink' | 'household' | 'checkout' | 'checkout-2';
 export type MarketTelemetryControlMode = 'joystick' | 'touch' | 'accessibility';
 
 export type MarketMovementEventDraft = {
@@ -50,7 +50,7 @@ export class MarketMovementDetector {
   private visitCounts = new Map<MarketTelemetryStation, number>();
 
   constructor(
-    private readonly stations: Record<MarketTelemetryStation, MarketTelemetryPoint>,
+    private readonly stations: Partial<Record<MarketTelemetryStation, MarketTelemetryPoint>>,
     private readonly interactionDistance: number,
   ) {}
 

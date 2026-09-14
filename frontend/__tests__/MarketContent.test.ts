@@ -1,5 +1,5 @@
 import { marketCatalogProducts, enabledMarketScenarios, marketScenarioDefinitions, MARKET_CATALOG_VERSION, MARKET_SCENARIO_VERSION } from '../src/game/marketContent';
-import { buildMarketScenarioMission, buildRandomMarketScenarioMission, resolveMarketAiMission, getMarketProduct, getMarketCartTotal, evaluateMarketCart, getObjectiveQuantity } from '../src/game/scenarios';
+import { buildMarketScenarioMission, buildRandomMarketScenarioMission, resolveMarketAiMission, marketProducts, getMarketProduct, getMarketCartTotal, evaluateMarketCart, getObjectiveQuantity } from '../src/game/scenarios';
 import { MarketBehaviorTracker } from '../src/behavior/marketBehaviorTracker';
 import { enqueueBehaviorEvents, flushBehaviorEventQueue } from '../src/behavior/behaviorEventQueue';
 import type { BehaviorLogRequest } from '../src/api/behaviorLog';
@@ -65,7 +65,7 @@ it('로그에 버전·목표 조건·당시 표시 상품을 남기고 초록 �
     initialStockPerSku: 5, objectiveConstraints: [{ acceptedProductIds: ['apple', 'apple-green'] }, {}],
   } });
   const shelf = events.find(({ event }) => event.action.eventCode === 'SHOP.SHELF_OPENED')!.event;
-  expect((shelf.payload.marketContent as { displayedProducts: unknown[] }).displayedProducts).toHaveLength(15);
+  expect((shelf.payload.marketContent as { displayedProducts: unknown[] }).displayedProducts).toHaveLength(marketProducts.filter(p => p.categoryId === 'produce').length);
   expect(events.some(({ event }) => event.action.eventCode === 'SHOP.WRONG_ITEM_SELECTED')).toBe(false);
   expect(flushBehaviorEventQueue).toHaveBeenCalledWith('token');
   jest.useRealTimers();

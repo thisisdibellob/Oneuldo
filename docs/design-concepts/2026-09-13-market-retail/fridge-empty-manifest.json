@@ -1,0 +1,78 @@
+{
+  "asset": "fridge-empty",
+  "date": "2026-09-13",
+  "mode": "builtin-imagegen",
+  "inputs": [
+    {
+      "role": "edit-target geometry and material reference",
+      "path": "docs/design-concepts/2026-09-13-market-retail/gondola-master.png"
+    }
+  ],
+  "passes": [
+    {
+      "purpose": "precise refrigerated material edit",
+      "prompt": "Use case: precise-object-edit. Asset type: EMPTY refrigerated open-front grocery display sprite.\nEdit the provided empty gondola into a matching REFRIGERATED DAIRY DISPLAY, changing materials and small refrigeration details only. Preserve the exact outer silhouette, frontal orthographic camera, width, overall height, top header, two shelf levels, front rails, shelf-floor positions, side posts and feet. Same 1536×1024 landscape frame, furniture in the same pixel positions. Do not add a level.\nThe scene must clearly look like a refrigerated shelf: replace BOTH pale oak back panels with cool light brushed-silver metal, subtly blue-gray #D5E1E5; make the two flat shelf trays light silver/ivory. Add one very slim blue-white LED strip directly below the top header and a restrained tiny horizontal ventilation grille INSIDE the existing bottom plinth, without increasing its size. Keep warm ivory #F7F4EC outer cabinet, thin muted sage #587565 front rails, fine ink #304B54 hand-drawn contours, small restrained brass #C48B57 fasteners. Use the same gentle refined hand-painted storybook texture as the input, soft shading, no photorealism or glossy neon.\nEXACT INVARIANTS: exactly TWO empty open-front display levels. No glass doors, no extra shelves, no extra tray or rack, no wider fridge shell. Shelf-front product floor baselines stay at the input positions approximately y403 and y723 on 1024 image height (37 and 66.4 on a94px game artwork frame). Outer left/right vertical sides parallel, no narrowing perspective/isometric tilt; feet stay on same ground baseline. No products, food, milk cartons, people, text, logos, labels or price tags.\nOutput an isolated TRUE transparent RGBA PNG with real alpha zero outside the fixture silhouette, preserving source transparency. Any dark/gray surround in the reference is NOT scenery: remove it entirely. No checkerboard, no colored backdrop, no floor, no halo, no ground shadow or atmospheric bloom. This sprite will replace the same 141×94 art frame above an unchanged110×64 collision footprint.",
+      "rawPath": "C:/Users/PC/.codex/generated_images/01a09619-fb4e-7242-8a70-109d5d449476/exec-5355d7db-c38c-4bd0-bf44-a5bb35beb1a2.png",
+      "accepted": false,
+      "reason": "RGB baked transparency checkerboard rejected"
+    },
+    {
+      "purpose": "background-extraction",
+      "prompt": "Use case: background-extraction. Return a true transparent RGBA PNG cutout of this exact EMPTY refrigerated grocery shelf. The gray checkerboard outside it is an erroneous painted background and MUST be removed, with actual alpha ZERO everywhere outside the fridge silhouette. Keep every pixel of the refrigerator unchanged: exactly two levels, silver back panels, ivory sides/header, sage rails, slim LED and small bottom vent, unchanged positions and full feet. No new background, no checkerboard pattern, no glow, no floor and no cast shadow. Use real alpha transparency, not a drawn substitute. Preserve antialiased silhouette edges and transparent spaces under the base. Change ONLY the wrong background.",
+      "rawPath": "C:/Users/PC/.codex/generated_images/01a09619-fb4e-7242-8a70-109d5d449476/exec-16fed190-c7cd-45f1-8182-74296f56d5f2.png",
+      "accepted": false,
+      "reason": "RGB baked transparency checkerboard rejected"
+    },
+    {
+      "purpose": "background-extraction retry",
+      "prompt": "Remove the background of this image. Return a transparent PNG cutout of only the empty refrigerated shelf. The checkerboard is a wrong painted background, not real transparency. Delete it and make the outside pixels fully transparent (alpha=0). Keep the shelf exactly unchanged. Actual RGBA transparency is mandatory. No checkerboard, no replacement background, no shadow.",
+      "rawPath": "C:/Users/PC/.codex/generated_images/01a09619-fb4e-7242-8a70-109d5d449476/exec-77547e9b-2cd1-47a6-a79a-035c046cafa3.png",
+      "accepted": true
+    }
+  ],
+  "normalization": {
+    "method": "uniform 50% downscale preserving generated alpha only; no crop or repaint",
+    "from": [
+      1536,
+      1024
+    ],
+    "runtime": [
+      768,
+      512
+    ]
+  },
+  "overlayGuidance": {
+    "productFloorFractionsY": [
+      0.3935546875,
+      0.7060546875
+    ],
+    "worldProductFloorYAtHeight94": [
+      36.994140625,
+      66.369140625
+    ],
+    "notes": "Exactly two refrigerated open-front levels in the original gondola frame. No doors/products/text. Intended 141×94 artwork above unchanged 110×64 ground footprint."
+  },
+  "runtime": "frontend/assets/images/game/market/interior/retail-v4/fridge-empty.png",
+  "master": "docs/design-concepts/2026-09-13-market-retail/fridge-empty-master.png",
+  "qa": {
+    "width": 768,
+    "height": 512,
+    "hasAlpha": true,
+    "alphaZeroPixels": 103185,
+    "partialAlphaPixels": 288670,
+    "alpha32Bounds": [
+      44,
+      25,
+      722,
+      476
+    ],
+    "cornerAlpha": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "bytes": 443611,
+    "sha256": "08f4e7f26905ca97fe2836b23b97df153c7fb155b609be3b92336f1f81020fac"
+  }
+}

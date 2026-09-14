@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import type { ComponentProps } from 'react';
-import { useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, Animated, Easing, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { AccessibilityInfo, Animated, BackHandler, Easing, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { ImageSourcePropType } from 'react-native';
 
 import { icons } from '../../assets';
@@ -159,7 +159,7 @@ export function GameHud({
     }).start();
   };
 
-  const closeMenu = () => {
+  const closeMenu = useCallback(() => {
     panelProgress.stopAnimation();
     if (reduceMotionEnabled) {
       panelProgress.setValue(0);
@@ -179,7 +179,17 @@ export function GameHud({
       setMenu(null);
       onMenuVisibilityChange(false);
     });
-  };
+  }, [onMenuVisibilityChange, panelProgress, reduceMotionEnabled]);
+
+  useEffect(() => {
+    if (!menu) return;
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (phoneAction) setPhoneAction(null);
+      else closeMenu();
+      return true;
+    });
+    return () => subscription.remove();
+  }, [closeMenu, menu, phoneAction]);
 
   const toggleMenu = (next: MenuKey) => {
     if (menu === next) {
@@ -244,8 +254,8 @@ export function GameHud({
   };
 
   return (
-    <View pointerEvents="box-none" style={[StyleSheet.absoluteFill, menu && styles.menuRoot]}>
-      <View pointerEvents="none" style={styles.topHud}>
+    <View pointerEvents="box-none" testID="game-hud" style={[StyleSheet.absoluteFill, menu && styles.menuRoot]}>
+      <View pointerEvents="none" testID="game-top-hud" style={styles.topHud}>
         <OutlinedHudText>11:45</OutlinedHudText>
         <View style={styles.coinCounter}>
           <OutlinedHudText>515</OutlinedHudText>
@@ -253,7 +263,7 @@ export function GameHud({
         </View>
       </View>
 
-      <View pointerEvents="box-none" style={styles.toolbar}>
+      <View pointerEvents="box-none" testID="game-toolbar" style={styles.toolbar}>
         {toolbarItems.map((item) => (
           <PressScale
             accessibilityLabel={`${item.label} 열기`}
@@ -332,7 +342,10 @@ export function GameHud({
                 onAction={setPhoneAction}
                 onCancel={() => setPhoneAction(null)}
                 onEmergencyExit={handleEmergencyExit}
-                onExit={onExit}
+                onExit={() => {
+                  closeMenu();
+                  onExit();
+                }}
                 onOpenSettings={() => openMenu('settings')}
               />
             ) : null}
@@ -721,9 +734,9 @@ const styles = StyleSheet.create({
   },
   toolbarButton: { height: 76, width: 76 },
   toolbarIcon: { height: 76, width: 76 },
-  overlay: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', zIndex: 50 },
+  overlay: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center', zIndex: 50 },
   referenceOverlay: { justifyContent: 'flex-end', paddingBottom: 108, zIndex: 23 },
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(26,31,27,0.38)' },
+  backdrop: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(26,31,27,0.38)' },
   referenceBackdrop: { backgroundColor: 'transparent' },
   blobPanel: {
     backgroundColor: '#FFF7DC',
@@ -874,7 +887,7 @@ const styles = StyleSheet.create({
     right: 0,
   },
   inventoryDashedOutline: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     borderColor: 'rgba(75,75,75,0.25)',
     borderRadius: 4,
     borderStyle: 'dashed',
@@ -990,7 +1003,7 @@ const styles = StyleSheet.create({
     right: 0,
   },
   questDashedOutline: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     borderColor: 'rgba(75,75,75,0.25)',
     borderRadius: 4,
     borderStyle: 'dashed',

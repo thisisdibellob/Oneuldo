@@ -1,0 +1,80 @@
+{
+  "asset": "produce-empty",
+  "date": "2026-09-13",
+  "mode": "builtin-imagegen",
+  "inputs": [
+    {
+      "role": "material-style-reference",
+      "path": "frontend/assets/images/game/market/interior/retail-v4/checkout.png"
+    },
+    {
+      "role": "edit-target",
+      "path": "frontend/assets/images/game/market/interior/shelf_produce_ortho_v1.png"
+    }
+  ],
+  "passes": [
+    {
+      "purpose": "style-transfer and empty two-tier crate structure",
+      "prompt": "Use case: precise-object-edit and style-transfer. Asset type: one EMPTY produce display bench sprite for a warm neighborhood grocery game.\nInput image 1 (new ivory-and-sage checkout) is the MATERIAL AND DRAWING STYLE reference only. Input image 2 (existing fruit bench) is the EDIT TARGET: remove every fruit/vegetable, redesign it as an empty matching produce bench with TWO clearly separate stacked tiers of shallow wooden display crates, each tier divided into THREE broad open bins. These six bins must be empty and easy to fill with separate fruit PNGs at runtime. Both tiers must have clear unobstructed flat rear panels and straight horizontal product shelf lips. Keep it a believable LOW produce display, not a tall refrigerator.\nArt direction: restrained delicate hand-painted storybook illustration that matches our thin-outlined playable character. Pale natural oak crate interiors with warm ivory #F7F4EC enamel side posts, muted sage #587565 lower base and narrow shelf-lip trim, ink/slate #304B54 thin structural edges, tiny brass #C48B57 fasteners. Gentle material grain, subtle shadow INSIDE empty bins only. No thick black strokes, no saturated orange wood, no glossy plastic.\nProjection: exact orthographic FRONT view. Left and right outer vertical edges strictly parallel; top and bottom widths identical. All horizontal shelf lips truly horizontal. No trapezoids, converging lines, perspective narrowing, rotated side faces or isometric angle. ONE bench, exactly two tiers with three empty bins per tier. Feet are small and fully visible.\nComposition: landscape 1536×1024 (3:2), object occupies approximately 94% of width and 87% of height with tiny clear margin on every side, the feet share one horizontal ground line near bottom. Intended unchanged game artwork frame 141×94 and physical ground footprint110×64; do not include floor or architecture in asset.\nOutput: actual transparent RGBA PNG, alpha ZERO outside the isolated bench. No checkerboard pixels, no plain color backdrop, no floor, no cast shadow beyond the furniture, no ambient glow, no people, no fruit, no vegetables, no packages, no text, no price tags, no logo, no watermark. Transparency must be a real alpha channel, not a printed transparency pattern.",
+      "rawPath": "C:/Users/PC/.codex/generated_images/01a09619-fb4e-7242-8a70-109d5d449476/exec-edefba64-92a5-444d-8bd4-da643d547933.png",
+      "accepted": false,
+      "reason": "RGB baked transparency checkerboard rejected"
+    },
+    {
+      "purpose": "background-extraction",
+      "prompt": "Use case: background-extraction. Precise edit of the supplied EMPTY produce bench image. Keep the entire furniture EXACTLY unchanged: same two tiers with three empty crate bins per tier, pale oak interiors, ivory posts, sage trim, thin dark contours, brass fasteners and full small feet. The gray-and-white checkerboard surrounding it is an erroneous PAINTED background and must be removed. Deliver a genuinely transparent RGBA PNG with actual alpha ZERO outside the furniture silhouette and real antialiased edges. Do not replace it with white, black, gray, a solid color or another checker pattern. No floor or cast shadow. Change only the erroneous background; do not change the bench geometry or draw any goods, text, people or extra elements. Keep all transparent spaces between/under feet actually transparent. This output is an isolated transparent game sprite for compositing over arbitrary floor colors.",
+      "rawPath": "C:/Users/PC/.codex/generated_images/01a09619-fb4e-7242-8a70-109d5d449476/exec-30ea62be-346b-4765-8ee8-b74319a5093d.png",
+      "accepted": true
+    }
+  ],
+  "normalization": {
+    "method": "uniform 50% downscale preserving generated alpha only",
+    "from": [
+      1536,
+      1024
+    ],
+    "runtime": [
+      768,
+      512
+    ]
+  },
+  "overlayGuidance": {
+    "productFloorFractionsY": [
+      0.335,
+      0.669
+    ],
+    "productCenterFractionsX": [
+      0.13,
+      0.26,
+      0.425,
+      0.575,
+      0.74,
+      0.87
+    ],
+    "notes": "Two tiers, three crate compartments per tier. Values are visual guidance for decorative product overlays; game inventory and 110×64 footprint remain unchanged."
+  },
+  "runtime": "frontend/assets/images/game/market/interior/retail-v4/produce-empty.png",
+  "master": "docs/design-concepts/2026-09-13-market-retail/produce-empty-master.png",
+  "qa": {
+    "width": 768,
+    "height": 512,
+    "hasAlpha": true,
+    "alphaZeroPixels": 86974,
+    "partialAlphaPixels": 304756,
+    "alpha32Bounds": [
+      15,
+      35,
+      737,
+      441
+    ],
+    "bytes": 632149,
+    "sha256": "ad4c2898003caf7168e7ced412ec5dfa0963bca44ce02f0e91209ad6d54e5003",
+    "normalization": "uniform resize only",
+    "corners": [
+      0,
+      0,
+      0,
+      0
+    ]
+  }
+}

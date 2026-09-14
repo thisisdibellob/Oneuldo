@@ -7,11 +7,6 @@
     "orientation": "portrait",
     "icon": "./assets/images/app-icon.png",
     "userInterfaceStyle": "light",
-    "splash": {
-      "backgroundColor": "#FFFFFF",
-      "resizeMode": "contain",
-      "image": "./assets/images/source/Logo.png"
-    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.oneuldo.app"
@@ -31,9 +26,28 @@
     "plugins": [
       "expo-font",
       "expo-dev-client",
-      "expo-asset",
       "./plugins/with-bllossom-model",
-      "./plugins/with-llama-runtime"
+      "./plugins/with-llama-runtime",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": false,
+          "recordAudioAndroid": false,
+          "enableBackgroundRecording": false,
+          "enableBackgroundPlayback": false
+        }
+      ],
+      "expo-status-bar",
+      "expo-asset",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#FFFFFF",
+          "resizeMode": "contain",
+          "image": "./assets/images/source/Logo.png",
+          "imageWidth": 208
+        }
+      ]
     ]
   }
 }

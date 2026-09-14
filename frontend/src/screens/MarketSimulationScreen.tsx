@@ -1,1564 +1,1024 @@
 import { Ionicons } from '@expo/vector-icons';
-import { StatusBar } from 'expo-status-bar';
-import { ComponentProps, createContext, useContext, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  AccessibilityInfo,
-  Animated,
-  AppState,
-  Easing,
-  GestureResponderEvent,
-  Image,
-  LayoutChangeEvent,
-  PanResponder,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
-
-import { icons } from '../assets';
-import type { BehaviorSimulationContext } from '../api/behaviorLog';
-import { MarketBehaviorTracker } from '../behavior/marketBehaviorTracker';
-import type {
-  MarketTelemetryControlMode,
-  MarketTelemetryPoint,
-} from '../behavior/marketMovementDetector';
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { AppState, BackHandler, Image, Platform, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
 import { PressScale } from '../components/PressScale';
+import { MarketMap } from '../components/game/MarketMap';
+import { MarketHud, type MarketHudControlMode } from '../components/game/MarketHud';
+import { MarketStaffDialogue, MarketStaffDialogueChoice } from '../components/game/MarketStaffDialogue';
+import { MarketPanelTransition } from '../components/game/MarketPanelTransition';
+import { MarketShelfScene } from '../components/game/MarketShelfScene';
+import { MarketSetupPanel } from '../components/game/MarketSetupPanel';
+import { MarketEnvironment, MarketEnvironmentStationId, MarketCashierAvailability } from '../game/marketEnvironment';
 import {
-  getCartQuantity,
-  getMarketCartTotal,
-  getMarketProduct,
-  getObjectiveQuantity,
-  MarketCart,
-  MarketCategory,
-  MarketCategoryId,
-  MarketEvaluation,
-  MarketMission,
-  MarketProduct,
-  marketCategories,
-  marketMission,
-  marketProducts,
-} from '../game/scenarios';
-import { createMarketScene, restoreMarketScene } from '../game/marketScene';
+  applyMarketAction,
+  createMarketSession,
+  exportMarketEpisode,
+  MarketAction,
+  MarketSessionConfig
+} from '../game/marketSession';
+import { getMarketProductImage } from '../game/marketProductImages';
+import { getMarketCartTotal, getMarketProduct, marketCategories, MarketCart } from '../game/scenarios';
+import type { BehaviorSimulationContext } from '../api/behaviorLog';
 import { startSessionAnalysisJob } from '../api/behaviorAnalysis';
-import { colors, fonts } from '../theme';
+import { MarketBehaviorTracker } from '../behavior/marketBehaviorTracker';
+import type { MarketTelemetryControlMode, MarketTelemetryPoint } from '../behavior/marketMovementDetector';
+import type { MarketMission, MarketCategoryId } from '../game/scenarios';
+import { marketMission, marketProducts } from '../game/scenarios';
+import { MARKET_CATALOG_VERSION, MARKET_SCENARIO_VERSION, enabledMarketScenarios } from '../game/marketContent';
+import { fonts } from '../theme';
+import { listMarketEpisodes, saveMarketEpisode, MarketStoredEpisode } from '../game/marketEpisodeStore';
 
-type MarketPhase = 'briefing' | 'shopping' | 'checkout' | 'result';
-type IoniconName = ComponentProps<typeof Ionicons>['name'];
-export type MarketStationId = MarketCategoryId | 'checkout';
-export type MarketInteractionRequest = { id: number; station: MarketStationId };
-type MarketPoint = { x: number; y: number };
-type MarketControlMode = 'joystick' | 'touch';
-
-export type MarketTelemetrySink = {
-  movementStopped: (controlMode: MarketTelemetryControlMode) => void;
-  observeMovement: (point: MarketTelemetryPoint, controlMode: MarketTelemetryControlMode, blocked?: boolean) => void;
-};
-
-const MARKET_WORLD_WIDTH = 900;
-const MARKET_WORLD_HEIGHT = 1000;
-const MARKET_PLAYER_RADIUS = 22;
-const MARKET_MOVE_SPEED = 190;
-const MARKET_ACCESSIBILITY_STEP = 58;
-const MARKET_INTERACTION_DISTANCE = 105;
-const MARKET_JOYSTICK_RADIUS = 34;
-const MARKET_JOYSTICK_SIZE = 110;
-const MARKET_JOYSTICK_ZONE_HEIGHT = 250;
-const MARKET_PLAYER_START: MarketPoint = { x: 450, y: 860 };
-const MARKET_STATIONS: Record<MarketStationId, MarketPoint> = {
-  checkout: { x: 450, y: 250 },
-  fresh: { x: 350, y: 400 },
-  produce: { x: 550, y: 400 },
-  meal: { x: 350, y: 680 },
-  drink: { x: 550, y: 680 },
-};
-
-const MARKET_SHELVES: Record<MarketCategoryId, { height: number; width: number; x: number; y: number }> = {
-  fresh: { height: 128, width: 220, x: 90, y: 310 },
-  produce: { height: 128, width: 220, x: 590, y: 310 },
-  meal: { height: 128, width: 220, x: 90, y: 590 },
-  drink: { height: 128, width: 220, x: 590, y: 590 },
-};
-
-const MARKET_OBSTACLES = [
-  { height: 105, width: 250, x: 325, y: 92 },
-  ...Object.values(MARKET_SHELVES),
-];
-
-function isMarketBlocked(point: MarketPoint) {
-  return MARKET_OBSTACLES.some(
-    (obstacle) =>
-      point.x + MARKET_PLAYER_RADIUS > obstacle.x &&
-      point.x - MARKET_PLAYER_RADIUS < obstacle.x + obstacle.width &&
-      point.y + MARKET_PLAYER_RADIUS > obstacle.y &&
-      point.y - MARKET_PLAYER_RADIUS < obstacle.y + obstacle.height,
-  );
-}
-
-function clampMarketPoint(point: MarketPoint): MarketPoint {
-  return {
-    x: Math.max(MARKET_PLAYER_RADIUS, Math.min(point.x, MARKET_WORLD_WIDTH - MARKET_PLAYER_RADIUS)),
-    y: Math.max(MARKET_PLAYER_RADIUS, Math.min(point.y, MARKET_WORLD_HEIGHT - MARKET_PLAYER_RADIUS)),
-  };
-}
-
-function findMarketReachableTarget(current: MarketPoint, desired: MarketPoint): MarketPoint {
-  const clamped = clampMarketPoint(desired);
-  for (let step = 12; step >= 0; step -= 1) {
-    const ratio = step / 12;
-    const candidate = {
-      x: current.x + (clamped.x - current.x) * ratio,
-      y: current.y + (clamped.y - current.y) * ratio,
-    };
-    if (!isMarketBlocked(candidate)) return candidate;
+/** Preserve the mission's offered alternatives while using the new shelf layout. */
+function createMissionSession(config: Partial<MarketSessionConfig>, mission?: MarketMission, environment?: MarketEnvironment) {
+  if (!mission) return createMarketSession(config, environment);
+  const missionConfig = { ...config, difficulty: 'exact' as const,
+    objectives: mission.objectives.map(({ productId, quantity }) => ({ productId, quantity, match: 'exact' as const })) };
+  const draft = createMarketSession(missionConfig, environment);
+  const preset = enabledMarketScenarios.find(candidate => candidate.id === mission.scenarioId);
+  const required = new Set([
+    ...mission.objectives.flatMap(objective => [objective.productId, ...(objective.acceptedProductIds ?? [])]),
+    ...(preset?.mandatoryProductIds ?? []), ...(preset?.distractorProductIds ?? []),
+    ...(mission.scene?.products.map(product => product.id) ?? []),
+  ]);
+  const inventoryProductIds = { ...draft.shelfSlots };
+  for (const category of marketCategories) {
+    const mandatory = marketProducts.filter(product => product.categoryId === category.id && required.has(product.id)).map(product => product.id);
+    if (mandatory.length > 12) throw new Error('시나리오 필수 상품이 진열대 용량을 초과했어요.');
+    inventoryProductIds[category.id] = [...mandatory, ...draft.shelfSlots[category.id].filter(id => !required.has(id))].slice(0, 12);
   }
-  return current;
+  return createMarketSession({ ...draft.config, inventoryProductIds }, draft.environment);
 }
 
-const formatPrice = (price: number) => `${price.toLocaleString('ko-KR')}원`;
-
-type MarketSimulationScreenProps = {
+export type MarketStationId = MarketEnvironmentStationId;
+export type MarketInteractionRequest = {
+  id: number;
+  station: MarketStationId | 'give-up';
+};
+export type MarketProductDropDecision = {
+  accepted: boolean;
+  reason?: 'unavailable';
+};
+export function evaluateMarketProductDrop(_cart: MarketCart, productId: string, _mode?: 'practice' | 'challenge'): MarketProductDropDecision {
+  return getMarketProduct(productId) ? { accepted: true } : { accepted: false, reason: 'unavailable' };
+}
+type Point = {
+  x: number;
+  y: number;
+};
+export type MarketTelemetrySink = {
+  movementStopped: (mode: MarketTelemetryControlMode) => void;
+  observeMovement: (point: MarketTelemetryPoint, mode: MarketTelemetryControlMode, blocked?: boolean) => void;
+};
+export type MarketSimulationScreenProps = {
   accessToken?: string | null;
-  embedded?: boolean;
-  interactionRequest?: MarketInteractionRequest | null;
-  onExit: () => void;
-  onLockChange?: (locked: boolean) => void;
-  onMissionComplete?: () => void;
-  onTelemetryReady?: (sink: MarketTelemetrySink | null) => void;
   mission?: MarketMission;
   difficulty?: number;
   simulation?: Omit<BehaviorSimulationContext, 'simulationStarted'>;
+  onTelemetryReady?: (sink: MarketTelemetrySink | null) => void;
+
+  embedded?: boolean;
+  externalMenuOpen?: boolean;
+  hudTopInset?: number;
+  controlMode?: MarketHudControlMode;
+  onControlModeChange?: (mode: MarketHudControlMode) => void;
+  interactionRequest?: MarketInteractionRequest | null;
+  environment?: MarketEnvironment;
+  initialConfig?: Partial<MarketSessionConfig>;
+  playerPositionRef?: { current: Point; };
+  playerMovementListenerRef?: { current: ((previous: Point, next: Point) => void) | null; };
+  onEnvironmentChange?: (environment: MarketEnvironment) => void;
+  onCashierCalled?: (availability: MarketCashierAvailability) => void;
+  onEpisodeComplete?: (episode: ReturnType<typeof exportMarketEpisode>) => void;
+  onExit: () => void;
+  onLockChange?: (locked: boolean) => void;
+  onMissionComplete?: () => void;
 };
+const price = (value: number) => value.toLocaleString('ko-KR') + '원';
 
-const SceneProducts = createContext(marketProducts);
-
-export function MarketSimulationScreen(props: MarketSimulationScreenProps) {
-  const mission = useMemo(() => props.mission?.scene ? restoreMarketScene(props.mission.scene)
-    : restoreMarketScene(createMarketScene(props.mission ?? marketMission, Math.floor(Math.random() * 0x100000000), props.simulation?.questInstanceId)),
-    [props.mission, props.simulation?.questInstanceId]);
-  return <SceneProducts.Provider value={mission.scene!.products}><MarketSimulationContent {...props} mission={mission} /></SceneProducts.Provider>;
-}
-
-function MarketSimulationContent({
-  accessToken = null,
+export function MarketSimulationScreen({
+  accessToken = null, mission, difficulty = 2, simulation, onTelemetryReady,
   embedded = false,
+  externalMenuOpen = false,
+  hudTopInset,
+  controlMode,
+  onControlModeChange,
   interactionRequest = null,
-  mission = marketMission,
-  difficulty = 2,
-  simulation,
+  environment,
+  initialConfig,
+  playerPositionRef,
+  playerMovementListenerRef,
+  onEnvironmentChange,
+  onCashierCalled,
+  onEpisodeComplete,
   onExit,
   onLockChange,
-  onMissionComplete,
-  onTelemetryReady,
+  onMissionComplete
 }: MarketSimulationScreenProps) {
-  const sceneProducts = useContext(SceneProducts);
-  const getMarketProduct = (id: string) => sceneProducts.find(p => p.id === id);
-  const [review, setReview] = useState('');
+  const insets = useContext(SafeAreaInsetsContext);
+  const [session, setSession] = useState(() => createMissionSession({
+    seed: environment?.seed ?? 'market-' + Date.now(),
+    ...initialConfig,
+    startedAt: new Date().toISOString()
+  }, mission, environment));
+  // Missions from the application always use AI assessment. The standalone marketLab
+  // keeps the incoming deterministic research preview, never used as an AI verdict.
+  const aiAssessment = !!mission;
+  const [review, setReview] = useState<string | null>(null);
   const reviewing = useRef(false);
   const mounted = useRef(true);
-  useEffect(() => () => { mounted.current = false; }, []);
-  const [phase, setPhase] = useState<MarketPhase>('briefing');
-  const [briefingIndex, setBriefingIndex] = useState(0);
-  const [activeCategory, setActiveCategory] = useState<MarketCategoryId | null>(null);
-  const [cart, setCart] = useState<MarketCart>({});
-  const [cartOpen, setCartOpen] = useState(false);
-  const [evaluation, setEvaluation] = useState<MarketEvaluation | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
-  const [nearbyStation, setNearbyStation] = useState<MarketStationId | null>(null);
-  const behaviorTracker = useRef<MarketBehaviorTracker | null>(null);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  const tracker = useRef<MarketBehaviorTracker | null>(null);
+  const shelfOpenedAt = useRef(Date.now());
+  const cartOpenedAt = useRef(Date.now());
   const briefingShownAt = useRef(Date.now());
-  const cartOpenedAt = useRef<number | null>(null);
-  const cartRef = useRef<MarketCart>({});
-  const noticeOpacity = useRef(new Animated.Value(0)).current;
-  const handledInteractionId = useRef<number | null>(null);
-  const shelfOpenedAt = useRef<number | null>(null);
-
+  const live = useRef(session);
+  live.current = session;
+  const trackedMission = useMemo<MarketMission>(() => {
+    const original = mission ?? marketMission;
+    const { scene: ignored, ...base } = original;
+    const products = Object.values(session.shelfSlots).flat().map(id => ({ ...getMarketProduct(id)!, initialStock: session.initialStock[id] }));
+    return { ...base, objectives: mission?.objectives ?? session.config.objectives, scene: {
+      schemaVersion: 'market-scene-v1', questInstanceId: simulation?.questInstanceId ?? session.id,
+      seed: session.config.seed,
+      layoutVersion: 'market-retail-layout-v3', catalogVersion: base.catalogVersion ?? MARKET_CATALOG_VERSION,
+      scenarioVersion: base.scenarioVersion ?? MARKET_SCENARIO_VERSION, mission: { ...base, objectives: mission?.objectives ?? session.config.objectives }, products,
+      slots: Object.entries(session.shelfSlots).flatMap(([stationId, ids]) => ids.map((productId, index) => ({ slotId: stationId+'-'+index, stationId, productId, storage: getMarketProduct(productId)!.storage }))),
+      startingConditions: { cart: {}, player: session.environment.spawn, supportOptions: ['목록 다시 보기','직원 도움','거절/중단'],
+        geometry: JSON.stringify(session.environment), exposureMeaning: '진열 목록과 실제 배치이며 열람·이해를 뜻하지 않는다.' },
+    } };
+  }, [session.id, mission, simulation?.questInstanceId]);
   useEffect(() => {
     if (!accessToken) return;
-    const tracker = new MarketBehaviorTracker(accessToken, mission, difficulty, simulation);
-    behaviorTracker.current = tracker;
-    void tracker.flushNow().catch(() => undefined);
-    return () => {
-      void tracker.abort(cartRef.current);
-      behaviorTracker.current = null;
-    };
-  }, [accessToken, difficulty, mission, simulation]);
-
+    const current = new MarketBehaviorTracker(accessToken, trackedMission, difficulty, simulation, session.environment.stations);
+    tracker.current = current;
+    void current.flushNow().catch(() => undefined);
+    return () => { void current.abort(live.current.cart).catch(() => undefined); tracker.current = null; };
+  }, [accessToken, trackedMission, difficulty, simulation]);
   useEffect(() => {
-    if (!onTelemetryReady) return;
-    const sink: MarketTelemetrySink = {
-      movementStopped: (controlMode) => behaviorTracker.current?.movementStopped(controlMode),
-      observeMovement: (point, controlMode, blocked) => behaviorTracker.current?.observeMovement({
-        blocked,
-        controlMode,
-        point,
-        targetZoneIds: new Set(),
-      }),
-    };
-    onTelemetryReady(sink);
-    return () => onTelemetryReady(null);
-  }, [onTelemetryReady]);
-
-  useEffect(() => {
-    const subscription = AppState.addEventListener('change', (nextState) => {
-      if (nextState === 'active') behaviorTracker.current?.appForegrounded();
-      else behaviorTracker.current?.appBackgrounded();
-    });
+    const subscription = AppState.addEventListener('change', state => state === 'active' ? tracker.current?.appForegrounded() : tracker.current?.appBackgrounded());
     return () => subscription.remove();
   }, []);
-
-  const total = getMarketCartTotal(cart, sceneProducts);
-  const cartCount = Object.values(cart).reduce((sum, quantity) => sum + quantity, 0);
-  const remainingBudget = mission.budget - total;
-  const aiGenerated = simulation?.contentSource === 'GENERATED';
-
-  const objectiveProgress = useMemo(
-    () => mission.objectives.map((objective) => ({
-      ...objective,
-      product: getMarketProduct(objective.productId),
-      current: getObjectiveQuantity(cart, objective),
-    })),
-    [cart, mission],
-  );
-
-  const showNotice = (message: string) => {
-    setNotice(message);
-    noticeOpacity.stopAnimation();
-    noticeOpacity.setValue(0);
-    Animated.sequence([
-      Animated.timing(noticeOpacity, { duration: 160, toValue: 1, useNativeDriver: true }),
-      Animated.delay(1000),
-      Animated.timing(noticeOpacity, { duration: 180, toValue: 0, useNativeDriver: true }),
-    ]).start(({ finished }) => {
-      if (finished) setNotice(null);
-    });
-  };
-
-  const changeQuantity = (productId: string, change: number) => {
-    setCart((current) => {
-      const currentQuantity = getCartQuantity(current, productId);
-      const nextQuantity = Math.max(0, Math.min(getMarketProduct(productId)?.initialStock ?? 0, currentQuantity + change));
-      if (nextQuantity === currentQuantity) return current;
-      const next = { ...current };
-      if (nextQuantity === 0) delete next[productId];
-      else next[productId] = nextQuantity;
-      cartRef.current = next;
-      behaviorTracker.current?.updateCart(next);
-      behaviorTracker.current?.quantityChanged(productId, currentQuantity, nextQuantity, next);
-      return next;
-    });
-    const product = getMarketProduct(productId);
-    if (change > 0 && product) showNotice(`${product.name}을 담았어요`);
-  };
-
-  const continueBriefing = () => {
-    behaviorTracker.current?.briefingAdvanced(
-      briefingIndex,
-      Math.max(0, Date.now() - briefingShownAt.current),
-    );
-    briefingShownAt.current = Date.now();
-    if (briefingIndex < mission.briefing.length - 1) {
-      setBriefingIndex((index) => index + 1);
-      return;
+  useEffect(() => {
+    onTelemetryReady?.({ movementStopped: mode => tracker.current?.movementStopped(mode), observeMovement: (point, mode, blocked) => tracker.current?.observeMovement({ point, controlMode: mode, blocked, targetZoneIds: new Set() }) });
+    return () => onTelemetryReady?.(null);
+  }, [onTelemetryReady]);
+  const localPosition = useRef(session.environment.spawn);
+  const [briefing, setBriefing] = useState(true),
+    [briefingStep, setBriefingStep] = useState(0);
+  const [settings, setSettings] = useState(false),
+    [cartOpen, setCartOpen] = useState(false),
+    [helpOpen, setHelpOpen] = useState(false);
+  const [nearby, setNearby] = useState<MarketStationId | null>(null);
+  const [difficultyRating, setDifficultyRating] = useState(0),
+    [interestRating, setInterestRating] = useState(0);
+  const [exportMessage, setExportMessage] = useState(''),
+    [staffMessage, setStaffMessage] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [staffReturnHelp, setStaffReturnHelp] = useState(false);
+  const [staffResponse, setStaffResponse] = useState('');
+  const [alarmNotice, setAlarmNotice] = useState<number | null>(null);
+  const [panelPresent, setPanelPresent] = useState(true);
+  const handled = useRef<number | null>(null),
+    completed = useRef(false),
+    emitted = useRef(false);
+  const position = playerPositionRef ?? localPosition;
+  const shelf = marketCategories.find(category => category.id === session.activeStation);
+  const panelVisible = review !== null || briefing || settings || historyOpen || session.phase !== 'shopping' || cartOpen || helpOpen || staffMessage;
+  const locked = panelVisible || panelPresent || !!shelf;
+  const dispatch = useCallback((action: MarketAction, sync = false) => {
+    let current = live.current;
+    const at = new Date().toISOString();
+    if (sync) current = applyMarketAction(current, { type: 'setPosition', point: { ...position.current }, at });
+    const next = applyMarketAction(current, { ...action, at });
+    if (!next.lastActionError) {
+      const logger = tracker.current;
+      if (action.type === 'add' || action.type === 'remove' || action.type === 'requestReturn') {
+        logger?.updateCart(next.cart);
+        logger?.quantityChanged(action.productId, current.cart[action.productId] ?? 0, next.cart[action.productId] ?? 0, next.cart);
+      }
+      if (next.activeStation !== current.activeStation) {
+        if (marketCategories.some(c => c.id === current.activeStation)) logger?.shelfClosed(current.activeStation as MarketCategoryId, next.cart, shelfOpenedAt.current);
+        if (marketCategories.some(c => c.id === next.activeStation)) { shelfOpenedAt.current = Date.now(); logger?.shelfOpened(next.activeStation as MarketCategoryId); }
+      }
+      if (next.phase === 'checkout' && current.phase !== 'checkout') logger?.checkoutEntered(next.cart);
+      if (action.type === 'viewCart') { cartOpenedAt.current=Date.now(); logger?.cartOpened(next.cart); }
+      if (action.type === 'closeView' && current.view === 'cart') logger?.cartClosed(next.cart, Date.now()-cartOpenedAt.current);
+      if (action.type === 'retry') logger?.correctionStarted(next.cart);
+      if (action.type === 'viewHelp' || action.type === 'requestReturn' || action.type === 'requestCashier' || (action.type === 'interact' && action.station.startsWith('staff:'))) logger?.track({ eventCode:'SHOP.STAFF_HELP_REQUESTED', microActionId:action.type.toUpperCase(), payload:{marketContent:{action}} });
     }
-    setPhase('shopping');
-  };
-
-  const goToCheckout = () => {
-    behaviorTracker.current?.checkoutEntered(cartRef.current);
+    live.current = next;
+    setSession(next);
+    return next;
+  }, [position]);
+  const syncMovementSegment = useCallback((previous: Point, next: Point) => {
+    if (briefing || live.current.phase !== 'shopping') return;
+    if (!embedded) tracker.current?.observeMovement({point:next, controlMode:controlMode ?? 'joystick', targetZoneIds:new Set()});
+    const env = live.current.environment;
+    const gates = env.alarmGates ?? [{ axis: 'y' as const, boundary: env.entrance.alarmBoundaryY, rearm: env.entrance.rearmY }];
+    const crossesGate = gates.some(gate => {
+      const from = previous[gate.axis], to = next[gate.axis];
+      return from !== to && [gate.boundary, gate.rearm].some(line =>
+        Math.min(from, to) <= line && Math.max(from, to) >= line);
+    });
+    if (!crossesGate) return;
+    // Keep both ends of a gate crossing even when an out-and-back trip falls between log samples.
+    dispatch({ type: 'setPosition', point: { ...previous } });
+    dispatch({ type: 'setPosition', point: { ...next } });
+  }, [briefing, dispatch]);
+  useEffect(() => {
+    if (!playerMovementListenerRef) return;
+    playerMovementListenerRef.current = syncMovementSegment;
+    return () => { playerMovementListenerRef.current = null; };
+  }, [playerMovementListenerRef, syncMovementSegment]);
+  const giveUp = useCallback(() => {
+    setBriefing(false);
+    setSettings(false);
+    setHistoryOpen(false);
     setCartOpen(false);
-    setActiveCategory(null);
-    setEvaluation(null);
-    setPhase('checkout');
-  };
-
-  const openShelf = (station: MarketCategoryId) => {
-    shelfOpenedAt.current = Date.now();
-    behaviorTracker.current?.shelfOpened(station);
-    setActiveCategory(station);
-  };
-
-  const closeShelf = () => {
-    if (activeCategory) {
-      behaviorTracker.current?.shelfClosed(
-        activeCategory,
-        cartRef.current,
-        shelfOpenedAt.current ?? Date.now(),
-      );
+    setHelpOpen(false);
+    setStaffMessage(false);
+    setStaffReturnHelp(false);
+    setStaffResponse('');
+    dispatch({ type: 'giveUp' }, live.current.phase === 'shopping');
+  }, [dispatch]);
+  const interact = useCallback((station: MarketStationId) => {
+    if (externalMenuOpen) return;
+    const next = dispatch({ type: 'interact', station }, true);
+    if (station.startsWith('staff:') && !next.lastActionError) {
+      setStaffMessage(true);
+      setStaffReturnHelp(false);
+      setStaffResponse('');
     }
-    shelfOpenedAt.current = null;
-    setActiveCategory(null);
-  };
-
-  const useNearbyStation = () => {
-    if (!nearbyStation) return;
-    if (nearbyStation === 'checkout') {
-      if (cartCount === 0) {
-        showNotice('가방이 비어 있어요');
-        return;
-      }
-      goToCheckout();
+    setCartOpen(false);
+    setHelpOpen(false);
+  }, [dispatch, giveUp, externalMenuOpen]);
+  useEffect(() => {
+    if (!interactionRequest || handled.current === interactionRequest.id || session.phase === 'finished') return;
+    if (externalMenuOpen && interactionRequest.station !== 'give-up') {
+      handled.current = interactionRequest.id;
       return;
     }
-    openShelf(nearbyStation);
-  };
-
+    if (interactionRequest.station !== 'give-up' && (briefing || session.phase !== 'shopping')) return;
+    handled.current = interactionRequest.id;
+    if (interactionRequest.station === 'give-up') giveUp();
+    else interact(interactionRequest.station);
+  }, [briefing, interactionRequest, interact, giveUp, session.phase, externalMenuOpen]);
   useEffect(() => {
-    if (!embedded || !interactionRequest || phase !== 'shopping') return;
-    if (handledInteractionId.current === interactionRequest.id) return;
-    handledInteractionId.current = interactionRequest.id;
-    if (interactionRequest.station === 'checkout') {
-      if (cartCount === 0) {
-        showNotice('장바구니가 비어 있어요');
-        return;
-      }
-      goToCheckout();
-      return;
+    onLockChange?.(locked);
+  }, [locked, onLockChange]);
+  useEffect(() => () => onLockChange?.(false), [onLockChange]);
+  useEffect(() => {
+    if (session.environment.checkouts.some(counter => session.cashierAvailability[counter.id] && !counter.cashierPresent)) {
+      onCashierCalled?.({ ...session.cashierAvailability });
     }
-    openShelf(interactionRequest.station);
-  }, [cartCount, embedded, interactionRequest, phase]);
-
+  }, [session.cashierAvailability.checkout, session.cashierAvailability['checkout-2'], onCashierCalled]);
   useEffect(() => {
-    if (!embedded || !onLockChange) return;
-    onLockChange(phase !== 'shopping' || activeCategory !== null || cartOpen);
-  }, [activeCategory, cartOpen, embedded, onLockChange, phase]);
-
-  const checkCart = async () => {
+    if (!session.alarmCount) return;
+    const alarm = [...live.current.events].reverse().find(event => event.type === 'entrance_alarm');
+    setAlarmNotice(Math.abs(Number(alarm?.payload.delta ?? 0)));
+    const timer = setTimeout(() => setAlarmNotice(null), 4500);
+    return () => clearTimeout(timer);
+  }, [session.alarmCount]);
+  useEffect(() => {
+    if (!aiAssessment && session.outcome === 'success' && !completed.current) {
+      completed.current = true;
+      onMissionComplete?.();
+    }
+  }, [session.outcome, onMissionComplete]);
+  useEffect(() => {
+    if (session.phase !== 'finished') return;
+    const saved = saveMarketEpisode(exportMarketEpisode(session));
+    setExportMessage(saved.persisted ? '이 브라우저에 기록을 저장했어요. 시작 화면에서 다시 내보낼 수 있어요.' : '앱을 닫기 전에 게임 기록 저장을 눌러 보관해 주세요.');
+  }, [session.outcome, session.ratings, session.ratingSkipped]);
+  useEffect(() => {
+    if (briefing || session.phase === 'finished') return;
+    const timer = setInterval(() => {
+      const old = live.current.playerPosition,
+        point = position.current;
+      if (Math.hypot(old.x - point.x, old.y - point.y) >= 3) dispatch({ type: 'setPosition', point: { ...point } });
+    }, 500);
+    return () => clearInterval(timer);
+  }, [briefing, session.phase, dispatch, position]);
+  useEffect(() => {
+    const back = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (externalMenuOpen) return false;
+      if (panelPresent && !panelVisible) return true;
+      if (historyOpen) {
+        setHistoryOpen(false);
+        return true;
+      }
+      if (shelf) return false;
+      if (settings) setSettings(false);
+      else if (cartOpen) {
+        dispatch({ type: 'closeView' });
+        setCartOpen(false);
+      } else if (helpOpen) {
+        dispatch({ type: 'closeView' });
+        setHelpOpen(false);
+      } else if (staffMessage) {
+        setStaffResponse('');
+        if (staffReturnHelp) setStaffReturnHelp(false);
+        else {
+          dispatch({ type: 'closeStation' });
+          setStaffMessage(false);
+          setStaffReturnHelp(false);
+        }
+      }
+      else if (session.phase !== 'finished') giveUp();
+      else return false;
+      return true;
+    });
+    return () => back.remove();
+  }, [shelf, settings, historyOpen, cartOpen, helpOpen, staffMessage, staffReturnHelp, session.phase, giveUp, dispatch, panelPresent, panelVisible, externalMenuOpen]);
+  const configure = (config: Partial<MarketSessionConfig>) => {
+    const next = createMissionSession({ ...config, startedAt: new Date().toISOString() }, mission);
+    live.current = next;
+    setSession(next);
+    localPosition.current = next.environment.spawn;
+    onEnvironmentChange?.(next.environment);
+    setSettings(false);
+    setBriefingStep(0);
+  };
+  const submitForReview = async () => {
+    if (!aiAssessment) { dispatch({ type: 'submit' }); return; }
     if (reviewing.current) return;
     reviewing.current = true;
-    setPhase('result');
     setReview('기록을 전송하고 AI가 검토하고 있어요.');
-    const tracker = behaviorTracker.current;
     try {
-      if (!tracker || !accessToken) throw new Error('로그인 후 AI 검토를 사용할 수 있어요.');
-      tracker.checkoutSubmitted(cart);
-      await tracker.flushConfirmed();
-      await startSessionAnalysisJob(accessToken, tracker.sessionId);
+      const current = tracker.current;
+      if (!current || !accessToken) throw new Error('로그인 후 AI 검토를 사용할 수 있어요.');
+      current.checkoutSubmitted(live.current.cart);
+      await current.flushConfirmed();
+      await startSessionAnalysisJob(accessToken, current.sessionId);
       if (mounted.current) setReview('분석을 접수했어요. 다른 화면으로 이동해도 계속 진행됩니다. 분석 탭에서 진행 상태와 결과를 확인해 주세요.');
-    } catch (error) {
-      if (mounted.current) setReview(error instanceof Error ? error.message : '검토를 완료하지 못했어요. 판단 보류 상태예요.');
-    } finally { reviewing.current = false; }
+    } catch (error) { if (mounted.current) setReview(error instanceof Error ? error.message : '검토를 접수하지 못했어요.'); }
+    finally { reviewing.current = false; }
   };
-
-  const retryShopping = () => {
-    behaviorTracker.current?.correctionStarted(cartRef.current);
-    setEvaluation(null);
-    setPhase('shopping');
+  const leave = () => { if (!tracker.current) { onExit(); return; } void tracker.current.abort(live.current.cart).catch(() => undefined).finally(onExit); };
+  const selectDifficulty = (difficulty: 'family' | 'exact') => configure({
+    ...session.config,
+    difficulty,
+    objectives: session.config.objectives.map(({ productId, quantity }) => ({ productId, quantity }))
+  });
+  const start = () => {
+    if (aiAssessment) { setBriefing(false); return; }
+    const next = createMarketSession({ ...session.config, startedAt: new Date().toISOString() }, session.environment);
+    live.current = next;
+    setSession(next);
+    setBriefing(false);
   };
-
-  const exitMarket = () => {
-    const tracker = behaviorTracker.current;
-    if (!tracker) {
-      onExit();
-      return;
+  const finishRating = (rate: boolean) => {
+    const next = rate
+      ? dispatch({ type: 'rate', difficulty: difficultyRating, interest: interestRating })
+      : dispatch({ type: 'skipRating' });
+    if (next.lastActionError) return;
+    if (!emitted.current) {
+      emitted.current = true;
+      onEpisodeComplete?.(exportMarketEpisode(next));
     }
-    void tracker.abort(cartRef.current).catch(() => undefined).finally(onExit);
   };
-
-  const openCart = () => {
-    cartOpenedAt.current = Date.now();
-    behaviorTracker.current?.cartOpened(cartRef.current);
-    setCartOpen(true);
+  const exportData = async (episode: MarketStoredEpisode = exportMarketEpisode(live.current)) => {
+    const json = JSON.stringify(episode, null, 2);
+    if (Platform.OS === 'web') {
+      const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = episode.sessionId + '.json';
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setExportMessage('게임 기록을 JSON 파일로 저장했어요.');
+    } else {
+      await Share.share({ title: '장보기 게임 기록', message: json });
+      setExportMessage('공유 창에서 기록을 저장할 수 있어요.');
+    }
   };
-
-  const closeCart = () => {
-    behaviorTracker.current?.cartClosed(
-      cartRef.current,
-      Math.max(0, Date.now() - (cartOpenedAt.current ?? Date.now())),
-    );
-    cartOpenedAt.current = null;
-    setCartOpen(false);
+  const closeStation = () => {
+    dispatch({ type: 'closeStation' });
+    setStaffMessage(false);
+    setStaffReturnHelp(false);
+    setStaffResponse('');
   };
+  const requestProductReturn = (productId: string, quantity: number) => {
+    const next = dispatch({ type: 'requestReturn', productId, quantity }, true);
+    if (!next.lastActionError) setStaffResponse(`${getMarketProduct(productId)?.name} ${quantity}개를 제자리에 놓아드렸어요.`);
+  };
+  const cartCount = Object.values(session.cart).reduce((a, b) => a + b, 0);
+  const isFinished = session.phase === 'finished',
+    ratingDone = !!session.ratings || session.ratingSkipped;
+  const panelKey = review !== null ? 'ai-review' : settings ? 'settings' : historyOpen ? 'history' : briefing ? 'briefing-' + briefingStep
+    : cartOpen ? 'cart' : helpOpen ? 'help' : staffMessage ? 'staff-' + staffReturnHelp
+      : isFinished ? 'finished-' + ratingDone : session.phase + '-' + session.attempts;
+  const modal = (
+    title: string,
+    children: React.ReactNode,
+    eyebrow?: string,
+    onClose?: () => void
+  ) =>
+    <ModalCard
+      title={title}
+      eyebrow={eyebrow}
+      onClose={onClose}
+    >
+      {children}
+    </ModalCard>;
+  const quit = <Button
+    text="그만두기"
+    label="장보기 포기"
+    quiet
+    onPress={giveUp}
+  />;
 
-  return (
-    <View pointerEvents={embedded ? 'box-none' : 'auto'} style={embedded ? styles.embeddedRoot : styles.root}>
-      {!embedded ? <StatusBar style="dark" /> : null}
-
-      {!embedded ? <MarketTopBar
-        cartCount={cartCount}
-        objectiveProgress={objectiveProgress}
-        onExit={exitMarket}
-        remainingBudget={remainingBudget}
-      /> : null}
-
-      {!embedded && (phase === 'shopping' || phase === 'briefing') ? (
-        <MarketMap
-          interactive={phase === 'shopping' && activeCategory === null && !cartOpen}
-          nearbyStation={nearbyStation}
-          onNearbyStationChange={setNearbyStation}
-          onMovementSample={(point, controlMode, blocked) => behaviorTracker.current?.observeMovement({
-            blocked,
-            controlMode,
-            point,
-            targetZoneIds: new Set(),
-          })}
-          onMovementStopped={(controlMode) => behaviorTracker.current?.movementStopped(controlMode)}
+  return <View pointerEvents={embedded ? 'box-none' : 'auto'} style={embedded ? s.embeddedRoot : s.root}>
+    {!embedded
+      ? <MarketMap
+        key={JSON.stringify(session.environment.config)}
+        environment={session.environment}
+        cashierCalled={session.cashierAvailability}
+        hintedStation={null}
+        interactive={!locked && !externalMenuOpen}
+        nearbyStation={nearby}
+        onNearbyStationChange={setNearby}
+        onPositionChange={point => {
+          const previous = localPosition.current;
+          localPosition.current = point;
+          syncMovementSegment(previous, point);
+        }}
+      />
+      : null}
+    {!externalMenuOpen && !briefing && session.phase === 'shopping' && !shelf && !cartOpen && !helpOpen && !staffMessage
+      ? <MarketHud
+        objectives={session.objectives}
+        score={aiAssessment ? undefined : session.score}
+        topInset={hudTopInset ?? (embedded ? Math.max(112, (insets?.top ?? 0) + 64) : Math.max(12, insets?.top ?? 0))}
+        controlMode={embedded ? undefined : controlMode}
+        onControlModeChange={embedded ? undefined : onControlModeChange}
+        onGiveUp={giveUp}
+        onOpenHelp={() => {
+          dispatch({ type: 'viewHelp' });
+          setHelpOpen(true);
+        }}
+        onOpenCart={() => {
+          dispatch({ type: 'viewCart' });
+          setCartOpen(true);
+        }}
+      />
+      : null}
+    {!embedded && !externalMenuOpen && !locked && nearby
+      ? <View style={s.stationAction}>
+        <Button
+          text={nearby === 'checkout' || nearby === 'checkout-2'
+            ? '계산대 살펴보기'
+            : nearby === 'common-door' ? '마을로 나가기' : nearby.startsWith('staff:') ? '직원에게 말 걸기' : '진열대 살펴보기'}
+          onPress={() => interact(nearby)}
         />
-      ) : !embedded ? (
-        <CheckoutScene cart={cart} mission={mission} />
-      ) : null}
-
-      {phase === 'shopping' ? (
-        <View
-          pointerEvents="box-none"
-          style={[styles.shoppingFooter, embedded && styles.embeddedShoppingFooter]}
-        >
-          <View
-            accessibilityLabel={`오늘의 목록, ${objectiveProgress
-              .map(({ current, product, quantity, label }) => `${label ?? `${product?.name} ${product?.detail}`} ${current}/${quantity}`)
-              .join(', ')}`}
-            accessible
-            style={styles.missionStrip}
-          >
-            <View pointerEvents="none" style={styles.missionTape} />
-            <View style={styles.missionStripHeading}>
-              <Ionicons color="#9A8061" name="create-outline" size={11} />
-              <Text style={styles.missionStripLabel}>
-                {aiGenerated ? 'AI 생성 퀘스트 · 오늘의 목록' : '오늘의 목록'}
-              </Text>
-            </View>
-            <View style={styles.missionChecklist}>
-              {objectiveProgress.map(({ current, product, productId, quantity, label }) => {
-                const completed = current >= quantity;
-                return (
-                  <View key={productId} style={styles.missionChecklistItem}>
-                    <View style={styles.missionItemHeading}>
-                      <View style={[styles.missionCheckbox, completed && styles.missionCheckboxComplete]}>
-                        {completed ? <Ionicons color="#FFFFFF" name="checkmark" size={8} /> : null}
-                      </View>
-                      <Text
-                        ellipsizeMode="tail"
-                        numberOfLines={1}
-                        style={[styles.missionItemName, completed && styles.missionItemNameComplete]}
-                      >
-                        {label ?? `${product?.name ?? '물건'} ${product?.detail ?? ''}`}
-                      </Text>
-                    </View>
-                    <Text style={[styles.missionItemCount, completed && styles.missionItemCountComplete]}>
-                      {current}/{quantity} {product?.salesUnit}
-                    </Text>
-                  </View>
-                );
-              })}
-            </View>
-          </View>
-          <PressScale
-            accessibilityLabel={`장바구니 ${cartCount}개`}
-            accessibilityRole="button"
-            onPress={openCart}
-            style={styles.cartButton}
-          >
-            <Ionicons color={colors.white} name="basket" size={24} />
-            <Text style={styles.cartButtonText}>가방</Text>
-            <View style={styles.cartCountBadge}>
-              <Text style={styles.cartCountText}>{cartCount}</Text>
-            </View>
-          </PressScale>
-        </View>
-      ) : null}
-
-      {!embedded && phase === 'shopping' && nearbyStation ? (
-        <PressScale
-          accessibilityLabel={
-            nearbyStation === 'checkout'
-              ? '계산대에서 계산하기'
-              : `${marketCategories.find((category) => category.id === nearbyStation)?.label} 살펴보기`
-          }
-          accessibilityRole="button"
-          onPress={useNearbyStation}
-          scaleTo={0.94}
-          style={styles.stationActionButton}
-        >
-          <Ionicons
-            color="#FFF8E8"
-            name={nearbyStation === 'checkout' ? 'card-outline' : 'search'}
-            size={23}
+      </View>
+      : null}
+    {shelf && !briefing && session.phase === 'shopping'
+      ? <MarketShelfScene
+        category={shelf}
+        cart={session.cart}
+        slots={session.shelfSlots[shelf.id]}
+        stock={session.initialStock}
+        onChangeQuantity={(productId, change) => dispatch({ type: change > 0 ? 'add' : 'remove', productId })}
+        onDropProduct={productId => !dispatch({ type: 'add', productId }).lastActionError}
+        onClose={closeStation}
+        onGiveUp={giveUp}
+        onCartVisibilityChange={open => dispatch({ type: open ? 'viewCart' : 'closeView' })}
+      />
+      : null}
+    <MarketPanelTransition visible={panelVisible} transitionKey={panelKey} onPresenceChange={setPanelPresent}>
+    {review !== null ? modal('AI 수행 검토', <><Text style={s.body}>{review}</Text><Button text="마을로 돌아가기" onPress={leave} /></>) : null}
+    {review === null && briefing && !settings && !historyOpen
+      ? modal('마트에서 장보기', <>
+        <Text style={s.body}>
+          {briefingStep === 0
+            ? mission?.description ?? '목록을 보고 필요한 물건을 골라 보세요. 물건의 이름과 종류를 천천히 살펴봐요.'
+            : aiAssessment ? '다 골랐다면 계산대로 가서 AI 검토를 요청해 주세요. 언제든 그만둘 수 있어요.' : `다 골랐다면 출구 옆 계산대로 가요. 계산하지 않은 물건을 담고 입구·출구·측면 출입문의 빨간 경보기를 지나 매장 밖으로 나가면 ${session.config.alarmPenaltyPoints}점이 줄어요. 원하면 다시 해보거나 언제든 그만둘 수 있어요.`}
+        </Text>
+        {!aiAssessment && <View style={s.choices}>
+          <Button
+            text="연습 모드"
+            selected={session.config.difficulty === 'family'}
+            quiet
+            onPress={() => selectDifficulty('family')}
           />
-          <Text style={styles.stationActionText}>
-            {nearbyStation === 'checkout' ? '계산하기' : '살펴보기'}
+          <Button
+            text="도전 모드"
+            selected={session.config.difficulty === 'exact'}
+            quiet
+            onPress={() => selectDifficulty('exact')}
+          />
+        </View>}
+        <Text style={s.small}>
+          {aiAssessment ? '목록의 규격과 수량을 살펴보세요. 수행 판단은 AI가 검토합니다.' : session.config.difficulty === 'family'
+            ? '종류가 같으면 괜찮아요. 예: 우유는 맛과 지방 함량에 관계없이 골라요.'
+            : '목록에 적힌 상품을 정확히 골라요. 예: 저지방 우유는 저지방 우유만 골라요.'}
+        </Text>
+        <View style={s.requirements}>
+          {session.objectives.map(o => <View key={o.id} style={s.row}>
+            <Text style={s.body}>
+              {o.label}
+            </Text>
+            <Text style={s.quantity}>{o.quantity}개</Text>
+          </View>)}
+        </View>
+        <Button
+          text={briefingStep === 0 ? '다음' : '장보기 시작'}
+          onPress={() => { tracker.current?.briefingAdvanced(briefingStep, Date.now()-briefingShownAt.current); briefingShownAt.current=Date.now(); briefingStep === 0 ? setBriefingStep(1) : start(); }}
+        />
+        <Button
+          text="연습 환경 설정"
+          quiet
+          onPress={() => setSettings(true)}
+        />
+        <Button
+          text="이전 게임 기록"
+          quiet
+          onPress={() => setHistoryOpen(true)}
+        />
+        {quit}
+      </>, '오늘도 · 생활 연습')
+      : null}
+    {settings
+      ? <MarketSetupPanel
+        config={session.config}
+        onApply={configure}
+        onClose={() => setSettings(false)}
+      />
+      : null}
+    {historyOpen
+      ? modal('이전 게임 기록', <>
+        <Text style={s.small}>이 브라우저의 최근 20회 기록을 보관합니다. 네이티브 앱에서는 앱을 실행한 동안의 기록이며, JSON 공유로 따로 저장할 수 있어요.</Text>
+        {listMarketEpisodes().map(episode => <View key={episode.sessionId} style={s.requirements}>
+          <Text style={s.body}>{episode.outcome === 'success' ? '성공' : '실패 (포기)'} · {episode.attempts}회 시도</Text>
+          <Text style={s.small}>{episode.config.startedAt} · 시드 {String(episode.seed)}</Text>
+          <Button
+            text="기록 JSON 저장"
+            quiet
+            onPress={() => {
+              void exportData(episode).catch(() => setExportMessage('저장하지 못했어요. 다시 눌러 주세요.'));
+            }}
+          />
+        </View>)}
+        {!listMarketEpisodes().length
+          ? <Text style={s.body}>아직 저장된 기록이 없어요.</Text>
+          : null}
+        {exportMessage
+          ? <Text accessibilityLiveRegion="polite" style={s.small}>
+            {exportMessage}
           </Text>
-        </PressScale>
-      ) : null}
-
-      {phase === 'briefing' ? (
-        <NpcDialogueCard
-          aiGenerated={aiGenerated}
-          buttonLabel={briefingIndex === mission.briefing.length - 1 ? '장보기 시작' : '다음'}
-          message={mission.briefing[briefingIndex]}
-          onContinue={continueBriefing}
-          progress={`${briefingIndex + 1}/${mission.briefing.length}`}
+          : null}
+        <Button text="시작 화면으로" onPress={() => setHistoryOpen(false)} />
+      </>, undefined, () => setHistoryOpen(false))
+      : null}
+    {cartOpen && !isFinished
+      ? modal('장바구니', <>
+        <CartContents cart={session.cart} showReturnLocation />
+        <Text style={s.body}>담은 물건 {cartCount}개</Text>
+        <Text style={s.small}>물건을 내려놓으려면 그 물건의 진열대로 돌아가요. 어렵다면 매장 종업원에게 도움을 청할 수 있어요.</Text>
+        <Button text="계속 고르기" onPress={() => {
+          dispatch({ type: 'closeView' });
+          setCartOpen(false);
+        }} />
+      </>, '내가 담은 물품', () => {
+        dispatch({ type: 'closeView' });
+        setCartOpen(false);
+      })
+      : null}
+    {helpOpen
+      ? modal('이렇게 이용해요', <>
+        <Text style={s.body}>1. 사야 할 물품과 개수를 읽어요.{'\n\n'}2. 진열대 가까이 가서 물건을 살펴봐요.{'\n\n'}3. 장바구니를 눌러 담은 물건을 확인해요.{'\n\n'}4. 내려놓을 물건은 그 물건의 진열대로 돌아가 장바구니를 펼쳐 내려놓아요. 어렵다면 종업원에게 제자리에 놓아 달라고 부탁해요.{'\n\n'}5. 출구 옆 두 계산대 중 하나에서 구매를 확정해요. 계산원이 없으면 매장 직원을 찾아 말을 걸어요.{'\n\n'}6. 계산하지 않은 물건을 담고 입구·출구·측면 출입문의 빨간 경보기를 지나 매장 밖으로 나가면 {session.config.alarmPenaltyPoints}점이 줄어요. 입구와 출구는 공용 복도로 이어져요. 복도 끝 공동 출입문에서 마을로 나갈 수 있어요.</Text>
+        <Button text="알겠어요" onPress={() => {
+          dispatch({ type: 'closeView' });
+          setHelpOpen(false);
+        }} />
+      </>, undefined, () => {
+        dispatch({ type: 'closeView' });
+        setHelpOpen(false);
+      })
+      : null}
+    {staffMessage
+      ? <MarketStaffDialogue
+        name={session.environment.employees.find(employee => `staff:${employee.id}` === session.activeStation)?.label ?? '매장 직원'}
+        message={staffReturnHelp ? '어떤 물건을 제자리에 놓아드릴까요? 내려놓고 싶은 물건과 개수를 골라 주세요.' : '무엇을 도와드릴까요?'}
+        response={staffResponse}
+        bottomInset={embedded ? Math.max(132, (insets?.bottom ?? 0) + 112) : Math.max(24, insets?.bottom ?? 0)}
+      >
+        {staffReturnHelp ? <>
+          <CartContents cart={session.cart} onRequestReturn={requestProductReturn} dialogue />
+          <MarketStaffDialogueChoice text="직원 대화로 돌아가기" onPress={() => { setStaffReturnHelp(false); setStaffResponse(''); }} />
+        </> : <>
+          {session.environment.checkouts.filter(counter => !session.cashierAvailability[counter.id]).map(counter =>
+            <MarketStaffDialogueChoice key={counter.id} text={`${counter.id === 'checkout' ? 1 : 2}번 계산대 계산을 부탁드려요`}
+              onPress={() => {
+                const next = dispatch({ type: 'requestCashier', checkoutId: counter.id }, true);
+                if (!next.lastActionError) setStaffResponse(`${counter.id === 'checkout' ? 1 : 2}번 계산대로 와 주세요. 계산을 도와드릴게요.`);
+              }} />)}
+          {cartCount > 0 ? <MarketStaffDialogueChoice text="물건 제자리에 놓기 도움 요청" onPress={() => { setStaffReturnHelp(true); setStaffResponse(''); }} /> : null}
+        </>}
+        <MarketStaffDialogueChoice text="아니에요, 감사합니다." onPress={closeStation} />
+      </MarketStaffDialogue>
+      : null}
+    {review === null && !briefing && session.phase === 'checkout'
+      ? modal(session.cashierAvailable ? '이대로 구매할까요?' : '계산원이 자리를 비웠어요', <>
+        <CartContents cart={session.cart} />
+        <Text style={s.body}>합계 {price(getMarketCartTotal(session.cart))}</Text>
+        {session.cashierAvailable
+          ? <>
+            <Text style={s.small}>구매를 확정하면 이번 시도가 기록되고 결과가 나와요.</Text>
+            <Button text="구매 확정" onPress={() => { void submitForReview(); }} />
+          </>
+          : <>
+            <Text style={s.body}>매장 안의 직원을 찾아 가까이에서 계산을 요청해 주세요.</Text>
+            <Button text="직원 찾아 계산 요청하기" onPress={closeStation} />
+          </>}
+        <Button
+          text="다시 고르기"
+          quiet
+          onPress={closeStation}
         />
-      ) : null}
-
-      {phase === 'checkout' ? (
-        embedded ? (
-          <View style={styles.embeddedCheckoutOverlay}>
-            <View style={styles.embeddedCheckoutBackdrop} />
-            <CheckoutPanel cart={cart} mission={mission} onBack={retryShopping} onCheck={checkCart} total={total} />
+        {quit}
+      </>, `${session.selectedCheckoutId === 'checkout-2' ? 2 : 1}번 계산대 · 최종 결정`)
+      : null}
+    {session.phase === 'feedback'
+      ? modal('이번 구매는 맞지 않았어요', <>
+        {session.feedback?.details?.length
+          ? <View testID="market-detailed-feedback">
+            {session.feedback.details.map((detail, i) => <Text key={i} style={s.body}>• {detail}</Text>)}
           </View>
-        ) : (
-          <CheckoutPanel cart={cart} mission={mission} onBack={retryShopping} onCheck={checkCart} total={total} />
-        )
-      ) : null}
-
-      {phase === 'result' ? (
-        <View style={styles.resultOverlay}><View style={styles.resultCard}>
-          <Text style={styles.resultTitle}>AI 수행 검토</Text><Text style={styles.resultDescription}>{review}</Text>
-          <PressScale accessibilityRole="button" onPress={retryShopping} style={styles.resultPrimaryButton}><Text style={styles.resultPrimaryButtonText}>계속 연습하기</Text></PressScale>
-          <PressScale accessibilityRole="button" onPress={exitMarket} style={styles.resultPrimaryButton}><Text style={styles.resultPrimaryButtonText}>마을로 돌아가기</Text></PressScale>
-        </View></View>
-      ) : null}
-
-      {activeCategory && phase === 'shopping' ? (
-        <ProductShelfSheet
-          cart={cart}
-          category={marketCategories.find((category) => category.id === activeCategory)!}
-          onChangeQuantity={changeQuantity}
-          onClose={closeShelf}
+          : <Text testID="market-general-feedback" style={s.body}>목록과 장바구니를 스스로 다시 살펴보세요.</Text>}
+        <Button
+          text={session.attempts === 1 ? '1차 재시도' : session.attempts + '차 재시도'}
+          onPress={() => dispatch({ type: 'retry' })}
         />
-      ) : null}
-
-      {cartOpen && phase === 'shopping' ? (
-        <CartSheet
-          cart={cart}
-          onChangeQuantity={changeQuantity}
-          onCheckout={() => {
-            closeCart();
-            showNotice('계산대로 이동해 주세요');
-          }}
-          onClose={closeCart}
-          total={total}
-        />
-      ) : null}
-
-      {notice ? (
-        <Animated.View pointerEvents="none" style={[styles.notice, { opacity: noticeOpacity }]}>
-          <Ionicons color="#FFFFFF" name="checkmark" size={18} />
-          <Text style={styles.noticeText}>{notice}</Text>
-        </Animated.View>
-      ) : null}
-    </View>
-  );
-}
-
-function MarketTopBar({
-  cartCount,
-  objectiveProgress,
-  onExit,
-  remainingBudget,
-}: {
-  cartCount: number;
-  objectiveProgress: Array<{ current: number; quantity: number }>;
-  onExit: () => void;
-  remainingBudget: number;
-}) {
-  const completed = objectiveProgress.filter(({ current, quantity }) => current >= quantity).length;
-  return (
-    <View style={styles.topBar}>
-      <PressScale accessibilityLabel="장보기 나가기" accessibilityRole="button" hitSlop={8} onPress={onExit} style={styles.topIconButton}>
-        <Ionicons color="#FFFFFF" name="close" size={24} />
-      </PressScale>
-      <View style={styles.locationHeading}>
-        <Text style={styles.locationEyebrow}>생활 연습 · 장보기</Text>
-        <Text style={styles.locationTitle}>하늘마트</Text>
-      </View>
-      <View style={styles.topStats}>
-        <View style={styles.progressPill}>
-          <Ionicons color="#3A785A" name="checkmark-circle" size={17} />
-          <Text style={styles.progressPillText}>{completed}/{objectiveProgress.length}</Text>
-        </View>
-        <View style={[styles.budgetPill, remainingBudget < 0 && styles.budgetPillOver]}>
-          <Text style={styles.budgetPillLabel}>남은 돈</Text>
-          <Text style={styles.budgetPillValue}>{formatPrice(remainingBudget)}</Text>
-        </View>
-      </View>
-      {cartCount > 0 ? <View style={styles.topCartDot} /> : null}
-    </View>
-  );
-}
-
-function MarketMap({
-  interactive,
-  nearbyStation,
-  onNearbyStationChange,
-  onMovementSample,
-  onMovementStopped,
-}: {
-  interactive: boolean;
-  nearbyStation: MarketStationId | null;
-  onNearbyStationChange: (station: MarketStationId | null) => void;
-  onMovementSample: (point: MarketPoint, controlMode: MarketTelemetryControlMode, blocked?: boolean) => void;
-  onMovementStopped: (controlMode: MarketTelemetryControlMode) => void;
-}) {
-  const viewportNode = useRef<View | null>(null);
-  const camera = useRef(new Animated.ValueXY()).current;
-  const joystickKnob = useRef(new Animated.ValueXY()).current;
-  const playerPoint = useRef<MarketPoint>({ ...MARKET_PLAYER_START });
-  const viewport = useRef({ height: 0, width: 0 });
-  const viewportOrigin = useRef({ x: 0, y: 0 });
-  const direction = useRef<MarketPoint>({ x: 0, y: 0 });
-  const speedMultiplier = useRef(1);
-  const tapTarget = useRef<MarketPoint | null>(null);
-  const joystickEngaged = useRef(false);
-  const touchHoldActivated = useRef(false);
-  const animationFrame = useRef<number | null>(null);
-  const previousFrame = useRef<number | null>(null);
-  const nearbyStationRef = useRef<MarketStationId | null>(null);
-  const controlsLockedRef = useRef(!interactive);
-  const joystickZoneSize = useRef({ height: MARKET_JOYSTICK_ZONE_HEIGHT, width: 220 });
-
-  const [controlMode, setControlMode] = useState<MarketControlMode>('joystick');
-  const [runEnabled, setRunEnabled] = useState(false);
-  const [tapTargetMarker, setTapTargetMarker] = useState<MarketPoint | null>(null);
-  const [joystickActive, setJoystickActive] = useState(false);
-  const [joystickCenter, setJoystickCenter] = useState({ x: 76, y: 174 });
-  controlsLockedRef.current = !interactive;
-
-  const updateCamera = useCallback((point: MarketPoint) => {
-    camera.setValue({
-      x: viewport.current.width / 2 - point.x,
-      y: viewport.current.height / 2 - point.y,
-    });
-  }, [camera]);
-
-  const updateStationProximity = useCallback((point: MarketPoint) => {
-    let closest: MarketStationId | null = null;
-    let closestDistance = Number.POSITIVE_INFINITY;
-    (Object.entries(MARKET_STATIONS) as Array<[MarketStationId, MarketPoint]>).forEach(([station, stationPoint]) => {
-      const distance = Math.hypot(point.x - stationPoint.x, point.y - stationPoint.y);
-      if (distance <= MARKET_INTERACTION_DISTANCE && distance < closestDistance) {
-        closest = station;
-        closestDistance = distance;
-      }
-    });
-    if (closest !== nearbyStationRef.current) {
-      nearbyStationRef.current = closest;
-      onNearbyStationChange(closest);
-    }
-  }, [onNearbyStationChange]);
-
-  const movePlayer = useCallback((dx: number, dy: number) => {
-    const current = playerPoint.current;
-    let next = current;
-    const xCandidate = clampMarketPoint({ x: current.x + dx, y: current.y });
-    if (!isMarketBlocked(xCandidate)) next = xCandidate;
-    const yCandidate = clampMarketPoint({ x: next.x, y: next.y + dy });
-    if (!isMarketBlocked(yCandidate)) next = yCandidate;
-    playerPoint.current = next;
-    updateCamera(next);
-    updateStationProximity(next);
-    onMovementSample(next, controlMode, Math.hypot(next.x - current.x, next.y - current.y) < 0.05);
-    return next;
-  }, [controlMode, onMovementSample, updateCamera, updateStationProximity]);
-
-  const stopMovement = useCallback(() => {
-    direction.current = { x: 0, y: 0 };
-    joystickEngaged.current = false;
-    tapTarget.current = null;
-    previousFrame.current = null;
-    setJoystickActive(false);
-    setTapTargetMarker(null);
-    if (animationFrame.current !== null) {
-      cancelAnimationFrame(animationFrame.current);
-      animationFrame.current = null;
-    }
-    Animated.spring(joystickKnob, {
-      damping: 16,
-      mass: 0.7,
-      stiffness: 240,
-      toValue: { x: 0, y: 0 },
-      useNativeDriver: true,
-    }).start();
-    onMovementStopped(controlMode);
-  }, [controlMode, joystickKnob, onMovementStopped]);
-
-  const runMovement = useCallback((timestamp: number) => {
-    const last = previousFrame.current ?? timestamp;
-    const elapsedSeconds = Math.min(timestamp - last, 32) / 1000;
-    previousFrame.current = timestamp;
-    const target = tapTarget.current;
-
-    if (target) {
-      const current = playerPoint.current;
-      const dx = target.x - current.x;
-      const dy = target.y - current.y;
-      const distance = Math.hypot(dx, dy);
-      if (distance <= 3) {
-        tapTarget.current = null;
-        previousFrame.current = null;
-        animationFrame.current = null;
-        setTapTargetMarker(null);
-        return;
-      }
-      const step = Math.min(distance, MARKET_MOVE_SPEED * speedMultiplier.current * elapsedSeconds);
-      const next = movePlayer((dx / distance) * step, (dy / distance) * step);
-      if (step > 0 && Math.hypot(next.x - current.x, next.y - current.y) < 0.05) {
-        tapTarget.current = null;
-        previousFrame.current = null;
-        animationFrame.current = null;
-        setTapTargetMarker(null);
-        return;
-      }
-      animationFrame.current = requestAnimationFrame(runMovement);
-      return;
-    }
-
-    movePlayer(
-      direction.current.x * MARKET_MOVE_SPEED * speedMultiplier.current * elapsedSeconds,
-      direction.current.y * MARKET_MOVE_SPEED * speedMultiplier.current * elapsedSeconds,
-    );
-    if (joystickEngaged.current) animationFrame.current = requestAnimationFrame(runMovement);
-    else {
-      previousFrame.current = null;
-      animationFrame.current = null;
-    }
-  }, [movePlayer]);
-
-  const beginMovement = useCallback(() => {
-    if (animationFrame.current === null) animationFrame.current = requestAnimationFrame(runMovement);
-  }, [runMovement]);
-
-  const joystickResponder = useRef(PanResponder.create({
-    onStartShouldSetPanResponder: () => !controlsLockedRef.current,
-    onMoveShouldSetPanResponder: () => !controlsLockedRef.current,
-    onPanResponderGrant: (event) => {
-      const half = MARKET_JOYSTICK_SIZE / 2;
-      const { height, width } = joystickZoneSize.current;
-      setJoystickCenter({
-        x: Math.max(half, Math.min(event.nativeEvent.locationX, width - half)),
-        y: Math.max(half, Math.min(event.nativeEvent.locationY, height - half)),
-      });
-      setJoystickActive(true);
-      joystickEngaged.current = true;
-      joystickKnob.stopAnimation();
-      joystickKnob.setValue({ x: 0, y: 0 });
-      direction.current = { x: 0, y: 0 };
-      beginMovement();
-    },
-    onPanResponderMove: (_event, gesture) => {
-      const distance = Math.hypot(gesture.dx, gesture.dy);
-      const scale = distance > MARKET_JOYSTICK_RADIUS ? MARKET_JOYSTICK_RADIUS / distance : 1;
-      const x = gesture.dx * scale;
-      const y = gesture.dy * scale;
-      joystickKnob.setValue({ x, y });
-      direction.current = { x: x / MARKET_JOYSTICK_RADIUS, y: y / MARKET_JOYSTICK_RADIUS };
-    },
-    onPanResponderRelease: stopMovement,
-    onPanResponderTerminate: stopMovement,
-  })).current;
-
-  useEffect(() => () => {
-    if (animationFrame.current !== null) cancelAnimationFrame(animationFrame.current);
-  }, []);
-
-  useEffect(() => {
-    if (!interactive) stopMovement();
-  }, [interactive, stopMovement]);
-
-  const handleViewportLayout = (event: LayoutChangeEvent) => {
-    viewport.current = event.nativeEvent.layout;
-    viewportNode.current?.measureInWindow((x, y) => {
-      viewportOrigin.current = { x, y };
-    });
-    updateCamera(playerPoint.current);
-    updateStationProximity(playerPoint.current);
-  };
-
-  const handleAccessibilityMove = (actionName: string) => {
-    if (controlsLockedRef.current) return;
-    if (actionName === 'moveUp') movePlayer(0, -MARKET_ACCESSIBILITY_STEP);
-    if (actionName === 'moveDown') movePlayer(0, MARKET_ACCESSIBILITY_STEP);
-    if (actionName === 'moveLeft') movePlayer(-MARKET_ACCESSIBILITY_STEP, 0);
-    if (actionName === 'moveRight') movePlayer(MARKET_ACCESSIBILITY_STEP, 0);
-  };
-
-  const startTapMovement = (desired: MarketPoint) => {
-    if (controlsLockedRef.current) return;
-    stopMovement();
-    const target = findMarketReachableTarget(playerPoint.current, desired);
-    if (Math.hypot(target.x - playerPoint.current.x, target.y - playerPoint.current.y) < 2) return;
-    tapTarget.current = target;
-    setTapTargetMarker(target);
-    beginMovement();
-  };
-
-  const getTouchedWorldPoint = (event: GestureResponderEvent) => {
-    const current = playerPoint.current;
-    const { locationX, locationY, pageX, pageY } = event.nativeEvent;
-    const localX = Number.isFinite(pageX) ? pageX - viewportOrigin.current.x : locationX;
-    const localY = Number.isFinite(pageY) ? pageY - viewportOrigin.current.y : locationY;
-    const safeX = Math.max(0, Math.min(localX, viewport.current.width));
-    const safeY = Math.max(0, Math.min(localY, viewport.current.height));
-    return {
-      x: current.x + safeX - viewport.current.width / 2,
-      y: current.y + safeY - viewport.current.height / 2,
-    };
-  };
-
-  const handleWorldLongPress = (event: GestureResponderEvent) => {
-    if (controlMode !== 'touch' || controlsLockedRef.current) return;
-    const current = playerPoint.current;
-    const desired = getTouchedWorldPoint(event);
-    const dx = desired.x - current.x;
-    const dy = desired.y - current.y;
-    const distance = Math.hypot(dx, dy);
-    if (distance < 8) return;
-    stopMovement();
-    touchHoldActivated.current = true;
-    direction.current = { x: dx / distance, y: dy / distance };
-    joystickEngaged.current = true;
-    setTapTargetMarker(desired);
-    beginMovement();
-  };
-
-  const handleWorldPress = (event: GestureResponderEvent) => {
-    if (controlMode !== 'touch' || controlsLockedRef.current) return;
-    if (touchHoldActivated.current) {
-      touchHoldActivated.current = false;
-      return;
-    }
-    startTapMovement(getTouchedWorldPoint(event));
-  };
-
-  const handleStationPress = (event: GestureResponderEvent, station: MarketStationId) => {
-    event?.stopPropagation?.();
-    startTapMovement(MARKET_STATIONS[station]);
-  };
-
-  const selectControlMode = (mode: MarketControlMode) => {
-    stopMovement();
-    speedMultiplier.current = 1;
-    setRunEnabled(false);
-    setControlMode(mode);
-  };
-
-  return (
-    <Pressable
-      accessibilityActions={[
-        { label: '위로 이동', name: 'moveUp' },
-        { label: '아래로 이동', name: 'moveDown' },
-        { label: '왼쪽으로 이동', name: 'moveLeft' },
-        { label: '오른쪽으로 이동', name: 'moveRight' },
-      ]}
-      accessibilityHint={interactive ? '바깥 마을과 같은 방식으로 캐릭터를 움직입니다' : undefined}
-      accessibilityLabel="하늘마트 매장"
-      delayLongPress={260}
-      onAccessibilityAction={(event) => handleAccessibilityMove(event.nativeEvent.actionName)}
-      onLayout={handleViewportLayout}
-      onLongPress={handleWorldLongPress}
-      onPress={handleWorldPress}
-      onPressIn={() => {
-        if (controlMode === 'touch' && interactive) touchHoldActivated.current = false;
-      }}
-      onPressOut={() => {
-        if (touchHoldActivated.current) stopMovement();
-      }}
-      ref={viewportNode}
-      style={styles.map}
-    >
-      <Animated.View style={[styles.marketWorld, { transform: camera.getTranslateTransform() }]}>
-        <View style={styles.marketWorldGround} />
-        <View style={styles.marketBackWall}>
-          <View style={styles.wallStripe} />
-          <View style={styles.storeLogo}>
-            <Ionicons color="#FFFFFF" name="basket" size={18} />
-            <Text style={styles.storeLogoText}>HANEUL MART</Text>
-          </View>
-          <Text style={styles.wallMessage}>필요한 만큼, 알맞게 골라요</Text>
-        </View>
-        {[0, 1, 2, 3, 4, 5, 6].map((row) => (
-          <View key={row} style={[styles.floorTileRow, { top: 150 + row * 120 }]} />
-        ))}
-        {[0, 1, 2, 3, 4, 5].map((column) => (
-          <View key={column} style={[styles.floorTileColumn, { left: 70 + column * 150 }]} />
-        ))}
-        <View style={[styles.marketAisle, styles.marketAisleMain]} />
-        <View style={[styles.marketAisle, styles.marketAisleCrossTop]} />
-        <View style={[styles.marketAisle, styles.marketAisleCrossBottom]} />
-
-        {tapTargetMarker && controlMode === 'touch' ? (
-          <View pointerEvents="none" style={[styles.marketTapTarget, { left: tapTargetMarker.x - 12, top: tapTargetMarker.y - 12 }]} />
-        ) : null}
-
-        <PressScale
-          accessibilityHint="가까이 이동하면 계산할 수 있습니다"
-          accessibilityLabel="계산대로 이동"
-          accessibilityRole="button"
-          disabled={!interactive}
-          onPress={(event) => handleStationPress(event, 'checkout')}
-          scaleTo={0.98}
-          style={[styles.counterArea, nearbyStation === 'checkout' && styles.counterAreaActive]}
-        >
-          <View style={styles.counterRegister}>
-            <View style={styles.registerScreen} />
-            <View style={styles.registerBase} />
-          </View>
-          <View style={styles.cashierCharacter}>
-            <View style={styles.cashierHair} />
-            <View style={styles.cashierHead} />
-            <View style={styles.cashierBody}><View style={styles.cashierApron} /></View>
-          </View>
-          <View style={styles.cashierNameTag}><Text style={styles.cashierNameText}>수진</Text></View>
-          <Text style={styles.counterSign}>계산대</Text>
-          {nearbyStation === 'checkout' ? <View pointerEvents="none" style={styles.stationMarker} /> : null}
-        </PressScale>
-
-        {marketCategories.map((category) => (
-          <ShelfZone
-            active={nearbyStation === category.id}
-            category={category}
-            key={category.id}
-            layout={MARKET_SHELVES[category.id]}
-            onPress={(event) => handleStationPress(event, category.id)}
+        {quit}
+      </>, session.attempts + '번째 시도 결과')
+      : null}
+    {isFinished
+      ? modal(aiAssessment ? '장보기를 마쳤어요' : session.outcome === 'success' ? '장보기에 성공했어요!' : '장보기를 마쳤어요', <>
+        <View style={s.resultBadge}>
+          <Ionicons
+            name={session.outcome === 'success' ? 'checkmark-circle-outline' : 'flag-outline'}
+            size={42}
+            color="#517660"
           />
-        ))}
-
-        <View style={styles.marketEntranceInterior}>
-          <Ionicons color="#6D7B72" name="log-out-outline" size={23} />
-          <Text style={styles.marketEntranceInteriorText}>입구</Text>
+          <Text style={s.resultText}>
+            {aiAssessment ? '수행 판단은 AI 분석에서 확인해 주세요.' : session.outcome === 'success' ? '성공' : '실패 (포기)'}
+          </Text>
+          <Text style={s.body}>구매 시도 {session.attempts}회</Text>
+          {!aiAssessment && <Text testID="market-final-score" style={s.body}>최종 점수 {session.score}점 · 경보기 감점 {session.penaltyPoints}점 ({session.alarmCount}회)</Text>}
         </View>
-      </Animated.View>
-
-      <View accessibilityLabel="마트 안 내 캐릭터" pointerEvents="none" style={styles.marketPlayerFixed}>
-        <View style={styles.playerShadow} />
-        <View style={styles.playerMoveRing} />
-        <View style={styles.playerHead} />
-        <View style={styles.playerBody}><Image resizeMode="contain" source={icons.user} style={styles.playerBadgeImage} /></View>
-        <View style={styles.playerBasket}><Ionicons color="#FFFFFF" name="basket" size={15} /></View>
-      </View>
-
-      {interactive ? (
-        <PressScale
-          accessibilityLabel={controlMode === 'joystick' ? '터치 이동으로 변경' : '조이스틱 이동으로 변경'}
-          accessibilityRole="button"
-          onPress={(event) => {
-            event?.stopPropagation?.();
-            selectControlMode(controlMode === 'joystick' ? 'touch' : 'joystick');
-          }}
-          style={styles.marketControlToggle}
-        >
-          <Ionicons color="#FFF8E8" name={controlMode === 'joystick' ? 'hand-left-outline' : 'game-controller-outline'} size={17} />
-          <Text style={styles.marketControlToggleText}>{controlMode === 'joystick' ? '터치' : '조이스틱'}</Text>
-        </PressScale>
-      ) : null}
-
-      {interactive ? (
-        <PressScale
-          accessibilityHint="한 번 누르면 달리기를 켜고 다시 누르면 끕니다"
-          accessibilityLabel={runEnabled ? '마트에서 달리기 끄기' : '마트에서 달리기 켜기'}
-          accessibilityRole="button"
-          accessibilityState={{ selected: runEnabled }}
-          onPress={(event) => {
-            event?.stopPropagation?.();
-            setRunEnabled((enabled) => {
-              const next = !enabled;
-              speedMultiplier.current = next ? 1.55 : 1;
-              return next;
-            });
-          }}
-          style={[styles.marketRunButton, runEnabled && styles.marketRunButtonActive]}
-        >
-          <Ionicons color={runEnabled ? '#FFFFFF' : '#39493F'} name="walk" size={22} />
-        </PressScale>
-      ) : null}
-
-      {controlMode === 'joystick' && interactive ? (
-        <View
-          accessibilityActions={[
-            { label: '위로 이동', name: 'moveUp' },
-            { label: '아래로 이동', name: 'moveDown' },
-            { label: '왼쪽으로 이동', name: 'moveLeft' },
-            { label: '오른쪽으로 이동', name: 'moveRight' },
-          ]}
-          accessibilityLabel="마트 이동 조이스틱"
-          accessibilityRole="adjustable"
-          onAccessibilityAction={(event) => handleAccessibilityMove(event.nativeEvent.actionName)}
-          onLayout={(event) => { joystickZoneSize.current = event.nativeEvent.layout; }}
-          style={styles.marketJoystickZone}
-          {...joystickResponder.panHandlers}
-        >
-          <Animated.View
-            pointerEvents="none"
-            style={[
-              styles.marketJoystick,
-              {
-                left: joystickCenter.x - MARKET_JOYSTICK_SIZE / 2,
-                opacity: joystickActive ? 1 : 0.42,
-                top: joystickCenter.y - MARKET_JOYSTICK_SIZE / 2,
-              },
-            ]}
-          >
-            <View style={styles.marketJoystickGuideHorizontal} />
-            <View style={styles.marketJoystickGuideVertical} />
-            <Animated.View style={[styles.marketJoystickKnob, { transform: joystickKnob.getTranslateTransform() }]} />
-          </Animated.View>
-        </View>
-      ) : null}
-
-      {controlMode === 'touch' && interactive ? (
-        <View pointerEvents="none" style={styles.marketTouchHint}>
-          <Ionicons color="#FFFFFF" name="finger-print" size={15} />
-          <Text style={styles.marketTouchHintText}>누르거나 길게 눌러 이동</Text>
-        </View>
-      ) : null}
-    </Pressable>
-  );
-}
-
-function ShelfZone({
-  active,
-  category,
-  layout,
-  onPress,
-}: {
-  active: boolean;
-  category: MarketCategory;
-  layout: { height: number; width: number; x: number; y: number };
-  onPress: (event: GestureResponderEvent) => void;
-}) {
-  const products = useContext(SceneProducts).filter((product) => product.categoryId === category.id);
-  return (
-    <PressScale
-      accessibilityLabel={`${category.label} 진열대`}
-      accessibilityHint="가까이 이동한 뒤 살펴보기 버튼을 누릅니다"
-      accessibilityRole="button"
-      onPress={onPress}
-      scaleTo={0.97}
-      style={[
-        styles.shelfZone,
-        { height: layout.height, left: layout.x, top: layout.y, width: layout.width },
-        active && styles.shelfZoneActive,
-      ]}
-    >
-      <View style={[styles.shelfLabel, { backgroundColor: category.color }]}>
-        <Ionicons color="#FFFFFF" name={category.icon} size={15} />
-        <Text style={styles.shelfLabelText}>{category.label}</Text>
-      </View>
-      <View style={styles.shelfProducts}>
-        {products.slice(0, 4).map((product) => (
-          <View key={product.id} style={[styles.shelfProduct, { backgroundColor: product.packageColor }]}>
-            <View style={[styles.shelfProductBand, { backgroundColor: product.color }]} />
-          </View>
-        ))}
-      </View>
-      <View style={styles.shelfBoard} />
-      <Text style={styles.shelfHelper}>{category.helper}</Text>
-      {active ? <View pointerEvents="none" style={styles.stationMarker} /> : null}
-    </PressScale>
-  );
-}
-
-function NpcDialogueCard({
-  aiGenerated,
-  buttonLabel,
-  message,
-  onContinue,
-  progress,
-}: {
-  aiGenerated: boolean;
-  buttonLabel: string;
-  message: string;
-  onContinue: () => void;
-  progress: string;
-}) {
-  return (
-    <View style={styles.dialogueOverlay}>
-      <View style={styles.dialogueCard}>
-        <View style={styles.dialogueHeader}>
-          <View style={styles.dialogueAvatar}>
-            <View style={styles.dialogueAvatarHair} />
-            <View style={styles.dialogueAvatarFace} />
-          </View>
-          <View style={styles.dialogueHeaderCopy}>
-            <Text style={styles.dialogueName}>수진</Text>
-            <Text style={styles.dialogueRole}>하늘마트 직원</Text>
-          </View>
-          {aiGenerated ? (
-            <View style={styles.dialogueAiBadge}>
-              <Ionicons color="#325F51" name="sparkles" size={10} />
-              <Text style={styles.dialogueAiBadgeText}>AI 생성 퀘스트</Text>
-            </View>
-          ) : null}
-          <Text style={styles.dialogueProgress}>{progress}</Text>
-        </View>
-        <Text accessibilityLiveRegion="polite" style={styles.dialogueMessage}>{message}</Text>
-        <PressScale accessibilityRole="button" onPress={onContinue} style={styles.dialogueButton}>
-          <Text style={styles.dialogueButtonText}>{buttonLabel}</Text>
-          <Ionicons color="#FFFFFF" name="arrow-forward" size={20} />
-        </PressScale>
-      </View>
-    </View>
-  );
-}
-
-function ProductShelfSheet({
-  cart,
-  category,
-  onChangeQuantity,
-  onClose,
-}: {
-  cart: MarketCart;
-  category: MarketCategory;
-  onChangeQuantity: (productId: string, change: number) => void;
-  onClose: () => void;
-}) {
-  const products = useContext(SceneProducts).filter((product) => product.categoryId === category.id);
-  return (
-    <View style={styles.sheetOverlay}>
-      <Pressable accessibilityLabel="진열대 닫기" accessibilityRole="button" onPress={onClose} style={styles.sheetBackdrop} />
-      <View style={styles.productSheet}>
-        <View style={styles.sheetHandle} />
-        <View style={styles.sheetHeader}>
-          <View style={[styles.sheetHeaderIcon, { backgroundColor: category.softColor }]}>
-            <Ionicons color={category.color} name={category.icon} size={23} />
-          </View>
-          <View style={styles.sheetHeaderCopy}>
-            <Text style={styles.sheetEyebrow}>SHELF · 진열대 살펴보기</Text>
-            <Text style={styles.sheetTitle}>{category.label}</Text>
-          </View>
-          <PressScale accessibilityLabel="진열대 닫기" hitSlop={8} onPress={onClose} style={styles.sheetCloseButton}>
-            <Ionicons color="#666A67" name="close" size={23} />
-          </PressScale>
-        </View>
-        <ScrollView
-          contentContainerStyle={styles.productGrid}
-          showsVerticalScrollIndicator={false}
-          style={styles.productScroll}
-        >
-          {products.map((product) => (
-            <ProductCard
-              key={product.id}
-              onAdd={() => onChangeQuantity(product.id, 1)}
-              onRemove={() => onChangeQuantity(product.id, -1)}
-              product={product}
-              quantity={getCartQuantity(cart, product.id)}
+        {!ratingDone
+          ? <>
+            <Text style={s.body}>오늘 장보기는 어땠나요? 평가를 건너뛰어도 괜찮아요.</Text>
+            <Stars
+              title="난이도"
+              hint="1 쉬웠어요 · 5 어려웠어요"
+              value={difficultyRating}
+              onChange={setDifficultyRating}
             />
-          ))}
-        </ScrollView>
-        <PressScale accessibilityRole="button" onPress={onClose} style={styles.sheetDoneButton}>
-          <Text style={styles.sheetDoneButtonText}>진열대로 돌아가기</Text>
-        </PressScale>
+            <Stars
+              title="흥미"
+              hint="1 재미없었어요 · 5 재미있었어요"
+              value={interestRating}
+              onChange={setInterestRating}
+            />
+            <Button
+              text="별점 남기기"
+              disabled={!difficultyRating || !interestRating}
+              onPress={() => finishRating(true)}
+            />
+            <Button
+              text="평가 건너뛰기"
+              quiet
+              onPress={() => finishRating(false)}
+            />
+          </>
+          : <>
+            <Text style={s.body}>
+              {session.ratings
+                ? '난이도 ' + session.ratings.difficulty + '점 · 흥미 ' + session.ratings.interest + '점'
+                : '평가를 건너뛰었어요.'}
+            </Text>
+            <Button
+              text="게임 기록 저장"
+              quiet
+              onPress={() => {
+                void exportData().catch(() => setExportMessage('저장하지 못했어요. 다시 눌러 주세요.'));
+              }}
+            />
+            {exportMessage
+              ? <Text accessibilityLiveRegion="polite" style={s.small}>
+                {exportMessage}
+              </Text>
+              : null}
+            <Button text="마트 나가기" onPress={leave} />
+          </>}
+      </>, '최종 결과')
+      : null}
+    </MarketPanelTransition>
+    {alarmNotice !== null ? <View pointerEvents="none" style={[s.notice, s.alarmNotice]}>
+      <Text accessibilityRole="alert" accessibilityLiveRegion="assertive" style={s.alarmNoticeText}>
+        경보기가 울렸어요. 계산하지 않은 물건이 있어요.{!aiAssessment && ` −${alarmNotice}점`}
+      </Text>
+    </View> : null}
+    {session.lastActionError
+      ? <View pointerEvents="none" style={s.notice}>
+        <Text accessibilityLiveRegion="polite" style={s.noticeText}>
+          {session.lastActionError}
+        </Text>
       </View>
-    </View>
-  );
+      : null}
+  </View>;
 }
-
-function ProductCard({
-  onAdd,
-  onRemove,
-  product,
-  quantity,
-}: {
-  onAdd: () => void;
-  onRemove: () => void;
-  product: MarketProduct;
-  quantity: number;
-}) {
-  return (
-    <View style={[styles.productCard, quantity > 0 && styles.productCardSelected]}>
-      <View style={[styles.productVisual, { backgroundColor: product.packageColor }]}>
-        <View style={[styles.productVisualBand, { backgroundColor: product.color }]} />
-        <Ionicons color={product.color} name={product.icon as IoniconName} size={25} />
-        {quantity > 0 ? (
-          <View style={styles.selectedCheck}><Ionicons color="#FFFFFF" name="checkmark" size={11} /></View>
-        ) : null}
-      </View>
-      <Text numberOfLines={1} style={styles.productName}>{product.name}</Text>
-      <Text style={styles.productDetail}>{product.detail} · 구매 단위: {product.salesUnit}</Text>
-      {product.attributes.brand ? <Text style={styles.productDetail}>브랜드: {product.attributes.brand}</Text> : null}
-      <Text style={styles.productPrice}>{formatPrice(product.price)}</Text>
-      <Text style={styles.productDetail}>진열 재고 {Math.max(0, product.initialStock - quantity)}{product.salesUnit}</Text>
-      {quantity === 0 ? (
-        <PressScale accessibilityLabel={`${product.name} 담기`} accessibilityRole="button" onPress={onAdd} style={styles.addProductButton}>
-          <Ionicons color="#FFFFFF" name="add" size={15} />
-          <Text style={styles.addProductButtonText}>담기</Text>
-        </PressScale>
-      ) : (
-        <View style={styles.quantityControl}>
-          <PressScale accessibilityLabel={`${product.name} 한 개 빼기`} onPress={onRemove} style={styles.quantityButton}>
-            <Ionicons color="#4E5D55" name="remove" size={15} />
-          </PressScale>
-          <Text style={styles.quantityValue}>{quantity}</Text>
-          <PressScale accessibilityLabel={`${product.name} 한 개 더 담기`} disabled={quantity >= product.initialStock} onPress={onAdd} style={styles.quantityButton}>
-            <Ionicons color="#4E5D55" name="add" size={15} />
-          </PressScale>
-        </View>
-      )}
-    </View>
-  );
-}
-
-function CartSheet({
-  cart,
-  onChangeQuantity,
-  onCheckout,
-  onClose,
-  total,
-}: {
+function CartContents({ cart, onRequestReturn, showReturnLocation = false, dialogue = false }: {
   cart: MarketCart;
-  onChangeQuantity: (productId: string, change: number) => void;
-  onCheckout: () => void;
-  onClose: () => void;
-  total: number;
+  onRequestReturn?: (productId: string, quantity: number) => void;
+  showReturnLocation?: boolean;
+  dialogue?: boolean;
 }) {
-  const products = useContext(SceneProducts);
-  const getMarketProduct = (id: string) => products.find(p => p.id === id);
-  const lines = Object.entries(cart)
-    .map(([productId, quantity]) => ({ product: getMarketProduct(productId), quantity }))
-    .filter((line): line is { product: MarketProduct; quantity: number } => Boolean(line.product));
-  return (
-    <View style={styles.sheetOverlay}>
-      <Pressable accessibilityLabel="장바구니 닫기" accessibilityRole="button" onPress={onClose} style={styles.sheetBackdrop} />
-      <View style={styles.cartSheet}>
-        <View style={styles.sheetHandle} />
-        <View style={styles.cartSheetHeader}>
-          <View>
-            <Text style={styles.sheetEyebrow}>INVENTORY · 선택한 물건</Text>
-            <Text style={styles.sheetTitle}>내 가방</Text>
-          </View>
-          <PressScale accessibilityLabel="장바구니 닫기" onPress={onClose} style={styles.sheetCloseButton}>
-            <Ionicons color="#666A67" name="close" size={23} />
+  return <View testID="market-cart-contents">
+    {Object.entries(cart).filter(([, q]) => q > 0).map(([id, quantity]) => {
+      const product = getMarketProduct(id);
+      if (!product) return null;
+      return <View key={id} style={dialogue ? s.staffReturnProduct : undefined}>
+      <View style={s.cartRow}>
+        <Image
+          source={getMarketProductImage(id)}
+          style={s.productArt}
+          resizeMode="contain"
+        />
+        <View style={s.cartName}>
+          <Text style={s.body}>
+            {product.name}
+          </Text>
+          <Text style={s.small}>
+            {product.detail}
+          </Text>
+          {showReturnLocation ? <Text style={s.small}>{marketCategories.find(category => category.id === product.categoryId)?.label} 진열대에서 내려놓기</Text> : null}
+        </View>
+        <Text style={s.quantity}>{quantity}개</Text>
+      </View>
+      {onRequestReturn ? <View style={dialogue ? s.staffReturnChoices : s.returnChoices}>
+        {dialogue ? <>
+          <MarketStaffDialogueChoice text="1개 부탁하기" label={`${product.name} 1개 반납 부탁하기`} onPress={() => onRequestReturn(id, 1)} />
+          {quantity > 1 ? <MarketStaffDialogueChoice text={`${quantity}개 모두 부탁하기`} label={`${product.name} 전부 반납 부탁하기`} onPress={() => onRequestReturn(id, quantity)} /> : null}
+        </> : <>
+          <Button text="1개 부탁하기" label={`${product.name} 1개 반납 부탁하기`} quiet onPress={() => onRequestReturn(id, 1)} />
+          {quantity > 1 ? <Button text={`${quantity}개 모두 부탁하기`} label={`${product.name} 전부 반납 부탁하기`} quiet onPress={() => onRequestReturn(id, quantity)} /> : null}
+        </>}
+      </View> : null}
+      </View>;
+    })}
+    {!Object.values(cart).some(q => q > 0)
+      ? <Text style={[s.body, dialogue && s.staffEmptyCart]}>아직 담은 물건이 없어요.</Text>
+      : null}
+  </View>;
+}
+export function Button({
+  text,
+  label,
+  onPress,
+  quiet = false,
+  selected = false,
+  disabled = false
+}: {
+  text: string;
+  label?: string;
+  onPress: () => void;
+  quiet?: boolean;
+  selected?: boolean;
+  disabled?: boolean;
+}) {
+  return <PressScale
+    accessibilityRole="button"
+    accessibilityLabel={label ?? text}
+    accessibilityState={{ disabled, selected }}
+    disabled={disabled}
+    onPress={onPress}
+    style={[s.button, quiet && s.quiet, selected && s.selected, disabled && s.disabled]}
+  >
+    <Text style={[s.buttonText, quiet && s.quietText]}>
+      {text}
+    </Text>
+  </PressScale>;
+}
+export function ModalCard({ title, eyebrow, children, onClose }: {
+  title: string;
+  eyebrow?: string;
+  children: React.ReactNode;
+  onClose?: () => void;
+}) {
+  const insets = useContext(SafeAreaInsetsContext);
+  return <View
+    accessibilityViewIsModal
+    style={[s.overlay, { paddingTop: Math.max(16, insets?.top ?? 0), paddingBottom: Math.max(16, insets?.bottom ?? 0) }]}
+  >
+    <ScrollView
+      style={s.modal}
+      contentContainerStyle={s.modalContent}
+      keyboardShouldPersistTaps="handled"
+    >
+      <View style={s.modalHeader}>
+        <View style={[s.modalHeading, onClose ? s.modalHeadingWithClose : undefined]}>
+          {eyebrow
+            ? <Text style={s.eyebrow}>
+              {eyebrow}
+            </Text>
+            : null}
+          <Text accessibilityRole="header" style={s.title}>
+            {title}
+          </Text>
+        </View>
+        {onClose
+          ? <PressScale
+            accessibilityRole="button"
+            accessibilityLabel={title + ' 닫기'}
+            onPress={onClose}
+            style={[s.remove, s.modalClose]}
+          >
+            <Ionicons
+              name="close"
+              size={24}
+              color="#536253"
+            />
           </PressScale>
-        </View>
-        {lines.length === 0 ? (
-          <View style={styles.emptyCart}>
-            <View style={styles.emptyCartIcon}><Ionicons color="#87A395" name="basket-outline" size={34} /></View>
-            <Text style={styles.emptyCartTitle}>아직 담은 물건이 없어요</Text>
-            <Text style={styles.emptyCartDescription}>진열대를 눌러 필요한 물건을 찾아보세요.</Text>
-          </View>
-        ) : (
-          <ScrollView contentContainerStyle={styles.cartList} style={styles.cartListScroll}>
-            {lines.map(({ product, quantity }) => (
-              <View key={product.id} style={styles.cartLine}>
-                <View style={[styles.cartLineIcon, { backgroundColor: product.packageColor }]}>
-                  <Ionicons color={product.color} name={product.icon as IoniconName} size={21} />
-                </View>
-                <View style={styles.cartLineCopy}>
-                  <Text style={styles.cartLineName}>{product.name}</Text>
-                  <Text style={styles.cartLinePrice}>{formatPrice(product.price * quantity)}</Text>
-                </View>
-                <View style={styles.cartQuantity}>
-                  <PressScale accessibilityLabel={`${product.name} 한 개 빼기`} onPress={() => onChangeQuantity(product.id, -1)} style={styles.cartQuantityButton}>
-                    <Ionicons color="#4D5751" name="remove" size={16} />
-                  </PressScale>
-                  <Text style={styles.cartQuantityText}>{quantity}</Text>
-                  <PressScale accessibilityLabel={`${product.name} 한 개 더 담기`} disabled={quantity >= product.initialStock} onPress={() => onChangeQuantity(product.id, 1)} style={styles.cartQuantityButton}>
-                    <Ionicons color="#4D5751" name="add" size={16} />
-                  </PressScale>
-                </View>
-              </View>
-            ))}
-          </ScrollView>
-        )}
-        <View style={styles.cartTotalRow}>
-          <Text style={styles.cartTotalLabel}>예상 금액</Text>
-          <Text style={styles.cartTotalValue}>{formatPrice(total)}</Text>
-        </View>
-        <PressScale
-          accessibilityRole="button"
-          disabled={lines.length === 0}
-          onPress={onCheckout}
-          style={[styles.checkoutButton, lines.length === 0 && styles.buttonDisabled]}
-        >
-          <Text style={styles.checkoutButtonText}>가방 닫기</Text>
-          <Ionicons color="#FFFFFF" name="close" size={20} />
-        </PressScale>
+          : null}
       </View>
-    </View>
-  );
+      {children}
+    </ScrollView>
+  </View>;
 }
-
-function CheckoutScene({ cart, mission }: { cart: MarketCart; mission: MarketMission }) {
-  const products = useContext(SceneProducts);
-  const getMarketProduct = (id: string) => products.find(p => p.id === id);
-  return (
-    <View style={styles.checkoutScene}>
-      <View style={styles.checkoutWall}>
-        <Text style={styles.checkoutWallText}>CHECKOUT</Text>
-      </View>
-      <View style={styles.checkoutCounterLarge}>
-        <View style={styles.checkoutScanner} />
-        <View style={styles.checkoutBelt}>
-          {Object.entries(cart).slice(0, 4).map(([productId], index) => {
-            const product = getMarketProduct(productId);
-            return product ? (
-              <View key={productId} style={[styles.beltProduct, { backgroundColor: product.packageColor, left: 20 + index * 48 }]}>
-                <Ionicons color={product.color} name={product.icon as IoniconName} size={20} />
-              </View>
-            ) : null;
-          })}
-        </View>
-      </View>
-      <View style={styles.checkoutCashierLarge}>
-        <View style={styles.checkoutCashierHair} />
-        <View style={styles.checkoutCashierHead} />
-        <View style={styles.checkoutCashierBody}><View style={styles.checkoutCashierApron} /></View>
-      </View>
-      <View style={styles.checkoutSpeech}>
-        <Text style={styles.checkoutSpeechName}>수진</Text>
-        <Text style={styles.checkoutSpeechText}>{mission.checkoutDialogue[0]}</Text>
-      </View>
+function Stars({ title, hint, value, onChange }: {
+  title: string;
+  hint: string;
+  value: number;
+  onChange: (value: number) => void;
+}) {
+  return <View style={s.stars}>
+    <Text style={s.body}>
+      {title}
+    </Text>
+    <View style={s.starRow}>
+      {[1, 2, 3, 4, 5].map(star => <PressScale
+        key={star}
+        accessibilityRole="button"
+        accessibilityLabel={title + ' ' + star + '점'}
+        accessibilityState={{ selected: value === star }}
+        onPress={() => onChange(star)}
+        style={s.star}
+      >
+        <Ionicons
+          name={star <= value ? 'star' : 'star-outline'}
+          color="#B58331"
+          size={28}
+        />
+      </PressScale>)}
     </View>
-  );
+    <Text style={s.small}>
+      {hint}
+    </Text>
+  </View>;
 }
-
-function CheckoutPanel({ cart, mission, onBack, onCheck, total }: { cart: MarketCart; mission: MarketMission; onBack: () => void; onCheck: () => void; total: number }) {
-  return (
-    <View style={styles.checkoutPanel}>
-      <View style={styles.receiptHeader}>
-        <View>
-          <Text style={styles.receiptEyebrow}>하늘마트 계산대</Text>
-          <Text style={styles.receiptTitle}>장바구니 확인</Text>
-        </View>
-        <View style={styles.receiptTotalBox}>
-          <Text style={styles.receiptTotalLabel}>합계</Text>
-          <Text style={styles.receiptTotalValue}>{formatPrice(total)}</Text>
-        </View>
-      </View>
-      <View style={styles.checkoutHint}>
-        <Ionicons color="#7A654F" name="information-circle" size={19} />
-        <Text style={styles.checkoutHintText}>{mission.checkoutDialogue[1]}</Text>
-      </View>
-      <View style={styles.checkoutActions}>
-        <PressScale accessibilityRole="button" onPress={onBack} style={styles.checkoutBackButton}>
-          <Text style={styles.checkoutBackText}>다시 보기</Text>
-        </PressScale>
-        <PressScale accessibilityRole="button" onPress={onCheck} style={styles.checkoutCheckButton}>
-          <Text style={styles.checkoutCheckText}>목록 확인</Text>
-          <Ionicons color="#FFFFFF" name="checkmark" size={20} />
-        </PressScale>
-      </View>
-    </View>
-  );
-}
-
-
-const styles = StyleSheet.create({
-  root: { backgroundColor: '#D8D1C2', flex: 1 },
-  embeddedRoot: { ...StyleSheet.absoluteFillObject, zIndex: 28 },
-  embeddedShoppingFooter: { height: 62, top: 110 },
-  embeddedCheckoutOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'flex-end',
-    zIndex: 52,
+const s = StyleSheet.create({
+  root: { flex: 1, backgroundColor: '#F7F4EC' },
+  embeddedRoot: { ...StyleSheet.absoluteFill, zIndex: 28 },
+  stationAction: {
+    position: 'absolute',
+    bottom: 100,
+    right: 14,
+    zIndex: 40
   },
-  embeddedCheckoutBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(24,30,26,0.52)',
+  overlay: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: 'rgba(29,45,51,0.58)',
+    justifyContent: 'center',
+    padding: 16,
+    zIndex: 80
   },
-  topBar: { alignItems: 'center', flexDirection: 'row', left: 0, paddingHorizontal: 14, paddingTop: 34, position: 'absolute', right: 0, top: 0, zIndex: 20 },
-  topIconButton: { alignItems: 'center', backgroundColor: 'rgba(34,44,38,0.84)', borderColor: 'rgba(255,255,255,0.28)', borderRadius: 18, borderWidth: 1, height: 42, justifyContent: 'center', width: 42 },
-  locationHeading: { backgroundColor: 'rgba(34,44,38,0.84)', borderColor: 'rgba(255,255,255,0.2)', borderRadius: 13, borderWidth: 1, flex: 1, marginLeft: 8, paddingHorizontal: 11, paddingVertical: 7 },
-  locationEyebrow: { color: 'rgba(255,255,255,0.62)', fontFamily: fonts.bold, fontSize: 8, letterSpacing: 0.7 },
-  locationTitle: { color: '#FFFFFF', fontFamily: fonts.bold, fontSize: 15, letterSpacing: -0.3, marginTop: 1 },
-  topStats: { alignItems: 'flex-end', gap: 5, marginLeft: 7 },
-  progressPill: { alignItems: 'center', backgroundColor: '#F5EBD4', borderColor: '#D9C49A', borderRadius: 10, borderWidth: 1, flexDirection: 'row', gap: 4, paddingHorizontal: 8, paddingVertical: 4 },
-  progressPillText: { color: '#466B55', fontFamily: fonts.bold, fontSize: 11 },
-  budgetPill: { alignItems: 'flex-end', backgroundColor: 'rgba(34,44,38,0.84)', borderRadius: 8, flexDirection: 'row', gap: 5, paddingHorizontal: 7, paddingVertical: 4 },
-  budgetPillOver: { backgroundColor: '#FFF0EC', borderRadius: 8, paddingHorizontal: 5, paddingVertical: 2 },
-  budgetPillLabel: { color: 'rgba(255,255,255,0.58)', fontFamily: fonts.medium, fontSize: 8 },
-  budgetPillValue: { color: '#FFFFFF', fontFamily: fonts.bold, fontSize: 11 },
-  topCartDot: { backgroundColor: '#E46D4E', borderColor: '#FFFFFF', borderRadius: 5, borderWidth: 2, height: 10, position: 'absolute', right: 10, top: 28, width: 10 },
-  map: { flex: 1, minHeight: 520, overflow: 'hidden', position: 'relative' },
-  marketWorld: { height: MARKET_WORLD_HEIGHT, left: 0, position: 'absolute', top: 0, width: MARKET_WORLD_WIDTH },
-  marketWorldGround: { ...StyleSheet.absoluteFillObject, backgroundColor: '#DED6C8', borderColor: '#B8AB98', borderWidth: 12 },
-  marketBackWall: { backgroundColor: '#F3E6D6', borderBottomColor: '#CFBBA6', borderBottomWidth: 4, height: 120, left: 0, position: 'absolute', top: 0, width: MARKET_WORLD_WIDTH },
-  marketAisle: { backgroundColor: 'rgba(250,244,230,0.54)', borderColor: 'rgba(145,125,99,0.16)', borderRadius: 26, borderWidth: 2, position: 'absolute' },
-  marketAisleMain: { height: 720, left: 365, top: 205, width: 170 },
-  marketAisleCrossTop: { height: 100, left: 245, top: 350, width: 410 },
-  marketAisleCrossBottom: { height: 100, left: 245, top: 630, width: 410 },
-  marketTapTarget: { borderColor: 'rgba(52,91,68,0.72)', borderRadius: 12, borderWidth: 3, height: 24, position: 'absolute', width: 24, zIndex: 4 },
-  backWall: { backgroundColor: '#F3E6D6', borderBottomColor: '#CFBBA6', borderBottomWidth: 3, height: 94, left: 0, position: 'absolute', right: 0, top: 0 },
-  wallStripe: { backgroundColor: '#D4775B', bottom: 11, height: 7, left: 0, opacity: 0.8, position: 'absolute', right: 0 },
-  storeLogo: { alignItems: 'center', alignSelf: 'center', backgroundColor: '#C95D46', borderRadius: 8, flexDirection: 'row', gap: 7, marginTop: 13, paddingHorizontal: 14, paddingVertical: 8 },
-  storeLogoText: { color: '#FFFFFF', fontFamily: fonts.bold, fontSize: 11, letterSpacing: 1.1 },
-  wallMessage: { bottom: 16, color: '#8B715E', fontFamily: fonts.medium, fontSize: 9, left: 17, position: 'absolute' },
-  mapFloor: { backgroundColor: '#E5DED1', bottom: 0, left: 0, position: 'absolute', right: 0, top: 94 },
-  floorTileRow: { backgroundColor: 'rgba(255,255,255,0.45)', height: 1, left: 0, position: 'absolute', right: 0 },
-  floorTileColumn: { backgroundColor: 'rgba(255,255,255,0.38)', bottom: 0, position: 'absolute', top: 0, transform: [{ rotate: '8deg' }], width: 1 },
-  counterArea: { backgroundColor: '#A97C59', borderColor: '#77563F', borderRadius: 12, borderWidth: 2, height: 105, left: 325, position: 'absolute', top: 92, width: 250 },
-  counterAreaActive: { borderColor: '#F3CE62', borderWidth: 3 },
-  counterRegister: { left: 12, position: 'absolute', top: -15 },
-  registerScreen: { backgroundColor: '#52605C', borderColor: '#36403D', borderRadius: 3, borderWidth: 1, height: 17, width: 28 },
-  registerBase: { backgroundColor: '#707B77', height: 6, marginLeft: 9, width: 10 },
-  cashierCharacter: { alignItems: 'center', position: 'absolute', right: 15, top: -37 },
-  cashierHair: { backgroundColor: '#5B4437', borderRadius: 12, height: 24, position: 'absolute', top: -2, width: 27 },
-  cashierHead: { backgroundColor: '#E2B592', borderColor: '#6A4D3D', borderRadius: 11, borderWidth: 1, height: 22, width: 22 },
-  cashierBody: { alignItems: 'center', backgroundColor: '#5D8C6B', borderColor: '#456550', borderRadius: 5, borderWidth: 1, height: 31, marginTop: -1, overflow: 'hidden', width: 24 },
-  cashierApron: { backgroundColor: '#E7E1CE', height: 21, marginTop: 8, width: 17 },
-  cashierNameTag: { backgroundColor: '#FFFFFF', borderRadius: 8, bottom: -19, paddingHorizontal: 8, paddingVertical: 3, position: 'absolute', right: 8 },
-  cashierNameText: { color: '#60574F', fontFamily: fonts.semibold, fontSize: 9 },
-  counterSign: { color: '#FFF4DE', fontFamily: fonts.bold, fontSize: 15, left: 24, letterSpacing: 1, position: 'absolute', top: 56 },
-  shelfGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 14, justifyContent: 'center', left: 14, position: 'absolute', right: 14, top: 176 },
-  shelfZone: { backgroundColor: '#9B7456', borderColor: '#6F503B', borderRadius: 12, borderWidth: 2, paddingHorizontal: 14, paddingTop: 16, position: 'absolute' },
-  shelfZoneOffset: { transform: [{ translateY: 10 }] },
-  shelfZoneActive: { borderColor: '#F3CE62', borderWidth: 3 },
-  shelfLabel: { alignItems: 'center', borderRadius: 9, flexDirection: 'row', gap: 5, left: 8, paddingHorizontal: 8, paddingVertical: 5, position: 'absolute', top: -11, zIndex: 3 },
-  shelfLabelText: { color: '#FFFFFF', fontFamily: fonts.semibold, fontSize: 10 },
-  shelfProducts: { flexDirection: 'row', gap: 7, justifyContent: 'center', marginTop: 9 },
-  shelfProduct: { borderColor: 'rgba(66,48,35,0.2)', borderRadius: 4, borderWidth: 1, height: 45, overflow: 'hidden', width: 38 },
-  shelfProductBand: { height: 9, marginTop: 8, width: '100%' },
-  shelfBoard: { backgroundColor: '#735038', height: 8, marginHorizontal: -4, marginTop: 8 },
-  shelfHelper: { color: '#F5EBDD', fontFamily: fonts.medium, fontSize: 9, marginTop: 6, textAlign: 'center' },
-  stationMarker: { backgroundColor: 'rgba(255,244,184,0.26)', borderColor: '#FFE889', borderRadius: 14, borderWidth: 3, bottom: -21, height: 28, left: '50%', marginLeft: -14, position: 'absolute', width: 28 },
-  playerCharacter: { alignItems: 'center', left: 0, position: 'absolute', top: 0, zIndex: 12 },
-  marketPlayerFixed: { alignItems: 'center', height: 78, justifyContent: 'flex-start', left: '50%', marginLeft: -25, marginTop: -39, position: 'absolute', top: '50%', width: 50, zIndex: 16 },
-  playerShadow: { backgroundColor: 'rgba(69,70,61,0.25)', borderRadius: 18, bottom: -8, height: 12, position: 'absolute', width: 42 },
-  playerMoveRing: { borderColor: 'rgba(255,244,184,0.64)', borderRadius: 23, borderWidth: 2, bottom: -13, height: 46, position: 'absolute', width: 46 },
-  playerHead: { backgroundColor: '#E4B894', borderColor: '#604639', borderRadius: 14, borderWidth: 1.5, height: 29, width: 29, zIndex: 2 },
-  playerBody: { alignItems: 'center', backgroundColor: '#E39344', borderColor: '#704D2B', borderRadius: 8, borderWidth: 1.5, height: 42, marginTop: -2, overflow: 'hidden', width: 33 },
-  playerBadgeImage: { height: 22, marginTop: 10, width: 22 },
-  playerBasket: { alignItems: 'center', backgroundColor: '#C95D46', borderColor: '#FFFFFF', borderRadius: 11, borderWidth: 1, height: 25, justifyContent: 'center', position: 'absolute', right: -19, top: 37, width: 25 },
-  marketEntranceInterior: { alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.7)', borderColor: '#B9B0A2', borderRadius: 16, borderStyle: 'dashed', borderWidth: 2, flexDirection: 'row', gap: 7, height: 58, justifyContent: 'center', left: 375, position: 'absolute', top: 900, width: 150 },
-  marketEntranceInteriorText: { color: '#647168', fontFamily: fonts.bold, fontSize: 13 },
-  marketControlToggle: { alignItems: 'center', backgroundColor: 'rgba(35,47,39,0.86)', borderColor: 'rgba(255,255,255,0.24)', borderRadius: 12, borderWidth: 1, flexDirection: 'row', gap: 5, paddingHorizontal: 10, paddingVertical: 8, position: 'absolute', right: 14, top: 112, zIndex: 26 },
-  marketControlToggleText: { color: '#FFF8E8', fontFamily: fonts.bold, fontSize: 9 },
-  marketRunButton: { alignItems: 'center', backgroundColor: 'rgba(255,250,236,0.88)', borderColor: 'rgba(75,64,46,0.28)', borderRadius: 25, borderWidth: 2, bottom: 162, height: 50, justifyContent: 'center', position: 'absolute', right: 92, width: 50, zIndex: 24 },
-  marketRunButtonActive: { backgroundColor: '#4C6E5A', borderColor: 'rgba(255,255,255,0.75)' },
-  marketJoystickZone: { bottom: 72, height: MARKET_JOYSTICK_ZONE_HEIGHT, left: 0, position: 'absolute', width: '58%', zIndex: 22 },
-  marketJoystick: { alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.52)', borderColor: 'rgba(49,61,52,0.22)', borderRadius: 55, borderWidth: 2, height: MARKET_JOYSTICK_SIZE, justifyContent: 'center', position: 'absolute', width: MARKET_JOYSTICK_SIZE },
-  marketJoystickGuideHorizontal: { backgroundColor: 'rgba(62,78,67,0.12)', height: 2, position: 'absolute', width: 70 },
-  marketJoystickGuideVertical: { backgroundColor: 'rgba(62,78,67,0.12)', height: 70, position: 'absolute', width: 2 },
-  marketJoystickKnob: { backgroundColor: 'rgba(60,76,65,0.82)', borderColor: 'rgba(255,255,255,0.7)', borderRadius: 24, borderWidth: 2, height: 48, width: 48 },
-  marketTouchHint: { alignItems: 'center', alignSelf: 'center', backgroundColor: 'rgba(38,50,42,0.84)', borderColor: 'rgba(255,255,255,0.2)', borderRadius: 13, borderWidth: 1, flexDirection: 'row', gap: 6, paddingHorizontal: 12, paddingVertical: 8, position: 'absolute', top: 122, zIndex: 24 },
-  marketTouchHintText: { color: '#FFFFFF', fontFamily: fonts.semibold, fontSize: 10 },
-  mapInstruction: { alignItems: 'center', alignSelf: 'center', backgroundColor: 'rgba(38,50,42,0.84)', borderColor: 'rgba(255,255,255,0.2)', borderRadius: 13, borderWidth: 1, flexDirection: 'row', gap: 6, paddingHorizontal: 12, paddingVertical: 8, position: 'absolute', top: 128 },
-  mapInstructionText: { color: '#FFFFFF', fontFamily: fonts.semibold, fontSize: 10 },
-  stationActionButton: { alignItems: 'center', backgroundColor: '#317A5B', borderColor: '#F5E8C8', borderRadius: 32, borderWidth: 3, bottom: 91, height: 64, justifyContent: 'center', position: 'absolute', right: 18, shadowColor: '#23352C', shadowOffset: { height: 4, width: 0 }, shadowOpacity: 0.24, shadowRadius: 6, width: 64, zIndex: 25 },
-  stationActionText: { color: '#FFF8E8', fontFamily: fonts.bold, fontSize: 9, marginTop: 2 },
-  shoppingFooter: { alignItems: 'stretch', bottom: 14, flexDirection: 'row', gap: 9, left: 13, position: 'absolute', right: 13, zIndex: 24 },
-  missionStrip: { backgroundColor: '#FFF9EA', borderColor: '#D8C6A5', borderRadius: 11, borderWidth: 1, elevation: 3, flex: 1, height: 62, justifyContent: 'center', paddingBottom: 6, paddingHorizontal: 9, paddingTop: 9, position: 'relative', shadowColor: '#5D4A34', shadowOffset: { height: 2, width: 0 }, shadowOpacity: 0.14, shadowRadius: 4 },
-  missionTape: { alignSelf: 'center', backgroundColor: 'rgba(224,204,163,0.62)', borderRadius: 2, height: 8, position: 'absolute', top: -4, transform: [{ rotate: '-1deg' }], width: 36 },
-  missionStripHeading: { alignItems: 'center', flexDirection: 'row', gap: 3, height: 13 },
-  missionStripLabel: { color: '#806B53', fontFamily: fonts.handwriting, fontSize: 9, letterSpacing: 0.15 },
-  missionChecklist: { alignItems: 'flex-start', flexDirection: 'row', gap: 7, marginTop: 2, minWidth: 0 },
-  missionChecklistItem: { flex: 1, flexBasis: 0, minWidth: 0 },
-  missionItemHeading: { alignItems: 'center', flexDirection: 'row', gap: 3, minWidth: 0 },
-  missionCheckbox: { alignItems: 'center', backgroundColor: '#FFFCF3', borderColor: '#BBAA89', borderRadius: 6, borderWidth: 1, height: 11, justifyContent: 'center', width: 11 },
-  missionCheckboxComplete: { backgroundColor: '#4E916B', borderColor: '#4E916B' },
-  missionItemName: { color: '#4D4338', flex: 1, fontFamily: fonts.handwriting, fontSize: 12, lineHeight: 15, minWidth: 0 },
-  missionItemNameComplete: { color: '#718074', textDecorationLine: 'line-through' },
-  missionItemCount: { color: '#8C7559', fontFamily: fonts.bold, fontSize: 9, lineHeight: 10, marginLeft: 14 },
-  missionItemCountComplete: { color: '#4E7D60' },
-  cartButton: { alignItems: 'center', backgroundColor: '#367A5A', borderColor: '#F5E8C8', borderRadius: 16, borderWidth: 2, height: 62, justifyContent: 'center', position: 'relative', width: 68 },
-  cartButtonText: { color: '#FFFFFF', fontFamily: fonts.bold, fontSize: 9, marginTop: 1 },
-  cartCountBadge: { alignItems: 'center', backgroundColor: '#F0C95B', borderColor: '#FFFFFF', borderRadius: 10, borderWidth: 1, height: 20, justifyContent: 'center', minWidth: 20, paddingHorizontal: 5, position: 'absolute', right: -4, top: -5 },
-  cartCountText: { color: '#317A5B', fontFamily: fonts.bold, fontSize: 11 },
-  dialogueOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(25,31,27,0.28)', justifyContent: 'flex-end', padding: 14, zIndex: 30 },
-  dialogueCard: { backgroundColor: 'rgba(35,43,38,0.96)', borderColor: '#EED9A8', borderRadius: 16, borderWidth: 3, padding: 17 },
-  dialogueHeader: { alignItems: 'center', flexDirection: 'row' },
-  dialogueAvatar: { alignItems: 'center', backgroundColor: '#EAF2E9', borderColor: '#EED9A8', borderRadius: 22, borderWidth: 2, height: 44, justifyContent: 'center', marginRight: 10, overflow: 'hidden', width: 44 },
-  dialogueAvatarHair: { backgroundColor: '#5B4437', borderRadius: 11, height: 22, position: 'absolute', top: 8, width: 25 },
-  dialogueAvatarFace: { backgroundColor: '#E2B592', borderColor: '#6A4D3D', borderRadius: 10, borderWidth: 1, height: 20, marginTop: -3, width: 20 },
-  dialogueHeaderCopy: { flex: 1 },
-  dialogueAiBadge: { alignItems: 'center', backgroundColor: '#DDF2E9', borderRadius: 10, flexDirection: 'row', gap: 3, marginRight: 8, paddingHorizontal: 7, paddingVertical: 4 },
-  dialogueAiBadgeText: { color: '#325F51', fontFamily: fonts.bold, fontSize: 8 },
-  dialogueName: { color: '#F5D895', fontFamily: fonts.cafe24Ssurround, fontSize: 15 },
-  dialogueRole: { color: 'rgba(255,255,255,0.58)', fontFamily: fonts.cafe24SsurroundAir, fontSize: 10, marginTop: 2 },
-  dialogueProgress: { color: 'rgba(255,255,255,0.54)', fontFamily: fonts.cafe24Ssurround, fontSize: 10 },
-  dialogueMessage: { color: '#FFFFFF', fontFamily: fonts.cafe24Ssurround, fontSize: 18, letterSpacing: -0.4, lineHeight: 27, marginTop: 16, minHeight: 58 },
-  dialogueButton: { alignItems: 'center', alignSelf: 'flex-end', backgroundColor: '#B85C43', borderColor: '#E9A082', borderRadius: 11, borderWidth: 2, flexDirection: 'row', gap: 7, height: 45, justifyContent: 'center', marginTop: 13, paddingHorizontal: 18 },
-  dialogueButtonText: { color: '#FFFFFF', fontFamily: fonts.cafe24Ssurround, fontSize: 14 },
-  sheetOverlay: { ...StyleSheet.absoluteFillObject, justifyContent: 'flex-end', zIndex: 50 },
-  sheetBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(21,27,23,0.56)' },
-  productSheet: { backgroundColor: '#F5E7C8', borderColor: '#77583E', borderRadius: 18, borderWidth: 4, margin: 10, paddingBottom: 15, paddingHorizontal: 14, paddingTop: 13 },
-  cartSheet: { backgroundColor: '#F5E7C8', borderColor: '#77583E', borderRadius: 18, borderWidth: 4, margin: 10, maxHeight: '82%', minHeight: 420, paddingBottom: 15, paddingHorizontal: 14, paddingTop: 13 },
-  sheetHandle: { alignSelf: 'center', backgroundColor: '#A88962', borderRadius: 3, height: 4, marginBottom: 12, opacity: 0.5, width: 38 },
-  sheetHeader: { alignItems: 'center', flexDirection: 'row' },
-  cartSheetHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
-  sheetHeaderIcon: { alignItems: 'center', borderRadius: 14, height: 44, justifyContent: 'center', marginRight: 10, width: 44 },
-  sheetHeaderCopy: { flex: 1 },
-  sheetEyebrow: { color: '#93734F', fontFamily: fonts.bold, fontSize: 9, letterSpacing: 0.45 },
-  sheetTitle: { color: '#423326', fontFamily: fonts.laundryBold, fontSize: 21, letterSpacing: -0.4, marginTop: 2 },
-  sheetCloseButton: { alignItems: 'center', backgroundColor: '#E2D0AA', borderColor: '#B39468', borderRadius: 10, borderWidth: 1, height: 38, justifyContent: 'center', width: 38 },
-  productScroll: { marginHorizontal: -2, marginTop: 13, maxHeight: 390 },
-  productGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingBottom: 4, paddingHorizontal: 2, width: '100%' },
-  productCard: { backgroundColor: '#FFF7E6', borderColor: '#CBB58E', borderRadius: 10, borderWidth: 2, padding: 7, width: '31.5%' },
-  productCardSelected: { borderColor: '#39795A', borderWidth: 3, padding: 6 },
-  productVisual: { alignItems: 'center', borderColor: 'rgba(87,62,40,0.14)', borderRadius: 8, borderWidth: 1, height: 56, justifyContent: 'center', overflow: 'hidden', position: 'relative' },
-  productVisualBand: { height: 7, left: 0, opacity: 0.8, position: 'absolute', right: 0, top: 8 },
-  selectedCheck: { alignItems: 'center', backgroundColor: '#317A5B', borderRadius: 8, height: 16, justifyContent: 'center', position: 'absolute', right: 4, top: 4, width: 16 },
-  productName: { color: '#333633', fontFamily: fonts.bold, fontSize: 12, marginTop: 7 },
-  productDetail: { color: '#94918D', fontFamily: fonts.regular, fontSize: 8, marginTop: 1 },
-  productPrice: { color: '#4C514D', fontFamily: fonts.semibold, fontSize: 10, marginTop: 5 },
-  addProductButton: { alignItems: 'center', backgroundColor: '#39795A', borderColor: '#285D43', borderRadius: 8, borderWidth: 1.5, flexDirection: 'row', height: 32, justifyContent: 'center', marginTop: 7 },
-  addProductButtonText: { color: '#FFFFFF', fontFamily: fonts.semibold, fontSize: 10, marginLeft: 2 },
-  quantityControl: { alignItems: 'center', backgroundColor: '#E8DFC9', borderColor: '#C4B18D', borderRadius: 8, borderWidth: 1, flexDirection: 'row', height: 32, justifyContent: 'space-between', marginTop: 7, paddingHorizontal: 2 },
-  quantityButton: { alignItems: 'center', height: 27, justifyContent: 'center', width: 25 },
-  quantityValue: { color: '#34483E', fontFamily: fonts.bold, fontSize: 11 },
-  sheetDoneButton: { alignItems: 'center', backgroundColor: '#E0CEA9', borderColor: '#B3966B', borderRadius: 10, borderWidth: 1.5, height: 46, justifyContent: 'center', marginTop: 14 },
-  sheetDoneButtonText: { color: '#574530', fontFamily: fonts.bold, fontSize: 13 },
-  emptyCart: { alignItems: 'center', flex: 1, justifyContent: 'center', minHeight: 210 },
-  emptyCartIcon: { alignItems: 'center', backgroundColor: '#EDF4EF', borderRadius: 28, height: 58, justifyContent: 'center', width: 58 },
-  emptyCartTitle: { color: '#404641', fontFamily: fonts.bold, fontSize: 16, marginTop: 13 },
-  emptyCartDescription: { color: '#8E918D', fontFamily: fonts.regular, fontSize: 12, marginTop: 5 },
-  cartListScroll: { flexGrow: 0, marginTop: 12, maxHeight: 275 },
-  cartList: { gap: 8, paddingBottom: 5 },
-  cartLine: { alignItems: 'center', backgroundColor: '#FFF7E6', borderColor: '#D1BD98', borderRadius: 10, borderWidth: 1, flexDirection: 'row', padding: 9 },
-  cartLineIcon: { alignItems: 'center', borderRadius: 11, height: 42, justifyContent: 'center', marginRight: 10, width: 42 },
-  cartLineCopy: { flex: 1 },
-  cartLineName: { color: '#343936', fontFamily: fonts.semibold, fontSize: 13 },
-  cartLinePrice: { color: '#88847F', fontFamily: fonts.medium, fontSize: 11, marginTop: 3 },
-  cartQuantity: { alignItems: 'center', backgroundColor: '#E9DFC8', borderColor: '#CBB792', borderRadius: 8, borderWidth: 1, flexDirection: 'row', padding: 3 },
-  cartQuantityButton: { alignItems: 'center', height: 29, justifyContent: 'center', width: 29 },
-  cartQuantityText: { color: '#39453E', fontFamily: fonts.bold, fontSize: 12, minWidth: 20, textAlign: 'center' },
-  cartTotalRow: { alignItems: 'center', borderStyle: 'dashed', borderTopColor: '#C7AF86', borderTopWidth: 1.5, flexDirection: 'row', justifyContent: 'space-between', marginTop: 12, paddingTop: 13 },
-  cartTotalLabel: { color: '#77736E', fontFamily: fonts.medium, fontSize: 13 },
-  cartTotalValue: { color: '#2F3933', fontFamily: fonts.bold, fontSize: 20 },
-  checkoutButton: { alignItems: 'center', backgroundColor: '#39795A', borderColor: '#285D43', borderRadius: 10, borderWidth: 2, flexDirection: 'row', gap: 7, height: 50, justifyContent: 'center', marginTop: 12 },
-  checkoutButtonText: { color: '#FFFFFF', fontFamily: fonts.bold, fontSize: 16 },
-  buttonDisabled: { opacity: 0.38 },
-  checkoutScene: { backgroundColor: '#E5DED1', flex: 1, minHeight: 400, overflow: 'hidden', position: 'relative' },
-  checkoutWall: { alignItems: 'center', backgroundColor: '#F2E5D4', borderBottomColor: '#C9B39B', borderBottomWidth: 3, height: 102, paddingTop: 30 },
-  checkoutWallText: { color: '#B2634D', fontFamily: fonts.bold, fontSize: 15, letterSpacing: 2 },
-  checkoutCounterLarge: { backgroundColor: '#A97C59', borderColor: '#6D4E39', borderRadius: 12, borderWidth: 2, height: 110, left: '9%', position: 'absolute', right: '9%', top: 230 },
-  checkoutScanner: { backgroundColor: '#57625F', borderColor: '#37403E', borderRadius: 7, borderWidth: 1, height: 32, position: 'absolute', right: 34, top: -22, width: 54 },
-  checkoutBelt: { backgroundColor: '#575C5B', borderRadius: 6, height: 54, left: 18, overflow: 'hidden', position: 'absolute', right: 108, top: 17 },
-  beltProduct: { alignItems: 'center', borderRadius: 6, height: 38, justifyContent: 'center', position: 'absolute', top: 8, width: 36 },
-  checkoutCashierLarge: { alignItems: 'center', position: 'absolute', right: 48, top: 128 },
-  checkoutCashierHair: { backgroundColor: '#594337', borderRadius: 25, height: 47, position: 'absolute', top: -4, width: 54 },
-  checkoutCashierHead: { backgroundColor: '#E2B592', borderColor: '#664A3B', borderRadius: 22, borderWidth: 2, height: 44, width: 44 },
-  checkoutCashierBody: { alignItems: 'center', backgroundColor: '#5D8C6B', borderColor: '#456550', borderRadius: 10, borderWidth: 2, height: 72, marginTop: -2, overflow: 'hidden', width: 58 },
-  checkoutCashierApron: { backgroundColor: '#EAE4D4', borderRadius: 5, height: 46, marginTop: 18, width: 38 },
-  checkoutSpeech: { backgroundColor: '#FFFFFF', borderColor: '#DED9D1', borderRadius: 18, borderWidth: 1, left: 24, padding: 14, position: 'absolute', right: 135, top: 118 },
-  checkoutSpeechName: { color: '#3A6D54', fontFamily: fonts.bold, fontSize: 11 },
-  checkoutSpeechText: { color: '#393D3A', fontFamily: fonts.semibold, fontSize: 13, lineHeight: 19, marginTop: 5 },
-  checkoutPanel: { backgroundColor: '#F5E7C8', borderColor: '#77583E', borderLeftWidth: 4, borderRightWidth: 4, borderTopLeftRadius: 18, borderTopRightRadius: 18, borderTopWidth: 4, paddingBottom: 17, paddingHorizontal: 16, paddingTop: 16 },
-  receiptHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
-  receiptEyebrow: { color: '#91887F', fontFamily: fonts.medium, fontSize: 10 },
-  receiptTitle: { color: '#2F3531', fontFamily: fonts.bold, fontSize: 19, marginTop: 3 },
-  receiptTotalBox: { alignItems: 'flex-end' },
-  receiptTotalLabel: { color: '#91887F', fontFamily: fonts.medium, fontSize: 10 },
-  receiptTotalValue: { color: '#2F3C35', fontFamily: fonts.bold, fontSize: 19, marginTop: 2 },
-  checkoutHint: { alignItems: 'flex-start', backgroundColor: '#FFF6E2', borderColor: '#D2BD94', borderRadius: 9, borderWidth: 1, flexDirection: 'row', gap: 7, marginTop: 13, padding: 11 },
-  checkoutHintText: { color: '#6E6257', flex: 1, fontFamily: fonts.regular, fontSize: 11, lineHeight: 17 },
-  checkoutActions: { flexDirection: 'row', gap: 9, marginTop: 12 },
-  checkoutBackButton: { alignItems: 'center', backgroundColor: '#E0CEA9', borderColor: '#B3966B', borderRadius: 10, borderWidth: 1.5, height: 50, justifyContent: 'center', width: 108 },
-  checkoutBackText: { color: '#5F6963', fontFamily: fonts.semibold, fontSize: 14 },
-  checkoutCheckButton: { alignItems: 'center', backgroundColor: '#39795A', borderColor: '#285D43', borderRadius: 10, borderWidth: 2, flex: 1, flexDirection: 'row', gap: 6, height: 50, justifyContent: 'center' },
-  checkoutCheckText: { color: '#FFFFFF', fontFamily: fonts.bold, fontSize: 15 },
-  resultOverlay: { ...StyleSheet.absoluteFillObject, alignItems: 'center', backgroundColor: 'rgba(26,32,28,0.64)', justifyContent: 'center', padding: 18, zIndex: 60 },
-  resultCard: { alignItems: 'center', backgroundColor: '#F8EACB', borderColor: '#74543A', borderRadius: 18, borderWidth: 4, maxWidth: 420, padding: 22, width: '100%' },
-  successIconStage: { alignItems: 'center', backgroundColor: '#3B8A65', borderRadius: 33, height: 66, justifyContent: 'center', overflow: 'hidden', width: 66 },
-  successRing: { borderColor: 'rgba(255,255,255,0.35)', borderRadius: 25, borderWidth: 2, height: 50, position: 'absolute', width: 50 },
-  retryIconStage: { alignItems: 'center', backgroundColor: '#F6E9D8', borderRadius: 31, height: 62, justifyContent: 'center', width: 62 },
-  resultStamp: { alignItems: 'center', backgroundColor: '#B85641', borderColor: '#D98C72', borderRadius: 8, borderWidth: 2, flexDirection: 'row', gap: 5, marginTop: 14, paddingHorizontal: 10, paddingVertical: 6, transform: [{ rotate: '-2deg' }] },
-  resultStampText: { color: '#FFFFFF', fontFamily: fonts.bold, fontSize: 10, letterSpacing: 0.8 },
-  resultEyebrow: { color: '#448166', fontFamily: fonts.bold, fontSize: 11, marginTop: 12 },
-  resultTitle: { color: '#252A27', fontFamily: fonts.laundryBold, fontSize: 23, letterSpacing: -0.6, lineHeight: 31, marginTop: 5, textAlign: 'center' },
-  resultDescription: { color: '#7A7D79', fontFamily: fonts.regular, fontSize: 13, lineHeight: 20, marginTop: 8, textAlign: 'center' },
-  resultStats: { backgroundColor: '#FFF6E3', borderColor: '#D0B98D', borderRadius: 10, borderWidth: 1, flexDirection: 'row', marginTop: 18, paddingVertical: 13, width: '100%' },
-  resultStat: { alignItems: 'center', flex: 1 },
-  resultStatValue: { color: '#34433B', fontFamily: fonts.bold, fontSize: 14 },
-  resultStatLabel: { color: '#8A8E8A', fontFamily: fonts.regular, fontSize: 9, marginTop: 4 },
-  resultStatDivider: { backgroundColor: '#DDDFDB', height: 30, width: 1 },
-  feedbackList: { gap: 8, marginTop: 18, width: '100%' },
-  feedbackRow: { alignItems: 'center', backgroundColor: '#F8F1E7', borderRadius: 13, flexDirection: 'row', padding: 10 },
-  feedbackIcon: { alignItems: 'center', backgroundColor: '#FFF9F0', borderRadius: 10, height: 34, justifyContent: 'center', marginRight: 9, width: 34 },
-  feedbackText: { color: '#665C52', flex: 1, fontFamily: fonts.medium, fontSize: 12, lineHeight: 18 },
-  resultPrimaryButton: { alignItems: 'center', backgroundColor: '#39795A', borderColor: '#285D43', borderRadius: 10, borderWidth: 2, height: 50, justifyContent: 'center', marginTop: 18, width: '100%' },
-  resultPrimaryButtonText: { color: '#FFFFFF', fontFamily: fonts.bold, fontSize: 16 },
-  notice: { alignItems: 'center', alignSelf: 'center', backgroundColor: 'rgba(37,49,42,0.92)', borderRadius: 18, bottom: 92, flexDirection: 'row', gap: 6, paddingHorizontal: 14, paddingVertical: 9, position: 'absolute', zIndex: 70 },
-  noticeText: { color: '#FFFFFF', fontFamily: fonts.semibold, fontSize: 12 },
+  modal: {
+    flexGrow: 0,
+    maxHeight: '100%',
+    width: '100%',
+    maxWidth: 560,
+    alignSelf: 'center',
+    borderRadius: 24,
+    backgroundColor: '#F7F4EC',
+    borderWidth: 1,
+    borderColor: '#DCD7C8',
+    ...Platform.select({ web: { boxShadow: '0 18px 60px rgba(22,39,44,0.22)' }, default: { elevation: 10 } })
+  },
+  modalContent: { padding: 22, gap: 14 },
+  modalHeader: { position: 'relative', justifyContent: 'center', minHeight: 44 },
+  modalHeading: { alignItems: 'center' },
+  modalHeadingWithClose: { paddingHorizontal: 44 },
+  modalClose: { position: 'absolute', right: 0, top: 0 },
+  staffReturnProduct: { backgroundColor: '#F7F4EC', padding: 12, borderRadius: 20, marginBottom: 10 },
+  staffReturnChoices: { gap: 8, paddingTop: 10 },
+  staffEmptyCart: { backgroundColor: '#F7F4EC', borderRadius: 20, padding: 16, textAlign: 'center' },
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 10
+  },
+  title: {
+    textAlign: 'center',
+    fontFamily: fonts.laundryBold,
+    fontSize: 25,
+    lineHeight: 34,
+    color: '#304B54'
+  },
+  eyebrow: {
+    textAlign: 'center',
+    fontFamily: fonts.semibold,
+    fontSize: 11,
+    color: '#93673F',
+    marginBottom: 4
+  },
+  body: {
+    fontFamily: fonts.medium,
+    fontSize: 15,
+    lineHeight: 23,
+    color: '#3E5158'
+  },
+  small: {
+    fontFamily: fonts.regular,
+    fontSize: 12,
+    lineHeight: 19,
+    color: '#667278'
+  },
+  quantity: { fontFamily: fonts.bold, fontSize: 16, color: '#587565' },
+  requirements: {
+    backgroundColor: '#EEEBE1',
+    borderLeftWidth: 3,
+    borderLeftColor: '#C48B57',
+    borderRadius: 12,
+    padding: 12,
+    gap: 7
+  },
+  choices: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  button: {
+    minHeight: 46,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+    backgroundColor: '#587565',
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  buttonText: { fontFamily: fonts.bold, fontSize: 14, color: '#FFFFFF' },
+  quiet: { backgroundColor: '#E5EBDD' },
+  quietText: { color: '#304B54' },
+  selected: { borderWidth: 2, borderColor: '#587565' },
+  disabled: { opacity: 0.4 },
+  cartRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#DDD8CB'
+  },
+  productArt: { width: 44, height: 52 },
+  cartName: { flex: 1 },
+  returnChoices: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingBottom: 12 },
+  remove: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  resultBadge: {
+    alignItems: 'center',
+    padding: 16,
+    gap: 8,
+    backgroundColor: '#E5EDDF',
+    borderWidth: 1,
+    borderColor: '#D1DDC9',
+    borderRadius: 16
+  },
+  resultText: { fontFamily: fonts.laundryBold, fontSize: 24, color: '#304B54' },
+  stars: { gap: 4 },
+  starRow: { flexDirection: 'row' },
+  star: {
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  notice: {
+    position: 'absolute',
+    bottom: 18,
+    left: 20,
+    right: 20,
+    zIndex: 100,
+    padding: 12,
+    backgroundColor: '#304B54',
+    borderRadius: 12
+  },
+  noticeText: { fontFamily: fonts.medium, fontSize: 13, color: '#FFFFFF' },
+  alarmNotice: { backgroundColor: '#A63E39', bottom: 150, zIndex: 110 },
+  alarmNoticeText: { fontFamily: fonts.bold, fontSize: 14, lineHeight: 21, color: '#FFFFFF' },
 });

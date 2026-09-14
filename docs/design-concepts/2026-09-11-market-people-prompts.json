@@ -1,0 +1,136 @@
+{
+  "date": "2026-09-11",
+  "mode": "built-in image_gen",
+  "reference": "frontend/assets/images/game/characters/player/fresh-v1/chr_player_fresh_front_idle_f00_v2@2x.png",
+  "promptBase": "Use case: stylized-concept. Asset type: a single full-body NPC illustration / transparent idle sprite for the Korean life-simulation game Oneuldo.\nInput image 1 is ONLY the art direction reference: the ACTUAL playable character sprite. Match its delicate warm dark-gray linework, modest anime/storybook facial features, soft flat color shading, restrained desaturated everyday palette and long slim limbs. Adult proportions about 5.5 to 6 heads tall, as in this exact reference; NOT chibi, NOT a big head or stubby body, NOT photorealistic, NOT 3D. Same illustrator and same world. Do not copy the reference person's identity or clothes.\nExactly ONE person, full body from hair to soles, facing straight forward in a natural neutral standing idle pose. Arms relaxed at sides, both hands and both complete shoes visible and separate, subtle friendly expression. Flat front camera, no perspective foreshortening, centered vertical figure, feet on a common baseline. Leave a small clear margin all around; no cropped hair or feet.\nOutput one portrait PNG, preferably 1024x1536. Background: actual transparent alpha if supported. If true alpha is unavailable, use a PERFECTLY SOLID FLAT CHROMA MAGENTA #FF00FF backdrop for clean sprite keying, identical RGB at every background pixel. Never draw a transparency checker pattern. No scenery, floor, cast shadow, glow, background gradient or texture, border, writing, watermark or multiple poses. No magenta anywhere on the person. The character must be crisply readable at a small in-game size.\n",
+  "variants": [
+    {
+      "id": "employee-male-01",
+      "label": "남성 종업원 1",
+      "role": "employee",
+      "age": "adult",
+      "gender": "male",
+      "description": "A Korean male grocery store employee in his late twenties. Neatly side-parted short dark-brown hair, no glasses. Off-white collared long-sleeve shirt with sleeves neatly rolled, muted sage green bib apron with a small plain cream rectangular name badge and one lower pocket, charcoal straight trousers, cream and green simple sneakers. Slender average adult build."
+    },
+    {
+      "id": "employee-male-02",
+      "label": "남성 종업원 2",
+      "role": "employee",
+      "age": "adult",
+      "gender": "male",
+      "description": "A Korean male grocery store employee around forty. Short tidy black hair with a slightly lifted front, thin round brown glasses. Dusty pale-blue collared shirt with sleeves rolled, muted sage green bib apron with a small plain cream rectangular name badge and one lower pocket, dark warm-gray straight trousers, brown simple work sneakers. Slightly broader shoulders than the reference, still slender illustrated adult proportions."
+    },
+    {
+      "id": "employee-female-01",
+      "label": "여성 종업원 1",
+      "role": "employee",
+      "age": "adult",
+      "gender": "female",
+      "description": "A Korean female grocery store employee in her late twenties. Dark brown hair tied in a simple low ponytail with a few gentle side bangs. Ivory long-sleeve collared shirt, muted sage green bib apron with a small plain cream rectangular name badge and one lower pocket, charcoal straight trousers and simple pale green sneakers. Practical comfortable work clothes, slim adult proportions."
+    },
+    {
+      "id": "employee-female-02",
+      "label": "여성 종업원 2",
+      "role": "employee",
+      "age": "adult",
+      "gender": "female",
+      "description": "A Korean female grocery store employee in her forties. Neat chin-length black bob with side part, small oval eyeglasses. Dusty beige long-sleeve shirt, muted sage green bib apron with a small plain cream rectangular name badge and one lower pocket, dark navy straight trousers, beige low sneakers. Practical comfortable work clothes, average adult build, gentle mature face."
+    },
+    {
+      "id": "customer-adult-male-01",
+      "label": "성인 남성 손님 1",
+      "role": "customer",
+      "age": "adult",
+      "gender": "male",
+      "description": "A Korean adult male shopper in his thirties. Short straight black hair with a soft side part. Muted dusty-blue open overshirt on an ivory T-shirt, beige straight chinos and white-gray sneakers. Average slender adult build. Empty hands, no bag and no apron."
+    },
+    {
+      "id": "customer-adult-male-02",
+      "label": "성인 남성 손님 2",
+      "role": "customer",
+      "age": "adult",
+      "gender": "male",
+      "description": "A Korean adult male shopper in his forties. Short warm brown hair, thin rectangular glasses. Muted terracotta crewneck knit sweater, charcoal straight trousers, brown casual shoes. Slightly broad adult build but proportional to the reference. Empty hands, no bag and no apron."
+    },
+    {
+      "id": "customer-adult-female-01",
+      "label": "성인 여성 손님 1",
+      "role": "customer",
+      "age": "adult",
+      "gender": "female",
+      "description": "A Korean adult female shopper in her thirties. Straight dark brown shoulder-length hair with soft bangs. Dusty lavender cardigan over an ivory top, muted blue straight jeans and cream sneakers. Slender adult proportions. Empty hands, no bag and no apron."
+    },
+    {
+      "id": "customer-adult-female-02",
+      "label": "성인 여성 손님 2",
+      "role": "customer",
+      "age": "adult",
+      "gender": "female",
+      "description": "A Korean adult female shopper in her forties. Dark hair in a loose low bun, face-framing side strands, no glasses. Muted warm ochre long-sleeve blouse, charcoal ankle-length straight trousers, beige flat walking shoes. Average adult proportions. Empty hands, no bag and no apron."
+    },
+    {
+      "id": "customer-senior-male-01",
+      "label": "노년 남성 손님 1",
+      "role": "customer",
+      "age": "senior",
+      "gender": "male",
+      "description": "A Korean older male shopper in his late sixties. Short neatly combed silver-gray hair, subtle smile lines and age lines, thin round glasses. Muted moss-green cardigan over a cream collared shirt, brown straight trousers, comfortable dark-brown shoes. Natural healthy upright older adult, calm warm expression. No exaggeration of aging or frailty. Empty hands, no cane, no bag, no apron."
+    },
+    {
+      "id": "customer-senior-male-02",
+      "label": "노년 남성 손님 2",
+      "role": "customer",
+      "age": "senior",
+      "gender": "male",
+      "description": "A Korean older male shopper in his seventies. Receding short gray-white hair, no glasses, subtle forehead and smile lines. Muted sand-colored sleeveless knit vest over a dusty pale-blue long-sleeve collared shirt, warm-gray straight trousers, brown walking shoes. Natural upright older adult, gentle expression. No exaggerated frailty. Empty hands, no cane, no bag, no apron."
+    },
+    {
+      "id": "customer-senior-female-01",
+      "label": "노년 여성 손님 1",
+      "role": "customer",
+      "age": "senior",
+      "gender": "female",
+      "description": "A Korean older female shopper in her late sixties. Short softly waved silver-gray hair, small oval glasses, subtle age and smile lines. Muted dusty-rose cardigan over an ivory blouse, dark warm-gray straight trousers, beige practical walking shoes. Natural upright older adult, warm calm expression, no exaggerated frailty. Empty hands, no bag, no apron."
+    },
+    {
+      "id": "customer-senior-female-02",
+      "label": "노년 여성 손님 2",
+      "role": "customer",
+      "age": "senior",
+      "gender": "female",
+      "description": "A Korean older female shopper in her seventies. Silver-white hair neatly arranged in a low bun, no glasses, subtle age lines. Muted pale teal long-sleeve buttoned blouse, dark-brown comfortable straight trousers, cream walking shoes. Natural upright older adult, dignified gentle smile. No exaggerated frailty. Empty hands, no bag, no apron."
+    },
+    {
+      "id": "customer-child-male-01",
+      "label": "어린이 남성 손님 1",
+      "role": "customer",
+      "age": "child",
+      "gender": "male",
+      "description": "A Korean school-age boy around eight. Short straight dark-brown hair, a friendly neutral face. Muted mustard crewneck sweatshirt, dusty navy knee-length shorts, ivory socks and cream-and-blue sneakers. Age-appropriate everyday clothes. Natural child proportions about 4.5 heads tall, slender arms and legs, NOT toddler and NOT chibi. Empty hands, no bag, no apron."
+    },
+    {
+      "id": "customer-child-male-02",
+      "label": "어린이 남성 손님 2",
+      "role": "customer",
+      "age": "child",
+      "gender": "male",
+      "description": "A Korean school-age boy around ten. Slightly tousled short black hair, thin round glasses. Muted dusty-blue zip hoodie over cream T-shirt, warm-gray straight joggers and muted green sneakers. Age-appropriate everyday clothes. Natural schoolchild proportions about 4.5 to 5 heads tall, slender arms and legs, NOT toddler or chibi. Empty hands, no bag, no apron."
+    },
+    {
+      "id": "customer-child-female-01",
+      "label": "어린이 여성 손님 1",
+      "role": "customer",
+      "age": "child",
+      "gender": "female",
+      "description": "A Korean school-age girl around eight. Dark-brown chin-length bob with a small simple muted coral hair clip. Dusty salmon-pink sweatshirt, warm beige straight trousers and cream sneakers. Age-appropriate practical everyday clothes. Natural schoolchild proportions about 4.5 heads tall, slender limbs, NOT toddler or chibi. Empty hands, no bag, no apron."
+    },
+    {
+      "id": "customer-child-female-02",
+      "label": "어린이 여성 손님 2",
+      "role": "customer",
+      "age": "child",
+      "gender": "female",
+      "description": "A Korean school-age girl around ten. Black hair tied into a simple low ponytail with soft bangs. Muted lavender long-sleeve crewneck top, dusty blue straight jeans and cream-and-lavender sneakers. Age-appropriate everyday clothes. Natural schoolchild proportions about 4.5 to 5 heads tall, slender limbs, NOT toddler or chibi. Empty hands, no bag, no apron."
+    }
+  ]
+}

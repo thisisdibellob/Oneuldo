@@ -7,11 +7,12 @@ import {
   AppState,
   Easing,
   Platform,
+  Pressable,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
-import { useFonts } from 'expo-font';
+import { useAppFonts } from './src/useAppFonts';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
@@ -23,9 +24,12 @@ import {
 } from './src/ai/nativeRuntime';
 import { AppShell } from './src/screens/AppShell';
 import { OnboardingScreen } from './src/screens/OnboardingScreen';
+import { MarketSimulationScreen } from './src/screens/MarketSimulationScreen';
 import { colors, fonts } from './src/theme';
 
 export default function App() {
+  const [marketLabVisit, setMarketLabVisit] = useState(0);
+  const marketLab = __DEV__ && Platform.OS === 'web' && typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('marketLab') === '1';
   const [entered, setEntered] = useState(false);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const aiVariation = useAiVariationSettings();
@@ -76,6 +80,7 @@ export default function App() {
   }, [accessToken, aiVariation.enabled, quests]);
 
   useEffect(() => {
+    if (marketLab) { setQuestsLoading(false); return; }
     const loadQuests = async () => {
       try {
         const data = await getQuests();
@@ -92,33 +97,10 @@ export default function App() {
 
   const [showOnboarding, setShowOnboarding] = useState(true);
   const [reduceMotion, setReduceMotion] = useState(false);
-  const [fontLoadingTimedOut, setFontLoadingTimedOut] = useState(false);
   const entryProgress = useRef(new Animated.Value(0)).current;
   const entering = useRef(false);
-  const [loaded, error] = useFonts({
-    Pretendard: require('./assets/fonts/Pretendard-Regular.otf'),
-    'Pretendard-Medium': require('./assets/fonts/Pretendard-Medium.otf'),
-    'Pretendard-SemiBold': require('./assets/fonts/Pretendard-SemiBold.otf'),
-    'Pretendard-Bold': require('./assets/fonts/Pretendard-Bold.otf'),
-    'Pretendard-ExtraBold': require('./assets/fonts/Pretendard-ExtraBold.otf'),
-    LaundryGothic: require('./assets/fonts/LaundryGothic-Regular.otf'),
-    'LaundryGothic-Bold': require('./assets/fonts/LaundryGothic-Bold.otf'),
-    KyoboHandwriting: require('./assets/fonts/KyoboHandwriting2019.otf'),
-    'Griun-InaDoongdoong': require('./assets/fonts/Griun_InaDoongdoong-Rg.ttf'),
-    'Cafe24-Ssurround': require('./assets/fonts/Cafe24Ssurround.otf'),
-    'Cafe24-Ssurround-Air': require('./assets/fonts/Cafe24SsurroundAir.otf'),
-  });
+  const { startupReady, allReady, error, retry } = useAppFonts();
 
-  useEffect(() => {
-    if (loaded || error) return;
-
-    const timeout = setTimeout(() => {
-      console.warn('[Fonts] Font loading timed out. Continuing with system fonts.');
-      setFontLoadingTimedOut(true);
-    }, 5000);
-
-    return () => clearTimeout(timeout);
-  }, [error, loaded]);
 
   useEffect(() => {
     AccessibilityInfo.isReduceMotionEnabled().then(setReduceMotion);
@@ -143,11 +125,21 @@ export default function App() {
     }).start(() => setShowOnboarding(false));
   };
 
-  if (!loaded && !error && !fontLoadingTimedOut) {
+  const fontsReady = entered || marketLab ? allReady : startupReady;
+  if (!fontsReady) {
     return (
       <View style={styles.loading}>
-        <ActivityIndicator color={colors.mint} size="large" />
-        <Text style={styles.loadingText}>오늘도를 준비하고 있어요</Text>
+        {!error && <ActivityIndicator color={colors.mint} size="large" />}
+        <Text accessibilityRole={error ? 'alert' : undefined} style={styles.loadingText}>
+          {error ? '글꼴을 불러오지 못했어요. 연결을 확인하고 다시 시도해 주세요.'
+            : entered || marketLab ? '화면을 준비하고 있어요'
+            : '오늘도를 준비하고 있어요'}
+        </Text>
+        {error && (
+          <Pressable accessibilityRole="button" onPress={retry} style={styles.retryButton}>
+            <Text style={styles.retryText}>다시 시도</Text>
+          </Pressable>
+        )}
       </View>
     );
   }
@@ -155,7 +147,8 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <StatusBar style="dark" />
-      {entered ? (
+      {marketLab ? <MarketSimulationScreen key={marketLabVisit} onExit={() => setMarketLabVisit(visit => visit + 1)} /> :
+      entered ? (
         <AppShell
           accessToken={accessToken}
           aiVariation={aiVariation}
@@ -179,7 +172,9 @@ export default function App() {
 
 const styles = StyleSheet.create({
   app: { backgroundColor: colors.white, flex: 1 },
-  layer: { ...StyleSheet.absoluteFillObject },
+  layer: { ...StyleSheet.absoluteFill },
   loading: { alignItems: 'center', backgroundColor: colors.white, flex: 1, justifyContent: 'center' },
-  loadingText: { color: colors.sage, fontFamily: fonts.regular, fontSize: 13, marginTop: 14 },
+  loadingText: { color: colors.sage, fontFamily: fonts.bold, fontSize: 13, marginTop: 14, paddingHorizontal: 24, textAlign: 'center' },
+  retryButton: { alignItems: 'center', justifyContent: 'center', minHeight: 44, minWidth: 100, marginTop: 14, borderRadius: 14, backgroundColor: colors.mint, paddingHorizontal: 20 },
+  retryText: { color: colors.white, fontFamily: fonts.bold, fontSize: 14 },
 });

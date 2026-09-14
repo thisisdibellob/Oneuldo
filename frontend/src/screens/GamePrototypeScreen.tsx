@@ -1,3 +1,7 @@
+import { DIALOGUE_CHARACTER_DELAY, DIALOGUE_CLEAR_VOLUME, isSilentGamePreview } from '../game/dialogueFeedback';
+import { useDialogueAudio } from '../components/game/useDialogueAudio';
+import { getMarketNavigationPath } from '../game/marketNavigation';
+import { getMarketRecoveryPoint } from '../game/marketRecovery';
 import { Ionicons } from '@expo/vector-icons';
 import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { StatusBar } from 'expo-status-bar';
@@ -23,7 +27,17 @@ import type { BehaviorSimulationContext } from '../api/behaviorLog';
 import { getMarketAiQuest } from '../api/marketPersonalization';
 import { DirectionalAvatar } from '../components/game/DirectionalAvatar';
 import { GameHud } from '../components/game/GameHud';
+import { MinsuDialoguePortrait } from '../components/game/MinsuDialoguePortrait';
+import {
+  MarketShelfTarget,
+  MarketCheckoutFixture,
+  MarketExitMarker,
+  MarketInteriorBackdrop,
+  MarketEnvironmentObjects,
+  MarketPersonFixture,
+} from '../components/game/MarketInteriorLayer';
 import { MODULAR_CHARACTER_CANVAS } from '../components/game/ModularCharacter';
+import { getMarketPersonFrame } from '../game/marketPersonLayout';
 import {
   ExpandedVillageLayer,
   HomeWorldLayer,
@@ -45,7 +59,7 @@ import {
   type AvatarMotion,
 } from '../game/avatarAnimation';
 import { freshPlayerAvatar } from '../game/freshPlayerAvatar';
-import { marketGameArt } from '../game/gameAssets';
+import { getMarketRenderDepth, getNearestMarketStation, getMarketStationApproachPoint, MARKET_ENVIRONMENT_PLAYER_RADIUS, createMarketEnvironment, isMarketEnvironmentBlocked, type MarketEnvironment, type MarketEnvironmentStationId, type MarketCashierAvailability } from '../game/marketEnvironment';
 import {
   BUS_STOP_POINT,
   HOME_EXIT_POINT,
@@ -55,9 +69,8 @@ import {
   HOUSE_ENTRANCE_POINT,
   HOUSE_RETURN_POINT,
   INITIAL_PLAYER_POINT,
+  MARKET_CHECKOUT_RECT,
   MARKET_ENTRANCE_POINT,
-  MARKET_EXIT_POINT,
-  MARKET_PLAYER_POINT,
   MARKET_RETURN_POINT,
   VILLAGE_NPC_BY_ID,
   VILLAGE_NPC_EXIT_DISTANCE,
@@ -67,7 +80,6 @@ import {
   WORLD_BOUNDS,
   WORLD_OBSTACLES,
   type Point,
-  type Rect,
   type VillageNpcDefinition,
   type VillageNpcId,
   type WorldMapId,
@@ -80,6 +92,8 @@ import {
 } from '../game/scenarios';
 import {
   clampWorldZoom,
+  getWorldCameraFrame,
+  MARKET_DEFAULT_ZOOM,
   screenPointToWorld,
   WORLD_ZOOM_MIN,
   zoomFromPinch,
@@ -93,10 +107,12 @@ import {
   MarketStationId,
   type MarketTelemetrySink,
 } from './MarketSimulationScreen';
+import { CashierSimulationScreen } from './CashierSimulationScreen';
 import { CookingSimulationScreen } from './CookingSimulationScreen';
 
-const MARKET_WORLD_WIDTH = 900;
-const MARKET_WORLD_HEIGHT = 1000;
+// Add ?muteAudio=1 to developer preview URLs for silent interaction checks.
+const DEVELOPMENT_AUDIO_MUTED = isSilentGamePreview();
+
 const PLAYER_RADIUS = 22;
 const PLAYER_ART_SCALE = 0.5;
 const PLAYER_ART_HEIGHT = MODULAR_CHARACTER_CANVAS.height * PLAYER_ART_SCALE;
@@ -106,17 +122,11 @@ const MOVE_SPEED = 190;
 const RUN_SPEED_MULTIPLIER = 1.55;
 const BACKGROUND_MUSIC_VOLUME = 0.5;
 const BACKGROUND_MUSIC_DUCKED_VOLUME = 0.25;
-const DIALOGUE_BLIP_VOLUME = 0.18;
-const DIALOGUE_BLIP_MIN_GAP = 92;
-const DIALOGUE_BLIP_PLAYBACK_RATES = [0.9, 0.96, 1.02] as const;
-const CLEAR_SOUND_VOLUME = 0.32;
 const ACCESSIBILITY_STEP = 58;
 const JOYSTICK_RADIUS = 34;
 const JOYSTICK_SIZE = 110;
 const JOYSTICK_ZONE_HEIGHT = 270;
-const DIALOGUE_CHARACTER_DELAY = 34;
 const DIALOGUE_READ_DELAY = 360;
-const MARKET_STATION_INTERACTION_DISTANCE = 105;
 
 function touchDistance(touches: readonly { pageX: number; pageY: number }[]): number {
   if (touches.length < 2) return 0;
@@ -133,29 +143,8 @@ const WEB_MOVEMENT_KEYS: Record<string, Point> = {
   KeyW: { x: 0, y: -1 },
 };
 
-const MARKET_STATIONS: Record<MarketStationId | 'exit', Point> = {
-  checkout: { x: 450, y: 250 },
-  fresh: { x: 350, y: 400 },
-  produce: { x: 550, y: 400 },
-  meal: { x: 350, y: 680 },
-  drink: { x: 550, y: 680 },
-  exit: MARKET_EXIT_POINT,
-};
-
-const MARKET_SHELVES: Record<MarketCategoryId, Rect> = {
-  fresh: { height: 128, width: 220, x: 90, y: 310 },
-  produce: { height: 128, width: 220, x: 590, y: 310 },
-  meal: { height: 128, width: 220, x: 90, y: 590 },
-  drink: { height: 128, width: 220, x: 590, y: 590 },
-};
-
-const marketObstacles: Rect[] = [
-  { height: 105, width: 250, x: 325, y: 92 },
-  ...Object.values(MARKET_SHELVES),
-];
-
 type DailyConversationChoice = 'fun' | 'tired';
-type NpcInteractionChoice = 'npc-quest' | 'npc-talk';
+type NpcInteractionChoice = 'npc-cashier' | 'npc-quest' | 'npc-talk';
 type DialogueChoice = DailyConversationChoice | NpcInteractionChoice;
 type DialogueStep =
   | { kind: 'line'; text: string }
@@ -165,7 +154,10 @@ type DialogueStep =
       purpose: 'conversation' | 'npc-action';
       text: string;
     }
-  | { kind: 'response'; responses: Record<DailyConversationChoice, string> };
+  | {
+      kind: 'response';
+      responses: Record<DailyConversationChoice, string>;
+    };
 
 const dialogueSteps = [
   { kind: 'line', text: '어, 왔구나! 오늘도 만나서 반가워.' },
@@ -201,7 +193,7 @@ function resolveDialogueText(
 }
 
 type ControlMode = 'joystick' | 'touch';
-type NearbyMarketStation = MarketStationId | 'exit' | null;
+type NearbyMarketStation = MarketEnvironmentStationId | null;
 type NearbyHomeStation = HomeStationId | null;
 type PendingPortal = VillagePortalId | null;
 type DialogueMode = 'minsu-quest' | 'npc-greeting' | 'small-talk' | null;
@@ -219,12 +211,13 @@ const NPC_QUEST_IDS: Partial<Record<VillageNpcId, DailyQuestId>> = {
   jiyoung: 'market-shopping',
   minsu: 'minsu-safety',
 };
-function getWorldBounds(worldMap: WorldMapId) {
-  return WORLD_BOUNDS[worldMap];
+function getWorldBounds(worldMap: WorldMapId, environment?: MarketEnvironment) {
+  return worldMap === 'market' && environment ? environment.world : WORLD_BOUNDS[worldMap];
 }
 
-function isBlocked(point: Point, worldMap: WorldMapId) {
-  const obstacles = worldMap === 'market' ? marketObstacles : WORLD_OBSTACLES[worldMap];
+function isBlocked(point: Point, worldMap: WorldMapId, environment: MarketEnvironment, cashierCalled: Partial<MarketCashierAvailability> = {}) {
+  if (worldMap === 'market') return isMarketEnvironmentBlocked(environment, point, cashierCalled);
+  const obstacles = WORLD_OBSTACLES[worldMap];
   return obstacles.some(
     (obstacle) =>
       point.x + PLAYER_RADIUS > obstacle.x &&
@@ -234,23 +227,24 @@ function isBlocked(point: Point, worldMap: WorldMapId) {
   );
 }
 
-function clampPoint(point: Point, worldMap: WorldMapId): Point {
-  const { height, width } = getWorldBounds(worldMap);
+function clampPoint(point: Point, worldMap: WorldMapId, environment?: MarketEnvironment): Point {
+  const { height, width } = getWorldBounds(worldMap, environment);
+  const radius = worldMap === 'market' ? MARKET_ENVIRONMENT_PLAYER_RADIUS : PLAYER_RADIUS;
   return {
-    x: Math.max(PLAYER_RADIUS, Math.min(point.x, width - PLAYER_RADIUS)),
-    y: Math.max(PLAYER_RADIUS, Math.min(point.y, height - PLAYER_RADIUS)),
+    x: Math.max(radius, Math.min(point.x, width - radius)),
+    y: Math.max(radius, Math.min(point.y, height - radius)),
   };
 }
 
-function findReachableTarget(current: Point, desired: Point, worldMap: WorldMapId): Point {
-  const clamped = clampPoint(desired, worldMap);
+function findReachableTarget(current: Point, desired: Point, worldMap: WorldMapId, environment: MarketEnvironment, cashierCalled: Partial<MarketCashierAvailability> = {}): Point {
+  const clamped = clampPoint(desired, worldMap, environment);
   for (let step = 12; step >= 0; step -= 1) {
     const ratio = step / 12;
     const candidate = {
       x: current.x + (clamped.x - current.x) * ratio,
       y: current.y + (clamped.y - current.y) * ratio,
     };
-    if (!isBlocked(candidate, worldMap)) return candidate;
+    if (!isBlocked(candidate, worldMap, environment, cashierCalled)) return candidate;
   }
   return current;
 }
@@ -389,23 +383,33 @@ function MarketProximityCloud({ visible }: { visible: boolean }) {
 
 function MarketWorldLayer({
   controlMode,
+  environment,
+  cashierCalled,
   nearbyStation,
   onStationPress,
   tapTargetMarker,
 }: {
   controlMode: ControlMode;
+  environment: MarketEnvironment;
+  cashierCalled: Partial<MarketCashierAvailability>;
   nearbyStation: NearbyMarketStation;
-  onStationPress: (event: GestureResponderEvent, station: MarketStationId | 'exit') => void;
+  onStationPress: (event: GestureResponderEvent, station: MarketEnvironmentStationId) => void;
   tapTargetMarker: Point | null;
 }) {
   return (
     <>
-      <Image
-        accessibilityIgnoresInvertColors
-        resizeMode="stretch"
-        source={marketGameArt.base}
-        style={styles.marketArtBase}
-      />
+      <MarketInteriorBackdrop environment={environment} />
+      <MarketEnvironmentObjects environment={environment} />
+
+      {[...environment.employees, ...environment.customers].map((person) => (
+        <PressScale key={person.id} accessibilityLabel={person.label}
+          accessibilityRole={person.kind === 'employee' && controlMode === 'touch' ? 'button' : 'image'}
+          disabled={person.kind !== 'employee' || controlMode !== 'touch'}
+          onPress={(event) => onStationPress(event, `staff:${person.id}`)}
+          style={{ position: 'absolute', ...getMarketPersonFrame(person.point), zIndex: getMarketRenderDepth(person.point.y) }}>
+          <MarketPersonFixture person={person} active={nearbyStation === `staff:${person.id}`} />
+        </PressScale>
+      ))}
 
       {tapTargetMarker && controlMode === 'touch' ? (
         <View
@@ -415,84 +419,38 @@ function MarketWorldLayer({
         />
       ) : null}
 
-      <PressScale
-        accessibilityLabel={controlMode === 'touch' ? '계산대로 이동' : '계산대'}
+      {environment.checkouts.map((counter, index) => <PressScale
+        key={counter.id}
+        accessibilityLabel={controlMode === 'touch' ? `${index + 1}번 계산대로 이동` : `${index + 1}번 계산대`}
         accessibilityRole={controlMode === 'touch' ? 'button' : undefined}
         disabled={controlMode !== 'touch'}
-        onPress={(event) => onStationPress(event, 'checkout')}
+        hitSlop={{ bottom: 12, left: 12, right: 12, top: 20 }}
+        onPress={(event) => onStationPress(event, counter.id)}
         scaleTo={0.98}
-        style={[
-          styles.marketCounter,
-          styles.marketCounterIllustrated,
-          nearbyStation === 'checkout' && styles.marketObjectActive,
-        ]}
+        style={[styles.marketCounter, { left: counter.rect.x, top: counter.rect.y, width: counter.rect.width, height: counter.rect.height, zIndex: getMarketRenderDepth(counter.rect.y + counter.rect.height) }]}
       >
-        <Image
-          accessibilityIgnoresInvertColors
-          resizeMode="contain"
-          source={marketGameArt.checkout}
-          style={styles.marketCounterArt}
-        />
-        {nearbyStation === 'checkout' ? (
-          <View pointerEvents="none" style={styles.marketCounterNameplate}>
-            <Ionicons color="#3F725B" name="card-outline" size={14} />
-            <Text style={styles.marketCounterText}>계산대</Text>
-          </View>
-        ) : null}
-      </PressScale>
+        <MarketCheckoutFixture counter={counter} index={index} active={nearbyStation === counter.id} cashierPresent={cashierCalled[counter.id] ?? counter.cashierPresent} />
+      </PressScale>)}
 
-      {marketCategories.map((category) => {
-        const shelf = MARKET_SHELVES[category.id];
-        return (
-          <PressScale
-            accessibilityLabel={controlMode === 'touch' ? `${category.label} 진열대로 이동` : `${category.label} 진열대`}
-            accessibilityRole={controlMode === 'touch' ? 'button' : undefined}
-            disabled={controlMode !== 'touch'}
-            key={category.id}
-            onPress={(event) => onStationPress(event, category.id)}
-            scaleTo={0.98}
-            style={[
-              styles.marketShelf,
-              styles.marketShelfIllustrated,
-              { height: shelf.height, left: shelf.x, top: shelf.y, width: shelf.width },
-              nearbyStation === category.id && styles.marketObjectActive,
-            ]}
-          >
-            <Image
-              accessibilityIgnoresInvertColors
-              resizeMode="contain"
-              source={marketGameArt.shelves[category.id]}
-              style={styles.marketShelfArt}
-            />
-            {nearbyStation === category.id ? (
-              <View pointerEvents="none" style={[styles.marketShelfLabel, { backgroundColor: category.color }]}>
-                <Ionicons color="#FFFFFF" name={category.icon as 'leaf' | 'fish' | 'fast-food' | 'water'} size={15} />
-                <Text style={styles.marketShelfLabelText}>{category.label}</Text>
-              </View>
-            ) : null}
-          </PressScale>
-        );
-      })}
-
-      <PressScale
-        accessibilityLabel={controlMode === 'touch' ? '마트 출구로 이동' : '마트 출구'}
-        accessibilityRole={controlMode === 'touch' ? 'button' : undefined}
-        disabled={controlMode !== 'touch'}
-        onPress={(event) => onStationPress(event, 'exit')}
-        scaleTo={0.98}
-        style={[
-          styles.marketExit,
-          nearbyStation !== 'exit' && styles.marketExitInactive,
-          nearbyStation === 'exit' && styles.marketObjectActive,
-        ]}
-      >
-        {nearbyStation === 'exit' ? (
-          <>
-            <Ionicons color="#627269" name="exit-outline" size={20} />
-            <Text style={styles.marketExitText}>마을로 나가기</Text>
-          </>
-        ) : null}
-      </PressScale>
+      {marketCategories.map(category => <MarketShelfTarget
+        key={category.id} placement={environment.shelves[category.id]} categoryId={category.id}
+        active={nearbyStation === category.id} disabled={controlMode !== 'touch'}
+        accessibilityLabel={controlMode === 'touch' ? `${category.label} 진열대로 이동` : `${category.label} 진열대`}
+        onPress={event => onStationPress(event, category.id)}
+      />)}
+      {(['entrance', 'exit'] as const).map(station => <View key={station} pointerEvents="none"
+        style={[styles.marketExit, { left: environment.stations[station].x - 64,
+          top: environment.stations[station].y + 24, width: 128, height: 46 }]}>
+        <MarketExitMarker kind={station} active={false}
+            blocked={environment.constructionZones?.some(zone => zone.gateId === station)} />
+      </View>)}
+      {environment.commonDoor ? <PressScale
+        accessibilityLabel="마트 공동 출입문으로 이동" accessibilityRole="button"
+        disabled={controlMode !== 'touch'} onPress={event => onStationPress(event, 'common-door')}
+        style={[styles.marketExit, { left: environment.commonDoor.point.x - 64,
+          top: environment.commonDoor.point.y - 54, width: 128, height: 46 }]}>
+        <MarketExitMarker kind="common-door" active={nearbyStation === 'common-door'} />
+      </PressScale> : null}
     </>
   );
 }
@@ -503,28 +461,19 @@ type GamePrototypeScreenProps = {
 };
 
 export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototypeScreenProps) {
-  const backgroundMusic = useAudioPlayer(require('../../assets/audio/apple-cider.wav'), {
-    downloadFirst: true,
-    keepAudioSessionActive: true,
-  });
-  const dialogueBlipOne = useAudioPlayer(require('../../assets/audio/dialogue-blip-1.wav'), {
-    downloadFirst: true,
-    keepAudioSessionActive: true,
-  });
-  const dialogueBlipTwo = useAudioPlayer(require('../../assets/audio/dialogue-blip-2.wav'), {
-    downloadFirst: true,
-    keepAudioSessionActive: true,
-  });
-  const dialogueBlipThree = useAudioPlayer(require('../../assets/audio/dialogue-blip-3.wav'), {
+  // A null source keeps silent previews from downloading or decoding audio at all.
+  // Keep every hook mounted so audio-enabled visits retain the same lifecycle.
+  const backgroundMusic = useAudioPlayer(DEVELOPMENT_AUDIO_MUTED ? null : require('../../assets/audio/apple-cider.m4a'), {
     downloadFirst: true,
     keepAudioSessionActive: true,
   });
   const backgroundMusicStatus = useAudioPlayerStatus(backgroundMusic);
-  const dialogueBlipOneStatus = useAudioPlayerStatus(dialogueBlipOne);
-  const dialogueBlipTwoStatus = useAudioPlayerStatus(dialogueBlipTwo);
-  const dialogueBlipThreeStatus = useAudioPlayerStatus(dialogueBlipThree);
   const viewportNode = useRef<View | null>(null);
   const camera = useRef(new Animated.ValueXY()).current;
+  const playerCameraOffset = useRef(new Animated.ValueXY()).current;
+  const marketPlayerPosition = useRef(new Animated.ValueXY(INITIAL_PLAYER_POINT)).current;
+  const marketPlayerDepth = useRef(new Animated.Value(getMarketRenderDepth(INITIAL_PLAYER_POINT.y))).current;
+  const cameraCenter = useRef<Point>({ ...INITIAL_PLAYER_POINT });
   const worldZoom = useRef(new Animated.Value(WORLD_ZOOM_MIN)).current;
   const joystickKnob = useRef(new Animated.ValueXY()).current;
   const dialoguePanelProgress = useRef(new Animated.Value(0)).current;
@@ -535,11 +484,14 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
   const resultCelebration = useRef(new Animated.Value(0)).current;
   const playerPoint = useRef<Point>({ ...INITIAL_PLAYER_POINT });
   const marketTelemetry = useRef<MarketTelemetrySink | null>(null);
+  const marketMovementListener = useRef<((previous: Point, next: Point) => void) | null>(null);
   const worldMapRef = useRef<WorldMapId>('village');
   const viewport = useRef({ width: 0, height: 0 });
   const viewportOrigin = useRef({ x: 0, y: 0 });
   const worldZoomCurrentRef = useRef(WORLD_ZOOM_MIN);
   const worldZoomTargetRef = useRef(WORLD_ZOOM_MIN);
+  const previousZoomMapRef = useRef<WorldMapId>('village');
+  const outsideMarketZoomRef = useRef(WORLD_ZOOM_MIN);
   const pinchStartDistanceRef = useRef(0);
   const pinchStartZoomRef = useRef(WORLD_ZOOM_MIN);
   const zoomGestureActiveRef = useRef(false);
@@ -550,6 +502,7 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
   const pressedMovementKeys = useRef(new Set<string>());
   const speedMultiplier = useRef(1);
   const tapTarget = useRef<Point | null>(null);
+  const tapWaypoints = useRef<Point[]>([]);
   const pendingNpcInteraction = useRef<VillageNpcId | null>(null);
   const pendingPortalInteraction = useRef<PendingPortal>(null);
   const pendingMarketStationInteraction = useRef<NearbyMarketStation>(null);
@@ -558,9 +511,6 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
   const joystickEngaged = useRef(false);
   const touchHoldActivated = useRef(false);
   const clearSoundTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
-  const dialogueBlipCursor = useRef(0);
-  const lastDialogueBlipAt = useRef(0);
-  const previousDialogueCharacterCount = useRef(0);
   const animationFrame = useRef<number | null>(null);
   const previousFrame = useRef<number | null>(null);
   const nearbyNpcIdRef = useRef<VillageNpcId | null>(null);
@@ -588,10 +538,16 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
   const [marketSimulation, setMarketSimulation] = useState<
     Omit<BehaviorSimulationContext, 'simulationStarted'> | undefined
   >(undefined);
+  const [marketEnvironment, setMarketEnvironment] = useState(() => createMarketEnvironment());
+  const marketEnvironmentRef = useRef(marketEnvironment);
+  const [marketCashierCalled, setMarketCashierCalled] = useState<Partial<MarketCashierAvailability>>({});
+  const marketCashierCalledRef = useRef<Partial<MarketCashierAvailability>>({});
+  const marketVisitNumber = useRef(0);
   const [marketInteractionRequest, setMarketInteractionRequest] =
     useState<MarketInteractionRequest | null>(null);
   const [fridgeMenuOpen, setFridgeMenuOpen] = useState(false);
   const [cookingOpen, setCookingOpen] = useState(false);
+  const [cashierOpen, setCashierOpen] = useState(false);
   const [worldMap, setWorldMap] = useState<WorldMapId>('village');
   const [audioModeReady, setAudioModeReady] = useState(false);
   const [reduceMotionEnabled, setReduceMotionEnabled] = useState(false);
@@ -621,6 +577,9 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
   const [quizPanelMounted, setQuizPanelMounted] = useState(false);
   const [dailyQuestStatuses, setDailyQuestStatuses] =
     useState<DailyQuestStatusMap>(INITIAL_DAILY_QUEST_STATUS);
+  useEffect(() => {
+    if (worldMap === 'market' && marketScenarioLocked) setHudMenuOpen(false);
+  }, [worldMap, marketScenarioLocked]);
   const questStatusesRef = useRef<DailyQuestStatusMap>(INITIAL_DAILY_QUEST_STATUS);
   questStatusesRef.current = dailyQuestStatuses;
 
@@ -651,9 +610,20 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
   const currentDialogueStep =
     dialogueIndex === null ? undefined : activeDialogueSteps[dialogueIndex];
   const currentDialogue = resolveDialogueText(currentDialogueStep, selectedDailyChoice);
+  const dialogueAudio = useDialogueAudio({
+    active: dialogueIndex !== null && !reduceMotionEnabled,
+    ready: audioModeReady,
+    turnKey: `${dialogueNpcId}:${dialogueIndex}:${currentDialogue}`,
+  });
   const renderedDialogueStep = activeDialogueSteps[renderedDialogueIndex];
   const renderedDialogue = resolveDialogueText(renderedDialogueStep, selectedDailyChoice);
   const dialogueSpeakerName = VILLAGE_NPC_BY_ID[dialogueNpcId].name;
+  const dialoguePortraitExpression =
+    dialogueNpcId === 'minsu'
+      ? dialogueMode === 'minsu-quest'
+        ? 'ready'
+        : 'attentive'
+      : null;
   const dialogueChoiceVisible =
     currentDialogueStep?.kind === 'choice' &&
     visibleDialogueCharacters >= currentDialogue.length;
@@ -669,7 +639,7 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
     infoPanel !== null ||
     fridgeMenuOpen ||
     cookingOpen ||
-    marketScenarioLocked || (worldMap === 'market' && (marketAiRequestToken !== accessToken || !['ready', 'baseline'].includes(marketAiStatus)));
+    cashierOpen || marketScenarioLocked || (worldMap === 'market' && (marketAiRequestToken !== accessToken || !['ready', 'baseline'].includes(marketAiStatus)));
 
   useEffect(() => {
     let active = true;
@@ -761,12 +731,17 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
 
   const updateCamera = useCallback(
     (point: Point) => {
-      camera.setValue({
-        x: viewport.current.width / 2 - point.x,
-        y: viewport.current.height / 2 - point.y,
-      });
+      const frame = getWorldCameraFrame(point, viewport.current, worldZoomCurrentRef.current,
+        worldMapRef.current === 'market' ? marketEnvironmentRef.current.world : undefined);
+      cameraCenter.current = frame.center;
+      camera.setValue(frame.translation);
+      playerCameraOffset.setValue(frame.playerOffset);
+      if (worldMapRef.current === 'market') {
+        marketPlayerPosition.setValue(point);
+        marketPlayerDepth.setValue(getMarketRenderDepth(point.y));
+      }
     },
-    [camera],
+    [camera, playerCameraOffset, marketPlayerPosition, marketPlayerDepth],
   );
 
   const updateNpcProximity = useCallback((point: Point) => {
@@ -797,17 +772,7 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
       setPortal(null);
       setHomeStation(null);
       setBusStop(false);
-      let closest: NearbyMarketStation = null;
-      let closestDistance = Number.POSITIVE_INFINITY;
-      (Object.entries(MARKET_STATIONS) as Array<[MarketStationId | 'exit', Point]>).forEach(
-        ([station, stationPoint]) => {
-          const distance = Math.hypot(point.x - stationPoint.x, point.y - stationPoint.y);
-          if (distance <= MARKET_STATION_INTERACTION_DISTANCE && distance < closestDistance) {
-            closest = station;
-            closestDistance = distance;
-          }
-        },
-      );
+      const closest = getNearestMarketStation(marketEnvironmentRef.current, point, marketCashierCalledRef.current)?.id ?? null;
       if (closest !== marketStationNearbyRef.current) {
         marketStationNearbyRef.current = closest;
         setMarketStationNearby(closest);
@@ -902,13 +867,17 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
       let next = current;
       const activeMap = worldMapRef.current;
 
-      const xCandidate = clampPoint({ x: current.x + dx, y: current.y }, activeMap);
-      if (!isBlocked(xCandidate, activeMap)) next = xCandidate;
-
-      const yCandidate = clampPoint({ x: next.x, y: next.y + dy }, activeMap);
-      if (!isBlocked(yCandidate, activeMap)) next = yCandidate;
+      // Sample large accessibility steps so they cannot cross a thin wall.
+      const steps = Math.max(1, Math.ceil(Math.max(Math.abs(dx), Math.abs(dy)) / 6));
+      for (let index = 0; index < steps; index += 1) {
+        const xCandidate = clampPoint({ x: next.x + dx / steps, y: next.y }, activeMap, marketEnvironmentRef.current);
+        if (!isBlocked(xCandidate, activeMap, marketEnvironmentRef.current, marketCashierCalledRef.current)) next = xCandidate;
+        const yCandidate = clampPoint({ x: next.x, y: next.y + dy / steps }, activeMap, marketEnvironmentRef.current);
+        if (!isBlocked(yCandidate, activeMap, marketEnvironmentRef.current, marketCashierCalledRef.current)) next = yCandidate;
+      }
 
       playerPoint.current = next;
+      if (activeMap === 'market') marketMovementListener.current?.(current, next);
       updateCamera(next);
       updateNpcProximity(next);
       if (activeMap === 'market') {
@@ -933,6 +902,7 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
     pressedMovementKeys.current.clear();
     joystickEngaged.current = false;
     tapTarget.current = null;
+    tapWaypoints.current = [];
     pendingNpcInteraction.current = null;
     pendingPortalInteraction.current = null;
     pendingMarketStationInteraction.current = null;
@@ -961,6 +931,10 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
 
   const handleExit = useCallback(() => {
     stopMovement();
+    if (worldMapRef.current === 'market') {
+      setMarketInteractionRequest((request) => ({ id: (request?.id ?? 0) + 1, station: 'give-up' }));
+      return;
+    }
     if (backgroundMusicStatus.isLoaded) {
       try {
         backgroundMusic.pause();
@@ -985,13 +959,34 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
     if (nearbyPortalIdRef.current !== 'market') return;
     prepareMapTransition();
     setMarketAiStatus('loading');
+    marketVisitNumber.current += 1;
+    const environment = createMarketEnvironment({ seed: `market-${Date.now()}-${marketVisitNumber.current}` });
+    marketEnvironmentRef.current = environment;
+    setMarketEnvironment(environment);
+    marketCashierCalledRef.current = {};
+    setMarketCashierCalled({});
     setMarketScenarioLocked(true);
     worldMapRef.current = 'market';
     setWorldMap('market');
-    playerPoint.current = { ...MARKET_PLAYER_POINT };
+    playerPoint.current = { ...environment.spawn };
     updateCamera(playerPoint.current);
     updateNpcProximity(playerPoint.current);
   }, [prepareMapTransition, updateCamera, updateNpcProximity]);
+
+  const handleMarketEnvironmentChange = useCallback((environment: MarketEnvironment) => {
+    marketEnvironmentRef.current = environment;
+    setMarketEnvironment(environment);
+    marketCashierCalledRef.current = {};
+    setMarketCashierCalled({});
+    playerPoint.current = { ...environment.spawn };
+    updateCamera(playerPoint.current);
+    updateNpcProximity(playerPoint.current);
+  }, [updateCamera, updateNpcProximity]);
+
+  const handleMarketCashierCalled = useCallback((availability: MarketCashierAvailability) => {
+    marketCashierCalledRef.current = availability;
+    setMarketCashierCalled(availability);
+  }, []);
 
   const handleLeaveMarket = useCallback(() => {
     prepareMapTransition();
@@ -1027,13 +1022,10 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
   const handleEmergencyExit = useCallback(() => {
     prepareMapTransition();
     const activeMap = worldMapRef.current;
-    playerPoint.current = {
-      ...(activeMap === 'market'
-        ? MARKET_PLAYER_POINT
-        : activeMap === 'home'
-          ? HOME_PLAYER_POINT
-          : INITIAL_PLAYER_POINT),
-    };
+    playerPoint.current = activeMap === 'market'
+      ? getMarketRecoveryPoint(marketEnvironmentRef.current, playerPoint.current, marketCashierCalledRef.current)
+        ?? { ...playerPoint.current }
+      : { ...(activeMap === 'home' ? HOME_PLAYER_POINT : INITIAL_PLAYER_POINT) };
     updateCamera(playerPoint.current);
     updateNpcProximity(playerPoint.current);
   }, [prepareMapTransition, updateCamera, updateNpcProximity]);
@@ -1097,6 +1089,12 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
         const busStopInteractionReached =
           pendingBusStopInteraction.current && busStopNearbyRef.current;
 
+        if (distance <= 3 && tapWaypoints.current.length && !marketStationInteractionReached) {
+          movePlayer(dx, dy);
+          tapTarget.current = tapWaypoints.current.shift()!;
+          animationFrame.current = requestAnimationFrame(runMovement);
+          return;
+        }
         if (
           distance <= 3 ||
           npcInteractionReached ||
@@ -1126,8 +1124,7 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
           if (npcToOpen) startNpcGreetingRef.current(npcToOpen);
           if (portalToUse === 'market') handleEnterMarket();
           if (portalToUse === 'home') handleEnterHome();
-          if (marketStationToUse === 'exit') handleLeaveMarket();
-          else if (marketStationToUse) {
+          if (marketStationToUse) {
             setMarketInteractionRequest((currentRequest) => ({
               id: (currentRequest?.id ?? 0) + 1,
               station: marketStationToUse,
@@ -1300,7 +1297,8 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
           : event.deltaMode === 2
             ? event.deltaY * Math.max(size.height, 1)
             : event.deltaY;
-      const nextZoom = zoomFromWheel(worldZoomTargetRef.current, deltaPixels);
+      const nextZoom = zoomFromWheel(worldZoomTargetRef.current, deltaPixels,
+        worldMapRef.current === 'market' ? MARKET_DEFAULT_ZOOM : WORLD_ZOOM_MIN);
       worldZoomTargetRef.current = nextZoom;
       worldZoom.stopAnimation();
       Animated.timing(worldZoom, {
@@ -1349,7 +1347,8 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
 
   const finishPinchZoom = useCallback(() => {
     zoomGestureActiveRef.current = false;
-    const settledZoom = clampWorldZoom(worldZoomCurrentRef.current);
+    const settledZoom = clampWorldZoom(worldZoomCurrentRef.current,
+      worldMapRef.current === 'market' ? MARKET_DEFAULT_ZOOM : WORLD_ZOOM_MIN);
     worldZoomCurrentRef.current = settledZoom;
     worldZoomTargetRef.current = settledZoom;
     worldZoom.setValue(settledZoom);
@@ -1385,6 +1384,7 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
           pinchStartZoomRef.current,
           pinchStartDistanceRef.current,
           distance,
+          worldMapRef.current === 'market' ? MARKET_DEFAULT_ZOOM : WORLD_ZOOM_MIN,
         );
         worldZoomCurrentRef.current = nextZoom;
         worldZoomTargetRef.current = nextZoom;
@@ -1420,11 +1420,16 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
       return undefined;
     }
 
+    if (reduceMotionEnabled) {
+      setVisibleDialogueCharacters(currentDialogue.length);
+      return undefined;
+    }
     const timer = setTimeout(() => {
+      dialogueAudio.playCharacter(currentDialogue[visibleDialogueCharacters]);
       setVisibleDialogueCharacters((count) => Math.min(count + 1, currentDialogue.length));
     }, DIALOGUE_CHARACTER_DELAY);
     return () => clearTimeout(timer);
-  }, [currentDialogue, dialogueIndex, visibleDialogueCharacters]);
+  }, [currentDialogue, dialogueAudio.playCharacter, dialogueIndex, reduceMotionEnabled, visibleDialogueCharacters]);
 
   useEffect(() => {
     dailyChoiceProgress.stopAnimation();
@@ -1470,14 +1475,37 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
   useEffect(() => {
     const listenerId = worldZoom.addListener(({ value }) => {
       worldZoomCurrentRef.current = value;
+      updateCamera(playerPoint.current);
     });
     return () => {
       worldZoom.removeListener(listenerId);
       worldZoom.stopAnimation();
     };
-  }, [worldZoom]);
+  }, [worldZoom, updateCamera]);
 
   useEffect(() => {
+    const previousMap = previousZoomMapRef.current;
+    previousZoomMapRef.current = worldMap;
+    if (previousMap === worldMap) return;
+    if (worldMap !== 'market' && previousMap !== 'market') return;
+    if (worldMap === 'market') outsideMarketZoomRef.current = worldZoomTargetRef.current;
+    const target = worldMap === 'market' ? MARKET_DEFAULT_ZOOM : outsideMarketZoomRef.current;
+    worldZoomTargetRef.current = target;
+    worldZoom.stopAnimation();
+    Animated.timing(worldZoom, {
+      toValue: target,
+      duration: reduceMotionEnabled ? 0 : 260,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [reduceMotionEnabled, worldMap, worldZoom]);
+
+  useEffect(() => {
+    if (DEVELOPMENT_AUDIO_MUTED) {
+      backgroundMusic.volume = 0;
+      backgroundMusic.pause();
+      return;
+    }
     if (!audioModeReady || !backgroundMusicStatus.isLoaded) return;
     backgroundMusic.loop = true;
     backgroundMusic.volume = BACKGROUND_MUSIC_VOLUME;
@@ -1486,113 +1514,37 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
 
   useEffect(() => {
     if (!backgroundMusicStatus.isLoaded) return;
-    backgroundMusic.volume = dialoguePanelMounted || quizPanelMounted
+    backgroundMusic.volume = DEVELOPMENT_AUDIO_MUTED ? 0 : dialoguePanelMounted || quizPanelMounted
       ? BACKGROUND_MUSIC_DUCKED_VOLUME
       : BACKGROUND_MUSIC_VOLUME;
   }, [backgroundMusic, backgroundMusicStatus.isLoaded, dialoguePanelMounted, quizPanelMounted]);
 
   useEffect(() => {
-    if (dialogueIndex === null || visibleDialogueCharacters === 0) {
-      previousDialogueCharacterCount.current = visibleDialogueCharacters;
-      lastDialogueBlipAt.current = 0;
-      return;
-    }
-
-    const previousCharacterCount = previousDialogueCharacterCount.current;
-    previousDialogueCharacterCount.current = visibleDialogueCharacters;
-    if (
-      !audioModeReady ||
-      visibleDialogueCharacters !== previousCharacterCount + 1
-    ) {
-      return;
-    }
-
-    const lastCharacter = currentDialogue[visibleDialogueCharacters - 1];
-    if (!lastCharacter || /[\s.,!?…]/.test(lastCharacter)) return;
-
-    const now = Date.now();
-    if (now - lastDialogueBlipAt.current < DIALOGUE_BLIP_MIN_GAP) return;
-
-    const players = [
-      {
-        isLoaded: dialogueBlipOneStatus.isLoaded,
-        player: dialogueBlipOne,
-        rate: DIALOGUE_BLIP_PLAYBACK_RATES[0],
-      },
-      {
-        isLoaded: dialogueBlipTwoStatus.isLoaded,
-        player: dialogueBlipTwo,
-        rate: DIALOGUE_BLIP_PLAYBACK_RATES[1],
-      },
-      {
-        isLoaded: dialogueBlipThreeStatus.isLoaded,
-        player: dialogueBlipThree,
-        rate: DIALOGUE_BLIP_PLAYBACK_RATES[2],
-      },
-    ];
-    const playerIndex =
-      (dialogueBlipCursor.current + lastCharacter.charCodeAt(0)) % players.length;
-    dialogueBlipCursor.current = (dialogueBlipCursor.current + 1) % players.length;
-    const { isLoaded, player, rate } = players[playerIndex];
-    if (!isLoaded) return;
-    lastDialogueBlipAt.current = now;
-    player.volume = DIALOGUE_BLIP_VOLUME;
-    player.shouldCorrectPitch = false;
-    player.setPlaybackRate(rate);
-    void player
-      .seekTo(0)
-      .then(() => player.play())
-      .catch(() => undefined);
-  }, [
-    audioModeReady,
-    currentDialogue,
-    dialogueBlipOne,
-    dialogueBlipOneStatus.isLoaded,
-    dialogueBlipThree,
-    dialogueBlipThreeStatus.isLoaded,
-    dialogueBlipTwo,
-    dialogueBlipTwoStatus.isLoaded,
-    dialogueIndex,
-    visibleDialogueCharacters,
-  ]);
-
-  useEffect(() => {
     clearSoundTimers.current.forEach(clearTimeout);
     clearSoundTimers.current = [];
-    if (!audioModeReady || transportQuiz.stage !== 'result') return undefined;
-
-    const notes = [
-      { delay: 0, isLoaded: dialogueBlipOneStatus.isLoaded, player: dialogueBlipOne },
-      { delay: 85, isLoaded: dialogueBlipTwoStatus.isLoaded, player: dialogueBlipTwo },
-      { delay: 170, isLoaded: dialogueBlipThreeStatus.isLoaded, player: dialogueBlipThree },
-    ];
+    if (DEVELOPMENT_AUDIO_MUTED || !audioModeReady || transportQuiz.stage !== 'result') return undefined;
+    let cancelled = false;
+    const notes = dialogueAudio.voices.map((voice, index) => ({ ...voice, delay: index * 85 }));
     clearSoundTimers.current = notes.map(({ delay, isLoaded, player }) =>
       setTimeout(() => {
-        if (!isLoaded) return;
-        player.volume = CLEAR_SOUND_VOLUME;
+        if (cancelled || DEVELOPMENT_AUDIO_MUTED || !isLoaded) return;
+        player.volume = DIALOGUE_CLEAR_VOLUME;
         player.shouldCorrectPitch = false;
         player.setPlaybackRate(1);
-        void player
-          .seekTo(0)
-          .then(() => player.play())
-          .catch(() => undefined);
+        void player.seekTo(0).then(() => {
+          if (!cancelled && !DEVELOPMENT_AUDIO_MUTED) player.play();
+        }).catch(() => undefined);
       }, delay),
     );
-
     return () => {
+      cancelled = true;
       clearSoundTimers.current.forEach(clearTimeout);
       clearSoundTimers.current = [];
+      notes.forEach(({ player }) => {
+        try { player.pause(); } catch { /* The player may already be released. */ }
+      });
     };
-  }, [
-    audioModeReady,
-    dialogueBlipOne,
-    dialogueBlipOneStatus.isLoaded,
-    dialogueBlipThree,
-    dialogueBlipThreeStatus.isLoaded,
-    dialogueBlipTwo,
-    dialogueBlipTwoStatus.isLoaded,
-    transportQuiz.stage,
-  ]);
+  }, [audioModeReady, dialogueAudio.voices, transportQuiz.stage]);
 
   useEffect(() => {
     resultCelebration.stopAnimation();
@@ -1851,6 +1803,9 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
               : '완료한 퀘스트',
       });
     }
+    if (npcId === 'jiyoung') {
+      options.push({ id: 'npc-cashier', label: '계산 알바 연습' });
+    }
     startDialogue(
       npcId,
       [
@@ -1878,9 +1833,14 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
   ) => {
     if (controlsLockedRef.current) return;
     stopMovement();
-    const target = findReachableTarget(playerPoint.current, desired, worldMapRef.current);
+    const target = findReachableTarget(playerPoint.current, desired, worldMapRef.current, marketEnvironmentRef.current, marketCashierCalledRef.current);
     if (Math.hypot(target.x - playerPoint.current.x, target.y - playerPoint.current.y) < 2) return;
-    tapTarget.current = target;
+    const path = worldMapRef.current === 'market'
+      ? getMarketNavigationPath(marketEnvironmentRef.current, playerPoint.current, target, marketCashierCalledRef.current)
+      : [target];
+    if (!path?.length) return;
+    tapTarget.current = path[0];
+    tapWaypoints.current = path.slice(1);
     pendingNpcInteraction.current = interaction.npcId ?? null;
     pendingPortalInteraction.current = interaction.portalId ?? null;
     pendingMarketStationInteraction.current = interaction.marketStation ?? null;
@@ -1891,7 +1851,6 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
   };
 
   const getTouchedWorldPoint = (event: GestureResponderEvent) => {
-    const current = playerPoint.current;
     const { locationX, locationY, pageX, pageY } = event.nativeEvent;
     const localX = Number.isFinite(pageX) ? pageX - viewportOrigin.current.x : locationX;
     const localY = Number.isFinite(pageY) ? pageY - viewportOrigin.current.y : locationY;
@@ -1899,7 +1858,7 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
     const safeY = Math.max(0, Math.min(localY, viewport.current.height));
     return screenPointToWorld(
       { x: safeX, y: safeY },
-      current,
+      cameraCenter.current,
       viewport.current,
       worldZoomCurrentRef.current,
     );
@@ -2065,7 +2024,7 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
 
   const handleMarketStationPress = (
     event: GestureResponderEvent,
-    station: MarketStationId | 'exit',
+    station: MarketEnvironmentStationId,
   ) => {
     event?.stopPropagation?.();
     if (
@@ -2075,28 +2034,15 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
       suppressWorldPressRef.current
     ) return;
     if (marketStationNearbyRef.current === station) {
-      if (station === 'exit') handleLeaveMarket();
-      else {
-        setMarketInteractionRequest((currentRequest) => ({
-          id: (currentRequest?.id ?? 0) + 1,
-          station,
-        }));
-      }
+      setMarketInteractionRequest((currentRequest) => ({
+        id: (currentRequest?.id ?? 0) + 1,
+        station,
+      }));
       return;
     }
-    const stationPoint = MARKET_STATIONS[station];
-    const current = playerPoint.current;
-    const dx = current.x - stationPoint.x;
-    const dy = current.y - stationPoint.y;
-    const distance = Math.max(Math.hypot(dx, dy), 1);
-    const approachDistance = MARKET_STATION_INTERACTION_DISTANCE - 18;
-    startTapMovement(
-      {
-        x: stationPoint.x + (dx / distance) * approachDistance,
-        y: stationPoint.y + (dy / distance) * approachDistance,
-      },
-      { marketStation: station },
-    );
+    const target = getMarketStationApproachPoint(marketEnvironmentRef.current, station,
+      playerPoint.current, marketCashierCalledRef.current);
+    if (target) startTapMovement(target, { marketStation: station });
   };
 
   const selectControlMode = (mode: ControlMode) => {
@@ -2151,13 +2097,9 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
   const handleInteraction = () => {
     if (worldMapRef.current === 'market') {
       if (!marketStationNearbyRef.current) return;
-      if (marketStationNearbyRef.current === 'exit') {
-        handleLeaveMarket();
-        return;
-      }
       setMarketInteractionRequest((current) => ({
         id: (current?.id ?? 0) + 1,
-        station: marketStationNearbyRef.current as MarketStationId,
+        station: marketStationNearbyRef.current as MarketEnvironmentStationId,
       }));
       return;
     }
@@ -2174,6 +2116,7 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
     if (quizStep) return;
     if (dialogueIndex !== null) {
       if (visibleDialogueCharacters < currentDialogue.length) {
+        dialogueAudio.stop();
         setVisibleDialogueCharacters(currentDialogue.length);
         dialogueReadyAt.current = Date.now() + DIALOGUE_READ_DELAY;
         return;
@@ -2265,6 +2208,14 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
     }
 
     if (currentDialogueStep.purpose === 'npc-action') {
+      if (choice === 'npc-cashier' && dialogueNpcId === 'jiyoung') {
+        stopMovement();
+        setDialogueIndex(null);
+        setDialogueMode(null);
+        setSelectedDailyChoice(null);
+        setCashierOpen(true);
+        return;
+      }
       if (choice === 'npc-talk') {
         startSmallTalk(dialogueNpcId, true);
         return;
@@ -2312,10 +2263,12 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
         : nearbyNpcId !== null || nearbyPortalId !== null || busStopNearby;
   const interactionLabel =
     worldMap === 'market'
-      ? marketStationNearby === 'checkout'
+      ? (marketStationNearby === 'checkout' || marketStationNearby === 'checkout-2')
         ? '계산대에서 계산하기'
-        : marketStationNearby === 'exit'
+        : marketStationNearby === 'common-door'
           ? '마트에서 마을로 나가기'
+          : marketStationNearby?.startsWith('staff:')
+        ? '종업원에게 도움 요청하기'
           : marketStationCategory
             ? `${marketStationCategory.label} 살펴보기`
             : '가까이 가면 상호작용할 수 있어요'
@@ -2338,9 +2291,9 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
                 : '상호작용할 대상이 없습니다';
   const interactionIcon =
     worldMap === 'market'
-      ? marketStationNearby === 'checkout'
+      ? (marketStationNearby === 'checkout' || marketStationNearby === 'checkout-2')
         ? 'card-outline'
-        : marketStationNearby === 'exit'
+        : marketStationNearby === 'common-door'
           ? 'exit-outline'
           : 'search'
       : worldMap === 'home'
@@ -2358,10 +2311,12 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
               : 'bus';
   const interactionActionText =
     worldMap === 'market'
-      ? marketStationNearby === 'checkout'
+      ? (marketStationNearby === 'checkout' || marketStationNearby === 'checkout-2')
         ? '계산'
-        : marketStationNearby === 'exit'
+        : marketStationNearby === 'common-door'
           ? '나가기'
+          : marketStationNearby?.startsWith('staff:')
+            ? '대화'
           : marketStationNearby
             ? '보기'
             : '행동'
@@ -2390,11 +2345,18 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
 
   const joystickControlsVisible =
     controlMode === 'joystick' &&
+    !hudMenuOpen &&
     !dialoguePanelMounted &&
     !quizPanelMounted &&
     !fridgeMenuOpen &&
     !cookingOpen &&
+    !cashierOpen &&
     !marketScenarioLocked;
+
+  if (cashierOpen) {
+    return <CashierSimulationScreen onExit={() => setCashierOpen(false)} />;
+  }
+
   return (
     <View
       onLayout={handleViewportLayout}
@@ -2437,9 +2399,9 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
           style={[
             styles.world,
             {
-              height: WORLD_BOUNDS[worldMap].height,
+              height: worldMap === 'market' ? marketEnvironment.world.height : WORLD_BOUNDS[worldMap].height,
               transform: camera.getTranslateTransform(),
-              width: WORLD_BOUNDS[worldMap].width,
+              width: worldMap === 'market' ? marketEnvironment.world.width : WORLD_BOUNDS[worldMap].width,
             },
           ]}
         >
@@ -2489,14 +2451,24 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
           ) : (
             <MarketWorldLayer
               controlMode={controlMode}
+              environment={marketEnvironment}
+              cashierCalled={marketCashierCalled}
               nearbyStation={marketStationNearby}
               onStationPress={handleMarketStationPress}
               tapTargetMarker={tapTargetMarker}
             />
           )}
+          {worldMap === 'market' ? <Animated.View accessibilityLabel="내 캐릭터" pointerEvents="none"
+            testID="market-world-player"
+            style={[styles.player, { left: 0, top: 0, zIndex: marketPlayerDepth,
+              transform: marketPlayerPosition.getTranslateTransform() }]}>
+            <DirectionalAvatar facing={playerAvatarPose.facing} manifest={freshPlayerAvatar}
+              motion={playerAvatarPose.motion} reduceMotion={reduceMotionEnabled} scale={PLAYER_ART_SCALE} />
+          </Animated.View> : null}
         </Animated.View>
 
-        <View accessibilityLabel="내 캐릭터" pointerEvents="none" style={styles.player}>
+        {worldMap !== 'market' ? <Animated.View accessibilityLabel="내 캐릭터" pointerEvents="none"
+          style={[styles.player, { transform: playerCameraOffset.getTranslateTransform() }]}>
           <DirectionalAvatar
             facing={playerAvatarPose.facing}
             manifest={freshPlayerAvatar}
@@ -2504,7 +2476,7 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
             reduceMotion={reduceMotionEnabled}
             scale={PLAYER_ART_SCALE}
           />
-        </View>
+        </Animated.View> : null}
       </Animated.View>
 
 
@@ -2587,7 +2559,7 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
       </View>
       ) : null}
 
-      {!cookingOpen ? (
+      {!cookingOpen && (worldMap !== 'market' || !marketScenarioLocked) ? (
         <GameHud
           controlMode={controlMode}
           dailyQuests={dailyQuests}
@@ -2614,6 +2586,14 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
         <MarketSimulationScreen
           accessToken={accessToken}
           difficulty={marketDifficulty}
+          externalMenuOpen={hudMenuOpen}
+          controlMode={controlMode}
+          onControlModeChange={selectControlMode}
+          environment={marketEnvironment}
+          onEnvironmentChange={handleMarketEnvironmentChange}
+          onCashierCalled={handleMarketCashierCalled}
+          playerPositionRef={playerPoint}
+          playerMovementListenerRef={marketMovementListener}
           embedded
           interactionRequest={marketInteractionRequest}
           key={`${personalizedMarketMission.id}-${marketDifficulty}-${marketSimulation?.questInstanceId ?? 'static'}`}
@@ -2776,11 +2756,42 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
               />
             ) : null}
           </Animated.View>
+          {dialoguePortraitExpression && !quizPanelMounted ? (
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.dialoguePortraitAnchor,
+                renderedDialogueStep?.kind === 'choice' && styles.dialoguePortraitAnchorRaised,
+                {
+                  opacity: dialoguePanelProgress,
+                  transform: [
+                    {
+                      translateY: dialoguePanelProgress.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [14, 0],
+                      }),
+                    },
+                    {
+                      scale: dialoguePanelProgress.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0.97, 1],
+                      }),
+                    },
+                  ],
+                },
+              ]}
+            >
+              <MinsuDialoguePortrait expression={dialoguePortraitExpression} />
+            </Animated.View>
+          ) : null}
           <Animated.View
             pointerEvents={dialogueIndex !== null ? 'auto' : 'none'}
             style={[
               styles.dialogueBox,
               currentDialogueStep?.kind === 'choice' && styles.dialogueChoiceBox,
+              currentDialogueStep?.kind === 'choice' &&
+                currentDialogueStep.options.length > 2 &&
+                styles.dialogueChoiceBoxTall,
               {
                 opacity: dialoguePanelProgress,
                 transform: [
@@ -2894,6 +2905,32 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
       {quizPanelMounted ? (
         <View style={styles.quizOverlay}>
           <Animated.View style={[styles.dim, { opacity: quizPanelProgress }]} />
+          {renderedQuizStep === 'question' ? (
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.dialoguePortraitAnchor,
+                styles.dialoguePortraitAnchorRaised,
+                styles.quizPortraitAnchor,
+                {
+                  opacity: quizPanelProgress,
+                  transform: [
+                    {
+                      translateY: quizPanelProgress.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [14, 0],
+                      }),
+                    },
+                  ],
+                },
+              ]}
+            >
+              <MinsuDialoguePortrait
+                expression="curious"
+                testID="minsu-quiz-portrait"
+              />
+            </Animated.View>
+          ) : null}
           <Animated.View
             style={[
               styles.quizSheet,
@@ -3162,129 +3199,48 @@ const styles = StyleSheet.create({
     backgroundColor: '#CAD3C3',
     cursor: 'auto',
     flex: 1,
-    overflow: 'hidden',
+    // The browser must not scroll the world when a zoomed, off-screen control receives focus.
+    overflow: Platform.OS === 'web' ? 'clip' as 'hidden' : 'hidden',
   },
   touchSurface: {
     flex: 1,
   },
   zoomScene: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   world: {
     left: 0,
     position: 'absolute',
     top: 0,
   },
-  marketArtBase: {
-    ...StyleSheet.absoluteFillObject,
-    height: MARKET_WORLD_HEIGHT,
-    width: MARKET_WORLD_WIDTH,
-  },
-  marketCounterIllustrated: {
-    backgroundColor: 'transparent',
-    borderWidth: 0,
-    overflow: 'visible',
-    padding: 0,
-  },
-  marketCounterArt: {
-    height: 168,
-    left: -6,
-    position: 'absolute',
-    top: -58,
-    width: 252,
-  },
-  marketCounterNameplate: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,253,248,0.94)',
-    borderColor: 'rgba(63,114,91,0.24)',
-    borderRadius: 12,
-    borderWidth: 1,
-    bottom: 6,
-    flexDirection: 'row',
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    position: 'absolute',
-  },
-  marketShelfIllustrated: {
-    backgroundColor: 'transparent',
-    borderWidth: 0,
-    overflow: 'visible',
-    padding: 0,
-  },
-  marketShelfArt: {
-    bottom: -6,
-    height: 148,
-    left: 0,
-    position: 'absolute',
-    width: 220,
-  },
   marketCounter: {
     alignItems: 'center',
-    backgroundColor: '#A97C59',
-    borderColor: '#77563F',
-    borderRadius: 12,
-    borderWidth: 2,
-    height: 105,
+    backgroundColor: 'transparent',
+    height: MARKET_CHECKOUT_RECT.height,
     justifyContent: 'center',
-    left: 325,
+    left: MARKET_CHECKOUT_RECT.x,
+    overflow: 'visible',
     position: 'absolute',
-    top: 92,
-    width: 250,
+    top: MARKET_CHECKOUT_RECT.y,
+    width: MARKET_CHECKOUT_RECT.width,
     zIndex: 5,
   },
-  marketCounterText: { color: '#FFF4DE', fontFamily: fonts.bold, fontSize: 15 },
   marketShelf: {
-    backgroundColor: '#9B7456',
-    borderColor: '#6F503B',
-    borderRadius: 12,
-    borderWidth: 2,
-    paddingHorizontal: 14,
-    paddingTop: 16,
+    backgroundColor: 'transparent',
+    overflow: 'visible',
     position: 'absolute',
     zIndex: 5,
   },
-  marketObjectActive: {
-    borderColor: '#F3CE62',
-    borderWidth: 4,
-    shadowColor: '#5C482D',
-    shadowOffset: { height: 4, width: 0 },
-    shadowOpacity: 0.22,
-    shadowRadius: 7,
-  },
-  marketShelfLabel: {
-    alignItems: 'center',
-    borderRadius: 9,
-    flexDirection: 'row',
-    gap: 5,
-    left: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    position: 'absolute',
-    top: 13,
-    zIndex: 3,
-  },
-  marketShelfLabelText: { color: '#FFFFFF', fontFamily: fonts.semibold, fontSize: 10 },
   marketExit: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.76)',
-    borderColor: '#B9B0A2',
-    borderRadius: 16,
-    borderStyle: 'dashed',
-    borderWidth: 2,
-    flexDirection: 'row',
-    gap: 7,
+    backgroundColor: 'transparent',
     height: 58,
-    justifyContent: 'center',
     left: 375,
     position: 'absolute',
     top: 900,
     width: 150,
   },
-  marketExitInactive: { backgroundColor: 'transparent', borderColor: 'transparent' },
-  marketExitText: { color: '#647168', fontFamily: fonts.bold, fontSize: 13 },
   ground: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: '#DDE4D5',
     borderColor: '#B7C1AF',
     borderWidth: 12,
@@ -3659,13 +3615,13 @@ const styles = StyleSheet.create({
   },
   busStopActionText: { color: colors.white, fontFamily: fonts.bold, fontSize: 12 },
   interactionOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     alignItems: 'center',
     justifyContent: 'flex-end',
     zIndex: 42,
   },
   interactionOverlayDim: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(38,45,40,0.24)',
   },
   fridgeMenuSheet: {
@@ -3907,10 +3863,20 @@ const styles = StyleSheet.create({
   },
   infoPanelButtonText: { color: colors.white, fontFamily: fonts.bold, fontSize: 15 },
   dialogueDim: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(49,50,46,0.15)',
     zIndex: 26,
   },
+  dialoguePortraitAnchor: {
+    bottom: 215,
+    height: 238,
+    left: '50%',
+    marginLeft: -174,
+    position: 'absolute',
+    width: 174,
+    zIndex: 27,
+  },
+  dialoguePortraitAnchorRaised: { bottom: 342 },
   dialogueBox: {
     alignSelf: 'center',
     backgroundColor: 'rgba(75,75,75,0.90)',
@@ -3928,6 +3894,7 @@ const styles = StyleSheet.create({
     zIndex: 27,
   },
   dialogueChoiceBox: { bottom: 258 },
+  dialogueChoiceBoxTall: { bottom: 318 },
   dialogueSpeakerTag: {
     alignItems: 'center',
     backgroundColor: '#D4C498',
@@ -3983,15 +3950,17 @@ const styles = StyleSheet.create({
     right: 22,
     width: 0,
   },
-  quizOverlay: { ...StyleSheet.absoluteFillObject, justifyContent: 'flex-end', zIndex: 30 },
-  dim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(49,50,46,0.18)' },
+  quizOverlay: { ...StyleSheet.absoluteFill, justifyContent: 'flex-end', zIndex: 30 },
+  dim: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(49,50,46,0.18)' },
+  quizPortraitAnchor: { zIndex: 0 },
   quizSheet: {
     alignSelf: 'center',
     maxWidth: 700,
     width: '100%',
+    zIndex: 1,
   },
   quizChoiceStage: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     alignItems: 'center',
     backgroundColor: 'transparent',
     maxWidth: '100%',

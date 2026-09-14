@@ -96,4 +96,10 @@ describe('마트 장보기 시나리오', () => {
     expect(mission.budget).toBe(17500);
     expect(mission.briefing).toHaveLength(1);
   });
+
+  it('생활용품은 실제 상품 규격과 가격으로 장바구니 합계에 포함된다', () => {
+    expect(getMarketCartTotal({ 'aa-batteries': 1, 'dish-soap': 1, 'black-ballpoint': 2 })).toBe(5000);
+    expect(getMarketProduct('packing-tape')?.variantLabel).toBe('포장용 50mm');
+    expect(getMarketProduct('transparent-tape')?.variantLabel).toBe('투명 사무용 18mm');
+  });
 });

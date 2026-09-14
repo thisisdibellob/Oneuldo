@@ -3,8 +3,6 @@ import { Image, Platform } from 'react-native';
 import type { ImageSourcePropType, StyleProp, ViewStyle } from 'react-native';
 
 import {
-  AVATAR_FACINGS,
-  AVATAR_MOTIONS,
   type AvatarAnimationManifest,
   type AvatarFacing,
   type AvatarMotion,
@@ -46,15 +44,12 @@ export function DirectionalAvatar({
   const frameCount = frameSet.length;
 
   useEffect(() => {
-    // React Native Web does not guarantee the native Image prefetch API shape.
-    // Browser assets are already cached by the mounted, opacity-switched frames.
+    // Mounting the active set warms the web image cache. Native prefetch is
+    // limited to this same set instead of competing for all 80 animation frames.
     if (Platform.OS === 'web') return undefined;
 
-    const sources = AVATAR_FACINGS.flatMap((manifestFacing) =>
-      AVATAR_MOTIONS.flatMap((manifestMotion) => manifest[manifestFacing][manifestMotion]),
-    );
     const uris = new Set(
-      sources
+      frameSet
         .map((source) => Image.resolveAssetSource(source)?.uri)
         .filter((uri): uri is string => Boolean(uri)),
     );
@@ -64,7 +59,7 @@ export function DirectionalAvatar({
     });
 
     return undefined;
-  }, [manifest]);
+  }, [frameSet]);
 
   useEffect(() => {
     setFrameIndex(0);
@@ -78,22 +73,21 @@ export function DirectionalAvatar({
     return () => clearInterval(timer);
   }, [frameCount, motion, reduceMotion]);
 
+  // Keep all frames of the current animation mounted for opacity swaps, but
+  // leave other directions/motions out of the initial render and request burst.
+  const frameLayers = useMemo(() => frameSet.map((source: ImageSourcePropType, index) => ({
+    id: `${facing}-${motion}-${index}`,
+    slot: 'bodySkin' as const,
+    source,
+  })), [facing, frameSet, motion]);
+
   const layers = useMemo(() => {
     const activeIndex = reduceMotion || frameCount === 0 ? 0 : frameIndex % frameCount;
-    return AVATAR_FACINGS.flatMap((layerFacing) =>
-      AVATAR_MOTIONS.flatMap((layerMotion) => {
-        const requestedFrames = manifest[layerFacing][layerMotion];
-        const frames = requestedFrames.length > 0 ? requestedFrames : manifest.front[layerMotion];
-        return frames.map((source: ImageSourcePropType, index) => ({
-          id: `${layerFacing}-${layerMotion}-${index}`,
-          opacity:
-            layerFacing === facing && layerMotion === motion && index === activeIndex ? 1 : 0,
-          slot: 'bodySkin' as const,
-          source,
-        }));
-      }),
-    );
-  }, [facing, frameCount, frameIndex, manifest, motion, reduceMotion]);
+    return frameLayers.map((layer, index) => ({
+      ...layer,
+      opacity: index === activeIndex ? 1 : 0,
+    }));
+  }, [frameCount, frameIndex, frameLayers, reduceMotion]);
 
   return (
     <ModularCharacter
