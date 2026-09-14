@@ -18,6 +18,8 @@ jest.mock('expo-audio', () => ({
 
 jest.mock('expo-font', () => ({ isLoaded: () => true, loadAsync: () => Promise.resolve() }));
 
+const CASHIER_REQUEST_TEXT = '계산대에 사람이 없어요,\n계산 부탁드릴게요';
+
 function finishStaffLine(screen: ReturnType<typeof render>) {
   const dialogue = screen.queryByRole('button', { name: '직원 대화 계속하기' });
   if (dialogue && !dialogue.props.accessibilityState?.disabled) fireEvent.press(dialogue);
@@ -164,33 +166,33 @@ describe('마트 장보기의 최종 결정과 재시도', () => {
         await game.station(counter.id);
         expect(game.screen.queryByRole('button', { name: '구매 확정' }) !== null).toBe(counter.cashierPresent);
         expect(game.screen.queryByText('계산원이 자리를 비웠어요') !== null).toBe(!counter.cashierPresent);
-        fireEvent.press(game.screen.getByRole('button', { name: counter.cashierPresent ? '다시 고르기' : '직원 찾아 계산 요청하기' }));
+        fireEvent.press(game.screen.getByRole('button', { name: counter.cashierPresent ? '다시 고르기' : '계산대 다시 살펴보기' }));
         await finishTransition();
       }
       expect(game.onCashierCalled).not.toHaveBeenCalled();
     } finally { game.screen.unmount(); }
   });
 
-  it('빈 2번 계산대에서 직원을 찾아 요청하면 2번만 계산 가능해지고 정상 구매를 완료한다', async () => {
+  it('빈 2번을 먼저 방문해도 직원에게 일반 요청을 하면 안내받은 1번에서 정상 구매를 완료한다', async () => {
     const game = setup({ objectives: [{ productId: 'milk', quantity: 1 }] }, 0);
     await game.start(); await game.station('fresh'); game.add('milk'); await game.closeShelf();
     try {
       await game.station('checkout-2');
       expect(game.screen.getByText('계산원이 자리를 비웠어요')).toBeTruthy();
-      fireEvent.press(game.screen.getByRole('button', { name: '직원 찾아 계산 요청하기' }));
+      fireEvent.press(game.screen.getByRole('button', { name: '계산대 다시 살펴보기' }));
       await finishTransition();
       await game.station(`staff:${game.environment.employees[0].id}`);
-      fireEvent.press(game.screen.getByRole('button', { name: '2번 계산대 계산을 부탁드려요' }));
+      fireEvent.press(game.screen.getByRole('button', { name: CASHIER_REQUEST_TEXT }));
       finishStaffLine(game.screen);
-      expect(game.onCashierCalled).toHaveBeenLastCalledWith({ checkout: false, 'checkout-2': true });
-      expect(game.screen.getByRole('button', { name: '1번 계산대 계산을 부탁드려요' })).toBeTruthy();
-      expect(game.screen.queryByRole('button', { name: '2번 계산대 계산을 부탁드려요' })).toBeNull();
+      expect(game.onCashierCalled).toHaveBeenLastCalledWith({ checkout: true, 'checkout-2': false });
+      expect(game.screen.getByText('1번 계산대로 와 주세요. 계산을 도와드릴게요.')).toBeTruthy();
+      expect(game.screen.queryByRole('button', { name: CASHIER_REQUEST_TEXT })).toBeNull();
       fireEvent.press(game.screen.getByRole('button', { name: '아니에요, 감사합니다.' })); await finishTransition();
-      await game.station('checkout-2');
+      await game.station('checkout');
       fireEvent.press(game.screen.getByRole('button', { name: '구매 확정' }));
       expect(game.screen.getByText('장보기에 성공했어요!')).toBeTruthy();
       fireEvent.press(game.screen.getByRole('button', { name: '평가 건너뛰기' }));
-      expect(game.onEpisodeComplete.mock.calls[0][0]).toMatchObject({ paid: true, selectedCheckoutId: 'checkout-2', cashierAvailability: { checkout: false, 'checkout-2': true } });
+      expect(game.onEpisodeComplete.mock.calls[0][0]).toMatchObject({ paid: true, selectedCheckoutId: 'checkout', cashierAvailability: { checkout: true, 'checkout-2': false } });
       expect(game.onCashierCalled).toHaveBeenCalledTimes(1);
     } finally { game.screen.unmount(); }
   });
@@ -209,7 +211,8 @@ describe('마트 장보기의 최종 결정과 재시도', () => {
       await move(game.environment.entrance.alarmBoundaryY - 10); await move(game.environment.entrance.alarmBoundaryY + 10);
       expect(game.screen.getByLabelText('현재 점수 90점')).toBeTruthy();
       fireEvent.press(game.screen.getByRole('button', { name: '장보기 포기' }));
-      expect(game.screen.getByText('최종 점수 90점 · 경보기 감점 10점 (1회)')).toBeTruthy();
+      expect(game.screen.getByText('최종 점수 90점 · 총 감점 10점')).toBeTruthy();
+      expect(game.screen.getByText('경보기 10점 (1회) · 계산원 확인 0점')).toBeTruthy();
       fireEvent.press(game.screen.getByRole('button', { name: '평가 건너뛰기' }));
       expect(game.onEpisodeComplete.mock.calls[0][0]).toMatchObject({ score: 90, penaltyPoints: 10, alarmCount: 1, paid: false });
     } finally { game.screen.unmount(); }
@@ -220,7 +223,8 @@ describe('마트 장보기의 최종 결정과 재시도', () => {
     try {
       game.playerPositionRef.current = { x: game.environment.entrance.point.x, y: game.environment.entrance.alarmBoundaryY + 15 };
       fireEvent.press(game.screen.getByRole('button', { name: '장보기 포기' }));
-      expect(game.screen.getByText('최종 점수 90점 · 경보기 감점 10점 (1회)')).toBeTruthy();
+      expect(game.screen.getByText('최종 점수 90점 · 총 감점 10점')).toBeTruthy();
+      expect(game.screen.getByText('경보기 10점 (1회) · 계산원 확인 0점')).toBeTruthy();
       fireEvent.press(game.screen.getByRole('button', { name: '평가 건너뛰기' }));
       const episode = game.onEpisodeComplete.mock.calls[0][0];
       expect(episode.events.filter((event: { type: string }) => event.type === 'entrance_alarm')).toHaveLength(1);
@@ -252,7 +256,8 @@ describe('마트 장보기의 최종 결정과 재시도', () => {
       await act(async () => { jest.advanceTimersByTime(500); await Promise.resolve(); });
       expect(game.screen.getByLabelText('현재 점수 80점')).toBeTruthy();
       fireEvent.press(game.screen.getByRole('button', { name: '장보기 포기' }));
-      expect(game.screen.getByText('최종 점수 80점 · 경보기 감점 20점 (2회)')).toBeTruthy();
+      expect(game.screen.getByText('최종 점수 80점 · 총 감점 20점')).toBeTruthy();
+      expect(game.screen.getByText('경보기 20점 (2회) · 계산원 확인 0점')).toBeTruthy();
       fireEvent.press(game.screen.getByRole('button', { name: '평가 건너뛰기' }));
       const episode = game.onEpisodeComplete.mock.calls[0][0];
       expect(episode.events.filter((event: { type: string }) => event.type === 'entrance_alarm')).toHaveLength(2);
@@ -376,7 +381,7 @@ describe('마트 장보기의 최종 결정과 재시도', () => {
     const game = setup({}, 0); await game.start(); await game.station('checkout');
     expect(game.screen.getByText('계산원이 자리를 비웠어요')).toBeTruthy();
     expect(game.screen.queryByRole('button', { name: '구매 확정' })).toBeNull();
-    fireEvent.press(game.screen.getByRole('button', { name: '직원 찾아 계산 요청하기' }));
+    fireEvent.press(game.screen.getByRole('button', { name: '계산대 다시 살펴보기' }));
     const staffId = `staff:${game.environment.employees[0].id}` as const;
     game.playerPositionRef.current = { ...game.environment.spawn };
     await game.station(staffId, false);
@@ -385,7 +390,7 @@ describe('마트 장보기의 최종 결정과 재시도', () => {
     await game.station(staffId);
     expect(game.screen.getByText('무엇을 도와드릴까요?')).toBeTruthy();
     expect(game.onCashierCalled).not.toHaveBeenCalled();
-    fireEvent.press(game.screen.getByRole('button', { name: '1번 계산대 계산을 부탁드려요' }));
+    fireEvent.press(game.screen.getByRole('button', { name: CASHIER_REQUEST_TEXT }));
     finishStaffLine(game.screen);
     expect(game.screen.getByText('1번 계산대로 와 주세요. 계산을 도와드릴게요.')).toBeTruthy();
     expect(game.onCashierCalled).toHaveBeenCalledTimes(1);
@@ -394,6 +399,56 @@ describe('마트 장보기의 최종 결정과 재시도', () => {
     await game.station('checkout'); expect(game.screen.getByRole('button', { name: '구매 확정' })).toBeTruthy();
     fireEvent.press(game.screen.getAllByRole('button', { name: '장보기 포기' })[0]);
     expect(game.screen.getByText('구매 시도 0회')).toBeTruthy(); game.screen.unmount();
+  });
+
+  it.each([0, 1, 2] as const)('계산원 %i명이어도 요청은 두 줄 선택지 하나이며 수락 또는 감점 응답을 한 번 처리한다', async cashierCount => {
+    const game = setup({ cashierRequestPenaltyPoints: 7 }, cashierCount);
+    const staff = `staff:${game.environment.employees[0].id}` as const;
+    try {
+      await game.start(); await game.station(staff);
+      const choices = game.screen.getAllByRole('button', { name: CASHIER_REQUEST_TEXT });
+      expect(choices).toHaveLength(1);
+      expect(game.screen.queryByRole('button', { name: /[12]번 계산대 계산을 부탁드려요/ })).toBeNull();
+      // Dispatch a second press before React can paint the removed choice.
+      act(() => { fireEvent.press(choices[0]); fireEvent.press(choices[0]); });
+      finishStaffLine(game.screen);
+      expect(game.screen.queryByRole('button', { name: CASHIER_REQUEST_TEXT })).toBeNull();
+      if (cashierCount === 0) {
+        expect(game.screen.getByText('1번 계산대로 와 주세요. 계산을 도와드릴게요.')).toBeTruthy();
+        expect(game.screen.queryByTestId('market-staff-request-penalty')).toBeNull();
+        expect(game.onCashierCalled).toHaveBeenCalledTimes(1);
+        expect(game.onCashierCalled).toHaveBeenLastCalledWith({ checkout: true, 'checkout-2': false });
+      } else {
+        expect(game.screen.getByTestId('market-staff-response-text').props.children).toMatch(/계산원|직원/);
+        expect(game.screen.getByText('계산원 확인 −7점')).toBeTruthy();
+        expect(game.onCashierCalled).not.toHaveBeenCalled();
+      }
+      fireEvent.press(game.screen.getByRole('button', { name: '아니에요, 감사합니다.' })); await finishTransition();
+      expect(game.screen.getByLabelText(`현재 점수 ${cashierCount === 0 ? 100 : 93}점`)).toBeTruthy();
+      await game.station(staff);
+      expect(game.screen.getAllByRole('button', { name: CASHIER_REQUEST_TEXT })).toHaveLength(1);
+      expect(game.screen.queryByTestId('market-staff-request-penalty')).toBeNull();
+      fireEvent.press(game.screen.getByRole('button', { name: '아니에요, 감사합니다.' })); await finishTransition();
+      await game.requestGiveUp();
+      expect(game.screen.getByTestId('market-final-score').props.children.join('')).toContain(`총 감점 ${cashierCount === 0 ? 0 : 7}점`);
+      fireEvent.press(game.screen.getByRole('button', { name: '평가 건너뛰기' }));
+      const episode = game.onEpisodeComplete.mock.calls[0][0];
+      expect(episode).toMatchObject({ attempts: 0, paid: false, finalCart: {}, alarmCount: 0,
+        score: cashierCount === 0 ? 100 : 93, penaltyPoints: cashierCount === 0 ? 0 : 7 });
+      expect(episode.events.filter((event: {type:string}) => event.type === 'cashier_request_declined')).toHaveLength(cashierCount === 0 ? 0 : 1);
+      expect(episode.events.filter((event: {type:string}) => event.type === 'cashier_requested')).toHaveLength(cashierCount === 0 ? 1 : 0);
+    } finally { game.screen.unmount(); }
+  });
+
+  it('계산원 확인 감점을 0으로 설정하면 안내는 하되 점수를 깎지 않는다', async () => {
+    const game = setup({ cashierRequestPenaltyPoints: 0 }, 2);
+    try {
+      await game.start(); await game.station(`staff:${game.environment.employees[0].id}`);
+      fireEvent.press(game.screen.getByRole('button', { name: CASHIER_REQUEST_TEXT })); finishStaffLine(game.screen);
+      expect(game.screen.getByText('계산원 확인 · 감점 없음')).toBeTruthy();
+      fireEvent.press(game.screen.getByRole('button', { name: '아니에요, 감사합니다.' })); await finishTransition();
+      expect(game.screen.getByLabelText('현재 점수 100점')).toBeTruthy();
+    } finally { game.screen.unmount(); }
   });
 
   it.each([0, 2] as const)('계산원 %i명 상태에서 직원 반납 도움은 여러 분류의 선택 수량만 돌려놓고 계산 상태를 바꾸지 않는다', async cashierCount => {
@@ -437,8 +492,8 @@ describe('마트 장보기의 최종 결정과 재시도', () => {
       fireEvent.press(game.screen.getByRole('button', { name: '직원 대화로 돌아가기' }));
       finishStaffLine(game.screen);
       expect(game.screen.queryByRole('button', { name: '물건 제자리에 놓기 도움 요청' })).toBeNull();
-      expect(game.screen.queryByRole('button', { name: '1번 계산대 계산을 부탁드려요' }) !== null).toBe(cashierCount === 0);
-      expect(game.screen.queryByRole('button', { name: '2번 계산대 계산을 부탁드려요' }) !== null).toBe(cashierCount === 0);
+      expect(game.screen.getAllByRole('button', { name: CASHIER_REQUEST_TEXT })).toHaveLength(1);
+      expect(game.screen.queryByRole('button', { name: /[12]번 계산대 계산을 부탁드려요/ })).toBeNull();
       fireEvent.press(game.screen.getByRole('button', { name: '아니에요, 감사합니다.' })); await finishTransition();
       fireEvent.press(game.screen.getByRole('button', { name: '장보기 포기' }));
       fireEvent.press(game.screen.getByRole('button', { name: '평가 건너뛰기' }));

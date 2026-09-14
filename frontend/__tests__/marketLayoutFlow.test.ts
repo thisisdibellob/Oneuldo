@@ -41,9 +41,9 @@ it.each(MARKET_LAYOUT_OPTIONS.flatMap(layout => [false, true].map(entranceConstr
   game = visit(game, staff);
   game = applyMarketAction(game, { type: 'requestReturn', productId: 'milk' });
   expect(game.cart.milk).toBe(1);
-  game = applyMarketAction(game, { type: 'requestCashier', checkoutId: 'checkout-2' });
-  expect(game.cashierAvailability['checkout-2']).toBe(true);
-  game = visit(game, 'checkout-2');
+  game = applyMarketAction(game, { type: 'requestCashier' });
+  expect(game.cashierAvailability).toEqual({ checkout: true, 'checkout-2': false });
+  game = visit(game, 'checkout');
   game = applyMarketAction(game, { type: 'submit' });
   expect(game).toMatchObject({ outcome: 'success', attempts: 1, paid: true, score: 100, alarmCount: 0 });
   expect(exportMarketEpisode(game).environment.config.layoutId).toBe(layoutId);

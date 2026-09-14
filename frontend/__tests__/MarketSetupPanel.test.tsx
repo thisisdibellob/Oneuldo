@@ -53,3 +53,18 @@ it('전달용 모퉁이 공사 JSON 예제는 실제 설정으로 가져올 수 
   expect(game.environment.spawn).toEqual({ x: 1060, y: 1210 });
   expect(game.environment.constructionZones).toHaveLength(1);
 });
+
+
+it('계산원 확인 감점을 별도로 적용하고 JSON 왕복에서 유지한다', () => {
+  const config = createMarketSession().config;
+  const onApply = jest.fn();
+  const screen = render(<MarketSetupPanel config={config} onApply={onApply} onClose={jest.fn()} />);
+  expect(screen.getByLabelText('계산원 확인 감점').props.value).toBe('10');
+  fireEvent.changeText(screen.getByLabelText('계산원 확인 감점'), '7');
+  fireEvent.press(screen.getByRole('button', { name: '설정 적용' }));
+  expect(parseMarketSessionConfig(JSON.stringify(onApply.mock.calls[0][0]))).toMatchObject({ cashierRequestPenaltyPoints: 7, alarmPenaltyPoints: config.alarmPenaltyPoints });
+  fireEvent.changeText(screen.getByLabelText('계산원 확인 감점'), '101');
+  fireEvent.press(screen.getByRole('button', { name: '설정 적용' }));
+  expect(onApply).toHaveBeenCalledTimes(1);
+  expect(screen.getByRole('alert').props.children).toMatch(/0~100/);
+});

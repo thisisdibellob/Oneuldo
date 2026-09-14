@@ -25,6 +25,7 @@ const runner = createMarketAgentAdapter({
   ],
   stockPerProduct: 6,
   alarmPenaltyPoints: 10,
+  cashierRequestPenaltyPoints: 10,
   stockOverrides: { 'low-fat-milk': 3 },
   environment: {
     layoutId: 'classic', // 'aisles': 가로 통로, 'corner': 모퉁이 지점
@@ -60,6 +61,7 @@ const afterMove = runner.act({ type: 'move', dx: 0, dy: -20 });
 | `objectives` | `{productId, quantity, match?}` 배열. 1~36개 조건, 수량 1~99. 개별 `match`가 전체 난이도보다 우선 |
 | `stockPerProduct` | SKU별 기본 재고 1~99개 |
 | `alarmPenaltyPoints` | 미결제 장바구니로 입구·출구·측면 문의 감지선을 바깥 방향으로 넘을 때 감점. 0~100, 기본 10 |
+| `cashierRequestPenaltyPoints` | 계산원이 한 곳 이상 있는데 직원에게 추가 계산원을 요청할 때 감점. 정수 0~100, 기본 10. 경보기 감점과 독립적이며 예전 설정에서 생략하면 10 |
 | `stockOverrides` | `{상품ID: 재고}`. 상품별 0~99개로 덮어쓰기 |
 | `inventoryProductIds` | 선택 사항. 분류마다 서로 다른 12개 상품 ID로 고정. 이전 9개 입력은 목표·재고 검증 후 다른 상품 3개를 seed로 추가하고 설정에 12개를 기록 |
 | `environment.layoutId` | `classic`: 기본 배치, `aisles`: 가로 통로 배치, `corner`: 별도 건물의 모퉁이 지점. 생략 시 `classic`, 다른 값은 거부 |
@@ -146,14 +148,22 @@ const afterMove = runner.act({ type: 'move', dx: 0, dy: -20 });
 | `viewHelp` | 이용 방법 보기. `help_viewed` 기록 |
 | `closeView` | 장바구니·도움 화면 닫기. `view_closed` 기록 |
 | `checkout {checkoutId?}` | 해당 계산대에 가까이 있을 때 구매 결정 단계 열기. 기본 `checkout`. 아직 판정하지 않음 |
-| `requestCashier {checkoutId?}` | 가까운 직원과 대화를 연 뒤 해당 빈 계산대에 계산원 배치. 생략하면 전에 선택한 빈 계산대, 없으면 첫 빈 계산대 |
+| `requestCashier` | 쇼핑 중 가까운 직원과 대화를 연 상태에서 한 번 요청. 두 계산대가 모두 비어 있을 때만 1번 계산대에 계산원 한 명을 배치. 이미 한 곳 이상에 계산원이 있으면 이용할 계산대를 안내하고 별도 감점 |
 | `submit` | 계산원이 있는 계산대에서 최종 결정. 이때만 시도 횟수를 1 증가 |
 | `retry` | 실패 결과 후 장바구니를 유지하고 쇼핑 재개 |
 | `giveUp` | 진행 중 어느 단계에서든 종료. 제출 횟수를 늘리지 않음 |
 | `rate {difficulty,interest}` | 종료 후 각각 1~5점. 난이도는 1 매우 쉬움~5 매우 어려움, 흥미는 1 재미없음~5 매우 재미있음 |
 | `skipRating` | 종료 후 별점 없이 마무리 |
 
-계산원이 처음에 없으면 직원 접근 지점에서 `interact`로 대화를 열고 `requestCashier`로 계산을 요청합니다. `cashierAvailability`는 `{checkout:boolean,'checkout-2':boolean}`이며 두 계산대는 독립적입니다. `selectedCheckoutId`는 마지막 선택/호출한 계산대이고, 호환용 `cashierAvailable`은 선택한 계산대(없으면 첫 번째)의 상태입니다. 직원 접근 없이 호출하거나 빈 계산대에서 결제할 수 없습니다. 이미 계산원이 있는 계산대에 중복 호출하면 거부합니다. 진열대·대화·장바구니·도움 화면이 열려 있는 동안에는 이동할 수 없으며 해당 화면을 닫아야 합니다. 무인 계산대는 배치/충돌 오브젝트이며 계산 행동 대상이 없습니다.
+계산대 두 곳을 확인한 뒤 모두 비어 있을 때 직원 접근 지점에서 `interact`로 대화를 열고 `requestCashier`를 선택합니다. 목적 계산대를 다시 묻지 않으며 항상 1번(`checkout`)에 한 명을 배치합니다. 한 곳이라도 이미 운영 중이면 직원을 더 배치하지 않고 해당 계산대를 이용하도록 안내하며 `cashierRequestPenaltyPoints`만큼 감점합니다. 이 정상 대화 결과의 `lastActionError`는 `null`입니다. 직원에게 가까이 가지 않았거나 대화를 열지 않은 요청, 장바구니·도움·결제·결과 화면의 요청은 `action_rejected`만 남기고 감점하지 않습니다. 반납 도움은 계속 무료입니다.
+
+`cashierAvailability`는 `{checkout:boolean,'checkout-2':boolean}`이며 두 계산대의 현재 배치를 각각 기록합니다. `selectedCheckoutId`는 마지막 선택/수락된 호출의 계산대이고, 호환용 `cashierAvailable`은 선택한 계산대(없으면 첫 번째)의 상태입니다. 추가 직원이 필요한지 판단할 때는 이 단일 별칭 대신 두 계산대의 `cashierAvailability`를 확인해야 합니다. 빈 계산대에서는 결제할 수 없으며 다른 계산원이 있으면 그 계산대를 이용하도록 안내합니다.
+
+이전 에이전트의 선택 필드 `requestCashier.checkoutId`는 알려진 두 ID에 한해 가져오기를 허용하지만 목적지 선택 기능은 폐기했습니다. 생략하거나 어느 ID를 보내도 수락 목적지는 1번으로 같고, 제공한 값은 이벤트의 `legacyRequestedCheckoutId`에만 기록합니다. 없는 계산대 ID는 감점 없이 `action_rejected`로 처리합니다.
+
+화면은 직원 응답 직후 요청 선택지를 숨기고 동일한 버튼 입력의 빠른 중복 처리를 막습니다. 대화를 다시 열거나 에이전트가 명시적으로 새 `requestCashier` 행동을 보내는 경우는 별도 요청이므로 운영 중인 계산원이 있으면 다시 감점할 수 있습니다. 세션 엔진은 전송 재시도의 식별 키나 중복 제거를 제공하지 않으므로 외부 실행기도 한 의도에 한 행동만 전송해야 합니다.
+
+진열대·대화·장바구니·도움 화면이 열려 있는 동안에는 이동할 수 없으며 해당 화면을 닫아야 합니다. 무인 계산대는 배치/충돌 오브젝트이며 계산 행동 대상이 없습니다.
 
 진열대 안에서 장바구니를 펼치는 경우에는 해당 진열대 상품과 장바구니를 함께 관측하며, 같은 진열대의 상품을 계속 담거나 제자리에 내려놓을 수 있습니다. 다른 분류의 물건은 해당 진열대로 이동하여 내려놓아야 합니다. 일반 장바구니나 계산대에서 `remove`로 물건을 없앨 수 없으며, 도움 화면을 보는 동안에는 담기·내려놓기·직원 반납을 할 수 없습니다.
 
@@ -164,6 +174,17 @@ const afterMove = runner.act({ type: 'move', dx: 0, dy: -20 });
 첫 구매 실패는 `feedback: {success:false}`만 반환합니다. 두 번째 이후 실패부터 `details`에 다른 품목/수량을 알려 줍니다. 재시도하면 이전 결과를 지우며 횟수 제한 없이 계속할 수 있습니다. 목록에는 필요한 수량만, 장바구니에는 담긴 수량만 표시하고 계산 전에는 자동 성공률이나 정오표를 제공하지 않습니다.
 
 화면 통합용 `applyMarketAction`에는 `setPosition`이라는 신뢰된 동기화 행동이 추가로 있습니다. 이는 기존 게임의 충돌 검사가 끝난 실제 플레이어 위치를 전달하는 용도입니다. AI 실행기에 노출하면 이동 우회가 되므로 `createMarketAgentAdapter`는 이 행동을 타입과 실행 시점 양쪽에서 차단합니다. 에이전트는 반드시 어댑터의 `move`를 사용합니다.
+
+### 계산원 요청의 공개 응답과 이벤트
+
+관측에는 `cashierRequestFeedback: {accepted, message, checkoutIds, penaltyPoints} | null`이 추가됩니다. 가까운 직원과의 대화에서 마지막 행동이 정상 계산원 요청일 때만 공개 안내문과 이용할 계산대 ID, 이번 실제 감점을 반환합니다. 수락이면 `accepted:true`, `checkoutIds:['checkout']`, 감점은 0입니다. 거절이면 운영 중인 계산대 ID 목록과 실제 차감액을 반환합니다. 그다음 다른 행동을 하면 `null`이 되며, 연구용 이벤트 전체나 숨겨진 상품 정답은 여전히 관측하지 못합니다.
+
+| 이벤트 | 기록 내용 |
+| --- | --- |
+| `cashier_requested` | 두 계산대 모두 없는 경우의 수락. `staffStation`, `checkoutId:'checkout'`, `message`, `playerPosition`, 선택적 `legacyRequestedCheckoutId` |
+| `cashier_request_declined` | 정상 요청이지만 계산원이 이미 있음. `reason:'cashier-already-available'`, `staffStation`, `availableCheckoutIds`, `requestedPenaltyPoints`(설정값), `delta`(실제 음수 차감 또는 0), 현재 `score`, 누적 `penaltyPoints`, `message`, `playerPosition`, 선택적 `legacyRequestedCheckoutId` |
+
+어느 응답도 장바구니·재고·구매 시도 횟수·결제 여부·구매 판정을 바꾸지 않습니다. 거절은 계산원 배치, 선택 계산대와 경보 횟수도 유지합니다. 수락만 1번 계산대의 현재 배치와 선택 계산대를 갱신합니다. 이벤트는 종료 에피소드에 보존되고 설정은 JSON 저장·불러오기와 함께 재현됩니다.
 
 ## 출입 경보와 점수
 
@@ -179,7 +200,7 @@ const afterMove = runner.act({ type: 'move', dx: 0, dy: -20 });
 
 같은 선 주변의 작은 왕복에 중복 감점하지 않도록 통과 후 `alarmArmed`를 해제합니다. 모든 경보기의 안쪽 재활성화 조건을 만족하는 **x355 이상·y970 이하**의 판매장으로 충분히 복귀하면 다시 활성화됩니다. 공동 로비와 서쪽 바깥 복도의 이동 자체에는 감점하지 않습니다. 내부 출구의 경보선을 미결제 상품과 함께 나가는 경우는 입구·측면 출입문과 동일하게 감점합니다. 빈 장바구니와 결제된 장바구니에도 감점하지 않습니다. 내부 입구·출구 표식에 `interact`를 보내는 것만으로는 경보를 추가하거나 게임을 종료하지 않습니다.
 
-`score`, `penaltyPoints`, `alarmCount`, `paid`는 세션·관측·종료 내보내기에 동일하게 들어갑니다. `alarmArmed`는 세션과 관측에 표시합니다. 점수는 0 아래로 내려가지 않으며 이벤트 `delta`는 설정값이 아니라 실제 점수 변화입니다. 예를 들어 35점에서 65점 경보가 발생하면 delta=-35이고 이후 경보는 delta=0입니다. 이 점수는 경보 규칙 점수이며 상품 선택의 정답률을 미리 공개하지 않습니다. 최종 성공 결제 때 `paid:true`가 되고 종료 후 이동은 거부합니다.
+`score`, `penaltyPoints`, `alarmCount`, `paid`는 세션·관측·종료 내보내기에 동일하게 들어갑니다. `alarmArmed`는 세션과 관측에 표시합니다. 점수는 0 아래로 내려가지 않으며 이벤트 `delta`는 설정값이 아니라 실제 점수 변화입니다. 예를 들어 35점에서 65점 경보가 발생하면 delta=-35이고 이후 경보는 delta=0입니다. 이 점수에는 출입 경보와 불필요한 계산원 요청의 실제 감점이 함께 반영됩니다. `penaltyPoints`는 두 사유의 누적 실제 차감 합계이고 `alarmCount`는 경보만 셉니다. 사유별 합계는 각 `entrance_alarm`과 `cashier_request_declined`의 `-delta`를 합산합니다. 계산원 요청 감점도 0점 하한을 따르며 상품 선택의 정답률을 미리 공개하지 않습니다. 최종 성공 결제 때 `paid:true`가 되고 종료 후 이동은 거부합니다.
 
 ## 종료 데이터와 연결 경계
 

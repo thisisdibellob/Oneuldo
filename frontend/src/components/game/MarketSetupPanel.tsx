@@ -151,6 +151,11 @@ export function MarketSetupPanel({ config, onApply, onClose }: {
         value={String(draft.alarmPenaltyPoints)}
         onChangeText={text => update({ ...draft, alarmPenaltyPoints: Number(text) })} style={s.input} />
       <Text style={s.description}>100점에서 시작해요. 계산하지 않은 물건을 담고 입구·출구·측면 출입문의 빨간 경보기를 지나 매장 밖으로 나갈 때 적용돼요.</Text>
+      <Text style={s.label}>계산원 확인 감점</Text>
+      <TextInput accessibilityLabel="계산원 확인 감점" keyboardType="number-pad"
+        value={String(draft.cashierRequestPenaltyPoints)}
+        onChangeText={text => update({ ...draft, cashierRequestPenaltyPoints: Number(text) })} style={s.input} />
+      <Text style={s.description}>계산원이 있는데 없다고 요청하면 적용돼요. 두 계산대가 모두 비어 있을 때 계산을 부탁하면 감점 없이 도와줘요. 0점으로 설정하면 감점하지 않아요.</Text>
       <Text style={s.label}>상품 고르기 조건</Text>
       <View style={s.options}>
         <Choice

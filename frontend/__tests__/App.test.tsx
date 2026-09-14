@@ -675,7 +675,7 @@ describe('오늘도 앱', () => {
 
     expect(screen.getByText('장보기에 성공했어요!')).toBeTruthy();
     expect(screen.getByText('구매 시도 1회')).toBeTruthy();
-    expect(screen.getByText('최종 점수 90점 · 경보기 감점 10점 (1회)')).toBeTruthy();
+    expect(screen.getByText('최종 점수 90점 · 총 감점 10점')).toBeTruthy();
     fireEvent.press(screen.getByText('평가 건너뛰기'));
     fireEvent.press(screen.getByText('마트 나가기'));
     await waitFor(() => expect(screen.queryByText('장보기 의뢰 완료')).toBeNull(), { timeout: 2000 });

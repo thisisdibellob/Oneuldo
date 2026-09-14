@@ -12,6 +12,7 @@ export type MarketSessionConfig = {
   objectives: MarketTaskObjectiveInput[];
   stockPerProduct: number;
   alarmPenaltyPoints: number;
+  cashierRequestPenaltyPoints: number;
   stockOverrides: Record<string, number>;
   inventoryProductIds?: Partial<Record<MarketCategoryId, string[]>>;
   environment: Partial<MarketEnvironmentConfig>;
@@ -22,13 +23,15 @@ export type MarketSessionConfig = {
 };
 export type MarketFeedback = { success: boolean; details?: string[] };
 export type MarketRating = { difficulty: number; interest: number };
+export type MarketCashierRequestFeedback = { accepted: boolean; message: string; checkoutIds: MarketCheckoutId[]; penaltyPoints: number };
 export type MarketEpisodeEvent = { sequence: number; timestamp: string; type: string; payload: Record<string, unknown> };
 export type MarketAction = (
   | { type: 'setPosition'; point: Point }
   | { type: 'move'; dx: number; dy: number }
   | { type: 'interact'; station: MarketEnvironmentStationId }
   | { type: 'add' | 'remove' | 'requestReturn'; productId: string; quantity?: number }
-  | { type: 'checkout' | 'requestCashier'; checkoutId?: MarketCheckoutId }
+  | { type: 'checkout'; checkoutId?: MarketCheckoutId }
+  | { type: 'requestCashier'; /** @deprecated Accepted for old actors; the first checkout is always used. */ checkoutId?: MarketCheckoutId }
   | { type: 'submit' | 'retry' | 'giveUp' | 'skipRating' | 'closeStation' | 'viewCart' | 'viewHelp' | 'closeView' }
   | { type: 'rate'; difficulty: number; interest: number }
 ) & { at?: string };
@@ -69,7 +72,7 @@ export type MarketSession = {
 export const DEFAULT_MARKET_SESSION_CONFIG: MarketSessionConfig = {
   seed: 'oneuldo-market-1', difficulty: 'family',
   objectives: [{ productId: 'milk', quantity: 1 }, { productId: 'apple', quantity: 2 }, { productId: 'curry', quantity: 1 }],
-  stockPerProduct: 6, alarmPenaltyPoints: 10, stockOverrides: {}, environment: {}, provenance: { source: 'human' }, startedAt: '1970-01-01T00:00:00.000Z',
+  stockPerProduct: 6, alarmPenaltyPoints: 10, cashierRequestPenaltyPoints: 10, stockOverrides: {}, environment: {}, provenance: { source: 'human' }, startedAt: '1970-01-01T00:00:00.000Z',
 };
 
 // Implementation below deliberately keeps the player observation separate from
@@ -106,7 +109,7 @@ function shuffle<T>(values: T[], random: () => number) {
 }
 function normalizeConfig(input: Partial<MarketSessionConfig>): MarketSessionConfig {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('게임 설정은 JSON 객체여야 합니다.');
-  const knownFields = ['seed', 'difficulty', 'objectives', 'stockPerProduct', 'alarmPenaltyPoints', 'stockOverrides', 'inventoryProductIds', 'environment', 'provenance', 'startedAt', 'sessionId'];
+  const knownFields = ['seed', 'difficulty', 'objectives', 'stockPerProduct', 'alarmPenaltyPoints', 'cashierRequestPenaltyPoints', 'stockOverrides', 'inventoryProductIds', 'environment', 'provenance', 'startedAt', 'sessionId'];
   for (const key of Object.keys(input)) if (!knownFields.includes(key)) throw new Error(`지원하지 않는 게임 설정입니다: ${key}`);
   const config = clone({ ...DEFAULT_MARKET_SESSION_CONFIG, ...input,
     environment: { ...DEFAULT_MARKET_SESSION_CONFIG.environment, ...input.environment },
@@ -116,6 +119,7 @@ function normalizeConfig(input: Partial<MarketSessionConfig>): MarketSessionConf
   if (!['family', 'exact'].includes(config.difficulty)) throw new Error('difficulty는 family 또는 exact여야 합니다.');
   integer(config.stockPerProduct, '기본 재고', 1);
   integer(config.alarmPenaltyPoints, '출입 경보기 감점', 0, 100);
+  integer(config.cashierRequestPenaltyPoints, '계산원 확인 감점', 0, 100);
   if (!Array.isArray(config.objectives) || config.objectives.length < 1 || config.objectives.length > 36) throw new Error('구매 목록은 1~36개여야 합니다.');
   for (const objective of config.objectives) {
     productOrThrow(objective.productId);
@@ -339,16 +343,29 @@ export function applyMarketAction(current: MarketSession, action: MarketAction):
   }
   if (action.type === 'requestCashier') {
     const staffStation = session.activeStation;
-    if (session.view !== 'world' || !staffStation?.startsWith('staff:') || !isNearMarketStation(session.environment, staffStation, session.playerPosition, undefined, session.cashierAvailability)) return reject(session, action, '종업원에게 다가가 대화를 연 뒤 계산을 요청해 주세요.');
-    const selected = session.selectedCheckoutId;
-    const checkoutId = action.checkoutId ?? (selected && !session.cashierAvailability[selected] ? selected
-      : session.environment.checkouts.find(checkout => !session.cashierAvailability[checkout.id])?.id);
-    if (!checkoutId || !session.environment.checkouts.some(checkout => checkout.id === checkoutId)) return reject(session, action, '호출할 빈 계산대가 없어요.');
-    if (session.cashierAvailability[checkoutId]) return reject(session, action, '이 계산대에는 이미 계산원이 있어요.');
+    if (session.phase !== 'shopping' || session.view !== 'world' || !staffStation?.startsWith('staff:') || !isNearMarketStation(session.environment, staffStation, session.playerPosition, undefined, session.cashierAvailability)) return reject(session, action, '종업원에게 다가가 대화를 연 뒤 계산을 요청해 주세요.');
+    if (action.checkoutId !== undefined && !session.environment.checkouts.some(checkout => checkout.id === action.checkoutId)) return reject(session, action, '등록되지 않은 계산대예요.');
+    const legacyRequest = action.checkoutId === undefined ? {} : { legacyRequestedCheckoutId: action.checkoutId };
+    const availableCheckoutIds = session.environment.checkouts.filter(checkout => session.cashierAvailability[checkout.id]).map(checkout => checkout.id);
+    if (availableCheckoutIds.length > 0) {
+      const deduction = Math.min(session.score, session.config.cashierRequestPenaltyPoints);
+      session.score -= deduction;
+      session.penaltyPoints += deduction;
+      const counters = availableCheckoutIds.map(id => id === 'checkout' ? '1번' : '2번').join(' 또는 ');
+      const message = '이미 ' + counters + ' 계산대에 계산원이 있어요. 해당 계산대를 이용해 주세요.';
+      // A valid but unnecessary request is a staff response, not an action error.
+      record(session, 'cashier_request_declined', { reason: 'cashier-already-available', staffStation, availableCheckoutIds,
+        requestedPenaltyPoints: session.config.cashierRequestPenaltyPoints, delta: deduction ? -deduction : 0,
+        score: session.score, penaltyPoints: session.penaltyPoints, message, ...legacyRequest, playerPosition: clone(session.playerPosition) }, action.at);
+      return session;
+    }
+    // One request recruits one attendant only when the whole checkout area is unstaffed.
+    const checkoutId = 'checkout';
     session.cashierAvailability[checkoutId] = true;
     session.selectedCheckoutId = checkoutId;
     session.cashierAvailable = true;
-    record(session, 'cashier_requested', { staffStation, checkoutId, playerPosition: clone(session.playerPosition) }, action.at);
+    record(session, 'cashier_requested', { staffStation, checkoutId, ...legacyRequest,
+      message: '1번 계산대로 와 주세요. 계산을 도와드릴게요.', playerPosition: clone(session.playerPosition) }, action.at);
     return session;
   }
   if (action.type === 'add' || action.type === 'remove' || action.type === 'requestReturn') {
@@ -389,7 +406,7 @@ export function applyMarketAction(current: MarketSession, action: MarketAction):
   if (action.type === 'submit') {
     const checkoutId = session.activeStation;
     if (session.phase !== 'checkout' || (checkoutId !== 'checkout' && checkoutId !== 'checkout-2') || !isNearMarketStation(session.environment, checkoutId, session.playerPosition, undefined, session.cashierAvailability)) return reject(session, action, '계산대에서 최종 구매를 결정해 주세요.');
-    if (!session.cashierAvailability[checkoutId]) return reject(session, action, '종업원을 찾아 계산을 요청해 주세요.');
+    if (!session.cashierAvailability[checkoutId]) return reject(session, action, '계산원이 있는 계산대를 이용해 주세요. 두 곳 모두 비어 있으면 매장 직원에게 계산을 부탁해요.');
     session.attempts += 1;
     const evaluation = evaluate(session);
     session.feedback = { success: evaluation.success, ...(session.attempts >= 2 && !evaluation.success ? { details: evaluation.details } : {}) };
@@ -411,6 +428,13 @@ export function getMarketObservation(session: MarketSession) {
   const staffConversation = session.phase === 'shopping' && session.view === 'world'
     && session.activeStation?.startsWith('staff:') && isNearMarketStation(session.environment, session.activeStation, session.playerPosition, undefined, session.cashierAvailability);
   const cartVisible = session.view === 'cart' || session.phase === 'checkout' || session.phase === 'finished' || staffConversation;
+  const lastEvent = session.events.at(-1);
+  const cashierRequestFeedback: MarketCashierRequestFeedback | null = staffConversation && lastEvent
+    && (lastEvent.type === 'cashier_requested' || lastEvent.type === 'cashier_request_declined') ? {
+      accepted: lastEvent.type === 'cashier_requested', message: String(lastEvent.payload.message),
+      checkoutIds: lastEvent.type === 'cashier_requested' ? [lastEvent.payload.checkoutId as MarketCheckoutId] : lastEvent.payload.availableCheckoutIds as MarketCheckoutId[],
+      penaltyPoints: lastEvent.type === 'cashier_request_declined' ? -Number(lastEvent.payload.delta) : 0,
+    } : null;
   return clone({
     schemaVersion: 1, sessionId: session.id, seed: session.config.seed, phase: session.phase, view: session.view,
     objectives: session.objectives.map(({ id, label, quantity, match }) => ({ id, label, quantity, match })),
@@ -419,7 +443,7 @@ export function getMarketObservation(session: MarketSession) {
       const product = productOrThrow(id); return { id, categoryId: product.categoryId, name: product.name, detail: product.detail, price: product.price };
     }),
     stock: Object.fromEntries(visibleProductIds.map((id) => [id, session.stock[id]])), cart: cartVisible ? session.cart : null, cashierAvailable: session.cashierAvailable,
-    cashierAvailability: session.cashierAvailability, selectedCheckoutId: session.selectedCheckoutId,
+    cashierAvailability: session.cashierAvailability, selectedCheckoutId: session.selectedCheckoutId, cashierRequestFeedback,
     score: session.score, penaltyPoints: session.penaltyPoints, alarmCount: session.alarmCount, alarmArmed: session.alarmArmed, paid: session.paid,
     attempts: session.attempts, feedback: session.feedback, outcome: session.outcome,
     ratings: session.ratings, ratingSkipped: session.ratingSkipped, lastActionError: session.lastActionError,
