@@ -33,7 +33,7 @@ public class AiUserProfileValidator {
         for (var finding : draft.findings()) {
             require(finding != null); text(finding.id()); require(findingIds.add(finding.id()));
             text(finding.skill()); text(finding.observation()); text(finding.interpretation()); text(finding.suggestedSupport());
-            require(finding.alternativeExplanations() != null && !finding.alternativeExplanations().isEmpty()
+            require(finding.alternativeExplanations() != null
                     && finding.alternativeExplanations().size() <= 8);
             finding.alternativeExplanations().forEach(this::text);
             require(finding.evidenceEventIds() != null && !finding.evidenceEventIds().isEmpty()

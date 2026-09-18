@@ -54,7 +54,7 @@ public class ChatController {
         // Rebuild from allowlisted fields. No client-supplied tools, images, templates, URLs or model-loading options.
         var wire = new HashMap<String,Object>(Map.of("model", MODEL, "messages", body.path("messages"), "think", false, "stream", false,
                 "keep_alive", "10m", "options", Map.of("num_ctx", context, "num_predict", output, "temperature", temperature, "top_p", 0.8)));
-        if (body.has("format")) wire.put("format", ObservationOutputSchema.VALUE);
+        if (body.has("format")) wire.put("format", body.get("format"));
         return gate.run((String)request.getAttribute(ApiKeyFilter.IDENTITY), () -> {
             try {
                 JsonNode result = upstream.post().uri("/api/chat").body(wire).retrieve().body(JsonNode.class);
@@ -67,7 +67,8 @@ public class ChatController {
         if (body == null || !body.isObject() || !MODEL.equals(body.path("model").asString())
                 || (body.has("stream") && (!body.path("stream").isBoolean() || body.path("stream").asBoolean()))
                 || (body.has("think") && (!body.path("think").isBoolean() || body.path("think").asBoolean()))) throw error(HttpStatus.BAD_REQUEST, "UNSUPPORTED_REQUEST");
-        if (body.has("format") && !body.path("format").equals(mapper.valueToTree(ObservationOutputSchema.VALUE)))
+        if (body.has("format") && !body.path("format").equals(mapper.valueToTree(ObservationOutputSchema.VALUE))
+                && !body.path("format").equals(mapper.valueToTree(ObservationOutputSchema.LEGACY_VALUE)))
             throw error(HttpStatus.BAD_REQUEST, "UNSUPPORTED_OUTPUT_SCHEMA");
         var messages = body.path("messages");
         if (!messages.isArray() || messages.isEmpty() || messages.size() > 32) throw error(HttpStatus.BAD_REQUEST, "INVALID_MESSAGES");

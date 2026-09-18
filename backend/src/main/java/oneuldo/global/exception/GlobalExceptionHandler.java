@@ -36,7 +36,8 @@ public class GlobalExceptionHandler {
     ) {
         return ResponseEntity
                 .status(HttpStatus.SERVICE_UNAVAILABLE)
-                .body(new ErrorResponse("CLOUD_AI_UNAVAILABLE", exception.getMessage()));
+                .body(new ErrorResponse(exception instanceof oneuldo.ai.exception.AiTransportException transport
+                        ? transport.code().name() : "CLOUD_AI_UNAVAILABLE", exception.getMessage()));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

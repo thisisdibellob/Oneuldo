@@ -30,6 +30,17 @@ public final class AnalysisReferences {
         if (aliases.putIfAbsent(uuid, alias) != null) throw new IllegalArgumentException("DUPLICATE_ANALYSIS_REFERENCE");
         originals.put(alias, uuid);
     }
+    /** Dataset order only. Does not evaluate the meaning of a claim or of an event. */
+    public void validateEventOrder(java.util.List<String> ids) {
+        int previous = 0;
+        for (String id : ids) {
+            if (!id.matches("E[1-9][0-9]*") || !originals.containsKey(id))
+                throw new IllegalArgumentException("UNKNOWN_REVIEW_EVIDENCE");
+            int position = Integer.parseInt(id.substring(1));
+            if (position <= previous) throw new IllegalArgumentException("REVIEW_EVIDENCE_OUT_OF_ORDER: E" + previous + " " + id);
+            previous = position;
+        }
+    }
     public String encode(String json) {
         return encode(json,true);
     }

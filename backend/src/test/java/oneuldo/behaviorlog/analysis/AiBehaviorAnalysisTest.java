@@ -44,6 +44,75 @@ class AiBehaviorAnalysisTest {
     }
 
     @Test
+    void AI검토가_초안을_정정하면_검토결과를_보존한다() {
+        ReflectionTestUtils.setField(service, "qualityReview", true);
+        when(client.complete(anyString(), anyString(), anyInt(), anyDouble()))
+                .thenReturn(new GroqChatClient.GroqChatResult(mapper.writeValueAsString(valid("SUCCESS")), "test-model"))
+                .thenReturn(new GroqChatClient.GroqChatResult(reviewed(valid("UNDETERMINED")), "test-model"));
+        var response = service.analyze(memberId, new BehaviorAnalysisInputRequest(null, null));
+        assertThat(response.status()).isEqualTo("READY");
+        assertThat(response.analysis().sessionAssessments().getFirst().judgment()).isEqualTo("UNDETERMINED");
+        verify(client).complete(eq(AnalysisReviewPrompt.system()), contains("draftToReview"), anyInt(), anyDouble());
+        verify(repository).save(argThat(run -> run.getAttempts().size()==2
+                && run.getAttempts().get(1).inputPrompt().contains("behaviorTimeline")
+                && run.getAttempts().get(1).inputPrompt().contains("SUCCESS")));
+    }
+
+    @Test void 검토는_원본과_관찰을_보존하면서_중간단계의_추측을_반복주입하지않는다() {
+        var data=input(true);var refs=new AnalysisReferences(mapper,data);
+        var digest=new AiObservationDigest("구간",List.of(new AiObservationDigest.Observation(
+                "수량 1에서 2 변경", "중간 단계의 의도 추측", List.of("중간 단계의 우연한 조작 추측"), List.of(eventId))),List.of("동기는 미확인"));
+        String source=AnalysisSynthesisPrompt.build(mapper,prompts,data,List.of(digest),refs,false);
+        var review=mapper.readTree(AnalysisReviewPrompt.build(mapper,source,valid("SUCCESS"),refs));
+        var fact=review.path(SourceEventDetails.FIELD).get(0);
+        assertThat(fact.path("id").asString()).isEqualTo("E1");
+        assertThat(fact.path("quantityBefore").asInt()).isEqualTo(1);
+        assertThat(fact.path("quantityAfter").asInt()).isEqualTo(2);
+        var context=review.path("chunkAnalyses").get(0);
+        assertThat(context.path("observations").get(0).path("observation").asString()).isEqualTo("수량 1에서 2 변경");
+        assertThat(context.path("observations").get(0).path("evidenceEventIds").get(0).asString()).isEqualTo("E1");
+        assertThat(context.path("uncertainties").get(0).asString()).isEqualTo("동기는 미확인");
+        assertThat(context.toString()).doesNotContain("중간 단계의 의도 추측", "중간 단계의 우연한 조작 추측");
+        assertThat(review.path("draftToReview").isArray()).isTrue();
+        assertThat(digest.observations().getFirst().alternativeExplanations()).containsExactly("중간 단계의 우연한 조작 추측");
+    }
+
+    @Test
+    void AI검토_연결실패는_검토하지않은_초안을_READY로_내보내지않는다() {
+        ReflectionTestUtils.setField(service, "qualityReview", true);
+        when(client.complete(anyString(), anyString(), anyInt(), anyDouble()))
+                .thenReturn(new GroqChatClient.GroqChatResult(mapper.writeValueAsString(valid("SUCCESS")), "test-model"))
+                .thenThrow(new oneuldo.ai.exception.CloudAiUnavailableException("test"));
+        var response=service.analyze(memberId,new BehaviorAnalysisInputRequest(null,null));
+        assertThat(response.status()).isEqualTo("FAILED");
+        assertThat(response.analysis()).isNull();
+        verify(repository).save(argThat(run -> run.getAttempts().size()==2 && run.getAttempts().getFirst().rawOutput()!=null));
+    }
+
+    @Test
+    void 검토만_실패하면_저장된_초안부터_재개한다() {
+        var cache=new HashMap<String,GroqChatClient.GroqChatResult>();
+        AnalysisCheckpoints store=new AnalysisCheckpoints() {
+            public Optional<GroqChatClient.GroqChatResult> find(String s,String p,int o) {return Optional.ofNullable(cache.get(s+p+o));}
+            public void save(String s,String p,int o,GroqChatClient.GroqChatResult r) {cache.put(s+p+o,r);}
+        };
+        var draft=new GroqChatClient.GroqChatResult(mapper.writeValueAsString(valid("SUCCESS")),"test-model");
+        var reviewed=new GroqChatClient.GroqChatResult(reviewed(valid("UNDETERMINED")),"test-model");
+        when(client.complete(anyString(),anyString(),anyInt(),anyDouble()))
+                .thenReturn(draft).thenThrow(new oneuldo.ai.exception.CloudAiUnavailableException("test")).thenReturn(reviewed);
+        var first=new TimelineAnalysisPipeline(prompts,validator,client,mapper,64,budget,new AnalysisCallPacer())
+                .withQualityReview(true).withCheckpoints(store);
+        assertThatThrownBy(()->first.analyze(input(true),12000,new ArrayList<>())).hasMessage("AI_UNAVAILABLE");
+        assertThat(cache).hasSize(1);
+        var audit=new ArrayList<AiBehaviorAnalysisRun.Attempt>();
+        var result=new TimelineAnalysisPipeline(prompts,validator,client,mapper,64,budget,new AnalysisCallPacer())
+                .withQualityReview(true).withCheckpoints(store).analyze(input(true),12000,audit);
+        assertThat(result.sessionAssessments().getFirst().judgment()).isEqualTo("UNDETERMINED");
+        assertThat(audit).extracting(AiBehaviorAnalysisRun.Attempt::source).containsExactly("CHECKPOINT","LIVE");
+        verify(client,times(3)).complete(anyString(),anyString(),anyInt(),anyDouble());
+    }
+
+    @Test
     void 모든_사건을_보존하고_판정필드만_입력에서_분리한다() {
         var input = input(true);
         var tree = mapper.readTree(prompts.userPrompt(input));
@@ -157,6 +226,16 @@ class AiBehaviorAnalysisTest {
         verify(client, times(1)).complete(anyString(), anyString(), anyInt(), anyDouble());
     }
 
+    @Test void transport_failure_is_auditable_and_does_not_become_a_player_judgment() {
+        var details=new oneuldo.ai.exception.AiTransportException.Details("request-1","CONNECT","HttpConnectTimeoutException",null,3,45000);
+        when(client.complete(anyString(),anyString(),anyInt(),anyDouble())).thenThrow(
+                new oneuldo.ai.exception.AiTransportException(oneuldo.ai.exception.AiTransportException.Code.AI_CONNECT_TIMEOUT,details,null));
+        var response=service.analyze(memberId,new BehaviorAnalysisInputRequest(null,null));
+        assertThat(response.errorCode()).isEqualTo("AI_CONNECT_TIMEOUT");assertThat(response.analysis()).isNull();
+        verify(repository).save(argThat(run->details.equals(run.getAttempts().getFirst().transportFailure())
+                && run.getAttempts().getFirst().latencyMs()!=null));
+    }
+
     @Test
     void 기록없음과_입력초과는_모델을_호출하지_않는다() {
         when(inputs.create(eq(memberId), any())).thenReturn(input(false));
@@ -204,6 +283,30 @@ class AiBehaviorAnalysisTest {
         when(inputs.find(memberId, datasetId)).thenThrow(new ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND));
         assertThatThrownBy(() -> service.analyzeSnapshot(memberId, datasetId)).isInstanceOf(ResponseStatusException.class);
         verifyNoInteractions(client, repository);
+    }
+
+    private String reviewed(AiBehaviorAnalysis analysis) {
+        var tree=mapper.valueToTree(analysis);
+        ((tools.jackson.databind.node.ObjectNode)tree.path("findings").get(0)).put("observation","(E1) 수량을 1에서 2로 변경했다.");
+        return mapper.writeValueAsString(Map.of("reviewNotes",List.of(),"analysis",tree,"claimChecks",List.of(
+                List.of("/summary",List.of("E1")), List.of("/findings/0/observation",List.of("E1")),
+                List.of("/findings/0/interpretation",List.of("E1")),
+                List.of("/findings/0/alternativeExplanations/0",List.of("E1")),
+                List.of("/sessionAssessments/0/explanation",List.of("E1")))));
+    }
+
+    @Test void 근거없는_대안을_채우지않아도_분석과_요약이_통과하고_null은_거부한다() {
+        var tree=(tools.jackson.databind.node.ObjectNode)mapper.valueToTree(valid("UNDETERMINED"));
+        var finding=(tools.jackson.databind.node.ObjectNode)tree.path("findings").get(0);
+        finding.putArray("alternativeExplanations");
+        var analysis=mapper.convertValue(tree,AiBehaviorAnalysis.class);
+        assertThat(validator.validate(analysis,input(true))).isSameAs(analysis);
+        var digest=new AiObservationDigest("수량 변경",List.of(new AiObservationDigest.Observation(
+                "1→2", "동기 미확인", List.of(), List.of(eventId))),List.of("동기 미확인"));
+        assertThat(validator.validateReduction(digest,input(true),List.of(digest))).isSameAs(digest);
+        finding.putNull("alternativeExplanations");
+        assertThatThrownBy(()->validator.validate(mapper.convertValue(tree,AiBehaviorAnalysis.class),input(true)))
+                .hasMessage("INVALID_ANALYSIS_CONTRACT");
     }
 
     private AiBehaviorAnalysis valid(String judgment) {

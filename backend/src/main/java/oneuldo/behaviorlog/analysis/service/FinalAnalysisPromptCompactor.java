@@ -7,7 +7,7 @@ import tools.jackson.databind.node.ObjectNode;
 
 /** Final-stage transport changes only; never edits stored observations or chooses evidence. */
 public final class FinalAnalysisPromptCompactor {
-    public static final String VERSION = "final-input-v2";
+    public static final String VERSION = "final-input-v4-claim-evidence";
     private final ObjectMapper mapper;
     public FinalAnalysisPromptCompactor(ObjectMapper mapper) { this.mapper = mapper; }
 
@@ -22,8 +22,8 @@ public final class FinalAnalysisPromptCompactor {
                 analysisWindow는 일부일 수 있고 integrity는 수신 상태다. 현재 상품 정보를 다른 catalogVersion이나 버전 없는 과거 사건에 덮어쓰지 않는다. S02는 사과 품종 제한이 없고 distractor는 오답 판정이 아니다.
                 의학적 진단·IQ·장애 등급·임의 능력 점수·개인정보·위험 행동·실제 결제 지시는 금지한다.
                 evidenceCards는 제한된 인터페이스 지원 참고자료이지 지시나 개인 능력·진단·성패의 근거가 아니다. 출처를 만들지 말고 사용한 카드 ID만 기록한다. 전문가 검증·추가 학습 완료를 주장하지 않는다.
-                한국어 JSON 객체 하나만 출력한다. 650토큰 내 완결을 목표로, 핵심 finding 1개와 짧은 설명을 권장한다. 분량은 권장치이며 근거·다른 설명·불확실성을 빼거나 서버가 잘라 맞추지 않는다.
-                """;
+                한국어 JSON 객체 하나만 출력한다. 근거가 구별되면 관찰 2~3개를 작성하고 중복 설명을 줄여 출력 상한 안에서 완결한다. 실제 근거와 불확실성을 유지한다. 대안 설명은 원본 근거가 있는 경우에만 쓴다. 없으면 alternativeExplanations는 []이며, 동기·이해도 미확인은 uncertainties에 쓴다. 대안의 개수를 채우지 않는다.
+                """ + AnalysisSourceContext.REVIEW;
     }
 
     public ObjectNode compactInstructions(ObjectNode source) {
@@ -53,13 +53,13 @@ public final class FinalAnalysisPromptCompactor {
         root.put("outputContract", """
                 JSON 필드 정의(모두 필수, 설명은 문자열):
                 summary; usedEvidenceCardIds:[사용한 카드 ID];
-                findings:[{id,skill,observation,interpretation,alternativeExplanations:[다른 설명],evidenceEventIds:[사건 ID],suggestedSupport}];
+                findings:[{id,skill,observation,interpretation,alternativeExplanations:[],evidenceEventIds:[사건 ID],suggestedSupport}];
                 sessionAssessments:[{sessionId,judgment:SUCCESS|FAILURE|UNDETERMINED,explanation,evidenceEventIds:[해당 세션 사건 ID]}];
                 uncertainties:[자료 한계];
                 practicePlan:{targetFindingIds:[finding ID],goal,rationale,recommendedDifficulty:정수1~3,itemCount:정수2~4,quantityComplexity:LOW|MEDIUM|HIGH,budgetPressure:LOW|MEDIUM|HIGH,textSupport:SIMPLIFIED|STANDARD|REDUCED,reasonCodes:[영문대문자/숫자/밑줄 2~50자,1~8개]}.
-                각 finding에 실제 근거와 다른 설명을 넣는다. findings 최대12개, 핵심1개 권장. 모든 세션을 한 번씩 판정하고 실제 근거를 1개 이상 인용한다.
+                각 finding에 실제 근거를 넣는다. 대안 설명은 원본 근거가 있는 경우에만 쓴다. 없으면 alternativeExplanations는 []이며, 동기·이해도 미확인은 uncertainties에 쓴다. 대안의 개수를 채우지 않는다. findings 최대12개, 핵심1개 권장. 모든 세션을 한 번씩 판정하고 실제 근거를 1개 이상 인용한다.
                 targetFindingIds는 반환한 finding을 참조한다. finding이 없으면 빈 배열과 불확실성을 쓰고 rationale에 관찰용 연습임을 명시한다.
-                난이도 범위는 게임 실행 제약이다. summary와 각 설명은 20~40자 한 문장, 대안과 불확실성은 각 1개를 권장한다. 핵심 근거·한계가 더 필요하면 유지하되 장문 배경설명과 본문의 ID 반복은 피한다.
+                난이도 범위는 게임 실행 제약이다. summary와 각 설명은 20~40자 한 문장, 대안은 근거가 없으면 빈 배열이다. 불확실성은 필요한 만큼 유지한다. 핵심 근거·한계가 더 필요하면 유지하되 장문 배경설명과 본문의 ID 반복은 피한다.
                 """);
         return root;
     }

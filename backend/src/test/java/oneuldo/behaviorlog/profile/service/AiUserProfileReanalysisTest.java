@@ -28,6 +28,26 @@ class AiUserProfileReanalysisTest {
         assertThatThrownBy(()->refs.read(mapper.writeValueAsString(wire))).hasMessage("UNKNOWN_PROFILE_EVENT_REFERENCE");
     }
 
+    @Test void empty_alternatives_survive_profile_validation_but_missing_array_does_not() {
+        var mapper=JsonMapper.builder().findAndAddModules().build();
+        var event=UUID.randomUUID();
+        var plan=new AiBehaviorAnalysis.PracticePlan(List.of("F1"),"목표","근거",1,2,
+                "LOW","LOW","SIMPLIFIED",List.of("OBSERVATION_PRACTICE"));
+        var finding=new AiBehaviorAnalysis.Finding("F1","수량","수량 변경","동기는 미확인",List.of(),List.of(event),"목록 비교");
+        var analysis=new AiBehaviorAnalysis("관찰",List.of(finding),List.of(),List.of("동기 미확인"),plan);
+        var previous=org.mockito.Mockito.mock(AiUserProfile.class);
+        org.mockito.Mockito.when(previous.getProfile()).thenReturn(analysis);
+        var current=new AiBehaviorAnalysisResponse(UUID.randomUUID(),UUID.randomUUID(),"READY","model","v","v",1,0,Instant.now(),null,analysis);
+        var tree=(tools.jackson.databind.node.ObjectNode)mapper.valueToTree(analysis);
+        tree.remove("sessionAssessments");
+        var validator=new AiUserProfileValidator(new oneuldo.behaviorlog.personalization.service.MarketAiDifficultyValidator());
+        var draft=mapper.convertValue(tree,oneuldo.behaviorlog.profile.domain.AiUserProfileDraft.class);
+        assertThat(validator.validate(draft,previous,current)).isSameAs(draft);
+        ((tools.jackson.databind.node.ObjectNode)tree.path("findings").get(0)).putNull("alternativeExplanations");
+        assertThatThrownBy(()->validator.validate(mapper.convertValue(tree,oneuldo.behaviorlog.profile.domain.AiUserProfileDraft.class),previous,current))
+                .hasMessage("INVALID_USER_PROFILE_CONTRACT");
+    }
+
     @Test void distinguishes_a_correction_from_a_new_play_after_reference_encoding() {
         var mapper = JsonMapper.builder().findAndAddModules().build();
         var session = UUID.randomUUID();

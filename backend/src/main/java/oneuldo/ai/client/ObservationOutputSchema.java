@@ -19,12 +19,15 @@ public final class ObservationOutputSchema {
                 "required", List.copyOf(ordered.keySet()), "additionalProperties", false);
     }
     private static final Map<String, Object> REFERENCE = Map.of("type", "string", "pattern", "^E[1-9][0-9]*$");
-    public static final Map<String, Object> VALUE = object(Map.of(
+    /** Accept legacy callers during a gateway-first rolling upgrade. */
+    public static final Map<String, Object> LEGACY_VALUE = schema(1);
+    public static final Map<String, Object> VALUE = schema(0);
+    private static Map<String, Object> schema(int minimumAlternatives) { return object(Map.of(
             "summary", TEXT,
             "observations", array(object(Map.of(
                     "observation", TEXT, "interpretation", TEXT,
-                    "alternativeExplanations", array(TEXT, 1, 8),
+                    "alternativeExplanations", array(TEXT, minimumAlternatives, 8),
                     "evidenceEventIds", array(REFERENCE, 1, 30))), 0, 6),
             "uncertainties", array(TEXT, 0, 12),
-            "requestedSegmentIds", array(REFERENCE, 0, 8)));
+            "requestedSegmentIds", array(REFERENCE, 0, 8))); }
 }

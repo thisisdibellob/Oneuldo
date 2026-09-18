@@ -118,7 +118,7 @@ class RestOllamaChatClientTest {
                     assertThat(entered.await(5, TimeUnit.SECONDS)).isTrue();
                     assertThatThrownBy(() -> client.complete("s", "second"))
                             .isInstanceOf(CloudAiUnavailableException.class)
-                            .hasMessageContaining(queued == 0 ? "가득" : "대기 시간");
+                            .hasMessage(queued == 0 ? "AI_QUEUE_FULL" : "AI_QUEUE_TIMEOUT");
                 } finally { release.countDown(); }
                 assertThat(first.get(5, TimeUnit.SECONDS).text()).isEqualTo("결과");
                 assertThat(client.complete("s", "third").text()).isEqualTo("결과");

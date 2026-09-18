@@ -20,7 +20,7 @@ import {
 } from './marketMovementDetector';
 
 const MARKET_TASK_ID = '30000000-0000-0000-0000-000000000003';
-const CONTENT_VERSION = 'market-micro-behavior-v2-content';
+const CONTENT_VERSION = 'market-micro-behavior-v3-lifecycle';
 const DETECTION_RULE_VERSION = 'market-detection-rules-v1';
 const APP_VERSION = '1.0.0';
 const PERSIST_DELAY_MS = 1000;
@@ -57,6 +57,7 @@ export class MarketBehaviorTracker {
 
   private buffer: BufferedEvent[] = [];
   private closed = false;
+  private submissionRequested = false;
   private controlMode: MarketTelemetryControlMode = 'joystick';
   private firstUserActionAt: number | null = null;
   private interruptionCount = 0;
@@ -333,6 +334,7 @@ export class MarketBehaviorTracker {
   }
 
   checkoutSubmitted(cart: MarketCart, _legacyEvaluation?: MarketEvaluation) {
+    this.submissionRequested = true;
     this.track({ eventCode: 'SHOP.CHECKOUT_SUBMITTED', microActionId: 'SUBMIT_CHECKOUT',
       payload: this.cartPayload(cart), priority: 'critical' });
   }
@@ -373,16 +375,22 @@ export class MarketBehaviorTracker {
     });
   }
 
-  async complete(cart: MarketCart, _legacyEvaluation?: MarketEvaluation) { await this.abort(cart); }
+  async complete(cart: MarketCart, _legacyEvaluation?: MarketEvaluation) {
+    await this.closeSession(cart, 'FLOW_FINISHED');
+  }
 
   async abort(cart: MarketCart) {
+    await this.closeSession(cart, this.submissionRequested ? 'EXIT_AFTER_SUBMISSION' : 'USER_ABORTED');
+  }
+
+  private async closeSession(cart: MarketCart, reason: NonNullable<BehaviorLogRequest['sessionEnd']>['reason']) {
     if (this.closed) return;
     this.trackMovementEvents(this.movementDetector.finish(this.targetZoneIds()));
     this.closed = true;
     this.track({ eventCode: 'SHOP.SESSION_ENDED', microActionId: 'EXIT_MARKET',
       payload: this.cartPayload(cart), priority: 'critical',
       finalContext: { sessionEnd: { interruptionCount: this.interruptionCount,
-        interruptionTimeMs: this.interruptionTimeMs, reason: 'USER_ABORTED' } } });
+        interruptionTimeMs: this.interruptionTimeMs, reason } } });
     this.clearTimers();
     await this.flushNow();
   }

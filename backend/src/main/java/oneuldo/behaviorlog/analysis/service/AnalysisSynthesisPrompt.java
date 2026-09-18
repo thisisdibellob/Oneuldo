@@ -5,18 +5,22 @@ import tools.jackson.databind.ObjectMapper;
 
 /** Synthesizes observations whose source IDs have been checked, without replaying raw scene blobs. */
 public final class AnalysisSynthesisPrompt {
-    public static final String VERSION="synthesis-v4-source-crosscheck";
+    public static final String VERSION="synthesis-v6-claim-evidence";
     public static final String CONTRACT="""
-        짧은 JSON 객체: {"s":"요약","f":[["F1","기술","사실","가설",["다른설명"],["E1"],"지원"]],
+        짧은 JSON 객체: {"s":"요약","f":[["F1","기술","사실","가설",[],["E1"],"지원"]],
         "a":[["S1","SUCCESS|FAILURE|UNDETERMINED","이유",["E1"]]],"u":["한계"],
         "p":[["F1"],"목표","근거와 목표 연결",1,2,"LOW","LOW","SIMPLIFIED",["OBSERVATION_PRACTICE"]],"c":[]}
         f는 서로 다른 근거가 있으면 2~3개 작성하며 근거가 적으면 적게 쓴다. 구간에서 관찰되지 않은 행동으로 개수를 채우지 않는다. a는 모든 제공 세션을 한번씩 포함. 모든 근거는 evidenceReferences의 해당 세션 ID만.
         p의 순서: findingID목록,목표,이유,난이도1~3,품목2~4,수량복잡도LOW|MEDIUM|HIGH,예산압박LOW|MEDIUM|HIGH,문자지원SIMPLIFIED|STANDARD|REDUCED,영문대문자사유목록.
-        사실은 무엇을 어떻게 했는지, 가설은 그렇게 해석한 이유, 지원은 다음에 할 수 있는 행동을 각각 완결된 문장으로 설명한다. 고정 글자 수로 자르지 말고 중복 표현을 줄여 출력 상한 안에서 JSON을 완성한다. 다른 설명과 자료 한계 필수. f가 비면 p첫칸도 빈배열, 관찰용 과제임을 명시.
+        사실은 무엇을 어떻게 했는지, 가설은 그렇게 해석한 이유, 지원은 다음에 할 수 있는 행동을 각각 완결된 문장으로 설명한다. 고정 글자 수로 자르지 말고 중복 표현을 줄여 출력 상한 안에서 JSON을 완성한다. 대안 설명은 원본 근거가 있는 경우에만 쓴다. 없으면 alternativeExplanations는 []이며, 동기·이해도 미확인은 uncertainties에 쓴다. 대안의 개수를 채우지 않는다. f가 비면 p첫칸도 빈배열, 관찰용 과제임을 명시.
         c는 빈배열: 이 요청에 문헌 카드를 제공하지 않았다. 관찰 밖 추론은 확정하지 않는다.
         """;
     public static String build(ObjectMapper mapper,AiBehaviorAnalysisPromptFactory prompts,BehaviorAnalysisInputResponse input,
             List<AiObservationDigest> digests,AnalysisReferences refs,boolean limited) {
+        return build(mapper,prompts,input,digests,refs,limited,List.of());
+    }
+    public static String build(ObjectMapper mapper,AiBehaviorAnalysisPromptFactory prompts,BehaviorAnalysisInputResponse input,
+            List<AiObservationDigest> digests,AnalysisReferences refs,boolean limited,List<BehaviorAnalysisInputResponse> scopes) {
         var root=mapper.createObjectNode();root.put("synthesisVersion",VERSION);
         root.put("stage","FINAL: AI 구간 해석과 원본 사건 값 사본을 함께 제공한다. 참조 ID 검증은 해석의 진실성을 보장하지 않는다. "
                 + "먼저 sourceEventDetails에서 실제 상품·수량·장바구니를 읽고 각 구간 요약과 대조한 뒤 최종 판단하라. "
@@ -26,8 +30,17 @@ public final class AnalysisSynthesisPrompt {
         root.set(SourceEventDetails.FIELD,details);
         root.put("sourceEventDetailsRule",SourceEventDetails.RULE);
         root.put("eventSemantics",prompts.marketEventSemantics());
+        root.set("eventDefinitions",AnalysisSourceContext.definitions(mapper));
+        root.set("sourceCoverage",AnalysisSourceContext.coverage(mapper,input));
+        var scopeNodes=root.putArray("chunkScopes");
+        for(int i=0;i<scopes.size();i++) {
+            var scope=AnalysisSourceContext.coverage(mapper,scopes.get(i));
+            scope.put("chunkAnalysisIndex",i);scope.put("fullEventCount",input.eventCount());
+            scope.put("partial",scopes.get(i).eventCount()<input.eventCount());scopeNodes.add(scope);
+        }
+        root.put("sourceReview",AnalysisSourceContext.REVIEW);
         root.put("interpretationRule","대안 설명의 개수를 채우려고 자동 결제·자동 팝업·시스템 수량 변경 등 입력에 없는 기능을 가정하지 않는다. "
-                + "기록으로 지지되는 대안이 없으면 '이 기록만으로 행동의 동기는 확인할 수 없다'처럼 확인 한계를 명시한다. "
+                + "대안 설명은 원본 근거가 있는 경우에만 쓴다. 없으면 alternativeExplanations는 []이며, 동기·이해도 미확인은 uncertainties에 쓴다. 대안의 개수를 채우지 않는다. "
                 + "skill에는 기술 이름을, observation에는 실제 행동을 쓴다. 지원은 다음 플레이에서 할 수 있는 구체적인 행동으로 제안한다.");
         root.set("taskContext",prompts.tasks(input));
         root.set("chunkAnalyses",mapper.valueToTree(digests));
@@ -46,7 +59,7 @@ public final class AnalysisSynthesisPrompt {
                 r.put("timeMs",event.elapsedFromSessionStartMs());if(event.action()!=null)r.put("eventCode",event.action().eventCode());
             }
         }
-        root.put("outputContract",CONTRACT);
+        root.put("outputContract",CONTRACT+" 최종 출력 전 확인: "+AnalysisSourceContext.REVIEW);
         return refs.encode(prompts.pack(root));
     }
 }

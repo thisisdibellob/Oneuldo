@@ -12,7 +12,7 @@ import tools.jackson.databind.node.ObjectNode;
 /** 원본 스냅샷은 변경하지 않고 기존 판정 필드만 AI 입력에서 분리한다. */
 @Component
 public class AiBehaviorAnalysisPromptFactory {
-    public static final String VERSION = "behavior-analysis-v20-source-crosscheck";
+    public static final String VERSION = "behavior-analysis-v23-claim-evidence";
     public static final String EVIDENCE_VERSION = EvidenceIndex.VERSION;
     private final ObjectMapper mapper;
     @org.springframework.beans.factory.annotation.Value("${ai.behavior-analysis.movement-max-error:0}")
@@ -118,7 +118,7 @@ public class AiBehaviorAnalysisPromptFactory {
                 "outputContract", """
                         {"summary":"전체 관찰 요약", "usedEvidenceCardIds":["사용한 제공 카드 ID; 없으면 빈 배열"],
                          "findings":[{"id":"F1","skill":"관찰된 생활기술","observation":"실제 사건",
-                          "interpretation":"가설","alternativeExplanations":["다른 해석"],
+                          "interpretation":"가설","alternativeExplanations":[],
                           "evidenceEventIds":["제공된 실제 사건 ID"],"suggestedSupport":"지원 제안"}],
                          "sessionAssessments":[{"sessionId":"제공된 실제 세션 ID",
                           "judgment":"SUCCESS 또는 FAILURE 또는 UNDETERMINED","explanation":"AI 판단 이유",
@@ -129,8 +129,8 @@ public class AiBehaviorAnalysisPromptFactory {
                           "recommendedDifficulty":2,"itemCount":2,"quantityComplexity":"LOW",
                           "budgetPressure":"LOW","textSupport":"SIMPLIFIED","reasonCodes":["OBSERVATION_PRACTICE"]}}
                         findings는 최대 12개, sessionAssessments는 모든 입력 세션을 한 번씩 포함.
-                        서로 다른 근거가 있으면 finding 2~3개를 작성하고, 관찰된 행동과 해석 이유를 각각 완결된 문장으로 설명한다. 항목 수를 채우려고 사실을 만들지 않는다. JSON을 완성하고 근거·다른 설명·불확실성을 빼지 않는다.
-                        observation/interpretation/alternativeExplanations/suggestedSupport는 관찰과 가설을 구분.
+                        서로 다른 근거가 있으면 finding 2~3개를 작성하고, 관찰된 행동과 해석 이유를 각각 완결된 문장으로 설명한다. 항목 수를 채우려고 사실을 만들지 않는다. JSON을 완성하고 실제 근거·불확실성을 유지한다. 대안 설명은 원본 근거가 있는 경우에만 쓴다. 없으면 alternativeExplanations는 []이며, 동기·이해도 미확인은 uncertainties에 쓴다. 대안의 개수를 채우지 않는다.
+                        observation/interpretation/alternativeExplanations/suggestedSupport는 관찰과 가설을 구분. interpretation은 행동과 실제 과제 목표의 관계를 설명하며 직접 근거 없는 이해·의도는 가정하지 않고 uncertainties에 남긴다.
                         모든 finding은 실제 사건을 참조. targetFindingIds는 반환한 finding만 참조.
                         findings가 없으면 targetFindingIds도 빈 배열, uncertainties에 불확실성을 기재.
                         각 세션 판정은 해당 세션의 실제 사건을 1개 이상 참조.
@@ -153,18 +153,22 @@ public class AiBehaviorAnalysisPromptFactory {
                 + "구간의 마지막 사건을 세션 종료로 취급하지 않는다. endedAt과 integrity는 전체 세션 메타데이터일 수 있다. "
                 + "상품 선택이 이 구간에 없으면 '이 구간에는 기록 없음'으로만 쓰고 전체 세션의 미수행으로 확대하지 않는다. "
                 + "누락·기기 문제·세션 경계를 고려하고 의학적 진단·IQ·장애 등급·개인정보를 출력하지 않는다. 한국어 JSON 하나만 출력한다."
+                + " 대안 설명을 채우려고 기기 오류·우연한 터치·자동 기능을 상상하지 않는다. 대안 설명은 원본 근거가 있는 경우에만 쓴다. 없으면 alternativeExplanations는 []이며, 동기·이해도 미확인은 uncertainties에 쓴다. 대안의 개수를 채우지 않는다. "
                 + SourceEventDetails.RULE + marketEventSemantics();
     }
     /** Collector meaning, not a claim about the user's intent. Keep in sync with marketMovementDetector.ts. */
     public String marketEventSemantics() {
         return " SHOP.ITEM_SEARCH_STARTED(MOVE_IN_MARKET)는 이동 시작·재시작 때 자동 기록된다. 검색창/검색 기능 사용의 증거가 아니다. "
                 + "선반 stationId는 게임 분류 코드다. produce는 과일 선반(채소도 포함)이며 생산품이 아니다. fresh=냉장 식품, drink=음료, meal=간편 식품이다. "
-                + "상품 위치는 해당 플레이의 categoryId를 확인하고 선반 이름만으로 추정하지 않는다.";
+                + "상품 위치는 해당 플레이의 categoryId를 확인하고 선반 이름만으로 추정하지 않는다. "
+                + "CHECKOUT_SUBMITTED는 제출 조작이며 결제 확정 기록이 아니다. SESSION_ENDED는 기록 종료다. "
+                + "market-micro-behavior-v2-content는 제출 후 나가기와 완료 처리도 USER_ABORTED로 남길 수 있었다. 종료명만으로 성패를 단정하지 않는다.";
     }
     public String observationPrompt(BehaviorAnalysisInputResponse chunk, BehaviorAnalysisInputResponse full) {
         ObjectNode root = (ObjectNode) new LosslessTables(mapper).decode(mapper.readTree(userPrompt(chunk, full)));
         root.remove(List.of("evidenceCards", "availablePracticeScenarios", "practiceCapabilities", "excludedLegacyFields", "evidenceVersion"));
         root.put("outputContract", digestContract());
+        root.set("eventDefinitions", AnalysisSourceContext.definitions(mapper));
         root.put("stage", "OBSERVE: 해당 구간의 관측을 읽고 근거 있는 해석만 작성. 구간 밖 행동을 가정하지 말 것.");
         var scope = root.putObject("observationScope");
         scope.put("providedEventCount", chunk.eventCount());
@@ -200,12 +204,12 @@ public class AiBehaviorAnalysisPromptFactory {
         return pack(root);
     }
     public String wholeSourceSystem() {
-        return FinalAnalysisPromptCompactor.systemPrompt()+marketEventSemantics();
+        return FinalAnalysisPromptCompactor.systemPrompt()+marketEventSemantics()+AnalysisSourceContext.REVIEW;
     }
     public String digestContract() {
         return "필드 이름이 있는 JSON 객체 하나를 출력한다. 형식: "
-                + "{\"summary\":\"요약\",\"observations\":[{\"observation\":\"사실\",\"interpretation\":\"가설\",\"alternativeExplanations\":[\"다른 설명\"],\"evidenceEventIds\":[\"E1\"]}],\"uncertainties\":[\"한계\"],\"requestedSegmentIds\":[]}. "
-                + "예시 내용/ID는 제공 자료로 대체한다. evidenceEventIds에는 실제 사건 ID만, alternativeExplanations에는 대안 설명만 쓴다. "
+                + "{\"summary\":\"요약\",\"observations\":[{\"observation\":\"사실\",\"interpretation\":\"가설\",\"alternativeExplanations\":[],\"evidenceEventIds\":[\"E1\"]}],\"uncertainties\":[\"한계\"],\"requestedSegmentIds\":[]}. "
+                + "예시 내용/ID는 제공 자료로 대체한다. evidenceEventIds에는 실제 사건 ID만, alternativeExplanations에는 원본 근거가 있는 대안만 쓰고 없으면 []로 둔다. 동기 미확인은 uncertainties에 쓴다. "
                 + "관찰 개수를 채우지 말고 관련 사건을 묶어 쓴다. summary는 관찰 본문을 반복하지 않는 한 문장으로 쓴다. 같은 행동의 반복은 합치고 수량 조정·목록 확인·가격 비교·도움·이동 중 실제로 기록된 서로 다른 행동과 반증을 보존한다. 각 관찰은 구체적인 사실과 가능한 해석을 완결된 문장으로 설명하고 근거1~3개와 대안1개를 포함한다. 출력 상한 안에서 중복 표현을 줄여 JSON을 완성하며 개수를 채우려고 관찰을 만들지 않는다. "
                 + "원문에 있는 상품 규격·수량·금액과 종료 사유를 관찰에 인용할 때 수치를 보존한다. 의도나 성패로 바꾸지 않는다. 반증/도움/자료 한계를 숨기지 않는다. 관찰이 없으면 uncertainties에 이유. 구간 밖 사실은 쓰지 않는다.";
     }

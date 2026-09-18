@@ -88,7 +88,7 @@ export type BehaviorLogRequest = {
   };
   simulation: BehaviorSimulationContext;
   sessionEnd?: {
-    reason: 'COMPLETED' | 'USER_ABORTED' | 'APP_BACKGROUNDED' | 'APP_TERMINATED' | 'NETWORK_ERROR' | 'TECHNICAL_ERROR' | 'TIMEOUT' | 'OTHER';
+    reason: 'COMPLETED' | 'FLOW_FINISHED' | 'EXIT_AFTER_SUBMISSION' | 'USER_ABORTED' | 'APP_BACKGROUNDED' | 'APP_TERMINATED' | 'NETWORK_ERROR' | 'TECHNICAL_ERROR' | 'TIMEOUT' | 'OTHER';
     interruptionCount: number;
     interruptionTimeMs: number;
   };

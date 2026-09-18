@@ -29,6 +29,7 @@ class SourceEventDetailsTest {
         var details=wire.path(SourceEventDetails.FIELD);
         assertThat(details.isArray()).isTrue();assertThat(details.size()).isEqualTo(3);
         assertThat(details.get(0).path("id").asString()).isEqualTo("E4");
+        assertThat(details.get(0).path("sequence").asInt()).isEqualTo(input.input().sessions().getFirst().events().get(3).sequence());
         assertThat(details.get(0).path("itemId").asString()).isEqualTo("apple");
         assertThat(details.get(0).path("quantityBefore").asInt()).isZero();
         assertThat(details.get(1).path("quantityAfter").asInt()).isEqualTo(2);
@@ -53,6 +54,33 @@ class SourceEventDetailsTest {
         assertThat(expanded.path("evidenceReferences").toString()).contains("E4","E5","E9");
         assertThat(expanded.path("chunkAnalyses").get(0).path("summary").asString()).isEqualTo("상품 선택 기록 없음");
         assertThat(expanded.path("stage").asString()).contains("원본을 우선");
+    }
+
+    @Test void scope_and_lifecycle_values_survive_final_transport_without_changing_old_records() {
+        var tree=(ObjectNode)mapper.valueToTree(fixture());
+        var session=(ObjectNode)tree.path("input").path("sessions").get(0);
+        var end=(ObjectNode)session.path("events").get(11);
+        ((ObjectNode)end.path("action")).put("eventCode","SHOP.SESSION_ENDED");
+        end.putObject("sessionEnd").put("reason","USER_ABORTED").put("interruptionCount",0).put("interruptionTimeMs",0);
+        end.putObject("task").put("taskVersion","market-micro-behavior-v2-content");
+        var input=mapper.convertValue(tree,BehaviorAnalysisInputResponse.class);
+        var original=mapper.writeValueAsString(input);
+        var full=input.input().sessions().getFirst();var events=full.events().subList(0,6);
+        var part=new BehaviorAnalysisInputResponse(input.id(),input.schemaVersion(),input.generatedAt(),1,6,
+                new BehaviorAnalysisInput(input.input().schemaVersion(),input.id(),input.generatedAt(),input.input().analysisWindow(),
+                        input.input().anonymousSubjectId(),1,6,List.of(new BehaviorAnalysisInput.SessionTimeline(
+                        full.sessionId(),full.startedAt(),full.endedAt(),full.integrity(),events))));
+        var digest=new AiObservationDigest("부분 관찰",List.of(),List.of("이 구간의 한계"));
+        var wire=mapper.readTree(AnalysisSynthesisPrompt.build(mapper,new AiBehaviorAnalysisPromptFactory(mapper),input,
+                List.of(digest),new AnalysisReferences(mapper,input),false,List.of(part)));
+        var expanded=new LosslessTables(mapper).decode(wire);
+        assertThat(expanded.path("sourceCoverage").path("providedEventCount").asInt()).isEqualTo(12);
+        assertThat(expanded.path("chunkScopes").get(0).path("providedEventCount").asInt()).isEqualTo(6);
+        assertThat(expanded.path("chunkScopes").get(0).path("partial").asBoolean()).isTrue();
+        var endings=wire.path(SourceEventDetails.FIELD).findValues("sessionEnd");
+        assertThat(endings).hasSize(1);assertThat(endings.getFirst().path("reason").asString()).isEqualTo("USER_ABORTED");
+        assertThat(expanded.path("eventDefinitions").toString()).contains("market-micro-behavior-v2-content");
+        assertThat(mapper.writeValueAsString(input)).isEqualTo(original);
     }
 
     @Test

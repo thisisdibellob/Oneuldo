@@ -56,6 +56,7 @@ public class AiUserProfileService {
         for (int number = 1; number <= 2; number++) {
             String submitted = prompt + (number == 1 ? "" : "\n이전 응답이 형식 또는 근거 검사를 통과하지 못했습니다. 제공된 ID만 사용해 짧은 JSON 객체 하나로 수정하세요.");
             GroqChatClient.GroqChatResult response = null;
+            long attemptStarted = System.nanoTime();
             try {
                 tokenBudget.requireFits(system, submitted, outputMax, tokenBudget.requestTokens(),
                         "USER_PROFILE_INPUT_EXCEEDS_LIMIT");
@@ -70,8 +71,12 @@ public class AiUserProfileService {
                 attempts.add(attempt(number, submitted, outputMax, response, null));
                 break;
             } catch (RuntimeException failure) {
-                error = response == null ? "AI_UNAVAILABLE" : "INVALID_USER_PROFILE";
-                attempts.add(attempt(number, submitted, outputMax, response, error));
+                var transport = failure instanceof oneuldo.ai.exception.AiTransportException t ? t : null;
+                error = transport != null ? transport.code().name() : response == null ? "AI_UNAVAILABLE" : "INVALID_USER_PROFILE";
+                var audit = attempt(number, submitted, outputMax, response, error);
+                attempts.add(new AiBehaviorAnalysisRun.Attempt(audit.number(),audit.inputPrompt(),audit.rawOutput(),audit.errorCode(),
+                        audit.source(),audit.systemPrompt(),audit.outputMax(),audit.finishReason(),audit.inputTokens(),audit.outputTokens(),
+                        elapsed(attemptStarted),transport == null ? null : transport.details()));
                 if (response == null) break;
             }
         }

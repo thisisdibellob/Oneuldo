@@ -61,6 +61,9 @@ public class AiBehaviorAnalysisService {
         return analyzeSnapshot(memberId,find(memberId,analysisId).datasetId());
     }
 
+    @org.springframework.beans.factory.annotation.Value("${ai.behavior-analysis.quality-review:false}")
+    private boolean qualityReview;
+
     private AiBehaviorAnalysisResponse analyzeShared(UUID memberId, BehaviorAnalysisInputResponse input) {
         return datasets.run(memberId+":"+input.id(),()->analyzeInput(memberId,input));
     }
@@ -72,7 +75,7 @@ public class AiBehaviorAnalysisService {
                 system,mapper.readTree(prompt),prompts.observationSystem(),prompts.digestContract(),prompts.reductionContract(),
                 FinalAnalysisPromptCompactor.systemPrompt(),FinalAnalysisPromptCompactor.VERSION,
                 budget.requestTokens(),budget.chunkOutputTokens(),budget.finalOutputTokens(),maxChunks,0.2,
-                MovementProjection.VERSION,prompts.movementMaxError(),MovementInputEncoder.VERSION,"analysis-reuse-v3-bounded-reduction");
+                MovementProjection.VERSION,prompts.movementMaxError(),MovementInputEncoder.VERSION,"analysis-reuse-v4-reviewed", qualityReview, AnalysisReviewPrompt.VERSION, AnalysisReviewPrompt.system());
         var reusable=repository.findFirstByMemberIdAndDatasetIdAndRequestKeyAndStatusOrderByCreatedAtDesc(memberId,input.id(),requestKey,"READY");
         if(reusable.isPresent()) {
             try {
@@ -86,7 +89,7 @@ public class AiBehaviorAnalysisService {
         if (input.eventCount() == 0) {
             status = "NO_HISTORY";
         } else {
-            var pipeline = new TimelineAnalysisPipeline(prompts, validator, client, mapper, maxChunks, budget, pacer);
+            var pipeline = new TimelineAnalysisPipeline(prompts, validator, client, mapper, maxChunks, budget, pacer).withQualityReview(qualityReview);
             if(checkpointStore!=null) pipeline.withCheckpoints(checkpointStore.scope(memberId,input.id()));
             try {
                 analysis = pipeline.analyze(input, budget.requestTokens(), attempts);
@@ -95,7 +98,8 @@ public class AiBehaviorAnalysisService {
                 status = "INPUT_TOO_LARGE"; error = tooLarge.getMessage();
             } catch (RuntimeException failure) {
                 status = "FAILED";
-                error = List.of("AI_RATE_LIMITED", "AI_UNAVAILABLE", "INVALID_AI_ANALYSIS").contains(failure.getMessage())
+                error = (failure.getMessage()!=null && List.of("AI_RATE_LIMITED", "AI_UNAVAILABLE", "INVALID_AI_ANALYSIS").contains(failure.getMessage()))
+                        || oneuldo.ai.exception.AiTransportException.isCode(failure.getMessage())
                         ? failure.getMessage() : "CHUNK_ANALYSIS_FAILED";
             }
             model = pipeline.model();

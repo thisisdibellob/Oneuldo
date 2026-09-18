@@ -34,7 +34,7 @@ public class AiBehaviorAnalysisValidator {
             text(finding.id()); require(findingIds.add(finding.id()));
             text(finding.skill()); text(finding.observation()); text(finding.interpretation());
             text(finding.suggestedSupport());
-            require(finding.alternativeExplanations() != null && !finding.alternativeExplanations().isEmpty()
+            require(finding.alternativeExplanations() != null
                     && finding.alternativeExplanations().size() <= 8);
             finding.alternativeExplanations().forEach(this::text);
             evidence(finding.evidenceEventIds(), events);
@@ -69,7 +69,7 @@ public class AiBehaviorAnalysisValidator {
         input.input().sessions().forEach(s -> s.events().forEach(e -> allowed.add(e.behaviorLogId())));
         for (var observation : digest.observations()) {
             require(observation != null); text(observation.observation()); text(observation.interpretation());
-            require(observation.alternativeExplanations() != null && !observation.alternativeExplanations().isEmpty()
+            require(observation.alternativeExplanations() != null
                     && observation.alternativeExplanations().size() <= 8);
             observation.alternativeExplanations().forEach(this::text);
             evidence(observation.evidenceEventIds(), allowed);

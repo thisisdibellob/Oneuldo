@@ -66,9 +66,22 @@ export function AbilityAnalysisScreen({ accessToken }: { accessToken: string | n
   }
 
   const stages: Record<string, string> = { QUEUED: '분석 순서를 기다리고 있어요.', PREPARING: '분석 기록을 준비하고 있어요.',
-    OBSERVING: '플레이 구간을 분석하고 있어요.', REDUCING: '구간 결과를 정리하고 있어요.', FINALIZING: '최종 분석을 작성하고 있어요.',
+    OBSERVING: '플레이 구간을 분석하고 있어요.', REDUCING: '구간 결과를 정리하고 있어요.', FINALIZING: '최종 분석을 작성하고 있어요.', REVIEWING: '원본과 분석 결과를 대조하고 있어요.',
     PROFILE: '누적 프로필에 반영하고 있어요.', RECOVERING: '저장한 지점부터 다시 처리하고 있어요.' };
   const jobErrors: Record<string, string> = {
+    AI_CONNECT_TIMEOUT: 'AI 서버에 연결하지 못했어요. 연결 상태를 확인한 뒤 다시 시도해 주세요.',
+    AI_CONNECT_FAILED: 'AI 서버 연결이 거절됐어요. 잠시 후 다시 시도해 주세요.',
+    AI_DNS_FAILED: 'AI 서버 주소를 찾지 못했어요.',
+    AI_TLS_FAILED: 'AI 서버의 보안 연결을 확인하지 못했어요.',
+    AI_RESPONSE_TIMEOUT: 'AI 응답 대기 시간이 지났어요. 서버에서 처리 중일 수 있어요.',
+    AI_AUTH_FAILED: 'AI 서버 인증에 실패했어요. 관리자에게 연결 설정 확인을 요청해 주세요.',
+    AI_SERVER_ERROR: 'AI 서버에서 오류가 발생했어요.',
+    AI_REQUEST_REJECTED: 'AI 서버가 요청을 받아들이지 못했어요.',
+    AI_TRANSPORT_ERROR: 'AI 서버와 통신이 중단됐어요.',
+    AI_INVALID_RESPONSE: 'AI 서버에서 완성된 응답을 받지 못했어요.',
+    AI_QUEUE_FULL: 'AI 요청이 많아요. 잠시 후 다시 시도해 주세요.',
+    AI_QUEUE_TIMEOUT: 'AI 처리 순서를 기다리는 시간이 초과됐어요.',
+    AI_INTERRUPTED: 'AI 요청 처리가 중단됐어요.',
     AI_RATE_LIMITED: 'AI 서비스의 사용 한도에 도달했어요.',
     OUTPUT_TRUNCATED: 'AI 응답이 끝까지 작성되지 않았어요.',
     INVALID_AI_ANALYSIS: 'AI 응답의 형식이나 근거를 확인하지 못했어요.',
@@ -112,8 +125,12 @@ export function AbilityAnalysisScreen({ accessToken }: { accessToken: string | n
                     <Text style={styles.heading}>{finding.skill}</Text>
                     <Text style={styles.label}>관찰한 행동</Text><Text style={styles.body}>{finding.observation}</Text>
                     <Text style={styles.label}>AI의 해석 · 확인이 필요한 가설</Text><Text style={styles.body}>{finding.interpretation}</Text>
-                    <Text style={styles.label}>다른 가능한 설명</Text>
-                    {finding.alternativeExplanations.map((item, i) => <Text key={i} style={styles.body}>{item}</Text>)}
+                    {finding.alternativeExplanations.length > 0 ? (
+                      <>
+                        <Text style={styles.label}>다른 가능한 설명</Text>
+                        {finding.alternativeExplanations.map((item, i) => <Text key={i} style={styles.body}>{item}</Text>)}
+                      </>
+                    ) : null}
                     <Text style={styles.label}>도움이 될 수 있는 지원</Text><Text style={styles.body}>{finding.suggestedSupport}</Text>
                     {showEvidence ? <Text selectable style={styles.note}>근거 이벤트: {finding.evidenceEventIds.join(', ')}</Text> : null}
                   </View>

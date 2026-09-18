@@ -55,7 +55,8 @@ public class MarketAiQuestService {
                         ? "\n이전 응답이 구조/상품/가격 검사를 통과하지 못했습니다. 제약을 다시 확인하고 JSON만 출력하세요." : ""), 900, 0.2);
                 model = result.model();
             } catch (RuntimeException unavailable) {
-                attempts.add(new MarketAiQuestGeneration.Attempt(number, null, "AI_UNAVAILABLE"));
+                attempts.add(new MarketAiQuestGeneration.Attempt(number, null,
+                        unavailable instanceof oneuldo.ai.exception.AiTransportException t ? t.code().name() : "AI_UNAVAILABLE"));
                 break;
             }
             try {

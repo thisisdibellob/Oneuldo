@@ -18,7 +18,12 @@ import org.hibernate.type.SqlTypes;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class AiBehaviorAnalysisRun {
     public record Attempt(int number, String inputPrompt, String rawOutput, String errorCode, String source,
-            String systemPrompt,Integer outputMax,String finishReason,Integer inputTokens,Integer outputTokens,Long latencyMs) {
+            String systemPrompt,Integer outputMax,String finishReason,Integer inputTokens,Integer outputTokens,Long latencyMs,
+            oneuldo.ai.exception.AiTransportException.Details transportFailure) {
+        public Attempt(int number,String inputPrompt,String rawOutput,String errorCode,String source,String systemPrompt,
+                Integer outputMax,String finishReason,Integer inputTokens,Integer outputTokens,Long latencyMs) {
+            this(number,inputPrompt,rawOutput,errorCode,source,systemPrompt,outputMax,finishReason,inputTokens,outputTokens,latencyMs,null);
+        }
         public Attempt(int number,String prompt,String raw,String error) {this(number,prompt,raw,error,null,null,null,null,null,null,null);}
     }
     @Id private UUID id;

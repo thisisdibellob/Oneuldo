@@ -77,10 +77,13 @@ class GatewayHttpTest {
     @Test void forwardsOnlyTheFixedObservationSchema() throws Exception {
         var mapper=JsonMapper.builder().build();
         var body=(tools.jackson.databind.node.ObjectNode)mapper.readTree(BODY);
-        body.set("format",mapper.valueToTree(oneuldo.ai.client.ObservationOutputSchema.VALUE));
-        mvc.perform(post("/api/chat").header("Authorization", "Bearer " + KEY)
-                .contentType(MediaType.APPLICATION_JSON).content(body.toString())).andExpect(status().isOk());
-        assertThat(received.path("format")).isEqualTo(body.path("format"));
+        for (var schema : java.util.List.of(oneuldo.ai.client.ObservationOutputSchema.LEGACY_VALUE,
+                oneuldo.ai.client.ObservationOutputSchema.VALUE)) {
+            body.set("format",mapper.valueToTree(schema));
+            mvc.perform(post("/api/chat").header("Authorization", "Bearer " + KEY)
+                    .contentType(MediaType.APPLICATION_JSON).content(body.toString())).andExpect(status().isOk());
+            assertThat(received.path("format")).isEqualTo(body.path("format"));
+        }
         count.set(0);
         for(String format: new String[]{"null", "\"json\"", "{\"type\":\"object\"}"}) {
             body.set("format",mapper.readTree(format));

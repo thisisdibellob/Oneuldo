@@ -52,3 +52,24 @@ test('pending movement survives interactions, periodic persistence, backgroundin
   expect(samples.every(e => (e.payload?.marketContent as any).movementContext.samplingVersion === 'market-movement-v2')).toBe(true);
   jest.useRealTimers();
 });
+
+test.each([
+  ['before-submit', 'USER_ABORTED'],
+  ['after-submit', 'EXIT_AFTER_SUBMISSION'],
+  ['flow-finished', 'FLOW_FINISHED'],
+] as const)('session exit records observed lifecycle without judging success: %s', async (flow, reason) => {
+  const tracker = new MarketBehaviorTracker('test', marketMission);
+  // Empty/wrong cart intentionally: lifecycle must not score the player's performance.
+  if (flow === 'after-submit') tracker.checkoutSubmitted({});
+  if (flow === 'flow-finished') await tracker.complete({});
+  else await tracker.abort({});
+  await tracker.abort({}); // a second unmount must not emit another ending
+  const events = jest.mocked(enqueueBehaviorEvents).mock.calls.flatMap(call => call[1].map(entry => entry.event));
+  const ending = events.filter(event => event.action.eventCode === 'SHOP.SESSION_ENDED');
+  expect(ending).toHaveLength(1);
+  expect(ending[0].sessionEnd?.reason).toBe(reason);
+  expect(ending[0].task.taskVersion).toBe('market-micro-behavior-v3-lifecycle');
+  expect(ending[0].taskResult).toBeUndefined();
+  expect(ending[0].action.stepOutcome).toBeUndefined();
+  expect(events.some(event => event.action.eventCode === 'SHOP.CHECKOUT_SUBMITTED')).toBe(flow === 'after-submit');
+});

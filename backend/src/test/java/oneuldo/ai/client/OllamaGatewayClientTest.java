@@ -39,6 +39,8 @@ class OllamaGatewayClientTest {
         context.run(ctx -> {
             assertThat(ctx).hasNotFailed();
             assertThat(ctx.getBean(OllamaProperties.class).apiKey()).isEmpty();
+            assertThat(ctx.getBean(OllamaProperties.class).connectTimeout()).isEqualTo(Duration.ofSeconds(15));
+            assertThat(ctx.getBean(OllamaProperties.class).connectRetries()).isEqualTo(2);
         });
         context.withPropertyValues("ai.ollama.api-key=test-team-key").run(ctx -> {
             assertThat(ctx).hasNotFailed();

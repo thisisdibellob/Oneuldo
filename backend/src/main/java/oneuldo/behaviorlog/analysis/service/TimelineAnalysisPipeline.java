@@ -18,6 +18,9 @@ public final class TimelineAnalysisPipeline {
     private final AnalysisTokenBudget budget;
     private final AnalysisCallPacer pacer;
     private String model;
+    private boolean qualityReview;
+    public TimelineAnalysisPipeline withQualityReview(boolean enabled) {qualityReview=enabled;return this;}
+    private int finalReserve() {return budget.finalOutputTokens() + (qualityReview ? budget.finalOutputTokens()+1500 : 0);}
     private boolean movementDetailLimited;
     private int completedObservations;
     private int plannedObservations;
@@ -99,16 +102,16 @@ public final class TimelineAnalysisPipeline {
         // Larger context is opt-in; retain the existing 8K path for older gateways.
         if(limit>8192) {
             String source=refs.encode(prompts.wholeSourcePrompt(input));
-            if(budget.total(prompts.wholeSourceSystem(),source+RETRY,budget.finalOutputTokens())+200<=limit) {
+            if(budget.total(prompts.wholeSourceSystem(),source+RETRY,finalReserve())+200<=limit) {
                 AnalysisProgress.stage("FINALIZING",0,1);
-                var result=call(prompts.wholeSourceSystem(),source,budget.finalOutputTokens(),limit,audit,raw->validator.validate(refs.read(raw),input));
+                var result=finalCall(prompts.wholeSourceSystem(),source,refs,limit,audit,raw->validator.validate(refs.read(raw),input));
                 AnalysisProgress.stage("FINALIZING",1,1);return result;
             }
         }
         String whole=refs.encode(prompts.userPrompt(input));
-        if(budget.total(prompts.systemPrompt(),whole+RETRY,budget.finalOutputTokens())+200<=limit) {
+        if(budget.total(prompts.systemPrompt(),whole+RETRY,finalReserve())+200<=limit) {
             AnalysisProgress.stage("FINALIZING",0,1);
-            var result=call(prompts.systemPrompt(),whole,budget.finalOutputTokens(),limit,audit,raw->validator.validate(refs.read(raw),input));
+            var result=finalCall(prompts.systemPrompt(),whole,refs,limit,audit,raw->validator.validate(refs.read(raw),input));
             AnalysisProgress.stage("FINALIZING",1,1);return result;
         }
         var chunks=partition(input,limit);
@@ -124,10 +127,10 @@ public final class TimelineAnalysisPipeline {
             AnalysisProgress.stage("FINALIZING",completedObservations,plannedObservations);
             String finalPrompt=finalPrompt(input,groups,refs);
             String finalSystem=FinalAnalysisPromptCompactor.systemPrompt();
-            log.info("AI final assembly: groups={}, reservedTokens={}, limit={}",groups.size(),budget.total(finalSystem,finalPrompt+RETRY,budget.finalOutputTokens()),limit);
-            if(budget.total(finalSystem,finalPrompt+RETRY,budget.finalOutputTokens())<=limit) {
+            log.info("AI final assembly: groups={}, reservedTokens={}, limit={}",groups.size(),budget.total(finalSystem,finalPrompt+RETRY,finalReserve()),limit);
+            if(budget.total(finalSystem,finalPrompt+RETRY,finalReserve())<=limit) {
                 try {
-                    return call(finalSystem,finalPrompt,budget.finalOutputTokens(),limit,audit,
+                    return finalCall(finalSystem,finalPrompt,refs,limit,audit,
                             raw->validateFinal(refs.read(raw),input,finalPrompt));
                 } catch(IllegalStateException failure) {
                     if(!"OUTPUT_TRUNCATED".equals(failure.getMessage()) || groups.size()<=1) throw failure;
@@ -265,13 +268,28 @@ public final class TimelineAnalysisPipeline {
         ObjectNode merge=mapper.createObjectNode();
         merge.put("stage","REDUCE: 구간 AI 해석을 시간순으로 통합하라. 사실·가설·반증·불확실성과 근거 ID를 유지하라. 다수결·성공률을 계산하지 말고 원문 미확인 추측을 사실로 바꾸지 말라.");
         merge.set("chunkAnalyses",mapper.valueToTree(groups.stream().map(Group::digest).toList()));
+        var scopes=merge.putArray("chunkScopes");
+        for(int i=0;i<groups.size();i++) {
+            var scope=AnalysisSourceContext.coverage(mapper,groups.get(i).scope());scope.put("chunkAnalysisIndex",i);scopes.add(scope);
+        }
+        merge.put("scopeRule","각 한계는 해당 구간 범위에 한정한다. 다른 자식 구간에 기록이 있으면 그 원본 근거 ID로 확인하고 전체 미확인으로 확대하지 않는다.");
         merge.put("outputContract",prompts.reductionContract());
         return refs.encode(mapper.writeValueAsString(merge));
     }
     private String finalPrompt(BehaviorAnalysisInputResponse input,List<Group> groups,AnalysisReferences refs) {
-        return AnalysisSynthesisPrompt.build(mapper,prompts,input,groups.stream().map(Group::digest).toList(),refs,movementDetailLimited);
+        return AnalysisSynthesisPrompt.build(mapper,prompts,input,groups.stream().map(Group::digest).toList(),refs,movementDetailLimited,
+                groups.stream().map(Group::scope).toList());
     }
     private static String suffix(int n,int count) {return "\n구간 "+n+"/"+count+": 세션 일부이며 구간 밖 행동을 가정하지 마세요.";}
+    private AiBehaviorAnalysis finalCall(String system,String prompt,AnalysisReferences refs,int limit,
+            List<AiBehaviorAnalysisRun.Attempt> audit,Function<String,AiBehaviorAnalysis> parse) {
+        var draft=call(system,prompt,budget.finalOutputTokens(),limit,audit,parse);
+        if(!qualityReview) return draft;
+        AnalysisProgress.stage("REVIEWING",completedObservations,plannedObservations);
+        String review=AnalysisReviewPrompt.build(mapper,prompt,draft,refs);
+        return call(AnalysisReviewPrompt.system(),review,budget.finalOutputTokens(),limit,audit,
+                raw->parse.apply(AnalysisReviewPrompt.reviewedAnalysis(mapper,raw,refs)));
+    }
     private <T> T call(String system,String prompt,int output,int limit,List<AiBehaviorAnalysisRun.Attempt> audit,Function<String,T> parse) {
         return call(system,prompt,output,limit,audit,parse,false);
     }
@@ -291,21 +309,25 @@ public final class TimelineAnalysisPipeline {
         }
         String correction="", lastFailure="INVALID_AI_ANALYSIS";
         for(int attempt=0;attempt<2;attempt++) {
-            if(audit.size()>=maxChunks*2+1) throw new IllegalArgumentException("TOTAL_CALL_BUDGET_EXCEEDED");
+            if(audit.size()>=maxChunks*2+1+(qualityReview?2:0)) throw new IllegalArgumentException("TOTAL_CALL_BUDGET_EXCEEDED");
             String submitted=prompt+(attempt==0?"":RETRY+correction),raw=null;
             budget.requireFits(system,submitted,output,limit,"ANALYSIS_INPUT_EXCEEDS_LIMIT");
             GroqChatClient.GroqChatResult response=null;
             T result;
+            long started=System.nanoTime();
             try {
-                long started=System.nanoTime();
                 log.info("AI analysis request: attempt={}, inputTokens={}, outputMax={}",audit.size()+1,QwenTokenCounter.inputTokens(system,submitted),output);
                 response=digest?client.completeDigest(system,submitted,output,0.2):client.complete(system,submitted,output,0.2);raw=response.text();model=response.model();
                 if("length".equals(response.finishReason())) throw new IllegalArgumentException("OUTPUT_TRUNCATED");
                 result=parse.apply(raw);
                 log.info("AI analysis response: attempt={}, latencyMs={}",audit.size()+1,(System.nanoTime()-started)/1000000);
             } catch(RuntimeException failure) {
-                String error=failure instanceof oneuldo.ai.exception.CloudAiRateLimitException?"AI_RATE_LIMITED":raw==null?"AI_UNAVAILABLE":"INVALID_AI_ANALYSIS";
-                audit.add(attempt(audit.size()+1,system,submitted,output,response,error,"LIVE"));
+                var transport=failure instanceof oneuldo.ai.exception.AiTransportException t?t:null;
+                String error=transport!=null?transport.code().name():failure instanceof oneuldo.ai.exception.CloudAiRateLimitException?"AI_RATE_LIMITED":raw==null?"AI_UNAVAILABLE":"INVALID_AI_ANALYSIS";
+                audit.add(new AiBehaviorAnalysisRun.Attempt(audit.size()+1,submitted,raw,error,"LIVE",system,output,
+                        response==null?null:response.finishReason(),response==null?null:response.inputTokens(),
+                        response==null?null:response.outputTokens(),(System.nanoTime()-started)/1_000_000,
+                        transport==null?null:transport.details()));
                 if(raw==null) throw new IllegalStateException(error,failure);
                 String reason=failure.getMessage();
                 lastFailure="OUTPUT_TRUNCATED".equals(reason)?reason:"INVALID_AI_ANALYSIS";

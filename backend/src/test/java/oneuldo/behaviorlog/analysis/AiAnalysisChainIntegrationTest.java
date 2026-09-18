@@ -165,7 +165,7 @@ class AiAnalysisChainIntegrationTest {
             }
             if (system.contains("사용자 프로필을 갱신")) {
                 var input=mapper.readTree(prompt.substring(0,prompt.lastIndexOf('}')+1));
-                String evidence=input.path("newSessionAnalysis").path("findings").get(0).path("evidenceEventIds").get(0).asString();
+                String evidence=input.path("currentAnalysis").path("findings").get(0).path("evidenceEventIds").get(0).asString();
                 return new GroqChatClient.GroqChatResult("""
                         {"summary":"목록 확인 행동이 누적 관찰되었습니다.","findings":[{"id":"F1","skill":"수량 확인","observation":"목록을 열었습니다.",
                         "interpretation":"수량을 확인했을 가능성이 있습니다.","alternativeExplanations":["단순 탐색일 수도 있습니다."],
