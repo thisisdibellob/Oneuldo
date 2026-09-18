@@ -73,7 +73,40 @@ curl -i http://127.0.0.1:8081/api/tags
 기존 `/opt/oneuldo-ai/.venv`가 있어도 사용하지 않으며 설치 스크립트가 삭제하지 않는다.
 기동 실패 시 `sudo journalctl -u oneuldo-ai -n 60 --no-pager`로 확인한다.
 
-## HTTPS와 공유기 (로컬 인증 확인 후)
+### 기존 Java를 유지하는 학교 서버 설치
+
+학교 서버처럼 시스템 Java 11을 다른 프로그램에서 쓰는 경우, 기본 Java를 변경하지 않고 별도의 Java 21 런타임을 설치한다. 예를 들어 런타임이 `/opt/oneuldo-java21`에 있으면 다음과 같이 설치한다.
+
+```sh
+sudo env ONEULDO_JAVA_BIN=/opt/oneuldo-java21/bin/java bash install.sh
+```
+
+설치 스크립트는 지정한 실행 파일의 Java 버전을 확인하고 `oneuldo-ai.service.d/10-java.conf`에 게이트웨이 전용 실행 경로를 저장한다. 시스템 Java 및 `update-alternatives`는 변경하지 않는다. 이후 설치 스크립트를 다시 실행할 때도 같은 런타임 경로를 지정한다.
+
+Ollama의 별도 `gpu.conf` 및 `vulkan-gpu.conf`는 유지된다. 학교의 GPU 1 선택 설정은 새 서비스 설치 후에도 `nvidia-smi`로 다시 확인한다. 설치만으로 외부 접속이나 HTTPS가 구성되지는 않는다.
+
+Ubuntu 20.04의 glibc 2.31에서는 DJL 0.36.0 기본 Linux 바이너리가 `GLIBC_2.32 not found`로 실패했다. OS의 glibc를 교체하지 않고 같은 DJL 버전의 Rust JNI 라이브러리를 대상 서버에서 빌드해 사용한다. `RUST_LIBRARY_PATH`는 게이트웨이 서비스에만 적용한다. 토크나이저를 생략하거나 글자 수 추정으로 대체하지 않는다.
+
+학교 전용 배포에는 jar와 Java 21 아카이브 외에 `libtokenizers.so`와 각 SHA-256 파일이 필요하다. 이 파일들을 준비하고 비관리자 계정의 시험 실행을 통과한 뒤 `sudo bash install-school.sh`로 설치한다. 이 스크립트는 서비스 전용 Java와 JNI 경로를 설정하고, `admin-mac` 키를 생성하며, 인증·실제 AI 응답을 확인한다. 관리자용 키 사본은 해당 사용자의 `~/.local/share/oneuldo/school-gateway-client.key`에 600 권한으로 저장한다. 배포 파일에 키를 포함하지 않는다.
+
+## 학교 서버 HTTPS
+
+현재 기본 주소는 `https://oneuldo.duckdns.org`이다. 학교 서버는 `oneuldo-https.service`의 Caddy와 DuckDNS DNS-01 인증서를 사용한다. 설치 구성, 검증 결과 및 간헐적 연결 시간 초과에 대한 기록은 [학교 서버 연결](../docs/ai/school-server-connection.md)을 참고한다. 아래 공유기 절차는 기존 집 노트북용이다.
+
+## 기존 게이트웨이 업데이트
+
+프로젝트 루트에서 Java 21로 빌드하고 업데이트 묶음을 만든다. `output/`의 바이너리와 실험 자료는 Git에 올리지 않는다.
+
+```bash
+bash backend/gradlew -p ai-gateway test bootJar
+mkdir -p output/gateway-update
+cp ai-gateway/build/libs/oneuldo-ai-gateway.jar ai-gateway/deploy/update-schema.sh output/gateway-update/
+(cd output/gateway-update && shasum -a 256 oneuldo-ai-gateway.jar > oneuldo-ai-gateway.jar.sha256)
+```
+
+세 파일을 같은 서버 디렉터리로 전송하고, 진행 중인 요청이 없는 때 그 디렉터리에서 `sudo bash update-schema.sh`를 실행한다. 스크립트는 SHA-256을 확인하고 기존 JAR을 백업한 뒤 게이트웨이를 재시작한다. 상태 확인에 실패하면 기존 JAR을 복원한다. 기존·신규 관측 스키마를 함께 지원하므로 게이트웨이를 먼저 업데이트한 뒤 새 프로젝트 백엔드를 실행한다. 이 작업은 외부 TCP 연결 장애를 해결하는 조치가 아니다.
+
+## 기존 노트북 HTTPS와 공유기 (로컬 인증 확인 후)
 
 1. DNS `bluem.myvnc.com`이 현재 HGWD-1G WAN 공인 IP를 가리키는지 확인한다.
 2. 기존 Caddyfile을 백업하고 제공 파일을 설치한 뒤 검증한다:
@@ -104,7 +137,7 @@ No-IP 무료 호스트의 30일 유지 확인은 DDNS 자동 IP 갱신과 별도
 `backend/local.properties`(git 제외)에 추가한다:
 
 ```properties
-ai.ollama.base-url=https://bluem.myvnc.com
+ai.ollama.base-url=https://oneuldo.duckdns.org
 ai.ollama.api-key=여기에_해당_팀원의_키
 ai.ollama.timeout=PT30M
 ```

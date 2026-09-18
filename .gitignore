@@ -79,3 +79,9 @@ coverage/
 # Project-local development tools
 /.tools/
 /.pnpm/
+
+# Local experiments and release bundles. Existing tracked reports remain tracked.
+/output/
+/tmp/
+__pycache__/
+*.py[cod]

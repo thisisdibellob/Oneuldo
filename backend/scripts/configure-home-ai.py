@@ -1,23 +1,56 @@
 #!/usr/bin/env python3
 """Validate a team key and configure this checkout without printing the key."""
+import argparse
 import getpass
 import json
 import os
 from pathlib import Path
 import re
+import socket
+import ssl
 import tempfile
 import urllib.error
 import urllib.request
 
-BASE_URL = "https://bluem.myvnc.com"
+SERVERS = {
+    "school": "https://oneuldo.duckdns.org",
+    "laptop": "https://bluem.myvnc.com",
+}
 BACKEND = Path(__file__).resolve().parents[1]
 
 
+def connection_error_message(error):
+    """Classify without echoing URLs, response bodies or credentials."""
+    if isinstance(error, urllib.error.HTTPError):
+        if error.code in (401, 403):
+            return f"API 키 인증 실패 (HTTP {error.code}). 선택한 서버에서 발급한 본인 키인지 확인하세요."
+        if error.code == 429:
+            return "서버 요청 제한 (HTTP 429). 진행 중인 요청이 끝난 후 다시 확인하세요."
+        if error.code >= 500:
+            return f"서버 서비스 오류 (HTTP {error.code}). 관리자에게 서비스 상태 확인을 요청하세요."
+        return f"서버가 요청을 거부했습니다 (HTTP {error.code}). 서버 주소와 게이트웨이 구성을 확인하세요."
+    reason = error.reason if isinstance(error, urllib.error.URLError) else error
+    if isinstance(reason, socket.gaierror):
+        return "DNS 조회 실패. 서버 이름을 IP 주소로 찾지 못했습니다. DNS와 네트워크를 확인하세요."
+    if isinstance(reason, ssl.SSLError):
+        return "TLS 인증서 또는 암호화 연결 확인 실패. 인증서 검증을 끄지 말고 서버 인증서와 PC 시간을 확인하세요."
+    if isinstance(reason, (TimeoutError, socket.timeout)):
+        return "HTTPS 연결 또는 응답 시간 초과. API 키 오류로 확인된 것이 아닙니다. 네트워크와 서버 상태를 확인하세요."
+    if isinstance(reason, ConnectionRefusedError):
+        return "서버 연결이 거절되었습니다. HTTPS 서비스와 포트 설정을 확인하세요."
+    return "HTTPS 연결 또는 응답 확인 실패. 연결 진단 명령으로 실패 단계를 확인하세요."
+
+
 def main():
+    parser = argparse.ArgumentParser(description="팀원 AI 서버 연결 설정 (기본: 학교 서버)")
+    parser.add_argument("--server", choices=SERVERS, default="school")
+    args = parser.parse_args()
+    base_url = SERVERS[args.server]
+    print(f"연결 대상: {base_url} — 해당 서버에서 발급한 키를 입력하세요.")
     key = getpass.getpass("팀원용 AI API 키 (입력 내용은 표시되지 않습니다): ").strip()
     if not re.fullmatch(r"[0-9a-fA-F]{64}", key):
         raise SystemExit("서버 add-key.sh로 발급한 64자리 키를 입력하세요. 파일은 변경하지 않았습니다.")
-    request = urllib.request.Request(BASE_URL + "/api/tags", headers={"Authorization": "Bearer " + key})
+    request = urllib.request.Request(base_url + "/api/tags", headers={"Authorization": "Bearer " + key})
     # Do not follow redirects carrying credentials to another destination.
     class NoRedirect(urllib.request.HTTPRedirectHandler):
         def redirect_request(self, req, fp, code, msg, headers, newurl):
@@ -27,15 +60,14 @@ def main():
             models = json.load(response).get("models", [])
         if not any(m.get("name") == "qwen3.6:27b-q4_K_M" for m in models):
             raise SystemExit("예상한 모델을 확인하지 못했습니다. 파일은 변경하지 않았습니다.")
-    except urllib.error.HTTPError as error:
-        raise SystemExit(f"인증 확인 실패: HTTP {error.code}. 파일은 변경하지 않았습니다.") from None
-    except (urllib.error.URLError, TimeoutError, ValueError):
-        raise SystemExit("HTTPS 연결 또는 응답 확인 실패. 파일은 변경하지 않았습니다.") from None
+    except (urllib.error.URLError, TimeoutError, OSError, ValueError) as error:
+        raise SystemExit(connection_error_message(error) + "\n파일은 변경하지 않았습니다.\n"
+                         f"진단: python3 backend/scripts/check-ai-connection.py --server {args.server}") from None
 
     target = BACKEND / "local.properties"
     original = target.read_text() if target.exists() else ""
     updates = {
-        "ai.ollama.base-url": BASE_URL,
+        "ai.ollama.base-url": base_url,
         "ai.ollama.api-key": key,
         "ai.ollama.timeout": "PT30M",
     }
