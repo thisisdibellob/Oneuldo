@@ -62,14 +62,15 @@ it('사람·계산원·기둥·의자·키오스크 및 진열대 위치를 개�
   expect(environment.objects.filter(({ kind }) => kind === 'chair')).toHaveLength(0);
   expect(environment.objects.filter(({ kind }) => kind === 'restSet')).toHaveLength(4);
   expect(environment.config.chairCount).toBe(0);
-  expect(environment.objects.filter(({ kind }) => kind === 'kiosk')).toHaveLength(1);
+  expect(environment.objects.filter(({ kind }) => kind === 'kiosk')).toHaveLength(0);
+  expect(environment.kiosks).toHaveLength(2);
   expect(environment.shelves.drink.slotId).toBe('northwest');
   expect(environment.shelves.fresh.slotId).toBe('middle-east');
   expect(environment.shelves.household.slotId).toBe('middle-west');
-  expect(environment.stationDetails.filter(({ kind }) => kind === 'checkout')).toHaveLength(2);
+  expect(environment.stationDetails.filter(({ kind }) => kind === 'checkout')).toHaveLength(1);
   expect(environment.checkouts).toHaveLength(2);
   expect(environment.checkout).toEqual(environment.checkouts[0]);
-  expect(environment.stationDetails.some(({ id }) => id.includes('kiosk'))).toBe(false);
+  expect(environment.stationDetails.filter(({ kind }) => kind === 'kiosk')).toHaveLength(2);
   expect(getMarketEnvironmentObstacles(environment, true)).toHaveLength(environment.obstacles.length + 1);
 });
 
@@ -81,7 +82,7 @@ it('다양한 seed와 최대 밀집도에서도 발판이 겹치지 않고 모�
       employeeCount: 3, customerCount: 5, pillarCount: 4, chairCount: 4,
     });
     cashierStates.add(environment.checkout.cashierPresent);
-    kioskStates.add(environment.objects.some(({ kind }) => kind === 'kiosk'));
+    kioskStates.add(environment.kiosks.length > 0);
     expect(environment.employees.length).toBeGreaterThanOrEqual(1);
     expect(environment.employees.length).toBeLessThanOrEqual(3);
     expect(environment.customers.length).toBeGreaterThanOrEqual(1);
@@ -154,7 +155,7 @@ it('직원과 계산대의 접근점만 상호작용 허용하고 가짜 위치�
 });
 
 it('입구와 출구, 별실과 ATM 통로 및 두 계산대의 독립 계산원 상태를 노출한다', () => {
-  const environment = createMarketEnvironment({ seed: 'architecture', cashierCount: 0 });
+  const environment = createMarketEnvironment({ seed: 'architecture', cashierCount: 0, kioskLane: 'none' });
   expect(environment).toMatchObject({ layoutVersion: 3, world: { width: 1100, height: 1500 },
     spawn: { x: 710, y: 1350 }, exit: { x: 710, y: 1430 }, entrance: { alarmBoundaryY: 1030, rearmY: 970 } });
   expect(environment.objects.filter(object => object.kind === 'atm')).toHaveLength(1);
@@ -168,7 +169,7 @@ it('입구와 출구, 별실과 ATM 통로 및 두 계산대의 독립 계산원
   expect(getMarketEnvironmentObstacles(environment, { checkout: true, 'checkout-2': true })).toHaveLength(base.length + 2);
   expect(getMarketEnvironmentObstacles(environment, { 'checkout-2': true })).toContainEqual(environment.checkouts[1].cashierCollider);
   for (const count of [0, 1, 2] as const) {
-    expect(createMarketEnvironment({ cashierCount: count }).checkouts.filter(checkout => checkout.cashierPresent)).toHaveLength(count);
+    expect(createMarketEnvironment({ cashierCount: count, kioskLane: 'none' }).checkouts.filter(checkout => checkout.cashierPresent)).toHaveLength(count);
   }
 });
 
@@ -216,7 +217,7 @@ it('두 진열대의 실제 발판 사이 간격은 통과하며 양쪽 유닛�
 
 it('계산대는 기존 크기의 정확히 75퍼센트이고 두 곳 모두 직원 왼쪽·손님 오른쪽이다', () => {
   const environment = emptyArchitecture();
-  for (const counter of environment.checkouts) {
+  for (const counter of environment.checkouts.filter(counter => counter.kind !== 'kiosk')) {
     expect(counter.rect.width).toBe(64 * 0.75);
     expect(counter.rect.height).toBe(156 * 0.75);
     expect(counter.cashierPoint.x).toBeLessThan(counter.rect.x);
@@ -339,7 +340,7 @@ it('공사는 안쪽 입구만 막고 시작점은 각 공동 출입문에서 80
       const zone = environment.constructionZones[0];
       expect(zone.rect.x).toBe(environment.entrance.gate.x);
       expect(zone.rect.width).toBe(environment.entrance.gate.width);
-      expect(zone.detourGateIds).toEqual(expect.arrayContaining(['exit', layoutId === 'corner' ? 'east-door' : 'west-door']));
+      expect(zone.detourGateIds).toEqual([layoutId === 'corner' ? 'east-door' : 'west-door']);
       expect(getMarketStationApproachPoint(environment, 'entrance', environment.spawn)).toBeNull();
     }
   }
@@ -356,7 +357,7 @@ it('모퉁이 계산대를 내려 배치해도 53px 출구 연결 통로와 두 
     const environment = createMarketEnvironment({ layoutId: 'corner', entranceConstruction: true, seed,
       employeeCount: 3, customerCount: 5, pillarCount: 4, cashierCount: 0, kioskPresent: true, shelfOrder: 'random' });
     const called = { checkout: true, 'checkout-2': true };
-    for (const counter of environment.checkouts) {
+    for (const counter of environment.checkouts.filter(counter => counter.kind !== 'kiosk')) {
       expect(counter.rect.y).toBe(870);
       expect(counter.cashierPoint.y).toBe(930);
       expect(counter.point.y).toBe(930);
@@ -365,5 +366,28 @@ it('모퉁이 계산대를 내려 배치해도 53px 출구 연결 통로와 두 
       expect(isNearMarketStation(environment, counter.id, counter.point, undefined, called)).toBe(true);
     }
     for (let x = 275; x <= 510; x += 5) expect(isMarketEnvironmentBlocked(environment, { x, y: 1008 }, called)).toBe(false);
+  }
+});
+
+it('직원과 진열대가 모두 가까우면 직원 클릭은 말 걸기 버튼이 뜨는 접근점으로 안내한다', () => {
+  const environment = createMarketEnvironment({ seed: 'market-v8-browser', layoutId: 'classic',
+    employeeCount: 1, customerCount: 1, pillarCount: 1, cashierCount: 1, kioskLane: 'checkout-2',
+    shelfOrder: ['produce', 'fresh', 'household', 'meal', 'drink'] });
+  const employee = environment.employees[0];
+  const staffId = `staff:${employee.id}` as const;
+  const ambiguous: Point[] = [];
+  for (let x = employee.point.x - 90; x <= employee.point.x + 90; x += 6) {
+    for (let y = employee.point.y - 90; y <= employee.point.y + 90; y += 6) {
+      const point = { x, y };
+      if (isNearMarketStation(environment, staffId, point) && getNearestMarketStation(environment, point)?.id !== staffId) ambiguous.push(point);
+    }
+  }
+  expect(ambiguous.length).toBeGreaterThan(0);
+  for (const current of [environment.spawn, environment.stations.fresh, ...ambiguous]) {
+    const target = getMarketStationApproachPoint(environment, staffId, current)!;
+    expect(target).not.toBeNull();
+    expect(isMarketEnvironmentBlocked(environment, target)).toBe(false);
+    expect(isNearMarketStation(environment, staffId, target)).toBe(true);
+    expect(getNearestMarketStation(environment, target)?.id).toBe(staffId);
   }
 });

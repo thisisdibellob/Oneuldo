@@ -21,6 +21,7 @@
       "quantity": 2
     }
   ],
+  "learning": { "stockoutEnabled": false, "budgetChoiceEnabled": false },
   "stockPerProduct": 6,
   "alarmPenaltyPoints": 10,
   "stockOverrides": {
@@ -38,7 +39,7 @@
     "pillarCount": 2,
     "chairCount": 0,
     "cashierCount": 0,
-    "kioskPresent": true,
+    "kioskLane": "checkout-2",
     "shelfOrder": [
       "produce",
       "fresh",

@@ -3,13 +3,15 @@ import { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { BackHandler, Image, Platform, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
 import { PressScale } from '../components/PressScale';
+import { MarketRequesterCall } from '../components/game/MarketRequesterCall';
+import { MarketKioskCheckout } from '../components/game/MarketKioskCheckout';
 import { MarketMap } from '../components/game/MarketMap';
 import { MarketHud, type MarketHudControlMode } from '../components/game/MarketHud';
 import { MarketStaffDialogue, MarketStaffDialogueChoice } from '../components/game/MarketStaffDialogue';
 import { MarketPanelTransition } from '../components/game/MarketPanelTransition';
 import { MarketShelfScene } from '../components/game/MarketShelfScene';
 import { MarketSetupPanel } from '../components/game/MarketSetupPanel';
-import { MarketEnvironment, MarketEnvironmentStationId, MarketCashierAvailability } from '../game/marketEnvironment';
+import { getMarketWrongWayRearm, MarketEnvironment, MarketEnvironmentStationId, MarketCashierAvailability } from '../game/marketEnvironment';
 import {
   applyMarketAction,
   createMarketSession,
@@ -25,7 +27,7 @@ import { listMarketEpisodes, saveMarketEpisode, MarketStoredEpisode } from '../g
 export type MarketStationId = MarketEnvironmentStationId;
 export type MarketInteractionRequest = {
   id: number;
-  station: MarketStationId | 'give-up';
+  station: MarketStationId | 'give-up' | 'contact-requester';
 };
 export type MarketProductDropDecision = {
   accepted: boolean;
@@ -98,6 +100,7 @@ export function MarketSimulationScreen({
     [staffMessage, setStaffMessage] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [staffReturnHelp, setStaffReturnHelp] = useState(false);
+  const [staffLocationHelp, setStaffLocationHelp] = useState(false);
   const [staffResponse, setStaffResponse] = useState('');
   const [cashierAnswered, setCashierAnswered] = useState(false);
   const [staffRequestPenalty, setStaffRequestPenalty] = useState<number | null>(null);
@@ -109,13 +112,15 @@ export function MarketSimulationScreen({
     cashierRequestHandled.current = false;
   }, []);
   const [alarmNotice, setAlarmNotice] = useState<number | null>(null);
+  const [wrongWayNotice, setWrongWayNotice] = useState<{ delta: number; message: string } | null>(null);
   const [panelPresent, setPanelPresent] = useState(true);
   const handled = useRef<number | null>(null),
     completed = useRef(false),
     emitted = useRef(false);
   const position = playerPositionRef ?? localPosition;
   const shelf = marketCategories.find(category => category.id === session.activeStation);
-  const panelVisible = briefing || settings || historyOpen || session.phase !== 'shopping' || cartOpen || helpOpen || staffMessage;
+  const requesterOpen = session.view === 'requester';
+  const panelVisible = requesterOpen || briefing || settings || historyOpen || session.phase !== 'shopping' || cartOpen || helpOpen || staffMessage;
   const locked = panelVisible || panelPresent || !!shelf;
   const dispatch = useCallback((action: MarketAction, sync = false) => {
     let current = live.current;
@@ -126,13 +131,26 @@ export function MarketSimulationScreen({
     setSession(next);
     return next;
   }, [position]);
+  const contactRequester = useCallback(() => {
+    const next = dispatch({ type: 'viewRequester' }, true);
+    if (next.lastActionError) return;
+    setStaffMessage(false);
+    setStaffReturnHelp(false);
+    setStaffLocationHelp(false);
+    setCartOpen(false);
+    setHelpOpen(false);
+    resetStaffReply();
+  }, [dispatch, resetStaffReply]);
   const syncMovementSegment = useCallback((previous: Point, next: Point) => {
     if (briefing || live.current.phase !== 'shopping') return;
     const env = live.current.environment;
     const gates = env.alarmGates ?? [{ axis: 'y' as const, boundary: env.entrance.alarmBoundaryY, rearm: env.entrance.rearmY }];
+    const exitGate = env.alarmGates?.find(gate => gate.id === 'exit');
     const crossesGate = gates.some(gate => {
       const from = previous[gate.axis], to = next[gate.axis];
-      return from !== to && [gate.boundary, gate.rearm].some(line =>
+      const lines = [gate.boundary, gate.rearm];
+      if (exitGate && gate === exitGate) lines.push(getMarketWrongWayRearm(exitGate));
+      return from !== to && lines.some(line =>
         Math.min(from, to) <= line && Math.max(from, to) >= line);
     });
     if (!crossesGate) return;
@@ -162,6 +180,7 @@ export function MarketSimulationScreen({
     if (station.startsWith('staff:') && !next.lastActionError) {
       setStaffMessage(true);
       setStaffReturnHelp(false);
+      setStaffLocationHelp(false);
       resetStaffReply();
     }
     setCartOpen(false);
@@ -176,8 +195,9 @@ export function MarketSimulationScreen({
     if (interactionRequest.station !== 'give-up' && (briefing || session.phase !== 'shopping')) return;
     handled.current = interactionRequest.id;
     if (interactionRequest.station === 'give-up') giveUp();
+    else if (interactionRequest.station === 'contact-requester') contactRequester();
     else interact(interactionRequest.station);
-  }, [briefing, interactionRequest, interact, giveUp, session.phase, externalMenuOpen]);
+  }, [briefing, interactionRequest, interact, giveUp, contactRequester, session.phase, externalMenuOpen]);
   useEffect(() => {
     onLockChange?.(locked);
   }, [locked, onLockChange]);
@@ -194,6 +214,14 @@ export function MarketSimulationScreen({
     const timer = setTimeout(() => setAlarmNotice(null), 4500);
     return () => clearTimeout(timer);
   }, [session.alarmCount]);
+  useEffect(() => {
+    if (!session.wrongWayEntryCount) return;
+    const event = [...live.current.events].reverse().find(item => item.type === 'wrong_way_entry');
+    if (!event) return;
+    setWrongWayNotice({ delta: Math.abs(Number(event.payload.delta ?? 0)), message: String(event.payload.message ?? '입구를 이용해 주세요.') });
+    const timer = setTimeout(() => setWrongWayNotice(null), 4500);
+    return () => clearTimeout(timer);
+  }, [session.wrongWayEntryCount]);
   useEffect(() => {
     if (session.outcome === 'success' && !completed.current) {
       completed.current = true;
@@ -222,6 +250,7 @@ export function MarketSimulationScreen({
         setHistoryOpen(false);
         return true;
       }
+      if (requesterOpen) { dispatch({ type: 'closeView' }); return true; }
       if (shelf) return false;
       if (settings) setSettings(false);
       else if (cartOpen) {
@@ -232,7 +261,8 @@ export function MarketSimulationScreen({
         setHelpOpen(false);
       } else if (staffMessage) {
         resetStaffReply();
-        if (staffReturnHelp) setStaffReturnHelp(false);
+        if (staffLocationHelp) setStaffLocationHelp(false);
+        else if (staffReturnHelp) setStaffReturnHelp(false);
         else {
           dispatch({ type: 'closeStation' });
           setStaffMessage(false);
@@ -244,7 +274,7 @@ export function MarketSimulationScreen({
       return true;
     });
     return () => back.remove();
-  }, [shelf, settings, historyOpen, cartOpen, helpOpen, staffMessage, staffReturnHelp, session.phase, giveUp, dispatch, resetStaffReply, panelPresent, panelVisible, externalMenuOpen]);
+  }, [shelf, settings, historyOpen, cartOpen, helpOpen, staffMessage, staffReturnHelp, staffLocationHelp, requesterOpen, session.phase, giveUp, dispatch, resetStaffReply, panelPresent, panelVisible, externalMenuOpen]);
   const configure = (config: Partial<MarketSessionConfig>) => {
     const next = createMarketSession({ ...config, startedAt: new Date().toISOString() });
     live.current = next;
@@ -294,6 +324,7 @@ export function MarketSimulationScreen({
     dispatch({ type: 'closeStation' });
     setStaffMessage(false);
     setStaffReturnHelp(false);
+    setStaffLocationHelp(false);
     resetStaffReply();
   };
   const requestCashier = () => {
@@ -320,13 +351,42 @@ export function MarketSimulationScreen({
     const next = dispatch({ type: 'requestReturn', productId, quantity }, true);
     if (!next.lastActionError) setStaffResponse(`${getMarketProduct(productId)?.name} ${quantity}개를 제자리에 놓아드렸어요.`);
   };
+  const askLocation = (objectiveId: string) => {
+    const next = dispatch({ type: 'askLocation', objectiveId }, true);
+    if (next.lastActionError) return;
+    const event = next.events[next.events.length - 1];
+    const categoryId = String(event?.payload.categoryId ?? '');
+    const category = marketCategories.find(item => item.id === categoryId);
+    if (!category) return;
+    const shelves = Object.values(next.environment.shelves);
+    const target = next.environment.shelves[category.id];
+    const row = shelves.filter(item => Math.abs(item.point.y - target.point.y) < 70).sort((a, b) => a.point.x - b.point.x);
+    const index = row.indexOf(target);
+    const side = row.length === 1 ? '가운데' : index === 0 ? '왼편' : index === row.length - 1 ? '오른편' : '가운데';
+    const depth = target.point.y <= Math.min(...shelves.map(item => item.point.y)) + 70 ? '안쪽' : '중앙';
+    setStaffResponse(`${category.label} 진열대에 있어요. 매장 ${depth} ${side}에서 찾아보세요.`);
+  };
+  const checkStock = () => {
+    const stockout = live.current.learning.stockout;
+    if (!stockout) return;
+    const next = dispatch({ type: 'checkStock', productId: stockout.requestedProductId }, true);
+    if (!next.lastActionError) setStaffResponse(`${getMarketProduct(stockout.requestedProductId)?.name}는 창고에도 남아 있지 않아요.`);
+  };
+  const shoppingObjectives = [...session.objectives, ...(session.learning.choiceTask ? [{
+    id: session.learning.choiceTask.id,
+    label: `${session.learning.choiceTask.label} · ${price(session.learning.choiceTask.budget)} 이내`,
+    quantity: session.learning.choiceTask.quantity,
+  }] : [])];
   const cartCount = Object.values(session.cart).reduce((a, b) => a + b, 0);
   const isFinished = session.phase === 'finished',
     ratingDone = !!session.ratings || session.ratingSkipped;
   const cashierPenaltyTotal = isFinished ? session.events.reduce((total, event) =>
     total + (event.type === 'cashier_request_declined' ? Math.abs(Number(event.payload.delta ?? 0)) : 0), 0) : 0;
+  const wrongWayPenaltyTotal = isFinished ? session.events.reduce((total, event) =>
+    total + (event.type === 'wrong_way_entry' ? Math.abs(Number(event.payload.delta ?? 0)) : 0), 0) : 0;
+  const constructionActive = !!session.environment.constructionZones?.length;
   const panelKey = settings ? 'settings' : historyOpen ? 'history' : briefing ? 'briefing-' + briefingStep
-    : cartOpen ? 'cart' : helpOpen ? 'help' : staffMessage ? 'staff-' + staffReturnHelp
+    : requesterOpen ? 'requester' : cartOpen ? 'cart' : helpOpen ? 'help' : staffMessage ? 'staff-' + staffReturnHelp + '-' + staffLocationHelp
       : isFinished ? 'finished-' + ratingDone : session.phase + '-' + session.attempts;
   const modal = (
     title: string,
@@ -365,9 +425,10 @@ export function MarketSimulationScreen({
         }}
       />
       : null}
-    {!externalMenuOpen && !briefing && session.phase === 'shopping' && !shelf && !cartOpen && !helpOpen && !staffMessage
+    {!externalMenuOpen && !briefing && session.phase === 'shopping' && !shelf && !cartOpen && !helpOpen && !staffMessage && !requesterOpen
       ? <MarketHud
-        objectives={session.objectives}
+        objectives={shoppingObjectives}
+        onContactRequester={!embedded ? contactRequester : undefined}
         score={session.score}
         topInset={hudTopInset ?? (embedded ? Math.max(112, (insets?.top ?? 0) + 64) : Math.max(12, insets?.top ?? 0))}
         controlMode={embedded ? undefined : controlMode}
@@ -388,7 +449,7 @@ export function MarketSimulationScreen({
         <Button
           text={nearby === 'checkout' || nearby === 'checkout-2'
             ? '계산대 살펴보기'
-            : nearby === 'common-door' ? '마을로 나가기' : nearby.startsWith('staff:') ? '직원에게 말 걸기' : '진열대 살펴보기'}
+            : nearby.startsWith('kiosk:') ? '무인 계산하기' : nearby === 'common-door' ? '마을로 나가기' : nearby.startsWith('staff:') ? '직원에게 말 걸기' : (marketCategories.find(category => category.id === nearby)?.label ?? '진열대') + ' 살펴보기'}
           onPress={() => interact(nearby)}
         />
       </View>
@@ -430,17 +491,21 @@ export function MarketSimulationScreen({
         </View>
         <Text style={s.small}>
           {session.config.difficulty === 'family'
-            ? '종류가 같으면 괜찮아요. 예: 우유는 맛과 지방 함량에 관계없이 골라요.'
+            ? (session.learning.stockout ? '같은 종류의 상품을 골라도 돼요. 다만 이름을 정확히 부탁한 상품은 바꾸기 전에 지영에게 물어봐요.' : '종류가 같으면 괜찮아요. 예: 우유는 맛과 지방 함량에 관계없이 골라요.')
             : '목록에 적힌 상품을 정확히 골라요. 예: 저지방 우유는 저지방 우유만 골라요.'}
         </Text>
         <View style={s.requirements}>
-          {session.objectives.map(o => <View key={o.id} style={s.row}>
+          {shoppingObjectives.map(o => <View key={o.id} style={s.row}>
             <Text style={s.body}>
               {o.label}
             </Text>
             <Text style={s.quantity}>{o.quantity}개</Text>
           </View>)}
         </View>
+        {session.learning.choiceTask ? <Text style={s.small}>음료는 가격표를 보고 원하는 것으로 골라요. 필요하면 휴대폰의 계산기를 이용해요.</Text> : null}
+        {constructionActive ? <Text style={s.small}>바깥 입구는 공사 중이에요. 안쪽 입구를 이용해 주세요.</Text> : null}
+        <Text style={s.small}>출구로 들어가면 {session.config.wrongWayPenaltyPoints}점이 줄어요. 들어갈 때는 입구를 이용해요.</Text>
+        {session.learning.stockout ? <Text style={s.small}>물건이 없으면 직원에게 물어보고, 부탁을 바꾸려면 휴대폰의 전화에서 지영을 선택해요.</Text> : null}
         <Button
           text={briefingStep === 0 ? '다음' : '장보기 시작'}
           onPress={() => briefingStep === 0 ? setBriefingStep(1) : start()}
@@ -506,7 +571,9 @@ export function MarketSimulationScreen({
       : null}
     {helpOpen
       ? modal('이렇게 이용해요', <>
-        <Text style={s.body}>1. 사야 할 물품과 개수를 읽어요.{'\n\n'}2. 진열대 가까이 가서 물건을 살펴봐요.{'\n\n'}3. 장바구니를 눌러 담은 물건을 확인해요.{'\n\n'}4. 내려놓을 물건은 그 물건의 진열대로 돌아가 장바구니를 펼쳐 내려놓아요. 어렵다면 종업원에게 제자리에 놓아 달라고 부탁해요.{'\n\n'}5. 출구 옆 두 계산대 중 하나에서 구매를 확정해요. 두 계산대에 모두 계산원이 없으면 매장 직원을 찾아 계산을 부탁해요. 계산원이 있는 상태에서 없다고 요청하면 {session.config.cashierRequestPenaltyPoints}점이 줄어요.{'\n\n'}6. 계산하지 않은 물건을 담고 입구·출구·측면 출입문의 빨간 경보기를 지나 매장 밖으로 나가면 {session.config.alarmPenaltyPoints}점이 줄어요. 입구와 출구는 공용 복도로 이어져요. 복도 끝 공동 출입문에서 마을로 나갈 수 있어요.</Text>
+        <Text style={s.body}>1. 사야 할 물품과 개수를 읽어요.{'\n\n'}2. 진열대 가까이 가서 물건을 살펴봐요.{'\n\n'}3. 장바구니를 눌러 담은 물건을 확인해요.{'\n\n'}4. 내려놓을 물건은 그 물건의 진열대로 돌아가 장바구니를 펼쳐 내려놓아요. 어렵다면 종업원에게 제자리에 놓아 달라고 부탁해요.{'\n\n'}5. 유인 계산대에서 구매를 확정하거나, 무인 계산대에 물건을 끌어 스캔한 뒤 화면 확인 → 결제로 마무리해요. 유인 계산대가 모두 비어 있으면 매장 직원에게 부탁해요. 계산원이 있는 상태에서 없다고 요청하면 {session.config.cashierRequestPenaltyPoints}점이 줄어요.{'\n\n'}6. 계산하지 않은 물건을 담고 입구·출구·측면 출입문의 빨간 경보기를 지나 매장 밖으로 나가면 {session.config.alarmPenaltyPoints}점이 줄어요. 입구와 출구는 공용 복도로 이어져요. 복도 끝 공동 출입문에서 마을로 나갈 수 있어요.</Text>
+        <Text style={s.body}>출구로 들어가면 {session.config.wrongWayPenaltyPoints}점이 줄어요. {constructionActive ? '바깥 입구는 공사 중이에요. 안쪽 입구를 이용해 주세요.' : '들어갈 때는 입구를 이용해요.'}</Text>
+        <Text style={s.body}>상품 위치는 직원에게 물어볼 수 있어요. 품절을 확인하면 재고를 물어보고 휴대폰의 전화에서 지영을 선택해요. 계산기는 휴대폰 메뉴에 있어요.</Text>
         <Button text="알겠어요" onPress={() => {
           dispatch({ type: 'closeView' });
           setHelpOpen(false);
@@ -519,14 +586,19 @@ export function MarketSimulationScreen({
     {staffMessage
       ? <MarketStaffDialogue
         name={session.environment.employees.find(employee => `staff:${employee.id}` === session.activeStation)?.label ?? '매장 직원'}
-        message={staffReturnHelp ? '어떤 물건을 제자리에 놓아드릴까요? 내려놓고 싶은 물건과 개수를 골라 주세요.' : '무엇을 도와드릴까요?'}
+        message={staffLocationHelp ? '어떤 물건을 찾고 계세요?' : staffReturnHelp ? '어떤 물건을 제자리에 놓아드릴까요? 내려놓고 싶은 물건과 개수를 골라 주세요.' : '무엇을 도와드릴까요?'}
         response={staffResponse}
         bottomInset={embedded ? Math.max(132, (insets?.bottom ?? 0) + 112) : Math.max(24, insets?.bottom ?? 0)}
       >
-        {staffReturnHelp ? <>
+        {staffLocationHelp ? <>
+          {shoppingObjectives.map(objective => <MarketStaffDialogueChoice key={objective.id} text={objective.label} onPress={() => askLocation(objective.id)} />)}
+          <MarketStaffDialogueChoice text="뒤로가기" onPress={() => { setStaffLocationHelp(false); resetStaffReply(); }} />
+        </> : staffReturnHelp ? <>
           <CartContents cart={session.cart} onRequestReturn={requestProductReturn} dialogue />
           <MarketStaffDialogueChoice text="직원 대화로 돌아가기" onPress={() => { setStaffReturnHelp(false); resetStaffReply(); }} />
         </> : <>
+          <MarketStaffDialogueChoice text="이 물건은 어디에 있나요?" onPress={() => { setStaffLocationHelp(true); resetStaffReply(); }} />
+          {session.learning.stockout?.shelfVisited && session.learning.stockout.status === 'unresolved' ? <MarketStaffDialogueChoice text="재고 있나요?" onPress={checkStock} /> : null}
           {!cashierAnswered ? <MarketStaffDialogueChoice text={CASHIER_REQUEST_TEXT} onPress={requestCashier} /> : null}
           {staffRequestPenalty !== null ? <Text accessibilityLiveRegion="polite"
             testID="market-staff-request-penalty" style={s.staffPenaltyNotice}>
@@ -534,20 +606,27 @@ export function MarketSimulationScreen({
           </Text> : null}
           {cartCount > 0 ? <MarketStaffDialogueChoice text="물건 제자리에 놓기 도움 요청" onPress={() => { setStaffReturnHelp(true); resetStaffReply(); }} /> : null}
         </>}
-        <MarketStaffDialogueChoice text="아니에요, 감사합니다." onPress={closeStation} />
+        {!staffLocationHelp ? <MarketStaffDialogueChoice text="아니에요, 감사합니다." onPress={closeStation} /> : null}
       </MarketStaffDialogue>
       : null}
-    {!briefing && session.phase === 'checkout'
+    {requesterOpen ? <MarketRequesterCall session={session} onAction={dispatch} onClose={() => dispatch({ type: 'closeView' })}
+      bottomInset={embedded ? Math.max(132, (insets?.bottom ?? 0) + 112) : Math.max(24, insets?.bottom ?? 0)} /> : null}
+    {!briefing && session.phase === 'checkout' && session.selectedKioskId ? <MarketKioskCheckout
+      key={session.selectedKioskId + '-' + session.attempts}
+      cart={session.cart} kioskLabel="무인 계산대"
+      onConfirm={scannedCart => dispatch({ type: 'submitKiosk', scannedCart })}
+      onCancel={closeStation} /> : null}
+    {!briefing && session.phase === 'checkout' && !session.selectedKioskId
       ? modal(session.cashierAvailable ? '이대로 구매할까요?' : '계산원이 자리를 비웠어요', <>
         <CartContents cart={session.cart} />
-        <Text style={s.body}>합계 {price(getMarketCartTotal(session.cart))}</Text>
+        <Text style={s.body}>결제 금액 {price(getMarketCartTotal(session.cart))}</Text>
         {session.cashierAvailable
           ? <>
             <Text style={s.small}>구매를 확정하면 이번 시도가 기록되고 결과가 나와요.</Text>
             <Button text="구매 확정" onPress={() => dispatch({ type: 'submit' })} />
           </>
           : <>
-            <Text style={s.body}>계산원이 있는 계산대를 이용해 주세요. 두 곳 모두 비어 있으면 매장 직원에게 계산을 부탁해요.</Text>
+            <Text style={s.body}>계산원이 있는 계산대나 무인 계산대를 이용해 주세요. 유인 계산대가 모두 비어 있으면 직원에게 부탁해요.</Text>
             <Button text="계산대 다시 살펴보기" onPress={closeStation} />
           </>}
         <Button
@@ -584,8 +663,10 @@ export function MarketSimulationScreen({
             {session.outcome === 'success' ? '성공' : '실패 (포기)'}
           </Text>
           <Text style={s.body}>구매 시도 {session.attempts}회</Text>
+          {session.learning.stockout?.status === 'replacement-approved' ? <Text style={s.small}>지영에게 확인하고 대체 상품을 골랐어요.</Text> : null}
+          {session.learning.stockout?.status === 'waived' ? <Text style={s.small}>구매하지 못한 이유를 지영에게 전달했어요.</Text> : null}
           <Text testID="market-final-score" style={s.body}>최종 점수 {session.score}점 · 총 감점 {session.penaltyPoints}점</Text>
-          <Text style={s.small}>경보기 {session.penaltyPoints - cashierPenaltyTotal}점 ({session.alarmCount}회) · 계산원 확인 {cashierPenaltyTotal}점</Text>
+          <Text style={s.small}>경보기 {session.penaltyPoints - cashierPenaltyTotal - wrongWayPenaltyTotal}점 ({session.alarmCount}회) · 출구 역진입 {wrongWayPenaltyTotal}점 ({session.wrongWayEntryCount}회) · 계산원 확인 {cashierPenaltyTotal}점</Text>
         </View>
         {!ratingDone
           ? <>
@@ -639,6 +720,11 @@ export function MarketSimulationScreen({
     {alarmNotice !== null ? <View pointerEvents="none" style={[s.notice, s.alarmNotice]}>
       <Text accessibilityRole="alert" accessibilityLiveRegion="assertive" style={s.alarmNoticeText}>
         경보기가 울렸어요. 계산하지 않은 물건이 있어요. −{alarmNotice}점
+      </Text>
+    </View> : null}
+    {wrongWayNotice !== null ? <View pointerEvents="none" style={[s.notice, s.alarmNotice]}>
+      <Text accessibilityRole="alert" accessibilityLiveRegion="assertive" style={s.alarmNoticeText}>
+        출구로 들어왔어요. −{wrongWayNotice.delta}점{'\n'}{wrongWayNotice.message}
       </Text>
     </View> : null}
     {session.lastActionError

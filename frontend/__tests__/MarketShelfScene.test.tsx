@@ -38,7 +38,7 @@ async function advanceTransition(milliseconds = 500) {
 }
 
 function renderEmbeddedMarket() {
-  const fixture = createMarketSession({seed:'shelf-tests', environment:{cashierCount:1}});
+  const fixture = createMarketSession({seed:'shelf-tests', learning:{stockoutEnabled:false,budgetChoiceEnabled:false}, environment:{cashierCount:1,kioskLane:'none'}});
   const playerPositionRef = {current:fixture.environment.spawn};
   const onExit = jest.fn();
   const onLockChange = jest.fn();
@@ -60,7 +60,7 @@ function renderEmbeddedMarket() {
     fireEvent.press(screen.getByText('장보기 시작'));
     await advanceTransition();
   };
-  const open = async (nextRequest: MarketInteractionRequest & { station: Exclude<MarketInteractionRequest['station'], 'give-up'> }) => {
+  const open = async (nextRequest: MarketInteractionRequest & { station: Exclude<MarketInteractionRequest['station'], 'give-up' | 'contact-requester'> }) => {
     playerPositionRef.current = fixture.environment.stations[nextRequest.station];
     request = nextRequest;
     screen.rerender(renderScreen());

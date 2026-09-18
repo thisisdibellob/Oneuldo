@@ -10,7 +10,7 @@ import {
   MARKET_SHELF_UNIT_HEIGHT, MARKET_SHELF_UNIT_STEP, MARKET_SHELF_UNIT_WIDTH,
   MARKET_SHELF_VERTICAL_STEP, getMarketShelfUnitRects,
 } from '../../game/marketFixtureLayout';
-import { getMarketRenderDepth, type MarketConstructionZone, type MarketCheckoutPlacement, type MarketEnvironment, type MarketPerson, type MarketShelfPlacement } from '../../game/marketEnvironment';
+import { getMarketRenderDepth, type MarketConstructionZone, type MarketKioskPlacement, type MarketCheckoutPlacement, type MarketEnvironment, type MarketPerson, type MarketShelfPlacement } from '../../game/marketEnvironment';
 import {
   MARKET_PERSON_HEIGHT, getMarketPersonCollider,
   MARKET_PERSON_WIDTH,
@@ -54,11 +54,6 @@ export function MarketCategoryFixture({
 
 function MarketCategoryMarker({ category, active }: { category: MarketCategory; active: boolean }) {
   return (<View testID={`market-aisle-marker-${category.id}`} style={[styles.categorySign, active && styles.categorySignActive]}>
-        <View style={[styles.aisleCode, active && styles.aisleCodeActive]}>
-          <Text style={[styles.aisleCodeText, active && styles.aisleCodeTextActive]}>
-            {String(marketCategories.findIndex(item => item.id === category.id) + 1).padStart(2, '0')}
-          </Text>
-        </View>
         <Text numberOfLines={1} style={styles.categoryName}>{category.label}</Text>
         {active ? <Ionicons color="#587565" name="chevron-forward" size={11} /> : null}
       </View>
@@ -171,10 +166,22 @@ export function MarketPersonFixture({ person, active = false }: { person: Market
   );
 }
 
-/** Decorative kiosk intentionally has no press handler, focus target or station. */
+export function MarketKioskFixture({ kiosk, active = false }: { kiosk: MarketKioskPlacement; active?: boolean }) {
+  return <View pointerEvents="none" style={styles.fixtureContent}>
+    <View style={[styles.kioskFloorShadow, active && styles.floorFocus]} />
+    <Image accessible={false} source={require('../../../assets/images/game/market/interior/self-checkout-v1.png')}
+      resizeMode="contain" style={styles.selfCheckoutArt} testID={`market-kiosk-art-${kiosk.id}`} />
+    <View style={[styles.selfCheckoutLabel, active && styles.categorySignActive]}>
+      <Ionicons name="scan-outline" size={10} color="#587565" />
+      <Text style={styles.selfCheckoutText}>셀프 {kiosk.number}</Text>
+    </View>
+  </View>;
+}
+
+/** Decorative objects have no action targets. The working kiosks belong to checkout lanes. */
 export function MarketEnvironmentObjects({ environment }: { environment: MarketEnvironment }) {
   return <>
-    {environment.objects.map((object) => {
+    {environment.objects.filter(object => object.kind !== 'kiosk').map((object) => {
       const { rect } = object;
       return <View key={object.id} pointerEvents="none" accessibilityRole="image"
         accessibilityLabel={object.kind === 'pillar' ? '마트 기둥' : object.kind === 'restSet' ? '의자 · 원형 테이블 · 의자 휴게석'
@@ -229,9 +236,6 @@ export function MarketConstructionBarrier({ zone }: { zone: MarketConstructionZo
       testID={`market-construction-art-${zone.id}`}
       style={{ position: 'absolute', width: artWidth, height: artHeight,
         left: (rect.width - artWidth) / 2, bottom: -89 * artWidth / 1983 }} />
-    <View style={[styles.constructionLabel, { left: (rect.width - 72) / 2 }]}>
-      <Text style={styles.constructionLabelText}>공사 중</Text>
-    </View>
   </View>;
 }
 
@@ -244,7 +248,7 @@ export function MarketExitMarker({ active, entrance = false, kind, blocked = fal
   const markerKind = kind ?? (entrance ? 'entrance' : 'exit');
   const entering = markerKind === 'entrance';
   const common = markerKind === 'common-door';
-  const label = common ? (active ? '마을로 나가기' : '공동 출입문') : entering ? (blocked ? '입구 · 공사 중' : '입구 · 경보기') : '출구 · 경보기';
+  const label = common ? (active ? '마을로 나가기' : '공동 출입문') : entering ? '입구' : '출구';
   return (
     <View pointerEvents="none" testID={`market-wayfinding-${markerKind}`}
       style={[styles.exitMat, active && styles.exitMatActive]}>
@@ -260,6 +264,10 @@ export function MarketExitMarker({ active, entrance = false, kind, blocked = fal
 }
 
 const styles = StyleSheet.create({
+  selfCheckoutArt: { position: 'absolute', left: -8, bottom: -8, width: 64, height: 90 },
+  kioskFloorShadow: { position: 'absolute', left: -3, bottom: -3, width: 54, height: 18, borderRadius: 20, backgroundColor: 'rgba(48,75,84,0.10)' },
+  selfCheckoutLabel: { position: 'absolute', bottom: -19, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3, width: 54, height: 18, borderRadius: 3, borderWidth: 1, borderColor: '#D8D4C7', backgroundColor: '#F7F4EC' },
+  selfCheckoutText: { fontFamily: fonts.bold, fontSize: 9, color: '#304B54' },
   shelfTarget: { position: 'absolute', overflow: 'visible' },
   plantStem: { position: 'absolute', left: 13, bottom: 17, width: 3, height: 33, backgroundColor: '#587565' },
   plantLeaf: { position: 'absolute', width: 17, height: 25, borderRadius: 13, backgroundColor: '#789B78', borderWidth: 1, borderColor: '#587565' },
@@ -325,8 +333,8 @@ const styles = StyleSheet.create({
   categorySign: {
     alignItems: 'center', alignSelf: 'center', backgroundColor: '#F7F4EC',
     borderColor: '#D8D4C7', borderLeftColor: '#C48B57', borderWidth: 1, borderLeftWidth: 3,
-    borderRadius: 3, bottom: -22, flexDirection: 'row', gap: 5, height: 24, width: 118,
-    justifyContent: 'center', paddingHorizontal: 5, position: 'absolute',
+    borderRadius: 3, bottom: -22, flexDirection: 'row', gap: 5, height: 24, minWidth: 62, maxWidth: 92,
+    justifyContent: 'center', paddingHorizontal: 9, position: 'absolute',
   },
   categorySignActive: { borderColor: '#8DAB95', borderLeftColor: '#587565', backgroundColor: '#F0F5ED' },
   aisleCode: { alignItems: 'center', justifyContent: 'center', height: 16, width: 19, borderRadius: 2, backgroundColor: '#EBDCC6' },

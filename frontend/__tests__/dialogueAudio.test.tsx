@@ -1,5 +1,6 @@
 import { act, renderHook } from '@testing-library/react-native';
 import { Platform } from 'react-native';
+import { resetGamePreferencesForTests, updateGamePreferences } from '../src/game/gamePreferences';
 import { useAudioPlayer } from 'expo-audio';
 import { useDialogueAudio } from '../src/components/game/useDialogueAudio';
 import { DIALOGUE_TONE_MIN_GAP, DIALOGUE_TONE_VOLUME } from '../src/game/dialogueFeedback';
@@ -13,7 +14,7 @@ jest.mock('expo-audio', () => ({
   useAudioPlayerStatus: () => ({ isLoaded: true }),
 }));
 
-beforeEach(() => { jest.useFakeTimers(); jest.setSystemTime(1000); jest.clearAllMocks(); });
+beforeEach(() => { jest.useFakeTimers(); jest.setSystemTime(1000); jest.clearAllMocks(); resetGamePreferencesForTests(); });
 afterEach(() => { jest.useRealTimers(); });
 
 it('uses soft voices at the configured volume, ignores punctuation, and limits repeated character sounds', async () => {
@@ -90,4 +91,29 @@ it('does not play before audio readiness and gives silent previews null sources'
     if (oldWindow) Object.defineProperty(globalThis, 'window', oldWindow);
     else Reflect.deleteProperty(globalThis, 'window');
   }
+});
+it('applies effect volume immediately and cancels pending tones when muted, even after unmuting', async () => {
+  updateGamePreferences({ effectsVolume: 0.5 });
+  const hook = renderHook(() => useDialogueAudio({ active: true, ready: true, turnKey: 'first' }));
+  const players = hook.result.current.voices.map(voice => voice.player);
+  await act(async () => { hook.result.current.playCharacter('가'); await Promise.resolve(); });
+  const first = players.find(player => jest.mocked(player.play).mock.calls.length)!;
+  expect(first.volume).toBe(DIALOGUE_TONE_VOLUME * 0.5);
+  act(() => updateGamePreferences({ effectsVolume: 0.25 }));
+  players.forEach(player => expect(player.volume).toBe(DIALOGUE_TONE_VOLUME * 0.25));
+  let resolveSeek: (() => void) | undefined;
+  players.forEach(player => { jest.mocked(player.play).mockClear();
+    jest.mocked(player.pause).mockClear();
+    jest.mocked(player.seekTo).mockImplementation(() => new Promise<void>(resolve => { resolveSeek = resolve; })); });
+  act(() => { jest.advanceTimersByTime(DIALOGUE_TONE_MIN_GAP); hook.result.current.playCharacter('나'); });
+  expect(resolveSeek).toBeDefined();
+  act(() => updateGamePreferences({ effectsVolume: 0 }));
+  players.forEach(player => { expect(player.pause).toHaveBeenCalled(); expect(player.volume).toBe(0); });
+  act(() => hook.result.current.playCharacter('다'));
+  act(() => updateGamePreferences({ effectsVolume: 1 }));
+  await act(async () => { resolveSeek?.(); await Promise.resolve(); });
+  players.forEach(player => expect(player.play).not.toHaveBeenCalled());
+  await act(async () => { hook.result.current.playCharacter('라'); resolveSeek?.(); await Promise.resolve(); });
+  expect(players.reduce((sum, player) => sum + jest.mocked(player.play).mock.calls.length, 0)).toBe(1);
+  hook.unmount();
 });

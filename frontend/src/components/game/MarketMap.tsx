@@ -19,6 +19,7 @@ import { PressScale } from '../PressScale';
 import {
   MarketShelfTarget,
   MarketCheckoutFixture,
+  MarketKioskFixture,
   MarketExitMarker,
   MarketInteriorBackdrop,
   MarketEnvironmentObjects,
@@ -411,7 +412,7 @@ export function MarketMap({
           )
           : null}
 
-        {environment.checkouts.map((counter, index) => <PressScale
+        {environment.checkouts.map((counter, index) => counter.kind === 'kiosk' ? null : <PressScale
           key={counter.id}
           accessibilityHint="가까이 이동하면 계산할 수 있습니다"
           accessibilityLabel={`${index + 1}번 계산대로 이동`}
@@ -443,6 +444,14 @@ export function MarketMap({
             cashierPresent={cashierCalled[counter.id] ?? counter.cashierPresent}
             active={nearbyStation === counter.id || hintedStation === counter.id}
           />
+        </PressScale>)}
+
+        {(environment.kiosks ?? []).map(kiosk => <PressScale key={kiosk.id}
+          accessibilityRole="button" accessibilityLabel={`셀프 계산대 ${kiosk.number}로 이동`} hitSlop={{ top: 48, bottom: 5, left: 8, right: 8 }}
+          disabled={!interactive} onPress={event => handleStationPress(event, kiosk.id)}
+          style={{ position: 'absolute', left: kiosk.rect.x, top: kiosk.rect.y, width: kiosk.rect.width, height: kiosk.rect.height,
+            zIndex: getMarketRenderDepth(kiosk.rect.y + kiosk.rect.height), overflow: 'visible' }}>
+          <MarketKioskFixture kiosk={kiosk} active={nearbyStation === kiosk.id || hintedStation === kiosk.id} />
         </PressScale>)}
 
         {marketCategories.map(category => <MarketShelfTarget key={category.id}

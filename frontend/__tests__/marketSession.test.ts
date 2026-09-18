@@ -6,7 +6,7 @@ import { MarketEnvironmentStationId } from '../src/game/marketEnvironment';
 import { getMarketProduct, marketProducts } from '../src/game/scenarios';
 
 function session(overrides: Parameters<typeof createMarketSession>[0] = {}) {
-  return createMarketSession({ seed: 'session-test', startedAt: '2026-09-11T00:00:00.000Z', environment: { cashierCount: 2 }, ...overrides });
+  return createMarketSession({ seed: 'session-test', startedAt: '2026-09-11T00:00:00.000Z', learning: { stockoutEnabled: false, budgetChoiceEnabled: false }, ...overrides, environment: { kioskLane: 'none', cashierCount: 2, ...overrides.environment } });
 }
 function visit(current: MarketSession, station: MarketEnvironmentStationId) {
   const moved = applyMarketAction(current, { type: 'setPosition', point: current.environment.stations[station] });
@@ -34,7 +34,7 @@ describe('configurable market session', () => {
     const before = game;
     game = applyMarketAction(game, { type: 'requestCashier', ...(checkoutId === undefined ? {} : { checkoutId }) });
     expect(game).toMatchObject({ cashierAvailability: { checkout: true, 'checkout-2': false }, selectedCheckoutId: 'checkout', cashierAvailable: true,
-      score: 100, penaltyPoints: 0, attempts: 0, paid: false, phase: 'shopping', activeStation: staff, lastActionError: null });
+      score: before.score, penaltyPoints: before.penaltyPoints, attempts: 0, paid: false, phase: 'shopping', activeStation: staff, lastActionError: null });
     expect(game.cart).toEqual(before.cart);
     expect(game.stock).toEqual(before.stock);
     expect(game.events.at(-1)).toMatchObject({ type: 'cashier_requested', payload: { staffStation: staff, checkoutId: 'checkout', playerPosition: game.playerPosition } });
@@ -429,7 +429,7 @@ describe('configurable market session', () => {
     game = visit(game, 'checkout');
     game = applyMarketAction(game, { type: 'submit' });
     expect(game.attempts).toBe(0);
-    expect(game.lastActionError).toContain('두 곳 모두 비어 있으면');
+    expect(game.lastActionError).toContain('유인 계산대가 비어 있으면');
     const staff = game.environment.stationDetails.find((station) => station.kind === 'employee')!.id;
     const remote = applyMarketAction(game, { type: 'interact', station: staff });
     expect(remote.cashierAvailable).toBe(false);
@@ -594,9 +594,10 @@ it('deducts at the exit once per outward crossing after rearm and records its ga
   expect(game.alarmArmed).toBe(true);
   game = applyMarketAction(game, { type: 'setPosition', point: { x: 930, y: 1018 } });
   game = applyMarketAction(game, { type: 'move', dx: 0, dy: 24 });
-  expect(game).toMatchObject({ score: 80, penaltyPoints: 20, alarmCount: 2 });
+  expect(game).toMatchObject({ score: 60, penaltyPoints: 40, alarmCount: 2, wrongWayEntryCount: 2 });
+  expect(game.events.filter(event => event.type === 'wrong_way_entry')).toHaveLength(2);
   expect(game.events.filter(event => event.type === 'entrance_alarm').map(event => event.payload.gateId)).toEqual(['exit', 'exit']);
-  expect(exportMarketEpisode(applyMarketAction(game, { type: 'giveUp' }))).toMatchObject({ score: 80, alarmCount: 2, penaltyPoints: 20 });
+  expect(exportMarketEpisode(applyMarketAction(game, { type: 'giveUp' }))).toMatchObject({ score: 60, alarmCount: 2, penaltyPoints: 40, wrongWayEntryCount: 2 });
 });
 
 it.each(['entrance', 'exit', 'west-door'] as const)('%s exempts empty and already-paid baskets on an actual outward crossing', gateId => {
@@ -606,7 +607,8 @@ it.each(['entrance', 'exit', 'west-door'] as const)('%s exempts empty and alread
     const gate = game.environment.alarmGates.find(candidate => candidate.id === gateId)!;
     const inside = gate.axis === 'x' ? { x: gate.boundary + 12, y: gate.gate.y + gate.gate.height / 2 }
       : { x: gate.gate.x + gate.gate.width / 2, y: gate.boundary - 12 };
-    game = applyMarketAction(game, { type: 'setPosition', point: inside });
+    // Start on the sales-floor side: this test isolates an outward crossing, not how the player entered.
+    game = { ...game, playerPosition: inside, activeStation: null, phase: 'shopping', view: 'world' };
     expect(game.lastActionError).toBeNull();
     game = applyMarketAction(game, { type: 'move', dx: gate.axis === 'x' ? -24 : 0, dy: gate.axis === 'y' ? 24 : 0 });
     expect(game.lastActionError).toBeNull();

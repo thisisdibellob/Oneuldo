@@ -1,5 +1,6 @@
 import { DIALOGUE_CHARACTER_DELAY, DIALOGUE_CLEAR_VOLUME, isSilentGamePreview } from '../game/dialogueFeedback';
 import { useDialogueAudio } from '../components/game/useDialogueAudio';
+import { useGamePreferences } from '../game/gamePreferences';
 import { getMarketNavigationPath } from '../game/marketNavigation';
 import { getMarketRecoveryPoint } from '../game/marketRecovery';
 import { Ionicons } from '@expo/vector-icons';
@@ -24,10 +25,13 @@ import {
 import { icons } from '../assets';
 import { DirectionalAvatar } from '../components/game/DirectionalAvatar';
 import { GameHud } from '../components/game/GameHud';
+import { GameContactCall } from '../components/game/GameContactCall';
+import { MarketPanelTransition } from '../components/game/MarketPanelTransition';
 import { MinsuDialoguePortrait } from '../components/game/MinsuDialoguePortrait';
 import {
   MarketShelfTarget,
   MarketCheckoutFixture,
+  MarketKioskFixture,
   MarketExitMarker,
   MarketInteriorBackdrop,
   MarketEnvironmentObjects,
@@ -100,7 +104,6 @@ import { CashierSimulationScreen } from './CashierSimulationScreen';
 import { CookingSimulationScreen } from './CookingSimulationScreen';
 
 // Add ?muteAudio=1 to developer preview URLs for silent interaction checks.
-const DEVELOPMENT_AUDIO_MUTED = isSilentGamePreview();
 
 const PLAYER_RADIUS = 22;
 const PLAYER_ART_SCALE = 0.5;
@@ -414,7 +417,7 @@ function MarketWorldLayer({
         />
       ) : null}
 
-      {environment.checkouts.map((counter, index) => <PressScale
+      {environment.checkouts.map((counter, index) => counter.kind === 'kiosk' ? null : <PressScale
         key={counter.id}
         accessibilityLabel={controlMode === 'touch' ? `${index + 1}번 계산대로 이동` : `${index + 1}번 계산대`}
         accessibilityRole={controlMode === 'touch' ? 'button' : undefined}
@@ -425,6 +428,14 @@ function MarketWorldLayer({
         style={[styles.marketCounter, { left: counter.rect.x, top: counter.rect.y, width: counter.rect.width, height: counter.rect.height, zIndex: getMarketRenderDepth(counter.rect.y + counter.rect.height) }]}
       >
         <MarketCheckoutFixture counter={counter} index={index} active={nearbyStation === counter.id} cashierPresent={cashierCalled[counter.id] ?? counter.cashierPresent} />
+      </PressScale>)}
+
+      {(environment.kiosks ?? []).map(kiosk => <PressScale key={kiosk.id}
+        accessibilityRole="button" accessibilityLabel={`셀프 계산대 ${kiosk.number}로 이동`} hitSlop={{ top: 48, bottom: 5, left: 8, right: 8 }}
+        disabled={controlMode !== 'touch'} onPress={event => onStationPress(event, kiosk.id)}
+        style={{ position: 'absolute', left: kiosk.rect.x, top: kiosk.rect.y, width: kiosk.rect.width, height: kiosk.rect.height,
+          zIndex: getMarketRenderDepth(kiosk.rect.y + kiosk.rect.height), overflow: 'visible' }}>
+        <MarketKioskFixture kiosk={kiosk} active={nearbyStation === kiosk.id} />
       </PressScale>)}
 
       {marketCategories.map(category => <MarketShelfTarget
@@ -455,6 +466,10 @@ type GamePrototypeScreenProps = {
 };
 
 export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
+  const DEVELOPMENT_AUDIO_MUTED = isSilentGamePreview();
+  const { preferences } = useGamePreferences();
+  const effectsVolumeRef = useRef(preferences.effectsVolume);
+  effectsVolumeRef.current = preferences.effectsVolume;
   // A null source keeps silent previews from downloading or decoding audio at all.
   // Keep every hook mounted so audio-enabled visits retain the same lifecycle.
   const backgroundMusic = useAudioPlayer(DEVELOPMENT_AUDIO_MUTED ? null : require('../../assets/audio/apple-cider.m4a'), {
@@ -504,6 +519,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
   const joystickEngaged = useRef(false);
   const touchHoldActivated = useRef(false);
   const clearSoundTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const clearSoundGeneration = useRef(0);
   const animationFrame = useRef<number | null>(null);
   const previousFrame = useRef<number | null>(null);
   const nearbyNpcIdRef = useRef<VillageNpcId | null>(null);
@@ -539,6 +555,9 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
   const [reduceMotionEnabled, setReduceMotionEnabled] = useState(false);
   const [controlMode, setControlMode] = useState<ControlMode>('joystick');
   const [hudMenuOpen, setHudMenuOpen] = useState(false);
+  const [phoneContact, setPhoneContact] = useState<'jiyoung' | 'minsu' | null>(null);
+  const [phoneCallPresent, setPhoneCallPresent] = useState(false);
+  const closePhoneCall = useCallback(() => setPhoneContact(null), []);
   const [runEnabled, setRunEnabled] = useState(false);
   const [playerAvatarPose, setPlayerAvatarPose] = useState<{
     facing: AvatarFacing;
@@ -615,6 +634,8 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
     dialogueIndex !== null ||
     quizStep !== null ||
     hudMenuOpen ||
+    phoneContact !== null ||
+    phoneCallPresent ||
     questOfferId !== null ||
     infoPanel !== null ||
     fridgeMenuOpen ||
@@ -1394,38 +1415,31 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
   }, [reduceMotionEnabled, worldMap, worldZoom]);
 
   useEffect(() => {
-    if (DEVELOPMENT_AUDIO_MUTED) {
-      backgroundMusic.volume = 0;
-      backgroundMusic.pause();
-      return;
-    }
+    const volume = DEVELOPMENT_AUDIO_MUTED ? 0 : preferences.musicVolume;
+    backgroundMusic.volume = volume * (dialoguePanelMounted || quizPanelMounted
+      ? BACKGROUND_MUSIC_DUCKED_VOLUME : BACKGROUND_MUSIC_VOLUME);
+    if (volume === 0) { backgroundMusic.pause(); return; }
     if (!audioModeReady || !backgroundMusicStatus.isLoaded) return;
     backgroundMusic.loop = true;
-    backgroundMusic.volume = BACKGROUND_MUSIC_VOLUME;
     backgroundMusic.play();
-  }, [audioModeReady, backgroundMusic, backgroundMusicStatus.isLoaded]);
-
-  useEffect(() => {
-    if (!backgroundMusicStatus.isLoaded) return;
-    backgroundMusic.volume = DEVELOPMENT_AUDIO_MUTED ? 0 : dialoguePanelMounted || quizPanelMounted
-      ? BACKGROUND_MUSIC_DUCKED_VOLUME
-      : BACKGROUND_MUSIC_VOLUME;
-  }, [backgroundMusic, backgroundMusicStatus.isLoaded, dialoguePanelMounted, quizPanelMounted]);
+  }, [audioModeReady, backgroundMusic, backgroundMusicStatus.isLoaded, DEVELOPMENT_AUDIO_MUTED,
+    dialoguePanelMounted, preferences.musicVolume, quizPanelMounted]);
 
   useEffect(() => {
     clearSoundTimers.current.forEach(clearTimeout);
     clearSoundTimers.current = [];
-    if (DEVELOPMENT_AUDIO_MUTED || !audioModeReady || quizStep !== 'result') return undefined;
+    if (DEVELOPMENT_AUDIO_MUTED || !audioModeReady || quizStep !== 'result' || effectsVolumeRef.current === 0) return undefined;
     let cancelled = false;
+    const generation = ++clearSoundGeneration.current;
     const notes = dialogueAudio.voices.map((voice, index) => ({ ...voice, delay: index * 85 }));
     clearSoundTimers.current = notes.map(({ delay, isLoaded, player }) =>
       setTimeout(() => {
-        if (cancelled || DEVELOPMENT_AUDIO_MUTED || !isLoaded) return;
-        player.volume = DIALOGUE_CLEAR_VOLUME;
+        if (cancelled || generation !== clearSoundGeneration.current || DEVELOPMENT_AUDIO_MUTED || !isLoaded || effectsVolumeRef.current === 0) return;
+        player.volume = DIALOGUE_CLEAR_VOLUME * effectsVolumeRef.current;
         player.shouldCorrectPitch = false;
         player.setPlaybackRate(1);
         void player.seekTo(0).then(() => {
-          if (!cancelled && !DEVELOPMENT_AUDIO_MUTED) player.play();
+          if (!cancelled && generation === clearSoundGeneration.current && !DEVELOPMENT_AUDIO_MUTED && effectsVolumeRef.current > 0) player.play();
         }).catch(() => undefined);
       }, delay),
     );
@@ -1437,7 +1451,20 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
         try { player.pause(); } catch { /* The player may already be released. */ }
       });
     };
-  }, [audioModeReady, dialogueAudio.voices, quizStep]);
+  }, [audioModeReady, dialogueAudio.voices, DEVELOPMENT_AUDIO_MUTED, quizStep]);
+
+  useEffect(() => {
+    if (quizStep !== 'result') return;
+    if (DEVELOPMENT_AUDIO_MUTED || preferences.effectsVolume === 0) {
+      clearSoundGeneration.current += 1;
+      clearSoundTimers.current.forEach(clearTimeout);
+      clearSoundTimers.current = [];
+      dialogueAudio.voices.forEach(({ player }) => { try { player.pause(); } catch { /* Released native player. */ } });
+    }
+    dialogueAudio.voices.forEach(({ player }) => {
+      try { player.volume = DEVELOPMENT_AUDIO_MUTED ? 0 : DIALOGUE_CLEAR_VOLUME * preferences.effectsVolume; } catch { /* Released native player. */ }
+    });
+  }, [DEVELOPMENT_AUDIO_MUTED, dialogueAudio.voices, preferences.effectsVolume, quizStep]);
 
   useEffect(() => {
     resultCelebration.stopAnimation();
@@ -2171,7 +2198,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
         : nearbyNpcId !== null || nearbyPortalId !== null || busStopNearby;
   const interactionLabel =
     worldMap === 'market'
-      ? (marketStationNearby === 'checkout' || marketStationNearby === 'checkout-2')
+      ? (marketStationNearby === 'checkout' || marketStationNearby === 'checkout-2' || marketStationNearby?.startsWith('kiosk:'))
         ? '계산대에서 계산하기'
         : marketStationNearby === 'common-door'
           ? '마트에서 마을로 나가기'
@@ -2199,7 +2226,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
                 : '상호작용할 대상이 없습니다';
   const interactionIcon =
     worldMap === 'market'
-      ? (marketStationNearby === 'checkout' || marketStationNearby === 'checkout-2')
+      ? (marketStationNearby === 'checkout' || marketStationNearby === 'checkout-2' || marketStationNearby?.startsWith('kiosk:'))
         ? 'card-outline'
         : marketStationNearby === 'common-door'
           ? 'exit-outline'
@@ -2219,7 +2246,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
               : 'bus';
   const interactionActionText =
     worldMap === 'market'
-      ? (marketStationNearby === 'checkout' || marketStationNearby === 'checkout-2')
+      ? (marketStationNearby === 'checkout' || marketStationNearby === 'checkout-2' || marketStationNearby?.startsWith('kiosk:'))
         ? '계산'
         : marketStationNearby === 'common-door'
           ? '나가기'
@@ -2467,7 +2494,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
       </View>
       ) : null}
 
-      {!cookingOpen && (worldMap !== 'market' || !marketScenarioLocked) ? (
+      {!cookingOpen && !phoneContact && !phoneCallPresent && (worldMap !== 'market' || !marketScenarioLocked) ? (
         <GameHud
           controlMode={controlMode}
           dailyQuests={dailyQuests}
@@ -2475,12 +2502,18 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
           onEmergencyExit={handleEmergencyExit}
           onExit={handleExit}
           onMenuVisibilityChange={handleHudMenuVisibilityChange}
+          onCallContact={contact => {
+            stopMovement();
+            if (contact === 'jiyoung' && worldMap === 'market') {
+              setMarketInteractionRequest(current => ({ id: (current?.id ?? 0) + 1, station: 'contact-requester' }));
+            } else setPhoneContact(contact);
+          }}
         />
       ) : null}
 
       {worldMap === 'market' ? (
         <MarketSimulationScreen
-          externalMenuOpen={hudMenuOpen}
+          externalMenuOpen={hudMenuOpen || phoneContact !== null || phoneCallPresent}
           controlMode={controlMode}
           onControlModeChange={selectControlMode}
           environment={marketEnvironment}
@@ -3007,6 +3040,9 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
         </View>
       ) : null}
       </Pressable>
+      <MarketPanelTransition visible={phoneContact !== null} transitionKey={`phone-call-${phoneContact}`} onPresenceChange={setPhoneCallPresent}>
+        {phoneContact ? <GameContactCall key={phoneContact} contact={phoneContact} inMarket={worldMap === 'market'} onClose={closePhoneCall} /> : null}
+      </MarketPanelTransition>
       {cookingOpen ? (
         <CookingSimulationScreen onClose={() => setCookingOpen(false)} />
       ) : null}

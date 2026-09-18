@@ -13,12 +13,13 @@ export type MarketHudProps = {
   onGiveUp: () => void;
   onOpenCart: () => void;
   onOpenHelp: () => void;
+  onContactRequester?: () => void;
 };
 
 /** A quiet shopping note: only the required quantities and explicit cart access. */
 export function MarketHud({
   objectives, score, topInset = 12, controlMode, onControlModeChange,
-  onGiveUp, onOpenCart, onOpenHelp,
+  onGiveUp, onOpenCart, onOpenHelp, onContactRequester,
 }: MarketHudProps) {
   return <View pointerEvents="box-none" style={[s.anchor, { top: topInset }]} testID="market-hud">
     <View style={s.card} testID="market-hud-card">
@@ -30,6 +31,9 @@ export function MarketHud({
           onPress={() => onControlModeChange(controlMode === 'joystick' ? 'touch' : 'joystick')}
           style={s.iconButton}>
           <Ionicons name={controlMode === 'joystick' ? 'hand-left-outline' : 'game-controller-outline'} color="#587565" size={20} />
+        </PressScale> : null}
+        {onContactRequester ? <PressScale accessibilityRole="button" accessibilityLabel="지영에게 전화" onPress={onContactRequester} style={s.iconButton}>
+          <Ionicons name="call-outline" color="#587565" size={21} />
         </PressScale> : null}
         <PressScale accessibilityRole="button" accessibilityLabel="이용 방법" onPress={onOpenHelp} style={s.iconButton}>
           <Ionicons name="help-circle-outline" color="#68796D" size={22} />

@@ -3,7 +3,7 @@ import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import App from '../App';
 import { GamePrototypeScreen } from '../src/screens/GamePrototypeScreen';
 import { MarketSimulationScreen } from '../src/screens/MarketSimulationScreen';
-import { getNearestMarketStation, isMarketEnvironmentBlocked, type MarketEnvironmentStationId, type MarketEnvironment } from '../src/game/marketEnvironment';
+import { getMarketWrongWayGate, getNearestMarketStation, isMarketEnvironmentBlocked, type MarketEnvironmentStationId, type MarketEnvironment } from '../src/game/marketEnvironment';
 
 jest.mock('expo-font', () => ({
   isLoaded: () => true,
@@ -260,7 +260,8 @@ describe('오늘도 앱', () => {
     fireEvent.press(screen.getByRole('button', { name: '오늘도 마을 들어가기' }));
 
     fireEvent.press(screen.getByRole('button', { name: '설정 열기' }));
-    fireEvent.press(screen.getByText('터치 이동'));
+    fireEvent.press(screen.getByRole('radio', { name: '터치 이동' }));
+    fireEvent.press(screen.getByRole('button', { name: '휴대폰 닫기' }));
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 220));
     });
@@ -303,7 +304,8 @@ describe('오늘도 앱', () => {
     });
 
     fireEvent.press(screen.getByRole('button', { name: '설정 열기' }));
-    fireEvent.press(screen.getByText('터치 이동'));
+    fireEvent.press(screen.getByRole('radio', { name: '터치 이동' }));
+    fireEvent.press(screen.getByRole('button', { name: '휴대폰 닫기' }));
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 220));
     });
@@ -477,7 +479,8 @@ describe('오늘도 앱', () => {
       await Promise.resolve();
     });
     fireEvent.press(screen.getByRole('button', { name: '설정 열기' }));
-    fireEvent.press(screen.getByText('터치 이동'));
+    fireEvent.press(screen.getByRole('radio', { name: '터치 이동' }));
+    fireEvent.press(screen.getByRole('button', { name: '휴대폰 닫기' }));
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 220));
     });
@@ -522,6 +525,7 @@ describe('오늘도 앱', () => {
     fireEvent.press(screen.getByRole('button', { name: '연구용 상세 설정 · JSON 가져오기' }));
     fireEvent.changeText(screen.getByLabelText('장보기 설정 JSON'), JSON.stringify({
       seed: 'app-smoke-fixed-layout',
+      learning: { stockoutEnabled: false, budgetChoiceEnabled: false },
       environment: {
         shelfOrder: ['produce', 'fresh', 'household', 'meal', 'drink'], employeeCount: 1, customerCount: 1,
         employeeSlotIds: ['staff-northwest'], customerSlotIds: ['customer-west'],
@@ -537,7 +541,7 @@ describe('오늘도 앱', () => {
     await waitFor(() => expect(screen.getByLabelText('이동 조이스틱')).toBeTruthy());
     expect(screen.getByTestId('game-top-hud')).toBeTruthy();
     expect(screen.getByText('11:45')).toBeTruthy();
-    expect(screen.getByText('515')).toBeTruthy();
+    expect(screen.getByText('30,000')).toBeTruthy();
     expect(screen.getByTestId('game-toolbar')).toBeTruthy();
     for (const menu of ['가방', '수첩', '휴대폰', '설정']) {
       expect(screen.getByRole('button', { name: menu + ' 열기' })).toBeTruthy();
@@ -562,7 +566,8 @@ describe('오늘도 앱', () => {
         if (reached(current)) { finish = key(current); break; }
         for (const [dx, dy, actionName] of [[58, 0, 'moveRight'], [-58, 0, 'moveLeft'], [0, 58, 'moveDown'], [0, -58, 'moveUp']] as const) {
           const next = { x: current.x + dx, y: current.y + dy };
-          if (parents.has(key(next))) continue;
+          // The shopping success route follows entrance direction; wrong-way entries have dedicated UI tests.
+          if (parents.has(key(next)) || getMarketWrongWayGate(environment, current, next)) continue;
           let blocked = false;
           for (let step = 1; step <= 15; step++) {
             if (isMarketEnvironmentBlocked(environment, { x: current.x + dx * step / 15, y: current.y + dy * step / 15 })) { blocked = true; break; }
@@ -627,8 +632,9 @@ describe('오늘도 앱', () => {
         // Toggle the real toolbar affordance again to close the bag.
         fireEvent.press(screen.getByRole('button', { name: '가방 열기' }));
       } else {
-        expect(screen.getByText('조작법 변경')).toBeTruthy();
+        expect(screen.getByText('조작 방식')).toBeTruthy();
         fireEvent.press(screen.getByRole('radio', { name: '슬라이드 패드' }));
+        fireEvent.press(screen.getByRole('button', { name: '휴대폰 닫기' }));
       }
       // Closing keeps movement locked until the overlay has actually departed.
       expect(screen.queryByTestId('market-hud')).toBeNull();

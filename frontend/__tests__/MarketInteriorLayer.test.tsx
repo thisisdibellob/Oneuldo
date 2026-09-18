@@ -34,7 +34,7 @@ it('다섯 분류는 통일된 가구에 서로 다른 상품 두 묶음과 하�
       .not.toEqual(screen.getByTestId(`market-facing-${category.id}-2-0-0`).props.source);
     expect(screen.getAllByText(category.label)).toHaveLength(1);
     const aisleIndex = marketCategories.findIndex(item => item.id === category.id) + 1;
-    expect(screen.getByText(String(aisleIndex).padStart(2, '0'))).toBeTruthy();
+    expect(screen.queryByText(String(aisleIndex).padStart(2, '0'))).toBeNull();
   }
 });
 
@@ -60,7 +60,7 @@ it('가로와 세로 묶음 모두 선택 강조로 가구 크기와 발 위치�
 });
 
 it('두 세로 계산대는 각 번호와 계산원을 따로 표시하며 같은 접근 통로를 사용한다', () => {
-  const environment = createMarketEnvironment({ cashierCount: 2 });
+  const environment = createMarketEnvironment({ cashierCount: 2, kioskLane: 'none' });
   const screen = render(<View>{environment.checkouts.map((counter, index) => <MarketCheckoutFixture key={counter.id}
     counter={counter} index={index} active={false} cashierPresent={counter.cashierPresent} />)}</View>);
   expect(screen.getByText('1')).toBeTruthy();
@@ -115,8 +115,8 @@ it('안쪽 입구와 출구는 이동 표지이며 공동 출입문에서만 마
     <MarketExitMarker active={false} />
     <MarketExitMarker active={false} kind="common-door" />
   </View>);
-  expect(screen.getByText('입구 · 경보기')).toBeTruthy();
-  expect(screen.getByText('출구 · 경보기')).toBeTruthy();
+  expect(screen.getByText('입구')).toBeTruthy();
+  expect(screen.getByText('출구')).toBeTruthy();
   expect(screen.getByText('공동 출입문')).toBeTruthy();
   for (const kind of ['entrance', 'exit', 'common-door']) {
     const marker = StyleSheet.flatten(screen.getByTestId(`market-wayfinding-${kind}`).props.style);
@@ -128,8 +128,8 @@ it('안쪽 입구와 출구는 이동 표지이며 공동 출입문에서만 마
     <MarketExitMarker active kind="exit" />
     <MarketExitMarker active kind="common-door" />
   </View>);
-  expect(screen.getByText('입구 · 경보기')).toBeTruthy();
-  expect(screen.getByText('출구 · 경보기')).toBeTruthy();
+  expect(screen.getByText('입구')).toBeTruthy();
+  expect(screen.getByText('출구')).toBeTruthy();
   expect(screen.getAllByText('마을로 나가기')).toHaveLength(1);
 });
 
@@ -310,13 +310,13 @@ it.each(MARKET_LAYOUT_OPTIONS)('$label의 공사는 같은 충돌 사각형에�
   expect(art.bottom + (793 - 704) * art.width / 1983).toBeCloseTo(0);
   expect(closed.obstacles).toContainEqual(zone.rect);
   expect(isMarketEnvironmentBlocked(closed, closed.entrance.point)).toBe(true);
-  expect(screen.getByText('공사 중')).toBeTruthy();
-  expect(screen.getByText('입구 · 공사 중')).toBeTruthy();
+  expect(screen.queryByText('공사 중')).toBeNull();
+  expect(screen.getByText('입구')).toBeTruthy();
   screen.rerender(<View><MarketEnvironmentObjects environment={open} />
     <MarketExitMarker kind="entrance" active={false} /></View>);
   expect(screen.queryByTestId(`market-construction-${zone.id}`)).toBeNull();
   expect(screen.queryByText('공사 중')).toBeNull();
-  expect(screen.getByText('입구 · 경보기')).toBeTruthy();
+  expect(screen.getByText('입구')).toBeTruthy();
   expect(isMarketEnvironmentBlocked(open, open.entrance.point)).toBe(false);
   screen.unmount();
 });

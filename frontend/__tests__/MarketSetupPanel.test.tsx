@@ -68,3 +68,18 @@ it('계산원 확인 감점을 별도로 적용하고 JSON 왕복에서 유지�
   expect(onApply).toHaveBeenCalledTimes(1);
   expect(screen.getByRole('alert').props.children).toMatch(/0~100/);
 });
+
+it('셀프 계산 줄과 학습 조건을 저장하고 예산 입력 중 빈 값은 화면을 깨뜨리지 않는다', () => {
+  const onApply = jest.fn();
+  const screen = render(<MarketSetupPanel config={createMarketSession().config} onApply={onApply} onClose={jest.fn()} />);
+  fireEvent.press(screen.getByRole('button', { name: '1번 줄을 셀프 계산대' }));
+  fireEvent.press(screen.getByRole('button', { name: '원래 상품만 구매' }));
+  fireEvent.changeText(screen.getByLabelText('선택 상품 예산'), '');
+  fireEvent.press(screen.getByRole('button', { name: '설정 적용' }));
+  expect(onApply).not.toHaveBeenCalled();
+  expect(screen.getByRole('alert').props.children).toMatch(/예산/);
+  fireEvent.changeText(screen.getByLabelText('선택 상품 예산'), '3500');
+  fireEvent.press(screen.getByRole('button', { name: '설정 적용' }));
+  expect(onApply).toHaveBeenCalledTimes(1);
+  expect(onApply.mock.calls[0][0]).toMatchObject({ environment: { kioskLane: 'checkout' }, learning: { allowSubstitution: false, choiceBudget: 3500 } });
+});

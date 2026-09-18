@@ -26,6 +26,7 @@ function visit(game: MarketSession, station: MarketEnvironmentStationId) {
 
 it.each(MARKET_LAYOUT_OPTIONS.flatMap(layout => [false, true].map(entranceConstruction => ({ ...layout, entranceConstruction }))))('$label 공사=$entranceConstruction에서 반납·직원 도움·계산원 호출을 걸어서 수행하고 구매에 성공한다', ({ id: layoutId, entranceConstruction }) => {
   let game = createMarketSession({ seed: 'both-layout-return-route', difficulty: 'exact', objectives: [{ productId: 'milk', quantity: 1 }],
+    learning: { stockoutEnabled: false, budgetChoiceEnabled: false },
     environment: { layoutId, entranceConstruction, shelfOrder: 'random', cashierCount: 0, employeeCount: 3, customerCount: 5, pillarCount: 4, kioskPresent: true } });
   game = visit(game, 'fresh');
   game = applyMarketAction(game, { type: 'add', productId: 'milk', quantity: 3 });

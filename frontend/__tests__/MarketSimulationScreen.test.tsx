@@ -2,7 +2,7 @@ import { act, fireEvent, render, waitFor, within } from '@testing-library/react-
 import { BackHandler, StyleSheet } from 'react-native';
 
 import { MarketShelfScene } from '../src/components/game/MarketShelfScene';
-import { createMarketEnvironment, type MarketEnvironmentStationId } from '../src/game/marketEnvironment';
+import { createMarketEnvironment, getMarketWrongWayRearm, type MarketEnvironmentStationId } from '../src/game/marketEnvironment';
 import { createMarketSession, type MarketSessionConfig } from '../src/game/marketSession';
 import { getMarketProduct } from '../src/game/scenarios';
 import { evaluateMarketProductDrop, MarketInteractionRequest, MarketSimulationScreen, type MarketSimulationScreenProps } from '../src/screens/MarketSimulationScreen';
@@ -30,9 +30,9 @@ async function finishTransition() {
 }
 
 function setup(config: Partial<MarketSessionConfig> = {}, cashierCount: 0 | 1 | 2 = 2, extraProps: Partial<MarketSimulationScreenProps> = {}) {
-  const environment = createMarketEnvironment({ seed: 'screen-replay', employeeCount: 1, customerCount: 1, cashierCount });
+  const environment = createMarketEnvironment({ seed: 'screen-replay', employeeCount: 1, customerCount: 1, cashierCount, kioskLane: 'none', ...config.environment });
   const initialConfig: Partial<MarketSessionConfig> = {
-    seed: environment.seed, difficulty: 'exact', objectives: [{ productId: 'milk', quantity: 2 }], ...config,
+    seed: environment.seed, learning: { stockoutEnabled: false, budgetChoiceEnabled: false }, difficulty: 'exact', objectives: [{ productId: 'milk', quantity: 2 }], ...config,
   };
   const playerPositionRef = { current: { ...environment.spawn } };
   const playerMovementListenerRef: NonNullable<MarketSimulationScreenProps['playerMovementListenerRef']> = { current: null };
@@ -55,6 +55,11 @@ function setup(config: Partial<MarketSessionConfig> = {}, cashierCount: 0 | 1 | 
     await act(async () => { await Promise.resolve(); });
     if (id.startsWith('staff:')) finishStaffLine(screen);
   };
+  const contactRequester = async () => {
+    request = { id: ++requestId, station: 'contact-requester' }; screen.rerender(element());
+    await act(async () => { await Promise.resolve(); });
+    finishStaffLine(screen);
+  };
   const requestGiveUp = async () => {
     request = { id: ++requestId, station: 'give-up' }; screen.rerender(element());
     await act(async () => { await Promise.resolve(); });
@@ -68,7 +73,7 @@ function setup(config: Partial<MarketSessionConfig> = {}, cashierCount: 0 | 1 | 
     await finishTransition();
     await waitFor(() => expect(screen.queryByTestId('market-shelf-scene')).toBeNull());
   };
-  return { screen, environment, initialConfig, playerPositionRef, playerMovementListenerRef, setExternalMenuOpen, start, station, requestGiveUp, add, closeShelf, ...callbacks };
+  return { screen, environment, initialConfig, playerPositionRef, playerMovementListenerRef, setExternalMenuOpen, start, station, contactRequester, requestGiveUp, add, closeShelf, ...callbacks };
 }
 
 describe('마트 장보기의 최종 결정과 재시도', () => {
@@ -212,7 +217,7 @@ describe('마트 장보기의 최종 결정과 재시도', () => {
       expect(game.screen.getByLabelText('현재 점수 90점')).toBeTruthy();
       fireEvent.press(game.screen.getByRole('button', { name: '장보기 포기' }));
       expect(game.screen.getByText('최종 점수 90점 · 총 감점 10점')).toBeTruthy();
-      expect(game.screen.getByText('경보기 10점 (1회) · 계산원 확인 0점')).toBeTruthy();
+      expect(game.screen.getByText('경보기 10점 (1회) · 출구 역진입 0점 (0회) · 계산원 확인 0점')).toBeTruthy();
       fireEvent.press(game.screen.getByRole('button', { name: '평가 건너뛰기' }));
       expect(game.onEpisodeComplete.mock.calls[0][0]).toMatchObject({ score: 90, penaltyPoints: 10, alarmCount: 1, paid: false });
     } finally { game.screen.unmount(); }
@@ -224,7 +229,7 @@ describe('마트 장보기의 최종 결정과 재시도', () => {
       game.playerPositionRef.current = { x: game.environment.entrance.point.x, y: game.environment.entrance.alarmBoundaryY + 15 };
       fireEvent.press(game.screen.getByRole('button', { name: '장보기 포기' }));
       expect(game.screen.getByText('최종 점수 90점 · 총 감점 10점')).toBeTruthy();
-      expect(game.screen.getByText('경보기 10점 (1회) · 계산원 확인 0점')).toBeTruthy();
+      expect(game.screen.getByText('경보기 10점 (1회) · 출구 역진입 0점 (0회) · 계산원 확인 0점')).toBeTruthy();
       fireEvent.press(game.screen.getByRole('button', { name: '평가 건너뛰기' }));
       const episode = game.onEpisodeComplete.mock.calls[0][0];
       expect(episode.events.filter((event: { type: string }) => event.type === 'entrance_alarm')).toHaveLength(1);
@@ -257,7 +262,7 @@ describe('마트 장보기의 최종 결정과 재시도', () => {
       expect(game.screen.getByLabelText('현재 점수 80점')).toBeTruthy();
       fireEvent.press(game.screen.getByRole('button', { name: '장보기 포기' }));
       expect(game.screen.getByText('최종 점수 80점 · 총 감점 20점')).toBeTruthy();
-      expect(game.screen.getByText('경보기 20점 (2회) · 계산원 확인 0점')).toBeTruthy();
+      expect(game.screen.getByText('경보기 20점 (2회) · 출구 역진입 0점 (0회) · 계산원 확인 0점')).toBeTruthy();
       fireEvent.press(game.screen.getByRole('button', { name: '평가 건너뛰기' }));
       const episode = game.onEpisodeComplete.mock.calls[0][0];
       expect(episode.events.filter((event: { type: string }) => event.type === 'entrance_alarm')).toHaveLength(2);
@@ -595,4 +600,108 @@ describe('마트 장보기의 최종 결정과 재시도', () => {
     game.add(another); expect(game.screen.queryByText(/목록에 없어요|너무 많이|수량을 다시|예산을 넘/)).toBeNull();
     expect(game.screen.UNSAFE_getByType(MarketShelfScene).props.cart).toEqual({ milk: 4, [another]: 1 }); game.screen.unmount();
   });
+});
+
+
+describe('직원에게 묻고 의뢰인과 상의하는 장보기', () => {
+  beforeEach(() => jest.useFakeTimers());
+  afterEach(() => jest.useRealTimers());
+
+  it('위치 질문 다음에는 사야 할 품목과 뒤로가기만 선택할 수 있다', async () => {
+    const game = setup({ objectives: [{ productId: 'milk', quantity: 1 }, { productId: 'apple', quantity: 2 }] });
+    try {
+      await game.start();
+      await game.station(('staff:' + game.environment.employees[0].id) as 'staff:employee-1');
+      fireEvent.press(game.screen.getByRole('button', { name: '이 물건은 어디에 있나요?' }));
+      finishStaffLine(game.screen);
+      expect(game.screen.getByRole('button', { name: '흰 우유' })).toBeTruthy();
+      expect(game.screen.getByRole('button', { name: '사과' })).toBeTruthy();
+      expect(game.screen.getByRole('button', { name: '뒤로가기' })).toBeTruthy();
+      expect(game.screen.queryByRole('button', { name: CASHIER_REQUEST_TEXT })).toBeNull();
+      expect(game.screen.queryByRole('button', { name: '아니에요, 감사합니다.' })).toBeNull();
+      fireEvent.press(game.screen.getByRole('button', { name: '흰 우유' }));
+      finishStaffLine(game.screen);
+      expect(game.screen.getByText(/냉장 식품 진열대에 있어요/)).toBeTruthy();
+      fireEvent.press(game.screen.getByRole('button', { name: '뒤로가기' }));
+      finishStaffLine(game.screen);
+      expect(game.screen.getByRole('button', { name: CASHIER_REQUEST_TEXT })).toBeTruthy();
+    } finally { game.screen.unmount(); }
+  });
+
+  it('품절 진열 확인 → 재고 질문 → 전화 승인으로 실제 구매 목표를 바꾼다', async () => {
+    const game = setup({ objectives: [{ productId: 'milk', quantity: 1 }], learning: { stockoutEnabled: true, budgetChoiceEnabled: false } });
+    try {
+      await game.start();
+      const staff = ('staff:' + game.environment.employees[0].id) as 'staff:employee-1';
+      await game.station(staff);
+      expect(game.screen.queryByRole('button', { name: '재고 있나요?' })).toBeNull();
+      fireEvent.press(game.screen.getByRole('button', { name: '아니에요, 감사합니다.' })); await finishTransition();
+      await game.station('fresh');
+      expect(game.screen.UNSAFE_getByType(MarketShelfScene).props.stock.milk).toBe(0);
+      expect(game.screen.getByLabelText('흰 우유 품절')).toBeTruthy();
+      expect(game.screen.queryByRole('button', { name: '흰 우유 담기' })).toBeNull();
+      act(() => { expect(game.screen.UNSAFE_getByType(MarketShelfScene).props.onDropProduct('milk')).toBe(false); });
+      await game.closeShelf();
+      await game.station(staff);
+      fireEvent.press(game.screen.getByRole('button', { name: '재고 있나요?' })); finishStaffLine(game.screen);
+      expect(game.screen.getByText(/창고에도 남아 있지 않아요/)).toBeTruthy();
+      fireEvent.press(game.screen.getByRole('button', { name: '아니에요, 감사합니다.' })); await finishTransition();
+      await game.contactRequester();
+      const replacement = game.screen.getAllByRole('button', { name: /로 바꿔도 될까요\?/ })[0];
+      const name = replacement.props.accessibilityLabel.replace('로 바꿔도 될까요?', '');
+      fireEvent.press(replacement); finishStaffLine(game.screen);
+      expect(game.screen.getByText(/목록에도 바꿔 적었어/)).toBeTruthy();
+      fireEvent.press(game.screen.getByRole('button', { name: '통화 마치기' })); await finishTransition();
+      expect(within(game.screen.getByTestId('market-shopping-list')).getByText(name)).toBeTruthy();
+      expect(within(game.screen.getByTestId('market-shopping-list')).queryByText('흰 우유')).toBeNull();
+    } finally { game.screen.unmount(); }
+  });
+
+  it('대체 불가 설정에서는 못 산 이유를 보고한 후에만 목록에서 제외한다', async () => {
+    const game = setup({ objectives: [{ productId: 'milk', quantity: 1 }, { productId: 'apple', quantity: 1 }], learning: { stockoutEnabled: true, allowSubstitution: false, budgetChoiceEnabled: false } });
+    try {
+      await game.start(); await game.station('fresh'); await game.closeShelf();
+      await game.station(('staff:' + game.environment.employees[0].id) as 'staff:employee-1');
+      fireEvent.press(game.screen.getByRole('button', { name: '재고 있나요?' })); finishStaffLine(game.screen);
+      fireEvent.press(game.screen.getByRole('button', { name: '아니에요, 감사합니다.' })); await finishTransition();
+      await game.contactRequester();
+      expect(game.screen.queryByRole('button', { name: /로 바꿔도 될까요\?/ })).toBeNull();
+      fireEvent.press(game.screen.getByRole('button', { name: '재고가 없어서 부탁한 상품을 사지 못했어요.' })); finishStaffLine(game.screen);
+      expect(game.screen.getByText(/못 산 이유를 잘 들었어/)).toBeTruthy();
+      fireEvent.press(game.screen.getByRole('button', { name: '통화 마치기' })); await finishTransition();
+      const list = within(game.screen.getByTestId('market-shopping-list'));
+      expect(list.queryByText('흰 우유')).toBeNull();
+      expect(list.getByText('사과')).toBeTruthy();
+    } finally { game.screen.unmount(); }
+  });
+
+  it('빈 장바구니로 출구를 역진입해도 감점하고 공사 시 안쪽 입구를 안내한다', async () => {
+    const game = setup({ environment: { entranceConstruction: true }, wrongWayPenaltyPoints: 10 });
+    try {
+      expect(game.screen.getByText('바깥 입구는 공사 중이에요. 안쪽 입구를 이용해 주세요.')).toBeTruthy();
+      await game.start();
+      const gate = game.environment.alarmGates.find(item => item.id === 'exit')!;
+      const outside = { x: gate.gate.x + gate.gate.width / 2, y: gate.gate.y + gate.gate.height / 2 };
+      outside[gate.axis] = getMarketWrongWayRearm(gate) + gate.outward * 10;
+      const inside = { ...outside, [gate.axis]: gate.boundary - gate.outward * 15 };
+      const cross = (from: typeof outside, to: typeof outside) => act(() => {
+        game.playerPositionRef.current = to;
+        game.playerMovementListenerRef.current!(from, to);
+      });
+      cross(outside, inside);
+      expect(game.screen.getByLabelText('현재 점수 90점')).toBeTruthy();
+      expect(game.screen.getByText(/출구로 들어왔어요.*−10점/)).toBeTruthy();
+      expect(game.screen.getByText(/안쪽 입구를 이용해 주세요/)).toBeTruthy();
+      const threshold = { ...outside, [gate.axis]: gate.boundary + gate.outward * 1 };
+      cross(inside, threshold); cross(threshold, inside);
+      expect(game.screen.getByLabelText('현재 점수 90점')).toBeTruthy();
+      cross(inside, outside); cross(outside, inside);
+      expect(game.screen.getByLabelText('현재 점수 80점')).toBeTruthy();
+      await game.requestGiveUp();
+      fireEvent.press(game.screen.getByRole('button', { name: '평가 건너뛰기' }));
+      await finishTransition();
+      expect(game.screen.getByText(/경보기 0점.*출구 역진입 20점/)).toBeTruthy();
+    } finally { game.screen.unmount(); }
+  });
+
 });

@@ -1,6 +1,7 @@
-import { createMarketEnvironment, isMarketEnvironmentBlocked, isNearMarketStation, MarketEnvironment, MarketEnvironmentConfig, MarketEnvironmentStationId, MarketCashierAvailability, MarketCheckoutId } from './marketEnvironment';
+import { MARKET_ENVIRONMENT_PLAYER_RADIUS, getMarketWrongWayGate, getMarketWrongWayRearm, createMarketEnvironment, isMarketEnvironmentBlocked, isNearMarketStation, MarketEnvironment, MarketEnvironmentConfig, MarketEnvironmentStationId, MarketCashierAvailability, MarketCheckoutId, MarketKioskId } from './marketEnvironment';
 import { MarketCategoryId, marketCategories, marketProducts, MarketProduct, getMarketProduct } from './scenarios';
 import { Point } from './prototypeWorld';
+import { normalizeMarketLearningConfig, type MarketLearningConfig, type MarketLearningState, type MarketStockoutState, type MarketUnavailableReason } from './marketLearning';
 
 export type MarketMatchRule = 'family' | 'exact';
 export type MarketTaskObjectiveInput = { productId: string; quantity: number; match?: MarketMatchRule };
@@ -13,7 +14,10 @@ export type MarketSessionConfig = {
   stockPerProduct: number;
   alarmPenaltyPoints: number;
   cashierRequestPenaltyPoints: number;
+  /** Separate from unpaid-goods alarms; old config JSON defaults to ten. */
+  wrongWayPenaltyPoints: number;
   stockOverrides: Record<string, number>;
+  learning?: Partial<MarketLearningConfig>;
   inventoryProductIds?: Partial<Record<MarketCategoryId, string[]>>;
   environment: Partial<MarketEnvironmentConfig>;
   provenance: MarketProvenance;
@@ -32,7 +36,12 @@ export type MarketAction = (
   | { type: 'add' | 'remove' | 'requestReturn'; productId: string; quantity?: number }
   | { type: 'checkout'; checkoutId?: MarketCheckoutId }
   | { type: 'requestCashier'; /** @deprecated Accepted for old actors; the first checkout is always used. */ checkoutId?: MarketCheckoutId }
-  | { type: 'submit' | 'retry' | 'giveUp' | 'skipRating' | 'closeStation' | 'viewCart' | 'viewHelp' | 'closeView' }
+  | { type: 'askLocation'; objectiveId: string }
+  | { type: 'checkStock'; productId: string }
+  | { type: 'requestSubstitution'; productId: string }
+  | { type: 'reportUnavailable'; reason: MarketUnavailableReason }
+  | { type: 'submitKiosk'; scannedCart: Record<string, number> }
+  | { type: 'submit' | 'viewRequester' | 'retry' | 'giveUp' | 'skipRating' | 'closeStation' | 'viewCart' | 'viewHelp' | 'closeView' }
   | { type: 'rate'; difficulty: number; interest: number }
 ) & { at?: string };
 export type MarketSession = {
@@ -53,13 +62,17 @@ export type MarketSession = {
   cashierAvailable: boolean;
   cashierAvailability: MarketCashierAvailability;
   selectedCheckoutId: MarketCheckoutId | null;
+  selectedKioskId: MarketKioskId | null;
+  learning: MarketLearningState;
   score: number;
   penaltyPoints: number;
   alarmCount: number;
   alarmArmed: boolean;
+  wrongWayEntryCount: number;
+  wrongWayEntryArmed: boolean;
   paid: boolean;
   phase: 'shopping' | 'checkout' | 'feedback' | 'finished';
-  view: 'world' | 'cart' | 'help';
+  view: 'world' | 'cart' | 'help' | 'requester';
   attempts: number;
   feedback: MarketFeedback | null;
   outcome: 'success' | 'gave-up' | null;
@@ -72,7 +85,8 @@ export type MarketSession = {
 export const DEFAULT_MARKET_SESSION_CONFIG: MarketSessionConfig = {
   seed: 'oneuldo-market-1', difficulty: 'family',
   objectives: [{ productId: 'milk', quantity: 1 }, { productId: 'apple', quantity: 2 }, { productId: 'curry', quantity: 1 }],
-  stockPerProduct: 6, alarmPenaltyPoints: 10, cashierRequestPenaltyPoints: 10, stockOverrides: {}, environment: {}, provenance: { source: 'human' }, startedAt: '1970-01-01T00:00:00.000Z',
+  learning: normalizeMarketLearningConfig(),
+  stockPerProduct: 6, alarmPenaltyPoints: 10, cashierRequestPenaltyPoints: 10, wrongWayPenaltyPoints: 10, stockOverrides: {}, environment: {}, provenance: { source: 'human' }, startedAt: '1970-01-01T00:00:00.000Z',
 };
 
 // Implementation below deliberately keeps the player observation separate from
@@ -109,10 +123,11 @@ function shuffle<T>(values: T[], random: () => number) {
 }
 function normalizeConfig(input: Partial<MarketSessionConfig>): MarketSessionConfig {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('게임 설정은 JSON 객체여야 합니다.');
-  const knownFields = ['seed', 'difficulty', 'objectives', 'stockPerProduct', 'alarmPenaltyPoints', 'cashierRequestPenaltyPoints', 'stockOverrides', 'inventoryProductIds', 'environment', 'provenance', 'startedAt', 'sessionId'];
+  const knownFields = ['seed', 'difficulty', 'objectives', 'stockPerProduct', 'alarmPenaltyPoints', 'cashierRequestPenaltyPoints', 'wrongWayPenaltyPoints', 'stockOverrides', 'learning', 'inventoryProductIds', 'environment', 'provenance', 'startedAt', 'sessionId'];
   for (const key of Object.keys(input)) if (!knownFields.includes(key)) throw new Error(`지원하지 않는 게임 설정입니다: ${key}`);
   const config = clone({ ...DEFAULT_MARKET_SESSION_CONFIG, ...input,
     environment: { ...DEFAULT_MARKET_SESSION_CONFIG.environment, ...input.environment },
+    learning: normalizeMarketLearningConfig(input.learning),
     stockOverrides: { ...input.stockOverrides }, provenance: { ...DEFAULT_MARKET_SESSION_CONFIG.provenance, ...input.provenance },
   });
   if (!['string', 'number'].includes(typeof config.seed) || !String(config.seed).trim() || (typeof config.seed === 'number' && !Number.isFinite(config.seed))) throw new Error('seed가 올바르지 않습니다.');
@@ -120,6 +135,7 @@ function normalizeConfig(input: Partial<MarketSessionConfig>): MarketSessionConf
   integer(config.stockPerProduct, '기본 재고', 1);
   integer(config.alarmPenaltyPoints, '출입 경보기 감점', 0, 100);
   integer(config.cashierRequestPenaltyPoints, '계산원 확인 감점', 0, 100);
+  integer(config.wrongWayPenaltyPoints, '출구 역진입 감점', 0, 100);
   if (!Array.isArray(config.objectives) || config.objectives.length < 1 || config.objectives.length > 36) throw new Error('구매 목록은 1~36개여야 합니다.');
   for (const objective of config.objectives) {
     productOrThrow(objective.productId);
@@ -151,6 +167,28 @@ export function createMarketSession(input: Partial<MarketSessionConfig> = {}, en
       throw new Error('같은 상품 또는 겹치는 품목군의 구매 목록은 하나로 합쳐 주세요.');
     }
   }
+  const learningConfig = normalizeMarketLearningConfig(config.learning);
+  const stockoutObjective = learningConfig.stockoutEnabled ? objectives[0] : undefined;
+  if (stockoutObjective) {
+    // A generic family match must not silently bypass the need to ask the requester.
+    stockoutObjective.match = 'exact';
+    stockoutObjective.label = productOrThrow(stockoutObjective.productId).name;
+  }
+  const learning: MarketLearningState = {
+    stockout: stockoutObjective ? {
+      objectiveId: stockoutObjective.id, requestedProductId: stockoutObjective.productId,
+      requestedQuantity: stockoutObjective.quantity, shelfVisited: false, staffChecked: false,
+      status: 'unresolved', approvedProductId: null, resolutionReason: null,
+    } : null,
+    choiceTask: learningConfig.budgetChoiceEnabled
+      ? { id: 'choice-drink', categoryId: 'drink', label: '내가 고른 음료', quantity: 1, budget: learningConfig.choiceBudget }
+      : null,
+    visitedCategoryIds: [],
+  };
+  const isAffordableChoice = (product: MarketProduct) => product.categoryId === 'drink'
+    && product.price <= learningConfig.choiceBudget
+    && (config.stockOverrides[product.id] ?? config.stockPerProduct) >= 1
+    && !objectives.some(objective => matchesObjective(product.id, objective));
   const shelfSlots = {} as Record<MarketCategoryId, string[]>;
   const initialStock: Record<string, number> = {};
   for (const category of marketCategories) {
@@ -168,7 +206,7 @@ export function createMarketSession(input: Partial<MarketSessionConfig> = {}, en
         // An invalid preset must not become solvable by accidentally adding its missing goal.
         for (const objective of required) {
           const supply = selected.reduce((sum, id) => sum + (matchesObjective(id, objective) ? config.stockOverrides[id] ?? config.stockPerProduct : 0), 0);
-          if (supply < objective.quantity) throw new Error(`${objective.label}의 재고가 구매 수량보다 적어 완수할 수 없습니다.`);
+          if (objective.id !== stockoutObjective?.id && supply < objective.quantity) throw new Error(`${objective.label}의 재고가 구매 수량보다 적어 완수할 수 없습니다.`);
         }
         selected.push(...shuffle(catalog.filter(product => !selected.includes(product.id)), random).slice(0, 3).map(product => product.id));
         config.inventoryProductIds![category.id] = [...selected];
@@ -176,6 +214,11 @@ export function createMarketSession(input: Partial<MarketSessionConfig> = {}, en
     } else {
       const reserved = new Set(required.map((objective) => objective.productId));
       if (reserved.size > 12) throw new Error(`${category.label}의 필수 상품이 12종을 초과합니다.`);
+      if (learning.choiceTask && category.id === learning.choiceTask.categoryId) {
+        const candidate = shuffle(catalog.filter(isAffordableChoice), random)[0];
+        if (!candidate || (reserved.size === 12 && !reserved.has(candidate.id))) throw new Error('선택 구매 예산 안에서 고를 음료 재고가 없습니다.');
+        reserved.add(candidate.id);
+      }
       // Include a close alternative beside a required SKU whenever there is room.
       for (const objective of required) {
         const alternate = shuffle(catalog.filter((product) => familyOf(product) === objective.familyId && !reserved.has(product.id)), random)[0];
@@ -191,36 +234,79 @@ export function createMarketSession(input: Partial<MarketSessionConfig> = {}, en
       selected = shuffle([...reserved], random);
     }
     shelfSlots[category.id] = [...selected];
-    for (const id of selected) initialStock[id] = config.stockOverrides[id] ?? config.stockPerProduct;
+    for (const id of selected) initialStock[id] = id === stockoutObjective?.productId ? 0 : config.stockOverrides[id] ?? config.stockPerProduct;
+    if (learning.choiceTask && category.id === learning.choiceTask.categoryId && !selected.some(id => isAffordableChoice(productOrThrow(id)))) {
+      throw new Error('진열 상품에 선택 구매 예산 안에서 고를 음료가 없습니다.');
+    }
   }
+  if (stockoutObjective && !(stockoutObjective.productId in initialStock)) throw new Error('품절을 확인할 목표 상품이 진열 목록에 있어야 합니다.');
   for (const objective of objectives) {
     const supply = Object.entries(initialStock).reduce((sum, [id, quantity]) => sum + (matchesObjective(id, objective) ? quantity : 0), 0);
-    if (supply < objective.quantity) throw new Error(`${objective.label}의 재고가 구매 수량보다 적어 완수할 수 없습니다.`);
+    if (objective.id !== stockoutObjective?.id && supply < objective.quantity) throw new Error(`${objective.label}의 재고가 구매 수량보다 적어 완수할 수 없습니다.`);
   }
   const session: MarketSession = {
     schemaVersion: 1, id: config.sessionId ?? `market-${config.seed}-${Date.parse(config.startedAt)}`, config, environment, objectives,
     shelfSlots, initialStock, stock: { ...initialStock }, cart: {}, playerPosition: { ...environment.spawn }, activeStation: null,
     cashierAvailable: environment.checkout.cashierPresent,
     cashierAvailability: Object.fromEntries(environment.checkouts.map(checkout => [checkout.id, checkout.cashierPresent])) as MarketCashierAvailability,
-    selectedCheckoutId: null, score: 100, penaltyPoints: 0, alarmCount: 0, alarmArmed: true, paid: false,
+    selectedCheckoutId: null, selectedKioskId: null, learning, score: 100, penaltyPoints: 0, alarmCount: 0, alarmArmed: true, wrongWayEntryCount: 0, wrongWayEntryArmed: true, paid: false,
     phase: 'shopping', view: 'world', attempts: 0, feedback: null, outcome: null,
     ratings: null, ratingSkipped: false, lastActionError: null, events: [],
   };
-  record(session, 'session_started', { config: clone(config), environment: clone(environment), objectives: clone(objectives), shelfSlots: clone(shelfSlots), initialStock: clone(initialStock) });
+  record(session, 'session_started', { config: clone(config), environment: clone(environment), objectives: clone(objectives), shelfSlots: clone(shelfSlots), initialStock: clone(initialStock), learning: clone(learning) });
   return session;
 }
 
 function matchesObjective(productId: string, objective: MarketTaskObjective) {
   return objective.match === 'exact' ? productId === objective.productId : familyOf(productOrThrow(productId)) === objective.familyId;
 }
+/** Deliberately reveals the exception only after the player has looked at that shelf. */
+export function getStockoutStatus(session: MarketSession): MarketStockoutState | null {
+  return session.learning.stockout?.shelfVisited ? clone(session.learning.stockout) : null;
+}
+
+function compatibleSubstitutions(session: MarketSession): MarketProduct[] {
+  const task = session.learning.stockout;
+  if (!task) return [];
+  const original = productOrThrow(task.requestedProductId);
+  return session.shelfSlots[original.categoryId].map(productOrThrow).filter(product =>
+    product.id !== original.id && familyOf(product) === familyOf(original)
+    // Stock includes anything already held by this player, which can still be approved.
+    && (session.stock[product.id] ?? 0) + (session.cart[product.id] ?? 0) >= task.requestedQuantity
+    && !session.objectives.some(objective => objective.id !== task.objectiveId && matchesObjective(product.id, objective)));
+}
+
+/** Candidate facts come from the staff stock check, never from a hidden cart evaluation. */
+export function getAvailableSubstitutions(session: MarketSession): MarketProduct[] {
+  const task = session.learning.stockout;
+  if (!task?.staffChecked || task.status !== 'unresolved' || !normalizeMarketLearningConfig(session.config.learning).allowSubstitution) return [];
+  return clone(compatibleSubstitutions(session));
+}
+
+function isChoiceProduct(session: MarketSession, productId: string) {
+  return !!session.learning.choiceTask && productOrThrow(productId).categoryId === session.learning.choiceTask.categoryId
+    && !session.objectives.some(objective => matchesObjective(productId, objective));
+}
+
 function evaluate(session: MarketSession): MarketFeedback {
   const details: string[] = [];
+  const exception = session.learning.stockout;
+  if (exception?.status === 'unresolved') details.push(productOrThrow(exception.requestedProductId).name + '의 재고를 직원에게 확인하고, 부탁한 분에게 대체 구매나 못 산 이유를 알려 주세요.');
   for (const objective of session.objectives) {
+    if (objective.id === exception?.objectiveId && exception.status === 'unresolved') continue;
     const count = Object.entries(session.cart).reduce((sum, [id, quantity]) => sum + (matchesObjective(id, objective) ? quantity : 0), 0);
     if (count !== objective.quantity) details.push(`${objective.label}: 필요한 수량은 ${objective.quantity}개, 담은 수량은 ${count}개예요.`);
   }
   for (const [id, quantity] of Object.entries(session.cart)) {
-    if (quantity > 0 && !session.objectives.some((objective) => matchesObjective(id, objective))) details.push(`${productOrThrow(id).name} ${quantity}개는 구매 목록에 없어요.`);
+    if (quantity > 0 && !session.objectives.some((objective) => matchesObjective(id, objective)) && !isChoiceProduct(session, id)) details.push(`${productOrThrow(id).name} ${quantity}개는 구매 목록에 없어요.`);
+  }
+  const choice = session.learning.choiceTask;
+  if (choice) {
+    const chosen = Object.entries(session.cart).filter(([id]) => isChoiceProduct(session, id));
+    const count = chosen.reduce((sum, [, quantity]) => sum + quantity, 0);
+    const total = chosen.reduce((sum, [id, quantity]) => sum + productOrThrow(id).price * quantity, 0);
+    if (count !== choice.quantity) details.push('직접 고르는 음료는 ' + choice.quantity + '개예요. 담은 수량은 ' + count + '개예요.');
+    if (total > choice.budget) details.push('직접 고르는 음료의 예산은 ' + choice.budget.toLocaleString('ko-KR') + '원이에요. 가격표를 보고 다시 골라 주세요.');
   }
   return { success: details.length === 0, details };
 }
@@ -239,6 +325,13 @@ function pointIsFree(session: MarketSession, point: Point) {
   return !isMarketEnvironmentBlocked(session.environment, point, session.cashierAvailability);
 }
 
+function isConstructionBlocked(session: MarketSession, point: Point | undefined) {
+  if (!point) return false;
+  const radius = MARKET_ENVIRONMENT_PLAYER_RADIUS;
+  return session.environment.constructionZones.some(({ rect }) => point.x + radius > rect.x && point.x - radius < rect.x + rect.width
+    && point.y + radius > rect.y && point.y - radius < rect.y + rect.height);
+}
+
 function soundEntranceAlarm(session: MarketSession, trigger: 'boundary-crossed', at?: string, gateId = 'entrance') {
   if (!session.alarmArmed) return;
   session.alarmArmed = false;
@@ -251,6 +344,24 @@ function soundEntranceAlarm(session: MarketSession, trigger: 'boundary-crossed',
   record(session, 'entrance_alarm', { trigger, gateId, delta: delta ? -delta : 0, configuredPenalty: session.config.alarmPenaltyPoints,
     score: session.score, penaltyPoints: session.penaltyPoints, alarmCount: session.alarmCount,
     playerPosition: clone(session.playerPosition), cart: clone(session.cart) }, at);
+}
+
+function checkWrongWayEntry(session: MarketSession, previous: Point, next: Point, at?: string) {
+  const exit = session.environment.alarmGates.find(gate => gate.id === 'exit');
+  if (!exit) return;
+  if ((next[exit.axis] - getMarketWrongWayRearm(exit)) * exit.outward >= 0) session.wrongWayEntryArmed = true;
+  if (!session.wrongWayEntryArmed || !getMarketWrongWayGate(session.environment, previous, next)) return;
+  session.wrongWayEntryArmed = false;
+  const delta = Math.min(session.score, session.config.wrongWayPenaltyPoints);
+  session.score -= delta;
+  session.penaltyPoints += delta;
+  session.wrongWayEntryCount += 1;
+  const message = session.environment.config.entranceConstruction
+    ? '안쪽 입구를 이용해 주세요.' : '입구를 이용해 주세요.';
+  record(session, 'wrong_way_entry', { gateId: exit.id, trigger: 'inward-boundary-crossed',
+    delta: delta ? -delta : 0, configuredPenalty: session.config.wrongWayPenaltyPoints, message,
+    score: session.score, penaltyPoints: session.penaltyPoints, wrongWayEntryCount: session.wrongWayEntryCount,
+    playerPosition: clone(session.playerPosition), basketQuantity: Object.values(session.cart).reduce((sum, count) => sum + count, 0) }, at);
 }
 
 function checkEntranceCrossing(session: MarketSession, previous: Point, next: Point, at?: string) {
@@ -276,7 +387,7 @@ export function applyMarketAction(current: MarketSession, action: MarketAction):
   if (session.phase === 'finished' && !['rate', 'skipRating'].includes(action.type)) return reject(session, action, '이미 종료된 게임이에요.');
   if (action.type === 'giveUp') {
     session.phase = 'finished'; session.outcome = 'gave-up'; session.activeStation = null; session.view = 'world';
-    record(session, 'session_finished', { outcome: session.outcome, attempts: session.attempts, cart: clone(session.cart), reason: 'player_gave_up', score: session.score, penaltyPoints: session.penaltyPoints, alarmCount: session.alarmCount, paid: session.paid }, action.at);
+    record(session, 'session_finished', { outcome: session.outcome, attempts: session.attempts, cart: clone(session.cart), reason: 'player_gave_up', score: session.score, penaltyPoints: session.penaltyPoints, alarmCount: session.alarmCount, wrongWayEntryCount: session.wrongWayEntryCount, paid: session.paid }, action.at);
     return session;
   }
   if (action.type === 'rate' || action.type === 'skipRating') {
@@ -298,13 +409,15 @@ export function applyMarketAction(current: MarketSession, action: MarketAction):
       if (!Number.isFinite(distance) || distance > 32) return reject(session, action, '한 번에 최대 32픽셀 이동할 수 있어요.');
       for (let t = 0; t <= Math.max(1, Math.ceil(distance / 4)); t++) {
         const fraction = t / Math.max(1, Math.ceil(distance / 4));
-        if (!pointIsFree(session, { x: session.playerPosition.x + action.dx * fraction, y: session.playerPosition.y + action.dy * fraction })) return reject(session, action, '장애물이 있어 이동할 수 없어요.');
+        const step = { x: session.playerPosition.x + action.dx * fraction, y: session.playerPosition.y + action.dy * fraction };
+        if (!pointIsFree(session, step)) return reject(session, action, isConstructionBlocked(session, step) ? '안쪽 입구를 이용해 주세요.' : '장애물이 있어 이동할 수 없어요.');
       }
     }
-    if (!point || !pointIsFree(session, point)) return reject(session, action, '이동할 수 없는 위치예요.');
+    if (!point || !pointIsFree(session, point)) return reject(session, action, isConstructionBlocked(session, point) ? '안쪽 입구를 이용해 주세요.' : '이동할 수 없는 위치예요.');
     const previousPosition = session.playerPosition;
     session.playerPosition = { ...point };
     checkEntranceCrossing(session, previousPosition, point, action.at);
+    checkWrongWayEntry(session, previousPosition, point, action.at);
     if (session.activeStation && !isNearMarketStation(session.environment, session.activeStation, point, undefined, session.cashierAvailability)) { session.activeStation = null; if (session.phase === 'checkout') session.phase = 'shopping'; }
     record(session, 'player_moved', { point: clone(point), input: action.type === 'move' ? 'bounded-agent-step' : 'trusted-renderer' }, action.at);
     return session;
@@ -316,6 +429,12 @@ export function applyMarketAction(current: MarketSession, action: MarketAction):
     return session;
   }
   if (session.phase === 'feedback') return reject(session, action, '다시 시도하거나 그만하기를 선택해 주세요.');
+  if (action.type === 'viewRequester') {
+    if (session.phase !== 'shopping') return reject(session, action, '장보는 동안 부탁한 분에게 연락할 수 있어요.');
+    session.view = 'requester'; session.activeStation = null;
+    record(session, 'requester_contacted', {}, action.at);
+    return session;
+  }
   if (action.type === 'viewCart' || action.type === 'viewHelp' || action.type === 'closeView') {
     session.view = action.type === 'viewCart' ? 'cart' : action.type === 'viewHelp' ? 'help' : 'world';
     record(session, action.type === 'viewCart' ? 'cart_viewed' : action.type === 'viewHelp' ? 'help_viewed' : 'view_closed', action.type === 'viewCart' ? { cart: clone(session.cart) } : {}, action.at);
@@ -325,20 +444,95 @@ export function applyMarketAction(current: MarketSession, action: MarketAction):
   if (action.type === 'interact' || action.type === 'checkout') {
     if (session.view !== 'world') return reject(session, action, '열린 화면을 닫고 다가가 주세요.');
     const station = action.type === 'interact' ? action.station : action.checkoutId ?? 'checkout';
+    if (station === 'entrance' && session.environment.config.entranceConstruction) return reject(session, action, '안쪽 입구를 이용해 주세요.');
     if (!isNearMarketStation(session.environment, station, session.playerPosition, undefined, session.cashierAvailability)) return reject(session, action, '가까이 다가간 뒤 선택해 주세요.');
     session.activeStation = station;
-    if (station === 'checkout' || station === 'checkout-2') {
+    const kiosk = session.environment.kiosks?.find(item => item.id === station);
+    if (kiosk) {
+      session.phase = 'checkout'; session.selectedKioskId = kiosk.id;
+      session.selectedCheckoutId = kiosk.laneId; session.cashierAvailable = false;
+    } else if (station === 'checkout' || station === 'checkout-2') {
+      if (session.environment.checkouts.find(counter => counter.id === station)?.kind === 'kiosk') {
+        session.activeStation = null;
+        return reject(session, action, '무인 계산대의 키오스크를 선택해 주세요.');
+      }
+      session.selectedKioskId = null;
       session.phase = 'checkout'; session.selectedCheckoutId = station;
       session.cashierAvailable = session.cashierAvailability[station];
     }
     else session.phase = 'shopping';
     record(session, 'station_interacted', { station, playerPosition: clone(session.playerPosition) }, action.at);
+    const category = marketCategories.find(item => item.id === station);
+    if (category && !session.learning.visitedCategoryIds.includes(category.id)) session.learning.visitedCategoryIds.push(category.id);
+    const stockout = session.learning.stockout;
+    if (category && stockout && !stockout.shelfVisited && session.shelfSlots[category.id].includes(stockout.requestedProductId)) {
+      stockout.shelfVisited = true;
+      record(session, 'stockout_shelf_visited', { objectiveId: stockout.objectiveId, productId: stockout.requestedProductId, categoryId: category.id }, action.at);
+    }
     if (station === 'entrance' || station === 'exit') session.activeStation = null;
     if (station === 'common-door') {
       session.phase = 'finished'; session.outcome = 'gave-up'; session.activeStation = null; session.view = 'world';
       record(session, 'session_finished', { outcome: session.outcome, attempts: session.attempts, cart: clone(session.cart), reason: 'player_left_market', station,
-        score: session.score, penaltyPoints: session.penaltyPoints, alarmCount: session.alarmCount, paid: session.paid }, action.at);
+        score: session.score, penaltyPoints: session.penaltyPoints, alarmCount: session.alarmCount, wrongWayEntryCount: session.wrongWayEntryCount, paid: session.paid }, action.at);
     }
+    return session;
+  }
+  if (action.type === 'askLocation' || action.type === 'checkStock') {
+    const station = session.activeStation;
+    if (session.phase !== 'shopping' || session.view !== 'world' || !station?.startsWith('staff:')
+      || !isNearMarketStation(session.environment, station, session.playerPosition, undefined, session.cashierAvailability)) {
+      return reject(session, action, '매장 직원에게 다가가 대화를 연 뒤 물어봐 주세요.');
+    }
+    if (action.type === 'askLocation') {
+      const objective = session.objectives.find(item => item.id === action.objectiveId);
+      const choice = session.learning.choiceTask?.id === action.objectiveId ? session.learning.choiceTask : null;
+      if (!objective && !choice) return reject(session, action, '현재 부탁받은 물품의 위치를 물어봐 주세요.');
+      const categoryId = objective ? productOrThrow(objective.productId).categoryId : choice!.categoryId;
+      const category = marketCategories.find(item => item.id === categoryId)!;
+      record(session, 'product_location_requested', { staffStation: station, objectiveId: action.objectiveId,
+        categoryId, message: (objective?.label ?? choice!.label) + '는 ' + category.label + ' 진열대에서 살펴볼 수 있어요.' }, action.at);
+      return session;
+    }
+    const task = session.learning.stockout;
+    if (!task || task.requestedProductId !== action.productId || task.status !== 'unresolved') return reject(session, action, '확인이 필요한 품절 상품을 골라 주세요.');
+    if (!task.shelfVisited) return reject(session, action, '먼저 그 상품이 있는 진열대를 살펴봐 주세요.');
+    if (session.initialStock[action.productId] !== 0) return reject(session, action, '이 상품은 품절 확인 대상이 아니에요.');
+    task.staffChecked = true;
+    record(session, 'stock_checked', { staffStation: station, objectiveId: task.objectiveId, productId: action.productId,
+      inStock: false, substituteProductIds: compatibleSubstitutions(session).map(product => product.id),
+      message: productOrThrow(action.productId).name + '는 오늘 재고가 없어요.' }, action.at);
+    return session;
+  }
+  if (action.type === 'requestSubstitution' || action.type === 'reportUnavailable') {
+    if (session.phase !== 'shopping' || session.view !== 'requester') return reject(session, action, '부탁한 분과의 연락 화면에서 이야기해 주세요.');
+    const task = session.learning.stockout;
+    if (!task?.staffChecked || task.status !== 'unresolved') return reject(session, action, '먼저 진열대를 살펴보고 직원에게 품절인지 확인해 주세요.');
+    const policy = normalizeMarketLearningConfig(session.config.learning);
+    if (action.type === 'requestSubstitution') {
+      const product = getMarketProduct(action.productId);
+      if (!product || !compatibleSubstitutions(session).some(item => item.id === product.id)) return reject(session, action, '직원이 재고를 확인한 같은 종류의 대체 상품을 골라 주세요.');
+      if (!policy.allowSubstitution) {
+        record(session, 'substitution_declined', { objectiveId: task.objectiveId, productId: action.productId,
+          reason: 'replacement-not-allowed', message: '이번에는 원래 부탁한 상품이 필요해요. 못 산 이유를 알려 주세요.' }, action.at);
+        return session;
+      }
+      const objective = session.objectives.find(item => item.id === task.objectiveId)!;
+      const before = clone(objective);
+      Object.assign(objective, { productId: product.id, familyId: familyOf(product), label: product.name, match: 'exact' });
+      task.status = 'replacement-approved'; task.approvedProductId = product.id; task.resolutionReason = 'requester-approved-substitute';
+      record(session, 'substitution_approved', { originalObjective: before, approvedObjective: clone(objective),
+        reason: task.resolutionReason, message: product.name + ' ' + objective.quantity + '개로 바꿔서 사 와 주세요.' }, action.at);
+      return session;
+    }
+    const validReason = action.reason === 'replacement-not-allowed' ? !policy.allowSubstitution
+      : action.reason === 'no-substitute-in-stock' && policy.allowSubstitution && compatibleSubstitutions(session).length === 0;
+    if (!validReason) return reject(session, action, '직원에게 확인한 재고와 부탁한 분의 요청에 맞는 이유를 알려 주세요.');
+    const removed = session.objectives.find(item => item.id === task.objectiveId)!;
+    session.objectives = session.objectives.filter(item => item.id !== task.objectiveId);
+    task.status = 'waived'; task.resolutionReason = action.reason;
+    record(session, 'unavailable_reported', { objectiveId: task.objectiveId, removedObjective: clone(removed),
+      productId: task.requestedProductId, reason: action.reason,
+      message: '못 산 이유를 알려 줘서 고마워요. ' + removed.label + '는 이번 목록에서 빼도 괜찮아요.' }, action.at);
     return session;
   }
   if (action.type === 'requestCashier') {
@@ -346,7 +540,7 @@ export function applyMarketAction(current: MarketSession, action: MarketAction):
     if (session.phase !== 'shopping' || session.view !== 'world' || !staffStation?.startsWith('staff:') || !isNearMarketStation(session.environment, staffStation, session.playerPosition, undefined, session.cashierAvailability)) return reject(session, action, '종업원에게 다가가 대화를 연 뒤 계산을 요청해 주세요.');
     if (action.checkoutId !== undefined && !session.environment.checkouts.some(checkout => checkout.id === action.checkoutId)) return reject(session, action, '등록되지 않은 계산대예요.');
     const legacyRequest = action.checkoutId === undefined ? {} : { legacyRequestedCheckoutId: action.checkoutId };
-    const availableCheckoutIds = session.environment.checkouts.filter(checkout => session.cashierAvailability[checkout.id]).map(checkout => checkout.id);
+    const availableCheckoutIds = session.environment.checkouts.filter(checkout => checkout.kind !== 'kiosk' && session.cashierAvailability[checkout.id]).map(checkout => checkout.id);
     if (availableCheckoutIds.length > 0) {
       const deduction = Math.min(session.score, session.config.cashierRequestPenaltyPoints);
       session.score -= deduction;
@@ -360,12 +554,13 @@ export function applyMarketAction(current: MarketSession, action: MarketAction):
       return session;
     }
     // One request recruits one attendant only when the whole checkout area is unstaffed.
-    const checkoutId = 'checkout';
+    const checkoutId = session.environment.checkouts.find(checkout => checkout.kind !== 'kiosk')?.id;
+    if (!checkoutId) return reject(session, action, '이 매장에는 유인 계산대가 없어요. 키오스크를 이용해 주세요.');
     session.cashierAvailability[checkoutId] = true;
     session.selectedCheckoutId = checkoutId;
     session.cashierAvailable = true;
     record(session, 'cashier_requested', { staffStation, checkoutId, ...legacyRequest,
-      message: '1번 계산대로 와 주세요. 계산을 도와드릴게요.', playerPosition: clone(session.playerPosition) }, action.at);
+      message: (checkoutId === 'checkout' ? '1번' : '2번') + ' 계산대로 와 주세요. 계산을 도와드릴게요.', playerPosition: clone(session.playerPosition) }, action.at);
     return session;
   }
   if (action.type === 'add' || action.type === 'remove' || action.type === 'requestReturn') {
@@ -403,17 +598,30 @@ export function applyMarketAction(current: MarketSession, action: MarketAction):
     }, action.at);
     return session;
   }
-  if (action.type === 'submit') {
-    const checkoutId = session.activeStation;
-    if (session.phase !== 'checkout' || (checkoutId !== 'checkout' && checkoutId !== 'checkout-2') || !isNearMarketStation(session.environment, checkoutId, session.playerPosition, undefined, session.cashierAvailability)) return reject(session, action, '계산대에서 최종 구매를 결정해 주세요.');
-    if (!session.cashierAvailability[checkoutId]) return reject(session, action, '계산원이 있는 계산대를 이용해 주세요. 두 곳 모두 비어 있으면 매장 직원에게 계산을 부탁해요.');
+  if (action.type === 'submit' || action.type === 'submitKiosk') {
+    const station = session.activeStation;
+    const kiosk = session.environment.kiosks?.find(item => item.id === station);
+    const checkoutId = kiosk?.laneId ?? station as MarketCheckoutId;
+    if (session.phase !== 'checkout' || !station || !isNearMarketStation(session.environment, station, session.playerPosition, undefined, session.cashierAvailability)) return reject(session, action, '계산대에서 최종 구매를 결정해 주세요.');
+    if (action.type === 'submitKiosk') {
+      if (!kiosk) return reject(session, action, '키오스크에서 구매를 결정해 주세요.');
+      const scanned = action.scannedCart;
+      if (!scanned || typeof scanned !== 'object' || Array.isArray(scanned)
+        || Object.entries(scanned).some(([id, count]) => !getMarketProduct(id) || !Number.isInteger(count) || count < 1 || count !== session.cart[id])
+        || Object.entries(session.cart).some(([id, count]) => count !== scanned[id])) return reject(session, action, '담은 물건을 모두 스캔했는지 확인해 주세요.');
+      record(session, 'kiosk_scan_confirmed', { kioskId: kiosk.id, checkoutId, scannedCart: clone(scanned) }, action.at);
+    } else {
+      if (kiosk || (checkoutId !== 'checkout' && checkoutId !== 'checkout-2')
+        || session.environment.checkouts.find(counter => counter.id === checkoutId)?.kind === 'kiosk') return reject(session, action, '유인 계산대에서 구매를 결정해 주세요.');
+      if (!session.cashierAvailability[checkoutId]) return reject(session, action, '계산원이 있는 계산대를 이용해 주세요. 유인 계산대가 비어 있으면 매장 직원에게 계산을 부탁해요.');
+    }
     session.attempts += 1;
     const evaluation = evaluate(session);
     session.feedback = { success: evaluation.success, ...(session.attempts >= 2 && !evaluation.success ? { details: evaluation.details } : {}) };
     session.phase = evaluation.success ? 'finished' : 'feedback';
     if (evaluation.success) { session.outcome = 'success'; session.paid = true; }
-    record(session, 'purchase_submitted', { checkoutId, attempt: session.attempts, cart: clone(session.cart), evaluation, shownFeedback: clone(session.feedback) }, action.at);
-    if (evaluation.success) record(session, 'session_finished', { outcome: session.outcome, attempts: session.attempts, cart: clone(session.cart), score: session.score, penaltyPoints: session.penaltyPoints, alarmCount: session.alarmCount, paid: session.paid }, action.at);
+    record(session, 'purchase_submitted', { checkoutId, ...(kiosk ? { kioskId: kiosk.id } : {}), attempt: session.attempts, cart: clone(session.cart), evaluation, shownFeedback: clone(session.feedback) }, action.at);
+    if (evaluation.success) record(session, 'session_finished', { outcome: session.outcome, attempts: session.attempts, cart: clone(session.cart), score: session.score, penaltyPoints: session.penaltyPoints, alarmCount: session.alarmCount, wrongWayEntryCount: session.wrongWayEntryCount, paid: session.paid }, action.at);
     return session;
   }
   return reject(session, action, '알 수 없는 행동이에요.');
@@ -435,6 +643,20 @@ export function getMarketObservation(session: MarketSession) {
       checkoutIds: lastEvent.type === 'cashier_requested' ? [lastEvent.payload.checkoutId as MarketCheckoutId] : lastEvent.payload.availableCheckoutIds as MarketCheckoutId[],
       penaltyPoints: lastEvent.type === 'cashier_request_declined' ? -Number(lastEvent.payload.delta) : 0,
     } : null;
+  const staffLearningFeedback = staffConversation && lastEvent
+    && (lastEvent.type === 'product_location_requested' || lastEvent.type === 'stock_checked') ? {
+      kind: lastEvent.type, message: String(lastEvent.payload.message),
+      ...(lastEvent.type === 'product_location_requested' ? { categoryId: lastEvent.payload.categoryId as MarketCategoryId }
+        : { productId: String(lastEvent.payload.productId), inStock: false }),
+    } : null;
+  const task = session.learning.stockout;
+  const canResolve = session.view === 'requester' && task?.staffChecked && task.status === 'unresolved';
+  const allowSubstitution = normalizeMarketLearningConfig(session.config.learning).allowSubstitution;
+  const requesterOptions = session.view === 'requester' ? {
+    substitutions: getAvailableSubstitutions(session).map(product => ({ id: product.id, name: product.name, detail: product.detail })),
+    unavailableReasons: canResolve ? (!allowSubstitution ? ['replacement-not-allowed']
+      : compatibleSubstitutions(session).length === 0 ? ['no-substitute-in-stock'] : []) as MarketUnavailableReason[] : [],
+  } : null;
   return clone({
     schemaVersion: 1, sessionId: session.id, seed: session.config.seed, phase: session.phase, view: session.view,
     objectives: session.objectives.map(({ id, label, quantity, match }) => ({ id, label, quantity, match })),
@@ -443,8 +665,11 @@ export function getMarketObservation(session: MarketSession) {
       const product = productOrThrow(id); return { id, categoryId: product.categoryId, name: product.name, detail: product.detail, price: product.price };
     }),
     stock: Object.fromEntries(visibleProductIds.map((id) => [id, session.stock[id]])), cart: cartVisible ? session.cart : null, cashierAvailable: session.cashierAvailable,
-    cashierAvailability: session.cashierAvailability, selectedCheckoutId: session.selectedCheckoutId, cashierRequestFeedback,
-    score: session.score, penaltyPoints: session.penaltyPoints, alarmCount: session.alarmCount, alarmArmed: session.alarmArmed, paid: session.paid,
+    cashierAvailability: session.cashierAvailability, selectedCheckoutId: session.selectedCheckoutId, cashierRequestFeedback, staffLearningFeedback, requesterOptions,
+    score: session.score, penaltyPoints: session.penaltyPoints, alarmCount: session.alarmCount, alarmArmed: session.alarmArmed, wrongWayEntryCount: session.wrongWayEntryCount, wrongWayEntryArmed: session.wrongWayEntryArmed, paid: session.paid,
+    selectedKioskId: session.selectedKioskId,
+    learning: { stockout: getStockoutStatus(session), choiceTask: session.learning.choiceTask,
+      visitedCategoryIds: session.learning.visitedCategoryIds },
     attempts: session.attempts, feedback: session.feedback, outcome: session.outcome,
     ratings: session.ratings, ratingSkipped: session.ratingSkipped, lastActionError: session.lastActionError,
   });
@@ -456,9 +681,9 @@ export function exportMarketEpisode(session: MarketSession) {
   return clone({ schema: 'oneuldo.market.episode', version: 1, sessionId: session.id, seed: session.config.seed,
     provenance: session.config.provenance, syntheticDataIsNotClinicalEvidence: session.config.provenance.source === 'synthetic',
     config: session.config, environment: session.environment, objectives: session.objectives, shelfSlots: session.shelfSlots,
-    initialStock: session.initialStock, finalStock: session.stock, finalCart: session.cart,
+    initialStock: session.initialStock, finalStock: session.stock, finalCart: session.cart, learning: session.learning, selectedKioskId: session.selectedKioskId,
     cashierAvailability: session.cashierAvailability, selectedCheckoutId: session.selectedCheckoutId,
-    score: session.score, penaltyPoints: session.penaltyPoints, alarmCount: session.alarmCount, paid: session.paid,
+    score: session.score, penaltyPoints: session.penaltyPoints, alarmCount: session.alarmCount, wrongWayEntryCount: session.wrongWayEntryCount, paid: session.paid,
     attempts: session.attempts, outcome: session.outcome, ratings: session.ratings, ratingSkipped: session.ratingSkipped, events: session.events,
   });
 }

@@ -20,12 +20,14 @@ export function getMarketRenderDepth(groundY: number) { return 10 + Math.round(g
 
 export type MarketCount = number | { min: number; max: number };
 export type MarketCheckoutId = 'checkout' | 'checkout-2';
+export type MarketKioskId = `kiosk:${MarketCheckoutId}:${1 | 2}`;
+export type MarketKioskLane = 'none' | MarketCheckoutId | 'random';
 export type MarketCashierAvailability = Record<MarketCheckoutId, boolean>;
-export type MarketEnvironmentStationId = MarketCategoryId | MarketCheckoutId | 'entrance' | 'exit' | 'common-door' | `staff:${string}`;
+export type MarketEnvironmentStationId = MarketCategoryId | MarketCheckoutId | MarketKioskId | 'entrance' | 'exit' | 'common-door' | `staff:${string}`;
 export type MarketEnvironmentConfig = {
   /** Older configuration JSON omits this field and keeps the classic floor plan. */
   layoutId?: MarketLayoutId;
-  /** Close only the inner entrance; the outer common door and detour gates remain open. */
+  /** Close the front entrance; the common door and inner side entrance remain open. */
   entranceConstruction?: boolean;
   seed: string | number;
   employeeCount: MarketCount;
@@ -33,7 +35,10 @@ export type MarketEnvironmentConfig = {
   pillarCount: MarketCount;
   chairCount: MarketCount;
   cashierCount: 0 | 1 | 2 | 'random';
+  /** Legacy switch: true replaces lane 2; no decorative kiosk is generated. */
   kioskPresent: boolean | 'random';
+  /** One entire checkout lane may hold two working self-checkout terminals. */
+  kioskLane?: MarketKioskLane;
   /** Top left/right, middle left/center/right. Four-category legacy orders insert household in the middle left. */
   shelfOrder?: readonly MarketCategoryId[] | 'random';
   /** Optional candidate pools, restricted to the safe slots exported below. */
@@ -53,12 +58,14 @@ export type MarketEnvironmentObject = {
 };
 export type MarketShelfPlacement = Rect & { slotId: string; point: Point; orientation: 'horizontal' | 'vertical' };
 export type MarketCheckoutPlacement = {
+  kind?: 'staffed' | 'kiosk';
   id: MarketCheckoutId; rect: Rect; point: Point; cashierPresent: boolean; cashierPoint: Point; cashierCollider: Rect;
   cashierAppearance?: number;
 };
+export type MarketKioskPlacement = { id: MarketKioskId; laneId: MarketCheckoutId; number: 1 | 2; rect: Rect; point: Point };
 export type MarketStationDetail = {
   id: MarketEnvironmentStationId;
-  kind: 'shelf' | 'employee' | 'checkout' | 'entrance' | 'exit' | 'common-door';
+  kind: 'shelf' | 'employee' | 'checkout' | 'kiosk' | 'entrance' | 'exit' | 'common-door';
   point: Point;
   categoryId?: MarketCategoryId;
   /** A closed construction entrance remains visible in observations but cannot be approached/interacted with. */
@@ -84,6 +91,7 @@ export type MarketEnvironment = {
   /** First checkout alias retained for previous renderers and episode readers. */
   checkout: MarketCheckoutPlacement;
   checkouts: MarketCheckoutPlacement[];
+  kiosks: MarketKioskPlacement[];
   world: { width: number; height: number };
   walkableAreas: Array<Rect & { id: string }>;
   walls: Rect[];
@@ -394,7 +402,7 @@ function makePeople(kind: MarketPerson['kind'], slots: PersonSlot[], appearanceR
 
 export function createMarketEnvironment(overrides: Partial<MarketEnvironmentConfig> = {}): MarketEnvironment {
   const knownKeys = ['layoutId', 'entranceConstruction', 'seed', 'employeeCount', 'customerCount', 'pillarCount', 'chairCount', 'cashierCount',
-    'kioskPresent', 'shelfOrder', 'employeeSlotIds', 'customerSlotIds', 'pillarSlotIds', 'chairSlotIds'];
+    'kioskPresent', 'kioskLane', 'shelfOrder', 'employeeSlotIds', 'customerSlotIds', 'pillarSlotIds', 'chairSlotIds'];
   if (!overrides || typeof overrides !== 'object' || Array.isArray(overrides) ||
     Object.keys(overrides).some((key) => !knownKeys.includes(key))) throw new Error('알 수 없는 마트 환경 변수입니다.');
   const config: MarketEnvironmentConfig = { ...DEFAULT_MARKET_ENVIRONMENT_CONFIG, ...overrides };
@@ -409,6 +417,7 @@ export function createMarketEnvironment(overrides: Partial<MarketEnvironmentConf
     (typeof config.seed === 'number' && !Number.isFinite(config.seed))) throw new Error('seed를 지정하세요.');
   if (![0, 1, 2, 'random'].includes(config.cashierCount)) throw new Error('cashierCount는 0, 1, 2, random 중 하나입니다.');
   if (![true, false, 'random'].includes(config.kioskPresent)) throw new Error('kioskPresent는 true, false, random 중 하나입니다.');
+  if (config.kioskLane !== undefined && !['none', 'checkout', 'checkout-2', 'random'].includes(config.kioskLane)) throw new Error('kioskLane은 none, checkout, checkout-2, random 중 하나입니다.');
   if (config.shelfOrder !== 'random') {
     const order = config.shelfOrder;
     if (!Array.isArray(order) || ![4, 5].includes(order.length) || new Set(order).size !== order.length ||
@@ -446,22 +455,32 @@ export function createMarketEnvironment(overrides: Partial<MarketEnvironmentConf
       drawCount(config.pillarCount, 'pillarCount', 0, 4, random), 'pillarSlotIds', random)
       .map((slot, index) => ({ id: `pillar-${index + 1}`, kind: 'pillar' as const, slotId: slot.id, rect: { ...slot.rect } })),
   ];
-  const cashierCount = config.cashierCount === 'random' ? Math.floor(random() * 3) : config.cashierCount;
-  const staffedIndexes = shuffle([0, 1], random).slice(0, cashierCount);
+  const kioskRandom = createMarketRandom(`${config.seed}:kiosk-lane:v1`);
+  const requestedLane = config.kioskLane ?? (config.kioskPresent === 'random' ? 'random' : config.kioskPresent ? 'checkout-2' : 'none');
+  const kioskLane: MarketCheckoutId | 'none' = requestedLane === 'random'
+    ? (kioskRandom() < 0.5 ? 'none' : kioskRandom() < 0.5 ? 'checkout' : 'checkout-2') : requestedLane;
+  const staffedPool = [0, 1].filter(index => structure.checkouts[index].id !== kioskLane);
+  const cashierCount = config.cashierCount === 'random' ? Math.floor(random() * (staffedPool.length + 1)) : Math.min(config.cashierCount, staffedPool.length);
+  const staffedIndexes = shuffle(staffedPool, random).slice(0, cashierCount);
   // Use a separate random stream so new art never changes existing floor layouts.
   const cashierAppearances = shuffle(MARKET_EMPLOYEE_APPEARANCES.map((_, index) => index),
     createMarketRandom(`${config.seed}:cashier-appearance:v1`))
     .sort((a, b) => Number(employees.some(person => person.appearance === a)) - Number(employees.some(person => person.appearance === b)));
   const checkouts: MarketCheckoutPlacement[] = structure.checkouts.map((counter, index) => ({
-    ...counter, rect: { ...counter.rect }, point: { ...counter.point }, cashierPoint: { ...counter.cashierPoint },
+    ...counter, kind: counter.id === kioskLane ? 'kiosk' : 'staffed', rect: { ...counter.rect }, point: { ...counter.point }, cashierPoint: { ...counter.cashierPoint },
     cashierCollider: getMarketPersonCollider(counter.cashierPoint, 'employee', cashierAppearances[index]),
     cashierPresent: staffedIndexes.includes(index), cashierAppearance: cashierAppearances[index],
   }));
-  const kioskPresent = config.kioskPresent === 'random' ? random() < 0.5 : config.kioskPresent;
-  if (kioskPresent) objects.push({ id: 'kiosk-1', kind: 'kiosk', slotId: structure.kiosk.id, rect: { ...structure.kiosk.rect } });
+  const kiosks: MarketKioskPlacement[] = checkouts.filter(counter => counter.kind === 'kiosk').flatMap(counter =>
+    ([1, 2] as const).map((number) => {
+      const rect = { x: counter.rect.x, y: counter.rect.y + (number - 1) * 77, width: counter.rect.width, height: 40 };
+      return { id: `kiosk:${counter.id}:${number}` as MarketKioskId, laneId: counter.id, number, rect,
+        point: { x: counter.point.x, y: rect.y + rect.height / 2 } };
+    }));
   const stationDetails: MarketStationDetail[] = [
     ...CATEGORY_IDS.map((categoryId) => ({ id: categoryId, kind: 'shelf' as const, categoryId, point: shelves[categoryId].point })),
-    ...checkouts.map(checkout => ({ id: checkout.id, kind: 'checkout' as const, point: { ...checkout.point } })),
+    ...checkouts.filter(checkout => checkout.kind !== 'kiosk').map(checkout => ({ id: checkout.id, kind: 'checkout' as const, point: { ...checkout.point } })),
+    ...kiosks.map(kiosk => ({ id: kiosk.id, kind: 'kiosk' as const, point: { ...kiosk.point } })),
     { id: 'entrance', kind: 'entrance', point: { ...structure.entrance.point }, available: !config.entranceConstruction },
     { id: 'exit', kind: 'exit', point: { ...structure.exitPoint } },
     { id: 'common-door', kind: 'common-door', point: { ...structure.commonDoor.point } },
@@ -472,7 +491,7 @@ export function createMarketEnvironment(overrides: Partial<MarketEnvironmentConf
   const constructionZones: MarketConstructionZone[] = config.entranceConstruction ? [{
     id: 'entrance-construction', gateId: 'entrance',
     rect: { x: structure.entrance.gate.x, y: structure.entrance.alarmBoundaryY - 25, width: structure.entrance.gate.width, height: 50 },
-    detourGateIds: structure.alarmGates.filter(gate => gate.id !== 'entrance').map(gate => gate.id),
+    detourGateIds: structure.alarmGates.filter(gate => gate.id !== 'entrance' && gate.id !== 'exit').map(gate => gate.id),
   }] : [];
   const elevatorFacade = getMarketElevatorFacadeRect(objects, structure.walls);
   // The facade replaces its contained door/backing-wall colliders, keeping the obstacle map disjoint.
@@ -482,17 +501,39 @@ export function createMarketEnvironment(overrides: Partial<MarketEnvironmentConf
     schemaVersion: 1, layoutVersion: 3, seed: String(config.seed), config: JSON.parse(JSON.stringify(config)) as MarketEnvironmentConfig,
     shelves, stationDetails, stations: Object.fromEntries(stationDetails.map(({ id, point }) => [id, point])) as MarketEnvironment['stations'],
     employees, customers, objects,
-    checkout: checkouts[0], checkouts, world: { ...structure.world },
+    checkout: checkouts[0], checkouts, kiosks, world: { ...structure.world },
     walkableAreas: structure.walkableAreas.map(area => ({ ...area })), walls: structure.walls.map(rect => ({ ...rect })),
     entrance: { ...structure.entrance, point: { ...structure.entrance.point }, gate: { ...structure.entrance.gate } },
     alarmGates: structure.alarmGates.map(gate => ({ ...gate, gate: { ...gate.gate } })), constructionZones,
     commonDoor: { point: { ...structure.commonDoor.point }, gate: { ...structure.commonDoor.gate } },
-    obstacles: [...constructionZones.map(zone => zone.rect), ...structure.walls.filter(wall => !insideFacade(wall)), ...(elevatorFacade ? [elevatorFacade] : []), ...checkouts.map(checkout => checkout.rect), ...Object.values(shelves).flatMap(getMarketShelfUnitRects), ...employees.map((person) => person.collider),
+    obstacles: [...constructionZones.map(zone => zone.rect), ...structure.walls.filter(wall => !insideFacade(wall)), ...(elevatorFacade ? [elevatorFacade] : []), ...checkouts.filter(checkout => checkout.kind !== 'kiosk').map(checkout => checkout.rect), ...kiosks.map(kiosk => kiosk.rect), ...Object.values(shelves).flatMap(getMarketShelfUnitRects), ...employees.map((person) => person.collider),
       ...customers.map((person) => person.collider), ...objects.filter(object => object.kind !== 'elevator' || !insideFacade(object.rect)).map((object) => object.rect),
       ...checkouts.filter(checkout => checkout.cashierPresent).map(checkout => checkout.cashierCollider)].map((rect) => ({ x: rect.x, y: rect.y, width: rect.width, height: rect.height })),
     spawn: { ...structure.spawn }, exit: { ...structure.commonDoor.point },
   };
   return environment;
+}
+
+/** Exact directional crossing, independent of world axis and outward sign. */
+export function crossesMarketGate(gate: MarketAlarmGate, previous: Point, next: Point, direction: 'inward' | 'outward') {
+  const side = (point: Point) => { const value = (point[gate.axis] - gate.boundary) * gate.outward; return Math.abs(value) < 1e-7 ? 0 : value; };
+  const before = side(previous);
+  const after = side(next);
+  const crossed = direction === 'inward' ? (before > 0 && after <= 0) || (before === 0 && after < 0)
+    : (before < 0 && after >= 0) || (before === 0 && after > 0);
+  if (!crossed || previous[gate.axis] === next[gate.axis]) return false;
+  const fraction = (gate.boundary - previous[gate.axis]) / (next[gate.axis] - previous[gate.axis]);
+  const other = gate.axis === 'x' ? 'y' : 'x';
+  const crossing = previous[other] + (next[other] - previous[other]) * fraction;
+  const start = gate.gate[other], length = gate.axis === 'x' ? gate.gate.height : gate.gate.width;
+  return crossing >= start && crossing <= start + length;
+}
+export function getMarketWrongWayGate(environment: MarketEnvironment, previous: Point, next: Point) {
+  return environment.alarmGates.find(gate => gate.id === 'exit' && crossesMarketGate(gate, previous, next, 'inward')) ?? null;
+}
+/** A full step into the public corridor rearms entry-direction feedback, never a threshold jitter. */
+export function getMarketWrongWayRearm(gate: MarketAlarmGate) {
+  return gate.boundary + gate.outward * Math.max(40, Math.abs(gate.boundary - gate.rearm));
 }
 
 export function getMarketEnvironmentObstacles(environment: MarketEnvironment, cashierCalled: boolean | Partial<MarketCashierAvailability> = false): Rect[] {
@@ -503,7 +544,7 @@ export function getMarketEnvironmentObstacles(environment: MarketEnvironment, ca
   const missingConstruction = (environment.constructionZones ?? []).map(zone => zone.rect)
     .filter(rect => !environment.obstacles.some(obstacle => sameRect(rect, obstacle)));
   return [...environment.obstacles, ...missingFacade, ...missingConstruction, ...environment.checkouts.filter(checkout =>
-    availability[checkout.id] && !checkout.cashierPresent).map(checkout => checkout.cashierCollider)];
+    checkout.kind !== 'kiosk' && availability[checkout.id] && !checkout.cashierPresent).map(checkout => checkout.cashierCollider)];
 }
 export function isMarketEnvironmentBlocked(environment: MarketEnvironment, point: Point, cashierCalled: boolean | Partial<MarketCashierAvailability> = false) {
   const radius = MARKET_ENVIRONMENT_PLAYER_RADIUS;
@@ -538,7 +579,7 @@ function clearInteractionLine(environment: MarketEnvironment, from: Point, to: P
 }
 function stationReach(environment: MarketEnvironment, stationId: MarketEnvironmentStationId, maximum = MARKET_ENVIRONMENT_INTERACTION_DISTANCE) {
   const kind = environment.stationDetails.find(station => station.id === stationId)?.kind;
-  return Math.min(maximum, kind === 'shelf' ? 64 : kind === 'checkout' ? 60 : kind === 'common-door' ? 56 : 88);
+  return Math.min(maximum, kind === 'shelf' ? 64 : (kind === 'checkout' || kind === 'kiosk') ? 60 : kind === 'common-door' ? 56 : 88);
 }
 /** Distance to the nearest accessible ground surface; approach anchors are only navigation hints. */
 export function getMarketStationDistance(environment: MarketEnvironment, stationId: MarketEnvironmentStationId, position: Point,
@@ -552,8 +593,10 @@ export function getMarketStationDistance(environment: MarketEnvironment, station
       return clearInteractionLine(environment, position, target, units, cashierCalled) ? Math.hypot(position.x - target.x, position.y - target.y) : Infinity;
     }));
   }
-  if (station.kind === 'checkout') {
-    const checkout = environment.checkouts.find(counter => counter.id === stationId)!;
+  if (station.kind === 'checkout' || station.kind === 'kiosk') {
+    const checkout = station.kind === 'kiosk' ? environment.kiosks?.find(kiosk => kiosk.id === stationId)
+      : environment.checkouts.find(counter => counter.id === stationId);
+    if (!checkout) return Infinity;
     const rect = checkout.rect;
     // Both lanes have staff on the left and the customer/payment aisle on the right.
     if (position.x < rect.x + rect.width + MARKET_ENVIRONMENT_PLAYER_RADIUS || position.y < rect.y - 20 || position.y > rect.y + rect.height + 20) return Infinity;
@@ -584,7 +627,8 @@ export function getMarketStationApproachPoint(environment: MarketEnvironment, st
   cashierCalled: boolean | Partial<MarketCashierAvailability> = false): Point | null {
   const station = environment.stationDetails.find(detail => detail.id === stationId);
   if (!station || station.available === false) return null;
-  if (isNearMarketStation(environment, stationId, position, undefined, cashierCalled)) return { ...position };
+  // Being within reach is not enough when a neighbouring fixture owns the action button.
+  if (getNearestMarketStation(environment, position, cashierCalled)?.id === stationId) return { ...position };
   const candidates: Point[] = [{ ...station.point }];
   const padding = MARKET_ENVIRONMENT_PLAYER_RADIUS + 10;
   const addRectEdges = (rect: Rect, rightOnly = false) => {
@@ -598,7 +642,12 @@ export function getMarketStationApproachPoint(environment: MarketEnvironment, st
   };
   if (station.kind === 'shelf' && station.categoryId) getMarketShelfUnitRects(environment.shelves[station.categoryId]).forEach(rect => addRectEdges(rect));
   else if (station.kind === 'checkout') addRectEdges(environment.checkouts.find(counter => counter.id === stationId)!.rect, true);
+  else if (station.kind === 'kiosk') { const kiosk = environment.kiosks?.find(item => item.id === stationId); if (kiosk) addRectEdges(kiosk.rect, true); }
   else if (station.kind === 'employee') addRectEdges(environment.employees.find(person => stationId === 'staff:' + person.id)!.collider);
-  return candidates.filter(point => isNearMarketStation(environment, stationId, point, undefined, cashierCalled))
+  const reachable = candidates.filter(point => isNearMarketStation(environment, stationId, point, undefined, cashierCalled));
+  // Prefer a free face where the requested person/fixture is also the selected action.
+  // This keeps touch navigation and the automatic HUD target consistent in both maps.
+  const unambiguous = reachable.filter(point => getNearestMarketStation(environment, point, cashierCalled)?.id === stationId);
+  return (unambiguous.length ? unambiguous : reachable)
     .sort((a, b) => Math.hypot(a.x - position.x, a.y - position.y) - Math.hypot(b.x - position.x, b.y - position.y))[0] ?? null;
 }

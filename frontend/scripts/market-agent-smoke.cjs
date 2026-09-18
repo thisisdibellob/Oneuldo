@@ -17,11 +17,15 @@ require.extensions['.ts'] = (module, filename) => {
 };
 
 const { createMarketAgentAdapter } = require('../src/game/marketSession.ts');
+const { normalizeMarketLearningConfig } = require('../src/game/marketLearning.ts');
 const { isMarketEnvironmentBlocked, isNearMarketStation } = require('../src/game/marketEnvironment.ts');
 const args = process.argv.slice(2);
 const option = (name) => { const index = args.indexOf(name); if (index >= 0 && !args[index + 1]) throw new Error(`${name} requires a path.`); return index < 0 ? undefined : args[index + 1]; };
 const configPath = option('--config') || path.resolve(__dirname, '../docs/market-environment.example.json');
 const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+const learning = normalizeMarketLearningConfig(config.learning);
+assert.ok(!learning.stockoutEnabled && !learning.budgetChoiceEnabled,
+  'This fixed-list smoke policy requires learning.stockoutEnabled:false and learning.budgetChoiceEnabled:false. The exception/choice/kiosk flow is covered by __tests__/marketLearning.test.ts.');
 const adapter = createMarketAgentAdapter(config);
 
 function act(action) {
