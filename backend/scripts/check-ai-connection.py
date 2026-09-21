@@ -40,36 +40,41 @@ def classify(code, metrics, body, endpoint):
     return "HTTP_" + str(status)
 
 
-def probe(base, endpoint):
-    fields = ("http_code", "remote_ip", "time_namelookup", "time_connect", "time_appconnect", "time_total")
+def probe(base, endpoint, direct=False):
+    fields = ("http_code", "remote_ip", "remote_port", "local_ip", "local_port", "time_namelookup", "time_connect", "time_appconnect", "time_total")
     template = "\nONEULDO_METRICS\n" + "\n".join(n + "=%{" + n + "}" for n in fields)
+    started_at = datetime.now(timezone.utc).isoformat()
     started = time.monotonic()
     try:
         # -q first disables personal curl configuration; no redirects or insecure TLS.
-        result = subprocess.run(["curl", "-q", "--silent", "--show-error", "--connect-timeout", "6",
+        command = ["curl", "-q"] + (["--noproxy", "*", "--ipv4"] if direct else [])
+        result = subprocess.run(command + ["--silent", "--show-error", "--connect-timeout", "6",
                                  "--max-time", "12", "--max-filesize", "65536", "--write-out", template,
                                  base + endpoint], capture_output=True, text=True, timeout=15)
         body, marker, raw = result.stdout.rpartition("\nONEULDO_METRICS\n")
         metrics = dict(line.split("=", 1) for line in raw.splitlines() if "=" in line) if marker else {}
-        return {"endpoint": endpoint, "result": classify(result.returncode, metrics, body, endpoint),
+        return {"startedAt": started_at, "endedAt": datetime.now(timezone.utc).isoformat(),
+                "endpoint": endpoint, "result": classify(result.returncode, metrics, body, endpoint),
                 "curlExit": result.returncode, "metrics": metrics}
     except subprocess.TimeoutExpired:
-        return {"endpoint": endpoint, "result": "DIAGNOSTIC_TIMEOUT", "seconds": round(time.monotonic()-started, 2)}
+        return {"startedAt": started_at, "endedAt": datetime.now(timezone.utc).isoformat(),
+                "endpoint": endpoint, "result": "DIAGNOSTIC_TIMEOUT", "seconds": round(time.monotonic()-started, 2)}
 
 
 def main():
     parser = argparse.ArgumentParser(description="AI 서버 공개 연결 진단. 키·설정 파일을 읽거나 변경하지 않습니다.")
     parser.add_argument("--server", choices=SERVERS, default="school")
-    parser.add_argument("--attempts", type=int, choices=range(1, 4), default=2)
+    parser.add_argument("--attempts", type=int, choices=range(1, 11), default=2)
+    parser.add_argument("--direct", action="store_true", help="프록시를 우회하고 IPv4로 직접 연결하여 경로를 대조합니다.")
     args = parser.parse_args()
     if not shutil.which("curl"):
         raise SystemExit("curl 명령이 필요합니다.")
     failed = False
     print(json.dumps({"server": SERVERS[args.server], "startedAt": datetime.now(timezone.utc).isoformat(),
-                      "scope": "공개 HTTPS와 무인증 차단 검사. 개인 키 유효성·Ollama 추론은 검사하지 않습니다."}, ensure_ascii=False), flush=True)
+                      "directIpv4": args.direct, "scope": "공개 HTTPS와 무인증 차단 검사. 개인 키 유효성·Ollama 추론은 검사하지 않습니다."}, ensure_ascii=False), flush=True)
     for attempt in range(1, args.attempts + 1):
         for endpoint in ("/healthz", "/api/tags"):
-            result = probe(SERVERS[args.server], endpoint)
+            result = probe(SERVERS[args.server], endpoint, args.direct)
             result["attempt"] = attempt
             failed |= result["result"] not in ("GATEWAY_UP", "AUTH_REQUIRED_EXPECTED")
             print(json.dumps(result, ensure_ascii=False), flush=True)

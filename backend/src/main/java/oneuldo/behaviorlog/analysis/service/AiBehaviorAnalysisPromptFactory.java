@@ -12,7 +12,7 @@ import tools.jackson.databind.node.ObjectNode;
 /** 원본 스냅샷은 변경하지 않고 기존 판정 필드만 AI 입력에서 분리한다. */
 @Component
 public class AiBehaviorAnalysisPromptFactory {
-    public static final String VERSION = "behavior-analysis-v23-claim-evidence";
+    public static final String VERSION = "behavior-analysis-v26-claim-arrays";
     public static final String EVIDENCE_VERSION = EvidenceIndex.VERSION;
     private final ObjectMapper mapper;
     @org.springframework.beans.factory.annotation.Value("${ai.behavior-analysis.movement-max-error:0}")

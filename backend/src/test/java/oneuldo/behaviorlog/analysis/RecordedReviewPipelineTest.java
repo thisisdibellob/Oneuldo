@@ -17,11 +17,11 @@ import static org.assertj.core.api.Assertions.*;
 class RecordedReviewPipelineTest {
     @Test void full_208_event_pipeline_accepts_recorded_review_within_the_actual_context_budget() throws Exception {
         var mapper=JsonMapper.builder().findAndAddModules().build();
-        var report=mapper.readTree(Files.readString(Path.of("../output/ai-claim-evidence-2026-09-17/v10/original-208-review-3.json")));
-        var input=mapper.convertValue(report.path("input"),BehaviorAnalysisInputResponse.class);
+        var report=mapper.readTree(Files.readString(Path.of("../output/output-consistency-2026-09-18/live.json")));
+        var input=mapper.readValue(Files.readString(Path.of("../output/analysis-request-2026-09-18/input.json")),BehaviorAnalysisInputResponse.class);
         var reference=mapper.convertValue(report.path("analysis"),AiBehaviorAnalysis.class);
-        var calls=report.path("calls");
-        String recordedReview=calls.get(calls.size()-1).path("response").path("text").asString();
+        var calls=report.path("attempts");
+        String recordedReview=calls.get(calls.size()-1).path("rawOutput").asString();
         GroqChatClient replay=new GroqChatClient() {
             public GroqChatResult complete(String system,String user) {return complete(system,user,1800,0.2);}
             public GroqChatResult complete(String system,String user,int max,double temperature) {
@@ -49,6 +49,6 @@ class RecordedReviewPipelineTest {
             var step=steps.addObject();step.put("inputTokens",QwenTokenCounter.inputTokens(attempt.systemPrompt(),attempt.inputPrompt()));
             step.put("outputReserve",attempt.outputMax());step.put("review",attempt.systemPrompt().equals(AnalysisReviewPrompt.system()));
         }
-        Files.writeString(Path.of("../output/ai-claim-evidence-2026-09-17/offline-pipeline-replay.json"),mapper.writerWithDefaultPrettyPrinter().writeValueAsString(out));
+        Files.writeString(Path.of("../output/output-consistency-2026-09-18/offline-pipeline-replay.json"),mapper.writerWithDefaultPrettyPrinter().writeValueAsString(out));
     }
 }

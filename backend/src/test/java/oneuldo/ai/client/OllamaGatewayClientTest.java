@@ -46,5 +46,10 @@ class OllamaGatewayClientTest {
             assertThat(ctx).hasNotFailed();
             assertThat(ctx.getBean(OllamaProperties.class).apiKey()).isEqualTo("test-team-key");
         });
+        context.withPropertyValues("ai.behavior-analysis.request-token-budget=18000").run(ctx -> {
+            assertThat(ctx).hasFailed();
+            assertThat(ctx.getStartupFailure()).hasRootCauseMessage(
+                    "OLLAMA_ANALYSIS_BUDGET_MISMATCH: configure context/request budget together; school=18432/18000, laptop=8192/7800");
+        });
     }
 }

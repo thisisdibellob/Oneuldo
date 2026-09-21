@@ -30,6 +30,12 @@ public final class AnalysisReferences {
         if (aliases.putIfAbsent(uuid, alias) != null) throw new IllegalArgumentException("DUPLICATE_ANALYSIS_REFERENCE");
         originals.put(alias, uuid);
     }
+    /** Source events eligible for a summary's independent evidence list. */
+    public Set<String> eventIds() {
+        return originals.keySet().stream().filter(id -> id.startsWith("E"))
+                .collect(java.util.stream.Collectors.toUnmodifiableSet());
+    }
+
     /** Dataset order only. Does not evaluate the meaning of a claim or of an event. */
     public void validateEventOrder(java.util.List<String> ids) {
         int previous = 0;

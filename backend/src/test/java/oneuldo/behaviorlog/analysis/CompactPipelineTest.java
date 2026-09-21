@@ -22,6 +22,35 @@ class CompactPipelineTest {
         "p":[["F1"],"목표 확인","이동 관찰과 연결",1,2,"LOW","LOW","SIMPLIFIED",["OBSERVATION_PRACTICE"]],"c":[]}
         """;
 
+    @Test void review_retry_receives_exact_unknown_reference_and_audit_keeps_both_failures() {
+        var input=fixture.input(fixture.fixture());
+        var review=new ReviewedClaimOutputTest().envelope();
+        ((tools.jackson.databind.node.ObjectNode)review.path("analysis").path("findings").get(0)
+                .path("observation").get(1)).putArray("evidenceEventIds").add("E999");
+        var client=mock(GroqChatClient.class);
+        when(client.complete(anyString(),anyString(),anyInt(),anyDouble()))
+                .thenReturn(new GroqChatClient.GroqChatResult(finalJson,"test"))
+                .thenReturn(new GroqChatClient.GroqChatResult(review.toString(),"test"));
+        var budget=new AnalysisTokenBudget();
+        org.springframework.test.util.ReflectionTestUtils.setField(budget,"requestTokens",18000);
+        org.springframework.test.util.ReflectionTestUtils.setField(budget,"finalOutputTokens",1800);
+        var audit=new ArrayList<AiBehaviorAnalysisRun.Attempt>();
+        assertThatThrownBy(()->new TimelineAnalysisPipeline(prompts,validator,client,mapper,64,budget,new AnalysisCallPacer())
+                .withQualityReview(true).analyze(input,18000,audit)).hasMessage("INVALID_AI_ANALYSIS");
+        assertThat(audit).hasSize(3);
+        for(var attempt:audit.subList(1,3)) {
+            assertThat(attempt.validationFailure().code()).isEqualTo("UNKNOWN_REVIEW_EVIDENCE");
+            assertThat(attempt.validationFailure().path()).isEqualTo("/findings/0/observation/1");
+            assertThat(attempt.validationFailure().offendingIds()).containsExactly("E999");
+            var restored=mapper.readValue(mapper.writeValueAsString(attempt),AiBehaviorAnalysisRun.Attempt.class);
+            assertThat(restored.validationFailure()).isEqualTo(attempt.validationFailure());
+        }
+        assertThat(audit.get(2).inputPrompt()).contains("\"code\":\"UNKNOWN_REVIEW_EVIDENCE\"", "\"offendingIds\":[\"E999\"]");
+        var legacy=(tools.jackson.databind.node.ObjectNode)mapper.valueToTree(audit.get(1));
+        legacy.remove("validationFailure");
+        assertThat(mapper.convertValue(legacy,AiBehaviorAnalysisRun.Attempt.class).validationFailure()).isNull();
+    }
+
     @Test void synthesis_does_not_reattach_raw_scene_and_restores_compact_result() {
         var input=fixture.input(fixture.fixture());var refs=new AnalysisReferences(mapper,input);
         var source=input.input().sessions().getFirst().events().getFirst().behaviorLogId();

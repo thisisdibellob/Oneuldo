@@ -22,6 +22,37 @@ class ReviewEvidenceChecksTest {
     @Test void permits_no_alternative_and_unknown_motivation_without_invented_evidence() {
         assertThatCode(() -> ReviewEvidenceChecks.validate(analysis, checks("[\"E2\",\"E4\"]"), refs)).doesNotThrowAnyException();
     }
+    @Test void summary_can_cite_source_context_absent_from_findings_without_mutating_evidence() {
+        var checks=(tools.jackson.databind.node.ArrayNode)checks("[\"E2\",\"E4\"]");
+        checks.set(0,fixture.mapper.readTree("[\"/summary\",[\"E1\",\"E2\"]]"));
+        String before=analysis.toString();
+        assertThatCode(()->ReviewEvidenceChecks.validate(analysis,checks,refs)).doesNotThrowAnyException();
+        assertThat(analysis.toString()).isEqualTo(before);
+    }
+    @Test void summary_still_rejects_unknown_non_event_duplicate_and_reversed_ids() {
+        for(String evidence:java.util.List.of("[\"E999\"]","[\"S1\"]","[\"E1\",\"E1\"]","[\"E4\",\"E1\"]")) {
+            var checks=(tools.jackson.databind.node.ArrayNode)checks("[\"E2\",\"E4\"]");
+            checks.set(0,fixture.mapper.readTree("[\"/summary\","+evidence+"]"));
+            assertThatThrownBy(()->ReviewEvidenceChecks.validate(analysis,checks,refs))
+                    .isInstanceOf(IllegalArgumentException.class);
+        }
+    }
+    @Test void source_context_is_not_automatically_valid_for_a_different_finding() {
+        assertThatThrownBy(()->ReviewEvidenceChecks.validate(analysis,checks("[\"E1\",\"E2\",\"E4\"]"),refs))
+                .isInstanceOfSatisfying(ReviewEvidenceException.class,e->{
+                    assertThat(e.details().code()).isEqualTo("REVIEW_EVIDENCE_NOT_CITED");
+                    assertThat(e.details().path()).isEqualTo("/findings/0/observation");
+                    assertThat(e.details().offendingIds()).containsExactly("E1");
+                });
+    }
+    @Test void reviewing_only_one_of_two_inline_events_is_not_complete_coverage() {
+        assertThatThrownBy(()->ReviewEvidenceChecks.validate(analysis,checks("[\"E2\"]"),refs))
+                .isInstanceOfSatisfying(ReviewEvidenceException.class,e->{
+                    assertThat(e.details().code()).isEqualTo("REVIEW_OBSERVATION_NOT_COVERED");
+                    assertThat(e.details().path()).isEqualTo("/findings/0/observation");
+                    assertThat(e.details().offendingIds()).containsExactly("E4");
+                });
+    }
     @Test void accepts_unambiguous_envelope_pointers_and_removed_alternative_notes() {
         var checks=(tools.jackson.databind.node.ArrayNode)checks("[\"E2\",\"E4\"]");
         ((tools.jackson.databind.node.ArrayNode)checks.get(0)).set(0,fixture.mapper.valueToTree("/analysis/summary"));

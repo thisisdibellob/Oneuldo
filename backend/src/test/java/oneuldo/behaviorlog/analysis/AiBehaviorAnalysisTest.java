@@ -286,13 +286,27 @@ class AiBehaviorAnalysisTest {
     }
 
     private String reviewed(AiBehaviorAnalysis analysis) {
-        var tree=mapper.valueToTree(analysis);
-        ((tools.jackson.databind.node.ObjectNode)tree.path("findings").get(0)).put("observation","(E1) 수량을 1에서 2로 변경했다.");
-        return mapper.writeValueAsString(Map.of("reviewNotes",List.of(),"analysis",tree,"claimChecks",List.of(
-                List.of("/summary",List.of("E1")), List.of("/findings/0/observation",List.of("E1")),
-                List.of("/findings/0/interpretation",List.of("E1")),
-                List.of("/findings/0/alternativeExplanations/0",List.of("E1")),
-                List.of("/sessionAssessments/0/explanation",List.of("E1")))));
+        var tree=(tools.jackson.databind.node.ObjectNode)mapper.valueToTree(analysis);
+        tree.putArray("summary").add(claim(analysis.summary()));
+        for(var finding:tree.path("findings")) {
+            var f=(tools.jackson.databind.node.ObjectNode)finding;
+            f.remove("evidenceEventIds");
+            f.putArray("observation").add(claim("수량을 1에서 2로 변경했다."));
+            var interpretation=claim(f.path("interpretation").asString());
+            f.putArray("interpretation").add(interpretation);
+            var old=f.path("alternativeExplanations").deepCopy();
+            var alternatives=f.putArray("alternativeExplanations");
+            old.forEach(text->alternatives.add(claim(text.asString())));
+        }
+        for(var assessment:tree.path("sessionAssessments")) {
+            var a=(tools.jackson.databind.node.ObjectNode)assessment;
+            a.remove("evidenceEventIds");var explanation=claim(a.path("explanation").asString());
+            a.putArray("explanation").add(explanation);
+        }
+        return mapper.writeValueAsString(Map.of("reviewFormat",ReviewedClaimOutput.FORMAT,"reviewNotes",List.of(),"analysis",tree));
+    }
+    private tools.jackson.databind.JsonNode claim(String text) {
+        return mapper.valueToTree(Map.of("text",text,"evidenceEventIds",List.of("E1")));
     }
 
     @Test void 근거없는_대안을_채우지않아도_분석과_요약이_통과하고_null은_거부한다() {

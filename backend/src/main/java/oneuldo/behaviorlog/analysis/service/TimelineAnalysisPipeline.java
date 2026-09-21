@@ -20,7 +20,9 @@ public final class TimelineAnalysisPipeline {
     private String model;
     private boolean qualityReview;
     public TimelineAnalysisPipeline withQualityReview(boolean enabled) {qualityReview=enabled;return this;}
-    private int finalReserve() {return budget.finalOutputTokens() + (qualityReview ? budget.finalOutputTokens()+1500 : 0);}
+    private FinalAnalysisBudget.Estimate finalEstimate(String system,String source,AnalysisReferences refs) {
+        return FinalAnalysisBudget.estimate(mapper,budget,system,source,refs,qualityReview,RETRY);
+    }
     private boolean movementDetailLimited;
     private int completedObservations;
     private int plannedObservations;
@@ -99,17 +101,17 @@ public final class TimelineAnalysisPipeline {
     private record Group(BehaviorAnalysisInputResponse scope,AiObservationDigest digest) {}
     public AiBehaviorAnalysis analyze(BehaviorAnalysisInputResponse input,int limit,List<AiBehaviorAnalysisRun.Attempt> audit) {
         var refs=new AnalysisReferences(mapper,input);
-        // Larger context is opt-in; retain the existing 8K path for older gateways.
+        // The school profile uses larger context; explicit 8K clients retain the older path.
         if(limit>8192) {
             String source=refs.encode(prompts.wholeSourcePrompt(input));
-            if(budget.total(prompts.wholeSourceSystem(),source+RETRY,finalReserve())+200<=limit) {
+            if(finalEstimate(prompts.wholeSourceSystem(),source,refs).required()+200<=limit) {
                 AnalysisProgress.stage("FINALIZING",0,1);
                 var result=finalCall(prompts.wholeSourceSystem(),source,refs,limit,audit,raw->validator.validate(refs.read(raw),input));
                 AnalysisProgress.stage("FINALIZING",1,1);return result;
             }
         }
         String whole=refs.encode(prompts.userPrompt(input));
-        if(budget.total(prompts.systemPrompt(),whole+RETRY,finalReserve())+200<=limit) {
+        if(finalEstimate(prompts.systemPrompt(),whole,refs).required()+200<=limit) {
             AnalysisProgress.stage("FINALIZING",0,1);
             var result=finalCall(prompts.systemPrompt(),whole,refs,limit,audit,raw->validator.validate(refs.read(raw),input));
             AnalysisProgress.stage("FINALIZING",1,1);return result;
@@ -127,8 +129,10 @@ public final class TimelineAnalysisPipeline {
             AnalysisProgress.stage("FINALIZING",completedObservations,plannedObservations);
             String finalPrompt=finalPrompt(input,groups,refs);
             String finalSystem=FinalAnalysisPromptCompactor.systemPrompt();
-            log.info("AI final assembly: groups={}, reservedTokens={}, limit={}",groups.size(),budget.total(finalSystem,finalPrompt+RETRY,finalReserve()),limit);
-            if(budget.total(finalSystem,finalPrompt+RETRY,finalReserve())<=limit) {
+            var estimate=finalEstimate(finalSystem,finalPrompt,refs);
+            log.info("AI final assembly: groups={}, draftRequestBudget={}, reviewRequestEstimate={}, required={}, limit={}",
+                    groups.size(),estimate.draftRequest(),estimate.reviewRequest(),estimate.required(),limit);
+            if(estimate.required()<=limit) {
                 try {
                     return finalCall(finalSystem,finalPrompt,refs,limit,audit,
                             raw->validateFinal(refs.read(raw),input,finalPrompt));
@@ -323,15 +327,20 @@ public final class TimelineAnalysisPipeline {
                 log.info("AI analysis response: attempt={}, latencyMs={}",audit.size()+1,(System.nanoTime()-started)/1000000);
             } catch(RuntimeException failure) {
                 var transport=failure instanceof oneuldo.ai.exception.AiTransportException t?t:null;
+                var validation=failure instanceof ReviewEvidenceException e?e.details():null;
                 String error=transport!=null?transport.code().name():failure instanceof oneuldo.ai.exception.CloudAiRateLimitException?"AI_RATE_LIMITED":raw==null?"AI_UNAVAILABLE":"INVALID_AI_ANALYSIS";
                 audit.add(new AiBehaviorAnalysisRun.Attempt(audit.size()+1,submitted,raw,error,"LIVE",system,output,
                         response==null?null:response.finishReason(),response==null?null:response.inputTokens(),
                         response==null?null:response.outputTokens(),(System.nanoTime()-started)/1_000_000,
-                        transport==null?null:transport.details()));
+                        transport==null?null:transport.details(),validation));
                 if(raw==null) throw new IllegalStateException(error,failure);
                 String reason=failure.getMessage();
                 lastFailure="OUTPUT_TRUNCATED".equals(reason)?reason:"INVALID_AI_ANALYSIS";
                 correction="\n재시도: 서로 다른 관찰과 근거·불확실성을 유지하고 중복 표현을 줄이세요. JSON을 끝까지 닫으세요. 검사 오류: "+(reason!=null&&reason.matches("[A-Z0-9_:= .-]{1,120}")?reason:"INVALID_JSON_OR_CONTRACT")+". 해당 오류를 수정하고 근거 없는 내용을 추가하지 마세요.";
+                if(validation!=null) correction += "\n문장별 근거 오류: " + mapper.writeValueAsString(validation)
+                        + ". 해당 경로의 문장 객체를 원본과 대조하고 text와 evidenceEventIds를 함께 수정하세요. "
+                        + "text에 사건 ID를 쓰거나 별도 claimChecks/상위 근거 목록을 만들지 마세요. "
+                        + "순서 오류는 관찰 절 순서를 바로잡고, 무관한 사건을 추가하지 말고 수정된 전체 JSON을 반환하세요.";
                 continue;
             }
             audit.add(attempt(audit.size()+1,system,submitted,output,response,null,"LIVE"));
