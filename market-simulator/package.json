@@ -1,0 +1,15 @@
+{
+  "name": "oneuldo-market-simulator",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Offline synthetic market episodes using the application state machine",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "start": "node server.cjs",
+    "cli": "node cli.cjs",
+    "test": "node --test test/*.test.cjs",
+    "typecheck": "node ../frontend/node_modules/typescript/bin/tsc -p tsconfig.json",
+    "verify": "node scripts/verify.cjs",
+    "verify:persona": "node scripts/verify-persona.cjs"
+  }
+}

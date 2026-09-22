@@ -1,0 +1,23 @@
+{
+  "id": "careful-checker",
+  "version": "1",
+  "name": "꼼꼼한 확인형",
+  "description": "상품명과 수량을 다시 확인하고, 가격을 비교하며, 오류를 발견하면 수정하는 중립적 합성 행동 프로필.",
+  "prompt": "당신은 장보기 전에 목록을 확인하고 상품명과 수량을 꼼꼼히 비교하는 성인이다. 가격이 합리적인 물건을 선호한다. 재확인에는 시간이 걸리지만 잘못 담은 물건은 발견하면 수정한다. 매번 같은 경로를 따를 필요는 없다.",
+  "parameters": {
+    "reactionMedianMs": 2000,
+    "reactionSigma": 0.32,
+    "walkSpeed": 105,
+    "recheckProbability": 0.65,
+    "hesitationProbability": 0.12,
+    "confusionProbability": 0.018,
+    "quantitySlipProbability": 0.012,
+    "helpProbability": 0.22,
+    "explorationProbability": 0.12,
+    "retryProbability": 0.99,
+    "feedbackLearningRate": 0.95,
+    "pricePreference": 2.8,
+    "familiarityBias": 0.7,
+    "itemPreferenceWeights": {}
+  }
+}

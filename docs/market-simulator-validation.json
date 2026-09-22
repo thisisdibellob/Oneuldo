@@ -1,0 +1,560 @@
+{
+  "schema": "oneuldo.market.validation",
+  "version": 1,
+  "seed": "verification-v1",
+  "environmentSeed": "validation-store-v1",
+  "mode": "stochastic",
+  "perPersonaCount": 30,
+  "episodes": 90,
+  "note": "Simulated timings and uncalibrated synthetic behavior profiles, not measured human or clinical evidence. Selection errors mean wrong SKU or excess quantity on add; checkout failures are state-machine evaluations.",
+  "outputDirectory": "market-simulator/output/verification-final",
+  "personas": [
+    {
+      "personaId": "mild-intellectual-disability-adult",
+      "episodes": 30,
+      "successes": 30,
+      "uniqueActionSequences": 30,
+      "maxMovePixels": 28.844410203711917,
+      "rejectedActions": 0,
+      "meanCartChecks": 1.7666666666666673,
+      "meanHelpRequests": 0,
+      "decisionMedianMs": 3040,
+      "decisionP90Ms": 7610,
+      "selectionErrorRate": 0.03260869565217391,
+      "checkoutFailureRate": 0,
+      "selectedItemCounts": {
+        "apple": 35,
+        "curry-spicy": 9,
+        "milk-small": 6,
+        "curry": 17,
+        "milk": 10,
+        "strawberry-milk": 8,
+        "green-apple": 14,
+        "milk-large": 4,
+        "spicy-curry": 5,
+        "apple-green": 11,
+        "low-fat-milk": 4
+      },
+      "examples": [
+        {
+          "seed": "verification-v1:0",
+          "actionFingerprint": "1b6d3a93a1f31f881956e7f7da0551cc9a150021a93e361007fcf0aaa2084e63",
+          "visitedStations": [
+            "produce",
+            "meal",
+            "drink",
+            "fresh",
+            "checkout-2"
+          ],
+          "cartChecks": 3,
+          "selectedItems": {
+            "apple": 2,
+            "curry-spicy": 2,
+            "milk-small": 1
+          },
+          "movementSample": [
+            {
+              "at": "2026-01-01T00:00:00.263Z",
+              "x": 697,
+              "y": 1327.857142857143
+            },
+            {
+              "at": "2026-01-01T00:00:00.526Z",
+              "x": 684,
+              "y": 1305.7142857142858
+            },
+            {
+              "at": "2026-01-01T00:00:00.789Z",
+              "x": 671,
+              "y": 1283.5714285714287
+            },
+            {
+              "at": "2026-01-01T00:00:01.052Z",
+              "x": 658,
+              "y": 1261.4285714285716
+            },
+            {
+              "at": "2026-01-01T00:00:01.315Z",
+              "x": 645,
+              "y": 1239.2857142857144
+            },
+            {
+              "at": "2026-01-01T00:00:01.578Z",
+              "x": 632,
+              "y": 1217.1428571428573
+            }
+          ]
+        },
+        {
+          "seed": "verification-v1:1",
+          "actionFingerprint": "dc4cffe98e096fcdec6f1a4905546ff9376d47fa1495ebe4aefa952a847fb406",
+          "visitedStations": [
+            "produce",
+            "meal",
+            "drink",
+            "fresh",
+            "checkout"
+          ],
+          "cartChecks": 2,
+          "selectedItems": {
+            "apple": 2,
+            "curry": 1,
+            "milk": 1
+          },
+          "movementSample": [
+            {
+              "at": "2026-01-01T00:00:00.267Z",
+              "x": 697,
+              "y": 1327.857142857143
+            },
+            {
+              "at": "2026-01-01T00:00:00.534Z",
+              "x": 684,
+              "y": 1305.7142857142858
+            },
+            {
+              "at": "2026-01-01T00:00:00.801Z",
+              "x": 671,
+              "y": 1283.5714285714287
+            },
+            {
+              "at": "2026-01-01T00:00:01.068Z",
+              "x": 658,
+              "y": 1261.4285714285716
+            },
+            {
+              "at": "2026-01-01T00:00:01.335Z",
+              "x": 645,
+              "y": 1239.2857142857144
+            },
+            {
+              "at": "2026-01-01T00:00:01.602Z",
+              "x": 632,
+              "y": 1217.1428571428573
+            }
+          ]
+        },
+        {
+          "seed": "verification-v1:2",
+          "actionFingerprint": "5dad6de91d0d398a2565432430b76985964a67340f0f658815b74c4ba53f7258",
+          "visitedStations": [
+            "drink",
+            "produce",
+            "meal",
+            "fresh",
+            "fresh",
+            "checkout"
+          ],
+          "cartChecks": 3,
+          "selectedItems": {
+            "apple": 2,
+            "curry": 1,
+            "strawberry-milk": 2
+          },
+          "movementSample": [
+            {
+              "at": "2026-01-01T00:00:00.259Z",
+              "x": 721.8461538461538,
+              "y": 1327.3846153846155
+            },
+            {
+              "at": "2026-01-01T00:00:00.518Z",
+              "x": 733.6923076923076,
+              "y": 1304.769230769231
+            },
+            {
+              "at": "2026-01-01T00:00:00.777Z",
+              "x": 745.5384615384614,
+              "y": 1282.1538461538464
+            },
+            {
+              "at": "2026-01-01T00:00:01.036Z",
+              "x": 757.3846153846152,
+              "y": 1259.538461538462
+            },
+            {
+              "at": "2026-01-01T00:00:01.295Z",
+              "x": 769.230769230769,
+              "y": 1236.9230769230774
+            },
+            {
+              "at": "2026-01-01T00:00:01.554Z",
+              "x": 781.0769230769229,
+              "y": 1214.3076923076928
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "personaId": "careful-checker",
+      "episodes": 30,
+      "successes": 30,
+      "uniqueActionSequences": 30,
+      "maxMovePixels": 28.571428571428573,
+      "rejectedActions": 0,
+      "meanCartChecks": 2.233333333333334,
+      "meanHelpRequests": 0,
+      "decisionMedianMs": 2160,
+      "decisionP90Ms": 4755,
+      "selectionErrorRate": 0,
+      "checkoutFailureRate": 0,
+      "selectedItemCounts": {
+        "milk-small": 20,
+        "curry": 9,
+        "apple-green": 10,
+        "green-apple": 12,
+        "milk": 4,
+        "curry-spicy": 11,
+        "low-fat-milk": 2,
+        "strawberry-milk": 4,
+        "apple": 38,
+        "spicy-curry": 10
+      },
+      "examples": [
+        {
+          "seed": "verification-v1:0",
+          "actionFingerprint": "36b458e33ddc574c29a2f3c6ea8837bfacd814f530a516f0575681b6be432c0d",
+          "visitedStations": [
+            "fresh",
+            "meal",
+            "produce",
+            "checkout-2"
+          ],
+          "cartChecks": 2,
+          "selectedItems": {
+            "milk-small": 1,
+            "curry": 1,
+            "apple-green": 2
+          },
+          "movementSample": [
+            {
+              "at": "2026-01-01T00:00:00.207Z",
+              "x": 721,
+              "y": 1329
+            },
+            {
+              "at": "2026-01-01T00:00:00.414Z",
+              "x": 732,
+              "y": 1308
+            },
+            {
+              "at": "2026-01-01T00:00:00.621Z",
+              "x": 743,
+              "y": 1287
+            },
+            {
+              "at": "2026-01-01T00:00:00.828Z",
+              "x": 754,
+              "y": 1266
+            },
+            {
+              "at": "2026-01-01T00:00:01.035Z",
+              "x": 765,
+              "y": 1245
+            },
+            {
+              "at": "2026-01-01T00:00:01.242Z",
+              "x": 776,
+              "y": 1224
+            }
+          ]
+        },
+        {
+          "seed": "verification-v1:1",
+          "actionFingerprint": "af1dcc5175f08f4051ae37746006fc42973f071e31e9a9796a2b07836c38fc29",
+          "visitedStations": [
+            "produce",
+            "meal",
+            "fresh",
+            "checkout"
+          ],
+          "cartChecks": 2,
+          "selectedItems": {
+            "green-apple": 2,
+            "curry": 1,
+            "milk": 1
+          },
+          "movementSample": [
+            {
+              "at": "2026-01-01T00:00:00.241Z",
+              "x": 697.8666666666667,
+              "y": 1329.3333333333333
+            },
+            {
+              "at": "2026-01-01T00:00:00.482Z",
+              "x": 685.7333333333333,
+              "y": 1308.6666666666665
+            },
+            {
+              "at": "2026-01-01T00:00:00.723Z",
+              "x": 673.6,
+              "y": 1287.9999999999998
+            },
+            {
+              "at": "2026-01-01T00:00:00.964Z",
+              "x": 661.4666666666667,
+              "y": 1267.333333333333
+            },
+            {
+              "at": "2026-01-01T00:00:01.205Z",
+              "x": 649.3333333333334,
+              "y": 1246.6666666666663
+            },
+            {
+              "at": "2026-01-01T00:00:01.446Z",
+              "x": 637.2,
+              "y": 1225.9999999999995
+            }
+          ]
+        },
+        {
+          "seed": "verification-v1:2",
+          "actionFingerprint": "8fcdd2aba4ee0182de614c792d89442d42c3a5c5df92da11ff77d8fb33be9e75",
+          "visitedStations": [
+            "produce",
+            "meal",
+            "fresh",
+            "checkout-2"
+          ],
+          "cartChecks": 3,
+          "selectedItems": {
+            "green-apple": 2,
+            "curry-spicy": 1,
+            "low-fat-milk": 1
+          },
+          "movementSample": [
+            {
+              "at": "2026-01-01T00:00:00.235Z",
+              "x": 698.625,
+              "y": 1330.625
+            },
+            {
+              "at": "2026-01-01T00:00:00.470Z",
+              "x": 687.25,
+              "y": 1311.25
+            },
+            {
+              "at": "2026-01-01T00:00:00.705Z",
+              "x": 675.875,
+              "y": 1291.875
+            },
+            {
+              "at": "2026-01-01T00:00:00.940Z",
+              "x": 664.5,
+              "y": 1272.5
+            },
+            {
+              "at": "2026-01-01T00:00:01.175Z",
+              "x": 653.125,
+              "y": 1253.125
+            },
+            {
+              "at": "2026-01-01T00:00:01.410Z",
+              "x": 641.75,
+              "y": 1233.75
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "personaId": "quick-decider",
+      "episodes": 30,
+      "successes": 26,
+      "uniqueActionSequences": 30,
+      "maxMovePixels": 28.547479396290957,
+      "rejectedActions": 0,
+      "meanCartChecks": 0.6666666666666666,
+      "meanHelpRequests": 0.1,
+      "decisionMedianMs": 666,
+      "decisionP90Ms": 1248,
+      "selectionErrorRate": 0.2,
+      "checkoutFailureRate": 0.35,
+      "selectedItemCounts": {
+        "spicy-curry": 24,
+        "milk": 5,
+        "green-apple": 46,
+        "curry-spicy": 8,
+        "low-fat-milk": 8,
+        "milk-small": 5,
+        "curry": 5,
+        "milk-large": 12,
+        "apple-green": 16,
+        "strawberry-milk": 6,
+        "apple": 3
+      },
+      "examples": [
+        {
+          "seed": "verification-v1:0",
+          "actionFingerprint": "e822468b64d474d060d9c6954ad89d80b9326afe1fa6a9a364d415b3716f00c8",
+          "visitedStations": [
+            "meal",
+            "fresh",
+            "produce",
+            "checkout",
+            "produce",
+            "checkout-2"
+          ],
+          "cartChecks": 1,
+          "selectedItems": {
+            "spicy-curry": 1,
+            "milk": 1,
+            "green-apple": 3
+          },
+          "movementSample": [
+            {
+              "at": "2026-01-01T00:00:00.179Z",
+              "x": 697.8666666666667,
+              "y": 1329.3333333333333
+            },
+            {
+              "at": "2026-01-01T00:00:00.358Z",
+              "x": 685.7333333333333,
+              "y": 1308.6666666666665
+            },
+            {
+              "at": "2026-01-01T00:00:00.537Z",
+              "x": 673.6,
+              "y": 1287.9999999999998
+            },
+            {
+              "at": "2026-01-01T00:00:00.716Z",
+              "x": 661.4666666666667,
+              "y": 1267.333333333333
+            },
+            {
+              "at": "2026-01-01T00:00:00.895Z",
+              "x": 649.3333333333334,
+              "y": 1246.6666666666663
+            },
+            {
+              "at": "2026-01-01T00:00:01.074Z",
+              "x": 637.2,
+              "y": 1225.9999999999995
+            }
+          ]
+        },
+        {
+          "seed": "verification-v1:1",
+          "actionFingerprint": "925ad23a3eddf4fc114e019421b5dca6adf267b233a91d700687b6417386b762",
+          "visitedStations": [
+            "meal",
+            "produce",
+            "fresh",
+            "checkout",
+            "meal",
+            "produce",
+            "checkout-2"
+          ],
+          "cartChecks": 1,
+          "selectedItems": {
+            "curry-spicy": 2,
+            "green-apple": 2,
+            "low-fat-milk": 1
+          },
+          "movementSample": [
+            {
+              "at": "2026-01-01T00:00:00.170Z",
+              "x": 697.8666666666667,
+              "y": 1329.3333333333333
+            },
+            {
+              "at": "2026-01-01T00:00:00.340Z",
+              "x": 685.7333333333333,
+              "y": 1308.6666666666665
+            },
+            {
+              "at": "2026-01-01T00:00:00.510Z",
+              "x": 673.6,
+              "y": 1287.9999999999998
+            },
+            {
+              "at": "2026-01-01T00:00:00.680Z",
+              "x": 661.4666666666667,
+              "y": 1267.333333333333
+            },
+            {
+              "at": "2026-01-01T00:00:00.850Z",
+              "x": 649.3333333333334,
+              "y": 1246.6666666666663
+            },
+            {
+              "at": "2026-01-01T00:00:01.020Z",
+              "x": 637.2,
+              "y": 1225.9999999999995
+            }
+          ]
+        },
+        {
+          "seed": "verification-v1:2",
+          "actionFingerprint": "eb8bfaafc0c9f69e75f7b7a8de92f3c4d1fb04214714a744005bf06ac34cd31e",
+          "visitedStations": [
+            "fresh",
+            "meal",
+            "produce",
+            "checkout-2",
+            "staff:employee-1",
+            "checkout"
+          ],
+          "cartChecks": 1,
+          "selectedItems": {
+            "milk-small": 1,
+            "spicy-curry": 2,
+            "green-apple": 2
+          },
+          "movementSample": [
+            {
+              "at": "2026-01-01T00:00:00.214Z",
+              "x": 722.8333333333334,
+              "y": 1325.5
+            },
+            {
+              "at": "2026-01-01T00:00:00.428Z",
+              "x": 735.6666666666667,
+              "y": 1301
+            },
+            {
+              "at": "2026-01-01T00:00:00.642Z",
+              "x": 748.5000000000001,
+              "y": 1276.5
+            },
+            {
+              "at": "2026-01-01T00:00:00.856Z",
+              "x": 761.3333333333335,
+              "y": 1252
+            },
+            {
+              "at": "2026-01-01T00:00:01.070Z",
+              "x": 774.1666666666669,
+              "y": 1227.5
+            },
+            {
+              "at": "2026-01-01T00:00:01.284Z",
+              "x": 787.0000000000002,
+              "y": 1203
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "backendHttp": {
+    "httpStatus": 200,
+    "retryHttpStatus": 200,
+    "persistedEventCount": 50,
+    "provenancePreserved": true,
+    "database": "isolated H2 in-memory database",
+    "acceptedCount": 50,
+    "duplicateCount": 50,
+    "testClass": "oneuldo.behaviorlog.controller.SyntheticMarketBatchHttpTest"
+  },
+  "checks": {
+    "simulatorTests": 19,
+    "frontendTests": 76,
+    "backendActualHttpTests": 1,
+    "typescript": "passed",
+    "skillYamlAndLinks": "passed",
+    "liveExternalLlmTested": false
+  }
+}

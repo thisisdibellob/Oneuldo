@@ -208,7 +208,7 @@ export function MarketSimulationScreen({
       if (action.type === 'viewCart') { cartOpenedAt.current=Date.now(); logger?.cartOpened(next.cart); }
       if (action.type === 'closeView' && current.view === 'cart') logger?.cartClosed(next.cart, Date.now()-cartOpenedAt.current);
       if (action.type === 'retry') logger?.correctionStarted(next.cart);
-      if (action.type === 'viewHelp' || action.type === 'requestReturn' || action.type === 'requestCashier' || (action.type === 'interact' && action.station.startsWith('staff:'))) logger?.track({ eventCode:'SHOP.STAFF_HELP_REQUESTED', microActionId:action.type.toUpperCase(), payload:{marketContent:{action}} });
+      if (action.type === 'viewHelp' || action.type === 'requestReturn' || action.type === 'requestCashier' || (action.type === 'interact' && action.station.startsWith('staff:'))) logger?.staffHelpRequested(action);
     }
     live.current = next;
     setSession(next);
