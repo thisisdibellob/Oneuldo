@@ -56,6 +56,39 @@ class ConnectionTest(unittest.TestCase):
                 self.assertNotIn(secret, str(error.exception) + output.getvalue())
                 self.assertEqual(original, target.read_text())
 
+    def test_school_and_laptop_setup_replace_stale_budgets_and_preserve_other_settings(self):
+        for server, context, budget in [("school", "18432", "18000"), ("laptop", "8192", "7800")]:
+            with self.subTest(server=server), tempfile.TemporaryDirectory() as directory:
+                target = Path(directory) / "local.properties"
+                target.write_text("spring.datasource.password=private\nai.ollama.context-length=8192\nai.behavior-analysis.request-token-budget=7800\nai.behavior-analysis.chunk-output-tokens=400\n")
+                secret = "b" * 64
+                output = io.StringIO()
+                with patch.object(config, "BACKEND", Path(directory)), patch("sys.argv", ["configure-home-ai.py", "--server", server]), \
+                        patch.object(config.getpass, "getpass", return_value=secret), \
+                        patch.object(config.urllib.request, "build_opener") as opener, contextlib.redirect_stdout(output):
+                    opener.return_value.open.return_value = io.BytesIO(b'{"models":[{"name":"qwen3.6:27b-q4_K_M"}]}')
+                    config.main()
+                text = target.read_text()
+                self.assertIn("spring.datasource.password=private", text)
+                self.assertEqual(1, text.count("ai.ollama.context-length="))
+                self.assertIn("ai.ollama.context-length=" + context, text)
+                self.assertIn("ai.behavior-analysis.request-token-budget=" + budget, text)
+                self.assertIn("ai.behavior-analysis.chunk-output-tokens=1800", text)
+                self.assertIn("ai.behavior-analysis.quality-review=true", text)
+                self.assertNotIn(secret, output.getvalue())
+                self.assertEqual(0o600, target.stat().st_mode & 0o777)
+
+    def test_direct_probe_records_request_times_and_disables_proxies_without_disabling_tls(self):
+        from types import SimpleNamespace
+        with patch.object(diagnostic.subprocess, "run", return_value=SimpleNamespace(returncode=28,
+                stdout="\nONEULDO_METRICS\nhttp_code=000\ntime_namelookup=0.01\ntime_connect=0")) as run:
+            result = diagnostic.probe("https://example.test", "/healthz", direct=True)
+        self.assertLessEqual(result["startedAt"], result["endedAt"])
+        self.assertEqual("TCP_CONNECT_TIMEOUT", result["result"])
+        command = run.call_args.args[0]
+        self.assertEqual(["curl", "-q", "--noproxy", "*", "--ipv4"], command[:5])
+        self.assertNotIn("--insecure", command)
+
     def test_timeout_stage_and_expected_unauthorized_response(self):
         self.assertEqual("TCP_CONNECT_TIMEOUT", diagnostic.classify(28, {"time_namelookup": "0.1", "time_connect": "0"}, "", "/healthz"))
         self.assertEqual("TLS_TIMEOUT", diagnostic.classify(28, {"time_connect": "0.1"}, "", "/healthz"))

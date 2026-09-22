@@ -9,8 +9,8 @@ public final class ReviewEvidenceChecks {
 
     public static void validate(JsonNode analysis, JsonNode checks, AnalysisReferences refs) {
         Map<String, Set<String>> paths = new LinkedHashMap<>();
+        Map<String, List<String>> observationReferences = new LinkedHashMap<>();
         Set<String> mustCite = new HashSet<>();
-        Set<String> all = new HashSet<>();
         int i = 0;
         for (var finding : analysis.path("findings")) {
             Set<String> ids = ids(finding.path("evidenceEventIds"));
@@ -22,9 +22,9 @@ public final class ReviewEvidenceChecks {
             if (mentioned.isEmpty()) throw new IllegalArgumentException("MISSING_OBSERVATION_EVENT_REFERENCES");
             refs.validateEventOrder(mentioned);
             if (!ids.containsAll(mentioned)) throw new IllegalArgumentException("OBSERVATION_EVENT_NOT_CITED");
-            all.addAll(ids);
             String prefix = "/findings/" + i++;
             paths.put(prefix + "/observation", ids);
+            observationReferences.put(prefix + "/observation", mentioned);
             mustCite.add(prefix + "/observation");
             paths.put(prefix + "/interpretation", ids);
             for (int j = 0; j < finding.path("alternativeExplanations").size(); j++) {
@@ -35,11 +35,12 @@ public final class ReviewEvidenceChecks {
         i = 0;
         for (var assessment : analysis.path("sessionAssessments")) {
             Set<String> ids = ids(assessment.path("evidenceEventIds"));
-            all.addAll(ids);
             String path = "/sessionAssessments/" + i++ + "/explanation";
             paths.put(path, ids); mustCite.add(path);
         }
-        paths.put("/summary", all);
+        // A summary may cite source context (e.g. the mission) absent from individual findings.
+        // Its claimChecks entry is its own evidence list; source existence/order still apply.
+        paths.put("/summary", refs.eventIds());
         Set<String> seen = new HashSet<>();
         for (var check : checks) {
             if (!check.isArray() || check.size() != 2 || !check.get(0).isString() || !check.get(1).isArray())
@@ -62,8 +63,15 @@ public final class ReviewEvidenceChecks {
                 evidence.add(id.asString());
             }
             refs.validateEventOrder(evidence);
-            if (!paths.get(path).containsAll(evidence)) throw new IllegalArgumentException("REVIEW_EVIDENCE_NOT_CITED");
+            var allowed = paths.get(path);
+            if (!allowed.containsAll(evidence))
+                throw new ReviewEvidenceException("REVIEW_EVIDENCE_NOT_CITED", path,
+                        evidence.stream().filter(id -> !allowed.contains(id)).toList());
             if (mustCite.contains(path) && evidence.isEmpty()) throw new IllegalArgumentException("MISSING_REVIEW_EVIDENCE");
+            var mentioned = observationReferences.getOrDefault(path, List.of());
+            if (!evidence.containsAll(mentioned))
+                throw new ReviewEvidenceException("REVIEW_OBSERVATION_NOT_COVERED", path,
+                        mentioned.stream().filter(id -> !evidence.contains(id)).toList());
         }
         if (!seen.equals(paths.keySet())) throw new IllegalArgumentException("MISSING_REVIEW_CLAIM_CHECK");
     }

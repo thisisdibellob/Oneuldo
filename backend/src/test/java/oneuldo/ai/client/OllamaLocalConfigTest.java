@@ -32,7 +32,8 @@ class OllamaLocalConfigTest {
                     assertThat(context.getEnvironment().getProperty("ai.behavior-analysis.chunk-output-tokens", Integer.class)).isEqualTo(1800);
                     assertThat(context.getEnvironment().getProperty("ai.behavior-analysis.final-output-tokens", Integer.class)).isEqualTo(1800);
                     int requestBudget = context.getEnvironment().getProperty("ai.behavior-analysis.request-token-budget", Integer.class);
-                    assertThat(requestBudget).isEqualTo(7800);
+                    assertThat(requestBudget).isEqualTo(18000);
+                    assertThat(properties.contextLength()).isEqualTo(18432);
                     assertThat(requestBudget + 32).isLessThanOrEqualTo(properties.contextLength() - 256);
                 });
     }

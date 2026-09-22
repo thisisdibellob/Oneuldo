@@ -21,7 +21,7 @@ import tools.jackson.databind.node.ObjectNode;
 @EnabledIfEnvironmentVariable(named="AI_CLAIM_EVIDENCE_LIVE", matches="true")
 class ClaimEvidenceSchoolLiveTest {
     private final JsonMapper mapper=JsonMapper.builder().findAndAddModules().build();
-    private final Path root=Path.of(System.getenv().getOrDefault("AI_CLAIM_OUTPUT", "../output/ai-claim-evidence-2026-09-17/v10"));
+    private final Path root=Path.of(System.getenv().getOrDefault("AI_CLAIM_OUTPUT", "../output/ai-claim-evidence/"+AnalysisReviewPrompt.VERSION));
     private final AiBehaviorAnalysisValidator validator=new AiBehaviorAnalysisValidator(new MarketAiDifficultyValidator());
 
     @Test void review_faulty_draft_repeatedly_and_distinguish_event_order() throws Exception {
@@ -110,7 +110,7 @@ class ClaimEvidenceSchoolLiveTest {
         long started=System.nanoTime();boolean valid=false;
         for(int retry=0;retry<2&&!valid;retry++) {
             var call=calls.addObject();
-            String submitted=prompt+(retry==0?"":"\n이전 구조 검사 오류: "+calls.get(0).path("error").asString()+". 원본을 다시 보고 전체 JSON과 모든 claimChecks를 완성하세요.");
+            String submitted=prompt+(retry==0?"":"\n이전 구조 검사 오류: "+calls.get(0).path("error").asString()+". 원본을 다시 보고 전체 JSON과 모든 문장 객체의 text·evidenceEventIds를 완성하세요. claimChecks는 작성하지 마세요.");
             new AnalysisTokenBudget().requireFits(AnalysisReviewPrompt.system(),submitted,1800,18000,"LIVE_REVIEW_TOO_LARGE");
             Files.writeString(root.resolve(name+".json"),mapper.writerWithDefaultPrettyPrinter().writeValueAsString(report));
             GroqChatClient.GroqChatResult response;
@@ -127,7 +127,10 @@ class ClaimEvidenceSchoolLiveTest {
                 assertThat(response.finishReason()).isNotEqualTo("length");
                 var result=validator.validate(refs.read(AnalysisReviewPrompt.reviewedAnalysis(mapper,response.text(),refs)),input);
                 report.set("analysis",mapper.valueToTree(result));valid=true;
-            } catch(RuntimeException|AssertionError e) {call.put("error",e.getMessage());}
+            } catch(RuntimeException|AssertionError e) {
+                call.put("error",e.getMessage());
+                if(e instanceof ReviewEvidenceException detail) call.set("validationFailure",mapper.valueToTree(detail.details()));
+            }
             report.put("wallSeconds",(System.nanoTime()-started)/1_000_000_000.0);report.put("structurallyValid",valid);
             Files.writeString(root.resolve(name+".json"),mapper.writerWithDefaultPrettyPrinter().writeValueAsString(report));
         }

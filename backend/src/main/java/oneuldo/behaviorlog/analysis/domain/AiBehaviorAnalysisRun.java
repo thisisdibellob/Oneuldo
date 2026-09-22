@@ -19,7 +19,13 @@ import org.hibernate.type.SqlTypes;
 public class AiBehaviorAnalysisRun {
     public record Attempt(int number, String inputPrompt, String rawOutput, String errorCode, String source,
             String systemPrompt,Integer outputMax,String finishReason,Integer inputTokens,Integer outputTokens,Long latencyMs,
-            oneuldo.ai.exception.AiTransportException.Details transportFailure) {
+            oneuldo.ai.exception.AiTransportException.Details transportFailure,
+            oneuldo.behaviorlog.analysis.service.ReviewEvidenceException.Details validationFailure) {
+        public Attempt(int number,String inputPrompt,String rawOutput,String errorCode,String source,String systemPrompt,
+                Integer outputMax,String finishReason,Integer inputTokens,Integer outputTokens,Long latencyMs,
+                oneuldo.ai.exception.AiTransportException.Details transportFailure) {
+            this(number,inputPrompt,rawOutput,errorCode,source,systemPrompt,outputMax,finishReason,inputTokens,outputTokens,latencyMs,transportFailure,null);
+        }
         public Attempt(int number,String inputPrompt,String rawOutput,String errorCode,String source,String systemPrompt,
                 Integer outputMax,String finishReason,Integer inputTokens,Integer outputTokens,Long latencyMs) {
             this(number,inputPrompt,rawOutput,errorCode,source,systemPrompt,outputMax,finishReason,inputTokens,outputTokens,latencyMs,null);
