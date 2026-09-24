@@ -1,10 +1,13 @@
 import {
   MARKET_COMMON_DOOR_POINT, MARKET_FRONT_WALL_Y, MARKET_CASHIER_POINT, MARKET_CHECKOUT_POINT,
-  MARKET_CHECKOUT_RECT, MARKET_EXIT_POINT, MARKET_PLAYER_POINT,
+  MARKET_CHECKOUT_RECT, MARKET_CHECKOUT_WIDTH, MARKET_CHECKOUT_LENGTH, MARKET_CHECKOUT_SIZE_MULTIPLIER, MARKET_KIOSK_WIDTH, MARKET_EXIT_POINT, MARKET_PLAYER_POINT,
   MARKET_INTERIOR_ENTRANCE_POINT, MARKET_SECOND_CHECKOUT_RECT, MARKET_SECOND_CHECKOUT_POINT, MARKET_SECOND_CASHIER_POINT,
   MARKET_WORLD_HEIGHT, MARKET_WORLD_WIDTH, type Point, type Rect,
 } from './prototypeWorld';
-import { getMarketShelfUnitRects } from './marketFixtureLayout';
+import {
+  getMarketShelfUnitRects, MARKET_SHELF_PAIR_WIDTH, MARKET_SHELF_PAIR_HEIGHT,
+  MARKET_SHELF_UNIT_WIDTH, MARKET_SHELF_VERTICAL_HEIGHT,
+} from './marketFixtureLayout';
 import { getMarketPersonCollider } from './marketPersonLayout';
 import type { MarketCategoryId } from './scenarios';
 import { MARKET_CUSTOMER_APPEARANCES, MARKET_EMPLOYEE_APPEARANCES, getMarketPersonAppearance, type MarketPersonAppearanceId } from './marketPeople';
@@ -114,12 +117,19 @@ export const DEFAULT_MARKET_ENVIRONMENT_CONFIG: MarketEnvironmentConfig = {
   shelfOrder: ['produce', 'fresh', 'household', 'meal', 'drink'],
 };
 
+/** Preserve each pair's floor-plan center when fixture art and ground footprints grow. */
+function shelfSlot(slotId: string, orientation: MarketShelfPlacement['orientation'], center: Point, point: Point): MarketShelfPlacement {
+  const width = orientation === 'horizontal' ? MARKET_SHELF_PAIR_WIDTH : MARKET_SHELF_UNIT_WIDTH;
+  const height = orientation === 'horizontal' ? MARKET_SHELF_PAIR_HEIGHT : MARKET_SHELF_VERTICAL_HEIGHT;
+  return { slotId, orientation, x: center.x - width / 2, y: center.y - height / 2, width, height, point };
+}
 export const MARKET_SHELF_SLOTS: readonly MarketShelfPlacement[] = [
-  { slotId: 'northwest', orientation: 'horizontal', width: 242, height: 64, x: 379, y: 196, point: { x: 500, y: 308 } },
-  { slotId: 'northeast', orientation: 'horizontal', width: 242, height: 64, x: 739, y: 196, point: { x: 860, y: 308 } },
-  { slotId: 'middle-west', orientation: 'vertical', width: 110, height: 168, x: 345, y: 432, point: { x: 500, y: 536 } },
-  { slotId: 'middle-center', orientation: 'vertical', width: 110, height: 168, x: 595, y: 432, point: { x: 550, y: 536 } },
-  { slotId: 'middle-east', orientation: 'vertical', width: 110, height: 168, x: 845, y: 432, point: { x: 800, y: 536 } },
+  shelfSlot('northwest', 'horizontal', { x: 500, y: 228 }, { x: 500, y: 308 }),
+  shelfSlot('northeast', 'horizontal', { x: 860, y: 228 }, { x: 860, y: 308 }),
+  // Leave room for the player's full footprint between the wider shelf feet and west wall.
+  shelfSlot('middle-west', 'vertical', { x: 408, y: 516 }, { x: 500, y: 536 }),
+  shelfSlot('middle-center', 'vertical', { x: 650, y: 516 }, { x: 550, y: 536 }),
+  shelfSlot('middle-east', 'vertical', { x: 900, y: 516 }, { x: 800, y: 536 }),
 ];
 export const MARKET_WALKABLE_AREAS: Array<Rect & { id: string }> = [
   { id: 'main-sales-floor', x: 310, y: 80, width: 740, height: MARKET_FRONT_WALL_Y + 20 - 80 },
@@ -196,11 +206,11 @@ export const MARKET_FIXED_OBJECTS: MarketEnvironmentObject[] = [
 
 /** Stable slot IDs let saved candidate pools work in either plan; all coordinates are physical. */
 export const MARKET_AISLE_SHELF_SLOTS: readonly MarketShelfPlacement[] = [
-  { slotId: 'northwest', orientation: 'horizontal', width: 242, height: 64, x: 379, y: 196, point: { x: 500, y: 308 } },
-  { slotId: 'northeast', orientation: 'horizontal', width: 242, height: 64, x: 739, y: 196, point: { x: 860, y: 308 } },
-  { slotId: 'middle-west', orientation: 'horizontal', width: 242, height: 64, x: 379, y: 430, point: { x: 500, y: 542 } },
-  { slotId: 'middle-center', orientation: 'horizontal', width: 242, height: 64, x: 739, y: 430, point: { x: 860, y: 542 } },
-  { slotId: 'middle-east', orientation: 'horizontal', width: 242, height: 64, x: 559, y: 640, point: { x: 680, y: 752 } },
+  shelfSlot('northwest', 'horizontal', { x: 500, y: 228 }, { x: 500, y: 308 }),
+  shelfSlot('northeast', 'horizontal', { x: 860, y: 228 }, { x: 860, y: 308 }),
+  shelfSlot('middle-west', 'horizontal', { x: 500, y: 462 }, { x: 500, y: 542 }),
+  shelfSlot('middle-center', 'horizontal', { x: 860, y: 462 }, { x: 860, y: 542 }),
+  shelfSlot('middle-east', 'horizontal', { x: 680, y: 672 }, { x: 680, y: 752 }),
 ];
 const AISLE_EMPLOYEE_SLOTS: readonly PersonSlot[] = MARKET_EMPLOYEE_SLOTS.map(slot => slot.id === 'staff-west-aisle'
   ? { id: slot.id, point: { x: 340, y: 350 }, approach: { x: 396, y: 350 } }
@@ -213,15 +223,15 @@ const AISLE_CUSTOMER_SLOTS: readonly PersonSlot[] = MARKET_CUSTOMER_SLOTS.map(sl
 // This L-shaped branch has its own building dimensions, circulation and service wing.
 // Its coordinates are authored directly; no mirrored physics or visual transforms are used.
 export const MARKET_CORNER_SHELF_SLOTS: readonly MarketShelfPlacement[] = [
-  { slotId: 'northwest', orientation: 'horizontal', x: 190, y: 330, width: 242, height: 64, point: { x: 311, y: 442 } },
-  { slotId: 'northeast', orientation: 'horizontal', x: 550, y: 330, width: 242, height: 64, point: { x: 671, y: 442 } },
-  { slotId: 'middle-west', orientation: 'vertical', x: 170, y: 555, width: 110, height: 168, point: { x: 325, y: 650 } },
-  { slotId: 'middle-center', orientation: 'vertical', x: 440, y: 555, width: 110, height: 168, point: { x: 595, y: 650 } },
-  { slotId: 'middle-east', orientation: 'horizontal', x: 650, y: 590, width: 242, height: 64, point: { x: 771, y: 702 } },
+  shelfSlot('northwest', 'horizontal', { x: 311, y: 362 }, { x: 311, y: 442 }),
+  shelfSlot('northeast', 'horizontal', { x: 671, y: 362 }, { x: 671, y: 442 }),
+  shelfSlot('middle-west', 'vertical', { x: 225, y: 639 }, { x: 325, y: 650 }),
+  shelfSlot('middle-center', 'vertical', { x: 495, y: 639 }, { x: 595, y: 650 }),
+  shelfSlot('middle-east', 'horizontal', { x: 771, y: 622 }, { x: 771, y: 702 }),
 ];
 const CORNER_EMPLOYEE_SLOTS: readonly PersonSlot[] = [
   { id: 'staff-west-aisle', point: { x: 330, y: 520 }, approach: { x: 386, y: 520 } },
-  { id: 'staff-east-aisle', point: { x: 730, y: 520 } },
+  { id: 'staff-east-aisle', point: { x: 730, y: 520 }, approach: { x: 786, y: 520 } },
   { id: 'staff-southwest', point: { x: 325, y: 770 } },
   { id: 'staff-southeast', point: { x: 820, y: 710 }, approach: { x: 764, y: 710 } },
   { id: 'staff-northwest', point: { x: 330, y: 270 }, approach: { x: 386, y: 270 } },
@@ -251,6 +261,9 @@ type MarketLayoutStructure = {
   entrance: MarketEnvironment['entrance']; exitPoint: Point;
   alarmGates: MarketAlarmGate[]; commonDoor: MarketEnvironment['commonDoor']; spawn: Point;
 };
+// Keep the exit-side bottom edge fixed so both enlarged counters leave the 53px passage open.
+const CORNER_CHECKOUT_Y = 987 - MARKET_CHECKOUT_LENGTH;
+const CORNER_CHECKOUT_SERVICE_Y = CORNER_CHECKOUT_Y + 60 * MARKET_CHECKOUT_SIZE_MULTIPLIER;
 export function getMarketLayoutStructure(layoutId: MarketLayoutId = 'classic'): MarketLayoutStructure {
   if (layoutId === 'corner') return {
     world: { width: 1280, height: 1380 },
@@ -288,8 +301,10 @@ export function getMarketLayoutStructure(layoutId: MarketLayoutId = 'classic'): 
     ],
     kiosk: { id: 'kiosk-north', rect: { x: 420, y: 245, width: 64, height: 48 } },
     checkouts: [
-      { id: 'checkout', rect: { x: 200, y: 870, width: 48, height: 117 }, point: { x: 287, y: 930 }, cashierPoint: { x: 164, y: 930 } },
-      { id: 'checkout-2', rect: { x: 405, y: 870, width: 48, height: 117 }, point: { x: 492, y: 930 }, cashierPoint: { x: 369, y: 930 } },
+      { id: 'checkout', rect: { x: 224 - MARKET_CHECKOUT_WIDTH / 2, y: CORNER_CHECKOUT_Y, width: MARKET_CHECKOUT_WIDTH, height: MARKET_CHECKOUT_LENGTH },
+        point: { x: 287, y: CORNER_CHECKOUT_SERVICE_Y }, cashierPoint: { x: 164, y: CORNER_CHECKOUT_SERVICE_Y } },
+      { id: 'checkout-2', rect: { x: 429 - MARKET_CHECKOUT_WIDTH / 2, y: CORNER_CHECKOUT_Y, width: MARKET_CHECKOUT_WIDTH, height: MARKET_CHECKOUT_LENGTH },
+        point: { x: 492, y: CORNER_CHECKOUT_SERVICE_Y }, cashierPoint: { x: 369, y: CORNER_CHECKOUT_SERVICE_Y } },
     ],
     entrance: { point: { x: 730, y: 1050 }, gate: { x: 650, y: 1030, width: 160, height: 40 }, alarmBoundaryY: 1050, rearmY: 990 },
     exitPoint: { x: 430, y: 1050 },
@@ -473,7 +488,9 @@ export function createMarketEnvironment(overrides: Partial<MarketEnvironmentConf
   }));
   const kiosks: MarketKioskPlacement[] = checkouts.filter(counter => counter.kind === 'kiosk').flatMap(counter =>
     ([1, 2] as const).map((number) => {
-      const rect = { x: counter.rect.x, y: counter.rect.y + (number - 1) * 77, width: counter.rect.width, height: 40 };
+      const rect = { x: counter.rect.x + (counter.rect.width - MARKET_KIOSK_WIDTH) / 2,
+        y: counter.rect.y + (number - 1) * 77 * MARKET_CHECKOUT_SIZE_MULTIPLIER,
+        width: MARKET_KIOSK_WIDTH, height: 40 * MARKET_CHECKOUT_SIZE_MULTIPLIER };
       return { id: `kiosk:${counter.id}:${number}` as MarketKioskId, laneId: counter.id, number, rect,
         point: { x: counter.point.x, y: rect.y + rect.height / 2 } };
     }));

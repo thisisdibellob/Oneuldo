@@ -7,7 +7,7 @@ import { MarketRetailShelf } from './MarketRetailShelf';
 import { MarketPersonIllustration } from './MarketPersonIllustration';
 import { MarketArchitectureLayer } from './MarketArchitectureLayer';
 import {
-  MARKET_SHELF_UNIT_HEIGHT, MARKET_SHELF_UNIT_STEP, MARKET_SHELF_UNIT_WIDTH,
+  MARKET_SHELF_UNIT_HEIGHT, MARKET_SHELF_UNIT_STEP, MARKET_SHELF_UNIT_WIDTH, MARKET_SHELF_SCALE,
   MARKET_SHELF_VERTICAL_STEP, getMarketShelfUnitRects,
 } from '../../game/marketFixtureLayout';
 import { getMarketRenderDepth, type MarketConstructionZone, type MarketKioskPlacement, type MarketCheckoutPlacement, type MarketEnvironment, type MarketPerson, type MarketShelfPlacement } from '../../game/marketEnvironment';
@@ -19,6 +19,7 @@ import {
   MARKET_CASHIER_POINT,
   MARKET_CHECKOUT_RECT,
   MARKET_CHECKOUT_SCALE,
+  MARKET_CHECKOUT_SIZE_MULTIPLIER,
 } from '../../game/prototypeWorld';
 import { marketCategories, type MarketCategory, type MarketCategoryId } from '../../game/scenarios';
 import { fonts } from '../../theme';
@@ -125,13 +126,14 @@ export function MarketCheckoutFixture({ active, cashierPresent = true, counter, 
         <MarketPersonIllustration kind="employee" appearance={appearance}
           testID={`market-cashier-art-${index + 1}`} />
       </View> : null}
-      <View testID="market-checkout-shadow" style={[styles.counterShadow, active && styles.floorFocus]} />
+      <View testID="market-checkout-shadow" style={[styles.counterShadow,
+        { left: (rect.width - 54 * MARKET_CHECKOUT_SIZE_MULTIPLIER) / 2 }, active && styles.floorFocus]} />
       <Image
         accessibilityIgnoresInvertColors
         accessible={false}
         resizeMode="contain"
         source={marketGameArt.checkout}
-        style={styles.counterArt}
+        style={[styles.counterArt, { left: (rect.width - 72 * MARKET_CHECKOUT_SIZE_MULTIPLIER) / 2 }]}
         testID="market-checkout-art"
       />
       <View style={[styles.counterNumberPole, { left: rect.width / 2 - 1.5 }]} />
@@ -168,10 +170,12 @@ export function MarketPersonFixture({ person, active = false }: { person: Market
 
 export function MarketKioskFixture({ kiosk, active = false }: { kiosk: MarketKioskPlacement; active?: boolean }) {
   return <View pointerEvents="none" style={styles.fixtureContent}>
-    <View style={[styles.kioskFloorShadow, active && styles.floorFocus]} />
+    <View style={[styles.kioskFloorShadow,
+      { left: (kiosk.rect.width - 54 * MARKET_CHECKOUT_SIZE_MULTIPLIER) / 2 }, active && styles.floorFocus]} />
     <Image accessible={false} source={require('../../../assets/images/game/market/interior/self-checkout-v1.png')}
-      resizeMode="contain" style={styles.selfCheckoutArt} testID={`market-kiosk-art-${kiosk.id}`} />
-    <View style={[styles.selfCheckoutLabel, active && styles.categorySignActive]}>
+      resizeMode="contain" style={[styles.selfCheckoutArt,
+        { left: (kiosk.rect.width - 64 * MARKET_CHECKOUT_SIZE_MULTIPLIER) / 2 }]} testID={`market-kiosk-art-${kiosk.id}`} />
+    <View style={[styles.selfCheckoutLabel, { left: (kiosk.rect.width - 54) / 2 }, active && styles.categorySignActive]}>
       <Ionicons name="scan-outline" size={10} color="#587565" />
       <Text style={styles.selfCheckoutText}>셀프 {kiosk.number}</Text>
     </View>
@@ -264,9 +268,12 @@ export function MarketExitMarker({ active, entrance = false, kind, blocked = fal
 }
 
 const styles = StyleSheet.create({
-  selfCheckoutArt: { position: 'absolute', left: -8, bottom: -8, width: 64, height: 90 },
-  kioskFloorShadow: { position: 'absolute', left: -3, bottom: -3, width: 54, height: 18, borderRadius: 20, backgroundColor: 'rgba(48,75,84,0.10)' },
-  selfCheckoutLabel: { position: 'absolute', bottom: -19, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3, width: 54, height: 18, borderRadius: 3, borderWidth: 1, borderColor: '#D8D4C7', backgroundColor: '#F7F4EC' },
+  selfCheckoutArt: { position: 'absolute',
+    bottom: -8 * MARKET_CHECKOUT_SIZE_MULTIPLIER, width: 64 * MARKET_CHECKOUT_SIZE_MULTIPLIER, height: 90 * MARKET_CHECKOUT_SIZE_MULTIPLIER },
+  kioskFloorShadow: { position: 'absolute', bottom: -3 * MARKET_CHECKOUT_SIZE_MULTIPLIER,
+    width: 54 * MARKET_CHECKOUT_SIZE_MULTIPLIER, height: 18 * MARKET_CHECKOUT_SIZE_MULTIPLIER, borderRadius: 20, backgroundColor: 'rgba(48,75,84,0.10)' },
+  selfCheckoutLabel: { position: 'absolute', bottom: -19,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3, width: 54, height: 18, borderRadius: 3, borderWidth: 1, borderColor: '#D8D4C7', backgroundColor: '#F7F4EC' },
   selfCheckoutText: { fontFamily: fonts.bold, fontSize: 9, color: '#304B54' },
   shelfTarget: { position: 'absolute', overflow: 'visible' },
   plantStem: { position: 'absolute', left: 13, bottom: 17, width: 3, height: 33, backgroundColor: '#587565' },
@@ -312,11 +319,11 @@ const styles = StyleSheet.create({
   floorShadow: {
     backgroundColor: 'rgba(48,75,84,0.10)',
     borderRadius: 50,
-    bottom: -2.5,
-    height: 17.5,
-    left: -3,
+    bottom: -5 * MARKET_SHELF_SCALE,
+    height: 35 * MARKET_SHELF_SCALE,
+    left: (MARKET_SHELF_UNIT_WIDTH - 232 * MARKET_SHELF_SCALE) / 2,
     position: 'absolute',
-    width: 116,
+    width: 232 * MARKET_SHELF_SCALE,
   },
   floorFocus: {
     backgroundColor: 'rgba(88,117,101,0.16)',
@@ -346,10 +353,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(48,75,84,0.10)',
     borderRadius: 50,
     bottom: -5 * MARKET_CHECKOUT_SCALE,
-    height: 118.5,
-    left: -3,
+    height: 118.5 * MARKET_CHECKOUT_SIZE_MULTIPLIER,
     position: 'absolute',
-    width: 54,
+    width: 54 * MARKET_CHECKOUT_SIZE_MULTIPLIER,
   },
   cashierFloorMat: {
     backgroundColor: 'rgba(88,117,101,0.11)',
@@ -366,10 +372,9 @@ const styles = StyleSheet.create({
   },
   counterArt: {
     bottom: 0,
-    height: 142.5,
-    left: -12,
+    height: 142.5 * MARKET_CHECKOUT_SIZE_MULTIPLIER,
     position: 'absolute',
-    width: 72,
+    width: 72 * MARKET_CHECKOUT_SIZE_MULTIPLIER,
   },
   counterNumberPole: { backgroundColor: '#8C9E92', borderRightColor: '#6B8073', borderRightWidth: 1,
     position: 'absolute', top: -68, width: 3, height: 50 },

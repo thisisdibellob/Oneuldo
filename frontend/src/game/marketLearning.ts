@@ -6,6 +6,8 @@ export type MarketLearningConfig = {
   budgetChoiceEnabled: boolean;
   /** Spending limit for the additional self-chosen drink, not for the fixed shopping list. */
   choiceBudget: number;
+  /** Seeded cashier receipt exercise; old presets keep their original checkout behavior. */
+  checkoutReviewMode: 'normal' | 'overcharge' | 'random';
 };
 
 export const DEFAULT_MARKET_LEARNING_CONFIG: MarketLearningConfig = {
@@ -13,6 +15,7 @@ export const DEFAULT_MARKET_LEARNING_CONFIG: MarketLearningConfig = {
   allowSubstitution: true,
   budgetChoiceEnabled: true,
   choiceBudget: 3000,
+  checkoutReviewMode: 'normal',
 };
 
 export type MarketUnavailableReason = 'no-substitute-in-stock' | 'replacement-not-allowed';
@@ -53,6 +56,9 @@ export function normalizeMarketLearningConfig(input?: Partial<MarketLearningConf
   }
   if (!Number.isInteger(config.choiceBudget) || config.choiceBudget < 1 || config.choiceBudget > 1000000) {
     throw new Error('선택 구매 예산은 1~1000000원 사이 정수여야 합니다.');
+  }
+  if (!['normal', 'overcharge', 'random'].includes(config.checkoutReviewMode)) {
+    throw new Error('계산 확인 설정은 normal, overcharge, random 중 하나여야 합니다.');
   }
   return config;
 }

@@ -5,6 +5,7 @@ import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
 import { PressScale } from '../components/PressScale';
 import { MarketRequesterCall } from '../components/game/MarketRequesterCall';
 import { MarketKioskCheckout } from '../components/game/MarketKioskCheckout';
+import { MarketStaffedCheckout } from '../components/game/MarketStaffedCheckout';
 import { MarketMap } from '../components/game/MarketMap';
 import { MarketHud, type MarketHudControlMode } from '../components/game/MarketHud';
 import { MarketStaffDialogue, MarketStaffDialogueChoice } from '../components/game/MarketStaffDialogue';
@@ -20,7 +21,8 @@ import {
   MarketSessionConfig
 } from '../game/marketSession';
 import { getMarketProductImage } from '../game/marketProductImages';
-import { getMarketCartTotal, getMarketProduct, marketCategories, MarketCart } from '../game/scenarios';
+import { getMarketCheckoutReview } from '../game/marketCheckoutReview';
+import { getMarketProduct, marketCategories, MarketCart } from '../game/scenarios';
 import { fonts } from '../theme';
 import { listMarketEpisodes, saveMarketEpisode, MarketStoredEpisode } from '../game/marketEpisodeStore';
 
@@ -83,11 +85,15 @@ export function MarketSimulationScreen({
   const [session, setSession] = useState(() => createMarketSession({
     seed: environment?.seed ?? 'market-' + Date.now(),
     ...initialConfig,
+    // New interactive games mix normal/error bills; imported presets retain their explicit/default mode.
+    learning: initialConfig ? initialConfig.learning : { checkoutReviewMode: 'random' },
     startedAt: new Date().toISOString()
   }, environment));
   const live = useRef(session);
   live.current = session;
   const localPosition = useRef(session.environment.spawn);
+  const checkoutBackHandler = useRef<(() => boolean) | null>(null);
+  const setCheckoutBackHandler = useCallback((handler: (() => boolean) | null) => { checkoutBackHandler.current = handler; }, []);
   const [briefing, setBriefing] = useState(true),
     [briefingStep, setBriefingStep] = useState(0);
   const [settings, setSettings] = useState(false),
@@ -246,6 +252,7 @@ export function MarketSimulationScreen({
     const back = BackHandler.addEventListener('hardwareBackPress', () => {
       if (externalMenuOpen) return false;
       if (panelPresent && !panelVisible) return true;
+      if (live.current.phase === 'checkout' && checkoutBackHandler.current?.()) return true;
       if (historyOpen) {
         setHistoryOpen(false);
         return true;
@@ -269,6 +276,7 @@ export function MarketSimulationScreen({
           setStaffReturnHelp(false);
         }
       }
+      else if (session.phase === 'checkout') dispatch({ type: 'closeStation' });
       else if (session.phase !== 'finished') giveUp();
       else return false;
       return true;
@@ -378,6 +386,7 @@ export function MarketSimulationScreen({
     quantity: session.learning.choiceTask.quantity,
   }] : [])];
   const cartCount = Object.values(session.cart).reduce((a, b) => a + b, 0);
+  const checkoutReview = getMarketCheckoutReview(session);
   const isFinished = session.phase === 'finished',
     ratingDone = !!session.ratings || session.ratingSkipped;
   const cashierPenaltyTotal = isFinished ? session.events.reduce((total, event) =>
@@ -616,19 +625,21 @@ export function MarketSimulationScreen({
       cart={session.cart} kioskLabel="무인 계산대"
       onConfirm={scannedCart => dispatch({ type: 'submitKiosk', scannedCart })}
       onCancel={closeStation} /> : null}
-    {!briefing && session.phase === 'checkout' && !session.selectedKioskId
-      ? modal(session.cashierAvailable ? '이대로 구매할까요?' : '계산원이 자리를 비웠어요', <>
-        <CartContents cart={session.cart} />
-        <Text style={s.body}>결제 금액 {price(getMarketCartTotal(session.cart))}</Text>
-        {session.cashierAvailable
-          ? <>
-            <Text style={s.small}>구매를 확정하면 이번 시도가 기록되고 결과가 나와요.</Text>
-            <Button text="구매 확정" onPress={() => dispatch({ type: 'submit' })} />
-          </>
-          : <>
+    {!briefing && session.phase === 'checkout' && !session.selectedKioskId && checkoutReview
+      ? <MarketStaffedCheckout key={`${session.selectedCheckoutId}-${session.attempts}`}
+        review={checkoutReview} cart={session.cart} counterNumber={session.selectedCheckoutId === 'checkout-2' ? 2 : 1}
+        dialogueBottomInset={Math.max(24, insets?.bottom ?? 0)}
+        onCorrect={(productId, quantity) => {
+          const next = dispatch({ type: 'requestCheckoutCorrection', productId, quantity });
+          return next.lastActionError ?? getMarketCheckoutReview(next)?.response ?? '계산 내역을 다시 확인해 주세요.';
+        }}
+        onSubmit={() => dispatch({ type: 'submit' })} onCancel={closeStation}
+        onInspectCart={() => dispatch({ type: 'viewCheckoutCart' })}
+        onBackHandlerChange={setCheckoutBackHandler} /> : null}
+    {!briefing && session.phase === 'checkout' && !session.selectedKioskId && !session.cashierAvailable
+      ? modal('계산원이 자리를 비웠어요', <>
             <Text style={s.body}>계산원이 있는 계산대나 무인 계산대를 이용해 주세요. 유인 계산대가 모두 비어 있으면 직원에게 부탁해요.</Text>
             <Button text="계산대 다시 살펴보기" onPress={closeStation} />
-          </>}
         <Button
           text="다시 고르기"
           quiet
@@ -643,7 +654,7 @@ export function MarketSimulationScreen({
           ? <View testID="market-detailed-feedback">
             {session.feedback.details.map((detail, i) => <Text key={i} style={s.body}>• {detail}</Text>)}
           </View>
-          : <Text testID="market-general-feedback" style={s.body}>목록과 장바구니를 스스로 다시 살펴보세요.</Text>}
+          : <Text testID="market-general-feedback" style={s.body}>구매 목록, 장바구니, 계산 내역을 다시 확인해 보세요.</Text>}
         <Button
           text={session.attempts === 1 ? '1차 재시도' : session.attempts + '차 재시도'}
           onPress={() => dispatch({ type: 'retry' })}
@@ -861,7 +872,7 @@ function Stars({ title, hint, value, onChange }: {
   onChange: (value: number) => void;
 }) {
   return <View style={s.stars}>
-    <Text style={s.body}>
+    <Text style={[s.body, s.ratingCaption]}>
       {title}
     </Text>
     <View style={s.starRow}>
@@ -874,13 +885,13 @@ function Stars({ title, hint, value, onChange }: {
         style={s.star}
       >
         <Ionicons
-          name={star <= value ? 'star' : 'star-outline'}
-          color="#B58331"
+          name="star"
+          color={star <= value ? '#B58331' : '#DDD8CC'}
           size={28}
         />
       </PressScale>)}
     </View>
-    <Text style={s.small}>
+    <Text style={[s.small, s.ratingCaption]}>
       {hint}
     </Text>
   </View>;
@@ -1005,8 +1016,9 @@ const s = StyleSheet.create({
     borderRadius: 16
   },
   resultText: { fontFamily: fonts.laundryBold, fontSize: 24, color: '#304B54' },
-  stars: { gap: 4 },
-  starRow: { flexDirection: 'row' },
+  stars: { gap: 4, alignItems: 'center' },
+  ratingCaption: { textAlign: 'center' },
+  starRow: { flexDirection: 'row', justifyContent: 'center' },
   star: {
     minWidth: 44,
     minHeight: 44,

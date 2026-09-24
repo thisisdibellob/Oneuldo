@@ -139,8 +139,8 @@ it('가로 진열대 두 묶음과 세로 진열대 세 묶음은 카테고리 �
   expect(Object.values(environment.shelves).filter(shelf => shelf.orientation === 'vertical')).toHaveLength(3);
   expect(isMarketEnvironmentBlocked(environment, { x: 500, y: 350 })).toBe(false);
   expect(isMarketEnvironmentBlocked(environment, { x: 400, y: 550 })).toBe(true);
-  expect(environment.shelves.fresh.y + environment.shelves.fresh.height).toBe(260);
-  expect(environment.shelves.meal.y + environment.shelves.meal.height).toBe(600);
+  expect(environment.shelves.fresh.y + environment.shelves.fresh.height / 2).toBeCloseTo(228);
+  expect(environment.shelves.meal.y + environment.shelves.meal.height / 2).toBeCloseTo(516);
 });
 
 it('직원과 계산대의 접근점만 상호작용 허용하고 가짜 위치를 거부한다', () => {
@@ -202,7 +202,15 @@ it('두 진열대의 실제 발판 사이 간격은 통과하며 양쪽 유닛�
   expect(units).toHaveLength(2);
   expect(isMarketEnvironmentBlocked(environment, { x: 400, y: 516 })).toBe(false);
   expect(isNearMarketStation(environment, 'household', { x: 400, y: 516 })).toBe(true);
-  for (const point of [{ x: 327, y: 464 }, { x: 478, y: 464 }, { x: 400, y: 412 }, { x: 400, y: 620 }, { x: 478, y: 568 }]) {
+  const [back, front] = units;
+  const centerX = back.x + back.width / 2;
+  for (const point of [
+    { x: back.x - 14, y: back.y + back.height / 2 },
+    { x: back.x + back.width + 22, y: back.y + back.height / 2 },
+    { x: centerX, y: back.y - 22 },
+    { x: centerX, y: front.y + front.height + 22 },
+    { x: front.x + front.width + 22, y: front.y + front.height / 2 },
+  ]) {
     expect({ point, near: isNearMarketStation(environment, 'household', point) }).toEqual({ point, near: true });
     expect(getNearestMarketStation(environment, point)?.id).toBe('household');
   }
@@ -215,11 +223,11 @@ it('두 진열대의 실제 발판 사이 간격은 통과하며 양쪽 유닛�
   expect(approach.y).toBeGreaterThanOrEqual(600);
 });
 
-it('계산대는 기존 크기의 정확히 75퍼센트이고 두 곳 모두 직원 왼쪽·손님 오른쪽이다', () => {
+it('커진 계산대의 받침 전체를 막으면서 두 곳 모두 직원 왼쪽·손님 오른쪽 접근을 유지한다', () => {
   const environment = emptyArchitecture();
   for (const counter of environment.checkouts.filter(counter => counter.kind !== 'kiosk')) {
-    expect(counter.rect.width).toBe(64 * 0.75);
-    expect(counter.rect.height).toBe(156 * 0.75);
+    expect(counter.rect.width).toBeCloseTo(54 * 1.15);
+    expect(counter.rect.height).toBeCloseTo(117 * 1.15);
     expect(counter.cashierPoint.x).toBeLessThan(counter.rect.x);
     expect(counter.point.x).toBeGreaterThan(counter.rect.x + counter.rect.width);
     expect(isNearMarketStation(environment, counter.id, counter.point)).toBe(true);
@@ -240,10 +248,9 @@ it('매장 안 입출구를 원래 계산대 전면에 붙이고 새 로비는 �
   expect(environment.walkableAreas.find(area => area.id === 'entrance-lobby')).toEqual({ id: 'entrance-lobby', x: 120, y: 1020, width: 930, height: 424 });
   expect(environment.commonDoor.point).toEqual({ x: 710, y: 1430 });
   for (const checkout of environment.checkouts) {
-    expect(checkout.rect.y).toBe(829);
     expect(checkout.rect.y + checkout.rect.height).toBe(946);
-    expect(checkout.point.y).toBe(889);
-    expect(checkout.cashierPoint.y).toBe(889);
+    expect(checkout.point.y).toBeCloseTo(880.45);
+    expect(checkout.cashierPoint.y).toBeCloseTo(checkout.point.y);
   }
 });
 
@@ -358,9 +365,9 @@ it('모퉁이 계산대를 내려 배치해도 53px 출구 연결 통로와 두 
       employeeCount: 3, customerCount: 5, pillarCount: 4, cashierCount: 0, kioskPresent: true, shelfOrder: 'random' });
     const called = { checkout: true, 'checkout-2': true };
     for (const counter of environment.checkouts.filter(counter => counter.kind !== 'kiosk')) {
-      expect(counter.rect.y).toBe(870);
-      expect(counter.cashierPoint.y).toBe(930);
-      expect(counter.point.y).toBe(930);
+      expect(counter.rect.y + counter.rect.height).toBe(987);
+      expect(counter.cashierPoint.y).toBeCloseTo(921.45);
+      expect(counter.point.y).toBeCloseTo(counter.cashierPoint.y);
       expect(environment.entrance.gate.y + 10 - (counter.rect.y + counter.rect.height)).toBe(53);
       expect(isMarketEnvironmentBlocked(environment, counter.point, called)).toBe(false);
       expect(isNearMarketStation(environment, counter.id, counter.point, undefined, called)).toBe(true);

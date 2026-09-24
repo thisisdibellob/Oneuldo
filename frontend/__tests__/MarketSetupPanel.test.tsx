@@ -83,3 +83,20 @@ it('셀프 계산 줄과 학습 조건을 저장하고 예산 입력 중 빈 값
   expect(onApply).toHaveBeenCalledTimes(1);
   expect(onApply.mock.calls[0][0]).toMatchObject({ environment: { kioskLane: 'checkout' }, learning: { allowSubstitution: false, choiceBudget: 3500 } });
 });
+
+it.each([
+  ['항상 정상 계산', 'normal'],
+  ['계산 실수 있음', 'overcharge'],
+  ['계산 실수 랜덤', 'random'],
+] as const)('%s 조건을 선택하면 다른 학습 설정과 함께 저장하고 JSON으로 다시 불러온다', (label, mode) => {
+  const config = createMarketSession({ learning: { stockoutEnabled: false, budgetChoiceEnabled: false } }).config;
+  const onApply = jest.fn();
+  const screen = render(<MarketSetupPanel config={config} onApply={onApply} onClose={jest.fn()} />);
+  fireEvent.press(screen.getByRole('button', { name: label }));
+  expect(screen.getByRole('button', { name: label }).props.accessibilityState.selected).toBe(true);
+  fireEvent.press(screen.getByRole('button', { name: '설정 적용' }));
+  expect(onApply).toHaveBeenCalledTimes(1);
+  const applied = parseMarketSessionConfig(JSON.stringify(onApply.mock.calls[0][0]));
+  expect(applied.learning).toMatchObject({ checkoutReviewMode: mode, stockoutEnabled: false, budgetChoiceEnabled: false });
+  expect(applied.seed).toBe(config.seed);
+});

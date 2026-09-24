@@ -330,13 +330,85 @@ describe('마트 장보기의 최종 결정과 재시도', () => {
     expect(game.screen.queryByText(/부족해요|너무 많이|구매 목록에 없어요|필요한 수량은/)).toBeNull();
     fireEvent.press(game.screen.getByRole('button', { name: '계속 고르기' }));
     await game.station('checkout');
-    expect(game.screen.getByText('이대로 구매할까요?')).toBeTruthy();
+    expect(game.screen.getByRole('header', { name: '계산 내역' })).toBeTruthy();
     expect(game.screen.queryByTestId('market-general-feedback')).toBeNull();
     expect(game.screen.queryByTestId('market-detailed-feedback')).toBeNull();
+    expect(within(game.screen.getByTestId('checkout-pos')).queryByRole('button', { name: '장보기 포기' })).toBeNull();
     fireEvent.press(game.screen.getByRole('button', { name: '다시 고르기' }));
+    await finishTransition();
+    expect(game.screen.queryByTestId('market-staffed-checkout')).toBeNull();
+    expect(game.screen.getByTestId('market-hud')).toBeTruthy();
+    expect(game.screen.queryByText('실패 (포기)')).toBeNull();
+    expect(game.onMissionComplete).not.toHaveBeenCalled();
+    expect(game.onEpisodeComplete).not.toHaveBeenCalled();
+    expect(game.onExit).not.toHaveBeenCalled();
     fireEvent.press(game.screen.getByRole('button', { name: '장보기 포기' }));
     expect(game.screen.getByText('구매 시도 0회')).toBeTruthy();
     game.screen.unmount();
+  });
+
+  it('계산원에게 잘못 찍힌 수량을 정정 요청하고 수정 내역으로 구매한다', async () => {
+    const game = setup({ learning: { stockoutEnabled: false, budgetChoiceEnabled: false, checkoutReviewMode: 'overcharge' } });
+    try {
+      await game.start(); await game.station('fresh'); game.add('milk', 2); await game.closeShelf();
+      await game.station('checkout');
+      expect(within(game.screen.getByTestId('checkout-receipt')).getByText('3개')).toBeTruthy();
+      expect(game.screen.getByRole('button', { name: '구매 확정' }).props.accessibilityState.disabled).toBe(false);
+      expect(within(game.screen.getByTestId('checkout-receipt')).queryByText(/잘못|오류|필요한 수량/)).toBeNull();
+      fireEvent.press(game.screen.getByRole('button', { name: '장바구니 확인' }));
+      expect(within(game.screen.getByTestId('checkout-basket')).getByText('2개')).toBeTruthy();
+      fireEvent.press(game.screen.getByRole('button', { name: '계산 내역으로 돌아가기' }));
+      expect(within(game.screen.getByTestId('checkout-receipt')).getByText('3개')).toBeTruthy();
+      fireEvent.press(game.screen.getByRole('button', { name: '개수가 잘못된 것 같아요' })); finishStaffLine(game.screen);
+      fireEvent.press(game.screen.getByRole('button', { name: '흰 우유 계산 수량 확인' }));
+      expect(game.screen.getByTestId('checkout-claimed-quantity').props.children).toEqual([1, '개']);
+      fireEvent.press(game.screen.getByRole('button', { name: '정정 요청 수량 늘리기' }));
+      fireEvent.press(game.screen.getByRole('button', { name: '수량 확인 부탁하기' })); finishStaffLine(game.screen);
+      expect(game.onMissionComplete).not.toHaveBeenCalled();
+      expect(game.screen.getByText('확인했어요. 흰 우유 2개로 바로잡았어요.')).toBeTruthy();
+      fireEvent.press(game.screen.getByRole('button', { name: '계산 내역 다시 보기' }));
+      expect(within(game.screen.getByTestId('checkout-receipt')).getByText('2개')).toBeTruthy();
+      expect(game.screen.getByTestId('checkout-charged-total').props.children).toBe((getMarketProduct('milk')!.price * 2).toLocaleString('ko-KR') + '원');
+      fireEvent.press(game.screen.getByRole('button', { name: '구매 확정' }));
+      expect(game.screen.getByText('구매 시도 1회')).toBeTruthy();
+      expect(game.onMissionComplete).toHaveBeenCalledTimes(1);
+      fireEvent.press(game.screen.getByRole('button', { name: '평가 건너뛰기' }));
+      const episode = game.onEpisodeComplete.mock.calls[0][0];
+      expect(episode.finalCart).toEqual({ milk: 2 });
+      expect(episode.events.some((event: { type: string }) => event.type === 'checkout_cart_viewed')).toBe(true);
+      expect(episode.events.some((event: { type: string }) => event.type === 'checkout_bill_corrected')).toBe(true);
+    } finally { game.screen.unmount(); }
+  });
+
+  it('오청구를 놓친 첫 확정은 일반 안내, 같은 내역의 두 번째 확정부터 상세 안내한다', async () => {
+    const game = setup({ learning: { stockoutEnabled: false, budgetChoiceEnabled: false, checkoutReviewMode: 'overcharge' } });
+    try {
+      await game.start(); await game.station('fresh'); game.add('milk', 2); await game.closeShelf();
+      await game.station('checkout'); fireEvent.press(game.screen.getByRole('button', { name: '구매 확정' }));
+      expect(game.screen.getByTestId('market-general-feedback')).toBeTruthy();
+      expect(game.screen.queryByTestId('market-detailed-feedback')).toBeNull();
+      expect(game.onMissionComplete).not.toHaveBeenCalled();
+      fireEvent.press(game.screen.getByRole('button', { name: '1차 재시도' }));
+      await game.station('checkout-2');
+      expect(within(game.screen.getByTestId('checkout-receipt')).getByText('3개')).toBeTruthy();
+      fireEvent.press(game.screen.getByRole('button', { name: '구매 확정' }));
+      expect(within(game.screen.getByTestId('market-detailed-feedback')).getByText(/계산 확인: 흰 우유/)).toBeTruthy();
+      expect(game.screen.getByRole('button', { name: '2차 재시도' })).toBeTruthy();
+    } finally { game.screen.unmount(); }
+  });
+
+  it('계산 내역에서 Android 뒤로 가기는 계산대만 닫고 장보기를 포기하지 않는다', async () => {
+    const backEvents = jest.spyOn(BackHandler, 'addEventListener');
+    const game = setup();
+    try {
+      await game.start(); await game.station('checkout');
+      const handler = backEvents.mock.calls.filter(([event]) => event === 'hardwareBackPress').at(-1)![1];
+      act(() => { expect(handler({ type: 'hardwareBackPress', timeStamp: Date.now() })).toBe(true); });
+      await finishTransition();
+      expect(game.screen.queryByTestId('market-staffed-checkout')).toBeNull();
+      expect(game.screen.getByTestId('market-hud')).toBeTruthy();
+      expect(game.screen.queryByText('실패 (포기)')).toBeNull();
+    } finally { game.screen.unmount(); backEvents.mockRestore(); }
   });
 
   it('첫 실패는 정오만, 두 번째부터는 수정 항목을 보여주며 재시도 횟수를 제한하지 않는다', async () => {
@@ -402,7 +474,12 @@ describe('마트 장보기의 최종 결정과 재시도', () => {
     expect(game.onCashierCalled).toHaveBeenLastCalledWith({ checkout: true, 'checkout-2': false });
     fireEvent.press(game.screen.getByRole('button', { name: '아니에요, 감사합니다.' }));
     await game.station('checkout'); expect(game.screen.getByRole('button', { name: '구매 확정' })).toBeTruthy();
-    fireEvent.press(game.screen.getAllByRole('button', { name: '장보기 포기' })[0]);
+    expect(within(game.screen.getByTestId('checkout-pos')).queryByRole('button', { name: '장보기 포기' })).toBeNull();
+    fireEvent.press(game.screen.getByRole('button', { name: '다시 고르기' }));
+    await finishTransition();
+    expect(game.screen.queryByText('실패 (포기)')).toBeNull();
+    expect(game.onEpisodeComplete).not.toHaveBeenCalled();
+    fireEvent.press(game.screen.getByRole('button', { name: '장보기 포기' }));
     expect(game.screen.getByText('구매 시도 0회')).toBeTruthy(); game.screen.unmount();
   });
 

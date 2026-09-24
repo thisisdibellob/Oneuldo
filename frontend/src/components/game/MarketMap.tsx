@@ -13,8 +13,9 @@ import {
   View
 } from 'react-native';
 import { DirectionalAvatar } from './DirectionalAvatar';
-import { freshPlayerAvatar } from '../../game/freshPlayerAvatar';
-import { facingFromVector, type AvatarFacing } from '../../game/avatarAnimation';
+import { chibiPlayerAvatar as freshPlayerAvatar } from '../../game/chibiPlayerAvatar';
+import { createAvatarWalkCycle, getAvatarMovement, type AvatarFacing, type AvatarMotion } from '../../game/avatarAnimation';
+import { useMarketReducedMotion } from './MarketPanelTransition';
 import { PressScale } from '../PressScale';
 import {
   MarketShelfTarget,
@@ -80,6 +81,8 @@ export function MarketMap({
   const viewport = useRef({ height: 0, width: 0 });
   const viewportOrigin = useRef({ x: 0, y: 0 });
   const direction = useRef<MarketPoint>({ x: 0, y: 0 });
+  const keyboardDirection = useRef<MarketPoint>({ x: 0, y: 0 });
+  const pressedMovementKeys = useRef(new Set<string>());
   const speedMultiplier = useRef(1);
   const tapTarget = useRef<MarketPoint | null>(null);
   const tapWaypoints = useRef<MarketPoint[]>([]);
@@ -91,7 +94,10 @@ export function MarketMap({
   const controlsLockedRef = useRef(!interactive);
   const joystickZoneSize = useRef({ height: MARKET_JOYSTICK_ZONE_HEIGHT, width: 220 });
 
-  const [facing, setFacing] = useState<AvatarFacing>('front');
+  const [avatarPose, setAvatarPose] = useState<{ facing: AvatarFacing; motion: AvatarMotion }>({ facing: 'front', motion: 'idle' });
+  const avatarFacing = useRef<AvatarFacing>('front');
+  const [playerWalkCycle] = useState(createAvatarWalkCycle);
+  const reduceMotion = useMarketReducedMotion();
   const [controlMode, setControlMode] = useState<MarketControlMode>('joystick');
   const [runEnabled, setRunEnabled] = useState(false);
   const [tapTargetMarker, setTapTargetMarker] = useState<MarketPoint | null>(null);
@@ -116,7 +122,7 @@ export function MarketMap({
     }
   }, [onNearbyStationChange, environment]);
 
-  const movePlayer = useCallback((dx: number, dy: number) => {
+  const movePlayer = useCallback((dx: number, dy: number, animate = false) => {
     const current = playerPoint.current;
     let next = current;
     const steps = Math.max(1, Math.ceil(Math.max(Math.abs(dx), Math.abs(dy)) / 6));
@@ -126,16 +132,28 @@ export function MarketMap({
       const yCandidate = clampMarketPoint({ x: next.x, y: next.y + dy / steps }, geometryRef.current.environment.world);
       if (!isMarketBlocked(yCandidate)) next = yCandidate;
     }
-    if (dx || dy) setFacing(currentFacing => facingFromVector(dx, dy, currentFacing));
+    const movement = getAvatarMovement(current, next, avatarFacing.current, speedMultiplier.current > 1 ? 'sprint' : 'walk');
+    avatarFacing.current = movement.facing;
+    const motion = animate ? movement.motion : 'idle';
+    if (animate) playerWalkCycle.advance(movement.distance);
+    setAvatarPose(previous => previous.facing === movement.facing && previous.motion === motion
+      ? previous : { facing: movement.facing, motion });
     playerPoint.current = next;
     onPositionChange?.(next);
     updateCamera(next);
     updateStationProximity(next);
     return next;
-  }, [updateCamera, updateStationProximity, environment, cashierCalled, onPositionChange]);
+  }, [playerWalkCycle, updateCamera, updateStationProximity, environment, cashierCalled, onPositionChange]);
+
+  const settleAvatar = useCallback(() => {
+    setAvatarPose(previous => previous.motion === 'idle' ? previous : { ...previous, motion: 'idle' });
+  }, []);
 
   const stopMovement = useCallback(() => {
+    settleAvatar();
     direction.current = { x: 0, y: 0 };
+    keyboardDirection.current = { x: 0, y: 0 };
+    pressedMovementKeys.current.clear();
     joystickEngaged.current = false;
     tapTarget.current = null;
     tapWaypoints.current = [];
@@ -153,9 +171,10 @@ export function MarketMap({
       toValue: { x: 0, y: 0 },
       useNativeDriver: true,
     }).start();
-  }, [joystickKnob]);
+  }, [joystickKnob, settleAvatar]);
 
   const runMovement = useCallback((timestamp: number) => {
+    if (controlsLockedRef.current) { stopMovement(); return; }
     const last = previousFrame.current ?? timestamp;
     const elapsedSeconds = Math.min(timestamp - last, 32) / 1000;
     previousFrame.current = timestamp;
@@ -167,12 +186,13 @@ export function MarketMap({
       const dy = target.y - current.y;
       const distance = Math.hypot(dx, dy);
       if (distance <= 3 && tapWaypoints.current.length) {
-        movePlayer(dx, dy);
+        movePlayer(dx, dy, true);
         tapTarget.current = tapWaypoints.current.shift()!;
         animationFrame.current = requestAnimationFrame(runMovement);
         return;
       }
       if (distance <= 3) {
+        settleAvatar();
         tapTarget.current = null;
         previousFrame.current = null;
         animationFrame.current = null;
@@ -180,8 +200,9 @@ export function MarketMap({
         return;
       }
       const step = Math.min(distance, MARKET_MOVE_SPEED * speedMultiplier.current * elapsedSeconds);
-      const next = movePlayer((dx / distance) * step, (dy / distance) * step);
+      const next = movePlayer((dx / distance) * step, (dy / distance) * step, true);
       if (step > 0 && Math.hypot(next.x - current.x, next.y - current.y) < 0.05) {
+        settleAvatar();
         tapTarget.current = null;
         previousFrame.current = null;
         animationFrame.current = null;
@@ -192,16 +213,21 @@ export function MarketMap({
       return;
     }
 
+    const dx = direction.current.x + keyboardDirection.current.x;
+    const dy = direction.current.y + keyboardDirection.current.y;
+    const normalization = Math.max(1, Math.hypot(dx, dy));
     movePlayer(
-      direction.current.x * MARKET_MOVE_SPEED * speedMultiplier.current * elapsedSeconds,
-      direction.current.y * MARKET_MOVE_SPEED * speedMultiplier.current * elapsedSeconds,
+      dx / normalization * MARKET_MOVE_SPEED * speedMultiplier.current * elapsedSeconds,
+      dy / normalization * MARKET_MOVE_SPEED * speedMultiplier.current * elapsedSeconds,
+      true,
     );
-    if (joystickEngaged.current) animationFrame.current = requestAnimationFrame(runMovement);
+    if (joystickEngaged.current || pressedMovementKeys.current.size) animationFrame.current = requestAnimationFrame(runMovement);
     else {
+      settleAvatar();
       previousFrame.current = null;
       animationFrame.current = null;
     }
-  }, [movePlayer]);
+  }, [movePlayer, settleAvatar, stopMovement]);
 
   const beginMovement = useCallback(() => {
     if (animationFrame.current === null) animationFrame.current = requestAnimationFrame(runMovement);
@@ -262,27 +288,46 @@ export function MarketMap({
   };
 
   useEffect(() => {
-    if (Platform.OS !== 'web') return;
+    if (Platform.OS !== 'web' || typeof window === 'undefined') return;
+    const keys: Record<string, MarketPoint> = {
+      ArrowUp: { x: 0, y: -1 }, ArrowDown: { x: 0, y: 1 },
+      ArrowLeft: { x: -1, y: 0 }, ArrowRight: { x: 1, y: 0 },
+      w: { x: 0, y: -1 }, s: { x: 0, y: 1 }, a: { x: -1, y: 0 }, d: { x: 1, y: 0 },
+    };
+    const keyName = (event: KeyboardEvent) => event.key.length === 1 ? event.key.toLowerCase() : event.key;
+    const syncDirection = () => {
+      let x = 0, y = 0;
+      pressedMovementKeys.current.forEach(key => { x += keys[key].x; y += keys[key].y; });
+      const length = Math.hypot(x, y);
+      keyboardDirection.current = length ? { x: x / length, y: y / length } : { x: 0, y: 0 };
+    };
     const keydown = (event: KeyboardEvent) => {
-      if (controlsLockedRef.current || /INPUT|TEXTAREA|SELECT/.test((event.target as HTMLElement)?.tagName ?? '')) return;
-      const keys: Record<string, MarketPoint> = {
-        ArrowUp: { x: 0, y: -24 },
-        ArrowDown: { x: 0, y: 24 },
-        ArrowLeft: { x: -24, y: 0 },
-        ArrowRight: { x: 24, y: 0 },
-        w: { x: 0, y: -24 },
-        s: { x: 0, y: 24 },
-        a: { x: -24, y: 0 },
-        d: { x: 24, y: 0 }
-      };
-      const delta = keys[event.key];
-      if (!delta) return;
+      const key = keyName(event);
+      const target = event.target as HTMLElement | null;
+      if (!keys[key] || controlsLockedRef.current || event.altKey || event.ctrlKey || event.metaKey ||
+        target?.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/i.test(target?.tagName ?? '')) return;
       event.preventDefault();
-      movePlayer(delta.x, delta.y);
+      if (!pressedMovementKeys.current.size) stopMovement();
+      pressedMovementKeys.current.add(key);
+      syncDirection();
+      beginMovement();
+    };
+    const keyup = (event: KeyboardEvent) => {
+      const key = keyName(event);
+      if (!keys[key]) return;
+      pressedMovementKeys.current.delete(key);
+      syncDirection();
+      if (!pressedMovementKeys.current.size && !joystickEngaged.current) stopMovement();
     };
     window.addEventListener('keydown', keydown);
-    return () => window.removeEventListener('keydown', keydown);
-  }, [movePlayer]);
+    window.addEventListener('keyup', keyup);
+    window.addEventListener('blur', stopMovement);
+    return () => {
+      window.removeEventListener('keydown', keydown);
+      window.removeEventListener('keyup', keyup);
+      window.removeEventListener('blur', stopMovement);
+    };
+  }, [beginMovement, stopMovement]);
 
   const startTapMovement = (desired: MarketPoint) => {
     if (controlsLockedRef.current) return;
@@ -476,7 +521,8 @@ export function MarketMap({
         <Animated.View testID="market-player-world"
           accessibilityLabel="마트 안 내 캐릭터" pointerEvents="none"
           style={[styles.marketPlayerFixed, { transform: playerWorldPosition.getTranslateTransform(), zIndex: playerDepth }]}>
-          <DirectionalAvatar facing={facing} manifest={freshPlayerAvatar} motion="idle" scale={0.5} />
+          <DirectionalAvatar facing={avatarPose.facing} manifest={freshPlayerAvatar} motion={avatarPose.motion}
+            walkCycle={playerWalkCycle} reduceMotion={reduceMotion} scale={0.5} />
         </Animated.View>
       </Animated.View>
 

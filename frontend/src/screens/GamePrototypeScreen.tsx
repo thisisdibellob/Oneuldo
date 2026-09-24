@@ -55,11 +55,13 @@ import {
   type DailyQuestStatusMap,
 } from '../game/dailyQuests';
 import {
+  createAvatarWalkCycle,
+  getAvatarMovement,
   facingFromVector,
   type AvatarFacing,
   type AvatarMotion,
 } from '../game/avatarAnimation';
-import { freshPlayerAvatar } from '../game/freshPlayerAvatar';
+import { chibiPlayerAvatar as freshPlayerAvatar } from '../game/chibiPlayerAvatar';
 import { getMarketRenderDepth, getNearestMarketStation, getMarketStationApproachPoint, MARKET_ENVIRONMENT_PLAYER_RADIUS, createMarketEnvironment, isMarketEnvironmentBlocked, type MarketEnvironment, type MarketEnvironmentStationId, type MarketCashierAvailability } from '../game/marketEnvironment';
 import {
   BUS_STOP_POINT,
@@ -533,6 +535,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
   const startNpcGreetingRef = useRef<(npcId: VillageNpcId) => void>(() => undefined);
   const playerFacingRef = useRef<AvatarFacing>('front');
   const playerMotionRef = useRef<AvatarMotion>('idle');
+  const [playerWalkCycle] = useState(createAvatarWalkCycle);
 
   const [nearbyNpcId, setNearbyNpcId] = useState<VillageNpcId | null>(null);
   const [nearbyPortalId, setNearbyPortalId] = useState<PendingPortal>(null);
@@ -782,7 +785,8 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
 
   const syncPlayerAvatarPose = useCallback((x: number, y: number, moving: boolean) => {
     const nextFacing = facingFromVector(x, y, playerFacingRef.current);
-    const nextMotion: AvatarMotion = moving && Math.hypot(x, y) >= 0.04 ? 'walk' : 'idle';
+    const nextMotion: AvatarMotion = moving && Math.hypot(x, y) >= 0.04
+      ? (speedMultiplier.current > 1 ? 'sprint' : 'walk') : 'idle';
     if (nextFacing === playerFacingRef.current && nextMotion === playerMotionRef.current) return;
 
     playerFacingRef.current = nextFacing;
@@ -791,7 +795,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
   }, []);
 
   const movePlayer = useCallback(
-    (dx: number, dy: number) => {
+    (dx: number, dy: number, animate = false) => {
       const current = playerPoint.current;
       let next = current;
       const activeMap = worldMapRef.current;
@@ -805,13 +809,22 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
         if (!isBlocked(yCandidate, activeMap, marketEnvironmentRef.current, marketCashierCalledRef.current)) next = yCandidate;
       }
 
+      if (animate) {
+        const movement = getAvatarMovement(current, next, playerFacingRef.current, speedMultiplier.current > 1 ? 'sprint' : 'walk');
+        playerWalkCycle.advance(movement.distance);
+        if (movement.facing !== playerFacingRef.current || movement.motion !== playerMotionRef.current) {
+          playerFacingRef.current = movement.facing;
+          playerMotionRef.current = movement.motion;
+          setPlayerAvatarPose({ facing: movement.facing, motion: movement.motion });
+        }
+      }
       playerPoint.current = next;
       if (activeMap === 'market') marketMovementListener.current?.(current, next);
       updateCamera(next);
       updateNpcProximity(next);
       return next;
     },
-    [updateCamera, updateNpcProximity],
+    [playerWalkCycle, updateCamera, updateNpcProximity],
   );
 
   const stopMovement = useCallback(() => {
@@ -1004,7 +1017,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
           pendingBusStopInteraction.current && busStopNearbyRef.current;
 
         if (distance <= 3 && tapWaypoints.current.length && !marketStationInteractionReached) {
-          movePlayer(dx, dy);
+          movePlayer(dx, dy, true);
           tapTarget.current = tapWaypoints.current.shift()!;
           animationFrame.current = requestAnimationFrame(runMovement);
           return;
@@ -1066,8 +1079,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
         }
 
         const step = Math.min(distance, MOVE_SPEED * speedMultiplier.current * elapsedSeconds);
-        syncPlayerAvatarPose(dx, dy, true);
-        const next = movePlayer((dx / distance) * step, (dy / distance) * step);
+        const next = movePlayer((dx / distance) * step, (dy / distance) * step, true);
         const moved = Math.hypot(next.x - current.x, next.y - current.y);
         if (step > 0 && moved < 0.05) {
           tapTarget.current = null;
@@ -1090,10 +1102,10 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
       const combinedY = direction.current.y + keyboardDirection.current.y;
       const combinedLength = Math.hypot(combinedX, combinedY);
       const movementScale = combinedLength > 1 ? 1 / combinedLength : 1;
-      syncPlayerAvatarPose(combinedX, combinedY, combinedLength >= 0.04);
       movePlayer(
         combinedX * movementScale * MOVE_SPEED * speedMultiplier.current * elapsedSeconds,
         combinedY * movementScale * MOVE_SPEED * speedMultiplier.current * elapsedSeconds,
+        true,
       );
       if (joystickEngaged.current || keyboardEngaged.current) {
         animationFrame.current = requestAnimationFrame(runMovement);
@@ -2398,7 +2410,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
             style={[styles.player, { left: 0, top: 0, zIndex: marketPlayerDepth,
               transform: marketPlayerPosition.getTranslateTransform() }]}>
             <DirectionalAvatar facing={playerAvatarPose.facing} manifest={freshPlayerAvatar}
-              motion={playerAvatarPose.motion} reduceMotion={reduceMotionEnabled} scale={PLAYER_ART_SCALE} />
+              motion={playerAvatarPose.motion} walkCycle={playerWalkCycle} reduceMotion={reduceMotionEnabled} scale={PLAYER_ART_SCALE} />
           </Animated.View> : null}
         </Animated.View>
 
@@ -2408,6 +2420,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
             facing={playerAvatarPose.facing}
             manifest={freshPlayerAvatar}
             motion={playerAvatarPose.motion}
+            walkCycle={playerWalkCycle}
             reduceMotion={reduceMotionEnabled}
             scale={PLAYER_ART_SCALE}
           />

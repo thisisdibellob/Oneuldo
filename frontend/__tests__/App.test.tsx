@@ -1,9 +1,12 @@
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
+import { PanResponder } from 'react-native';
+import { DirectionalAvatar } from '../src/components/game/DirectionalAvatar';
+import { AVATAR_WALK_CYCLE_DISTANCE } from '../src/game/avatarAnimation';
 
 import App from '../App';
 import { GamePrototypeScreen } from '../src/screens/GamePrototypeScreen';
 import { MarketSimulationScreen } from '../src/screens/MarketSimulationScreen';
-import { getMarketWrongWayGate, getNearestMarketStation, isMarketEnvironmentBlocked, type MarketEnvironmentStationId, type MarketEnvironment } from '../src/game/marketEnvironment';
+import { MARKET_ENVIRONMENT_PLAYER_RADIUS, getMarketWrongWayGate, getNearestMarketStation, isMarketEnvironmentBlocked, type MarketEnvironmentStationId, type MarketEnvironment } from '../src/game/marketEnvironment';
 
 jest.mock('expo-font', () => ({
   isLoaded: () => true,
@@ -558,21 +561,28 @@ describe('오늘도 앱', () => {
         ? point.x > environment.entrance.gate.x + 12 && point.x < environment.entrance.gate.x + environment.entrance.gate.width - 12
           && point.y < environment.entrance.alarmBoundaryY && point.y + 58 >= environment.entrance.alarmBoundaryY
         : getNearestMarketStation(environment, point)?.id === stationId;
-      const key = (point: { x: number; y: number }) => `${point.x},${point.y}`;
+      const key = (point: { x: number; y: number }) => `${point.x.toFixed(3)},${point.y.toFixed(3)}`;
       const queue = [start], parents = new Map<string, { parent: string; actionName: string } | null>([[key(start), null]]);
       let finish: string | null = null;
       for (let index = 0; index < queue.length; index++) {
         const current = queue[index];
         if (reached(current)) { finish = key(current); break; }
         for (const [dx, dy, actionName] of [[58, 0, 'moveRight'], [-58, 0, 'moveLeft'], [0, 58, 'moveDown'], [0, -58, 'moveUp']] as const) {
-          const next = { x: current.x + dx, y: current.y + dy };
+          // The real accessibility control advances in <=6px pieces and stops at
+          // an obstacle. Keep those partial moves: a strict 58px lattice skips
+          // the usable gap between the enlarged northern shelf footprints.
+          const steps = Math.ceil(Math.max(Math.abs(dx), Math.abs(dy)) / 6);
+          const radius = MARKET_ENVIRONMENT_PLAYER_RADIUS;
+          let next = current;
+          for (let step = 0; step < steps; step++) {
+            const candidate = {
+              x: Math.max(radius, Math.min(next.x + dx / steps, environment.world.width - radius)),
+              y: Math.max(radius, Math.min(next.y + dy / steps, environment.world.height - radius)),
+            };
+            if (!isMarketEnvironmentBlocked(environment, candidate)) next = candidate;
+          }
           // The shopping success route follows entrance direction; wrong-way entries have dedicated UI tests.
           if (parents.has(key(next)) || getMarketWrongWayGate(environment, current, next)) continue;
-          let blocked = false;
-          for (let step = 1; step <= 15; step++) {
-            if (isMarketEnvironmentBlocked(environment, { x: current.x + dx * step / 15, y: current.y + dy * step / 15 })) { blocked = true; break; }
-          }
-          if (blocked) continue;
           parents.set(key(next), { parent: key(current), actionName }); queue.push(next);
         }
       }
@@ -677,7 +687,7 @@ describe('오늘도 앱', () => {
     expect(screen.getByLabelText('현재 점수 90점')).toBeTruthy();
     moveInsideMarket('checkout');
     fireEvent.press(await screen.findByRole('button', { name: '계산대에서 계산하기' }));
-    fireEvent.press(screen.getByText('구매 확정'));
+    fireEvent.press(screen.getByRole('button', { name: '구매 확정' }));
 
     expect(screen.getByText('장보기에 성공했어요!')).toBeTruthy();
     expect(screen.getByText('구매 시도 1회')).toBeTruthy();
@@ -736,4 +746,58 @@ describe('오늘도 앱', () => {
     fireEvent.press(screen.getByRole('button', { name: '퀘스트 목록으로' }));
     expect(screen.getByText('추천 퀘스트')).toBeTruthy();
   });
+});
+
+it('마을의 걷기는 실제 이동거리에 맞춰 진행되고 벽에 닿으면 멈춘다', async () => {
+  const frames = new Map<number, FrameRequestCallback>();
+  let frameId = 0, time = 0;
+  const raf = jest.spyOn(globalThis, 'requestAnimationFrame').mockImplementation(callback => {
+    frames.set(++frameId, callback); return frameId;
+  });
+  const cancel = jest.spyOn(globalThis, 'cancelAnimationFrame').mockImplementation(id => { if (id != null) frames.delete(id); });
+  let handlers: Parameters<typeof PanResponder.create>[0] | undefined;
+  const responder = jest.spyOn(PanResponder, 'create').mockImplementation(value => {
+    handlers ??= value; return { panHandlers: {} };
+  });
+  const screen = render(<GamePrototypeScreen onExit={jest.fn()} />);
+  const advance = (count: number) => {
+    for (let index = 0; index < count; index++) act(() => {
+      time += 32; const callbacks = [...frames.values()]; frames.clear(); callbacks.forEach(callback => callback(time));
+    });
+  };
+  const pose = () => screen.UNSAFE_getByType(DirectionalAvatar).props;
+  try {
+    await act(async () => { await Promise.resolve(); });
+    act(() => {
+      handlers!.onPanResponderGrant!({ nativeEvent: { locationX: 76, locationY: 190 } } as never, {} as never);
+      handlers!.onPanResponderMove!({} as never, { dx: 0, dy: 17 } as never);
+    });
+    advance(5);
+    expect(pose().motion).toBe('walk');
+    const halfDistance = 190 * 0.5 * 0.032 * 4;
+    expect(pose().walkCycle.frameIndex(10000)).toBe(Math.floor(halfDistance / AVATAR_WALK_CYCLE_DISTANCE * 10000));
+    fireEvent.press(screen.getByRole('button', { name: '달리기 켜기' }));
+    advance(4);
+    const runningDistance = halfDistance * (1 + 1.55);
+    expect(pose().motion).toBe('sprint');
+    expect(pose().walkCycle.frameIndex(10000)).toBe(Math.floor(runningDistance / AVATAR_WALK_CYCLE_DISTANCE * 10000));
+    // The real karaoke building blocks further southward travel from the spawn.
+    advance(30);
+    expect(pose().motion).toBe('idle');
+    const stoppedPhase = pose().walkCycle.frameIndex(10000);
+    advance(8);
+    expect(pose().walkCycle.frameIndex(10000)).toBe(stoppedPhase);
+    act(() => handlers!.onPanResponderMove!({} as never, { dx: -34, dy: 0 } as never));
+    advance(2);
+    expect(pose().motion).toBe('sprint');
+    expect(pose().facing).toBe('left');
+    expect(pose().walkCycle.frameIndex(10000)).not.toBe(stoppedPhase);
+    fireEvent.press(screen.getByRole('button', { name: '달리기 끄기' }));
+    advance(2);
+    expect(pose().motion).toBe('walk');
+    act(() => handlers!.onPanResponderRelease!({} as never, {} as never));
+    expect(pose().motion).toBe('idle');
+  } finally {
+    screen.unmount(); responder.mockRestore(); cancel.mockRestore(); raf.mockRestore();
+  }
 });

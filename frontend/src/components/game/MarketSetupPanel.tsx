@@ -186,6 +186,13 @@ export function MarketSetupPanel({ config, onApply, onClose }: {
           })}
         />
       </View>
+      <Text style={s.label}>계산 내역 확인 연습</Text>
+      <View style={s.options}>
+        <Choice text="항상 정상 계산" selected={learning.checkoutReviewMode === 'normal'} onPress={() => learn({ checkoutReviewMode: 'normal' })} />
+        <Choice text="계산 실수 있음" selected={learning.checkoutReviewMode === 'overcharge'} onPress={() => learn({ checkoutReviewMode: 'overcharge' })} />
+        <Choice text="계산 실수 랜덤" selected={learning.checkoutReviewMode === 'random'} onPress={() => learn({ checkoutReviewMode: 'random' })} />
+      </View>
+      <Text style={s.description}>유인 계산대에서 상품 하나가 한 개 더 찍힐 수 있어요. 장바구니와 계산 내역을 비교하고 직원에게 수량 확인을 부탁해요. 랜덤은 정상 계산과 계산 실수를 절반 확률로 정해요.</Text>
       <Text style={s.label}>품절 상황 연습</Text>
       <View style={s.options}>
         <Choice text="품절 상황 있음" selected={learning.stockoutEnabled} onPress={() => learn({ stockoutEnabled: true })} />

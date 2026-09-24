@@ -2,6 +2,8 @@ import { MARKET_ENVIRONMENT_PLAYER_RADIUS, getMarketWrongWayGate, getMarketWrong
 import { MarketCategoryId, marketCategories, marketProducts, MarketProduct, getMarketProduct } from './scenarios';
 import { Point } from './prototypeWorld';
 import { normalizeMarketLearningConfig, type MarketLearningConfig, type MarketLearningState, type MarketStockoutState, type MarketUnavailableReason } from './marketLearning';
+import { createMarketCheckoutReview, correctMarketCheckoutReview, evaluateMarketCheckoutReview, getMarketCartFingerprint,
+  getMarketCheckoutReview, isStaffedCheckoutReviewReady, type MarketCheckoutReviewState } from './marketCheckoutReview';
 
 export type MarketMatchRule = 'family' | 'exact';
 export type MarketTaskObjectiveInput = { productId: string; quantity: number; match?: MarketMatchRule };
@@ -41,7 +43,8 @@ export type MarketAction = (
   | { type: 'requestSubstitution'; productId: string }
   | { type: 'reportUnavailable'; reason: MarketUnavailableReason }
   | { type: 'submitKiosk'; scannedCart: Record<string, number> }
-  | { type: 'submit' | 'viewRequester' | 'retry' | 'giveUp' | 'skipRating' | 'closeStation' | 'viewCart' | 'viewHelp' | 'closeView' }
+  | { type: 'requestCheckoutCorrection'; productId: string; quantity: number }
+  | { type: 'submit' | 'viewRequester' | 'retry' | 'giveUp' | 'skipRating' | 'closeStation' | 'viewCart' | 'viewCheckoutCart' | 'viewHelp' | 'closeView' }
   | { type: 'rate'; difficulty: number; interest: number }
 ) & { at?: string };
 export type MarketSession = {
@@ -63,6 +66,7 @@ export type MarketSession = {
   cashierAvailability: MarketCashierAvailability;
   selectedCheckoutId: MarketCheckoutId | null;
   selectedKioskId: MarketKioskId | null;
+  checkoutReview: MarketCheckoutReviewState | null;
   learning: MarketLearningState;
   score: number;
   penaltyPoints: number;
@@ -249,7 +253,7 @@ export function createMarketSession(input: Partial<MarketSessionConfig> = {}, en
     shelfSlots, initialStock, stock: { ...initialStock }, cart: {}, playerPosition: { ...environment.spawn }, activeStation: null,
     cashierAvailable: environment.checkout.cashierPresent,
     cashierAvailability: Object.fromEntries(environment.checkouts.map(checkout => [checkout.id, checkout.cashierPresent])) as MarketCashierAvailability,
-    selectedCheckoutId: null, selectedKioskId: null, learning, score: 100, penaltyPoints: 0, alarmCount: 0, alarmArmed: true, wrongWayEntryCount: 0, wrongWayEntryArmed: true, paid: false,
+    selectedCheckoutId: null, selectedKioskId: null, checkoutReview: null, learning, score: 100, penaltyPoints: 0, alarmCount: 0, alarmArmed: true, wrongWayEntryCount: 0, wrongWayEntryArmed: true, paid: false,
     phase: 'shopping', view: 'world', attempts: 0, feedback: null, outcome: null,
     ratings: null, ratingSkipped: false, lastActionError: null, events: [],
   };
@@ -315,6 +319,14 @@ function record(session: MarketSession, type: string, payload: Record<string, un
   const timestamp = at && Number.isFinite(Date.parse(at)) && Date.parse(at) >= Date.parse(previous)
     ? new Date(at).toISOString() : new Date(Date.parse(previous) + (session.events.length ? 1 : 0)).toISOString();
   session.events.push({ sequence: session.events.length, timestamp, type, payload });
+}
+function ensureCheckoutReview(session: MarketSession, at?: string) {
+  if (!isStaffedCheckoutReviewReady(session)) return;
+  if (session.checkoutReview?.cartFingerprint === getMarketCartFingerprint(session.cart)) return;
+  session.checkoutReview = createMarketCheckoutReview(session.config.seed, session.cart,
+    normalizeMarketLearningConfig(session.config.learning).checkoutReviewMode);
+  record(session, 'checkout_bill_generated', { origin: 'system-cashier', checkoutId: session.selectedCheckoutId,
+    cart: clone(session.cart), review: clone(session.checkoutReview) }, at);
 }
 function reject(session: MarketSession, action: MarketAction | null | undefined, reason: string) {
   session.lastActionError = reason;
@@ -462,6 +474,7 @@ export function applyMarketAction(current: MarketSession, action: MarketAction):
     }
     else session.phase = 'shopping';
     record(session, 'station_interacted', { station, playerPosition: clone(session.playerPosition) }, action.at);
+    ensureCheckoutReview(session, action.at);
     const category = marketCategories.find(item => item.id === station);
     if (category && !session.learning.visitedCategoryIds.includes(category.id)) session.learning.visitedCategoryIds.push(category.id);
     const stockout = session.learning.stockout;
@@ -596,6 +609,38 @@ export function applyMarketAction(current: MarketSession, action: MarketAction):
       ...(action.type === 'requestReturn' ? { staffStation: session.activeStation } : {}),
       categoryId: product.categoryId, productId: product.id, quantity, cart: clone(session.cart), stock: clone(session.stock),
     }, action.at);
+    // A receipt is tied to the basket, never to the counter or number of retries.
+    // Editing the basket invalidates both the old bill and its staff response.
+    if (session.checkoutReview && session.checkoutReview.cartFingerprint !== getMarketCartFingerprint(session.cart)) {
+      record(session, 'checkout_bill_invalidated', { origin: 'system-cashier', reason: 'cart-changed',
+        previousFingerprint: session.checkoutReview.cartFingerprint, cart: clone(session.cart) }, action.at);
+      session.checkoutReview = null;
+    }
+    return session;
+  }
+  if (action.type === 'viewCheckoutCart') {
+    if (!isStaffedCheckoutReviewReady(session)) return reject(session, action, '계산원이 있는 계산대에서 장바구니를 확인해 주세요.');
+    record(session, 'checkout_cart_viewed', { origin: 'system-cashier', triggeredBy: 'player',
+      checkoutId: session.selectedCheckoutId, cart: clone(session.cart) }, action.at);
+    return session;
+  }
+  if (action.type === 'requestCheckoutCorrection') {
+    if (!isStaffedCheckoutReviewReady(session)) return reject(session, action, '계산원이 있는 계산대에서 계산 내역을 확인해 주세요.');
+    if (typeof action.productId !== 'string' || !getMarketProduct(action.productId)
+      || !Number.isInteger(action.quantity) || action.quantity < 1 || action.quantity > 99) {
+      return reject(session, action, '확인할 상품과 수량을 1~99개로 알려 주세요.');
+    }
+    ensureCheckoutReview(session, action.at);
+    const result = correctMarketCheckoutReview(session.checkoutReview!, session.cart, action.productId, action.quantity);
+    record(session, 'checkout_correction_requested', { origin: 'system-cashier', triggeredBy: 'player',
+      checkoutId: session.selectedCheckoutId, productId: action.productId, claimedQuantity: action.quantity,
+      previousChargedQuantity: session.checkoutReview!.chargedCart[action.productId] ?? 0 }, action.at);
+    session.checkoutReview = result.review;
+    record(session, result.corrected ? 'checkout_bill_corrected' : 'checkout_bill_rechecked', {
+      origin: 'system-cashier', checkoutId: session.selectedCheckoutId, productId: action.productId,
+      claimedQuantity: action.quantity, claimMatched: result.claimMatched, corrected: result.corrected,
+      chargedCart: clone(result.review.chargedCart), message: result.review.response,
+    }, action.at);
     return session;
   }
   if (action.type === 'submit' || action.type === 'submitKiosk') {
@@ -614,14 +659,25 @@ export function applyMarketAction(current: MarketSession, action: MarketAction):
       if (kiosk || (checkoutId !== 'checkout' && checkoutId !== 'checkout-2')
         || session.environment.checkouts.find(counter => counter.id === checkoutId)?.kind === 'kiosk') return reject(session, action, '유인 계산대에서 구매를 결정해 주세요.');
       if (!session.cashierAvailability[checkoutId]) return reject(session, action, '계산원이 있는 계산대를 이용해 주세요. 유인 계산대가 비어 있으면 매장 직원에게 계산을 부탁해요.');
+      if (!isStaffedCheckoutReviewReady(session)) return reject(session, action, '계산 내역 화면에서 최종 구매를 결정해 주세요.');
+      ensureCheckoutReview(session, action.at);
     }
     session.attempts += 1;
     const evaluation = evaluate(session);
-    session.feedback = { success: evaluation.success, ...(session.attempts >= 2 && !evaluation.success ? { details: evaluation.details } : {}) };
-    session.phase = evaluation.success ? 'finished' : 'feedback';
-    if (evaluation.success) { session.outcome = 'success'; session.paid = true; }
-    record(session, 'purchase_submitted', { checkoutId, ...(kiosk ? { kioskId: kiosk.id } : {}), attempt: session.attempts, cart: clone(session.cart), evaluation, shownFeedback: clone(session.feedback) }, action.at);
-    if (evaluation.success) record(session, 'session_finished', { outcome: session.outcome, attempts: session.attempts, cart: clone(session.cart), score: session.score, penaltyPoints: session.penaltyPoints, alarmCount: session.alarmCount, wrongWayEntryCount: session.wrongWayEntryCount, paid: session.paid }, action.at);
+    const checkoutReviewEvaluation = kiosk ? null : evaluateMarketCheckoutReview(session.checkoutReview!, session.cart);
+    const success = evaluation.success && (checkoutReviewEvaluation?.success ?? true);
+    session.feedback = { success, ...(session.attempts >= 2 && !success
+      ? { details: [...evaluation.details!, ...(checkoutReviewEvaluation?.details ?? [])] } : {}) };
+    session.phase = success ? 'finished' : 'feedback';
+    if (success) { session.outcome = 'success'; session.paid = true; }
+    if (checkoutReviewEvaluation) record(session, 'checkout_review_submitted', { origin: 'system-cashier',
+      checkoutId, attempt: session.attempts, chargedCart: clone(session.checkoutReview!.chargedCart),
+      evaluation: checkoutReviewEvaluation, shoppingSuccess: evaluation.success, purchaseSuccess: success }, action.at);
+    // The original evaluation remains a shopping-list assessment. A cashier error
+    // has its own audit result and never becomes a player shopping mistake.
+    record(session, 'purchase_submitted', { checkoutId, ...(kiosk ? { kioskId: kiosk.id } : {}), attempt: session.attempts,
+      cart: clone(session.cart), evaluation, checkoutReviewEvaluation, purchaseSuccess: success, shownFeedback: clone(session.feedback) }, action.at);
+    if (success) record(session, 'session_finished', { outcome: session.outcome, attempts: session.attempts, cart: clone(session.cart), score: session.score, penaltyPoints: session.penaltyPoints, alarmCount: session.alarmCount, wrongWayEntryCount: session.wrongWayEntryCount, paid: session.paid }, action.at);
     return session;
   }
   return reject(session, action, '알 수 없는 행동이에요.');
@@ -668,6 +724,7 @@ export function getMarketObservation(session: MarketSession) {
     cashierAvailability: session.cashierAvailability, selectedCheckoutId: session.selectedCheckoutId, cashierRequestFeedback, staffLearningFeedback, requesterOptions,
     score: session.score, penaltyPoints: session.penaltyPoints, alarmCount: session.alarmCount, alarmArmed: session.alarmArmed, wrongWayEntryCount: session.wrongWayEntryCount, wrongWayEntryArmed: session.wrongWayEntryArmed, paid: session.paid,
     selectedKioskId: session.selectedKioskId,
+    checkoutReview: getMarketCheckoutReview(session),
     learning: { stockout: getStockoutStatus(session), choiceTask: session.learning.choiceTask,
       visitedCategoryIds: session.learning.visitedCategoryIds },
     attempts: session.attempts, feedback: session.feedback, outcome: session.outcome,
@@ -682,7 +739,7 @@ export function exportMarketEpisode(session: MarketSession) {
     provenance: session.config.provenance, syntheticDataIsNotClinicalEvidence: session.config.provenance.source === 'synthetic',
     config: session.config, environment: session.environment, objectives: session.objectives, shelfSlots: session.shelfSlots,
     initialStock: session.initialStock, finalStock: session.stock, finalCart: session.cart, learning: session.learning, selectedKioskId: session.selectedKioskId,
-    cashierAvailability: session.cashierAvailability, selectedCheckoutId: session.selectedCheckoutId,
+    cashierAvailability: session.cashierAvailability, selectedCheckoutId: session.selectedCheckoutId, checkoutReview: session.checkoutReview,
     score: session.score, penaltyPoints: session.penaltyPoints, alarmCount: session.alarmCount, wrongWayEntryCount: session.wrongWayEntryCount, paid: session.paid,
     attempts: session.attempts, outcome: session.outcome, ratings: session.ratings, ratingSkipped: session.ratingSkipped, events: session.events,
   });
