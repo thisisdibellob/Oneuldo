@@ -443,9 +443,9 @@ export function parseMarketSessionConfig(json: string): MarketSessionConfig { re
 
 export type MarketAgentAction = Exclude<MarketAction, { type: 'setPosition' }>;
 /** Local synchronous adapter for next week's agent runner. It owns state, forbids teleport synchronization, and returns only actor-safe observations. */
-export function createMarketAgentAdapter(config: Partial<MarketSessionConfig>) {
+export function createMarketAgentAdapter(config: Partial<MarketSessionConfig>, environmentOverride?: MarketEnvironment) {
   if (config.provenance?.source !== 'synthetic') throw new Error('Agent episodes must identify synthetic provenance, agentModel, and personaId.');
-  let session = createMarketSession(config);
+  let session = createMarketSession(config, environmentOverride);
   return {
     observe: () => getMarketObservation(session),
     act: (action: MarketAgentAction) => {

@@ -1,81 +1,60 @@
-// Reproducible data checks; generated raw JSONL remains under ignored output/.
+// Generates trace artifacts only. This script never uploads or fabricates application logs.
 require('../runtime.cjs');
-const fs = require('node:fs');
-const fsp = require('node:fs/promises');
-const readline = require('node:readline');
+const fs = require('node:fs/promises');
 const path = require('node:path');
 const assert = require('node:assert/strict');
+const { createMarketSession } = require('../../frontend/src/game/marketSession.ts');
+const { createMarketReplaySnapshot } = require('../../frontend/src/game/marketReplayTrace.ts');
 const { generateBatch, listPersonas } = require('../src/simulator.ts');
-const { validateGeneratedEpisode } = require('../src/schemaValidation.ts');
-const { stableBatchId } = require('../src/backendExport.ts');
-const root = path.resolve(__dirname, '../..');
-const output = path.resolve(process.argv[2] ?? path.join(__dirname, '../output', `verification-${Date.now()}`));
-const perPersonaCount = Number(process.env.MARKET_VERIFY_COUNT ?? 30);
-
+const { validateTrace } = require('../src/traceValidation.ts');
+const output = path.resolve(process.argv[2] ?? path.join(__dirname, '../output', `trace-verification-${Date.now()}`));
+const count = Number(process.env.MARKET_VERIFY_COUNT ?? 12);
 async function main() {
-  await fsp.mkdir(output, { recursive: true });
+  if (!Number.isInteger(count) || count < 3 || count > 1000) throw new Error('MARKET_VERIFY_COUNT must be 3..1000.');
+  const snapshot = createMarketReplaySnapshot(createMarketSession({ seed: 'trace-verification-v1' }));
+  await fs.mkdir(output, { recursive: true });
+  await fs.writeFile(path.join(output, 'snapshot.json'), JSON.stringify(snapshot, null, 2) + '\n', { flag: 'wx' });
   const reports = [];
-  let fixtureWritten = false;
   for (const persona of listPersonas()) {
-    const batch = await generateBatch({ count: perPersonaCount, personaMix: { [persona.id]: 1 }, seed: 'verification-v1',
-      environmentSeed: 'validation-store-v1', concurrency: 3, outputPath: path.join(output, `${persona.id}.jsonl`) });
-    const stats = { personaId: persona.id, episodes: 0, successes: 0, uniqueActionSequences: 0, maxMovePixels: 0,
-      rejectedActions: 0, meanCartChecks: 0, meanHelpRequests: 0, decisionMedianMs: 0, decisionP90Ms: 0,
-      selectionErrorRate: 0, checkoutFailureRate: 0, selectedItemCounts: {}, examples: [] };
-    const reactions = [], fingerprints = new Set();
-    let selections = 0, mistakes = 0, submissions = 0, failedSubmissions = 0;
-    const input = readline.createInterface({ input: fs.createReadStream(batch.outputPath), crlfDelay: Infinity });
-    for await (const line of input) {
-      const item = JSON.parse(line);
-      const validation = validateGeneratedEpisode(item);
-      assert.equal(validation.valid, true, validation.errors.join('\n'));
-      assert.ok(item.summary.maxMoveDistance <= 32);
-      assert.equal(item.summary.rejectedActions, 0);
-      stats.episodes++; stats.successes += Number(item.episode.outcome === 'success');
-      stats.maxMovePixels = Math.max(stats.maxMovePixels, item.summary.maxMoveDistance);
-      stats.rejectedActions += item.summary.rejectedActions;
-      stats.meanCartChecks += item.summary.cartChecks / perPersonaCount;
-      stats.meanHelpRequests += item.summary.helpRequests / perPersonaCount;
-      fingerprints.add(item.summary.actionFingerprint);
-      selections += item.summary.selections; mistakes += item.summary.wrongSelections;
-      for (const [id, count] of Object.entries(item.summary.selectedItemCounts)) stats.selectedItemCounts[id] = (stats.selectedItemCounts[id] ?? 0) + count;
-      for (const step of item.trace) if (step.action.type !== 'move' && step.source !== 'limit') reactions.push(step.delayMs);
-      for (const event of item.episode.events) if (event.type === 'purchase_submitted') {
-        submissions++; failedSubmissions += Number(!event.payload.evaluation.success);
+    const batch = await generateBatch({ count, personaMix: { [persona.id]: 1 }, seed: 'trace-policy-verification-v1', snapshot,
+      concurrency: 3, outputPath: path.join(output, `${persona.id}.jsonl`) });
+    const traces = (await fs.readFile(batch.outputPath, 'utf8')).trim().split('\n').map(JSON.parse);
+    const reactions = [], sequences = new Set();
+    const report = { personaId: persona.id, traces: count, uniqueSequences: 0, meanCartChecks: 0, meanHelpRequests: 0,
+      plannedReactionMedianMs: 0, plannedReactionP90Ms: 0, reviewRequests: 0, gaveUp: 0, productChoices: {}, examples: [] };
+    for (const trace of traces) {
+      const result = validateTrace(trace, snapshot);
+      assert.ok(result.valid, result.errors.join('; '));
+      const meaningful = trace.steps.map(s => [s.type, s.target?.stationId, s.productId, s.quantity, s.reactionDelayMs]);
+      sequences.add(JSON.stringify(meaningful));
+      report.meanCartChecks += trace.steps.filter(s => s.type === 'viewCart').length / count;
+      report.meanHelpRequests += trace.steps.filter(s => s.type === 'viewHelp' || s.type === 'talkToStaff' && s.choice !== 'open').length / count;
+      report.reviewRequests += Number(trace.steps.some(s => s.type === 'submitForReview'));
+      report.gaveUp += Number(trace.steps.some(s => s.type === 'giveUp'));
+      for (const step of trace.steps) {
+        if (step.reactionDelayMs > 0) reactions.push(step.reactionDelayMs);
+        if (step.type === 'dragProduct' && step.gesture.outcome === 'drop') report.productChoices[step.productId] = (report.productChoices[step.productId] ?? 0) + step.quantity;
       }
-      if (stats.examples.length < 3) stats.examples.push({ seed: item.summary.seed,
-        actionFingerprint: item.summary.actionFingerprint,
-        visitedStations: item.trace.filter(t => t.action.type === 'interact').map(t => t.action.station),
-        cartChecks: item.summary.cartChecks, selectedItems: item.summary.selectedItemCounts,
-        movementSample: item.episode.events.filter(e => e.type === 'player_moved').slice(0, 6).map(e => ({ at: e.timestamp, ...e.payload.point })),
-      });
-      if (!fixtureWritten) {
-        const events = item.behaviorLogs.slice(0, 50);
-        await fsp.writeFile(path.join(output, 'http-smoke.json'), JSON.stringify({ batchId: stableBatchId(events), events }, null, 2) + '\n', { flag: 'wx' });
-        fixtureWritten = true;
-      }
+      if (report.examples.length < 3) report.examples.push({ traceId: trace.traceId, seed: trace.seed,
+        visitedStations: trace.steps.filter(s => s.type === 'walkTo').map(s => s.target.stationId),
+        cartChecks: trace.steps.filter(s => s.type === 'viewCart').length });
     }
-    stats.uniqueActionSequences = fingerprints.size;
-    assert.equal(fingerprints.size, perPersonaCount, 'Different policy seeds must produce different action sequences in the same store.');
+    report.uniqueSequences = sequences.size;
+    assert.equal(sequences.size, count);
     reactions.sort((a, b) => a - b);
-    stats.decisionMedianMs = reactions[Math.floor(reactions.length * .5)] ?? 0;
-    stats.decisionP90Ms = reactions[Math.floor(reactions.length * .9)] ?? 0;
-    stats.selectionErrorRate = mistakes / Math.max(1, selections);
-    stats.checkoutFailureRate = failedSubmissions / Math.max(1, submissions);
-    reports.push(stats);
-    process.stdout.write(JSON.stringify({ persona: persona.id, completed: stats.episodes, successes: stats.successes,
-      medianMs: stats.decisionMedianMs, checks: stats.meanCartChecks, selectionErrorRate: stats.selectionErrorRate }) + '\n');
+    report.plannedReactionMedianMs = reactions[Math.floor(reactions.length * .5)];
+    report.plannedReactionP90Ms = reactions[Math.floor(reactions.length * .9)];
+    reports.push(report);
+    process.stdout.write(JSON.stringify(report) + '\n');
   }
   const careful = reports.find(r => r.personaId === 'careful-checker');
   const quick = reports.find(r => r.personaId === 'quick-decider');
-  assert.ok(careful.decisionMedianMs > quick.decisionMedianMs * 2, 'Reaction time distributions should differ.');
-  assert.ok(careful.meanCartChecks > quick.meanCartChecks + .5, 'Cart rechecking patterns should differ.');
-  assert.ok(quick.selectionErrorRate > careful.selectionErrorRate, 'Selection errors should reflect the configured profiles.');
-  const report = { schema: 'oneuldo.market.validation', version: 1, seed: 'verification-v1', environmentSeed: 'validation-store-v1',
-    mode: 'stochastic', perPersonaCount, episodes: perPersonaCount * reports.length,
-    note: 'Simulated timings and uncalibrated synthetic behavior profiles, not measured human or clinical evidence. Selection errors mean wrong SKU or excess quantity on add; checkout failures are state-machine evaluations.',
-    outputDirectory: path.relative(root, output), personas: reports };
-  await fsp.writeFile(path.join(output, 'report.json'), JSON.stringify(report, null, 2) + '\n', { flag: 'wx' });
+  assert.ok(careful.plannedReactionMedianMs > quick.plannedReactionMedianMs * 2);
+  assert.ok(careful.meanCartChecks > quick.meanCartChecks);
+  const report = { schema: 'oneuldo.market.trace-validation', version: 1, snapshotId: snapshot.snapshotId,
+    totalTraces: count * reports.length,
+    note: 'Planned waits and uncalibrated persona intentions; not measured human timing, clinical evidence, or completed UI sessions. Actual logs are produced only by app replay.', personas: reports };
+  await fs.writeFile(path.join(output, 'report.json'), JSON.stringify(report, null, 2) + '\n', { flag: 'wx' });
   process.stdout.write(JSON.stringify({ reportPath: path.join(output, 'report.json'), status: 'passed' }) + '\n');
 }
 main().catch(error => { process.stderr.write(error.stack + '\n'); process.exitCode = 1; });

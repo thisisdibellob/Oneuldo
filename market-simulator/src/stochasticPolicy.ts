@@ -1,6 +1,6 @@
 import type { MarketAgentAction } from '../../frontend/src/game/marketSession';
 import type { MarketEnvironmentStationId } from '../../frontend/src/game/marketEnvironment';
-import type { Decision, Observation, Persona } from './types';
+import type { Decision, Observation, Persona, PolicyAction } from './types';
 import { Random } from './random';
 import { planWalk } from './navigation';
 import { PersonaContext } from './personaContext';
@@ -27,9 +27,10 @@ function suggestedCategory(label: string): string | undefined {
 
 export class StochasticPolicy {
   private readonly random: Random;
+  private readonly motorRandom: Random;
   private readonly context: PersonaContext;
   private currentContext?: ReturnType<PersonaContext['snapshot']>;
-  private queue: Decision[] = [];
+  private pendingInteraction: MarketEnvironmentStationId | null = null;
   private known = new Map<string, Product>();
   private stock = new Map<string, number>();
   private feedbackDetails: string[] = [];
@@ -53,8 +54,9 @@ export class StochasticPolicy {
   constructor(private readonly persona: Persona, seed: string | number) {
     this.random = new Random(`${seed}:policy:${persona.id}:${persona.version}`);
     this.context = new PersonaContext(persona);
+    this.motorRandom = new Random(`${seed}:motor:${persona.id}:${persona.version}`);
   }
-  private choose(action: MarketAgentAction, reason: string, multiplier = 1): Decision {
+  private choose(action: PolicyAction, reason: string, multiplier = 1): Decision {
     const p = this.persona.parameters;
     const c = this.currentContext!;
     const demand = .25 + c.novelty * .6 + c.memoryLoad * .5 + c.stress * .75;
@@ -69,16 +71,14 @@ export class StochasticPolicy {
   private route(o: Observation, station: MarketEnvironmentStationId, reason: string): Decision {
     if (o.view !== 'world') return this.choose({ type: 'closeView' }, 'close-view-before-walking');
     if (o.activeStation) return this.choose({ type: 'closeStation' }, 'leave-current-station');
-    const plan = planWalk(o, station, this.random, this.persona.parameters.walkSpeed);
+    const plan = planWalk(o, station, this.motorRandom, this.persona.parameters.walkSpeed);
     if (!plan) {
       this.unavailable.add(station);
       return this.choose({ type: 'viewHelp' }, `route-unavailable:${station}`);
     }
-    this.queue = plan;
+    this.pendingInteraction = station;
     this.plannedStation = station;
-    const first = this.queue.shift()!;
-    first.reason = `${reason};${first.reason};${this.context.describe(this.currentContext!)}`;
-    return first;
+    return this.choose({ type: 'walkTo', station }, reason);
   }
   private count(objective: Objective): number {
     return Object.entries(this.basket).reduce((sum, [id, quantity]) => {
@@ -111,7 +111,7 @@ export class StochasticPolicy {
   }
   onResult(action: MarketAgentAction, before: Observation, after: Observation) {
     this.context.record(action, before, after);
-    this.actionsSinceReview++;
+    if (action.type !== 'move') this.actionsSinceReview++;
     if (after.lastActionError) {
       this.rejectedActionCount++;
       const { at: ignored, ...identity } = action;
@@ -123,7 +123,7 @@ export class StochasticPolicy {
       if (count >= 2 && action.type === 'move' && this.plannedStation) this.unavailable.add(this.plannedStation);
       if (['add', 'remove', 'requestReturn'].includes(action.type)) this.retryNeedsCheck = true;
       if (action.type === 'requestCashier' && after.cashierAvailable) this.helpIntent = null;
-      this.queue = []; this.mistakenQuantity = null;
+      this.pendingInteraction = null; this.mistakenQuantity = null;
       return;
     }
     for (const product of after.products) { this.known.set(product.id, product); this.stock.set(product.id, after.stock[product.id]); }
@@ -154,10 +154,10 @@ export class StochasticPolicy {
       * (1 - c.support * .35) * (1 - c.familiarity * .25);
     const help = p.helpProbability * (.35 + c.memoryLoad * .5 + c.stress * .7 + c.novelty * .35)
       * (1 - c.confidence * .25);
-    if (this.queue.length) {
-      const step = this.queue.shift()!;
-      if (step.action.type === 'interact') return this.choose(step.action, step.reason);
-      return step;
+    if (this.pendingInteraction) {
+      const station = this.pendingInteraction;
+      this.pendingInteraction = null;
+      return this.choose({ type: 'interact', station }, `inspect:${station}`);
     }
     if (o.phase === 'feedback') {
       const retry = p.retryProbability ** o.attempts * (1 - c.stress * .25) + c.support * .1 + c.confidence * .08;

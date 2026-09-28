@@ -3,7 +3,7 @@ import quick from '../personas/quick-decider.json';
 import original from '../personas/mild-intellectual-disability-adult.json';
 import type { Persona } from './types';
 
-const profiles: Persona[] = [original, cautious, quick];
+const profiles = [original, cautious, quick] as Persona[];
 export function listPersonas(): Persona[] { return structuredClone(profiles); }
 export function getPersona(id: string): Persona {
   const profile = profiles.find(p => p.id === id);

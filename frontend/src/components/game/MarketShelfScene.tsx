@@ -16,6 +16,7 @@ import {
   marketCategories, marketProducts,
 } from '../../game/scenarios';
 import { fonts } from '../../theme';
+import type { ReplayShelfPort, ReplayBounds } from '../../replay/ports';
 
 type Point = { x: number; y: number };
 type Bounds = Point & { width: number; height: number };
@@ -29,6 +30,7 @@ export type MarketShelfSceneProps = {
   onChangeQuantity: (productId: string, change: number) => void;
   onClose: () => void;
   onDropProduct: (productId: string) => boolean;
+  replayPortRef?: { current: ReplayShelfPort | null };
 };
 
 const price = (value: number) => `${value.toLocaleString('ko-KR')}원`;
@@ -46,7 +48,7 @@ function ProductArt({ product, size }: { product: MarketProduct; size: number })
 
 /** A camera-like close-up over the existing map. Closing never changes world position. */
 export function MarketShelfScene({ slots, stock, onCartVisibilityChange, cart, category, onChangeQuantity,
-  onClose, onDropProduct }: MarketShelfSceneProps) {
+  onClose, onDropProduct, replayPortRef }: MarketShelfSceneProps) {
   const viewport = useWindowDimensions();
   const insets = useContext(SafeAreaInsetsContext);
   const [size, setSize] = useState({ width: viewport.width, height: viewport.height });
@@ -68,6 +70,9 @@ export function MarketShelfScene({ slots, stock, onCartVisibilityChange, cart, c
   const basketReveal = useRef(new Animated.Value(0)).current;
   const rootRef = useRef<View>(null);
   const basketRef = useRef<View>(null);
+  const replayProducts = useRef(new Map<string, View>());
+  const replayProductRows = useRef(new Map<string, View>());
+  const shelfScroll = useRef<ScrollView>(null);
   const rootBounds = useRef<Bounds>({ x: 0, y: 0, width: size.width, height: size.height });
   const basketBounds = useRef<Bounds | null>(null);
   const closingRef = useRef(false);
@@ -211,6 +216,58 @@ export function MarketShelfScene({ slots, stock, onCartVisibilityChange, cart, c
     previousCount.current = count;
   }, [basketPulse, count, reducedMotion]);
 
+  if (__DEV__ && replayPortRef) {
+    const measured = (view: View | null): Promise<ReplayBounds> => new Promise((resolve, reject) => {
+      if (!view) { reject(new Error('Replay target is not mounted')); return; }
+      const timeout = setTimeout(() => reject(new Error('Replay target measurement timed out')), 1500);
+      view.measureInWindow((x, y, width, height) => {
+        clearTimeout(timeout);
+        if (width <= 0 || height <= 0) reject(new Error('Replay target has no visible bounds'));
+        else resolve({ x, y, width, height });
+      });
+    });
+    replayPortRef.current = {
+      measure: async (productId, options) => {
+        const productIndex = products.findIndex(p => p.id === productId);
+        if (productIndex < 0) throw new Error('Product is not on this shelf');
+        if (basketOpenRef.current) throw new Error('Close the cart before dragging');
+        if (!options?.visibleOnly) {
+          const row = Math.floor(productIndex / columns);
+          shelfScroll.current?.scrollTo({ y: Math.max(0, row * rowHeight - 20), animated: true });
+          await new Promise(resolve => setTimeout(resolve, 420));
+        }
+        const [product, basket, root, grid, productRow] = await Promise.all([
+          measured(replayProducts.current.get(productId) ?? null), measured(basketRef.current), measured(rootRef.current),
+          options?.visibleOnly ? measured(shelfScroll.current as unknown as View | null) : Promise.resolve(null),
+          options?.visibleOnly ? measured(replayProductRows.current.get(productId) ?? null) : Promise.resolve(null),
+        ]);
+        const center = { x: product.x + product.width / 2, y: product.y + product.height / 2 };
+        if (center.x < root.x || center.x > root.x + root.width || center.y < root.y || center.y >= basket.y) {
+          throw new Error('Product is outside the visible shelf; no hidden drag allowed');
+        }
+        if (grid && productRow && (productRow.y < grid.y - 1 || productRow.y + productRow.height > grid.y + grid.height + 1
+          || productRow.x < grid.x - 1 || productRow.x + productRow.width > grid.x + grid.width + 1)) {
+          throw new Error('Read the visible product row before dragging; explicit browsing is required');
+        }
+        return { product, basket };
+      },
+      scroll: fraction => shelfScroll.current?.scrollTo({ y: Math.max(0, contentHeight - availableHeight) * fraction, animated: true }),
+      start: (productId, point) => {
+        const product = products.find(p => p.id === productId);
+        if (!product || (stock && (stock[productId] ?? 0) <= getCartQuantity(cart, productId))) throw new Error('Product is unavailable');
+        startDrag(product, point);
+      },
+      move: moveDrag, finish: finishDrag, close, viewCart: changeBasketVisibility,
+      remove: productId => {
+        if (!basketOpenRef.current || !products.some(p => p.id === productId) || getCartQuantity(cart, productId) < 1) {
+          throw new Error('Return requires an open cart at the product shelf');
+        }
+        onChangeQuantity(productId, -1);
+      },
+    };
+  }
+  useEffect(() => () => { if (replayPortRef) replayPortRef.current = null; }, [replayPortRef]);
+
   return (
     <View accessibilityViewIsModal onAccessibilityEscape={goBack} ref={rootRef} testID="market-shelf-scene"
       onLayout={event => { const { width, height } = event.nativeEvent.layout; setSize({ width, height }); measure(); }}
@@ -231,7 +288,7 @@ export function MarketShelfScene({ slots, stock, onCartVisibilityChange, cart, c
           </View>
           <View pointerEvents="none" style={s.headerBalance} />
         </View>
-        <ScrollView testID="market-shelf-scroll" scrollEnabled={canScroll && !dragActive}
+        <ScrollView ref={shelfScroll} testID="market-shelf-scroll" scrollEnabled={canScroll && !dragActive}
           onLayout={event => setGridHeight(event.nativeEvent.layout.height)}
           onContentSizeChange={(_width, height) => setMeasuredContentHeight(height)}
           showsVerticalScrollIndicator={canScroll} bounces={canScroll} overScrollMode={canScroll ? 'auto' : 'never'}
@@ -249,6 +306,8 @@ export function MarketShelfScene({ slots, stock, onCartVisibilityChange, cart, c
                     tagHeight={tagHeight} buttonHeight={buttonHeight} compactRows={compactRows}
                     quantity={getCartQuantity(cart, product.id)} unavailable={unavailable}
                     dragging={dragged?.id === product.id}
+                    replayMeasureRef={__DEV__ && replayPortRef ? node => { if (node) replayProducts.current.set(product.id, node); else replayProducts.current.delete(product.id); } : undefined}
+                    replayRowMeasureRef={__DEV__ && replayPortRef ? node => { if (node) replayProductRows.current.set(product.id, node); else replayProductRows.current.delete(product.id); } : undefined}
                     onAdd={() => onChangeQuantity(product.id, 1)}
                     onDragStart={startDrag} onDragMove={moveDrag} onDragEnd={finishDrag} />;
                 })}
@@ -336,12 +395,14 @@ export const MARKET_PRODUCT_HOLD_MS = 350;
 const DRAG_SLOP = 8;
 
 function ShelfProduct({ product, quantity, width, artworkSize, surfaceY, tagHeight, buttonHeight, compactRows, unavailable, dragging,
-  onAdd, onDragStart, onDragMove, onDragEnd }: {
+  onAdd, onDragStart, onDragMove, onDragEnd, replayMeasureRef, replayRowMeasureRef }: {
   product: MarketProduct; quantity: number; width: number; artworkSize: number; surfaceY: number;
   tagHeight: number; buttonHeight: number; compactRows: boolean; unavailable: boolean;
   dragging: boolean; onAdd: () => void;
   onDragStart: (product: MarketProduct, point: Point) => void; onDragMove: (point: Point) => void;
   onDragEnd: (point: Point, cancelled?: boolean) => void;
+  replayMeasureRef?: (view: View | null) => void;
+  replayRowMeasureRef?: (view: View | null) => void;
 }) {
   const hold = useRef<ReturnType<typeof setTimeout> | null>(null);
   const active = useRef(false);
@@ -443,8 +504,8 @@ function ShelfProduct({ product, quantity, width, artworkSize, surfaceY, tagHeig
     onContextMenu: (event: { preventDefault: () => void }) => event.preventDefault(),
     onDragStart: (event: { preventDefault: () => void }) => event.preventDefault(),
   } : {};
-  return <View style={[s.product, { width }, compactRows && s.productCompact]}>
-    <View {...(Platform.OS === 'web' ? {} : responder.panHandlers)} {...webOnly}
+  return <View ref={replayRowMeasureRef} testID={'market-product-row-' + product.id} style={[s.product, { width }, compactRows && s.productCompact]}>
+    <View ref={replayMeasureRef} {...(Platform.OS === 'web' ? {} : responder.panHandlers)} {...webOnly}
       testID={'market-product-drag-' + product.id} accessibilityLabel={product.name + ' 상품'}
       onTouchStart={Platform.OS === 'web' ? undefined : event => begin(pointOf(event))}
       onTouchMove={Platform.OS === 'web' ? undefined : event => move(pointOf(event))}

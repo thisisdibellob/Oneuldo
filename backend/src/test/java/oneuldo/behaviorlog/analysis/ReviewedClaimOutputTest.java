@@ -80,9 +80,44 @@ class ReviewedClaimOutputTest {
             assertThatThrownBy(()->read(source)).isInstanceOf(ReviewEvidenceException.class);
         }
     }
-    @Test void rejects_reversed_or_repeated_events_across_observation_clauses() {
-        for(String id:List.of("E1","E2")) {
-            var source=envelope();observation(source,1).putArray("evidenceEventIds").add(id);
+    @Test void shared_boundary_evidence_preserves_claims_and_deduplicates_the_public_evidence_list() {
+        for(var ids:List.of(List.of("E4"),List.of("E4","E5"))) {
+            var source=envelope();
+            observation(source,0).putArray("evidenceEventIds").add("E2").add("E4");
+            observation(source,1).set("evidenceEventIds",fixture.mapper.valueToTree(ids));
+            String before=source.toString();
+            var normalized=fixture.mapper.readTree(read(source));
+            var f=normalized.path("findings").get(0);
+            assertThat(f.path("observation").asString()).isEqualTo(
+                    "(E2, E4) 장바구니를 열었습니다. ("+String.join(", ",ids)+") 수량을 변경했습니다.");
+            var expected=new ArrayList<>(List.of("E2","E4"));
+            if(ids.contains("E5")) expected.add("E5");
+            assertThat(f.path("evidenceEventIds")).isEqualTo(fixture.mapper.valueToTree(expected));
+            new AiBehaviorAnalysisValidator(new MarketAiDifficultyValidator()).validate(refs.read(normalized.toString()),input);
+            assertThat(source.toString()).isEqualTo(before);
+        }
+    }
+    @Test void consecutive_claims_can_describe_the_same_single_event() {
+        var source=envelope();
+        observation(source,1).putArray("evidenceEventIds").add("E2");
+        var normalized=fixture.mapper.readTree(read(source)).path("findings").get(0);
+        assertThat(normalized.path("observation").asString())
+                .isEqualTo("(E2) 장바구니를 열었습니다. (E2) 수량을 변경했습니다.");
+        assertThat(normalized.path("evidenceEventIds").toString()).isEqualTo("[\"E2\"]");
+    }
+    @Test void duplicate_evidence_within_one_claim_has_a_specific_error() {
+        var source=envelope();observation(source,0).putArray("evidenceEventIds").add("E2").add("E2");
+        assertThatThrownBy(()->read(source)).isInstanceOfSatisfying(ReviewEvidenceException.class,error->{
+            assertThat(error.details().code()).isEqualTo("DUPLICATE_REVIEW_EVIDENCE");
+            assertThat(error.details().path()).isEqualTo("/findings/0/observation/0");
+            assertThat(error.details().offendingIds()).containsExactly("E2","E2");
+        });
+    }
+    @Test void rejects_returning_to_earlier_events_even_when_the_event_was_already_cited() {
+        for(var ids:List.of(List.of("E1"),List.of("E2"),List.of("E3"),List.of("E2","E4"))) {
+            var source=envelope();
+            observation(source,0).putArray("evidenceEventIds").add("E2").add("E4");
+            observation(source,1).set("evidenceEventIds",fixture.mapper.valueToTree(ids));
             assertThatThrownBy(()->read(source)).hasMessage("REVIEW_EVIDENCE_OUT_OF_ORDER");
         }
     }

@@ -1,0 +1,299 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Oneuldo persona profile",
+  "description": "Attention is an optional synthetic design profile, never clinical estimates. Runtime also checks maximumInterestActions >= minimumInterestActions. attentionExperience belongs to generation options, not the stable person.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "version",
+    "name",
+    "description",
+    "prompt",
+    "parameters"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1
+    },
+    "prompt": {
+      "type": "string",
+      "minLength": 1
+    },
+    "parameters": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "recheckProbability",
+        "hesitationProbability",
+        "confusionProbability",
+        "quantitySlipProbability",
+        "helpProbability",
+        "explorationProbability",
+        "retryProbability",
+        "feedbackLearningRate",
+        "reactionMedianMs",
+        "reactionSigma",
+        "walkSpeed",
+        "pricePreference",
+        "familiarityBias",
+        "itemPreferenceWeights"
+      ],
+      "properties": {
+        "recheckProbability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "hesitationProbability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "confusionProbability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "quantitySlipProbability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "helpProbability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "explorationProbability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "retryProbability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "feedbackLearningRate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "reactionMedianMs": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "reactionSigma": {
+          "type": "number",
+          "minimum": 0
+        },
+        "walkSpeed": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "pricePreference": {
+          "type": "number",
+          "minimum": 0
+        },
+        "familiarityBias": {
+          "type": "number",
+          "minimum": 0
+        },
+        "itemPreferenceWeights": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "character": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "selectedTraits",
+        "strengths",
+        "preferences",
+        "familiarCategories",
+        "familiarProductIds",
+        "practicedStrategies",
+        "name",
+        "age",
+        "goal"
+      ],
+      "properties": {
+        "selectedTraits": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "strengths": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "preferences": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "familiarCategories": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 0,
+          "uniqueItems": true
+        },
+        "familiarProductIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 0,
+          "uniqueItems": true
+        },
+        "practicedStrategies": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "age": {
+          "type": "integer",
+          "minimum": 18
+        },
+        "goal": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "shoppingStyle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["comparisonProbability", "maxComparisonPages", "listCheckAfterSelectionProbability", "preCheckoutCheckProbability", "familiarShortcutProbability", "headingPersistence"],
+      "properties": {
+        "comparisonProbability": { "type": "number", "minimum": 0, "maximum": 1 },
+        "maxComparisonPages": { "type": "integer", "minimum": 1, "maximum": 4 },
+        "listCheckAfterSelectionProbability": { "type": "number", "minimum": 0, "maximum": 1 },
+        "preCheckoutCheckProbability": { "type": "number", "minimum": 0, "maximum": 1 },
+        "familiarShortcutProbability": { "type": "number", "minimum": 0, "maximum": 1 },
+        "headingPersistence": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "attention": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "interestProductWeights",
+        "interestCategoryWeights",
+        "captureProbability",
+        "interestPurchaseProbability",
+        "resumeProbability",
+        "switchMemoryDecay",
+        "minimumInterestActions",
+        "maximumInterestActions",
+        "goalMemoryCapacity",
+        "firstPlayOrientationActions",
+        "spatialMemoryCapacity"
+      ],
+      "properties": {
+        "version": {
+          "const": "1"
+        },
+        "interestProductWeights": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "interestCategoryWeights": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "captureProbability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "interestPurchaseProbability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "resumeProbability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "switchMemoryDecay": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "minimumInterestActions": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maximumInterestActions": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "goalMemoryCapacity": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "firstPlayOrientationActions": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "spatialMemoryCapacity": {
+          "type": "integer",
+          "minimum": 4
+        }
+      }
+    }
+  }
+}

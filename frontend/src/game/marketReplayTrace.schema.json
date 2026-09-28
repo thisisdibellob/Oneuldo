@@ -1,0 +1,1092 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://oneuldo.local/schemas/market-replay-trace.json",
+  "title": "Oneuldo market UI intention trace (AI review flow only)",
+  "type": "object",
+  "properties": {
+    "traceSchemaVersion": {
+      "enum": [
+        "1",
+        "2"
+      ]
+    },
+    "traceId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "personaId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "personaVersion": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 30
+    },
+    "seed": {
+      "oneOf": [
+        {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        {
+          "type": "number"
+        }
+      ]
+    },
+    "generationPolicy": {
+      "enum": [
+        "stochastic",
+        "llm"
+      ]
+    },
+    "policyVersion": {
+      "enum": [
+        "3",
+        "4",
+        "5"
+      ]
+    },
+    "generation": {
+      "type": "object",
+      "properties": {
+        "model": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "reproducibility": {
+          "enum": [
+            "seed-and-snapshot",
+            "captured-trace"
+          ]
+        },
+        "requestId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        }
+      },
+      "required": [
+        "model",
+        "reproducibility"
+      ],
+      "additionalProperties": false
+    },
+    "target": {
+      "type": "object",
+      "properties": {
+        "snapshotId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "scenarioId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "missionId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "completionMode": {
+          "const": "ai-review"
+        }
+      },
+      "required": [
+        "snapshotId",
+        "completionMode"
+      ],
+      "additionalProperties": false
+    },
+    "steps": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 5000,
+      "items": {
+        "$ref": "#/$defs/step"
+      }
+    },
+    "experienceMode": {
+      "enum": [
+        "first-play",
+        "revisit"
+      ]
+    },
+    "attentionExperience": {
+      "type": "object",
+      "properties": {
+        "layoutKey": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300
+        },
+        "memory": {
+          "type": "object"
+        },
+        "source": {
+          "const": "planned-trace"
+        }
+      },
+      "required": [
+        "layoutKey",
+        "memory",
+        "source"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "traceSchemaVersion",
+    "traceId",
+    "personaId",
+    "personaVersion",
+    "seed",
+    "generationPolicy",
+    "policyVersion",
+    "target",
+    "steps"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "step": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "reactionDelayMs": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 120000
+            },
+            "timeoutMs": {
+              "type": "integer",
+              "minimum": 1000,
+              "maximum": 300000
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1000
+            },
+            "type": {
+              "enum": [
+                "start",
+                "viewCart",
+                "viewHelp",
+                "closeView",
+                "closeStation",
+                "submitForReview",
+                "awaitReviewAccepted",
+                "giveUp",
+                "leave",
+                "skipRating"
+              ]
+            },
+            "attentionTag": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "cueRefs": {
+              "type": "array",
+              "maxItems": 32,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              }
+            }
+          },
+          "required": [
+            "id",
+            "reactionDelayMs",
+            "timeoutMs",
+            "reason",
+            "type"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "reactionDelayMs": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 120000
+            },
+            "timeoutMs": {
+              "type": "integer",
+              "minimum": 1000,
+              "maximum": 300000
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1000
+            },
+            "type": {
+              "enum": [
+                "walkTo"
+              ]
+            },
+            "target": {
+              "type": "object",
+              "properties": {
+                "stationId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 80
+                }
+              },
+              "required": [
+                "stationId"
+              ],
+              "additionalProperties": false
+            },
+            "movement": {
+              "type": "object",
+              "properties": {
+                "style": {
+                  "enum": [
+                    "careful",
+                    "steady",
+                    "brisk"
+                  ]
+                },
+                "speedMultiplier": {
+                  "type": "number",
+                  "minimum": 0.4,
+                  "maximum": 1
+                },
+                "running": {
+                  "const": false,
+                  "type": "boolean"
+                },
+                "motorSeed": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                "accelerationMs": {
+                  "type": "integer",
+                  "minimum": 100,
+                  "maximum": 300
+                }
+              },
+              "required": [
+                "style",
+                "speedMultiplier",
+                "running",
+                "motorSeed",
+                "accelerationMs"
+              ],
+              "additionalProperties": false
+            },
+            "attentionTag": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "cueRefs": {
+              "type": "array",
+              "maxItems": 32,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              }
+            }
+          },
+          "required": [
+            "id",
+            "reactionDelayMs",
+            "timeoutMs",
+            "reason",
+            "type",
+            "target",
+            "movement"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "reactionDelayMs": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 120000
+            },
+            "timeoutMs": {
+              "type": "integer",
+              "minimum": 1000,
+              "maximum": 300000
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1000
+            },
+            "type": {
+              "enum": [
+                "pause",
+                "lookAround"
+              ]
+            },
+            "durationMs": {
+              "type": "integer",
+              "minimum": 100,
+              "maximum": 120000
+            },
+            "attentionTag": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "cueRefs": {
+              "type": "array",
+              "maxItems": 32,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              }
+            }
+          },
+          "required": [
+            "id",
+            "reactionDelayMs",
+            "timeoutMs",
+            "reason",
+            "type",
+            "durationMs"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "reactionDelayMs": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 120000
+            },
+            "timeoutMs": {
+              "type": "integer",
+              "minimum": 1000,
+              "maximum": 300000
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1000
+            },
+            "type": {
+              "enum": [
+                "openShelf"
+              ]
+            },
+            "stationId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "attentionTag": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "cueRefs": {
+              "type": "array",
+              "maxItems": 32,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              }
+            }
+          },
+          "required": [
+            "id",
+            "reactionDelayMs",
+            "timeoutMs",
+            "reason",
+            "type",
+            "stationId"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "reactionDelayMs": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 120000
+            },
+            "timeoutMs": {
+              "type": "integer",
+              "minimum": 1000,
+              "maximum": 300000
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1000
+            },
+            "type": {
+              "enum": [
+                "browse"
+              ]
+            },
+            "durationMs": {
+              "type": "integer",
+              "minimum": 100,
+              "maximum": 120000
+            },
+            "scrollFraction": {
+              "type": "number",
+              "minimum": -1,
+              "maximum": 1
+            },
+            "attentionTag": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "cueRefs": {
+              "type": "array",
+              "maxItems": 32,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              }
+            }
+          },
+          "required": [
+            "id",
+            "reactionDelayMs",
+            "timeoutMs",
+            "reason",
+            "type",
+            "durationMs",
+            "scrollFraction"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "reactionDelayMs": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 120000
+            },
+            "timeoutMs": {
+              "type": "integer",
+              "minimum": 1000,
+              "maximum": 300000
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1000
+            },
+            "type": {
+              "enum": [
+                "dragProduct"
+              ]
+            },
+            "productId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "quantity": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 99
+            },
+            "gesture": {
+              "type": "object",
+              "properties": {
+                "durationMs": {
+                  "type": "integer",
+                  "minimum": 300,
+                  "maximum": 5000
+                },
+                "hesitationMs": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 10000
+                },
+                "outcome": {
+                  "enum": [
+                    "drop",
+                    "cancel",
+                    "miss"
+                  ]
+                },
+                "motorSeed": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                }
+              },
+              "required": [
+                "durationMs",
+                "hesitationMs",
+                "outcome",
+                "motorSeed"
+              ],
+              "additionalProperties": false
+            },
+            "attentionTag": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "cueRefs": {
+              "type": "array",
+              "maxItems": 32,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              }
+            }
+          },
+          "required": [
+            "id",
+            "reactionDelayMs",
+            "timeoutMs",
+            "reason",
+            "type",
+            "productId",
+            "quantity",
+            "gesture"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "reactionDelayMs": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 120000
+            },
+            "timeoutMs": {
+              "type": "integer",
+              "minimum": 1000,
+              "maximum": 300000
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1000
+            },
+            "type": {
+              "enum": [
+                "removeProduct"
+              ]
+            },
+            "productId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "quantity": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 99
+            },
+            "attentionTag": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "cueRefs": {
+              "type": "array",
+              "maxItems": 32,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              }
+            }
+          },
+          "required": [
+            "id",
+            "reactionDelayMs",
+            "timeoutMs",
+            "reason",
+            "type",
+            "productId",
+            "quantity"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "reactionDelayMs": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 120000
+            },
+            "timeoutMs": {
+              "type": "integer",
+              "minimum": 1000,
+              "maximum": 300000
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1000
+            },
+            "type": {
+              "enum": [
+                "checkout"
+              ]
+            },
+            "checkoutId": {
+              "enum": [
+                "checkout",
+                "checkout-2"
+              ]
+            },
+            "attentionTag": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "cueRefs": {
+              "type": "array",
+              "maxItems": 32,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              }
+            }
+          },
+          "required": [
+            "id",
+            "reactionDelayMs",
+            "timeoutMs",
+            "reason",
+            "type",
+            "checkoutId"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "reactionDelayMs": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 120000
+            },
+            "timeoutMs": {
+              "type": "integer",
+              "minimum": 1000,
+              "maximum": 300000
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1000
+            },
+            "type": {
+              "const": "talkToStaff"
+            },
+            "stationId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "choice": {
+              "const": "open"
+            },
+            "attentionTag": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "cueRefs": {
+              "type": "array",
+              "maxItems": 32,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              }
+            }
+          },
+          "required": [
+            "id",
+            "reactionDelayMs",
+            "timeoutMs",
+            "reason",
+            "type",
+            "stationId",
+            "choice"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "reactionDelayMs": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 120000
+            },
+            "timeoutMs": {
+              "type": "integer",
+              "minimum": 1000,
+              "maximum": 300000
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1000
+            },
+            "type": {
+              "const": "talkToStaff"
+            },
+            "stationId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "choice": {
+              "const": "requestCashier"
+            },
+            "checkoutId": {
+              "enum": [
+                "checkout",
+                "checkout-2"
+              ]
+            },
+            "attentionTag": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "cueRefs": {
+              "type": "array",
+              "maxItems": 32,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              }
+            }
+          },
+          "required": [
+            "id",
+            "reactionDelayMs",
+            "timeoutMs",
+            "reason",
+            "type",
+            "stationId",
+            "choice",
+            "checkoutId"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "reactionDelayMs": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 120000
+            },
+            "timeoutMs": {
+              "type": "integer",
+              "minimum": 1000,
+              "maximum": 300000
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1000
+            },
+            "type": {
+              "const": "talkToStaff"
+            },
+            "stationId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "choice": {
+              "const": "returnProduct"
+            },
+            "productId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "quantity": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 99
+            },
+            "attentionTag": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "cueRefs": {
+              "type": "array",
+              "maxItems": 32,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              }
+            }
+          },
+          "required": [
+            "id",
+            "reactionDelayMs",
+            "timeoutMs",
+            "reason",
+            "type",
+            "stationId",
+            "choice",
+            "productId",
+            "quantity"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "reactionDelayMs": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 120000
+            },
+            "timeoutMs": {
+              "type": "integer",
+              "minimum": 1000,
+              "maximum": 300000
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1000
+            },
+            "type": {
+              "const": "walkToAnchor"
+            },
+            "target": {
+              "type": "object",
+              "properties": {
+                "anchorId": {
+                  "type": "string",
+                  "pattern": "^anchor-[0-9a-f]{8}$"
+                }
+              },
+              "required": [
+                "anchorId"
+              ],
+              "additionalProperties": false
+            },
+            "movement": {
+              "type": "object",
+              "properties": {
+                "style": {
+                  "enum": [
+                    "careful",
+                    "steady",
+                    "brisk"
+                  ]
+                },
+                "speedMultiplier": {
+                  "type": "number",
+                  "minimum": 0.4,
+                  "maximum": 1
+                },
+                "running": {
+                  "const": false,
+                  "type": "boolean"
+                },
+                "motorSeed": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                "accelerationMs": {
+                  "type": "integer",
+                  "minimum": 100,
+                  "maximum": 300
+                }
+              },
+              "required": [
+                "style",
+                "speedMultiplier",
+                "running",
+                "motorSeed",
+                "accelerationMs"
+              ],
+              "additionalProperties": false
+            },
+            "attentionTag": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "cueRefs": {
+              "type": "array",
+              "maxItems": 32,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              }
+            }
+          },
+          "required": [
+            "id",
+            "reactionDelayMs",
+            "timeoutMs",
+            "reason",
+            "type",
+            "target",
+            "movement"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "reactionDelayMs": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 120000
+            },
+            "timeoutMs": {
+              "type": "integer",
+              "minimum": 1000,
+              "maximum": 300000
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1000
+            },
+            "type": {
+              "const": "readList"
+            },
+            "durationMs": {
+              "type": "integer",
+              "minimum": 100,
+              "maximum": 120000
+            },
+            "attentionTag": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "cueRefs": {
+              "type": "array",
+              "maxItems": 32,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              }
+            }
+          },
+          "required": [
+            "id",
+            "reactionDelayMs",
+            "timeoutMs",
+            "reason",
+            "type",
+            "durationMs"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    }
+  }
+}

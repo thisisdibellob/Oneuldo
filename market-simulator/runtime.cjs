@@ -2,7 +2,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const ts = require('../frontend/node_modules/typescript');
-const roots = ['src', '../frontend/src/game', '../frontend/src/behavior'].map(p => path.resolve(__dirname, p) + path.sep);
+const roots = ['src', '../frontend/src/game'].map(p => path.resolve(__dirname, p) + path.sep);
 let installed = false;
 function register() {
   if (installed) return;
@@ -11,7 +11,7 @@ function register() {
   require.extensions['.ts'] = (module, filename) => {
     if (!roots.some(root => path.resolve(filename).startsWith(root))) {
       if (previous) return previous(module, filename);
-      throw new Error('Simulator loader only supports simulator and shared game/behavior modules.');
+      throw new Error('Simulator loader only supports simulator and shared game modules.');
     }
     const { outputText } = ts.transpileModule(fs.readFileSync(filename, 'utf8'), {
       fileName: filename,

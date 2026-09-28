@@ -5,15 +5,14 @@ import { mkdir, open, link, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import { Random } from './random';
 import { getPersona, listPersonas } from './personas';
-import type { EpisodeOptions, EpisodeSummary } from './types';
+import type { TraceOptions, TraceSummary } from './types';
 
-export type BatchOptions = Omit<EpisodeOptions, 'personaId' | 'sessionId' | 'decisionProvider' | 'replayTrace'> & {
+export type BatchOptions = Omit<TraceOptions, 'personaId' | 'decisionProvider' | 'actorDecisionProvider'> & {
   count: number; personaMix?: Record<string, number>; outputPath: string; concurrency?: number;
 };
-type WorkerResult = { line: string; summary: EpisodeSummary };
-type Aggregate = { episodes: number; successes: number; gaveUp: number; actions: number; moves: number; cartChecks: number;
-  helpRequests: number; retries: number; wrongSelections: number; selections: number; rejectedActions: number;
-  meanDecisionMs: number; meanPathDistance: number; selectedItemCounts: Record<string, number> };
+type WorkerResult = { line: string; summary: TraceSummary };
+type Aggregate = { traces: number; reviewRequests: number; gaveUp: number; steps: number; walkingIntentions: number;
+  cartChecks: number; helpRequests: number; productsDragged: number; meanReactionMs: number };
 
 export async function generateBatch(options: BatchOptions) {
   if (!Number.isInteger(options.count) || options.count < 1 || options.count > 100000) throw new Error('count must be 1..100000.');
@@ -50,15 +49,12 @@ export async function generateBatch(options: BatchOptions) {
       for (const result of results) {
         await file.write(result.line + '\n');
         const s = result.summary;
-        const a = aggregates[s.personaId] ??= { episodes: 0, successes: 0, gaveUp: 0, actions: 0, moves: 0,
-          cartChecks: 0, helpRequests: 0, retries: 0, wrongSelections: 0, selections: 0, rejectedActions: 0,
-          meanDecisionMs: 0, meanPathDistance: 0, selectedItemCounts: {} };
-        a.episodes++; a.successes += Number(s.outcome === 'success'); a.gaveUp += Number(s.outcome === 'gave-up');
-        a.actions += s.actionCount; a.moves += s.moveCount; a.cartChecks += s.cartChecks; a.helpRequests += s.helpRequests;
-        a.retries += s.retries; a.wrongSelections += s.wrongSelections; a.selections += s.selections; a.rejectedActions += s.rejectedActions;
-        a.meanDecisionMs += (s.decisionMeanMs - a.meanDecisionMs) / a.episodes;
-        a.meanPathDistance += (s.pathDistance - a.meanPathDistance) / a.episodes;
-        for (const [id, count] of Object.entries(s.selectedItemCounts)) a.selectedItemCounts[id] = (a.selectedItemCounts[id] ?? 0) + count;
+        const a = aggregates[s.personaId] ??= { traces: 0, reviewRequests: 0, gaveUp: 0, steps: 0,
+          walkingIntentions: 0, cartChecks: 0, helpRequests: 0, productsDragged: 0, meanReactionMs: 0 };
+        a.traces++; a.reviewRequests += Number(s.ending === 'review-requested'); a.gaveUp += Number(s.ending === 'gave-up');
+        a.steps += s.steps; a.walkingIntentions += s.walkingIntentions; a.cartChecks += s.cartChecks;
+        a.helpRequests += s.helpRequests; a.productsDragged += s.productsDragged;
+        a.meanReactionMs += (s.plannedReactionMs / s.steps - a.meanReactionMs) / a.traces;
       }
     }
     await file.sync(); await file.close();
@@ -72,7 +68,7 @@ export async function generateBatch(options: BatchOptions) {
   }
 }
 
-function runWorker(worker: Worker, options: EpisodeOptions): Promise<WorkerResult> {
+function runWorker(worker: Worker, options: TraceOptions): Promise<WorkerResult> {
   return new Promise((resolve, reject) => {
     const clean = () => { worker.off('message', message); worker.off('error', failed); worker.off('exit', exited); };
     const message = (data: WorkerResult & { error?: string }) => { clean(); data.error ? reject(new Error(data.error)) : resolve(data); };

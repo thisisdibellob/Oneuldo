@@ -1,10 +1,10 @@
 import { getMarketStationApproachPoint, isNearMarketStation, type MarketEnvironmentStationId } from '../../frontend/src/game/marketEnvironment';
 import { getMarketNavigationPath } from '../../frontend/src/game/marketNavigation';
-import type { Observation, Decision } from './types';
+import type { Observation, PrimitiveDecision } from './types';
 import type { Random } from './random';
 
 /** Plans use only the actor-visible environment. Every waypoint becomes a guarded adapter move. */
-export function planWalk(observation: Observation, station: MarketEnvironmentStationId, random: Random, speed: number): Decision[] | null {
+export function planWalk(observation: Observation, station: MarketEnvironmentStationId, random: Random, speed: number): PrimitiveDecision[] | null {
   const { environment, playerPosition: start, cashierAvailability } = observation;
   const approach = getMarketStationApproachPoint(environment, station, {
     x: start.x + random.between(-45, 45), y: start.y + random.between(-45, 45),
@@ -16,7 +16,7 @@ export function planWalk(observation: Observation, station: MarketEnvironmentSta
     path = nearest && getMarketNavigationPath(environment, start, nearest, cashierAvailability);
   }
   if (!path) return null;
-  const decisions: Decision[] = [];
+  const decisions: PrimitiveDecision[] = [];
   let point = start;
   const stepLength = random.between(23, 29);
   // Speed is chosen per journey, rather than independent jitter at every frame.

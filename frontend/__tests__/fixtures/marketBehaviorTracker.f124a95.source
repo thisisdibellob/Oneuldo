@@ -1,3 +1,5 @@
+import { randomUUID } from 'expo-crypto';
+
 import type {
   BehaviorLogRequest,
   BehaviorPriority,
@@ -5,9 +7,9 @@ import type {
   BehaviorStepOutcome,
 } from '../api/behaviorLog';
 import type { MarketCart, MarketEvaluation, MarketMission } from '../game/scenarios';
-import type { MarketProvenance } from '../game/marketSession';
 import { getObjectiveProductIds, getObjectiveQuantity, getMarketCartTotal, getMarketProduct, marketProducts } from '../game/scenarios';
 import { MARKET_CATALOG_VERSION, MARKET_SCENARIO_VERSION, MARKET_INITIAL_STOCK, MARKET_SUPPORT_OPTIONS } from '../game/marketContent';
+import { enqueueBehaviorEvents, flushBehaviorEventQueue, assertBehaviorEventsAcknowledged } from './behaviorEventQueue';
 import { MovementLogReducer, MOVEMENT_SAMPLING } from './movementLogReducer';
 import {
   MarketMovementDetector,
@@ -47,27 +49,13 @@ type TrackInput = {
   finalContext?: Pick<BehaviorLogRequest, 'sessionEnd' | 'taskResult'>;
 };
 
-export type MarketBufferedBehaviorEvent = { event: BehaviorLogRequest; priority: BehaviorPriority };
+type BufferedEvent = { event: BehaviorLogRequest; priority: BehaviorPriority };
 
-/** All platform boundaries live in the UI wrapper or the caller's replay runtime. */
-export type MarketBehaviorRuntime = {
-  now(): number;
-  randomUUID(): string;
-  setTimeout(callback: () => void, delayMs: number): unknown;
-  clearTimeout(handle: unknown): void;
-  persist(events: MarketBufferedBehaviorEvent[]): Promise<unknown>;
-  flush(): Promise<unknown>;
-  assertAcknowledged(sessionId: string, sequence: number): Promise<void>;
-  onEvent?(event: BehaviorLogRequest): void;
-  sessionId?: string;
-  provenance?: MarketProvenance;
-};
-
-export class MarketBehaviorTrackerCore {
+export class MarketBehaviorTracker {
   readonly questInstanceId: string;
-  readonly sessionId: string;
+  readonly sessionId = randomUUID();
 
-  private buffer: MarketBufferedBehaviorEvent[] = [];
+  private buffer: BufferedEvent[] = [];
   private closed = false;
   private submissionRequested = false;
   private controlMode: MarketTelemetryControlMode = 'joystick';
@@ -76,12 +64,12 @@ export class MarketBehaviorTrackerCore {
   private interruptionStartedAt: number | null = null;
   private interruptionTimeMs = 0;
   private idleStartedAt: number | null = null;
-  private idleTimer: unknown | null = null;
-  private persistTimer: unknown | null = null;
+  private idleTimer: ReturnType<typeof setTimeout> | null = null;
+  private persistTimer: ReturnType<typeof setTimeout> | null = null;
   private sequence = 0;
-  private readonly startedAt: number;
+  private readonly startedAt = Date.now();
   private readonly contentSource: BehaviorSimulationContext['contentSource'];
-  private uploadTimer: unknown | null = null;
+  private uploadTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly movementDetector: MarketMovementDetector;
   private readonly movementLogs = new MovementLogReducer<TrackInput>((event, span) => ({
     ...event, payload: { ...event.payload, marketContent: {
@@ -90,16 +78,14 @@ export class MarketBehaviorTrackerCore {
   }));
 
   constructor(
-    private readonly runtime: MarketBehaviorRuntime,
+    private readonly accessToken: string,
     private readonly mission: MarketMission,
     private readonly difficulty = 2,
     simulation?: Omit<BehaviorSimulationContext, 'simulationStarted'>,
     private readonly stations = MARKET_STATIONS,
   ) {
-    this.startedAt = runtime.now();
-    this.sessionId = runtime.sessionId ?? runtime.randomUUID();
     this.movementDetector = new MarketMovementDetector(stations, 105);
-    this.questInstanceId = mission.scene?.questInstanceId ?? simulation?.questInstanceId ?? this.runtime.randomUUID();
+    this.questInstanceId = mission.scene?.questInstanceId ?? simulation?.questInstanceId ?? randomUUID();
     this.contentSource = simulation?.contentSource ?? 'STATIC';
     this.track({
       eventCode: 'SHOP.SESSION_STARTED',
@@ -155,7 +141,7 @@ export class MarketBehaviorTrackerCore {
   }
 
   private record(input: TrackInput) {
-    const occurredAt = input.occurredAt ?? new Date(this.runtime.now()).toISOString();
+    const occurredAt = input.occurredAt ?? new Date().toISOString();
     const occurredAtMs = Date.parse(occurredAt);
     if (input.eventCode !== 'SHOP.IDLE_STARTED'
       && input.eventCode !== 'SHOP.IDLE_ENDED'
@@ -170,7 +156,7 @@ export class MarketBehaviorTrackerCore {
     const event: BehaviorLogRequest = {
       metadata: {
         appVersion: APP_VERSION,
-        clientEventId: this.runtime.randomUUID(),
+        clientEventId: randomUUID(),
         contentVersion: this.mission.catalogVersion ?? MARKET_CATALOG_VERSION,
         eventSchemaVersion: 'behavior-event-v1',
         eventSequence: this.sequence,
@@ -211,7 +197,7 @@ export class MarketBehaviorTrackerCore {
         scenarioVersion: this.mission.scenarioVersion ?? MARKET_SCENARIO_VERSION,
         thresholdRuleVersion: DETECTION_RULE_VERSION,
         ...input.payload,
-        marketContent: { ...(input.payload?.marketContent as object ?? {}), ...(this.runtime.provenance ? { provenance: this.runtime.provenance } : {}), sceneRef: this.questInstanceId, layoutVersion: this.mission.scene?.layoutVersion, seed: this.mission.scene?.seed,
+        marketContent: { ...(input.payload?.marketContent as object ?? {}), sceneRef: this.questInstanceId, layoutVersion: this.mission.scene?.layoutVersion, seed: this.mission.scene?.seed,
           movementContext: { coordinateSpace: 'market-world', stations: this.stations, interactionRadius: 105,
             ...MOVEMENT_SAMPLING } },
       },
@@ -229,7 +215,6 @@ export class MarketBehaviorTrackerCore {
       validity: input.validity,
       ...input.finalContext,
     };
-    this.runtime.onEvent?.(event);
     this.buffer.push({ event, priority: input.priority ?? 'normal' });
     if (input.priority === 'critical' || this.buffer.length >= 5) this.persistSafely();
     else this.schedulePersistence();
@@ -237,18 +222,17 @@ export class MarketBehaviorTrackerCore {
   }
 
   observeMovement(sample: MarketMovementSample) {
-    this.endIdleIfNeeded(sample.occurredAt ?? this.runtime.now(), 'SHOP.ITEM_SEARCH_STARTED');
+    this.endIdleIfNeeded(sample.occurredAt ?? Date.now(), 'SHOP.ITEM_SEARCH_STARTED');
     this.controlMode = sample.controlMode;
     this.trackMovementEvents(this.movementDetector.observe({
       ...sample,
-      occurredAt: sample.occurredAt ?? this.runtime.now(),
       targetZoneIds: this.targetZoneIds(),
     }));
   }
 
   movementStopped(controlMode: MarketTelemetryControlMode) {
     this.controlMode = controlMode;
-    this.trackMovementEvents(this.movementDetector.stop(this.runtime.now(), controlMode));
+    this.trackMovementEvents(this.movementDetector.stop(Date.now(), controlMode));
     this.scheduleIdle();
   }
 
@@ -284,16 +268,11 @@ export class MarketBehaviorTrackerCore {
       eventCode: 'SHOP.SHELF_CLOSED',
       microActionId: `CLOSE_SHELF_${station}`,
       payload: {
-        durationMs: Math.max(0, this.runtime.now() - openedAt),
+        durationMs: Math.max(0, Date.now() - openedAt),
         stationId: station,
       },
       priority: hasRemainingTarget ? 'high' : 'normal',
     });
-  }
-
-  staffHelpRequested(action: Record<string, unknown> & { type: string }) {
-    this.track({ eventCode: 'SHOP.STAFF_HELP_REQUESTED', microActionId: action.type.toUpperCase(),
-      payload: { marketContent: { action } } });
   }
 
   briefingAdvanced(index: number, durationMs: number) {
@@ -371,7 +350,7 @@ export class MarketBehaviorTrackerCore {
 
   appBackgrounded() {
     if (this.interruptionStartedAt !== null) return;
-    this.interruptionStartedAt = this.runtime.now();
+    this.interruptionStartedAt = Date.now();
     this.interruptionCount += 1;
     this.trackMovementEvents(this.movementDetector.stop(this.interruptionStartedAt, this.controlMode));
     this.track({
@@ -385,7 +364,7 @@ export class MarketBehaviorTrackerCore {
 
   appForegrounded() {
     if (this.interruptionStartedAt === null) return;
-    const durationMs = this.runtime.now() - this.interruptionStartedAt;
+    const durationMs = Date.now() - this.interruptionStartedAt;
     this.interruptionTimeMs += durationMs;
     this.interruptionStartedAt = null;
     this.track({
@@ -405,30 +384,25 @@ export class MarketBehaviorTrackerCore {
   }
 
   private async closeSession(cart: MarketCart, reason: NonNullable<BehaviorLogRequest['sessionEnd']>['reason']) {
-    this.finishSession(cart, reason);
-    await this.flushNow();
-  }
-
-  /** Synchronous completion for callers whose sink has no I/O, such as episode conversion. */
-  finishSession(cart: MarketCart, reason: NonNullable<BehaviorLogRequest['sessionEnd']>['reason']) {
     if (this.closed) return;
-    this.trackMovementEvents(this.movementDetector.finish(this.targetZoneIds(), this.runtime.now()));
+    this.trackMovementEvents(this.movementDetector.finish(this.targetZoneIds()));
     this.closed = true;
     this.track({ eventCode: 'SHOP.SESSION_ENDED', microActionId: 'EXIT_MARKET',
       payload: this.cartPayload(cart), priority: 'critical',
       finalContext: { sessionEnd: { interruptionCount: this.interruptionCount,
         interruptionTimeMs: this.interruptionTimeMs, reason } } });
     this.clearTimers();
+    await this.flushNow();
   }
 
   async flushConfirmed() {
     await this.flushNow();
-    await this.runtime.assertAcknowledged(this.sessionId, this.sequence);
+    await assertBehaviorEventsAcknowledged(this.accessToken, this.sessionId, this.sequence);
   }
 
   async flushNow() {
     await this.persist();
-    await this.runtime.flush();
+    await flushBehaviorEventQueue(this.accessToken);
   }
 
   private trackMovementEvents(events: MarketMovementEventDraft[]) {
@@ -473,7 +447,7 @@ export class MarketBehaviorTrackerCore {
 
   private schedulePersistence() {
     if (this.persistTimer) return;
-    this.persistTimer = this.runtime.setTimeout(() => {
+    this.persistTimer = setTimeout(() => {
       this.persistTimer = null;
       this.persistSafely();
     }, PERSIST_DELAY_MS);
@@ -481,7 +455,7 @@ export class MarketBehaviorTrackerCore {
 
   private scheduleUpload() {
     if (this.uploadTimer) return;
-    this.uploadTimer = this.runtime.setTimeout(() => {
+    this.uploadTimer = setTimeout(() => {
       this.uploadTimer = null;
       void this.flushNow().catch(() => undefined);
     }, UPLOAD_INTERVAL_MS);
@@ -490,13 +464,13 @@ export class MarketBehaviorTrackerCore {
   private async persist() {
     this.movementLogs.flush().forEach(event => this.record(event));
     if (this.persistTimer) {
-      this.runtime.clearTimeout(this.persistTimer);
+      clearTimeout(this.persistTimer);
       this.persistTimer = null;
     }
     if (this.buffer.length === 0) return;
     const events = this.buffer.splice(0, this.buffer.length);
     try {
-      await this.runtime.persist(events);
+      await enqueueBehaviorEvents(this.accessToken, events);
     } catch (error) {
       this.buffer.unshift(...events);
       throw error;
@@ -508,9 +482,9 @@ export class MarketBehaviorTrackerCore {
   }
 
   private clearTimers() {
-    if (this.persistTimer) this.runtime.clearTimeout(this.persistTimer);
-    if (this.uploadTimer) this.runtime.clearTimeout(this.uploadTimer);
-    if (this.idleTimer) this.runtime.clearTimeout(this.idleTimer);
+    if (this.persistTimer) clearTimeout(this.persistTimer);
+    if (this.uploadTimer) clearTimeout(this.uploadTimer);
+    if (this.idleTimer) clearTimeout(this.idleTimer);
     this.persistTimer = null;
     this.uploadTimer = null;
     this.idleTimer = null;
@@ -518,9 +492,9 @@ export class MarketBehaviorTrackerCore {
 
   private scheduleIdle() {
     if (this.idleTimer || this.idleStartedAt !== null || this.closed) return;
-    this.idleTimer = this.runtime.setTimeout(() => {
+    this.idleTimer = setTimeout(() => {
       this.idleTimer = null;
-      this.idleStartedAt = this.runtime.now();
+      this.idleStartedAt = Date.now();
       this.track({
         eventCode: 'SHOP.IDLE_STARTED',
         microActionId: 'IDLE_IN_MARKET',
@@ -532,7 +506,7 @@ export class MarketBehaviorTrackerCore {
 
   private endIdleIfNeeded(occurredAt: number, resumedByEventCode: string) {
     if (this.idleTimer) {
-      this.runtime.clearTimeout(this.idleTimer);
+      clearTimeout(this.idleTimer);
       this.idleTimer = null;
     }
     if (this.idleStartedAt === null) return;

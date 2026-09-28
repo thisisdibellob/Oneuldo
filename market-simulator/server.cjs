@@ -5,96 +5,118 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const readline = require('node:readline');
 require('./runtime.cjs').register();
-const { listPersonas, generateEpisode, generateBatch } = require('./src/simulator.ts');
-const { validateGeneratedEpisode, validateGeneratedJsonlFile } = require('./src/schemaValidation.ts');
-const { exportToBackend } = require('./src/backendExport.ts');
-
+const { ReplayBridge, loadReplayConfig } = require('./replay-bridge.cjs');
 const string = { type: 'string', minLength: 1 };
 const seed = { anyOf: [string, { type: 'number' }] };
-const llm = { type: 'object', additionalProperties: false, properties: { baseUrl: string, model: string, apiKeyEnv: string, maxCalls: { type: 'integer', minimum: 1, maximum: 10000 }, timeoutMs: { type: 'integer', minimum: 1, maximum: 300000 } } };
-const episodeProperties = {
-  personaId: string, seed, environmentSeed: seed, difficulty: { enum: ['family', 'exact'] },
-  mode: { enum: ['stochastic', 'llm'] }, startedAt: string,
-  maxActions: { type: 'integer', minimum: 1, maximum: 10000 },
-  timeBudgetMs: { type: 'integer', minimum: 1000 }, llm,
-};
-const { personaId: singleEpisodePersona, ...batchEpisodeProperties } = episodeProperties;
+const object = { type: 'object' };
+const llm = { type: 'object', additionalProperties: false, properties: { baseUrl: string, model: string, apiKeyEnv: string, maxCalls: { type: 'integer', minimum: 1, maximum: 2000 }, timeoutMs: { type: 'integer', minimum: 1, maximum: 300000 } } };
+const schema = (properties, required = []) => ({ type: 'object', additionalProperties: false, properties, required });
 const definitions = [
-  { name: 'list_personas', description: 'List synthetic shopping personas and policy parameters. No browser, app, or network required.', inputSchema: { type: 'object', additionalProperties: false, properties: {} }, annotations: { readOnlyHint: true } },
-  { name: 'generate_episode', description: 'Simulate one complete synthetic episode and save JSONL. Stochastic mode is offline; llm mode explicitly enables model API calls. Returns a compact summary and output path.', inputSchema: { type: 'object', required: ['personaId', 'seed'], additionalProperties: false, properties: { ...episodeProperties, outputPath: string } } },
-  { name: 'generate_batch', description: 'Generate episodes in parallel workers and save JSONL. Use distinct seed values for new samples; repeat the same seed for reproduction. No backend upload.', inputSchema: { type: 'object', required: ['count', 'seed', 'outputPath'], additionalProperties: false, properties: { ...batchEpisodeProperties, count: { type: 'integer', minimum: 1, maximum: 100000 }, personaMix: { type: 'object', minProperties: 1, additionalProperties: { type: 'number', exclusiveMinimum: 0 } }, outputPath: string, concurrency: { type: 'integer', minimum: 1, maximum: 32 } } } },
-  { name: 'validate_episode_schema', description: 'Validate a generated {episode,behaviorLogs,trace,summary} object or a JSONL file against actual frontend TypeScript contracts, synthetic provenance and sequence invariants.', inputSchema: { type: 'object', additionalProperties: false, properties: { episode: { type: 'object' }, batchFilePath: string } }, annotations: { readOnlyHint: true } },
-  { name: 'export_to_backend', description: 'Explicitly upload validated JSONL to an isolated configured local/staging backend in batches of 50. Requires MARKET_SIM_TARGETS configuration with isolated:true. Production is disabled.', inputSchema: { type: 'object', required: ['batchFilePath', 'targetEnv'], additionalProperties: false, properties: { batchFilePath: string, targetEnv: { enum: ['local', 'staging'] }, maxRetries: { type: 'integer', minimum: 0, maximum: 5 } } } },
+  { name: 'list_personas', description: 'List available personas for intent trace generation.', inputSchema: schema({}), annotations: { readOnlyHint: true } },
+  { name: 'generate_trace', description: 'Generate an intent-level trace for a registered tab mission or explicit snapshot. Stochastic generation is offline. Saves JSON; never uploads gameplay logs.', inputSchema: schema({ personaId: string, seed, tabId: string, snapshot: object, snapshotFilePath: string, outputPath: string, mode: { enum: ['stochastic', 'llm'] }, maxActions: { type: 'integer', minimum: 1, maximum: 2000 }, timeBudgetMs: { type: 'integer', minimum: 1000, maximum: 3600000 }, attentionExperience: schema({ visit: { enum: ['first-play', 'revisit'] }, previousLayoutKey: string, memory: object }, ['visit']), llm }, ['personaId', 'seed']) },
+  { name: 'validate_trace', description: 'Validate a trace and its target mission snapshot with the shared schema and game guards.', inputSchema: schema({ trace: object, traceFilePath: string, tabId: string, snapshot: object, snapshotFilePath: string }), annotations: { readOnlyHint: true } },
+  { name: 'pair_app_session', description: 'Issue a five-minute, one-use pairing URL for one allowlisted local/staging test account. Open it in the development web app and log in with that account.', inputSchema: schema({ appOrigin: string, backendOrigin: string, memberId: string }, ['appOrigin', 'backendOrigin', 'memberId']) },
+  { name: 'list_app_sessions', description: 'List authenticated development app tabs, mission readiness and per-tab replay status.', inputSchema: schema({}), annotations: { readOnlyHint: true } },
+  { name: 'play_trace', description: 'Send a complete validated trace to one authenticated app tab for real-time replay through existing user inputs. One active replay per tab and test account.', inputSchema: schema({ tabId: string, trace: object, traceFilePath: string }, ['tabId']) },
+  { name: 'replay_status', description: 'Read progress and smoothness measurements for a replay.', inputSchema: schema({ replayId: string, tabId: string }), annotations: { readOnlyHint: true } },
+  { name: 'stop_replay', description: 'Stop replay on the selected tab and release its virtual input through the app.', inputSchema: schema({ tabId: string }, ['tabId']) },
 ];
-function checkArguments(value, schema, at = 'arguments') {
-  if (schema.anyOf) {
-    if (!schema.anyOf.some((item) => { try { checkArguments(value, item, at); return true; } catch { return false; } })) throw new Error(`${at}: invalid value`);
-    return;
-  }
-  if (schema.enum && !schema.enum.includes(value)) throw new Error(`${at}: expected ${schema.enum.join(' | ')}`);
-  if (schema.type === 'object') {
+function checkArguments(value, contract, at = 'arguments') {
+  if (contract.anyOf) { if (!contract.anyOf.some(option => { try { checkArguments(value, option, at); return true; } catch { return false; } })) throw new Error(`${at}: invalid value`); return; }
+  if (contract.enum && !contract.enum.includes(value)) throw new Error(`${at}: expected ${contract.enum.join(' | ')}`);
+  if (contract.type === 'object') {
     if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${at}: expected object`);
-    for (const required of schema.required ?? []) if (!(required in value)) throw new Error(`${at}.${required}: required`);
-    if (schema.minProperties && Object.keys(value).length < schema.minProperties) throw new Error(`${at}: empty object`);
+    for (const key of contract.required ?? []) if (!Object.hasOwn(value, key)) throw new Error(`${at}.${key}: required`);
     for (const [key, child] of Object.entries(value)) {
-      if (Object.hasOwn(schema.properties ?? {}, key)) checkArguments(child, schema.properties[key], `${at}.${key}`);
-      else if (schema.additionalProperties === false) throw new Error(`${at}.${key}: unknown argument`);
-      else if (schema.additionalProperties && typeof schema.additionalProperties === 'object') checkArguments(child, schema.additionalProperties, `${at}.${key}`);
+      if (Object.hasOwn(contract.properties ?? {}, key)) checkArguments(child, contract.properties[key], `${at}.${key}`);
+      else if (contract.additionalProperties === false) throw new Error(`${at}.${key}: unknown argument`);
     }
   }
-  if (schema.type === 'string' && (typeof value !== 'string' || (schema.minLength && value.trim().length < schema.minLength))) throw new Error(`${at}: expected nonempty string`);
-  if (schema.type === 'number' || schema.type === 'integer') {
-    if (typeof value !== 'number' || !Number.isFinite(value) || (schema.type === 'integer' && !Number.isInteger(value))) throw new Error(`${at}: expected ${schema.type}`);
-    if ((schema.minimum !== undefined && value < schema.minimum) || (schema.maximum !== undefined && value > schema.maximum) || (schema.exclusiveMinimum !== undefined && value <= schema.exclusiveMinimum)) throw new Error(`${at}: out of range`);
+  if (contract.type === 'string' && (typeof value !== 'string' || !value.trim())) throw new Error(`${at}: expected nonempty string`);
+  if (['number', 'integer'].includes(contract.type)) {
+    if (typeof value !== 'number' || !Number.isFinite(value) || (contract.type === 'integer' && !Number.isInteger(value))) throw new Error(`${at}: expected ${contract.type}`);
+    if ((contract.minimum !== undefined && value < contract.minimum) || (contract.maximum !== undefined && value > contract.maximum)) throw new Error(`${at}: out of range`);
   }
 }
-async function invokeTool(name, args) {
-  const tool = definitions.find((item) => item.name === name);
-  if (!tool) throw new Error(`Unknown tool: ${name}`);
-  checkArguments(args, tool.inputSchema);
-  if (name === 'list_personas') return { personas: listPersonas() };
-  if (name === 'generate_episode') {
-    const { outputPath, ...options } = args;
-    const result = await generateEpisode(options);
-    const destination = path.resolve(outputPath ?? path.join(__dirname, 'output', `episode-${crypto.randomUUID()}.jsonl`));
-    fs.mkdirSync(path.dirname(destination), { recursive: true });
-    fs.writeFileSync(destination, JSON.stringify(result) + '\n', { flag: 'wx', mode: 0o600 });
-    return { outputPath: destination, summary: result.summary, sessionId: result.episode.sessionId, eventCount: result.behaviorLogs.length };
-  }
-  if (name === 'generate_batch') return generateBatch(args);
-  if (name === 'export_to_backend') return exportToBackend(args);
-  if (Boolean(args.episode) === Boolean(args.batchFilePath)) throw new Error('Provide exactly one of episode or batchFilePath');
-  if (args.episode) return validateGeneratedEpisode(args.episode);
-  return validateGeneratedJsonlFile(args.batchFilePath);
+function readJson(file) { return JSON.parse(fs.readFileSync(path.resolve(file), 'utf8')); }
+function readTrace(args) {
+  if (Boolean(args.trace) === Boolean(args.traceFilePath)) throw new Error('Provide exactly one of trace or traceFilePath.');
+  return args.trace ?? readJson(args.traceFilePath);
 }
-async function dispatch(message) {
-  if (!message || message.jsonrpc !== '2.0' || typeof message.method !== 'string') return { jsonrpc: '2.0', id: message?.id ?? null, error: { code: -32600, message: 'Invalid Request' } };
-  if (message.id === undefined) return null;
-  try {
+function createService(options = {}) {
+  let bridge = options.bridge ?? null, starting = null;
+  const ownerId = crypto.randomUUID();
+  const validate = options.validateTrace ?? ((trace, snapshot) => require('./src/traceValidation.ts').validateTrace(trace, snapshot));
+  async function getBridge() {
+    if (!bridge) bridge = new ReplayBridge(loadReplayConfig(), { validateTrace: validate });
+    if (!starting) starting = bridge.start().catch(error => { starting = null; throw error; });
+    await starting;
+    return bridge;
+  }
+  async function getSnapshot(args) {
+    if ([args.tabId, args.snapshot, args.snapshotFilePath].filter(Boolean).length !== 1) throw new Error('Provide exactly one of tabId, snapshot, or snapshotFilePath.');
+    return args.tabId ? (await getBridge()).snapshot(args.tabId) : args.snapshot ?? readJson(args.snapshotFilePath);
+  }
+  async function invokeTool(name, args = {}) {
+    const tool = definitions.find(item => item.name === name);
+    if (!tool) throw new Error(`Unknown tool: ${name}`);
+    checkArguments(args, tool.inputSchema);
+    if (name === 'list_personas') {
+      const personas = require('./src/personas.ts').listPersonas();
+      return { personas: personas.map(({ prompt, ...profile }) => profile) };
+    }
+    if (name === 'generate_trace') {
+      const snapshot = await getSnapshot(args);
+      const { tabId, snapshot: supplied, snapshotFilePath, outputPath, ...settings } = args;
+      const trace = await require('./src/simulator.ts').generateTrace({ ...settings, snapshot });
+      const validation = validate(trace, snapshot);
+      if (!validation.valid) throw new Error(`Generated trace invalid: ${validation.errors.join('; ')}`);
+      const destination = path.resolve(outputPath ?? path.join(__dirname, 'output', `trace-${crypto.randomUUID()}.json`));
+      fs.mkdirSync(path.dirname(destination), { recursive: true });
+      const snapshotDestination = `${destination}.snapshot.json`;
+      fs.writeFileSync(snapshotDestination, JSON.stringify(snapshot, null, 2) + '\n', { flag: 'wx', mode: 0o600 });
+      try { fs.writeFileSync(destination, JSON.stringify(trace, null, 2) + '\n', { flag: 'wx', mode: 0o600 }); }
+      catch (error) { fs.unlinkSync(snapshotDestination); throw error; }
+      return { outputPath: destination, snapshotFilePath: snapshotDestination, traceId: trace.traceId, personaId: trace.personaId, personaVersion: trace.personaVersion, steps: trace.steps.length, target: trace.target };
+    }
+    if (name === 'validate_trace') return validate(readTrace(args), await getSnapshot(args));
+    const active = await getBridge();
+    if (name === 'pair_app_session') return active.pair(args);
+    if (name === 'list_app_sessions') return active.list();
+    if (name === 'play_trace') return active.play(args.tabId, readTrace(args), ownerId);
+    if (name === 'replay_status') return active.status(args);
+    if (name === 'stop_replay') return active.stop(args.tabId, ownerId);
+    throw new Error('Unsupported tool.');
+  }
+  async function dispatch(message) {
+    if (!message || message.jsonrpc !== '2.0' || typeof message.method !== 'string') return { jsonrpc: '2.0', id: message?.id ?? null, error: { code: -32600, message: 'Invalid Request' } };
+    if (message.id === undefined) return null;
     let result;
-    if (message.method === 'initialize') result = { protocolVersion: ['2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05'].includes(message.params?.protocolVersion) ? message.params.protocolVersion : '2024-11-05', capabilities: { tools: {} }, serverInfo: { name: 'oneuldo-market-simulator', version: '1.0.0' } };
+    if (message.method === 'initialize') result = { protocolVersion: ['2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05'].includes(message.params?.protocolVersion) ? message.params.protocolVersion : '2024-11-05', capabilities: { tools: {} }, serverInfo: { name: 'oneuldo-market-replay', version: '2.0.0' } };
     else if (message.method === 'ping') result = {};
     else if (message.method === 'tools/list') result = { tools: definitions };
     else if (message.method === 'tools/call') {
-      try {
-        const value = await invokeTool(message.params?.name, message.params?.arguments ?? {});
-        result = { content: [{ type: 'text', text: JSON.stringify(value) }], structuredContent: value, isError: false };
-      } catch (error) { result = { content: [{ type: 'text', text: error.message }], isError: true }; }
+      try { const value = await invokeTool(message.params?.name, message.params?.arguments ?? {}); result = { content: [{ type: 'text', text: JSON.stringify(value) }], structuredContent: value, isError: false }; }
+      catch (error) { result = { content: [{ type: 'text', text: error.message }], isError: true }; }
     } else return { jsonrpc: '2.0', id: message.id, error: { code: -32601, message: 'Method not found' } };
     return { jsonrpc: '2.0', id: message.id, result };
-  } catch { return { jsonrpc: '2.0', id: message.id, error: { code: -32603, message: 'Internal error' } }; }
+  }
+  return { invokeTool, dispatch, close: async () => { if (bridge) await bridge.close(); }, getBridge };
 }
+const service = createService();
 function start() {
   const input = readline.createInterface({ input: process.stdin, crlfDelay: Infinity });
-  input.on('line', (line) => {
+  const pending = new Set();
+  input.on('line', line => {
     if (!line.trim()) return;
-    if (Buffer.byteLength(line) > 16 * 1024 * 1024) { process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: null, error: { code: -32600, message: 'Request exceeds 16 MiB; use a file path' } }) + '\n'); return; }
     let message;
-    try { message = JSON.parse(line); }
-    catch { process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: null, error: { code: -32700, message: 'Parse error' } }) + '\n'); return; }
-    // Each request owns its episode state; no browser lease or serial request queue.
-    dispatch(message).then((response) => { if (response) process.stdout.write(JSON.stringify(response) + '\n'); });
+    try { if (Buffer.byteLength(line) > 4 * 1024 * 1024) throw new Error('too large'); message = JSON.parse(line); }
+    catch { process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: null, error: { code: -32700, message: 'Invalid JSON or request exceeds 4 MiB; use a file path.' } }) + '\n'); return; }
+    const task = service.dispatch(message).then(response => { if (response) process.stdout.write(JSON.stringify(response) + '\n'); }).finally(() => pending.delete(task));
+    pending.add(task);
   });
+  input.on('close', async () => { await Promise.allSettled(pending); await service.close(); });
+  for (const signal of ['SIGINT', 'SIGTERM']) process.once(signal, async () => { await service.close(); process.exit(0); });
 }
-module.exports = { definitions, invokeTool, dispatch, start };
+module.exports = { definitions, createService, ...service, start };
 if (require.main === module) start();

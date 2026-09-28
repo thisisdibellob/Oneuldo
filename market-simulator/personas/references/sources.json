@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "personaId": "mild-intellectual-disability-adult",
-  "personaVersion": "2",
+  "personaVersion": "5",
   "runtimeProfile": "../mild-intellectual-disability-adult.json",
-  "promptMirror": "../persona-mild-intellectual-disability-adult-v2.md",
+  "promptMirror": "../persona-mild-intellectual-disability-adult-v5.md",
   "promptAssembly": "Game-specific guidance, then complete source1, then complete source2; source bodies are included without edits.",
   "sources": [
     {
@@ -34,6 +34,38 @@
         "https://www.nice.org.uk/guidance/ng11",
         "https://doi.org/10.3109/13668250.2020.1784520",
         "https://doi.org/10.3384/diss.diva-168070"
+      ]
+    }
+  ],
+  "profiles": [
+    {
+      "personaId": "mild-intellectual-disability-adult",
+      "personaVersion": "5",
+      "runtimeProfile": "../mild-intellectual-disability-adult.json",
+      "promptMirror": "../persona-mild-intellectual-disability-adult-v5.md",
+      "sourceIds": [
+        "source1",
+        "source2"
+      ]
+    },
+    {
+      "personaId": "careful-checker",
+      "personaVersion": "3",
+      "runtimeProfile": "../careful-checker.json",
+      "promptMirror": "../persona-careful-checker-v3.md",
+      "sourceIds": [
+        "source1",
+        "source2"
+      ]
+    },
+    {
+      "personaId": "quick-decider",
+      "personaVersion": "3",
+      "runtimeProfile": "../quick-decider.json",
+      "promptMirror": "../persona-quick-decider-v3.md",
+      "sourceIds": [
+        "source1",
+        "source2"
       ]
     }
   ]
