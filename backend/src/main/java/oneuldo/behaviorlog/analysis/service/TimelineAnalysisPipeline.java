@@ -340,7 +340,10 @@ public final class TimelineAnalysisPipeline {
                 if(validation!=null) correction += "\n문장별 근거 오류: " + mapper.writeValueAsString(validation)
                         + ". 해당 경로의 문장 객체를 원본과 대조하고 text와 evidenceEventIds를 함께 수정하세요. "
                         + "text에 사건 ID를 쓰거나 별도 claimChecks/상위 근거 목록을 만들지 마세요. "
-                        + "순서 오류는 관찰 절 순서를 바로잡고, 무관한 사건을 추가하지 말고 수정된 전체 JSON을 반환하세요.";
+                        + "DUPLICATE_REVIEW_EVIDENCE는 한 문장의 evidenceEventIds 안에서 같은 ID가 반복된 오류이므로 그 배열의 중복을 제거하세요. "
+                        + "문장 사이에서는 직전 문장의 마지막 사건을 다시 인용할 수 있습니다. "
+                        + "REVIEW_EVIDENCE_OUT_OF_ORDER는 앞선 사건으로 돌아간 오류이므로 관찰 절과 근거 순서를 바로잡으세요. "
+                        + "무관한 사건을 추가하지 말고 수정된 전체 JSON을 반환하세요.";
                 continue;
             }
             audit.add(attempt(audit.size()+1,system,submitted,output,response,null,"LIVE"));

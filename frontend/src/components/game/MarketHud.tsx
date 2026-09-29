@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useEffect, useRef } from 'react';
 import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { PressScale } from '../PressScale';
 import { fonts } from '../../theme';
@@ -13,13 +14,21 @@ export type MarketHudProps = {
   onGiveUp: () => void;
   onOpenCart: () => void;
   onOpenHelp: () => void;
+  replayListRef?: { current: ((fraction: number) => void) | null };
 };
 
 /** A quiet shopping note: only the required quantities and explicit cart access. */
 export function MarketHud({
   objectives, score, topInset = 12, controlMode, onControlModeChange,
-  onGiveUp, onOpenCart, onOpenHelp,
+  onGiveUp, onOpenCart, onOpenHelp, replayListRef,
 }: MarketHudProps) {
+  const list = useRef<ScrollView>(null);
+  const extent = useRef({ viewport: 0, content: 0 });
+  if (__DEV__ && replayListRef) replayListRef.current = fraction => {
+    if (!list.current || !extent.current.viewport) throw new Error('Shopping list layout is not ready');
+    list.current.scrollTo({ x: Math.max(0, extent.current.content - extent.current.viewport) * Math.max(0, Math.min(1, fraction)), animated: true });
+  };
+  useEffect(() => () => { if (replayListRef) replayListRef.current = null; }, [replayListRef]);
   return <View pointerEvents="box-none" style={[s.anchor, { top: topInset }]} testID="market-hud">
     <View style={s.card} testID="market-hud-card">
       <View style={s.header}>
@@ -40,7 +49,9 @@ export function MarketHud({
       </View>
       <View style={s.noteRow}>
         <View style={s.note} testID="market-shopping-list">
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.itemsScroll}
+          <ScrollView ref={list} horizontal showsHorizontalScrollIndicator={false} style={s.itemsScroll}
+            onLayout={event => { extent.current.viewport = event.nativeEvent.layout.width; }}
+            onContentSizeChange={width => { extent.current.content = width; }}
             contentContainerStyle={s.items} accessibilityLabel="사야 할 물품과 개수" keyboardShouldPersistTaps="handled">
             {objectives.map(objective => <View key={objective.id} style={s.item}>
               <Text style={s.itemName} numberOfLines={2}>{objective.label}</Text>

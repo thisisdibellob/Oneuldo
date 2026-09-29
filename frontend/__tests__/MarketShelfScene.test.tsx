@@ -17,6 +17,7 @@ import {
   PanResponder,
   PanResponderGestureState,
   Platform,
+  ScrollView,
   StyleSheet,
   View,
 } from 'react-native';
@@ -24,6 +25,7 @@ import {
 import { MarketShelfScene, MarketShelfSceneProps, MARKET_PRODUCT_HOLD_MS } from '../src/components/game/MarketShelfScene';
 import { marketCategories, marketProducts } from '../src/game/scenarios';
 import { createMarketSession } from '../src/game/marketSession';
+import type { ReplayShelfPort } from '../src/replay/ports';
 
 import {
   MarketInteractionRequest,
@@ -630,5 +632,40 @@ describe('진열대 전체 화면 구성과 뒤로가기', () => {
       if (windowDescriptor) Object.defineProperty(globalThis, 'window', windowDescriptor);
       else Reflect.deleteProperty(globalThis, 'window');
     }
+  });
+});
+
+describe('attention replay observes the visible shelf instead of seeking a hidden product', () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+    jest.spyOn(AccessibilityInfo, 'isReduceMotionEnabled').mockResolvedValue(false);
+  });
+  afterEach(() => { jest.restoreAllMocks(); jest.clearAllTimers(); jest.useRealTimers(); });
+  it('requires an explicit scroll before dragging an off-screen row and keeps v1 auto-scroll', async () => {
+    const product = marketProducts.find(p => p.categoryId === marketCategories[0].id)!;
+    let rowY = 760;
+    jest.spyOn(View.prototype, 'measureInWindow').mockImplementation(function (this: View, callback) {
+      const id = this.props.testID;
+      if (id === 'market-shelf-basket-dock') callback(0, 720, 375, 80);
+      else if (id === 'market-shelf-scroll') callback(0, 90, 375, 620);
+      else if (id === `market-product-drag-${product.id}`) callback(12, 130, 75, 70);
+      else if (id === `market-product-row-${product.id}`) callback(10, rowY, 80, 180);
+      else callback(0, 0, 375, 812);
+    });
+    const scrolling = jest.spyOn(ScrollView.prototype, 'scrollTo').mockImplementation(() => {});
+    const port = { current: null as ReplayShelfPort | null };
+    const screen = render(<MarketShelfScene {...shelfProps({ slots: [product.id], replayPortRef: port })} />);
+    await advanceTransition();
+    scrolling.mockClear();
+    await expect(port.current!.measure(product.id, { visibleOnly: true })).rejects.toThrow(/explicit browsing/);
+    expect(scrolling).not.toHaveBeenCalled();
+    rowY = 110;
+    await expect(port.current!.measure(product.id, { visibleOnly: true })).resolves.toHaveProperty('product');
+    expect(scrolling).not.toHaveBeenCalled();
+    const legacy = port.current!.measure(product.id);
+    await advanceTransition(430);
+    await expect(legacy).resolves.toHaveProperty('product');
+    expect(scrolling).toHaveBeenCalledTimes(1);
+    screen.unmount();
   });
 });

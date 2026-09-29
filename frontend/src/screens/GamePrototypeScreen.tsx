@@ -5,7 +5,8 @@ import { getMarketRecoveryPoint } from '../game/marketRecovery';
 import { Ionicons } from '@expo/vector-icons';
 import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { StatusBar } from 'expo-status-bar';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
 import {
   AccessibilityInfo,
   ActivityIndicator,
@@ -20,6 +21,7 @@ import {
   StyleSheet,
   Text,
   View,
+  useWindowDimensions,
 } from 'react-native';
 
 import { icons } from '../assets';
@@ -109,9 +111,13 @@ import {
 } from './MarketSimulationScreen';
 import { CashierSimulationScreen } from './CashierSimulationScreen';
 import { CookingSimulationScreen } from './CookingSimulationScreen';
+import type { ReplayMotionPort, ReplayUiPort } from '../replay/ports';
+import type { ReplayPresentation } from '../game/marketReplayPerception';
 
 // Add ?muteAudio=1 to developer preview URLs for silent interaction checks.
 const DEVELOPMENT_AUDIO_MUTED = isSilentGamePreview();
+const MARKET_REPLAY_ENABLED = __DEV__ && Platform.OS === 'web' && typeof window !== 'undefined'
+  && new URLSearchParams(window.location.search).get('marketReplay') === '1';
 
 const PLAYER_RADIUS = 22;
 const PLAYER_ART_SCALE = 0.5;
@@ -461,6 +467,8 @@ type GamePrototypeScreenProps = {
 };
 
 export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototypeScreenProps) {
+  const replayWindow = useWindowDimensions();
+  const replayInsets = useContext(SafeAreaInsetsContext);
   // A null source keeps silent previews from downloading or decoding audio at all.
   // Keep every hook mounted so audio-enabled visits retain the same lifecycle.
   const backgroundMusic = useAudioPlayer(DEVELOPMENT_AUDIO_MUTED ? null : require('../../assets/audio/apple-cider.m4a'), {
@@ -497,6 +505,10 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
   const zoomGestureActiveRef = useRef(false);
   const suppressWorldPressRef = useRef(false);
   const direction = useRef<Point>({ x: 0, y: 0 });
+  const replayFrame = useRef<((timestamp: number, dt: number) => Point) | null>(null);
+  const replayUi = useRef<ReplayUiPort | null>(null);
+  const replayMotion = useRef<ReplayMotionPort | null>(null);
+  const [replayStatus, setReplayStatus] = useState('재생 연결 준비');
   const keyboardDirection = useRef<Point>({ x: 0, y: 0 });
   const keyboardEngaged = useRef(false);
   const pressedMovementKeys = useRef(new Set<string>());
@@ -1066,6 +1078,9 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
       const last = previousFrame.current ?? timestamp;
       const elapsedSeconds = Math.min(timestamp - last, 32) / 1000;
       previousFrame.current = timestamp;
+      if (__DEV__ && MARKET_REPLAY_ENABLED && replayFrame.current) {
+        direction.current = replayFrame.current(timestamp, elapsedSeconds);
+      }
       const target = tapTarget.current;
 
       if (target) {
@@ -1206,6 +1221,37 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
       animationFrame.current = requestAnimationFrame(runMovement);
     }
   }, [runMovement]);
+
+  function replayPresentation(): ReplayPresentation {
+    return { viewport: { width: viewport.current.width, height: viewport.current.height }, zoom: worldZoomCurrentRef.current,
+      fontScale: Math.max(1, replayWindow.fontScale), safeArea: { top: replayInsets?.top ?? 0, bottom: replayInsets?.bottom ?? 0 } };
+  }
+  if (__DEV__ && MARKET_REPLAY_ENABLED) {
+    replayMotion.current = {
+      read: () => ({ position: { ...playerPoint.current }, environment: marketEnvironmentRef.current,
+        cashiers: marketCashierCalledRef.current, locked: controlsLockedRef.current, presentation: replayPresentation() }),
+      drive: frame => {
+        stopMovement();
+        selectControlMode('joystick');
+        speedMultiplier.current = 1;
+        replayFrame.current = frame;
+        joystickEngaged.current = true;
+        beginMovement();
+      },
+      stop: () => { replayFrame.current = null; stopMovement(); },
+    };
+  }
+  useEffect(() => {
+    if (!__DEV__ || !MARKET_REPLAY_ENABLED) return;
+    let active = true, disconnect: (() => void) | undefined;
+    void import('../replay/connection').then(async ({ connectMarketReplay }) => {
+      if (!active) return;
+      const cleanup = await connectMarketReplay({ accessToken, ui: () => replayUi.current,
+        motion: () => replayMotion.current!, status: text => { if (active) setReplayStatus(text); } });
+      if (active) disconnect = cleanup; else cleanup();
+    }).catch(error => { if (active) setReplayStatus(error instanceof Error ? error.message : String(error)); });
+    return () => { active = false; disconnect?.(); };
+  }, [accessToken]);
 
   useEffect(() => {
     if (Platform.OS !== 'web' || typeof window === 'undefined') return undefined;
@@ -2584,6 +2630,8 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
 
       {worldMap === 'market' && marketAiRequestToken === accessToken && (marketAiStatus === 'ready' || marketAiStatus === 'baseline') ? (
         <MarketSimulationScreen
+          replayUiRef={__DEV__ && MARKET_REPLAY_ENABLED ? replayUi : undefined}
+          replayPresentation={__DEV__ && MARKET_REPLAY_ENABLED ? replayPresentation : undefined}
           accessToken={accessToken}
           difficulty={marketDifficulty}
           externalMenuOpen={hudMenuOpen}
@@ -2605,6 +2653,11 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
           onTelemetryReady={registerMarketTelemetry}
         />
       ) : null}
+
+      {__DEV__ && MARKET_REPLAY_ENABLED ? <View pointerEvents="none" style={{ position: 'absolute', left: 12, top: 40, maxWidth: 480,
+        backgroundColor: '#f4fff3', borderColor: '#3b6b3b', borderWidth: 1, borderRadius: 8, padding: 8, zIndex: 10000 }}>
+        <Text accessibilityLiveRegion="polite" testID="market-replay-status" style={{ fontSize: 12, color: '#234b23' }}>{replayStatus}</Text>
+      </View> : null}
 
       {fridgeMenuOpen ? (
         <View style={styles.interactionOverlay}>

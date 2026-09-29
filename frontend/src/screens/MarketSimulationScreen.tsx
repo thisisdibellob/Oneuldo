@@ -29,6 +29,9 @@ import { marketMission, marketProducts } from '../game/scenarios';
 import { MARKET_CATALOG_VERSION, MARKET_SCENARIO_VERSION, enabledMarketScenarios } from '../game/marketContent';
 import { fonts } from '../theme';
 import { listMarketEpisodes, saveMarketEpisode, MarketStoredEpisode } from '../game/marketEpisodeStore';
+import type { ReplayUiPort, ReplayShelfPort } from '../replay/ports';
+import type { ReplayPresentation } from '../game/marketReplayPerception';
+import type { MarketReplaySnapshot } from '../game/marketReplayTrace';
 
 /** Preserve the mission's offered alternatives while using the new shelf layout. */
 function createMissionSession(config: Partial<MarketSessionConfig>, mission?: MarketMission, environment?: MarketEnvironment) {
@@ -94,6 +97,9 @@ export type MarketSimulationScreenProps = {
   onExit: () => void;
   onLockChange?: (locked: boolean) => void;
   onMissionComplete?: () => void;
+  /** Only supplied by the development web replay gate. */
+  replayUiRef?: { current: ReplayUiPort | null };
+  replayPresentation?: () => ReplayPresentation;
 };
 const price = (value: number) => value.toLocaleString('ko-KR') + '원';
 
@@ -114,7 +120,7 @@ export function MarketSimulationScreen({
   onEpisodeComplete,
   onExit,
   onLockChange,
-  onMissionComplete
+  onMissionComplete, replayUiRef, replayPresentation
 }: MarketSimulationScreenProps) {
   const insets = useContext(SafeAreaInsetsContext);
   const [session, setSession] = useState(() => createMissionSession({
@@ -129,6 +135,11 @@ export function MarketSimulationScreen({
   const lastBriefingStep = (briefingPages?.length ?? 2) - 1;
   const [review, setReview] = useState<string | null>(null);
   const reviewing = useRef(false);
+  const reviewAccepted = useRef(false);
+  const reviewError = useRef<string | null>(null);
+  const replayShelf = useRef<ReplayShelfPort | null>(null);
+  const replayList = useRef<((fraction: number) => void) | null>(null);
+  const replaySnapshot = useRef<MarketReplaySnapshot | null>(null);
   const mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const tracker = useRef<MarketBehaviorTracker | null>(null);
@@ -335,6 +346,7 @@ export function MarketSimulationScreen({
     return () => back.remove();
   }, [shelf, settings, historyOpen, cartOpen, helpOpen, staffMessage, staffReturnHelp, session.phase, giveUp, dispatch, panelPresent, panelVisible, externalMenuOpen]);
   const configure = (config: Partial<MarketSessionConfig>) => {
+    replaySnapshot.current = null;
     const next = createMissionSession({ ...config, startedAt: new Date().toISOString() }, mission);
     live.current = next;
     setSession(next);
@@ -347,6 +359,8 @@ export function MarketSimulationScreen({
     if (!aiAssessment) { dispatch({ type: 'submit' }); return; }
     if (reviewing.current) return;
     reviewing.current = true;
+    reviewAccepted.current = false;
+    reviewError.current = null;
     setReview('기록을 전송하고 AI가 검토하고 있어요.');
     try {
       const current = tracker.current;
@@ -354,11 +368,12 @@ export function MarketSimulationScreen({
       current.checkoutSubmitted(live.current.cart);
       await current.flushConfirmed();
       await startSessionAnalysisJob(accessToken, current.sessionId);
+      reviewAccepted.current = true;
       if (mounted.current) setReview('분석을 접수했어요. 다른 화면으로 이동해도 계속 진행됩니다. 분석 탭에서 진행 상태와 결과를 확인해 주세요.');
-    } catch (error) { if (mounted.current) setReview(error instanceof Error ? error.message : '검토를 접수하지 못했어요.'); }
+    } catch (error) { reviewError.current = error instanceof Error ? error.message : '검토를 접수하지 못했어요.'; if (mounted.current) setReview(reviewError.current); }
     finally { reviewing.current = false; }
   };
-  const leave = () => { if (!tracker.current) { onExit(); return; } void tracker.current.abort(live.current.cart).catch(() => undefined).finally(onExit); };
+  const leave = () => { if (!tracker.current) { onExit(); return Promise.resolve(); } return tracker.current.abort(live.current.cart).catch(() => undefined).finally(onExit); };
   const selectDifficulty = (difficulty: 'family' | 'exact') => configure({
     ...session.config,
     difficulty,
@@ -406,6 +421,53 @@ export function MarketSimulationScreen({
     const next = dispatch({ type: 'requestReturn', productId, quantity }, true);
     if (!next.lastActionError) setStaffResponse(`${getMarketProduct(productId)?.name} ${quantity}개를 제자리에 놓아드렸어요.`);
   };
+  // These handlers are shared by the visible buttons and the development input port.
+  const advanceBriefing = () => {
+    tracker.current?.briefingAdvanced(briefingStep, Date.now() - briefingShownAt.current);
+    briefingShownAt.current = Date.now();
+    briefingStep < lastBriefingStep ? setBriefingStep(step => step + 1) : start();
+  };
+  const openCart = () => { dispatch({ type: 'viewCart' }); setCartOpen(true); };
+  const openHelp = () => { dispatch({ type: 'viewHelp' }); setHelpOpen(true); };
+  const closeCart = () => { dispatch({ type: 'closeView' }); setCartOpen(false); };
+  const closeHelp = () => { dispatch({ type: 'closeView' }); setHelpOpen(false); };
+  const requestCashier = (checkoutId: 'checkout' | 'checkout-2') => {
+    const next = dispatch({ type: 'requestCashier', checkoutId }, true);
+    if (!next.lastActionError) setStaffResponse(`${checkoutId === 'checkout' ? 1 : 2}번 계산대로 와 주세요. 계산을 도와드릴게요.`);
+  };
+  const openReturnHelp = () => { setStaffReturnHelp(true); setStaffResponse(''); };
+  const backToStaff = () => { setStaffReturnHelp(false); setStaffResponse(''); };
+  if (__DEV__ && replayUiRef && aiAssessment) {
+    replayUiRef.current = {
+      snapshot: () => {
+        const presentation = replayPresentation?.();
+        if (briefing && briefingStep === 0 && JSON.stringify(replaySnapshot.current?.presentation) !== JSON.stringify(presentation)) replaySnapshot.current = null;
+        if (!replaySnapshot.current) {
+          const { createMarketReplaySnapshot } = require('../game/marketReplayTrace') as typeof import('../game/marketReplayTrace');
+          replaySnapshot.current = createMarketReplaySnapshot(live.current, mission, presentation);
+        }
+        return replaySnapshot.current!;
+      },
+      presentation: () => replayPresentation?.(),
+      scrollList: fraction => {
+        if (!replayList.current) throw new Error('Shopping list is not visible');
+        replayList.current(fraction);
+      },
+      sessionId: () => tracker.current?.sessionId ?? null,
+      read: () => ({ briefing, briefingStep, phase: live.current.phase, shelf: shelf?.id ?? null,
+        cartOpen, helpOpen, staffOpen: staffMessage, staffReturnHelp, panelTransition: panelPresent && !panelVisible,
+        reviewing: reviewing.current, reviewAccepted: reviewAccepted.current, reviewError: reviewError.current,
+        cart: { ...live.current.cart } }),
+      shelf: () => replayShelf.current,
+      advanceBriefing, interact, viewCart: openCart, viewHelp: openHelp,
+      closeView: () => { if (helpOpen) closeHelp(); else if (cartOpen) closeCart(); else if (replayShelf.current) replayShelf.current.viewCart(false); },
+      closeStation: () => replayShelf.current ? replayShelf.current.close() : closeStation(),
+      requestCashier, requestReturn: requestProductReturn, openReturnHelp, backToStaff, submit: submitForReview, giveUp,
+      skipRating: () => finishRating(false),
+      leave: async () => { const current = tracker.current; await leave(); await current?.flushConfirmed(); },
+    };
+  }
+  useEffect(() => () => { if (replayUiRef) replayUiRef.current = null; }, [replayUiRef]);
   const cartCount = Object.values(session.cart).reduce((a, b) => a + b, 0);
   const isFinished = session.phase === 'finished',
     ratingDone = !!session.ratings || session.ratingSkipped;
@@ -451,20 +513,15 @@ export function MarketSimulationScreen({
       : null}
     {!externalMenuOpen && !briefing && session.phase === 'shopping' && !shelf && !cartOpen && !helpOpen && !staffMessage
       ? <MarketHud
+        replayListRef={__DEV__ && replayUiRef ? replayList : undefined}
         objectives={session.objectives}
         score={aiAssessment ? undefined : session.score}
         topInset={hudTopInset ?? (embedded ? Math.max(112, (insets?.top ?? 0) + 64) : Math.max(12, insets?.top ?? 0))}
         controlMode={embedded ? undefined : controlMode}
         onControlModeChange={embedded ? undefined : onControlModeChange}
         onGiveUp={giveUp}
-        onOpenHelp={() => {
-          dispatch({ type: 'viewHelp' });
-          setHelpOpen(true);
-        }}
-        onOpenCart={() => {
-          dispatch({ type: 'viewCart' });
-          setCartOpen(true);
-        }}
+        onOpenHelp={openHelp}
+        onOpenCart={openCart}
       />
       : null}
     {!embedded && !externalMenuOpen && !locked && nearby
@@ -479,6 +536,7 @@ export function MarketSimulationScreen({
       : null}
     {shelf && !briefing && session.phase === 'shopping'
       ? <MarketShelfScene
+        replayPortRef={__DEV__ && replayUiRef ? replayShelf : undefined}
         category={shelf}
         cart={session.cart}
         slots={session.shelfSlots[shelf.id]}
@@ -529,7 +587,7 @@ export function MarketSimulationScreen({
         </View>
         <Button
           text={briefingStep < lastBriefingStep ? '다음' : '장보기 시작'}
-          onPress={() => { tracker.current?.briefingAdvanced(briefingStep, Date.now()-briefingShownAt.current); briefingShownAt.current=Date.now(); briefingStep < lastBriefingStep ? setBriefingStep(step => step + 1) : start(); }}
+          onPress={advanceBriefing}
         />
         <Button
           text="연습 환경 설정"
@@ -581,26 +639,14 @@ export function MarketSimulationScreen({
         <CartContents cart={session.cart} showReturnLocation />
         <Text style={s.body}>담은 물건 {cartCount}개</Text>
         <Text style={s.small}>물건을 내려놓으려면 그 물건의 진열대로 돌아가요. 어렵다면 매장 종업원에게 도움을 청할 수 있어요.</Text>
-        <Button text="계속 고르기" onPress={() => {
-          dispatch({ type: 'closeView' });
-          setCartOpen(false);
-        }} />
-      </>, '내가 담은 물품', () => {
-        dispatch({ type: 'closeView' });
-        setCartOpen(false);
-      })
+        <Button text="계속 고르기" onPress={closeCart} />
+      </>, '내가 담은 물품', closeCart)
       : null}
     {helpOpen
       ? modal('이렇게 이용해요', <>
         <Text style={s.body}>1. 사야 할 물품과 개수를 읽어요.{'\n\n'}2. 진열대 가까이 가서 물건을 살펴봐요.{'\n\n'}3. 장바구니를 눌러 담은 물건을 확인해요.{'\n\n'}4. 내려놓을 물건은 그 물건의 진열대로 돌아가 장바구니를 펼쳐 내려놓아요. 어렵다면 종업원에게 제자리에 놓아 달라고 부탁해요.{'\n\n'}5. 출구 옆 두 계산대 중 하나에서 구매를 확정해요. 계산원이 없으면 매장 직원을 찾아 말을 걸어요.{'\n\n'}6. 계산하지 않은 물건을 담고 입구·출구·측면 출입문의 빨간 경보기를 지나 매장 밖으로 나가면 {session.config.alarmPenaltyPoints}점이 줄어요. 입구와 출구는 공용 복도로 이어져요. 복도 끝 공동 출입문에서 마을로 나갈 수 있어요.</Text>
-        <Button text="알겠어요" onPress={() => {
-          dispatch({ type: 'closeView' });
-          setHelpOpen(false);
-        }} />
-      </>, undefined, () => {
-        dispatch({ type: 'closeView' });
-        setHelpOpen(false);
-      })
+        <Button text="알겠어요" onPress={closeHelp} />
+      </>, undefined, closeHelp)
       : null}
     {staffMessage
       ? <MarketStaffDialogue
@@ -611,15 +657,12 @@ export function MarketSimulationScreen({
       >
         {staffReturnHelp ? <>
           <CartContents cart={session.cart} onRequestReturn={requestProductReturn} dialogue />
-          <MarketStaffDialogueChoice text="직원 대화로 돌아가기" onPress={() => { setStaffReturnHelp(false); setStaffResponse(''); }} />
+          <MarketStaffDialogueChoice text="직원 대화로 돌아가기" onPress={backToStaff} />
         </> : <>
           {session.environment.checkouts.filter(counter => !session.cashierAvailability[counter.id]).map(counter =>
             <MarketStaffDialogueChoice key={counter.id} text={`${counter.id === 'checkout' ? 1 : 2}번 계산대 계산을 부탁드려요`}
-              onPress={() => {
-                const next = dispatch({ type: 'requestCashier', checkoutId: counter.id }, true);
-                if (!next.lastActionError) setStaffResponse(`${counter.id === 'checkout' ? 1 : 2}번 계산대로 와 주세요. 계산을 도와드릴게요.`);
-              }} />)}
-          {cartCount > 0 ? <MarketStaffDialogueChoice text="물건 제자리에 놓기 도움 요청" onPress={() => { setStaffReturnHelp(true); setStaffResponse(''); }} /> : null}
+              onPress={() => requestCashier(counter.id)} />)}
+          {cartCount > 0 ? <MarketStaffDialogueChoice text="물건 제자리에 놓기 도움 요청" onPress={openReturnHelp} /> : null}
         </>}
         <MarketStaffDialogueChoice text="아니에요, 감사합니다." onPress={closeStation} />
       </MarketStaffDialogue>

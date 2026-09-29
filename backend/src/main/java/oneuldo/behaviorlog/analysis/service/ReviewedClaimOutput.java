@@ -35,15 +35,21 @@ public final class ReviewedClaimOutput {
             keys(finding,Set.of("id","skill","observation","interpretation","alternativeExplanations","suggestedSupport"),path);
             var item=(ObjectNode)finding.deepCopy();
             var all=new LinkedHashSet<String>();
-            var ordered=new ArrayList<String>();
+            String previousEvent=null;
             var clauses=new ArrayList<String>();
             array(finding.path("observation"),path+"/observation",1,30);
             int j=0;
             for(var value:finding.path("observation")) {
                 String clausePath=path+"/observation/"+j++;
                 var clause=claim(value,clausePath,true);
-                ordered.addAll(clause.ids());
-                order(ordered,clausePath);
+                // Each claim is strictly ordered, but the next claim may elaborate on
+                // the same last event. Returning to an earlier event is still invalid.
+                if(previousEvent!=null && Integer.parseInt(clause.ids().getFirst().substring(1))
+                        < Integer.parseInt(previousEvent.substring(1))) {
+                    var boundary=new ArrayList<String>();boundary.add(previousEvent);boundary.addAll(clause.ids());
+                    fail("REVIEW_EVIDENCE_OUT_OF_ORDER",clausePath,boundary);
+                }
+                previousEvent=clause.ids().getLast();
                 all.addAll(clause.ids());
                 clauses.add("("+String.join(", ",clause.ids())+") "+clause.text());
             }
@@ -100,6 +106,7 @@ public final class ReviewedClaimOutput {
                 fail("UNKNOWN_REVIEW_EVIDENCE",path,List.of());
             ids.add(id.asString());
         }
+        if(new HashSet<>(ids).size()!=ids.size()) fail("DUPLICATE_REVIEW_EVIDENCE",path,ids);
         order(ids,path);
         return new Claim(value.path("text").asString(),List.copyOf(ids));
     }

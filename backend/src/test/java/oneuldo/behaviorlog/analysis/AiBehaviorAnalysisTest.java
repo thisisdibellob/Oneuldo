@@ -58,6 +58,41 @@ class AiBehaviorAnalysisTest {
                 && run.getAttempts().get(1).inputPrompt().contains("SUCCESS")));
     }
 
+    @Test void 같은_사건의_추가설명은_재시도없이_READY로_저장한다() {
+        ReflectionTestUtils.setField(service,"qualityReview",true);
+        var review=mapper.readTree(reviewed(valid("UNDETERMINED")));
+        ((tools.jackson.databind.node.ArrayNode)review.path("analysis").path("findings").get(0).path("observation"))
+                .add(claim("변경 후 수량은 2개였다."));
+        when(client.complete(anyString(),anyString(),anyInt(),anyDouble()))
+                .thenReturn(new GroqChatClient.GroqChatResult(mapper.writeValueAsString(valid("SUCCESS")),"test-model"))
+                .thenReturn(new GroqChatClient.GroqChatResult(review.toString(),"test-model"));
+        var response=service.analyze(memberId,new BehaviorAnalysisInputRequest(null,null));
+        assertThat(response.status()).isEqualTo("READY");
+        assertThat(response.analysis().findings().getFirst().observation())
+                .contains("수량을 1에서 2로 변경했다.","변경 후 수량은 2개였다.");
+        assertThat(response.analysis().findings().getFirst().evidenceEventIds()).containsExactly(eventId);
+        verify(client,times(2)).complete(anyString(),anyString(),anyInt(),anyDouble());
+        verify(repository).save(argThat(run->run.getStatus().equals("READY") && run.getAttempts().size()==2
+                && run.getAttempts().get(1).rawOutput().equals(review.toString())));
+    }
+
+    @Test void 문장내_중복은_오류정보와_교정지시를_전달한_뒤_재시도한다() {
+        ReflectionTestUtils.setField(service,"qualityReview",true);
+        var invalid=mapper.readTree(reviewed(valid("UNDETERMINED")));
+        ((tools.jackson.databind.node.ArrayNode)invalid.path("analysis").path("findings").get(0)
+                .path("observation").get(0).path("evidenceEventIds")).add("E1");
+        when(client.complete(anyString(),anyString(),anyInt(),anyDouble()))
+                .thenReturn(new GroqChatClient.GroqChatResult(mapper.writeValueAsString(valid("SUCCESS")),"test-model"))
+                .thenReturn(new GroqChatClient.GroqChatResult(invalid.toString(),"test-model"))
+                .thenReturn(new GroqChatClient.GroqChatResult(reviewed(valid("UNDETERMINED")),"test-model"));
+        var response=service.analyze(memberId,new BehaviorAnalysisInputRequest(null,null));
+        assertThat(response.status()).isEqualTo("READY");
+        verify(repository).save(argThat(run->run.getAttempts().size()==3
+                && run.getAttempts().get(1).validationFailure().code().equals("DUPLICATE_REVIEW_EVIDENCE")
+                && run.getAttempts().get(2).inputPrompt().contains("그 배열의 중복을 제거하세요")
+                && run.getAttempts().get(2).inputPrompt().contains("문장 사이에서는 직전 문장의 마지막 사건을 다시 인용할 수 있습니다")));
+    }
+
     @Test void 검토는_원본과_관찰을_보존하면서_중간단계의_추측을_반복주입하지않는다() {
         var data=input(true);var refs=new AnalysisReferences(mapper,data);
         var digest=new AiObservationDigest("구간",List.of(new AiObservationDigest.Observation(
