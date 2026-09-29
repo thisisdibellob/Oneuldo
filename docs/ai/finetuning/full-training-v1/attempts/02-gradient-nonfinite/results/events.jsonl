@@ -1,0 +1,79 @@
+{"event": "loading_model", "unix_time": 1790235062.6157882}
+{"event": "model_loaded", "unix_time": 1790235103.2539258, "trainable_parameters": 58363904}
+{"event": "evaluation_started", "unix_time": 1790235105.106555, "phase": "before", "case": "E01"}
+{"event": "evaluation_finished", "unix_time": 1790235170.8123903, "id": "E01", "task": "session_analysis", "phase": "before", "seconds": 65.69502835697494, "prefill_seconds": 3.468411626992747, "output_tokens": 435, "stop_reason": "eos", "peak_allocated_mib": 16274.1943359375}
+{"event": "evaluation_started", "unix_time": 1790235171.031641, "phase": "before", "case": "E02"}
+{"event": "evaluation_finished", "unix_time": 1790235247.1237655, "id": "E02", "task": "session_analysis", "phase": "before", "seconds": 76.08181469095871, "prefill_seconds": 3.587957726093009, "output_tokens": 490, "stop_reason": "eos", "peak_allocated_mib": 16282.0732421875}
+{"event": "evaluation_started", "unix_time": 1790235247.352321, "phase": "before", "case": "E03"}
+{"event": "evaluation_finished", "unix_time": 1790235334.1726646, "id": "E03", "task": "session_analysis", "phase": "before", "seconds": 86.80817385087721, "prefill_seconds": 3.819302460877225, "output_tokens": 554, "stop_reason": "eos", "peak_allocated_mib": 16248.5966796875}
+{"event": "evaluation_started", "unix_time": 1790235334.4102995, "phase": "before", "case": "E04"}
+{"event": "evaluation_finished", "unix_time": 1790235416.8328433, "id": "E04", "task": "session_analysis", "phase": "before", "seconds": 82.40562905208208, "prefill_seconds": 3.6485145350452513, "output_tokens": 533, "stop_reason": "eos", "peak_allocated_mib": 16276.9150390625}
+{"event": "evaluation_started", "unix_time": 1790235417.0606687, "phase": "before", "case": "E05"}
+{"event": "evaluation_finished", "unix_time": 1790235501.3514667, "id": "E05", "task": "session_analysis", "phase": "before", "seconds": 84.27151603880338, "prefill_seconds": 3.8532619539182633, "output_tokens": 547, "stop_reason": "eos", "peak_allocated_mib": 16256.1904296875}
+{"event": "evaluation_started", "unix_time": 1790235501.5778358, "phase": "before", "case": "E06"}
+{"event": "evaluation_finished", "unix_time": 1790235644.728609, "id": "E06", "task": "session_analysis", "phase": "before", "seconds": 143.12395715597086, "prefill_seconds": 3.9804241969250143, "output_tokens": 951, "stop_reason": "eos", "peak_allocated_mib": 16385.751953125}
+{"event": "evaluation_started", "unix_time": 1790235644.9712842, "phase": "before", "case": "E07"}
+{"event": "evaluation_finished", "unix_time": 1790235759.0870593, "id": "E07", "task": "session_analysis", "phase": "before", "seconds": 114.0986550101079, "prefill_seconds": 4.0215691609773785, "output_tokens": 756, "stop_reason": "eos", "peak_allocated_mib": 16406.763671875}
+{"event": "evaluation_started", "unix_time": 1790235759.3069036, "phase": "before", "case": "E08"}
+{"event": "evaluation_finished", "unix_time": 1790235837.953725, "id": "E08", "task": "profile_update", "phase": "before", "seconds": 78.62330644787289, "prefill_seconds": 2.3050040199887007, "output_tokens": 520, "stop_reason": "eos", "peak_allocated_mib": 15750.216796875}
+{"event": "evaluation_started", "unix_time": 1790235838.1749153, "phase": "before", "case": "E09"}
+{"event": "evaluation_finished", "unix_time": 1790235914.417922, "id": "E09", "task": "profile_update", "phase": "before", "seconds": 76.22595445718616, "prefill_seconds": 2.532378434203565, "output_tokens": 512, "stop_reason": "eos", "peak_allocated_mib": 15800.83740234375}
+{"event": "evaluation_started", "unix_time": 1790235914.638961, "phase": "before", "case": "E10"}
+{"event": "evaluation_finished", "unix_time": 1790236000.4394796, "id": "E10", "task": "profile_update", "phase": "before", "seconds": 85.78388076880947, "prefill_seconds": 2.1933360409457237, "output_tokens": 581, "stop_reason": "eos", "peak_allocated_mib": 15699.02392578125}
+{"event": "evaluation_started", "unix_time": 1790236000.660537, "phase": "before", "case": "E11"}
+{"event": "evaluation_finished", "unix_time": 1790236095.9312675, "id": "E11", "task": "session_analysis", "phase": "before", "seconds": 95.24320320901461, "prefill_seconds": 3.661329111084342, "output_tokens": 632, "stop_reason": "eos", "peak_allocated_mib": 16278.921875}
+{"event": "evaluation_started", "unix_time": 1790236096.1605592, "phase": "before", "case": "E12"}
+{"event": "evaluation_finished", "unix_time": 1790236199.4732404, "id": "E12", "task": "session_analysis", "phase": "before", "seconds": 103.29007401294075, "prefill_seconds": 4.354534575017169, "output_tokens": 686, "stop_reason": "eos", "peak_allocated_mib": 16413.0673828125}
+{"event": "evaluation_started", "unix_time": 1790236199.6991, "phase": "before", "case": "E13"}
+{"event": "evaluation_finished", "unix_time": 1790236276.9642508, "id": "E13", "task": "session_analysis", "phase": "before", "seconds": 77.24785280111246, "prefill_seconds": 3.5511356370989233, "output_tokens": 514, "stop_reason": "eos", "peak_allocated_mib": 16224.00146484375}
+{"event": "evaluation_started", "unix_time": 1790236277.1830738, "phase": "before", "case": "E14"}
+{"event": "evaluation_finished", "unix_time": 1790236360.1147106, "id": "E14", "task": "session_analysis", "phase": "before", "seconds": 82.91108056693338, "prefill_seconds": 3.853228732943535, "output_tokens": 544, "stop_reason": "eos", "peak_allocated_mib": 16256.47705078125}
+{"event": "evaluation_started", "unix_time": 1790236360.3350558, "phase": "before", "case": "E15"}
+{"event": "evaluation_finished", "unix_time": 1790236483.352136, "id": "E15", "task": "session_analysis", "phase": "before", "seconds": 122.99566049780697, "prefill_seconds": 4.208530426956713, "output_tokens": 827, "stop_reason": "eos", "peak_allocated_mib": 16514.16650390625}
+{"event": "evaluation_started", "unix_time": 1790236483.5706527, "phase": "before", "case": "E16"}
+{"event": "evaluation_finished", "unix_time": 1790236546.5814724, "id": "E16", "task": "session_analysis", "phase": "before", "seconds": 62.993922082008794, "prefill_seconds": 3.7006740469951183, "output_tokens": 408, "stop_reason": "eos", "peak_allocated_mib": 16201.55615234375}
+{"event": "evaluation_started", "unix_time": 1790236546.8016424, "phase": "before", "case": "E17"}
+{"event": "evaluation_finished", "unix_time": 1790236619.9479609, "id": "E17", "task": "session_analysis", "phase": "before", "seconds": 73.12808816204779, "prefill_seconds": 3.7915066371206194, "output_tokens": 483, "stop_reason": "eos", "peak_allocated_mib": 16227.29833984375}
+{"event": "evaluation_started", "unix_time": 1790236620.1705978, "phase": "before", "case": "E18"}
+{"event": "evaluation_finished", "unix_time": 1790236691.973493, "id": "E18", "task": "session_analysis", "phase": "before", "seconds": 71.78346114209853, "prefill_seconds": 3.2567261960357428, "output_tokens": 477, "stop_reason": "eos", "peak_allocated_mib": 16145.7783203125}
+{"event": "evaluation_started", "unix_time": 1790236692.194645, "phase": "before", "case": "E19"}
+{"event": "evaluation_finished", "unix_time": 1790236782.8767734, "id": "E19", "task": "session_analysis", "phase": "before", "seconds": 90.65933714807034, "prefill_seconds": 3.6877554999664426, "output_tokens": 601, "stop_reason": "eos", "peak_allocated_mib": 16301.509765625}
+{"event": "evaluation_started", "unix_time": 1790236783.0981548, "phase": "before", "case": "E20"}
+{"event": "evaluation_finished", "unix_time": 1790236857.269069, "id": "E20", "task": "session_analysis", "phase": "before", "seconds": 74.15311542293057, "prefill_seconds": 3.4019195889122784, "output_tokens": 484, "stop_reason": "eos", "peak_allocated_mib": 16276.9150390625}
+{"event": "evaluation_started", "unix_time": 1790236857.4981039, "phase": "before", "case": "E21"}
+{"event": "evaluation_finished", "unix_time": 1790236930.043421, "id": "E21", "task": "profile_update", "phase": "before", "seconds": 72.5286890459247, "prefill_seconds": 2.2243096800521016, "output_tokens": 489, "stop_reason": "eos", "peak_allocated_mib": 15720.607421875}
+{"event": "evaluation_started", "unix_time": 1790236930.2641191, "phase": "before", "case": "E22"}
+{"event": "evaluation_finished", "unix_time": 1790237021.2820845, "id": "E22", "task": "profile_update", "phase": "before", "seconds": 91.00011292193085, "prefill_seconds": 2.294574335915968, "output_tokens": 614, "stop_reason": "eos", "peak_allocated_mib": 15746.63525390625}
+{"event": "evaluation_started", "unix_time": 1790237021.5008693, "phase": "before", "case": "E23"}
+{"event": "evaluation_finished", "unix_time": 1790237107.912997, "id": "E23", "task": "profile_update", "phase": "before", "seconds": 86.39079366112128, "prefill_seconds": 2.2984965860377997, "output_tokens": 583, "stop_reason": "eos", "peak_allocated_mib": 15750.0732421875}
+{"event": "evaluation_started", "unix_time": 1790237108.133313, "phase": "before", "case": "E24"}
+{"event": "evaluation_finished", "unix_time": 1790237197.5090566, "id": "E24", "task": "profile_update", "phase": "before", "seconds": 89.35594112891704, "prefill_seconds": 2.210052866023034, "output_tokens": 603, "stop_reason": "eos", "peak_allocated_mib": 15719.6044921875}
+{"event": "evaluation_started", "unix_time": 1790237197.7292295, "phase": "before", "case": "E25"}
+{"event": "evaluation_finished", "unix_time": 1790237280.9222927, "id": "E25", "task": "profile_update", "phase": "before", "seconds": 83.17505099298432, "prefill_seconds": 2.2105499389581382, "output_tokens": 559, "stop_reason": "eos", "peak_allocated_mib": 15718.888671875}
+{"event": "training_started", "unix_time": 1790237281.2384486, "step": 1, "case": "T12", "tokens": 3423}
+{"event": "training_finished", "unix_time": 1790237304.84592, "step": 1, "case": "T12", "loss": 1.1925334930419922, "gradient_norm": 1.2980265617370605, "seconds": 23.60602673399262, "tokens": 3423, "loss_tokens": 337, "peak_allocated_mib": 19987.35400390625, "peak_reserved_mib": 20772.0}
+{"event": "training_started", "unix_time": 1790237305.1559684, "step": 2, "case": "T41", "tokens": 3267}
+{"event": "training_finished", "unix_time": 1790237327.000538, "step": 2, "case": "T41", "loss": 1.3824846744537354, "gradient_norm": 1.9949878454208374, "seconds": 21.841487113153562, "tokens": 3267, "loss_tokens": 363, "peak_allocated_mib": 20219.68701171875, "peak_reserved_mib": 20784.0}
+{"event": "training_started", "unix_time": 1790237327.3248532, "step": 3, "case": "T56", "tokens": 2206}
+{"event": "training_finished", "unix_time": 1790237340.7456534, "step": 3, "case": "T56", "loss": 0.760490894317627, "gradient_norm": 0.732033371925354, "seconds": 13.418159567983821, "tokens": 2206, "loss_tokens": 496, "peak_allocated_mib": 18689.6796875, "peak_reserved_mib": 19166.0}
+{"event": "training_started", "unix_time": 1790237341.0481832, "step": 4, "case": "T18", "tokens": 3557}
+{"event": "training_finished", "unix_time": 1790237365.3125753, "step": 4, "case": "T18", "loss": 1.0859181880950928, "gradient_norm": 1.6173285245895386, "seconds": 24.261910835048184, "tokens": 3557, "loss_tokens": 338, "peak_allocated_mib": 20622.44677734375, "peak_reserved_mib": 21194.0}
+{"event": "training_started", "unix_time": 1790237365.644906, "step": 5, "case": "T11", "tokens": 3403}
+{"event": "training_finished", "unix_time": 1790237388.8116744, "step": 5, "case": "T11", "loss": 1.2178984880447388, "gradient_norm": 1.4340897798538208, "seconds": 23.164439684012905, "tokens": 3403, "loss_tokens": 334, "peak_allocated_mib": 20411.599609375, "peak_reserved_mib": 20988.0}
+{"event": "training_started", "unix_time": 1790237389.1232812, "step": 6, "case": "T06", "tokens": 3372}
+{"event": "training_finished", "unix_time": 1790237411.890561, "step": 6, "case": "T06", "loss": 1.1272892951965332, "gradient_norm": 1.1567165851593018, "seconds": 22.764121976913884, "tokens": 3372, "loss_tokens": 341, "peak_allocated_mib": 20354.564453125, "peak_reserved_mib": 20888.0}
+{"event": "training_started", "unix_time": 1790237412.2174351, "step": 7, "case": "T24", "tokens": 1789}
+{"event": "training_finished", "unix_time": 1790237422.8620818, "step": 7, "case": "T24", "loss": 1.20197594165802, "gradient_norm": 1.138930320739746, "seconds": 10.64158047013916, "tokens": 1789, "loss_tokens": 232, "peak_allocated_mib": 18081.6767578125, "peak_reserved_mib": 18532.0}
+{"event": "training_started", "unix_time": 1790237423.1465862, "step": 8, "case": "T55", "tokens": 2117}
+{"event": "training_finished", "unix_time": 1790237436.2563555, "step": 8, "case": "T55", "loss": 0.7480102181434631, "gradient_norm": 0.7955424189567566, "seconds": 13.106475411914289, "tokens": 2117, "loss_tokens": 443, "peak_allocated_mib": 18571.98046875, "peak_reserved_mib": 19060.0}
+{"event": "training_started", "unix_time": 1790237436.5449219, "step": 9, "case": "T23", "tokens": 1819}
+{"event": "training_finished", "unix_time": 1790237447.8599875, "step": 9, "case": "T23", "loss": 1.0521256923675537, "gradient_norm": 1.3135906457901, "seconds": 11.3122426669579, "tokens": 1819, "loss_tokens": 237, "peak_allocated_mib": 18137.54345703125, "peak_reserved_mib": 18614.0}
+{"event": "training_started", "unix_time": 1790237448.1469696, "step": 10, "case": "T19", "tokens": 3260}
+{"event": "training_finished", "unix_time": 1790237469.7793686, "step": 10, "case": "T19", "loss": 1.2266488075256348, "gradient_norm": 1.3156673908233643, "seconds": 21.629133844049647, "tokens": 3260, "loss_tokens": 306, "peak_allocated_mib": 20187.89697265625, "peak_reserved_mib": 20740.0}
+{"event": "training_started", "unix_time": 1790237470.1036332, "step": 11, "case": "T16", "tokens": 3388}
+{"event": "training_finished", "unix_time": 1790237492.870287, "step": 11, "case": "T16", "loss": 1.2409619092941284, "gradient_norm": 1.2207528352737427, "seconds": 22.764278250047937, "tokens": 3388, "loss_tokens": 328, "peak_allocated_mib": 20371.39404296875, "peak_reserved_mib": 20908.0}
+{"event": "training_started", "unix_time": 1790237493.1831794, "step": 12, "case": "T47", "tokens": 3146}
+{"event": "training_finished", "unix_time": 1790237513.8284702, "step": 12, "case": "T47", "loss": 0.9602043628692627, "gradient_norm": 1.7751469612121582, "seconds": 20.641431221039966, "tokens": 3146, "loss_tokens": 296, "peak_allocated_mib": 20043.55126953125, "peak_reserved_mib": 20594.0}
+{"event": "training_started", "unix_time": 1790237514.1441567, "step": 13, "case": "T43", "tokens": 3327}
+{"event": "failed", "unix_time": 1790237536.829842, "stage": "training", "error": "NONFINITE_GRADIENT"}
+{"event": "finished", "unix_time": 1790237536.8309865, "status": "failed", "seconds": 2481.547101425007}

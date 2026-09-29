@@ -1,0 +1,63 @@
+{
+  "id": "c1e558a1-6d0f-5575-ae73-32c53a6f5ba3",
+  "schemaVersion": "synthetic-native-v2",
+  "generatedAt": "2026-01-31T00:00:00Z",
+  "sessionCount": 1,
+  "eventCount": 1,
+  "input": {
+    "schemaVersion": "synthetic-native-v2",
+    "datasetId": "c1e558a1-6d0f-5575-ae73-32c53a6f5ba3",
+    "generatedAt": "2026-01-31T00:00:00Z",
+    "analysisWindow": null,
+    "anonymousSubjectId": "T50-synthetic",
+    "sessionCount": 1,
+    "eventCount": 1,
+    "sessions": [
+      {
+        "sessionId": "b99d2162-172a-5ad7-b750-a52764296e34",
+        "startedAt": "2026-01-01T00:00:00Z",
+        "endedAt": null,
+        "integrity": null,
+        "events": [
+          {
+            "behaviorLogId": "c30b9a3d-f388-51c6-92c7-e5ec6cb89ecd",
+            "sequence": 1,
+            "elapsedFromSessionStartMs": 10000,
+            "occurredAt": "2026-01-01T00:00:10Z",
+            "receivedAt": "2026-01-01T00:00:10Z",
+            "eventSchemaVersion": "synthetic-native-v2",
+            "action": {
+              "eventCode": "SHOP.SESSION_STARTED"
+            },
+            "payload": {
+              "type": "SHOPPING",
+              "marketContent": {
+                "sceneSnapshot": {
+                  "schemaVersion": "market-scene-v1",
+                  "mission": {
+                    "id": "T50-mission",
+                    "description": "목표 목록의 물건과 수량을 담고 총액은 예산 이하로 제출하세요.",
+                    "budget": 4000,
+                    "objectives": [
+                      {
+                        "productId": "사과",
+                        "quantity": 2,
+                        "label": "사과"
+                      },
+                      {
+                        "productId": "생수",
+                        "quantity": 1,
+                        "label": "생수"
+                      }
+                    ]
+                  },
+                  "layoutVersion": "synthetic-layout-v2"
+                }
+              }
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

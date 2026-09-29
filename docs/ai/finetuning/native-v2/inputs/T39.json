@@ -1,0 +1,106 @@
+{
+  "id": "7c9a1b5b-b019-5e30-badd-457c8174a8c0",
+  "schemaVersion": "synthetic-native-v2",
+  "generatedAt": "2026-01-31T00:00:00Z",
+  "sessionCount": 1,
+  "eventCount": 3,
+  "input": {
+    "schemaVersion": "synthetic-native-v2",
+    "datasetId": "7c9a1b5b-b019-5e30-badd-457c8174a8c0",
+    "generatedAt": "2026-01-31T00:00:00Z",
+    "analysisWindow": null,
+    "anonymousSubjectId": "T39-synthetic",
+    "sessionCount": 1,
+    "eventCount": 3,
+    "sessions": [
+      {
+        "sessionId": "c8f08ae8-5f43-58fe-877c-c28ea9c82733",
+        "startedAt": "2026-01-01T00:00:00Z",
+        "endedAt": null,
+        "integrity": null,
+        "events": [
+          {
+            "behaviorLogId": "7f8f78d0-bcad-5d3e-a56a-5bb2e2def8ba",
+            "sequence": 1,
+            "elapsedFromSessionStartMs": 10000,
+            "occurredAt": "2026-01-01T00:00:10Z",
+            "receivedAt": "2026-01-01T00:00:10Z",
+            "eventSchemaVersion": "synthetic-native-v2",
+            "action": {
+              "eventCode": "SHOP.QUANTITY_CHANGED"
+            },
+            "payload": {
+              "type": "SHOPPING",
+              "itemId": "사과",
+              "quantityBefore": 1,
+              "quantityAfter": 2,
+              "marketContent": {
+                "sceneSnapshot": {
+                  "schemaVersion": "market-scene-v1",
+                  "mission": {
+                    "id": "T39-mission",
+                    "description": "목표 목록의 물건과 수량을 담고 총액은 예산 이하로 제출하세요.",
+                    "budget": 4000,
+                    "objectives": [
+                      {
+                        "productId": "사과",
+                        "quantity": 2,
+                        "label": "사과"
+                      },
+                      {
+                        "productId": "생수",
+                        "quantity": 1,
+                        "label": "생수"
+                      }
+                    ]
+                  },
+                  "layoutVersion": "synthetic-layout-v2"
+                }
+              }
+            }
+          },
+          {
+            "behaviorLogId": "248aa4ce-2331-5fb5-94e6-a418c8ff904c",
+            "sequence": 2,
+            "elapsedFromSessionStartMs": 20000,
+            "occurredAt": "2026-01-01T00:00:20Z",
+            "receivedAt": "2026-01-01T00:00:20Z",
+            "eventSchemaVersion": "synthetic-native-v2",
+            "action": {
+              "eventCode": "SHOP.CART_OPENED"
+            },
+            "payload": {
+              "type": "SHOPPING",
+              "marketContent": {
+                "cart": {
+                  "사과": 2
+                }
+              }
+            }
+          },
+          {
+            "behaviorLogId": "c8b26acd-2f8c-5039-ad88-81aeb362c156",
+            "sequence": 3,
+            "elapsedFromSessionStartMs": 30000,
+            "occurredAt": "2026-01-01T00:00:30Z",
+            "receivedAt": "2026-01-01T00:00:30Z",
+            "eventSchemaVersion": "synthetic-native-v2",
+            "action": {
+              "eventCode": "SHOP.CHECKOUT_SUBMITTED"
+            },
+            "payload": {
+              "type": "SHOPPING",
+              "marketContent": {
+                "cart": {
+                  "사과": 2,
+                  "생수": 1
+                }
+              },
+              "cartTotalAmount": 3200
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

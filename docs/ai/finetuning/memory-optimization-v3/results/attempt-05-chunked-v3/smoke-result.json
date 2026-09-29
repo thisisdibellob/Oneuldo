@@ -1,0 +1,104 @@
+{
+  "status": "passed_all_selected_full_example_steps",
+  "gpu_uuid": "GPU-215716d9-f53e-fc5f-566e-f54fcbc700b1",
+  "rank": 8,
+  "batch_size": 1,
+  "gradient_checkpointing": true,
+  "quantization": "NF4 double quantization",
+  "compute_dtype": "float16",
+  "max_sequence_length": 4096,
+  "steps": [
+    {
+      "case": "T56",
+      "task": "profile_update",
+      "tokens": 2206,
+      "loss_tokens": 496,
+      "loss": 0.7634271383285522,
+      "gradient_norm": 0.7256344556808472,
+      "step_seconds": 14.051665366161615,
+      "peak_allocated_mib": 20669.40234375,
+      "peak_reserved_mib": 21374.0,
+      "sample_adapter_changed": true
+    },
+    {
+      "case": "T18",
+      "task": "session_analysis",
+      "tokens": 3557,
+      "loss_tokens": 338,
+      "loss": 1.103400707244873,
+      "gradient_norm": 1.462515950202942,
+      "step_seconds": 23.75442063692026,
+      "peak_allocated_mib": 23047.44970703125,
+      "peak_reserved_mib": 23614.0,
+      "sample_adapter_changed": true
+    },
+    {
+      "case": "T18",
+      "task": "session_analysis",
+      "tokens": 3557,
+      "loss_tokens": 338,
+      "loss": 1.093697190284729,
+      "gradient_norm": 1.6093868017196655,
+      "step_seconds": 23.384867571061477,
+      "peak_allocated_mib": 23047.44970703125,
+      "peak_reserved_mib": 23614.0,
+      "sample_adapter_changed": true
+    }
+  ],
+  "attention": "efficient",
+  "memory_cleanup": true,
+  "deployment": false,
+  "full_training": false,
+  "eval_examples_used_for_training": false,
+  "torch": "2.10.0+cu128",
+  "cuda": "12.8",
+  "compute_capability": [
+    7,
+    5
+  ],
+  "gpu_name": "NVIDIA TITAN RTX",
+  "checkpoint": "/home/duream/.local/share/oneuldo/qlora-smoke-v1/hf-cache/hub/models--Qwen--Qwen3.6-27B/snapshots/6a9e13bd6fc8f0983b9b99948120bc37f49c13e9",
+  "train_sha256": "3e1038b2833964786047a5c6864552ff27d2b411fd74e852e9762f238cb86dfc",
+  "selected_example_count": 3,
+  "loss_implementation": "checkpointed_head_chunks_32_tokens",
+  "optimizer_foreach": false,
+  "selected_examples": [
+    {
+      "id": "T56",
+      "total_tokens": 2206,
+      "prompt_tokens": 1710
+    },
+    {
+      "id": "T18",
+      "total_tokens": 3557,
+      "prompt_tokens": 3219
+    },
+    {
+      "id": "T18",
+      "total_tokens": 3557,
+      "prompt_tokens": 3219
+    }
+  ],
+  "frozen_embedding_head_dtype": "float16_without_intermediate_fp32",
+  "trainable_parameters": 58363904,
+  "attention_statistics": {
+    "calls": 96,
+    "query_shapes": [
+      [
+        1,
+        24,
+        2206,
+        256
+      ],
+      [
+        1,
+        24,
+        3557,
+        256
+      ]
+    ],
+    "backend": "EFFICIENT_ATTENTION_ONLY"
+  },
+  "adapter_saved": false,
+  "total_seconds": 105.24372371891513
+}

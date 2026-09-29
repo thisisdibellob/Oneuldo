@@ -1,0 +1,84 @@
+{
+  "previousSourceSessionId": "1d499a4c-4169-59cf-889c-80407b27f353",
+  "previousProfile": {
+    "summary": "제공된 이전 관찰.",
+    "findings": [
+      {
+        "id": "F1",
+        "skill": "장보기 수행과 근거 범위",
+        "observation": "목표 사과·생수·두부·우유 각 1개, 예산 9000원에서 각 1개를 7000원에 제출했다.",
+        "interpretation": "제공된 관찰·보고의 범위로 한정한다.",
+        "alternativeExplanations": [],
+        "evidenceEventIds": [
+          "784bdbd6-1fbe-5cc8-9c39-b6092eba9831"
+        ],
+        "suggestedSupport": "같은 조건의 과제에서 추가 관찰한다."
+      }
+    ],
+    "sessionAssessments": [],
+    "uncertainties": [
+      "실제 참여자의 기록이 아닌 합성된 이전/현재 관찰이다."
+    ],
+    "practicePlan": {
+      "targetFindingIds": [
+        "F1"
+      ],
+      "goal": "4종류의 제출을 관찰한다.",
+      "rationale": "제공된 수행 범위 안에서 다음 관찰 조건을 정하며 능력이나 교육 효과를 확정하지 않는다.",
+      "recommendedDifficulty": 2,
+      "itemCount": 4,
+      "quantityComplexity": "LOW",
+      "budgetPressure": "LOW",
+      "textSupport": "STANDARD",
+      "reasonCodes": [
+        "OBSERVATION_PRACTICE"
+      ]
+    },
+    "usedEvidenceCardIds": []
+  },
+  "currentAnalysis": {
+    "summary": "새 세션은 장보기에 완전히 실패했다.",
+    "findings": [
+      {
+        "id": "F1",
+        "skill": "장보기 수행과 근거 범위",
+        "observation": "새 세션의 같은 네 종류 목표에서 사과 1개가 든 중간 장바구니만 제공됐고 제출은 없다.",
+        "interpretation": "새 세션은 장보기에 완전히 실패했다.",
+        "alternativeExplanations": [],
+        "evidenceEventIds": [
+          "4ffd46e9-4c06-5f75-881c-136528239e53"
+        ],
+        "suggestedSupport": "같은 조건의 과제에서 추가 관찰한다."
+      }
+    ],
+    "sessionAssessments": [
+      {
+        "sessionId": "6fb4cac5-d5d6-5573-840f-3203ea898e21",
+        "judgment": "UNDETERMINED",
+        "explanation": "새 세션의 같은 네 종류 목표에서 사과 1개가 든 중간 장바구니만 제공됐고 제출은 없다.",
+        "evidenceEventIds": [
+          "4ffd46e9-4c06-5f75-881c-136528239e53"
+        ]
+      }
+    ],
+    "uncertainties": [
+      "실제 참여자의 기록이 아닌 합성된 이전/현재 관찰이다."
+    ],
+    "practicePlan": {
+      "targetFindingIds": [
+        "F1"
+      ],
+      "goal": "4종류의 제출을 관찰한다.",
+      "rationale": "제공된 수행 범위 안에서 다음 관찰 조건을 정하며 능력이나 교육 효과를 확정하지 않는다.",
+      "recommendedDifficulty": 2,
+      "itemCount": 4,
+      "quantityComplexity": "LOW",
+      "budgetPressure": "LOW",
+      "textSupport": "STANDARD",
+      "reasonCodes": [
+        "OBSERVATION_PRACTICE"
+      ]
+    },
+    "usedEvidenceCardIds": []
+  }
+}

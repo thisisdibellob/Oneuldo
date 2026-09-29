@@ -1,0 +1,118 @@
+{
+  "id": "efe10e6f-25b6-553a-a2ce-a1fc67b97d7c",
+  "schemaVersion": "synthetic-native-v2",
+  "generatedAt": "2026-01-31T00:00:00Z",
+  "sessionCount": 2,
+  "eventCount": 2,
+  "input": {
+    "schemaVersion": "synthetic-native-v2",
+    "datasetId": "efe10e6f-25b6-553a-a2ce-a1fc67b97d7c",
+    "generatedAt": "2026-01-31T00:00:00Z",
+    "analysisWindow": null,
+    "anonymousSubjectId": "E06-synthetic",
+    "sessionCount": 2,
+    "eventCount": 2,
+    "sessions": [
+      {
+        "sessionId": "2a631493-7f92-5329-bf2d-5909a777f548",
+        "startedAt": "2026-01-01T00:00:00Z",
+        "endedAt": null,
+        "integrity": null,
+        "events": [
+          {
+            "behaviorLogId": "c421a671-2c34-5429-8660-c56431f90ef8",
+            "sequence": 1,
+            "elapsedFromSessionStartMs": 10000,
+            "occurredAt": "2026-01-01T00:00:10Z",
+            "receivedAt": "2026-01-01T00:00:10Z",
+            "eventSchemaVersion": "synthetic-native-v2",
+            "action": {
+              "eventCode": "SHOP.CHECKOUT_SUBMITTED"
+            },
+            "payload": {
+              "type": "SHOPPING",
+              "marketContent": {
+                "cart": {
+                  "바나나": 2,
+                  "요거트": 1
+                },
+                "sceneSnapshot": {
+                  "schemaVersion": "market-scene-v1",
+                  "mission": {
+                    "id": "E06-mission",
+                    "description": "목표 목록의 물건과 수량을 담고 총액은 예산 이하로 제출하세요.",
+                    "budget": 6000,
+                    "objectives": [
+                      {
+                        "productId": "바나나",
+                        "quantity": 2,
+                        "label": "바나나"
+                      },
+                      {
+                        "productId": "요거트",
+                        "quantity": 1,
+                        "label": "요거트"
+                      }
+                    ]
+                  },
+                  "layoutVersion": "synthetic-layout-v2"
+                }
+              },
+              "cartTotalAmount": 4800
+            }
+          }
+        ]
+      },
+      {
+        "sessionId": "deabd52d-d374-5d02-9353-19beac192d41",
+        "startedAt": "2026-01-15T00:00:00Z",
+        "endedAt": null,
+        "integrity": null,
+        "events": [
+          {
+            "behaviorLogId": "fd42edeb-812e-5f90-8b15-136f3b5cc785",
+            "sequence": 1,
+            "elapsedFromSessionStartMs": 10000,
+            "occurredAt": "2026-01-15T00:00:10Z",
+            "receivedAt": "2026-01-15T00:00:10Z",
+            "eventSchemaVersion": "synthetic-native-v2",
+            "action": {
+              "eventCode": "SHOP.CHECKOUT_SUBMITTED"
+            },
+            "payload": {
+              "type": "SHOPPING",
+              "marketContent": {
+                "cart": {
+                  "바나나": 1,
+                  "요거트": 1
+                },
+                "sceneSnapshot": {
+                  "schemaVersion": "market-scene-v1",
+                  "mission": {
+                    "id": "E06-mission",
+                    "description": "목표 목록의 물건과 수량을 담고 총액은 예산 이하로 제출하세요.",
+                    "budget": 6000,
+                    "objectives": [
+                      {
+                        "productId": "바나나",
+                        "quantity": 2,
+                        "label": "바나나"
+                      },
+                      {
+                        "productId": "요거트",
+                        "quantity": 1,
+                        "label": "요거트"
+                      }
+                    ]
+                  },
+                  "layoutVersion": "synthetic-layout-v2"
+                }
+              },
+              "cartTotalAmount": 3300
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,96 @@
+{
+  "previousSourceSessionId": "6cd5ec91-ca59-5377-a2e3-7d7cf15530dc",
+  "previousProfile": {
+    "summary": "제공된 이전 관찰.",
+    "findings": [
+      {
+        "id": "F1",
+        "skill": "장보기 수행과 근거 범위",
+        "observation": "목표 사과 1개·생수 1개·두부 1개, 예산 6000원에서 목표대로 3500원에 제출했다.",
+        "interpretation": "제공된 관찰·보고의 범위로 한정한다.",
+        "alternativeExplanations": [],
+        "evidenceEventIds": [
+          "6489673c-19f1-51e0-ae62-c63f5905222a"
+        ],
+        "suggestedSupport": "같은 조건의 과제에서 추가 관찰한다."
+      }
+    ],
+    "sessionAssessments": [],
+    "uncertainties": [
+      "실제 참여자의 기록이 아닌 합성된 이전/현재 관찰이다."
+    ],
+    "practicePlan": {
+      "targetFindingIds": [
+        "F1"
+      ],
+      "goal": "3종류의 제출을 관찰한다.",
+      "rationale": "제공된 수행 범위 안에서 다음 관찰 조건을 정하며 능력이나 교육 효과를 확정하지 않는다.",
+      "recommendedDifficulty": 2,
+      "itemCount": 3,
+      "quantityComplexity": "LOW",
+      "budgetPressure": "LOW",
+      "textSupport": "STANDARD",
+      "reasonCodes": [
+        "OBSERVATION_PRACTICE"
+      ]
+    },
+    "usedEvidenceCardIds": []
+  },
+  "currentAnalysis": {
+    "summary": "두 번 성공했으므로 혼자 계산하는 능력이 완전히 향상됐다.",
+    "findings": [
+      {
+        "id": "F1",
+        "skill": "장보기 수행과 근거 범위",
+        "observation": "같은 세 종류 목표에서 사과·생수·두부 각 1개를 3500원에 제출했다.",
+        "interpretation": "두 번 성공했으므로 혼자 계산하는 능력이 완전히 향상됐다.",
+        "alternativeExplanations": [],
+        "evidenceEventIds": [
+          "f7867c76-6ac6-5c93-8982-a8ee655832a9"
+        ],
+        "suggestedSupport": "같은 조건의 과제에서 추가 관찰한다."
+      },
+      {
+        "id": "F2",
+        "skill": "장보기 수행과 근거 범위",
+        "observation": "보고자 user, 이번 세션 뒤: “계산은 옆에서 도와줬어요. 합계는 아직 잘 모르겠어요. 짧은 목록을 계속 쓰고 싶어요.”",
+        "interpretation": "제공된 관찰·보고의 범위로 한정한다.",
+        "alternativeExplanations": [],
+        "evidenceEventIds": [
+          "e382999c-ed74-5425-895b-558f6002713d"
+        ],
+        "suggestedSupport": "같은 조건의 과제에서 추가 관찰한다."
+      }
+    ],
+    "sessionAssessments": [
+      {
+        "sessionId": "3be35d64-4d39-5930-900e-861e3a15cee0",
+        "judgment": "SUCCESS",
+        "explanation": "같은 세 종류 목표에서 사과·생수·두부 각 1개를 3500원에 제출했다.",
+        "evidenceEventIds": [
+          "f7867c76-6ac6-5c93-8982-a8ee655832a9"
+        ]
+      }
+    ],
+    "uncertainties": [
+      "실제 참여자의 기록이 아닌 합성된 이전/현재 관찰이다."
+    ],
+    "practicePlan": {
+      "targetFindingIds": [
+        "F1",
+        "F2"
+      ],
+      "goal": "3종류의 제출을 관찰한다.",
+      "rationale": "제공된 수행 범위 안에서 다음 관찰 조건을 정하며 능력이나 교육 효과를 확정하지 않는다.",
+      "recommendedDifficulty": 2,
+      "itemCount": 3,
+      "quantityComplexity": "LOW",
+      "budgetPressure": "LOW",
+      "textSupport": "STANDARD",
+      "reasonCodes": [
+        "OBSERVATION_PRACTICE"
+      ]
+    },
+    "usedEvidenceCardIds": []
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "id": "65dccc48-9726-505d-88da-292c18bc7511",
+  "schemaVersion": "synthetic-contract-fixture-v1",
+  "generatedAt": "2026-01-01T00:00:00Z",
+  "sessionCount": 1,
+  "eventCount": 1,
+  "input": {
+    "schemaVersion": "synthetic-contract-fixture-v1",
+    "datasetId": "65dccc48-9726-505d-88da-292c18bc7511",
+    "generatedAt": "2026-01-01T00:00:00Z",
+    "analysisWindow": null,
+    "anonymousSubjectId": "T19-synthetic",
+    "sessionCount": 1,
+    "eventCount": 1,
+    "sessions": [
+      {
+        "sessionId": "58158105-26a3-5ff2-a8f5-28e18b8bb08a",
+        "startedAt": "2026-01-01T00:00:00Z",
+        "endedAt": null,
+        "integrity": null,
+        "events": [
+          {
+            "behaviorLogId": "2b3832d0-434c-51e1-b7af-bead0bf983cd",
+            "sequence": 1,
+            "occurredAt": "2026-01-01T00:00:00Z",
+            "receivedAt": "2026-01-01T00:00:00Z",
+            "elapsedFromSessionStartMs": 0,
+            "eventSchemaVersion": "synthetic-contract-fixture-v1",
+            "action": {
+              "eventCode": "SHOP.CHECKOUT_SUBMITTED"
+            },
+            "payload": {
+              "type": "SHOPPING",
+              "marketContent": {
+                "cart": {
+                  "사과": 2,
+                  "생수": 1
+                },
+                "sceneSnapshot": {
+                  "mission": {
+                    "budget": 4000,
+                    "objectives": [
+                      {
+                        "productId": "사과",
+                        "quantity": 2,
+                        "label": "사과"
+                      },
+                      {
+                        "productId": "생수",
+                        "quantity": 1,
+                        "label": "생수"
+                      }
+                    ]
+                  }
+                }
+              },
+              "cartTotalAmount": 3200
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

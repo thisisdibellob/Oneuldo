@@ -1,0 +1,87 @@
+{
+  "id": "1b8a69aa-9617-52ba-a5de-501cd81ea049",
+  "schemaVersion": "synthetic-native-v2",
+  "generatedAt": "2026-01-31T00:00:00Z",
+  "sessionCount": 1,
+  "eventCount": 2,
+  "input": {
+    "schemaVersion": "synthetic-native-v2",
+    "datasetId": "1b8a69aa-9617-52ba-a5de-501cd81ea049",
+    "generatedAt": "2026-01-31T00:00:00Z",
+    "analysisWindow": null,
+    "anonymousSubjectId": "T40-synthetic",
+    "sessionCount": 1,
+    "eventCount": 2,
+    "sessions": [
+      {
+        "sessionId": "30231856-5a96-528c-8910-097944b2e560",
+        "startedAt": "2026-01-01T00:00:00Z",
+        "endedAt": null,
+        "integrity": null,
+        "events": [
+          {
+            "behaviorLogId": "61db2d79-c67d-5dc0-afa1-f07ba44720f1",
+            "sequence": 1,
+            "elapsedFromSessionStartMs": 10000,
+            "occurredAt": "2026-01-01T00:00:10Z",
+            "receivedAt": "2026-01-01T00:00:25Z",
+            "eventSchemaVersion": "synthetic-native-v2",
+            "action": {
+              "eventCode": "SHOP.QUANTITY_CHANGED"
+            },
+            "payload": {
+              "type": "SHOPPING",
+              "itemId": "사과",
+              "quantityBefore": 1,
+              "quantityAfter": 2,
+              "marketContent": {
+                "sceneSnapshot": {
+                  "schemaVersion": "market-scene-v1",
+                  "mission": {
+                    "id": "T40-mission",
+                    "description": "목표 목록의 물건과 수량을 담고 총액은 예산 이하로 제출하세요.",
+                    "budget": 4000,
+                    "objectives": [
+                      {
+                        "productId": "사과",
+                        "quantity": 2,
+                        "label": "사과"
+                      },
+                      {
+                        "productId": "생수",
+                        "quantity": 1,
+                        "label": "생수"
+                      }
+                    ]
+                  },
+                  "layoutVersion": "synthetic-layout-v2"
+                }
+              }
+            }
+          },
+          {
+            "behaviorLogId": "f2642ee2-4fac-5aca-abc3-99a153f65fef",
+            "sequence": 2,
+            "elapsedFromSessionStartMs": 20000,
+            "occurredAt": "2026-01-01T00:00:20Z",
+            "receivedAt": "2026-01-01T00:00:21Z",
+            "eventSchemaVersion": "synthetic-native-v2",
+            "action": {
+              "eventCode": "SHOP.CHECKOUT_SUBMITTED"
+            },
+            "payload": {
+              "type": "SHOPPING",
+              "marketContent": {
+                "cart": {
+                  "사과": 2,
+                  "생수": 1
+                }
+              },
+              "cartTotalAmount": 3200
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

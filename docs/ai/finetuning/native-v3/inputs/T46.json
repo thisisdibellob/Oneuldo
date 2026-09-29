@@ -1,0 +1,121 @@
+{
+  "id": "d1ba6ea0-479d-5bd5-9abe-1f1573146959",
+  "schemaVersion": "synthetic-native-v2",
+  "generatedAt": "2026-01-31T00:00:00Z",
+  "sessionCount": 1,
+  "eventCount": 2,
+  "input": {
+    "schemaVersion": "synthetic-native-v2",
+    "datasetId": "d1ba6ea0-479d-5bd5-9abe-1f1573146959",
+    "generatedAt": "2026-01-31T00:00:00Z",
+    "analysisWindow": null,
+    "anonymousSubjectId": "T46-synthetic",
+    "sessionCount": 1,
+    "eventCount": 2,
+    "sessions": [
+      {
+        "sessionId": "9e2dac95-73c4-5976-a06b-d7014077e5bd",
+        "startedAt": "2026-01-01T00:00:00Z",
+        "endedAt": null,
+        "integrity": null,
+        "events": [
+          {
+            "behaviorLogId": "a97136cc-8e98-557b-a65b-49e10eaa3bf0",
+            "sequence": 1,
+            "elapsedFromSessionStartMs": 10000,
+            "occurredAt": "2026-01-01T00:00:10Z",
+            "receivedAt": "2026-01-01T00:00:10Z",
+            "eventSchemaVersion": "synthetic-native-v2",
+            "action": {
+              "eventCode": "SHOP.MISSION_PRESENTED"
+            },
+            "payload": {
+              "type": "SHOPPING",
+              "marketContent": {
+                "sceneSnapshot": {
+                  "schemaVersion": "market-scene-v1",
+                  "mission": {
+                    "id": "T46-mission",
+                    "description": "목록의 품목과 수량을 담고 총액을 예산 이하로 제출하세요.",
+                    "budget": 9000,
+                    "objectives": [
+                      {
+                        "productId": "사과",
+                        "quantity": 1,
+                        "label": "사과"
+                      },
+                      {
+                        "productId": "생수",
+                        "quantity": 1,
+                        "label": "생수"
+                      },
+                      {
+                        "productId": "두부",
+                        "quantity": 1,
+                        "label": "두부"
+                      },
+                      {
+                        "productId": "우유",
+                        "quantity": 1,
+                        "label": "우유"
+                      }
+                    ]
+                  },
+                  "layoutVersion": "synthetic-layout-v2",
+                  "catalogVersion": "synthetic-v3",
+                  "products": [
+                    {
+                      "id": "사과",
+                      "name": "사과",
+                      "price": 1200
+                    },
+                    {
+                      "id": "생수",
+                      "name": "생수",
+                      "price": 800
+                    },
+                    {
+                      "id": "두부",
+                      "name": "두부",
+                      "price": 1500
+                    },
+                    {
+                      "id": "우유",
+                      "name": "우유",
+                      "price": 3500
+                    }
+                  ]
+                }
+              },
+              "catalogVersion": "synthetic-v3"
+            }
+          },
+          {
+            "behaviorLogId": "559bf231-816a-503d-9f4d-41a91c24193b",
+            "sequence": 2,
+            "elapsedFromSessionStartMs": 20000,
+            "occurredAt": "2026-01-01T00:00:20Z",
+            "receivedAt": "2026-01-01T00:00:20Z",
+            "eventSchemaVersion": "synthetic-native-v2",
+            "action": {
+              "eventCode": "SHOP.CHECKOUT_SUBMITTED"
+            },
+            "payload": {
+              "type": "SHOPPING",
+              "marketContent": {
+                "cart": {
+                  "사과": 1,
+                  "생수": 1,
+                  "두부": 1,
+                  "우유": 1
+                }
+              },
+              "cartTotalAmount": 7000,
+              "catalogVersion": "synthetic-v3"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

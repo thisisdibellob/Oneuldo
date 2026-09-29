@@ -1,0 +1,736 @@
+{
+  "phase" : "after",
+  "cases" : 25,
+  "accepted" : 19,
+  "rejected" : 6,
+  "semantic_truth_validated" : false,
+  "results" : [ {
+    "id" : "E01",
+    "task" : "session_analysis",
+    "stop_reason" : "eos",
+    "accepted" : true,
+    "expanded" : {
+      "summary" : "우유 1개를 담고 세션이 종료되었다. 목표는 우유 1개와 빵 2개를 예산 이하로 제출하는 것이었다. 우유는 담았지만 빵은 담지 않았다. 제출 조작 기록이 없으므로 최종 장바구니는 확인되지 않았다.",
+      "findings" : [ {
+        "id" : "F1",
+        "skill" : "수량 변경과 세션 종료",
+        "observation" : "우유 1개를 담고 세션이 종료되었다.",
+        "interpretation" : "목표는 우유 1개와 빵 2개를 예산 이하로 제출하는 것이었다. 우유는 담았지만 빵은 담지 않았다. 제출 조작 기록이 없으므로 최종 장바구니는 확인되지 않았다.",
+        "alternativeExplanations" : [ ],
+        "evidenceEventIds" : [ "60d3eea4-e7e6-5068-8492-90494cc237c3", "dc862a4a-54c6-5f16-bc71-6aa40eee74f0" ],
+        "suggestedSupport" : "우유 1개와 빵 2개만 담고 제출하는 연습을 한다."
+      } ],
+      "sessionAssessments" : [ {
+        "sessionId" : "726d42d7-0bfb-5977-9fbc-cf5473b4b1cd",
+        "judgment" : "UNDETERMINED",
+        "explanation" : "우유 1개를 담았지만 빵 2개는 담지 않았다. 제출 조작 기록이 없으므로 최종 장바구니는 확인되지 않았다.",
+        "evidenceEventIds" : [ "60d3eea4-e7e6-5068-8492-90494cc237c3", "dc862a4a-54c6-5f16-bc71-6aa40eee74f0" ]
+      } ],
+      "uncertainties" : [ "제출 조작 기록이 없으므로 최종 장바구니는 확인되지 않았다. 세션 종료 이유만으로는 중도 포기 여부를 판단할 수 없다." ],
+      "practicePlan" : {
+        "targetFindingIds" : [ "F1" ],
+        "goal" : "우유 1개와 빵 2개만 담고 제출하는 연습을 한다.",
+        "rationale" : "우유 1개와 빵 2개만 담고 제출하는 연습을 한다.",
+        "recommendedDifficulty" : 3,
+        "itemCount" : 2,
+        "quantityComplexity" : "LOW",
+        "budgetPressure" : "LOW",
+        "textSupport" : "SIMPLIFIED",
+        "reasonCodes" : [ "OBSERVATION_PRACTICE" ]
+      },
+      "usedEvidenceCardIds" : [ ]
+    }
+  }, {
+    "id" : "E02",
+    "task" : "session_analysis",
+    "stop_reason" : "eos",
+    "accepted" : true,
+    "expanded" : {
+      "summary" : "세션 시작과 함께 목표 목록이 제공되었으나, 30초 뒤 앱이 백그라운드로 전환되고 40초 뒤 세션이 종료되었다. 목표 목록을 확인하고 장바구니에 담는 행동은 관찰되지 않았다.",
+      "findings" : [ {
+        "id" : "F1",
+        "skill" : "세션 시작과 함께 목표 목록이 제공되었다.",
+        "observation" : "세션 시작과 함께 목표 목록이 제공되었다.",
+        "interpretation" : "목표 목록을 확인하고 장바구니에 담는 행동은 관찰되지 않았다.",
+        "alternativeExplanations" : [ ],
+        "evidenceEventIds" : [ "af132007-dd4c-5348-a35f-2b858d8d62d5" ],
+        "suggestedSupport" : "목표 목록을 확인하고 장바구니에 담는 행동을 관찰한다."
+      } ],
+      "sessionAssessments" : [ {
+        "sessionId" : "3c31e8b5-1c4d-5d30-9192-f36a809cf85e",
+        "judgment" : "UNDETERMINED",
+        "explanation" : "목표 목록을 확인하고 장바구니에 담는 행동은 관찰되지 않았다.",
+        "evidenceEventIds" : [ "af132007-dd4c-5348-a35f-2b858d8d62d5" ]
+      } ],
+      "uncertainties" : [ "목표 목록을 확인하고 장바구니에 담는 행동은 관찰되지 않았다." ],
+      "practicePlan" : {
+        "targetFindingIds" : [ "F1" ],
+        "goal" : "목표 목록을 확인하고 장바구니에 담는 행동을 관찰한다.",
+        "rationale" : "목표 목록을 확인하고 장바구니에 담는 행동을 관찰한다.",
+        "recommendedDifficulty" : 1,
+        "itemCount" : 2,
+        "quantityComplexity" : "LOW",
+        "budgetPressure" : "LOW",
+        "textSupport" : "SIMPLIFIED",
+        "reasonCodes" : [ "OBSERVATION_PRACTICE" ]
+      },
+      "usedEvidenceCardIds" : [ ]
+    }
+  }, {
+    "id" : "E03",
+    "task" : "session_analysis",
+    "stop_reason" : "length",
+    "accepted" : false,
+    "error_type" : "UnexpectedEndOfInputException",
+    "error" : "Unexpected end-of-input: was expecting closing quote for a string value\n at [Source: REDACTED (`StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION` disabled); byte offset: #UNKNOWN]"
+  }, {
+    "id" : "E04",
+    "task" : "session_analysis",
+    "stop_reason" : "eos",
+    "accepted" : true,
+    "expanded" : {
+      "summary" : "양파 3개를 담고 5100원을 제출했다. 목표는 양파 3개와 생수 2개를 6000원 이하로 담는 것이었다. 양파는 맞고 생수는 기록이 없다. 제출 금액은 예산 이하다. 생수 수량과 실제 구매 여부는 확인되지 않았다.",
+      "findings" : [ {
+        "id" : "F1",
+        "skill" : "수량 변경과 제출 조작을 기록했다.",
+        "observation" : "양파 3개를 담고 5100원을 제출했다.",
+        "interpretation" : "양파는 맞고 생수는 기록이 없다. 제출 금액은 예산 이하다. 생수 수량과 실제 구매 여부는 확인되지 않았다.",
+        "alternativeExplanations" : [ ],
+        "evidenceEventIds" : [ "0eac615e-e5c9-55ec-9b43-1d0003e3707c", "995c7918-41b7-5a82-9481-791a5d386633" ],
+        "suggestedSupport" : "양파 3개와 생수 2개를 6000원 이하로 담는 연습을 한다."
+      } ],
+      "sessionAssessments" : [ {
+        "sessionId" : "2ed6fb96-90bc-581c-a50b-2439c4fe34d5",
+        "judgment" : "UNDETERMINED",
+        "explanation" : "양파는 맞고 생수는 기록이 없다. 제출 금액은 예산 이하다. 생수 수량과 실제 구매 여부는 확인되지 않았다.",
+        "evidenceEventIds" : [ "0eac615e-e5c9-55ec-9b43-1d0003e3707c", "995c7918-41b7-5a82-9481-791a5d386633" ]
+      } ],
+      "uncertainties" : [ "생수 수량과 실제 구매 여부는 확인되지 않았다." ],
+      "practicePlan" : {
+        "targetFindingIds" : [ "F1" ],
+        "goal" : "양파 3개와 생수 2개를 6000원 이하로 담는 연습을 한다.",
+        "rationale" : "양파는 맞고 생수는 기록이 없다. 제출 금액은 예산 이하다. 생수 수량과 실제 구매 여부는 확인되지 않았다.",
+        "recommendedDifficulty" : 2,
+        "itemCount" : 2,
+        "quantityComplexity" : "LOW",
+        "budgetPressure" : "LOW",
+        "textSupport" : "SIMPLIFIED",
+        "reasonCodes" : [ "OBSERVATION_PRACTICE" ]
+      },
+      "usedEvidenceCardIds" : [ ]
+    }
+  }, {
+    "id" : "E05",
+    "task" : "session_analysis",
+    "stop_reason" : "eos",
+    "accepted" : true,
+    "expanded" : {
+      "summary" : "E1에서 빵 2개를 담은 장바구니를 열었고, E2에서 빵 2개와 우유 1개를 담은 장바구니를 5900원에 제출했다. 목표는 빵 2개와 우유 1개를 7000원 이하로 제출하는 것이었다. E1의 장바구니 열기 조작과 E2의 제출 조작은 기록되었으나, 그 사이에 우유를 추가한 행동은 기록되지 않았다. 제출된 품목과 수량은 목표와 일치하고, 총액은 예산 이하이므로 제출 조작만으로 성공으로 판단한다.",
+      "findings" : [ {
+        "id" : "F1",
+        "skill" : "장바구니 열기",
+        "observation" : "E1에서 빵 2개를 담은 장바구니를 열었다.",
+        "interpretation" : "장바구니 열기 조작은 기록되었으나, 그 사이에 우유를 추가한 행동은 기록되지 않았다.",
+        "alternativeExplanations" : [ ],
+        "evidenceEventIds" : [ "a6961677-6e4a-5e94-89fa-d80d7e702331" ],
+        "suggestedSupport" : "장바구니 열기 조작을 관찰한다."
+      }, {
+        "id" : "F2",
+        "skill" : "장바구니 제출",
+        "observation" : "E2에서 빵 2개와 우유 1개를 담은 장바구니를 5900원에 제출했다.",
+        "interpretation" : "제출된 품목과 수량은 목표와 일치하고, 총액은 예산 이하이므로 제출 조작만으로 성공으로 판단한다.",
+        "alternativeExplanations" : [ ],
+        "evidenceEventIds" : [ "85e7305b-4c3f-5caf-8581-58fc7f1fd199" ],
+        "suggestedSupport" : "장바구니 제출 조작을 관찰한다."
+      } ],
+      "sessionAssessments" : [ {
+        "sessionId" : "ee9c63f4-4ea8-5ee1-b9c3-7e234ab7e495",
+        "judgment" : "SUCCESS",
+        "explanation" : "제출된 품목과 수량은 목표와 일치하고, 총액은 예산 이하이므로 제출 조작만으로 성공으로 판단한다.",
+        "evidenceEventIds" : [ "a6961677-6e4a-5e94-89fa-d80d7e702331", "85e7305b-4c3f-5caf-8581-58fc7f1fd199" ]
+      } ],
+      "uncertainties" : [ "E1의 장바구니 열기 조작과 E2의 제출 조작은 기록되었으나, 그 사이에 우유를 추가한 행동은 기록되지 않았다. 제출된 품목과 수량은 목표와 일치하고, 총액은 예산 이하이므로 제출 조작만으로 성공으로 판단한다." ],
+      "practicePlan" : {
+        "targetFindingIds" : [ "F1", "F2" ],
+        "goal" : "장바구니 열기 조작과 제출 조작을 관찰한다.",
+        "rationale" : "제출된 품목과 수량은 목표와 일치하고, 총액은 예산 이하이므로 제출 조작만으로 성공으로 판단한다.",
+        "recommendedDifficulty" : 2,
+        "itemCount" : 2,
+        "quantityComplexity" : "LOW",
+        "budgetPressure" : "LOW",
+        "textSupport" : "SIMPLIFIED",
+        "reasonCodes" : [ "OBSERVATION_PRACTICE" ]
+      },
+      "usedEvidenceCardIds" : [ ]
+    }
+  }, {
+    "id" : "E06",
+    "task" : "session_analysis",
+    "stop_reason" : "eos",
+    "accepted" : false,
+    "error_type" : "IllegalArgumentException",
+    "error" : "INVALID_ANALYSIS_CONTRACT"
+  }, {
+    "id" : "E07",
+    "task" : "session_analysis",
+    "stop_reason" : "eos",
+    "accepted" : false,
+    "error_type" : "IllegalArgumentException",
+    "error" : "INVALID_COMPACT_ROW"
+  }, {
+    "id" : "E08",
+    "task" : "profile_update",
+    "stop_reason" : "eos",
+    "accepted" : true,
+    "expanded" : {
+      "summary" : "두 세션 모두 2개 품목의 목표 수량과 여유 있는 예산에서 제출을 관찰했다. 두 세션 모두 목표 수량과 예산을 충족했다. 다음에는 2개 품목으로 유지하며 다른 물건을 관찰한다.",
+      "findings" : [ {
+        "id" : "F1",
+        "skill" : "장보기 수행과 근거 범위",
+        "observation" : "목표는 우유 1개·빵 1개, 예산은 6000원이다. 우유 1개·빵 1개를 총액 4200원으로 제출했다.",
+        "interpretation" : "제공된 관찰·보고의 범위로 한정한다.",
+        "alternativeExplanations" : [ ],
+        "evidenceEventIds" : [ "0b29a5e5-7985-5bf8-ba71-d23d7fe8413d" ],
+        "suggestedSupport" : "같은 조건의 과제에서 추가 관찰한다."
+      }, {
+        "id" : "F2",
+        "skill" : "장보기 수행과 근거 범위",
+        "observation" : "목표는 두부 1개·당근 1개, 예산은 5000원이다. 두부 1개·당근 1개를 총액 2600원으로 제출했다.",
+        "interpretation" : "제공된 관찰·보고의 범위로 한정한다.",
+        "alternativeExplanations" : [ ],
+        "evidenceEventIds" : [ "ec5bc3e7-593a-5f0c-8cc4-8b3f9d3e83d4" ],
+        "suggestedSupport" : "같은 조건의 과제에서 추가 관찰한다."
+      } ],
+      "uncertainties" : [ "다른 조건의 수행은 확인하지 않았다." ],
+      "practicePlan" : {
+        "targetFindingIds" : [ "F1", "F2" ],
+        "goal" : "2개 품목 선택 관찰",
+        "rationale" : "제공된 세션 기록에 근거한 관찰용 제안이다.",
+        "recommendedDifficulty" : 2,
+        "itemCount" : 2,
+        "quantityComplexity" : "LOW",
+        "budgetPressure" : "LOW",
+        "textSupport" : "SIMPLIFIED",
+        "reasonCodes" : [ "OBSERVATION_PRACTICE" ]
+      },
+      "usedEvidenceCardIds" : [ ]
+    }
+  }, {
+    "id" : "E09",
+    "task" : "profile_update",
+    "stop_reason" : "eos",
+    "accepted" : true,
+    "expanded" : {
+      "summary" : "이전 세션은 피로 때문에 과제를 하지 못했다. 새 세션은 목표대로 제출됐다.",
+      "findings" : [ {
+        "id" : "F1",
+        "skill" : "장보기 수행과 근거 범위",
+        "observation" : "목표는 쌀 1개·두부 1개, 예산은 15000원이다. 쌀 1개·두부 1개를 총액 12800원으로 제출했다.",
+        "interpretation" : "제공된 관찰·보고의 범위로 한정한다.",
+        "alternativeExplanations" : [ ],
+        "evidenceEventIds" : [ "f8bf068b-97ec-5bfe-a84e-90e92a068b45" ],
+        "suggestedSupport" : "같은 조건의 과제에서 추가 관찰한다."
+      } ],
+      "uncertainties" : [ "다른 조건의 수행은 확인하지 않았다." ],
+      "practicePlan" : {
+        "targetFindingIds" : [ "F1" ],
+        "goal" : "2개 품목 선택 관찰",
+        "rationale" : "제공된 세션 기록에 근거한 관찰용 제안이다.",
+        "recommendedDifficulty" : 2,
+        "itemCount" : 2,
+        "quantityComplexity" : "LOW",
+        "budgetPressure" : "LOW",
+        "textSupport" : "SIMPLIFIED",
+        "reasonCodes" : [ "OBSERVATION_PRACTICE" ]
+      },
+      "usedEvidenceCardIds" : [ ]
+    }
+  }, {
+    "id" : "E10",
+    "task" : "profile_update",
+    "stop_reason" : "eos",
+    "accepted" : true,
+    "expanded" : {
+      "summary" : "두 세션 모두 목표 수량과 예산을 맞추었다. 이전 세션은 사과 3개와 우유 2개를 8200원으로 제출했으며, 이번 세션은 사과 1개와 우유 1개를 3400원으로 제출했다. 다른 조건의 수행은 확인하지 않았다.",
+      "findings" : [ {
+        "id" : "F1",
+        "skill" : "장보기 수행과 근거 범위",
+        "observation" : "두 세션 모두 목표 수량과 예산을 맞추었다. 이전 세션은 사과 3개와 우유 2개를 8200원으로 제출했으며, 이번 세션은 사과 1개와 우유 1개를 3400원으로 제출했다.",
+        "interpretation" : "제공된 관찰·보고의 범위로 한정한다.",
+        "alternativeExplanations" : [ ],
+        "evidenceEventIds" : [ "3782793c-fd34-52f8-aca1-fd95fcbe7e0e", "71e54228-7d77-5827-87ca-c05229b91141" ],
+        "suggestedSupport" : "같은 조건의 과제에서 추가 관찰한다."
+      } ],
+      "uncertainties" : [ "다른 조건의 수행은 확인하지 않았다." ],
+      "practicePlan" : {
+        "targetFindingIds" : [ "F1" ],
+        "goal" : "2개 품목 선택 관찰",
+        "rationale" : "제공된 세션 기록에 근거한 관찰용 제안이다.",
+        "recommendedDifficulty" : 2,
+        "itemCount" : 2,
+        "quantityComplexity" : "LOW",
+        "budgetPressure" : "LOW",
+        "textSupport" : "SIMPLIFIED",
+        "reasonCodes" : [ "OBSERVATION_PRACTICE" ]
+      },
+      "usedEvidenceCardIds" : [ ]
+    }
+  }, {
+    "id" : "E11",
+    "task" : "session_analysis",
+    "stop_reason" : "eos",
+    "accepted" : true,
+    "expanded" : {
+      "summary" : "S1의 E1은 배 2개와 빵 1개를 담은 장바구니를 열었고 총액은 5600원이었다. E2는 배 1개와 빵 1개를 담은 장바구니를 열었고 총액은 3800원이었다. E1의 수량은 목표와 같고 총액은 예산 이하다. E2의 배 수량은 목표보다 적다. E1의 수량과 총액이 목표와 예산에 부합하므로 S1은 성공이다.",
+      "findings" : [ {
+        "id" : "F1",
+        "skill" : "E1에서 배 2개와 빵 1개를 담은 장바구니를 열었고 총액은 5600원이었다.",
+        "observation" : "E1의 수량은 목표와 같고 총액은 예산 이하다.",
+        "interpretation" : "E1의 수량과 총액이 목표와 예산에 부합하므로 S1은 성공이다.",
+        "alternativeExplanations" : [ ],
+        "evidenceEventIds" : [ "f1a7412f-3382-5229-85d4-51c2c0debf1d" ],
+        "suggestedSupport" : "E1의 수량과 총액이 목표와 예산에 부합하므로 S1은 성공이다."
+      } ],
+      "sessionAssessments" : [ {
+        "sessionId" : "bccd6ef9-f800-5f90-b935-96d32e3b8210",
+        "judgment" : "SUCCESS",
+        "explanation" : "E1의 수량과 총액이 목표와 예산에 부합하므로 S1은 성공이다.",
+        "evidenceEventIds" : [ "f1a7412f-3382-5229-85d4-51c2c0debf1d" ]
+      } ],
+      "uncertainties" : [ "E2의 배 수량은 목표보다 적다." ],
+      "practicePlan" : {
+        "targetFindingIds" : [ "F1" ],
+        "goal" : "배 2개와 빵 1개를 담은 장바구니를 열고 총액이 예산 이하인지 확인한다.",
+        "rationale" : "E1의 수량과 총액이 목표와 예산에 부합하므로 S1은 성공이다.",
+        "recommendedDifficulty" : 1,
+        "itemCount" : 2,
+        "quantityComplexity" : "LOW",
+        "budgetPressure" : "LOW",
+        "textSupport" : "SIMPLIFIED",
+        "reasonCodes" : [ "OBSERVATION_PRACTICE" ]
+      },
+      "usedEvidenceCardIds" : [ ]
+    }
+  }, {
+    "id" : "E12",
+    "task" : "session_analysis",
+    "stop_reason" : "eos",
+    "accepted" : false,
+    "error_type" : "IllegalArgumentException",
+    "error" : "INVALID_ANALYSIS_CONTRACT"
+  }, {
+    "id" : "E13",
+    "task" : "session_analysis",
+    "stop_reason" : "eos",
+    "accepted" : true,
+    "expanded" : {
+      "summary" : "장바구니 열기만 기록되어 있고 제출·종료 기록이 없다. 우유·달걀 1개씩은 기록된 상태이며 목표와 일치한다. 제출·종료 기록이 없으므로 성패는 판단할 수 없다.",
+      "findings" : [ {
+        "id" : "F1",
+        "skill" : "장바구니 열기",
+        "observation" : "우유·달걀 1개씩이 기록된 장바구니를 열었다.",
+        "interpretation" : "목표와 일치하는 품목·수량이 기록되어 있다.",
+        "alternativeExplanations" : [ ],
+        "evidenceEventIds" : [ "34503c7d-59d2-5077-8d3a-ba113a963313" ],
+        "suggestedSupport" : "장바구니 열기만 관찰된 범위에서 목표 일치 확인을 반복한다."
+      } ],
+      "sessionAssessments" : [ {
+        "sessionId" : "30f72115-a5c4-5fd0-bc63-08150ce8fcb2",
+        "judgment" : "UNDETERMINED",
+        "explanation" : "제출·종료 기록이 없다.",
+        "evidenceEventIds" : [ "34503c7d-59d2-5077-8d3a-ba113a963313" ]
+      } ],
+      "uncertainties" : [ "제출·종료 기록이 없다. 동기·이해·실제 생활 능력은 미확인이다." ],
+      "practicePlan" : {
+        "targetFindingIds" : [ "F1" ],
+        "goal" : "장바구니 열기만 관찰된 범위에서 목표 일치 확인을 반복한다.",
+        "rationale" : "장바구니 열기만 관찰된 범위에서 목표 일치 확인을 반복한다.",
+        "recommendedDifficulty" : 1,
+        "itemCount" : 2,
+        "quantityComplexity" : "LOW",
+        "budgetPressure" : "LOW",
+        "textSupport" : "SIMPLIFIED",
+        "reasonCodes" : [ "OBSERVATION_PRACTICE" ]
+      },
+      "usedEvidenceCardIds" : [ ]
+    }
+  }, {
+    "id" : "E14",
+    "task" : "session_analysis",
+    "stop_reason" : "eos",
+    "accepted" : false,
+    "error_type" : "IllegalArgumentException",
+    "error" : "INVALID_COMPACT_ROW"
+  }, {
+    "id" : "E15",
+    "task" : "session_analysis",
+    "stop_reason" : "eos",
+    "accepted" : true,
+    "expanded" : {
+      "summary" : "S1과 S3는 목표 수량과 예산을 맞추고 제출했다. S2는 빵 수량이 부족하고 제출했다. S3는 목표 제시와 제출 사이에 10초의 기록 간격이 있다.",
+      "findings" : [ {
+        "id" : "F1",
+        "skill" : "S1과 S3는 목표 수량과 예산을 맞추고 제출했다.",
+        "observation" : "S1과 S3는 목표 수량과 예산을 맞추고 제출했다.",
+        "interpretation" : "목표 수량과 예산을 맞추고 제출했다.",
+        "alternativeExplanations" : [ ],
+        "evidenceEventIds" : [ "6ad5f5cb-25e9-52b6-a821-3ce6d407c6d6", "0c3f56c1-0ca9-59e7-9704-33afdf2c93ef" ],
+        "suggestedSupport" : "S1과 S3는 목표 수량과 예산을 맞추고 제출했다."
+      }, {
+        "id" : "F2",
+        "skill" : "S2는 빵 수량이 부족하고 제출했다.",
+        "observation" : "S2는 빵 수량이 부족하고 제출했다.",
+        "interpretation" : "빵 수량이 부족하고 제출했다.",
+        "alternativeExplanations" : [ ],
+        "evidenceEventIds" : [ "73185348-5bec-554d-bd67-2c54535e705a" ],
+        "suggestedSupport" : "S2는 빵 수량이 부족하고 제출했다."
+      } ],
+      "sessionAssessments" : [ {
+        "sessionId" : "94ec7b3f-8474-5af9-844f-b3084c66fd0b",
+        "judgment" : "SUCCESS",
+        "explanation" : "목표 수량과 예산을 맞추고 제출했다.",
+        "evidenceEventIds" : [ "6ad5f5cb-25e9-52b6-a821-3ce6d407c6d6" ]
+      }, {
+        "sessionId" : "4e2ff08d-013d-5e2b-b2b1-73cd53c20670",
+        "judgment" : "FAILURE",
+        "explanation" : "빵 수량이 부족하고 제출했다.",
+        "evidenceEventIds" : [ "73185348-5bec-554d-bd67-2c54535e705a" ]
+      }, {
+        "sessionId" : "b8339d7d-4731-5afe-86c5-e04272e77de3",
+        "judgment" : "SUCCESS",
+        "explanation" : "목표 수량과 예산을 맞추고 제출했다.",
+        "evidenceEventIds" : [ "0ecfaf3d-ceab-5a09-9c83-c0d69495bc5e", "0c3f56c1-0ca9-59e7-9704-33afdf2c93ef" ]
+      } ],
+      "uncertainties" : [ "S3의 목표 제시와 제출 사이에 10초의 기록 간격이 있다." ],
+      "practicePlan" : {
+        "targetFindingIds" : [ "F1", "F2" ],
+        "goal" : "목표 수량과 예산을 맞추고 제출하기",
+        "rationale" : "S1과 S3는 목표 수량과 예산을 맞추고 제출했다. S2는 빵 수량이 부족하고 제출했다.",
+        "recommendedDifficulty" : 2,
+        "itemCount" : 2,
+        "quantityComplexity" : "LOW",
+        "budgetPressure" : "LOW",
+        "textSupport" : "SIMPLIFIED",
+        "reasonCodes" : [ "OBSERVATION_PRACTICE" ]
+      },
+      "usedEvidenceCardIds" : [ ]
+    }
+  }, {
+    "id" : "E16",
+    "task" : "session_analysis",
+    "stop_reason" : "eos",
+    "accepted" : true,
+    "expanded" : {
+      "summary" : "세션 시작만 기록되어 있다. 목표는 배 1개와 우유 1개를 6000원 이하로 제출하는 것이다. 이동·선택·제출이 관찰되지 않아 성패를 판단할 수 없다.",
+      "findings" : [ {
+        "id" : "F1",
+        "skill" : "세션 시작만 기록되어 있다.",
+        "observation" : "세션 시작만 기록되어 있다.",
+        "interpretation" : "이동·선택·제출이 관찰되지 않아 성패를 판단할 수 없다.",
+        "alternativeExplanations" : [ ],
+        "evidenceEventIds" : [ "3375b812-7e9a-51a9-9ffd-fd3394c86a61" ],
+        "suggestedSupport" : "배 1개와 우유 1개를 6000원 이하로 제출하는 과제를 관찰한다."
+      } ],
+      "sessionAssessments" : [ {
+        "sessionId" : "b8ae8b6e-0c0d-5f2c-be9a-ddb4c21b6ecb",
+        "judgment" : "UNDETERMINED",
+        "explanation" : "이동·선택·제출이 관찰되지 않아 성패를 판단할 수 없다.",
+        "evidenceEventIds" : [ "3375b812-7e9a-51a9-9ffd-fd3394c86a61" ]
+      } ],
+      "uncertainties" : [ "이동·선택·제출이 관찰되지 않아 성패를 판단할 수 없다." ],
+      "practicePlan" : {
+        "targetFindingIds" : [ "F1" ],
+        "goal" : "배 1개와 우유 1개를 6000원 이하로 제출하는 과제를 관찰한다.",
+        "rationale" : "이동·선택·제출이 관찰되지 않아 성패를 판단할 수 없다.",
+        "recommendedDifficulty" : 2,
+        "itemCount" : 2,
+        "quantityComplexity" : "LOW",
+        "budgetPressure" : "LOW",
+        "textSupport" : "SIMPLIFIED",
+        "reasonCodes" : [ "OBSERVATION_PRACTICE" ]
+      },
+      "usedEvidenceCardIds" : [ ]
+    }
+  }, {
+    "id" : "E17",
+    "task" : "session_analysis",
+    "stop_reason" : "eos",
+    "accepted" : true,
+    "expanded" : {
+      "summary" : "S1의 E1은 배·우유·빵을 각각 1개씩 담은 장바구니를 7200원에 제출했다. 목표는 배·우유·빵을 각각 1개씩 담고 9000원 이하로 제출하는 것이었다. 제출 품목·수량·금액이 목표와 일치한다. 제출 조작만으로 실제 결제·성공을 확정하지 않는다.",
+      "findings" : [ {
+        "id" : "F1",
+        "skill" : "장바구니 제출",
+        "observation" : "배·우유·빵을 각각 1개씩 담은 장바구니를 7200원에 제출했다.",
+        "interpretation" : "목표는 배·우유·빵을 각각 1개씩 담고 9000원 이하로 제출하는 것이었다. 제출 품목·수량·금액이 목표와 일치한다. 제출 조작만으로 실제 결제·성공을 확정하지 않는다.",
+        "alternativeExplanations" : [ ],
+        "evidenceEventIds" : [ "f67081c0-6b09-5544-b571-d76f114e22ed" ],
+        "suggestedSupport" : "배·우유·빵을 각각 1개씩 담은 장바구니를 7200원에 제출했다. 목표는 배·우유·빵을 각각 1개씩 담고 9000원 이하로 제출하는 것이었다. 제출 품목·수량·금액이 목표와 일치한다. 제출 조작만으로 실제 결제·성공을 확정하지 않는다."
+      } ],
+      "sessionAssessments" : [ {
+        "sessionId" : "6a0f625d-c9be-5b78-aa47-9a8f5698675b",
+        "judgment" : "SUCCESS",
+        "explanation" : "배·우유·빵을 각각 1개씩 담은 장바구니를 7200원에 제출했다. 목표는 배·우유·빵을 각각 1개씩 담고 9000원 이하로 제출하는 것이었다. 제출 품목·수량·금액이 목표와 일치한다. 제출 조작만으로 실제 결제·성공을 확정하지 않는다.",
+        "evidenceEventIds" : [ "f67081c0-6b09-5544-b571-d76f114e22ed" ]
+      } ],
+      "uncertainties" : [ "제출 조작만으로 실제 결제·성공을 확정하지 않는다. 제출 전 장바구니 조작·상품 선택·금액 확인은 기록되지 않았다. 제출 전 장바구니 조작·상품 선택·금액 확인은 기록되지 않았다. 제출 전 장바구니 조작·상품 선택·금액 확인은 기록되지 않았다." ],
+      "practicePlan" : {
+        "targetFindingIds" : [ "F1" ],
+        "goal" : "배·우유·빵을 각각 1개씩 담은 장바구니를 7200원에 제출했다. 목표는 배·우유·빵을 각각 1개씩 담고 9000원 이하로 제출하는 것이었다. 제출 품목·수량·금액이 목표와 일치한다. 제출 조작만으로 실제 결제·성공을 확정하지 않는다.",
+        "rationale" : "배·우유·빵을 각각 1개씩 담은 장바구니를 7200원에 제출했다. 목표는 배·우유·빵을 각각 1개씩 담고 9000원 이하로 제출하는 것이었다. 제출 품목·수량·금액이 목표와 일치한다. 제출 조작만으로 실제 결제·성공을 확정하지 않는다.",
+        "recommendedDifficulty" : 1,
+        "itemCount" : 3,
+        "quantityComplexity" : "LOW",
+        "budgetPressure" : "LOW",
+        "textSupport" : "SIMPLIFIED",
+        "reasonCodes" : [ "OBSERVATION_PRACTICE" ]
+      },
+      "usedEvidenceCardIds" : [ ]
+    }
+  }, {
+    "id" : "E18",
+    "task" : "session_analysis",
+    "stop_reason" : "eos",
+    "accepted" : true,
+    "expanded" : {
+      "summary" : "두부 1개와 빵 1개를 담은 장바구니를 제출했다. 제출 조작만으로 실제 구매 성패를 확정하지 않는다.",
+      "findings" : [ {
+        "id" : "F1",
+        "skill" : "장바구니 제출",
+        "observation" : "두부 1개와 빵 1개를 담은 장바구니를 제출했다.",
+        "interpretation" : "제출 조작만으로 실제 구매 성패를 확정하지 않는다.",
+        "alternativeExplanations" : [ ],
+        "evidenceEventIds" : [ "96ad7458-83af-5cc9-8ab9-6b598dca44e7" ],
+        "suggestedSupport" : "두부 1개와 빵 1개만 담은 장바구니를 제출하는 관찰용 연습을 제안한다."
+      } ],
+      "sessionAssessments" : [ {
+        "sessionId" : "6c398459-536f-50e5-b57d-8c90cb5ae1b0",
+        "judgment" : "UNDETERMINED",
+        "explanation" : "두부 1개와 빵 1개를 담은 장바구니를 제출했다. 제출 조작만으로 실제 구매 성패를 확정하지 않는다.",
+        "evidenceEventIds" : [ "96ad7458-83af-5cc9-8ab9-6b598dca44e7" ]
+      } ],
+      "uncertainties" : [ "두부 1개와 빵 1개만 담은 장바구니를 제출하는 관찰용 연습을 제안한다." ],
+      "practicePlan" : {
+        "targetFindingIds" : [ "F1" ],
+        "goal" : "두부 1개와 빵 1개만 담은 장바구니를 제출하는 관찰용 연습을 제안한다.",
+        "rationale" : "두부 1개와 빵 1개만 담은 장바구니를 제출하는 관찰용 연습을 제안한다.",
+        "recommendedDifficulty" : 1,
+        "itemCount" : 2,
+        "quantityComplexity" : "LOW",
+        "budgetPressure" : "LOW",
+        "textSupport" : "SIMPLIFIED",
+        "reasonCodes" : [ "OBSERVATION_PRACTICE" ]
+      },
+      "usedEvidenceCardIds" : [ ]
+    }
+  }, {
+    "id" : "E19",
+    "task" : "session_analysis",
+    "stop_reason" : "eos",
+    "accepted" : false,
+    "error_type" : "IllegalArgumentException",
+    "error" : "AI 장보기 난이도 검증 실패: 추천 난이도"
+  }, {
+    "id" : "E20",
+    "task" : "session_analysis",
+    "stop_reason" : "eos",
+    "accepted" : true,
+    "expanded" : {
+      "summary" : "배 1개와 요거트 2개를 담은 장바구니를 제출하고 세션이 종료되었다.",
+      "findings" : [ {
+        "id" : "F1",
+        "skill" : "장바구니에 배 1개와 요거트 2개를 담고 제출했다.",
+        "observation" : "배 1개와 요거트 2개를 담은 장바구니를 제출했다.",
+        "interpretation" : "목표 목록의 물건과 수량을 담고 총액은 예산 이하로 제출하는 과제에 부합한다.",
+        "alternativeExplanations" : [ ],
+        "evidenceEventIds" : [ "f0539806-bc70-5608-ad60-9a27eeefb3ee" ],
+        "suggestedSupport" : "배 1개와 요거트 2개를 담은 장바구니를 제출하는 연습을 한다."
+      } ],
+      "sessionAssessments" : [ {
+        "sessionId" : "619004c4-ab16-5464-87af-7abf1905f96c",
+        "judgment" : "SUCCESS",
+        "explanation" : "배 1개와 요거트 2개를 담은 장바구니를 제출했다.",
+        "evidenceEventIds" : [ "f0539806-bc70-5608-ad60-9a27eeefb3ee" ]
+      } ],
+      "uncertainties" : [ "제출 조작 후 세션이 종료된 이유를 알 수 없다." ],
+      "practicePlan" : {
+        "targetFindingIds" : [ "F1" ],
+        "goal" : "배 1개와 요거트 2개를 담은 장바구니를 제출하는 연습을 한다.",
+        "rationale" : "배 1개와 요거트 2개를 담은 장바구니를 제출했다.",
+        "recommendedDifficulty" : 1,
+        "itemCount" : 2,
+        "quantityComplexity" : "LOW",
+        "budgetPressure" : "LOW",
+        "textSupport" : "SIMPLIFIED",
+        "reasonCodes" : [ "OBSERVATION_PRACTICE" ]
+      },
+      "usedEvidenceCardIds" : [ ]
+    }
+  }, {
+    "id" : "E21",
+    "task" : "profile_update",
+    "stop_reason" : "eos",
+    "accepted" : true,
+    "expanded" : {
+      "summary" : "두 번의 제출 기록이 목표와 맞다.",
+      "findings" : [ {
+        "id" : "F1",
+        "skill" : "장보기 수행과 근거 범위",
+        "observation" : "목표는 당근 2개·우유 1개, 예산은 6000원이다. 원 플레이 ID: capture-once. 당근 2개·우유 1개를 총액 4300원으로 제출했다.",
+        "interpretation" : "제공된 관찰·보고의 범위로 한정한다.",
+        "alternativeExplanations" : [ ],
+        "evidenceEventIds" : [ "c89a586f-af11-5b77-bb0b-49fabf2aa611", "d6f3b450-3862-5f3e-9ae0-95772f846e32" ],
+        "suggestedSupport" : "같은 조건의 과제에서 추가 관찰한다."
+      } ],
+      "uncertainties" : [ "다른 조건의 수행은 확인하지 않았다." ],
+      "practicePlan" : {
+        "targetFindingIds" : [ "F1" ],
+        "goal" : "2개 품목 선택 관찰",
+        "rationale" : "제공된 세션 기록에 근거한 관찰용 제안이다.",
+        "recommendedDifficulty" : 2,
+        "itemCount" : 2,
+        "quantityComplexity" : "LOW",
+        "budgetPressure" : "LOW",
+        "textSupport" : "SIMPLIFIED",
+        "reasonCodes" : [ "OBSERVATION_PRACTICE" ]
+      },
+      "usedEvidenceCardIds" : [ ]
+    }
+  }, {
+    "id" : "E22",
+    "task" : "profile_update",
+    "stop_reason" : "eos",
+    "accepted" : true,
+    "expanded" : {
+      "summary" : "두 세션 모두 목표대로 제출했다. 두 번째 세션에서 목록 글이 어렵다고 보고했다.",
+      "findings" : [ {
+        "id" : "F1",
+        "skill" : "장보기 수행과 근거 범위",
+        "observation" : "두 세션 모두 목표대로 제출했다. 두 번째 세션에서 목록 글이 어렵다고 보고했다.",
+        "interpretation" : "제공된 관찰·보고의 범위로 한정한다.",
+        "alternativeExplanations" : [ ],
+        "evidenceEventIds" : [ "bca7fc3f-8499-52e4-b045-b7897bc41ed7", "e0069336-2c10-5363-a6f4-0b9256768393", "5534e161-77f4-5b45-9850-f04ef91ecf09" ],
+        "suggestedSupport" : "같은 조건의 과제에서 추가 관찰한다."
+      } ],
+      "uncertainties" : [ "제공된 이전 기록의 범위만 사용할 수 있다." ],
+      "practicePlan" : {
+        "targetFindingIds" : [ "F1" ],
+        "goal" : "두 종류의 명확한 목표 수량과 여유 있는 예산에서 제출을 다시 관찰한다.",
+        "rationale" : "제공된 수행 범위 안에서 다음 관찰 조건을 정하며 능력이나 교육 효과를 확정하지 않는다.",
+        "recommendedDifficulty" : 2,
+        "itemCount" : 2,
+        "quantityComplexity" : "LOW",
+        "budgetPressure" : "LOW",
+        "textSupport" : "SIMPLIFIED",
+        "reasonCodes" : [ "OBSERVATION_PRACTICE" ]
+      },
+      "usedEvidenceCardIds" : [ ]
+    }
+  }, {
+    "id" : "E23",
+    "task" : "profile_update",
+    "stop_reason" : "eos",
+    "accepted" : true,
+    "expanded" : {
+      "summary" : "이전 세션에서는 보호자가 가격 비교를 잘한다고 보고했다. 이번 세션에서는 진행자가 가격 비교의 어려움을 보고했고 제출은 예산 이내였다. 상충하는 보고가 있으므로 가격 비교 수행은 확인이 필요하다.",
+      "findings" : [ {
+        "id" : "F1",
+        "skill" : "장보기 수행과 근거 범위",
+        "observation" : "이전 세션에서는 보호자가 가격 비교를 잘한다고 보고했다. 이번 세션에서는 진행자가 가격 비교의 어려움을 보고했다.",
+        "interpretation" : "상충하는 보고가 있으므로 가격 비교 수행은 확인이 필요하다.",
+        "alternativeExplanations" : [ ],
+        "evidenceEventIds" : [ "2aa98136-b7b7-55be-a073-82ebe2e6b6b0", "9345cfc0-86b8-50ad-b841-3341d695c638" ],
+        "suggestedSupport" : "같은 조건의 과제에서 추가 관찰한다."
+      }, {
+        "id" : "F2",
+        "skill" : "장보기 수행과 근거 범위",
+        "observation" : "우유 1개·빵 1개를 총액 4200원으로 제출했다.",
+        "interpretation" : "제공된 관찰·보고의 범위로 한정한다.",
+        "alternativeExplanations" : [ ],
+        "evidenceEventIds" : [ "a652129d-df64-55a0-85de-e77aa7f1761e" ],
+        "suggestedSupport" : "같은 조건의 과제에서 추가 관찰한다."
+      } ],
+      "uncertainties" : [ "다른 조건의 수행은 확인하지 않았다." ],
+      "practicePlan" : {
+        "targetFindingIds" : [ "F1", "F2" ],
+        "goal" : "2개 품목 선택 관찰",
+        "rationale" : "제공된 세션 기록에 근거한 관찰용 제안이다.",
+        "recommendedDifficulty" : 2,
+        "itemCount" : 2,
+        "quantityComplexity" : "LOW",
+        "budgetPressure" : "LOW",
+        "textSupport" : "SIMPLIFIED",
+        "reasonCodes" : [ "OBSERVATION_PRACTICE" ]
+      },
+      "usedEvidenceCardIds" : [ ]
+    }
+  }, {
+    "id" : "E24",
+    "task" : "profile_update",
+    "stop_reason" : "eos",
+    "accepted" : true,
+    "expanded" : {
+      "summary" : "2개 품목 목표에서 3개 품목 목표 수행으로 범위가 넓어졌다. 이전 세션의 2개 품목 수행은 유지하며 3개 품목 수행을 추가했다.",
+      "findings" : [ {
+        "id" : "F1",
+        "skill" : "장보기 수행과 근거 범위",
+        "observation" : "목표는 양파 1개·빵 1개, 예산은 5000원이다. 합성 사례 나이: 34. 양파 1개·빵 1개를 총액 3300원으로 제출했다.",
+        "interpretation" : "제공된 관찰·보고의 범위로 한정한다.",
+        "alternativeExplanations" : [ ],
+        "evidenceEventIds" : [ "c4b52746-6f6e-57bc-b7cb-c6781ef5a4b1" ],
+        "suggestedSupport" : "같은 조건의 과제에서 추가 관찰한다."
+      }, {
+        "id" : "F2",
+        "skill" : "장보기 수행과 근거 범위",
+        "observation" : "목표는 양파 1개·빵 1개·두부 1개, 예산은 7000원이다. 합성 사례 나이: 34. 양파 1개·빵 1개·두부 1개를 총액 5000원으로 제출했다.",
+        "interpretation" : "제공된 관찰·보고의 범위로 한정한다.",
+        "alternativeExplanations" : [ ],
+        "evidenceEventIds" : [ "9d7be7fe-5aff-53a0-a6ff-a2cba049d554" ],
+        "suggestedSupport" : "같은 조건의 과제에서 추가 관찰한다."
+      } ],
+      "uncertainties" : [ "다른 조건의 수행은 확인하지 않았다." ],
+      "practicePlan" : {
+        "targetFindingIds" : [ "F1", "F2" ],
+        "goal" : "3개 품목 선택 관찰",
+        "rationale" : "제공된 세션 기록에 근거한 관찰용 제안이다.",
+        "recommendedDifficulty" : 2,
+        "itemCount" : 3,
+        "quantityComplexity" : "LOW",
+        "budgetPressure" : "LOW",
+        "textSupport" : "SIMPLIFIED",
+        "reasonCodes" : [ "OBSERVATION_PRACTICE" ]
+      },
+      "usedEvidenceCardIds" : [ ]
+    }
+  }, {
+    "id" : "E25",
+    "task" : "profile_update",
+    "stop_reason" : "eos",
+    "accepted" : true,
+    "expanded" : {
+      "summary" : "익숙한 배열에서는 두 품목을 모두 제출했다. 새 배열에서는 우유를 제출하지 않았다. 두 배열 모두에서 수행이 가능할 수 있다.",
+      "findings" : [ {
+        "id" : "F1",
+        "skill" : "장보기 수행과 근거 범위",
+        "observation" : "익숙한 배열에서는 배 1개·우유 1개를 총액 4600원으로 제출했다. 새 배열에서는 배 1개를 총액 2400원으로 제출했다.",
+        "interpretation" : "두 배열 모두에서 수행이 가능할 수 있다.",
+        "alternativeExplanations" : [ ],
+        "evidenceEventIds" : [ "a732ec8c-26f6-563b-9c05-141db97b093b", "727b78fe-dd55-56e1-8ee7-05582ab3585f" ],
+        "suggestedSupport" : "두 배열 모두에서 수행을 관찰한다."
+      } ],
+      "uncertainties" : [ "두 배열 모두에서 수행이 가능할 수 있다." ],
+      "practicePlan" : {
+        "targetFindingIds" : [ "F1" ],
+        "goal" : "두 배열 모두에서 수행을 관찰한다.",
+        "rationale" : "두 배열 모두에서 수행이 가능할 수 있다.",
+        "recommendedDifficulty" : 2,
+        "itemCount" : 2,
+        "quantityComplexity" : "LOW",
+        "budgetPressure" : "LOW",
+        "textSupport" : "SIMPLIFIED",
+        "reasonCodes" : [ "OBSERVATION_PRACTICE" ]
+      },
+      "usedEvidenceCardIds" : [ ]
+    }
+  } ]
+}

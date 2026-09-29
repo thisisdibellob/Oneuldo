@@ -1,0 +1,5 @@
+{
+  "normalized_exact_input_duplicates": [],
+  "cross_split_exact_duplicates": [],
+  "note": "Exact normalized inputs only. Related scenario families remain across splits; this is a development set, not blind generalization evidence."
+}

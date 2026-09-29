@@ -1,0 +1,84 @@
+{
+  "id": "888edb13-2065-5fd2-b288-fea6582842e5",
+  "schemaVersion": "synthetic-native-v2",
+  "generatedAt": "2026-01-31T00:00:00Z",
+  "sessionCount": 1,
+  "eventCount": 2,
+  "input": {
+    "schemaVersion": "synthetic-native-v2",
+    "datasetId": "888edb13-2065-5fd2-b288-fea6582842e5",
+    "generatedAt": "2026-01-31T00:00:00Z",
+    "analysisWindow": null,
+    "anonymousSubjectId": "T16-synthetic",
+    "sessionCount": 1,
+    "eventCount": 2,
+    "sessions": [
+      {
+        "sessionId": "6aa38fe0-2ea4-5c99-b7c8-c8d1bb09349e",
+        "startedAt": "2026-01-01T00:00:00Z",
+        "endedAt": null,
+        "integrity": null,
+        "events": [
+          {
+            "behaviorLogId": "1fc20c4e-b348-5c45-bff2-45ecd5db563f",
+            "sequence": 1,
+            "elapsedFromSessionStartMs": 10000,
+            "occurredAt": "2026-01-01T00:00:10Z",
+            "receivedAt": "2026-01-01T00:00:10Z",
+            "eventSchemaVersion": "synthetic-native-v2",
+            "action": {
+              "eventCode": "SHOP.MISSION_PRESENTED"
+            },
+            "payload": {
+              "type": "SHOPPING",
+              "marketContent": {
+                "sceneSnapshot": {
+                  "schemaVersion": "market-scene-v1",
+                  "mission": {
+                    "id": "T16-mission",
+                    "description": "목표 목록의 물건과 수량을 담고 총액은 예산 이하로 제출하세요.",
+                    "budget": 4000,
+                    "objectives": [
+                      {
+                        "productId": "사과",
+                        "quantity": 2,
+                        "label": "사과"
+                      },
+                      {
+                        "productId": "생수",
+                        "quantity": 1,
+                        "label": "생수"
+                      }
+                    ]
+                  },
+                  "layoutVersion": "synthetic-layout-v2"
+                }
+              }
+            }
+          },
+          {
+            "behaviorLogId": "8fea4b75-a896-551b-a717-7ff1ad32ece4",
+            "sequence": 2,
+            "elapsedFromSessionStartMs": 20000,
+            "occurredAt": "2026-01-01T00:00:20Z",
+            "receivedAt": "2026-01-01T00:00:20Z",
+            "eventSchemaVersion": "synthetic-native-v2",
+            "action": {
+              "eventCode": "SHOP.CHECKOUT_SUBMITTED"
+            },
+            "payload": {
+              "type": "SHOPPING",
+              "marketContent": {
+                "cart": {
+                  "사과": 2,
+                  "생수": 1
+                }
+              },
+              "cartTotalAmount": 3200
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

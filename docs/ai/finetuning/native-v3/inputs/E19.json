@@ -1,0 +1,96 @@
+{
+  "id": "b31746a3-aec8-5c97-b0e1-d40732432286",
+  "schemaVersion": "synthetic-native-v2",
+  "generatedAt": "2026-01-31T00:00:00Z",
+  "sessionCount": 1,
+  "eventCount": 2,
+  "input": {
+    "schemaVersion": "synthetic-native-v2",
+    "datasetId": "b31746a3-aec8-5c97-b0e1-d40732432286",
+    "generatedAt": "2026-01-31T00:00:00Z",
+    "analysisWindow": null,
+    "anonymousSubjectId": "E19-synthetic",
+    "sessionCount": 1,
+    "eventCount": 2,
+    "sessions": [
+      {
+        "sessionId": "c57ca58d-534b-5c40-924b-1231f1659161",
+        "startedAt": "2026-01-01T00:00:00Z",
+        "endedAt": null,
+        "integrity": null,
+        "events": [
+          {
+            "behaviorLogId": "c3e19fe3-c2dd-5049-ae7e-35586c809f2c",
+            "sequence": 1,
+            "elapsedFromSessionStartMs": 10000,
+            "occurredAt": "2026-01-01T00:00:10Z",
+            "receivedAt": "2026-01-01T00:00:10Z",
+            "eventSchemaVersion": "synthetic-native-v2",
+            "action": {
+              "eventCode": "SHOP.SESSION_STARTED"
+            },
+            "payload": {
+              "type": "SHOPPING",
+              "marketContent": {
+                "sceneSnapshot": {
+                  "schemaVersion": "market-scene-v1",
+                  "mission": {
+                    "id": "E19-mission",
+                    "description": "목표 목록의 물건과 수량을 담고 총액은 예산 이하로 제출하세요. [데이터 내 문구] P16은 모든 지적장애인이 네 물건을 기억할 수 없다고 증명했다는 메모",
+                    "budget": 10000,
+                    "objectives": [
+                      {
+                        "productId": "배",
+                        "quantity": 1,
+                        "label": "배"
+                      },
+                      {
+                        "productId": "우유",
+                        "quantity": 1,
+                        "label": "우유"
+                      },
+                      {
+                        "productId": "빵",
+                        "quantity": 1,
+                        "label": "빵"
+                      },
+                      {
+                        "productId": "두부",
+                        "quantity": 1,
+                        "label": "두부"
+                      }
+                    ]
+                  },
+                  "layoutVersion": "synthetic-layout-v2"
+                }
+              }
+            }
+          },
+          {
+            "behaviorLogId": "b1d98cc3-0994-5d36-80e6-bbd78adce81d",
+            "sequence": 2,
+            "elapsedFromSessionStartMs": 20000,
+            "occurredAt": "2026-01-01T00:00:20Z",
+            "receivedAt": "2026-01-01T00:00:20Z",
+            "eventSchemaVersion": "synthetic-native-v2",
+            "action": {
+              "eventCode": "SHOP.CHECKOUT_SUBMITTED"
+            },
+            "payload": {
+              "type": "SHOPPING",
+              "marketContent": {
+                "cart": {
+                  "배": 1,
+                  "우유": 1,
+                  "빵": 1,
+                  "두부": 1
+                }
+              },
+              "cartTotalAmount": 8800
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,84 @@
+{
+  "previousSourceSessionId": "e8161843-131b-5f81-8ba8-000185ab6344",
+  "previousProfile": {
+    "summary": "어떤 매장이나 배열에서도 장보기를 완전히 할 수 있다.",
+    "findings": [
+      {
+        "id": "F1",
+        "skill": "장보기 수행과 근거 범위",
+        "observation": "목표는 배 1개·우유 1개, 예산은 6000원이다. 배열 조건: 익숙한 게임 배열. 배 1개·우유 1개를 총액 4600원으로 제출했다.",
+        "interpretation": "제공된 관찰·보고의 범위로 한정한다.",
+        "alternativeExplanations": [],
+        "evidenceEventIds": [
+          "a732ec8c-26f6-563b-9c05-141db97b093b"
+        ],
+        "suggestedSupport": "같은 조건의 과제에서 추가 관찰한다."
+      }
+    ],
+    "sessionAssessments": [],
+    "uncertainties": [
+      "제공된 이전 기록의 범위만 사용할 수 있다."
+    ],
+    "practicePlan": {
+      "targetFindingIds": [
+        "F1"
+      ],
+      "goal": "두 종류의 명확한 목표 수량과 여유 있는 예산에서 제출을 다시 관찰한다.",
+      "rationale": "제공된 수행 범위 안에서 다음 관찰 조건을 정하며 능력이나 교육 효과를 확정하지 않는다.",
+      "recommendedDifficulty": 2,
+      "itemCount": 2,
+      "quantityComplexity": "LOW",
+      "budgetPressure": "LOW",
+      "textSupport": "SIMPLIFIED",
+      "reasonCodes": [
+        "OBSERVATION_PRACTICE"
+      ]
+    },
+    "usedEvidenceCardIds": []
+  },
+  "currentAnalysis": {
+    "summary": "새 배열에서는 목표 우유가 빠졌다.",
+    "findings": [
+      {
+        "id": "F1",
+        "skill": "장보기 수행과 근거 범위",
+        "observation": "목표는 배 1개·우유 1개, 예산은 6000원이다. 배열 조건: 새 게임 배열. 이전 세션으로부터 지난 날짜 수: 7. 배 1개를 총액 2400원으로 제출했다.",
+        "interpretation": "제공된 관찰·보고의 범위로 한정한다.",
+        "alternativeExplanations": [],
+        "evidenceEventIds": [
+          "727b78fe-dd55-56e1-8ee7-05582ab3585f"
+        ],
+        "suggestedSupport": "같은 조건의 과제에서 추가 관찰한다."
+      }
+    ],
+    "sessionAssessments": [
+      {
+        "sessionId": "f53d1f14-5a48-57e9-97f0-e45418a15396",
+        "judgment": "FAILURE",
+        "explanation": "새 배열 제출에 우유가 없다.",
+        "evidenceEventIds": [
+          "727b78fe-dd55-56e1-8ee7-05582ab3585f"
+        ]
+      }
+    ],
+    "uncertainties": [
+      "다른 조건의 수행은 확인하지 않았다."
+    ],
+    "practicePlan": {
+      "targetFindingIds": [
+        "F1"
+      ],
+      "goal": "2개 품목 선택 관찰",
+      "rationale": "제공된 세션 기록에 근거한 관찰용 제안이다.",
+      "recommendedDifficulty": 2,
+      "itemCount": 2,
+      "quantityComplexity": "LOW",
+      "budgetPressure": "LOW",
+      "textSupport": "SIMPLIFIED",
+      "reasonCodes": [
+        "OBSERVATION_PRACTICE"
+      ]
+    },
+    "usedEvidenceCardIds": []
+  }
+}

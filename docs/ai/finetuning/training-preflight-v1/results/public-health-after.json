@@ -1,0 +1,7 @@
+{
+  "path": "https://oneuldo.duckdns.org/healthz",
+  "auth_sent": false,
+  "status": 200,
+  "response": "{\"status\":\"up\"}",
+  "seconds": 0.2874149160925299
+}

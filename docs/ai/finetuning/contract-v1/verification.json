@@ -1,0 +1,37 @@
+{
+  "date": "2026-09-24",
+  "git_head": "a304379bdd86915a7ea27eb7ca27fadf6cba84e7",
+  "source_85_rows_unchanged": true,
+  "baseline_eval_unchanged": true,
+  "java_tests": {
+    "tests": 3,
+    "failures": 0,
+    "cases": [
+      "native_fixture_messages_are_built_by_the_production_whole_source_path()",
+      "unknown_and_cross_session_citations_fail_and_changed_judgment_is_not_rule_scored()",
+      "all_57_compact_targets_round_trip_through_actual_parser_and_validator()"
+    ]
+  },
+  "python_contract_tests": {
+    "tests": 6,
+    "failures": 0
+  },
+  "production_output_round_trips": 57,
+  "native_fixture_messages": 6,
+  "template_boundary_checks": 91,
+  "training_executed": false,
+  "runtime_changes": false,
+  "source_file_sha256": {
+    "backend/src/main/java/oneuldo/behaviorlog/analysis/service/AiBehaviorAnalysisPromptFactory.java": "397486b6488335d35d341773e3d91b4d5e00ad7e349c2a18823e355edaa92de2",
+    "backend/src/main/java/oneuldo/behaviorlog/analysis/service/AnalysisReferences.java": "5b2cd737457593998768c27acb06e4b7a926092c76eb4295566cd0a948f1e268",
+    "backend/src/main/java/oneuldo/behaviorlog/analysis/service/AnalysisSynthesisPrompt.java": "5d1a95bb60851cedec9e856f326c641d16414fd5a19a2cc4ffbb75d7731998e9",
+    "backend/src/main/java/oneuldo/behaviorlog/analysis/service/AnalysisReviewPrompt.java": "318b83eb52430feaa3efb15a205481d94ec64084a17d2342d4d2732bdf67a8ee",
+    "backend/src/main/java/oneuldo/behaviorlog/analysis/service/AiBehaviorAnalysisValidator.java": "4a163eb29ef737e90a322616ef759fda4a7ee607b2778550c42408a75e52f779",
+    "backend/src/main/java/oneuldo/behaviorlog/analysis/service/TimelineAnalysisPipeline.java": "fc129135b85cd02dd3b8364481a4c3d266d9b368271fd6b6d6a1594282519fe1",
+    "backend/src/main/java/oneuldo/behaviorlog/profile/service/AiUserProfilePromptFactory.java": "d32a606b333bc32d51911ef85328c144471e7d65c9d4384e209db73cc09bb5e9",
+    "backend/src/main/java/oneuldo/behaviorlog/profile/service/AiUserProfileReferences.java": "fe3adf452f09ec10862ffe52477834e82c500d03b26850c22203a78594fbea48",
+    "docs/ai/finetuning/prepare_contract.py": "620e68f0732c41c00e77845502a582d972453e82dab82442df62cd20828f544a",
+    "docs/ai/finetuning/audit_contract_tokens.py": "ba98945d7d08523ed6c01910b96448e334a4a7caefdbf208c038ec68abe3525e",
+    "docs/ai/finetuning/test_contract_tools.py": "bfecb492437ffb144e65ec3530592e13174b53c8a6a6d4adb8d7b2fa2247268f"
+  }
+}

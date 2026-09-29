@@ -1,0 +1,21 @@
+{
+  "passed": true,
+  "overflow": {
+    "applied": false,
+    "scale_before": 256,
+    "scale_after": 128.0,
+    "nonfinite_parameter_count": 1,
+    "nonfinite_parameter_examples": [
+      "weight"
+    ]
+  },
+  "retry": {
+    "applied": true,
+    "gradient_norm": 400.0,
+    "scale_before": 128.0,
+    "scale_after": 128.0
+  },
+  "no_update_or_optimizer_state_on_overflow": true,
+  "same_sample_retry_updates_once": true,
+  "nonfinite_loss_rejected_without_update": true
+}

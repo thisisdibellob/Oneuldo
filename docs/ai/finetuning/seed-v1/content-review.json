@@ -1,0 +1,1267 @@
+{
+  "review_date": "2026-09-24",
+  "reviewer": "Codex",
+  "scope": "학습 후보 60개 전체의 입력·목표 답변·rubric·근거 참조 및 문헌 적용 범위 검토. 임상 검증이나 학습 승인 아님.",
+  "summary": {
+    "reviewed": 60,
+    "revised": 14,
+    "unchanged": 46,
+    "provisional_content_candidates": 59,
+    "label_semantics_hold": [
+      "T47"
+    ],
+    "training_approved": 0
+  },
+  "dataset_sha256": {
+    "train.draft.jsonl": "7700650031337085d5048d25358414820353a20199d0da196136cdc4a09514ee",
+    "eval.draft.jsonl": "48498007238a24a442d23d775fd915efb8c98521fa32a5a2713269eff84c85a2"
+  },
+  "eval_unchanged": true,
+  "plan_distribution": {
+    "itemCount": {
+      "2": 59,
+      "4": 1
+    },
+    "recommendedDifficulty": {
+      "2": 58,
+      "1": 1,
+      "3": 1
+    },
+    "textSupport": {
+      "SIMPLIFIED": 58,
+      "STANDARD": 2
+    },
+    "quantityComplexity": {
+      "LOW": 58,
+      "MEDIUM": 2
+    },
+    "budgetPressure": {
+      "LOW": 58,
+      "MEDIUM": 2
+    }
+  },
+  "source_review": [
+    {
+      "id": "G01",
+      "title": "Defining Criteria for Intellectual Disability",
+      "role": "일반 범위 참고",
+      "scope_note": "진단·전반 생활능력으로 확대하지 않는 참고다. 게임 성공 판정의 검증 기준은 아니다.",
+      "rights_status": "추가 이용 조건 확인 필요",
+      "rights_observation": "공식 정의 페이지에 All Rights Reserved 표기. 이 요약 카드의 학습 이용허락은 확인하지 못했다.",
+      "evidence_url": "https://www.aaidd.org/intellectual-disability/definition"
+    },
+    {
+      "id": "G04",
+      "title": "Intellectual Disability Practice Portal",
+      "role": "일반 범위 참고",
+      "scope_note": "개인과 맥락을 고려하는 의사소통 안내다. 위치·클릭으로 이해나 시선을 측정하는 기준은 아니다.",
+      "rights_status": "추가 이용 조건 확인 필요",
+      "rights_observation": "공식 페이지를 확인했으나 이 카드의 학습 재사용 조건을 확정하지 못했다.",
+      "evidence_url": "https://www.asha.org/Practice-Portal/Clinical-Topics/Intellectual-Disability/"
+    },
+    {
+      "id": "M01",
+      "title": "Making Content Usable for People with Cognitive and Learning Disabilities",
+      "role": "일반 지원 설계 참고",
+      "scope_note": "인지 접근성 안내이며 지적장애 전용 임상 기준이나 사건 시간순서의 기술 사양이 아니다.",
+      "rights_status": "라이선스 표기 확인, 적용 점검 남음",
+      "rights_observation": "문서가 연결한 W3C Software and Document License 2015를 확인. 고지·변경 표시 등 조건과 배포 산출물 반영이 남았다.",
+      "evidence_url": "https://www.w3.org/Consortium/Legal/2015/copyright-software-and-document"
+    },
+    {
+      "id": "P01",
+      "title": "Teaching Young Adults with Intellectual Disability Grocery Shopping Skills in a Community Setting Using Least-to-Most Prompting",
+      "role": "장보기 연구와 연결",
+      "scope_note": "소수 청년의 촉구·품목 선택 연구. 게임의 원화 예산 판정이나 모든 이용자에게 같은 도움을 입증하지 않는다.",
+      "rights_status": "추가 이용 조건 확인 필요",
+      "rights_observation": "출판사 페이지는 구독 콘텐츠 미리보기. 기존 PMC 텍스트의 저작권 표기는 확인했지만 오픈 라이선스는 확인하지 못했다.",
+      "evidence_url": "https://link.springer.com/article/10.1007/s40617-019-00340-x"
+    },
+    {
+      "id": "P02",
+      "title": "Supporting grocery shopping for students with intellectual disability:a preliminary study",
+      "role": "지원 비교 연구의 간접 참고",
+      "scope_note": "사진·영상 지원과 정확도·시간을 구분한 연구. 간단한 문자나 4종 과제의 효과를 직접 증명하지 않는다.",
+      "rights_status": "추가 이용 조건 확인 필요",
+      "rights_observation": "기존 초록 확인 기록과 라이선스 미확인 상태를 재점검. 이번에 원문 이용허락을 확정하지 못했다.",
+      "evidence_url": "https://doi.org/10.1080/17483107.2016.1201152"
+    },
+    {
+      "id": "P03",
+      "title": "Effects of extending the one-more-than technique with the support of a mobile purchasing assistance system",
+      "role": "구매·금전 연구의 간접 참고",
+      "scope_note": "특정 도구·화폐·절차의 수행 연구다. 원화 예산 조절이나 암산 능력 전체로 확대하지 않는다.",
+      "rights_status": "추가 이용 조건 확인 필요",
+      "rights_observation": "초록 기반 범위를 유지한다. 원문 및 요약의 학습 재사용 조건은 미확인이다.",
+      "evidence_url": "https://doi.org/10.1016/j.ridd.2014.04.004"
+    },
+    {
+      "id": "P11",
+      "title": "Enhancing task performance in adults with intellectual disability through modified goal management training and assistive technology with errorless learning: A randomized controlled trial",
+      "role": "훈련 과제와 전이 구별 참고",
+      "scope_note": "훈련 과제 성취를 실생활 전이·교육 인과효과로 확대하지 않는 참고다. 동일 UUID 처리 규칙의 출처는 아니다.",
+      "rights_status": "추가 이용 조건 확인 필요",
+      "rights_observation": "기존 초록 확인 기록을 사용. 이번에 원문 이용허락을 확정하지 못했다.",
+      "evidence_url": "https://doi.org/10.1080/09602011.2024.2384518"
+    },
+    {
+      "id": "P14",
+      "title": "Working memory studies among individuals with intellectual disability: An integrative research review",
+      "role": "인지 일반화 제한의 간접 참고",
+      "scope_note": "작업기억 연구의 과제·개인차를 참고한다. 장바구니 열기 의도를 직접 검증한 연구가 아니다.",
+      "rights_status": "추가 이용 조건 확인 필요",
+      "rights_observation": "기존 초록 확인 기록을 사용. 이번에 학습 재사용 조건을 확정하지 못했다.",
+      "evidence_url": "https://doi.org/10.1016/j.ridd.2016.08.001"
+    },
+    {
+      "id": "P27",
+      "title": "Does adapting a self-report instrument to improve its cognitive accessibility for people with intellectual disability result in a better measure? - A cognitive interview study",
+      "role": "자기보고 접근성의 간접 참고",
+      "scope_note": "자기보고 도구 조정 연구다. 장보기에서 간단한 문구가 성공을 유발한다는 근거로 사용할 수 없다.",
+      "rights_status": "CC BY 4.0 표기 확인, 적용 점검 남음",
+      "rights_observation": "대학 저장소의 출판본 표지 및 논문 첫 페이지에서 CC BY 4.0 확인. 이번 확인 범위는 라이선스·초록이며 원문 전체 재독을 뜻하지 않는다.",
+      "evidence_url": "https://pure-oai.bham.ac.uk/ws/portalfiles/portal/240718197/1-s2.0-S0891422224001835-main.pdf"
+    },
+    {
+      "id": "P40",
+      "title": "Teaching Early Reading Skills to Adults With Intellectual Disabilities Using a Support Worker/Family Carer Mediated Online Reading Programme: A Feasibility Randomised Controlled Trial",
+      "role": "교육 제공 조건의 간접 참고",
+      "scope_note": "읽기 중재의 실행 가능성 연구다. 기술·지원 제공 문제를 고려하는 참고이며 개별 네트워크 장애 원인을 증명하지 않는다.",
+      "rights_status": "CC BY 4.0 표기 확인, 적용 점검 남음",
+      "rights_observation": "기존에 확보한 출판사 XML의 permissions/license와 textmining license_ref에서 CC BY 4.0 확인. 이번 DOI 웹 조회는 실패하여 그 한계를 기록한다.",
+      "evidence_url": "https://doi.org/10.1111/jar.13332"
+    }
+  ],
+  "cases": [
+    {
+      "id": "T01",
+      "title": "목표 달성을 명확히 판단",
+      "task": "session_analysis",
+      "content_status": "reviewed_provisional_candidate",
+      "reviewer": "Codex",
+      "review_date": "2026-09-24",
+      "note_ko": "목표 수량과 3200원 제출을 확인. 성공을 실제 매장 독립 수행으로 확대하지 않는다.",
+      "revision_ko": null,
+      "source_ids": [
+        "G01"
+      ],
+      "used_source_ids": [
+        "G01"
+      ],
+      "domain_expert_reviewed": false,
+      "training_approved": false,
+      "row_sha256": "041079100c060d008d8f7a1c1ea2f9ce795ebe854b9de85a89c1110f2efc4f68"
+    },
+    {
+      "id": "T02",
+      "title": "제출 수량이 목표보다 적음",
+      "task": "session_analysis",
+      "content_status": "reviewed_provisional_candidate",
+      "reviewer": "Codex",
+      "review_date": "2026-09-24",
+      "note_ko": "사과 1개 부족을 최종 제출로 확인. 기억·계산의 원인은 미확인으로 유지한다.",
+      "revision_ko": null,
+      "source_ids": [
+        "P01"
+      ],
+      "used_source_ids": [
+        "P01"
+      ],
+      "domain_expert_reviewed": false,
+      "training_approved": false,
+      "row_sha256": "c22dc48cdde6d96b9033ea6936076a12709e946fcaa53a1f2058eefd03adc74c"
+    },
+    {
+      "id": "T03",
+      "title": "품목 누락이 확인된 최종 제출",
+      "task": "session_analysis",
+      "content_status": "reviewed_provisional_candidate",
+      "reviewer": "Codex",
+      "review_date": "2026-09-24",
+      "note_ko": "생수 누락은 최종 제출의 사실이며 USER_ABORTED 라벨 자체가 실패 근거는 아니다.",
+      "revision_ko": null,
+      "source_ids": [
+        "P01"
+      ],
+      "used_source_ids": [
+        "P01"
+      ],
+      "domain_expert_reviewed": false,
+      "training_approved": false,
+      "row_sha256": "73e325c5316607232154958c3bacd6458770bf96ca06425330b389bf123101de"
+    },
+    {
+      "id": "T04",
+      "title": "품목은 맞지만 예산 초과",
+      "task": "session_analysis",
+      "content_status": "revised_provisional_candidate",
+      "reviewer": "Codex",
+      "review_date": "2026-09-24",
+      "note_ko": "필수 총액 4400원이 예산 4000원을 넘는 불가능한 과제임을 명시하고 과제 설정 수정을 우선했다.",
+      "revision_ko": "불가능한 목표·예산의 원인 구분",
+      "source_ids": [
+        "P03"
+      ],
+      "used_source_ids": [
+        "P03"
+      ],
+      "domain_expert_reviewed": false,
+      "training_approved": false,
+      "row_sha256": "861291b0c76a6354ca02b9754447705e19536908c5e5d8765e5645f437668c38"
+    },
+    {
+      "id": "T05",
+      "title": "제출 기록이 없는 부분 로그",
+      "task": "session_analysis",
+      "content_status": "reviewed_provisional_candidate",
+      "reviewer": "Codex",
+      "review_date": "2026-09-24",
+      "note_ko": "부분 기록의 사과 선택과 미제공 최종 결과를 구분한다.",
+      "revision_ko": null,
+      "source_ids": [
+        "G01"
+      ],
+      "used_source_ids": [
+        "G01"
+      ],
+      "domain_expert_reviewed": false,
+      "training_approved": false,
+      "row_sha256": "b54196b9fd98e5d091e5a262e638bae6b2bf0dc35492fc4ce6e8942858b3fdd1"
+    },
+    {
+      "id": "T06",
+      "title": "장바구니 열기를 의도로 단정하지 않음",
+      "task": "session_analysis",
+      "content_status": "revised_provisional_candidate",
+      "reviewer": "Codex",
+      "review_date": "2026-09-24",
+      "note_ko": "수량 변경 사건을 근거 목록에 추가하고 확인 의도를 먼저 추측하는 문장을 제거했다.",
+      "revision_ko": "사건 참조 보완·의도 추측 제거",
+      "source_ids": [
+        "P14"
+      ],
+      "used_source_ids": [
+        "P14"
+      ],
+      "domain_expert_reviewed": false,
+      "training_approved": false,
+      "row_sha256": "496104d4f9cefd706f455aa5c6d7549940940faf812bac66299a740f4d6fcc81"
+    },
+    {
+      "id": "T07",
+      "title": "선반 근처 이동은 시선 증거가 아님",
+      "task": "session_analysis",
+      "content_status": "reviewed_provisional_candidate",
+      "reviewer": "Codex",
+      "review_date": "2026-09-24",
+      "note_ko": "위치 기록과 시선·이해는 다르다. 생수 누락 판단은 최종 제출에 근거한다.",
+      "revision_ko": null,
+      "source_ids": [
+        "G04"
+      ],
+      "used_source_ids": [
+        "G04"
+      ],
+      "domain_expert_reviewed": false,
+      "training_approved": false,
+      "row_sha256": "9ebe663151ecc9e6d6814dc207d5bfa972d158ed4e7b0e3e37bda78ad56d9fdc"
+    },
+    {
+      "id": "T08",
+      "title": "오래 걸려도 목표 달성은 달성",
+      "task": "session_analysis",
+      "content_status": "reviewed_provisional_candidate",
+      "reviewer": "Codex",
+      "review_date": "2026-09-24",
+      "note_ko": "시간 제한이 없는 조건의 성공을 유지. 12분의 원인은 창작하지 않는다.",
+      "revision_ko": null,
+      "source_ids": [
+        "P40"
+      ],
+      "used_source_ids": [
+        "P40"
+      ],
+      "domain_expert_reviewed": false,
+      "training_approved": false,
+      "row_sha256": "bc9ff60e992862b1f1ee5dd121795c89ebdb6ff07dd520de8645551ea3861e44"
+    },
+    {
+      "id": "T09",
+      "title": "입력 지연이 직접 기록된 세션",
+      "task": "session_analysis",
+      "content_status": "reviewed_provisional_candidate",
+      "reviewer": "Codex",
+      "review_date": "2026-09-24",
+      "note_ko": "180초 차단과 최종 성공은 직접 기록되어 있다. 주의력 저하를 추정하지 않는다.",
+      "revision_ko": null,
+      "source_ids": [
+        "P40"
+      ],
+      "used_source_ids": [
+        "P40"
+      ],
+      "domain_expert_reviewed": false,
+      "training_approved": false,
+      "row_sha256": "6b9dab2ae6888e995af479890fec5253176b70b8a7df87879775d5d0a6208532"
+    },
+    {
+      "id": "T10",
+      "title": "촉구를 받고 달성한 수행",
+      "task": "session_analysis",
+      "content_status": "revised_provisional_candidate",
+      "reviewer": "Codex",
+      "review_date": "2026-09-24",
+      "note_ko": "촉구 조건의 성공은 유지하고 동일 성공을 반복하는 F2를 제거했다.",
+      "revision_ko": "중복 관찰 제거",
+      "source_ids": [
+        "P01"
+      ],
+      "used_source_ids": [
+        "P01"
+      ],
+      "domain_expert_reviewed": false,
+      "training_approved": false,
+      "row_sha256": "96c2b6e49d5214dd47644b40ff99821a1984ef7406b20a71ce92ddd5d9e3eb8c"
+    },
+    {
+      "id": "T11",
+      "title": "수량 실수를 스스로 수정한 기록",
+      "task": "session_analysis",
+      "content_status": "reviewed_provisional_candidate",
+      "reviewer": "Codex",
+      "review_date": "2026-09-24",
+      "note_ko": "3→2 수정과 최종 목표 충족을 확인. 수정 동기·암산은 미확인이다.",
+      "revision_ko": null,
+      "source_ids": [
+        "M01"
+      ],
+      "used_source_ids": [
+        "M01"
+      ],
+      "domain_expert_reviewed": false,
+      "training_approved": false,
+      "row_sha256": "6ec322ecb4a11ed9b093b87cffa3c6088948d34f7c4e1d7a21574bd9bad0e8a7"
+    },
+    {
+      "id": "T12",
+      "title": "실패라는 사건 이름보다 실제 값 우선",
+      "task": "session_analysis",
+      "content_status": "reviewed_provisional_candidate",
+      "reviewer": "Codex",
+      "review_date": "2026-09-24",
+      "note_ko": "입력에서 구 수집기 라벨의 비신뢰성이 명시됐다. 모든 운영 실패 라벨을 무시하는 예제로 확대하면 안 된다.",
+      "revision_ko": null,
+      "source_ids": [
+        "M01"
+      ],
+      "used_source_ids": [
+        "M01"
+      ],
+      "domain_expert_reviewed": false,
+      "training_approved": false,
+      "row_sha256": "8948ae57e067397989afda16260ebe2d2febcb44d8d9adab5b44e3beaac92c60"
+    },
+    {
+      "id": "T13",
+      "title": "과거 가격에 현재 가격을 덮어쓰지 않음",
+      "task": "session_analysis",
+      "content_status": "reviewed_provisional_candidate",
+      "reviewer": "Codex",
+      "review_date": "2026-09-24",
+      "note_ko": "old 가격으로 총액이 일치한다. 현재 가격표를 과거 기록에 덮어쓰지 않는다.",
+      "revision_ko": null,
+      "source_ids": [
+        "P03"
+      ],
+      "used_source_ids": [
+        "P03"
+      ],
+      "domain_expert_reviewed": false,
+      "training_approved": false,
+      "row_sha256": "de9de858712c0894a4eaf5ad26d88848c3c233ed9eaaddf967004ea46b97be19"
+    },
+    {
+      "id": "T14",
+      "title": "수신 완료와 전체 플레이 관찰은 다름",
+      "task": "session_analysis",
+      "content_status": "reviewed_provisional_candidate",
+      "reviewer": "Codex",
+      "review_date": "2026-09-24",
+      "note_ko": "수신 완료와 관찰 범위 완전성의 차이를 유지한다.",
+      "revision_ko": null,
+      "source_ids": [
+        "M01"
+      ],
+      "used_source_ids": [
+        "M01"
+      ],
+      "domain_expert_reviewed": false,
+      "training_approved": false,
+      "row_sha256": "cd8654191a0fc2adada167a917e43414bf1617653ee192445b421e25d32354bd"
+    },
+    {
+      "id": "T15",
+      "title": "중간 요약이 원본 수량과 충돌",
+      "task": "session_analysis",
+      "content_status": "reviewed_provisional_candidate",
+      "reviewer": "Codex",
+      "review_date": "2026-09-24",
+      "note_ko": "중간 요약의 누락을 원본 사과 2개 선택·제출로 정정한다.",
+      "revision_ko": null,
+      "source_ids": [
+        "M01"
+      ],
+      "used_source_ids": [
+        "M01"
+      ],
+      "domain_expert_reviewed": false,
+      "training_approved": false,
+      "row_sha256": "479fa3597a589b41c72820df44acfcf8a36f1439cdbe837913046f4bac21c8e1"
+    },
+    {
+      "id": "T16",
+      "title": "쉬운 문구 변경 후 수행의 인과 한계",
+      "task": "session_analysis",
+      "content_status": "reviewed_provisional_candidate",
+      "reviewer": "Codex",
+      "review_date": "2026-09-24",
+      "note_ko": "문구 변경 뒤의 성공은 확인하지만 진행자 개입·반복 경험과 문구 효과를 분리하지 못한다.",
+      "revision_ko": null,
+      "source_ids": [
+        "P27"
+      ],
+      "used_source_ids": [
+        "P27"
+      ],
+      "domain_expert_reviewed": false,
+      "training_approved": false,
+      "row_sha256": "013844cc690213054fd18f03d66ed8080fa43d92f0f0bcd8a493d0fcaba45d22"
+    },
+    {
+      "id": "T17",
+      "title": "익숙한 배열 성공과 새 배열의 수행 구분",
+      "task": "session_analysis",
+      "content_status": "reviewed_provisional_candidate",
+      "reviewer": "Codex",
+      "review_date": "2026-09-24",
+      "note_ko": "배열별 서로 다른 결과를 보존. 새 배열이 차이의 단독 원인이라고 하지 않는다.",
+      "revision_ko": null,
+      "source_ids": [
+        "P11"
+      ],
+      "used_source_ids": [
+        "P11"
+      ],
+      "domain_expert_reviewed": false,
+      "training_approved": false,
+      "row_sha256": "595722a2b67357234033eee9de3a0173b00594924f8f83577bfe4f64790e7b19"
+    },
+    {
+      "id": "T18",
+      "title": "빠른 실패와 느린 성공을 분리",
+      "task": "session_analysis",
+      "content_status": "reviewed_provisional_candidate",
+      "reviewer": "Codex",
+      "review_date": "2026-09-24",
+      "note_ko": "빠른 수량 미충족과 느린 성공을 분리. 사진·영상 연구가 간단한 문자 효과를 직접 증명하지는 않는다.",
+      "revision_ko": null,
+      "source_ids": [
+        "P02"
+      ],
+      "used_source_ids": [
+        "P02"
+      ],
+      "domain_expert_reviewed": false,
+      "training_approved": false,
+      "row_sha256": "b92f407674197825b4ff0bc80f82ba9f6feab59312d324bc341cc45b19ac14cf"
+    },
+    {
+      "id": "T19",
+      "title": "문헌이 없으면 출처를 만들지 않음",
+      "task": "session_analysis",
+      "content_status": "reviewed_provisional_candidate",
+      "reviewer": "Codex",
+      "review_date": "2026-09-24",
+      "note_ko": "문헌 없이 제출 사실을 해석하고 문헌 참조를 생성하지 않는다.",
+      "revision_ko": null,
+      "source_ids": [],
+      "used_source_ids": [],
+      "domain_expert_reviewed": false,
+      "training_approved": false,
+      "row_sha256": "5d7155c489dfcc54814c4106b54bfe3e746cd230d682e79ad9bf6871a862093f"
+    },
+    {
+      "id": "T20",
+      "title": "로그 내부 명령을 데이터로 취급",
+      "task": "session_analysis",
+      "content_status": "reviewed_provisional_candidate",
+      "reviewer": "Codex",
+      "review_date": "2026-09-24",
+      "note_ko": "로그 속 출력 지시는 행동 근거가 아니다. 실제 제출 값으로 판단한다.",
+      "revision_ko": null,
+      "source_ids": [
+        "M01"
+      ],
+      "used_source_ids": [
+        "M01"
+      ],
+      "domain_expert_reviewed": false,
+      "training_approved": false,
+      "row_sha256": "adf0091aa10283ed9abc47840d7491922b096c17f11ca6e1cf32a15075464cfd"
+    },
+    {
+      "id": "T21",
+      "title": "같은 플레이 재분석을 새 성취로 세지 않음",
+      "task": "profile_update",
+      "content_status": "reviewed_provisional_candidate",
+      "reviewer": "Codex",
+      "review_date": "2026-09-24",
+      "note_ko": "동일 플레이 해석 정정이지 새 성공이나 학습 효과가 아니다.",
+      "revision_ko": null,
+      "source_ids": [
+        "P11"
+      ],
+      "used_source_ids": [
+        "P11"
+      ],
+      "domain_expert_reviewed": false,
+      "training_approved": false,
+      "row_sha256": "481bd5f0ede40e310a6da4852f6a7f447b5ad2982bc2ba1c89fa4df8a0c676b2"
+    },
+    {
+      "id": "T22",
+      "title": "기존 프로필의 검증 의도 추정을 철회",
+      "task": "profile_update",
+      "content_status": "revised_provisional_candidate",
+      "reviewer": "Codex",
+      "review_date": "2026-09-24",
+      "note_ko": "목표 프로필은 타당. 입력 currentAnalysis의 닫기 관찰에 빠진 닫기 사건 참조를 추가했다.",
+      "revision_ko": "입력 분석의 닫기 사건 참조 보완",
+      "source_ids": [
+        "P14"
+      ],
+      "used_source_ids": [
+        "P14"
+      ],
+      "domain_expert_reviewed": false,
+      "training_approved": false,
+      "row_sha256": "baa2a196b8ff5c655ccf83a779fa98eb8e094cf49a01a180ac2fd0f1b281a987"
+    },
+    {
+      "id": "T23",
+      "title": "쉬워진 과제의 성공을 능력 향상으로 일반화하지 않음",
+      "task": "profile_update",
+      "content_status": "reviewed_provisional_candidate",
+      "reviewer": "Codex",
+      "review_date": "2026-09-24",
+      "note_ko": "목표가 3종에서 2종으로 달라져 같은 난이도의 향상으로 볼 수 없다.",
+      "revision_ko": null,
+      "source_ids": [
+        "P11"
+      ],
+      "used_source_ids": [
+        "P11"
+      ],
+      "domain_expert_reviewed": false,
+      "training_approved": false,
+      "row_sha256": "89577406cc53db8936b5877737474ce5bf0c1c3e4e01c333e6520f16fa8d3da8"
+    },
+    {
+      "id": "T24",
+      "title": "새 원본으로 수량 오류 해석 정정",
+      "task": "profile_update",
+      "content_status": "reviewed_provisional_candidate",
+      "reviewer": "Codex",
+      "review_date": "2026-09-24",
+      "note_ko": "최종 3개라는 기존 주장을 3→2 수정 및 제출로 정정한다.",
+      "revision_ko": null,
+      "source_ids": [
+        "M01"
+      ],
+      "used_source_ids": [
+        "M01"
+      ],
+      "domain_expert_reviewed": false,
+      "training_approved": false,
+      "row_sha256": "0c0f9c26a56a6908ac4d75b7861b2f566d2c9d99860655cfda5223fcf8bbd977"
+    },
+    {
+      "id": "T25",
+      "title": "새 부분 기록으로 기존 확인 사실을 지우지 않음",
+      "task": "profile_update",
+      "content_status": "revised_provisional_candidate",
+      "reviewer": "Codex",
+      "review_date": "2026-09-24",
+      "note_ko": "시작과 선반 열기를 함께 주장하므로 빠진 시작 사건 참조를 추가했다.",
+      "revision_ko": "시작 사건 참조 보완",
+      "source_ids": [
+        "G01"
+      ],
+      "used_source_ids": [
+        "G01"
+      ],
+      "domain_expert_reviewed": false,
+      "training_approved": false,
+      "row_sha256": "37b15d3acb40b78cbb73b038879b305b541d490a3b76bf154fbeadf7526f1acc"
+    },
+    {
+      "id": "T26",
+      "title": "지원 감소와 수행 변화의 조건 보존",
+      "task": "profile_update",
+      "content_status": "reviewed_provisional_candidate",
+      "reviewer": "Codex",
+      "review_date": "2026-09-24",
+      "note_ko": "촉구 유무와 결과 차이를 보존. 지원 제거의 인과효과나 능력 퇴행을 확정하지 않는다.",
+      "revision_ko": null,
+      "source_ids": [
+        "P01"
+      ],
+      "used_source_ids": [
+        "P01"
+      ],
+      "domain_expert_reviewed": false,
+      "training_approved": false,
+      "row_sha256": "7a946de10bd16a312559d777f676df58861494b543b6390a01da3a079e415f47"
+    },
+    {
+      "id": "T27",
+      "title": "기술 지연을 프로필의 주의력 문제로 남기지 않음",
+      "task": "profile_update",
+      "content_status": "revised_provisional_candidate",
+      "reviewer": "Codex",
+      "review_date": "2026-09-24",
+      "note_ko": "180초 차단과 두 성공을 유지하고 같은 성취를 중복한 F2를 제거했다.",
+      "revision_ko": "중복 관찰 제거",
+      "source_ids": [
+        "P40"
+      ],
+      "used_source_ids": [
+        "P40"
+      ],
+      "domain_expert_reviewed": false,
+      "training_approved": false,
+      "row_sha256": "5a53fae1affb67f946c4e363f171efa074f8da8b4042b4c3838241853c5a4715"
+    },
+    {
+      "id": "T28",
+      "title": "반복 성공을 교육 효과로 확대하지 않음",
+      "task": "profile_update",
+      "content_status": "reviewed_provisional_candidate",
+      "reviewer": "Codex",
+      "review_date": "2026-09-24",
+      "note_ko": "두 성공은 관찰 사실이다. 교육 인과효과·실생활 전이는 미확인이다.",
+      "revision_ko": null,
+      "source_ids": [
+        "P11"
+      ],
+      "used_source_ids": [
+        "P11"
+      ],
+      "domain_expert_reviewed": false,
+      "training_approved": false,
+      "row_sha256": "9bf52fc2e42ae5aed92cfcd0fe23ac17f9cf83f3b7c166062878a7c7ee2f4c91"
+    },
+    {
+      "id": "T29",
+      "title": "원본이 없는 과거 평가를 확정 근거로 계승하지 않음",
+      "task": "profile_update",
+      "content_status": "reviewed_provisional_candidate",
+      "reviewer": "Codex",
+      "review_date": "2026-09-24",
+      "note_ko": "과거 근거 부재와 현재 성공을 구별. 현재 성공으로 기억 기능 회복을 주장하지 않는다.",
+      "revision_ko": null,
+      "source_ids": [
+        "G01"
+      ],
+      "used_source_ids": [
+        "G01"
+      ],
+      "domain_expert_reviewed": false,
+      "training_approved": false,
+      "row_sha256": "601068c42f170d7ce37e2be3304652687674744f89198eb0b994ac1a1f7bcaea"
+    },
+    {
+      "id": "T30",
+      "title": "프로필 문장과 연습 설정의 품목 수 일치",
+      "task": "profile_update",
+      "content_status": "revised_provisional_candidate",
+      "reviewer": "Codex",
+      "review_date": "2026-09-24",
+      "note_ko": "중복 F2를 제거하고 기존 4개 품목 확대 근거 부족을 계획 이유에 보존했다.",
+      "revision_ko": "중복 관찰 제거·계획 이유 보존",
+      "source_ids": [
+        "M01"
+      ],
+      "used_source_ids": [
+        "M01"
+      ],
+      "domain_expert_reviewed": false,
+      "training_approved": false,
+      "row_sha256": "50548bd8a1264f035246c84603c125e6ebad2846390ae7bcb1f56db7f2889ddd"
+    },
+    {
+      "id": "T31",
+      "title": "예산과 같은 금액의 제출",
+      "task": "session_analysis",
+      "content_status": "reviewed_provisional_candidate",
+      "reviewer": "Codex",
+      "review_date": "2026-09-24",
+      "note_ko": "예산 이하 조건에는 같은 금액도 포함된다. 잔액 0을 실패로 보지 않는다.",
+      "revision_ko": null,
+      "source_ids": [
+        "P03"
+      ],
+      "used_source_ids": [
+        "P03"
+      ],
+      "domain_expert_reviewed": false,
+      "training_approved": false,
+      "row_sha256": "2d1b57adcbe63054c4efa663acf7725b573b902ab5919bc696eff29612c7334e"
+    },
+    {
+      "id": "T32",
+      "title": "추가 품목이 허용된 과제",
+      "task": "session_analysis",
+      "content_status": "revised_provisional_candidate",
+      "reviewer": "Codex",
+      "review_date": "2026-09-24",
+      "note_ko": "추가 상품을 담았다는 이유만으로 필수 목표를 3종으로 늘리던 제안을 2종 유지로 수정했다.",
+      "revision_ko": "근거 부족한 필수 품목 증가 제거",
+      "source_ids": [
+        "P01"
+      ],
+      "used_source_ids": [
+        "P01"
+      ],
+      "domain_expert_reviewed": false,
+      "training_approved": false,
+      "row_sha256": "a01e3d04a45235cdb3c3b1e83f79ef8b2d4e51312831acbf9990767384eb741a"
+    },
+    {
+      "id": "T33",
+      "title": "추가 품목이 금지된 과제",
+      "task": "session_analysis",
+      "content_status": "reviewed_provisional_candidate",
+      "reviewer": "Codex",
+      "review_date": "2026-09-24",
+      "note_ko": "추가 품목 금지가 명시된 상황이다. 충동성 진단 없이 실제 조건 미충족만 기록한다.",
+      "revision_ko": null,
+      "source_ids": [
+        "M01"
+      ],
+      "used_source_ids": [
+        "M01"
+      ],
+      "domain_expert_reviewed": false,
+      "training_approved": false,
+      "row_sha256": "a44188ce95fc802122496d8769475eb5b9526106ab08d0879e7a0b63933a7bb4"
+    },
+    {
+      "id": "T34",
+      "title": "묶음 단위가 확인되지 않은 수량",
+      "task": "session_analysis",
+      "content_status": "reviewed_provisional_candidate",
+      "reviewer": "Codex",
+      "review_date": "2026-09-24",
+      "note_ko": "묶음당 병 수가 없으므로 단위 변환을 임의 가정하지 않는다.",
+      "revision_ko": null,
+      "source_ids": [
+        "P03"
+      ],
+      "used_source_ids": [
+        "P03"
+      ],
+      "domain_expert_reviewed": false,
+      "training_approved": false,
+      "row_sha256": "4ba88890694460da977adb278fcc045e99407639dc6931b8a7a66ccf95d32937"
+    },
+    {
+      "id": "T35",
+      "title": "허용 품종과 내부 분류 이름 구별",
+      "task": "session_analysis",
+      "content_status": "reviewed_provisional_candidate",
+      "reviewer": "Codex",
+      "review_date": "2026-09-24",
+      "note_ko": "명시된 허용 품종을 내부 distractor 이름과 구분한다.",
+      "revision_ko": null,
+      "source_ids": [
+        "P01"
+      ],
+      "used_source_ids": [
+        "P01"
+      ],
+      "domain_expert_reviewed": false,
+      "training_approved": false,
+      "row_sha256": "8791ae42b502d964a50aff23155ef1708ec536f0c3c5103f1b240c009e9216f5"
+    },
+    {
+      "id": "T36",
+      "title": "대체 상품이 허용되지 않은 목표",
+      "task": "session_analysis",
+      "content_status": "reviewed_provisional_candidate",
+      "reviewer": "Codex",
+      "review_date": "2026-09-24",
+      "note_ko": "대체가 금지된 목표와 실제 제출의 차이만 판단한다.",
+      "revision_ko": null,
+      "source_ids": [
+        "P01"
+      ],
+      "used_source_ids": [
+        "P01"
+      ],
+      "domain_expert_reviewed": false,
+      "training_approved": false,
+      "row_sha256": "cc38d62b91b35144f53c80b23f053b260fd42e32e36846e33ae93fd3caf398d5"
+    },
+    {
+      "id": "T37",
+      "title": "추가 상품을 제거한 뒤 정확히 제출",
+      "task": "session_analysis",
+      "content_status": "reviewed_provisional_candidate",
+      "reviewer": "Codex",
+      "review_date": "2026-09-24",
+      "note_ko": "중간 과자 선택과 최종 제거 후 제출을 구분한다.",
+      "revision_ko": null,
+      "source_ids": [
+        "M01"
+      ],
+      "used_source_ids": [
+        "M01"
+      ],
+      "domain_expert_reviewed": false,
+      "training_approved": false,
+      "row_sha256": "3ac8dd797395e5c32e2ae90060b388a957935e1e6d98e9b324e9f41e630cb95a"
+    },
+    {
+      "id": "T38",
+      "title": "시도와 최종 확정 제출을 구별",
+      "task": "session_analysis",
+      "content_status": "reviewed_provisional_candidate",
+      "reviewer": "Codex",
+      "review_date": "2026-09-24",
+      "note_ko": "미확정 시도와 확정 제출을 입력에 명시된 기준으로 구별한다.",
+      "revision_ko": null,
+      "source_ids": [
+        "M01"
+      ],
+      "used_source_ids": [
+        "M01"
+      ],
+      "domain_expert_reviewed": false,
+      "training_approved": false,
+      "row_sha256": "ffdd36bc0d5d0846a8964f3accdacba24a084fd0286723e2806e2ce9d35b6448"
+    },
+    {
+      "id": "T39",
+      "title": "재전송 로그를 별도 행동으로 세지 않음",
+      "task": "session_analysis",
+      "content_status": "reviewed_provisional_candidate",
+      "reviewer": "Codex",
+      "review_date": "2026-09-24",
+      "note_ko": "재전송 표시가 있으므로 별도 수량 조작으로 합산하지 않는다. P40은 일반 실행 조건 참고다.",
+      "revision_ko": null,
+      "source_ids": [
+        "P40"
+      ],
+      "used_source_ids": [
+        "P40"
+      ],
+      "domain_expert_reviewed": false,
+      "training_approved": false,
+      "row_sha256": "caa9f74c8df42ef9ac7d97a112644ef433c50332eb1e87caa40fed6d08d80ec4"
+    },
+    {
+      "id": "T40",
+      "title": "서버 도착 시각과 행동 순서를 구별",
+      "task": "session_analysis",
+      "content_status": "revised_provisional_candidate",
+      "reviewer": "Codex",
+      "review_date": "2026-09-24",
+      "note_ko": "검증된 클라이언트 순서가 근거다. W3C 문헌을 기술 증거처럼 쓰지 않도록 사용 카드 ID를 비웠다.",
+      "revision_ko": "직접 근거가 아닌 문헌 인용 제거",
+      "source_ids": [
+        "M01"
+      ],
+      "used_source_ids": [],
+      "domain_expert_reviewed": false,
+      "training_approved": false,
+      "row_sha256": "e686c4d2a82ab4612a20d0559defdf6fcb361f34b02505ff0d1655bd8aec6121"
+    },
+    {
+      "id": "T41",
+      "title": "가격표와 제출 총액이 모순인 기록",
+      "task": "session_analysis",
+      "content_status": "reviewed_provisional_candidate",
+      "reviewer": "Codex",
+      "review_date": "2026-09-24",
+      "note_ko": "동일 버전 가격표와 제출 총액이 예산 경계를 사이에 두고 충돌하므로 확정을 보류한다.",
+      "revision_ko": null,
+      "source_ids": [
+        "P03"
+      ],
+      "used_source_ids": [
+        "P03"
+      ],
+      "domain_expert_reviewed": false,
+      "training_approved": false,
+      "row_sha256": "66090b579e89b5183d17edf6b6dd39e447a1e2571def8009266dea4ef467cb1b"
+    },
+    {
+      "id": "T42",
+      "title": "목표가 전달되지 않은 제출 기록",
+      "task": "session_analysis",
+      "content_status": "reviewed_provisional_candidate",
+      "reviewer": "Codex",
+      "review_date": "2026-09-24",
+      "note_ko": "목표가 없는 입력에 사과 2개·생수 1개라는 기본 목표를 추정하지 않는다.",
+      "revision_ko": null,
+      "source_ids": [
+        "G01"
+      ],
+      "used_source_ids": [
+        "G01"
+      ],
+      "domain_expert_reviewed": false,
+      "training_approved": false,
+      "row_sha256": "2fdab0be5d3a6acabc376662607e6961b0138e74186b8be1bd168694bd4e4d43"
+    },
+    {
+      "id": "T43",
+      "title": "버튼 누름과 실제 수량 변경을 구별",
+      "task": "session_analysis",
+      "content_status": "reviewed_provisional_candidate",
+      "reviewer": "Codex",
+      "review_date": "2026-09-24",
+      "note_ko": "거절된 입력과 최종 생수 누락을 구분한다. FAILURE는 과제 결과이고 사용자 능력 실패가 아니다.",
+      "revision_ko": null,
+      "source_ids": [
+        "P40"
+      ],
+      "used_source_ids": [
+        "P40"
+      ],
+      "domain_expert_reviewed": false,
+      "training_approved": false,
+      "row_sha256": "2ab0c764d168acbcdcdcb99820cc62ef42c2c197398077eb4e60d21870578fbc"
+    },
+    {
+      "id": "T44",
+      "title": "자동 열린 장바구니를 사용자 의도로 읽지 않음",
+      "task": "session_analysis",
+      "content_status": "revised_provisional_candidate",
+      "reviewer": "Codex",
+      "review_date": "2026-09-24",
+      "note_ko": "자동 열림 주체는 입력에 있다. 작업기억 문헌을 의도 판단 근거처럼 인용하지 않도록 사용 ID를 비웠다.",
+      "revision_ko": "직접 근거가 아닌 문헌 인용 제거",
+      "source_ids": [
+        "P14"
+      ],
+      "used_source_ids": [],
+      "domain_expert_reviewed": false,
+      "training_approved": false,
+      "row_sha256": "e74942dbfca8b39f47d3c672d01defae4ac03c441aa8ddfb0b88413d02c4446b"
+    },
+    {
+      "id": "T45",
+      "title": "도움 로그가 없다는 것과 무지원 입증의 차이",
+      "task": "session_analysis",
+      "content_status": "reviewed_provisional_candidate",
+      "reviewer": "Codex",
+      "review_date": "2026-09-24",
+      "note_ko": "도움 미수집은 무지원 증명이 아니다. 목표 성공은 별도로 유지한다.",
+      "revision_ko": null,
+      "source_ids": [
+        "P01"
+      ],
+      "used_source_ids": [
+        "P01"
+      ],
+      "domain_expert_reviewed": false,
+      "training_approved": false,
+      "row_sha256": "7c4a7abc8d396cb1f82dff296f16c94471eb626a3945d42dcaa2d60fa7ad6beb"
+    },
+    {
+      "id": "T46",
+      "title": "도움 제안을 거절한 뒤 수행",
+      "task": "session_analysis",
+      "content_status": "reviewed_provisional_candidate",
+      "reviewer": "Codex",
+      "review_date": "2026-09-24",
+      "note_ko": "먼저 해보겠다는 응답을 성격·상시 도움 거부로 일반화하지 않는다.",
+      "revision_ko": null,
+      "source_ids": [
+        "G04"
+      ],
+      "used_source_ids": [
+        "G04"
+      ],
+      "domain_expert_reviewed": false,
+      "training_approved": false,
+      "row_sha256": "2ade6d1c99ede8a0307fe95b7303ea2e30d23554b96e271575f2bfdda17271b1"
+    },
+    {
+      "id": "T47",
+      "title": "명시된 무촉구 조건과 품목 달성을 구별",
+      "task": "session_analysis",
+      "content_status": "hold_label_semantics",
+      "reviewer": "Codex",
+      "review_date": "2026-09-24",
+      "note_ko": "보류: 진행자가 촉구를 제공해 무촉구 관찰 조건이 깨졌다. 목표 조건 미충족(FAILURE)과 무지원 능력 평가 불가(UNDETERMINED) 중 라벨 의미를 먼저 확정해야 한다.",
+      "revision_ko": null,
+      "source_ids": [
+        "P01"
+      ],
+      "used_source_ids": [
+        "P01"
+      ],
+      "domain_expert_reviewed": false,
+      "training_approved": false,
+      "row_sha256": "ad11fbc09d462ccc03605dbaaca5d48e231eb33ecd370fdfe1d5aa921cc25325"
+    },
+    {
+      "id": "T48",
+      "title": "총 낱개 수와 품목 종류 수 구별",
+      "task": "session_analysis",
+      "content_status": "reviewed_provisional_candidate",
+      "reviewer": "Codex",
+      "review_date": "2026-09-24",
+      "note_ko": "2종과 낱개 5개를 구분. 수량 조합 외의 일반 능력은 판단하지 않는다.",
+      "revision_ko": null,
+      "source_ids": [
+        "M01"
+      ],
+      "used_source_ids": [
+        "M01"
+      ],
+      "domain_expert_reviewed": false,
+      "training_approved": false,
+      "row_sha256": "7e2167875d3641bc3699de7bde779b4ab97b3a2898a8a23484a0759c0efff73f"
+    },
+    {
+      "id": "T49",
+      "title": "목록 닫기까지 있으나 최종 사건 유실",
+      "task": "session_analysis",
+      "content_status": "reviewed_provisional_candidate",
+      "reviewer": "Codex",
+      "review_date": "2026-09-24",
+      "note_ko": "목표 장바구니가 있어도 제출 구간 유실이면 제출 성공을 확정하지 않는다.",
+      "revision_ko": null,
+      "source_ids": [
+        "P40"
+      ],
+      "used_source_ids": [
+        "P40"
+      ],
+      "domain_expert_reviewed": false,
+      "training_approved": false,
+      "row_sha256": "240e69398320eabcfb0843d468f1931ff57d47519f448ba59713d39c635cbe77"
+    },
+    {
+      "id": "T50",
+      "title": "시작 신호만 있을 때 관찰을 만들어 채우지 않음",
+      "task": "session_analysis",
+      "content_status": "reviewed_provisional_candidate",
+      "reviewer": "Codex",
+      "review_date": "2026-09-24",
+      "note_ko": "시작 신호로 행동을 만들지 않고 findings를 비운다. 난이도 1은 작성자의 관찰 제안이지 측정된 능력 등급이 아니다.",
+      "revision_ko": null,
+      "source_ids": [
+        "G01"
+      ],
+      "used_source_ids": [
+        "G01"
+      ],
+      "domain_expert_reviewed": false,
+      "training_approved": false,
+      "row_sha256": "c38a645dd3a8b5eebe350f39b078070aa504d905e7fab2edf570fa96f96f3251"
+    },
+    {
+      "id": "T51",
+      "title": "뒤늦게 확인된 목표 버전으로 같은 세션 정정",
+      "task": "profile_update",
+      "content_status": "reviewed_provisional_candidate",
+      "reviewer": "Codex",
+      "review_date": "2026-09-24",
+      "note_ko": "목표 v2 정정이지 새 플레이의 향상이 아니다.",
+      "revision_ko": null,
+      "source_ids": [
+        "M01"
+      ],
+      "used_source_ids": [
+        "M01"
+      ],
+      "domain_expert_reviewed": false,
+      "training_approved": false,
+      "row_sha256": "184d93575303bc73e574482f27faa39a8fb618a9fe4d9c4e72f168930bd6f2b2"
+    },
+    {
+      "id": "T52",
+      "title": "문자 지원이 줄어든 조건의 성공 범위",
+      "task": "profile_update",
+      "content_status": "reviewed_provisional_candidate",
+      "reviewer": "Codex",
+      "review_date": "2026-09-24",
+      "note_ko": "일반 문구 조건의 성공을 유지하지만 읽기 과정이나 지원 불필요를 확정하지 않는다.",
+      "revision_ko": null,
+      "source_ids": [
+        "P27"
+      ],
+      "used_source_ids": [
+        "P27"
+      ],
+      "domain_expert_reviewed": false,
+      "training_approved": false,
+      "row_sha256": "f4753a01d8ae71056554edfac66f2734cb4bd3ef7681ffba911ca073825e9c97"
+    },
+    {
+      "id": "T53",
+      "title": "이전의 선호 추측을 직접 보고로 수정",
+      "task": "profile_update",
+      "content_status": "revised_provisional_candidate",
+      "reviewer": "Codex",
+      "review_date": "2026-09-24",
+      "note_ko": "합성 자기보고의 모호한 짧은 글씨를 짧은 문장으로 명확히 했다. 실제 발화를 고쳐 쓴 사례가 아니다.",
+      "revision_ko": "합성 발화의 의미 명확화",
+      "source_ids": [
+        "G04"
+      ],
+      "used_source_ids": [
+        "G04"
+      ],
+      "domain_expert_reviewed": false,
+      "training_approved": false,
+      "row_sha256": "625456e9eb57f200faf2fca045915bb7e1516dfff07a6e24eeadecc509076a3f"
+    },
+    {
+      "id": "T54",
+      "title": "새 예산 실패가 확인된 품목 수행까지 지우지 않음",
+      "task": "profile_update",
+      "content_status": "revised_provisional_candidate",
+      "reviewer": "Codex",
+      "review_date": "2026-09-24",
+      "note_ko": "필수 총액 4200원과 4000원 예산의 모순을 명시. 사용자 계산 훈련보다 과제 수정을 우선했다.",
+      "revision_ko": "불가능한 목표·예산의 원인 구분",
+      "source_ids": [
+        "P03"
+      ],
+      "used_source_ids": [
+        "P03"
+      ],
+      "domain_expert_reviewed": false,
+      "training_approved": false,
+      "row_sha256": "527ce22634624023e2ab46692d2369a291ad05739173c3f2c5c13a5eb5279e10"
+    },
+    {
+      "id": "T55",
+      "title": "이전 결과가 없으면 향상의 출발점을 가정하지 않음",
+      "task": "profile_update",
+      "content_status": "reviewed_provisional_candidate",
+      "reviewer": "Codex",
+      "review_date": "2026-09-24",
+      "note_ko": "이전 결과 유실을 이전 실패라는 기준선으로 만들지 않는다.",
+      "revision_ko": null,
+      "source_ids": [
+        "P11"
+      ],
+      "used_source_ids": [
+        "P11"
+      ],
+      "domain_expert_reviewed": false,
+      "training_approved": false,
+      "row_sha256": "77038513d994187bace72122a26b893f635ecd90c9b00f42c5ebc499990b5d5a"
+    },
+    {
+      "id": "T56",
+      "title": "과거의 과장된 성공 횟수를 근거로 쓰지 않음",
+      "task": "profile_update",
+      "content_status": "reviewed_provisional_candidate",
+      "reviewer": "Codex",
+      "review_date": "2026-09-24",
+      "note_ko": "두 원본 세션만 확인 가능하다. 이전 10회라는 주장을 누적 확정하지 않는다.",
+      "revision_ko": null,
+      "source_ids": [
+        "G01"
+      ],
+      "used_source_ids": [
+        "G01"
+      ],
+      "domain_expert_reviewed": false,
+      "training_approved": false,
+      "row_sha256": "2fd1b999fbe4aaced1c80a6aa9ad55c2a8c3556ffaa8ddb5d933e2caa6cceffa"
+    },
+    {
+      "id": "T57",
+      "title": "기술 문제 해결을 사용자 인지 회복으로 설명하지 않음",
+      "task": "profile_update",
+      "content_status": "revised_provisional_candidate",
+      "reviewer": "Codex",
+      "review_date": "2026-09-24",
+      "note_ko": "입력 가능 상태를 말하면서 누락했던 runtime_status 사건을 참조에 포함했다.",
+      "revision_ko": "입력 가능 상태의 사건 참조 보완",
+      "source_ids": [
+        "P40"
+      ],
+      "used_source_ids": [
+        "P40"
+      ],
+      "domain_expert_reviewed": false,
+      "training_approved": false,
+      "row_sha256": "ed47cd0c342cd481a7bcb304c619cee5309b89f54e54ee6729679877ff4de4c9"
+    },
+    {
+      "id": "T58",
+      "title": "다른 수량에서도 네 품목 수행이 확인된 경우",
+      "task": "profile_update",
+      "content_status": "revised_provisional_candidate",
+      "reviewer": "Codex",
+      "review_date": "2026-09-24",
+      "note_ko": "4종 수행은 유지. 입력에 없는 장애명을 언급하지 않고 사진·영상 연구를 4종 추천 근거로 인용하지 않도록 했다.",
+      "revision_ko": "미제공 장애명 언급·부적합 문헌 인용 제거",
+      "source_ids": [
+        "P02"
+      ],
+      "used_source_ids": [],
+      "domain_expert_reviewed": false,
+      "training_approved": false,
+      "row_sha256": "2c55af09aac81380cf9c37ce31367742eaa50bf000384e97f1a1105508d29397"
+    },
+    {
+      "id": "T59",
+      "title": "일시적 오류 관찰을 평생 특성으로 유지하지 않음",
+      "task": "profile_update",
+      "content_status": "reviewed_provisional_candidate",
+      "reviewer": "Codex",
+      "review_date": "2026-09-24",
+      "note_ko": "항상 잊는다는 주장을 철회하되 이전의 수량 미충족 사실은 보존한다.",
+      "revision_ko": null,
+      "source_ids": [
+        "P14"
+      ],
+      "used_source_ids": [
+        "P14"
+      ],
+      "domain_expert_reviewed": false,
+      "training_approved": false,
+      "row_sha256": "093fbf745b73fb97806400c56a375cddb6af83f1354d86c7adf45cb89ab1091a"
+    },
+    {
+      "id": "T60",
+      "title": "기존 프로필의 미지원 기능 제안 수정",
+      "task": "profile_update",
+      "content_status": "reviewed_provisional_candidate",
+      "reviewer": "Codex",
+      "review_date": "2026-09-24",
+      "note_ko": "미지원 음성 기능을 현재 문자 기능으로 정정. 문구의 단독 효과는 미확인이다.",
+      "revision_ko": null,
+      "source_ids": [
+        "M01"
+      ],
+      "used_source_ids": [
+        "M01"
+      ],
+      "domain_expert_reviewed": false,
+      "training_approved": false,
+      "row_sha256": "417a8cf1e34d5532b6d5aaed8a9aa9ee92065dc06e7256f3d9904a605e423b3f"
+    }
+  ]
+}

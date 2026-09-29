@@ -1,0 +1,18 @@
+{
+  "scope": "평가 시작 전 공개 HTTPS 점검",
+  "ssh_socket_present": false,
+  "checks": [
+    {
+      "path": "/healthz",
+      "http_status": 200,
+      "wall_seconds": 2.27
+    },
+    {
+      "path": "/api/tags",
+      "authenticated": true,
+      "result": "URLError_after_timeout",
+      "wall_seconds": 12.0
+    }
+  ],
+  "note": "첫 점검은 개별 연결이었다. 평가 실행은 연결을 재사용하며 동일 키 인증이 실제 chat 요청에서 성공했다. 인증 키는 저장하지 않는다."
+}

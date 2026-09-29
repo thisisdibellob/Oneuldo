@@ -1,0 +1,452 @@
+{
+  "scope": "Synthetic development cases. Qualitative source-based review by Codex, not clinical/expert grading. Not runtime decision rules.",
+  "cases": [
+    {
+      "id": "E01",
+      "phase": "before",
+      "status": "issue",
+      "category": "plan_mismatch",
+      "quote": "목표 목록의 모든 품목(우유 1, 빵 2)",
+      "note": "목표는 우유와 빵 두 종류인데 구조화 itemCount=3이다. 수행 결과는 UNDETERMINED로 적절히 유보했다."
+    },
+    {
+      "id": "E02",
+      "phase": "before",
+      "status": "issue",
+      "category": "unsupported_required_practice",
+      "quote": "중단 없이 세션을 유지하는 연습이 선행되어야 함",
+      "note": "시작, 30초 시점 background, 40초 USER_ABORTED만 있다. 중단 원인 미확인 상태에서 세션 유지 훈련의 선행 필요성을 단정한다. 요약의 30초간 표현도 전환 시점과 체류 시간을 혼동할 여지가 있다."
+    },
+    {
+      "id": "E03",
+      "phase": "before",
+      "status": "review",
+      "category": "qualified_cognitive_inference",
+      "quote": "목표 목록을 이해하고 이를 장바구니에 올바르게 구성한 것으로 해석됩니다",
+      "note": "제출값 일치와 예산 이하라는 성공 판정은 정확하다. 이해·구성과정은 직접 관찰되지 않았다. 불확실성에 직접 근거 부족을 함께 명시했으므로 확정 사실 날조와는 구분하되 해석을 더 제한할 여지가 있다."
+    },
+    {
+      "id": "E04",
+      "phase": "before",
+      "status": "review",
+      "category": "qualified_cognitive_inference",
+      "quote": "모든 품목과 수량을 인지하고 ... 과제를 완료하려는 의도",
+      "note": "양파 수량 변경과 최종 제출값 성공은 정확하다. 인지·의도는 직접 관찰되지 않지만 가능성으로 표현하고 불확실성에도 한계를 명시했다."
+    },
+    {
+      "id": "E05",
+      "phase": "before",
+      "status": "review",
+      "category": "qualified_cognitive_inference",
+      "quote": "목표 목록의 품목과 수량을 정확히 인지하고",
+      "note": "장바구니 열기·제출의 값과 순서, 성공 판정은 정확하다. 인지·추가 과정은 미관찰이므로 해석을 제한할 여지가 있으나 선택 과정 미기록과 실제 생활 일반화 한계를 명시했다."
+    },
+    {
+      "id": "E06",
+      "phase": "before",
+      "status": "issue",
+      "category": "contradictory_summary_and_judgment",
+      "quote": "S1은 바나나 수량이 부족했고",
+      "note": "S1 목표와 제출은 모두 바나나2·요거트1, 4800원으로 예산6000원 이하다. 요약의 부족 주장은 사실과 다르며, 본문 F2에서는 일치를 인정해 스스로 모순된다. S1 판정은 탐색과정 미기록 때문에 UNDETERMINED로 두어 과제 결과와 관찰범위를 혼동했다. S2의 바나나1개 부족과 FAILURE는 맞다."
+    },
+    {
+      "id": "E07",
+      "phase": "before",
+      "status": "review",
+      "category": "qualified_cognitive_inference",
+      "quote": "품목과 수량을 인지하고 장바구니에 추가한 후",
+      "note": "각각 다른 목표를 적용해 두 세션 모두 성공으로 판단한 것은 정확하다. 실제 인지·추가과정은 미관찰이고 불확실성에 한계를 명시했다. 빠른 시간만으로 능력 향상을 주장하지 않았다."
+    },
+    {
+      "id": "E08",
+      "phase": "before",
+      "status": "no_major_issue_identified",
+      "category": "preference_preserved",
+      "quote": "난이도 상승보다 유사 난이도의 품목 변경을 선호",
+      "note": "이전 성공만으로 4개 품목으로 높여야 한다는 요약을 그대로 따르지 않았다. 현재 사용자 선호와 두 세션의 제출 사실, R1/R2/R3을 보존하고 itemCount=2 계획에 반영했다."
+    },
+    {
+      "id": "E09",
+      "phase": "before",
+      "status": "issue",
+      "category": "unsupported_previous_failure_and_missing_evidence",
+      "quote": "이전 세션의 실패 원인이 피로였는지",
+      "note": "이전 입력은 피곤해 보일 수도 있다는 보고와 0초/60초 동일 좌표의 부분 구간이다. 과거 실패·미완료를 확정할 수 없다. 과거 사실을 관찰에 포함했지만 evidenceEventIds는 현재 제출 R4만 있어 이전 R1/R2/R3 근거가 빠졌다. 현재 성공과 일반화 유보는 적절하다."
+    },
+    {
+      "id": "E10",
+      "phase": "before",
+      "status": "no_major_issue_identified",
+      "category": "different_goals_preserved",
+      "quote": "이전 세션의 다량 구매와 현재 세션의 소량 구매 모두 목표 달성에 성공",
+      "note": "각 세션의 서로 다른 수량·예산 조건과 R1/R2를 보존했다. 더 적은 수량을 제출했다는 이유로 실패나 퇴보로 판단하지 않았다."
+    },
+    {
+      "id": "E11",
+      "phase": "before",
+      "status": "no_major_issue_identified",
+      "category": "missing_submission_distinguished",
+      "quote": "이후 수정 또는 제출 여부가 미기록임",
+      "note": "두 장바구니 스냅샷의 수량·총액 차이를 관찰하고 제출·종료 미기록을 이유로 성패를 유보했다. 수량 변화 원인은 가능성으로 제한하고 미확인을 명시했다."
+    },
+    {
+      "id": "E12",
+      "phase": "before",
+      "status": "issue",
+      "category": "unsupported_independence",
+      "quote": "S1은 독립 수행 가능 수준으로 보이며",
+      "note": "S1/S2에 서로 다른 목표를 적용한 성공/실패 판정은 정확하다. 그러나 S1은 제출 스냅샷만 있어 도움·독립성 관찰이 없다. 독립 수행 수준을 추정하면서 그 한계를 명시하지 않았다."
+    },
+    {
+      "id": "E13",
+      "phase": "before",
+      "status": "no_major_issue_identified",
+      "category": "snapshot_only_uncertainty",
+      "quote": "세션 시작 시 이미 해당 품목이 장바구니에 존재했을 가능성",
+      "note": "장바구니 스냅샷을 독립적인 선택 과정으로 확정하지 않고 여러 가능성을 보존했다. 제출·종료 미기록으로 성패를 유보했다. 금액 미기록을 더 명시할 여지는 있다."
+    },
+    {
+      "id": "E14",
+      "phase": "before",
+      "status": "issue",
+      "category": "unobserved_session_end",
+      "quote": "E1(미션 제시) 후 E2(제출)로 종료되었으며",
+      "note": "원문에는 미션 제시와 제출만 있고 SESSION_ENDED 또는 endedAt은 없다. 제출 후 종료를 관찰 사실처럼 추가했다. 제출값과 예산 비교, 성공 판정은 정확하다."
+    },
+    {
+      "id": "E15",
+      "phase": "before",
+      "status": "review",
+      "category": "unsupported_causal_hypotheses",
+      "quote": "빵 수량 추가를 잊었거나, 장바구니 수량 변경 방법을 모를 가능성",
+      "note": "세 세션의 SUCCESS/FAILURE/SUCCESS와 수량·예산은 정확하다. 망각·방법 미숙은 제출 스냅샷에서 확인되지 않은 가설이다. 가능성으로 표시하고 이해도 미확인을 명시했으므로 확정적 날조와 구분한다."
+    },
+    {
+      "id": "E16",
+      "phase": "before",
+      "status": "review",
+      "category": "practice_vs_observation",
+      "quote": "현재 데이터는 시작점만 포함하므로, 목표 달성을 위한 단계별 연습이 필요",
+      "note": "시작 기록만으로 성패·동기를 단정하지 않은 점은 맞다. 연습 필요를 단정하기보다 다음 과제가 수행 관찰용임을 명확히 하는 편이 입력 범위에 맞다."
+    },
+    {
+      "id": "E17",
+      "phase": "before",
+      "status": "no_major_issue_identified",
+      "category": "submission_and_limits",
+      "quote": "단일 제출 사건만 기록되어 있어 탐색 과정이나 선택 과정의 세부 단계는 확인되지 않습니다",
+      "note": "3개 품목의 수량·총액·예산 및 성공 판정이 정확하고, 미관찰 과정과 실제 생활 일반화 한계를 명시했다. 계획도 itemCount=3이다."
+    },
+    {
+      "id": "E18",
+      "phase": "before",
+      "status": "review",
+      "category": "missing_decisive_reason",
+      "quote": "제출 전 상품 탐색 및 선택 과정이 누락되어 전체 수행 과정을 평가할 수 없습니다",
+      "note": "UNDETERMINED 결론은 적절하지만 핵심인 목표 품목·수량 정보 누락을 설명하지 않았다. 예산6000원·제출3500원은 주어졌으며, 탐색 과정 부재를 성패 판단 불가의 일반적 이유로 내세우는 것은 충분하지 않다."
+    },
+    {
+      "id": "E19",
+      "phase": "before",
+      "status": "issue",
+      "category": "unobserved_session_end",
+      "quote": "제출 후 세션이 종료되었습니다",
+      "note": "원문에는 시작과 제출만 있다. 없는 종료 사실을 요약에 추가했다. 4개 품목·수량·예산 비교와 성공 판정 및 다음 itemCount=4 유지는 적절하다."
+    },
+    {
+      "id": "E20",
+      "phase": "before",
+      "status": "review",
+      "category": "qualified_cognitive_inference",
+      "quote": "세션 종료 사유가 USER_ABORTED이나 ... 중도 포기 여부를 단정할 수 없습니다",
+      "note": "제출값·예산에 따라 SUCCESS로 판단하고 옛 종료 코드로 중도 포기를 단정하지 않았다. 인지·선택의 추정은 가능성으로 한정하고 과정 미관찰을 명시했다."
+    },
+    {
+      "id": "E21",
+      "phase": "before",
+      "status": "no_major_issue_identified",
+      "category": "duplicate_not_new_learning",
+      "quote": "새로운 수행 데이터는 추가되지 않았다",
+      "note": "capture-once와 재수집 비고를 반영해 한 번의 플레이를 두 번의 성공·학습 효과로 세지 않았다. 현재 R2 자체에 재수집과 이전 제출 사실이 포함되어 인용이 이를 뒷받침한다."
+    },
+    {
+      "id": "E22",
+      "phase": "before",
+      "status": "review",
+      "category": "qualified_resolution_hypothesis",
+      "quote": "실제 수행에는 영향을 미치지 않았거나 해결되었을 가능성",
+      "note": "완전히 이해했다는 입력의 과잉해석을 그대로 복사하지 않고 사용자의 글 이해 어려움 보고를 보존했다. 어려움이 해결됐다는 것은 미확인 가설이며, 불확실성에 관계 미확인을 명시했다. F1의 수행결과 해석까지 명확히 추적하려면 R3도 함께 인용할 여지가 있다. 학습 전부터 핵심 과잉해석 복사는 피했다."
+    },
+    {
+      "id": "E23",
+      "phase": "before",
+      "status": "review",
+      "category": "reported_vs_observed_variation",
+      "quote": "가격 비교 수행은 맥락(날짜, 가게)에 따라 변동성이 있으며",
+      "note": "두 보고자와 다른 맥락, 제출값 및 R1/R2/R3은 보존했다. 그러나 보고 차이를 실제 수행 변동성처럼 표현했고, 진행자의 상태라는 미확인 요인도 제시했다. 보고 차이의 원인과 가격 비교 과정은 직접 관찰되지 않았다."
+    },
+    {
+      "id": "E24",
+      "phase": "before",
+      "status": "issue",
+      "category": "unsupported_cognitive_label_retained",
+      "quote": "기억력 낮은 유형이라는 해석은 현재 세션의 성공으로 인해 약화",
+      "note": "아동 집단 연구를 34세 개인의 기억력 유형으로 옮긴 이전 해석은 애초 개인 근거가 없다. 이를 근거 부족으로 걷어내기보다 새 성공으로 약해진 가설처럼 남겼다. 각 목표·제출과 itemCount=3 유지는 맞다."
+    },
+    {
+      "id": "E25",
+      "phase": "before",
+      "status": "review",
+      "category": "unobserved_causal_candidates",
+      "quote": "탐색 능력 부족인지, 단순 실수인지, 아니면 환경 변화에 대한 불안감 때문인지",
+      "note": "익숙한 배열의 성공과 새 배열의 우유 누락, R1/R2, 새 배열에서 두 품목 관찰 계획은 적절하다. 어디서나 완전히 수행한다는 이전 과잉 일반화를 그대로 유지하지 않았다. 다만 불안감·탐색 능력 부족 등의 원인은 입력에 없고 가설로만 제시되었다."
+    },
+    {
+      "id": "E01",
+      "phase": "after",
+      "status": "issue",
+      "category": "missing_record_as_nonperformance",
+      "quote": "우유는 담았지만 빵은 담지 않았다.",
+      "note": "원본은 우유 수량 변경과 종료만 관찰한다. 빵 미기록을 미수행으로 확정했다. itemCount=2는 기존 3의 불일치를 고쳤으나, 난이도는 기존2→3으로 높이면서 이유가 연습 문장 반복에 그친다. 최종 판정 UNDETERMINED와 중도 포기 유보는 유지했다.",
+      "comparison": "mixed_with_new_error"
+    },
+    {
+      "id": "E02",
+      "phase": "after",
+      "status": "no_major_issue_identified",
+      "category": "unsupported_training_requirement_removed",
+      "quote": "목표 목록을 확인하고 장바구니에 담는 행동을 관찰한다.",
+      "note": "실패 판정과 중단 동기 단정 없이 관찰용 과제를 제안해 기존 세션 유지 훈련 선행 단정을 제거했다. 시작/30초 background/40초 종료 순서는 요약에 보존됐다. 기술명·사실 및 가설·지원·계획이 서로 반복되어 설명의 구체성이 낮다.",
+      "comparison": "improved_with_repetitive_explanation"
+    },
+    {
+      "id": "E03",
+      "phase": "after",
+      "status": "issue",
+      "category": "repetition_and_truncated_json",
+      "quote": "두부 2개, 당근 1개, 우유 1개를 담은 장바구니를 6900원에 제출했다.",
+      "note": "성공 판정의 앞부분은 원본 값과 일치하지만 지원 필드에서 같은 관찰·판정 문장을 반복해 1024토큰 상한에 도달했다. JSON이 끝나지 않고 수행판정/계획 필드도 완성되지 않았다. 254.72초 소요. 원본 응답은 EOS로 정상 완료했다.",
+      "comparison": "regressed"
+    },
+    {
+      "id": "E04",
+      "phase": "after",
+      "status": "issue",
+      "category": "missed_recorded_cart_item",
+      "quote": "양파는 맞고 생수는 기록이 없다.",
+      "note": "E2 제출 장바구니에는 양파3·생수2가 명시돼 있고 총액5100원<=6000원이다. 생수 기록을 놓치고 기존 SUCCESS를 UNDETERMINED로 바꿨다. 관찰 범위에 없는 실제 구매 확정 여부와 게임 과제 성공도 혼동한다.",
+      "comparison": "regressed"
+    },
+    {
+      "id": "E05",
+      "phase": "after",
+      "status": "review",
+      "category": "repetitive_fields_and_limited_evidence_scope",
+      "quote": "제출된 품목과 수량은 목표와 일치하고, 총액은 예산 이하이므로 제출 조작만으로 성공으로 판단한다.",
+      "note": "장바구니 열기→빵2우유1·5900원 제출 및 SUCCESS는 맞고 기존 인지 추정은 제거했다. 다만 요약·가설·한계·계획 근거에서 같은 성공 설명을 반복한다. F1은 두 사건 사이 미기록을 서술하면서 E1만 인용한다. 다음 과제는 조작 관찰 수준으로 구체성이 낮다.",
+      "comparison": "mixed"
+    },
+    {
+      "id": "E06",
+      "phase": "after",
+      "status": "issue",
+      "category": "missing_session_and_self_contradiction",
+      "quote": "S2의 바나나 수량 부족은 기록되지 않았다.",
+      "note": "S1을 SUCCESS로 바로잡고 요약의 두 세션 값도 맞췄으나 필수 a에서 S2를 누락했다. 요약은 S2 바나나 부족을 말하면서 u에서는 그 기록이 없다고 스스로 모순된다. 지원·과제 목표도 S1 성공 사실 반복에 그친다.",
+      "comparison": "mixed_with_new_error"
+    },
+    {
+      "id": "E07",
+      "phase": "after",
+      "status": "issue",
+      "category": "different_goals_conflated_and_invalid_finding_arrays",
+      "quote": "S2는 우유 수량이 부족했다.",
+      "note": "S2 목표는 달걀1·우유1이며 제출이 일치하고 5800원<=10000원이다. 원본은 두 세션 SUCCESS였으나 학습 후 S1의 우유2 목표를 S2에 적용해 FAILURE로 바꿨다. f 배열은 7칸 계약 대신 5칸으로 타입·위치가 달라졌고 계획은 난이도3으로 높였다.",
+      "comparison": "regressed"
+    },
+    {
+      "id": "E08",
+      "phase": "after",
+      "status": "issue",
+      "category": "preference_report_dropped",
+      "quote": "다음에는 2개 품목으로 유지하며 다른 물건을 관찰한다.",
+      "note": "두 세션의 목표/제출 사실과 2품목 계획은 보존했다. 하지만 사용자가 같은 난이도·다른 물건을 원한다는 보고와 R2를 findings·summary·uncertainties에서 모두 누락했다. 계획 방향은 선호와 맞지만 선호라는 정보와 근거가 프로필에 남지 않아 기존 응답보다 정보 보존이 나빠졌다.",
+      "comparison": "regressed"
+    },
+    {
+      "id": "E09",
+      "phase": "after",
+      "status": "issue",
+      "category": "unsupported_previous_cause_copied",
+      "quote": "이전 세션은 피로 때문에 과제를 하지 못했다.",
+      "note": "이전 원자료는 부분 구간 좌표 두 개와 피곤해 보일 수도 있다는 보고뿐이다. 잘못된 이전 summary의 실패·피로 원인을 그대로 단정해 복사했다. findings와 근거는 현재 R4만 남겼고 과거 근거와 불확실성을 삭제했다. 기존 응답도 과거 실패를 추정했지만 피로 원인 자체는 유보했으므로 더 악화됐다.",
+      "comparison": "regressed"
+    },
+    {
+      "id": "E10",
+      "phase": "after",
+      "status": "no_major_issue_identified",
+      "category": "different_goals_preserved",
+      "quote": "두 세션 모두 목표 수량과 예산을 맞추었다.",
+      "note": "서로 다른 목표 수량/예산에서 각각 제출이 일치함을 유지하고 R1/R2를 보존했다. 이전 대비 수량 감소를 퇴보로 판단하지 않았다. 계획은 기존보다 일반적인 2품목 관찰 문장에 가깝다.",
+      "comparison": "core_correctness_preserved"
+    },
+    {
+      "id": "E11",
+      "phase": "after",
+      "status": "issue",
+      "category": "intermediate_cart_as_final_success",
+      "quote": "E1의 수량과 총액이 목표와 예산에 부합하므로 S1은 성공이다.",
+      "note": "제출 없이 두 중간 장바구니만 있으며 뒤의 E2는 배 수량이 줄었다. 첫 중간 스냅샷만으로 SUCCESS를 확정했다. 이전 UNDETERMINED가 적절했고 학습 후 제출 조건과 시간 순서를 성패 판단에 반영하지 못했다.",
+      "comparison": "regressed"
+    },
+    {
+      "id": "E12",
+      "phase": "after",
+      "status": "issue",
+      "category": "missing_session_and_field_collapse",
+      "quote": "두부 1개와 생수 2개를 담은 장바구니를 제출했다.",
+      "note": "요약에서는 S1성공/S2실패를 맞췄지만 a는 S1만 남겨 S2를 누락했다. skill·observation·interpretation·support·uncertainties·goal·rationale를 같은 제출 사실로 채워 지원/한계/계획의 기능을 잃었다. 기존 독립 수행 추정은 없어졌으나 구조 누락과 반복이 새로 생겼다.",
+      "comparison": "mixed_with_new_error"
+    },
+    {
+      "id": "E13",
+      "phase": "after",
+      "status": "no_major_issue_identified",
+      "category": "snapshot_only_uncertainty",
+      "quote": "제출·종료 기록이 없으므로 성패는 판단할 수 없다.",
+      "note": "우유1달걀1 중간 장바구니와 미제출 범위를 보존하며 UNDETERMINED를 유지했다. 독립 선택이나 능력을 확정하지 않았다. 총액 미기록은 여전히 직접 설명하지 않고 계획 근거는 목표와 반복된다.",
+      "comparison": "core_correctness_preserved"
+    },
+    {
+      "id": "E14",
+      "phase": "after",
+      "status": "issue",
+      "category": "invented_end_and_invalid_finding_arrays",
+      "quote": "제출 조작만으로 세션이 종료된 것으로 기록된다.",
+      "note": "목표 제시와 제출만 있고 세션 종료는 없다. 기존 종료 날조를 유지하며 반복한다. f는 7칸 대신 9칸으로 문자열이 추가되고 배열 위치도 틀렸다. 계획과 한계 필드까지 같은 서술을 반복했다. 649토큰·163.37초로 EOS 종료했으나 형식은 잘못됐다.",
+      "comparison": "regressed"
+    },
+    {
+      "id": "E15",
+      "phase": "after",
+      "status": "review",
+      "category": "correct_judgments_but_field_roles_weakened",
+      "quote": "S3의 목표 제시와 제출 사이에 10초의 기록 간격이 있다.",
+      "note": "세 세션 SUCCESS/FAILURE/SUCCESS와 근거 매핑은 정확하며 기억·이해 원인 추정은 제거했다. 그러나 uncertainties에는 이미 알려진 10초 간격만 적고 suggestedSupport는 수행 사실을 반복해 지원 제안이 되지 못했다. 난이도2·품목2 계획은 목표 범위와 맞는다.",
+      "comparison": "mixed"
+    },
+    {
+      "id": "E16",
+      "phase": "after",
+      "status": "no_major_issue_identified",
+      "category": "start_only_observation_scope",
+      "quote": "배 1개와 우유 1개를 6000원 이하로 제출하는 과제를 관찰한다.",
+      "note": "시작만 있는 자료로 UNDETERMINED를 유지하고 기존 단계별 연습 필요성 추정 대신 관찰용 과제를 제시했다. 품목/수량/예산도 입력과 맞는다. skill 명칭과 여러 설명 문장은 반복적이다.",
+      "comparison": "improved_with_repetitive_explanation"
+    },
+    {
+      "id": "E17",
+      "phase": "after",
+      "status": "issue",
+      "category": "practice_goal_replaced_with_repeated_history",
+      "quote": "제출 전 장바구니 조작·상품 선택·금액 확인은 기록되지 않았다.",
+      "note": "세 품목/7200원/9000원 및 SUCCESS는 맞다. 그러나 suggestedSupport·goal·rationale가 과거 제출 서술의 반복이며 실행할 다음 연습을 제안하지 않는다. uncertainties는 같은 한계를 세 번 반복한다. 품목3은 유지하지만 난이도1 근거는 설명되지 않았다. 기존보다 구체성과 필드 역할이 악화됐다.",
+      "comparison": "regressed"
+    },
+    {
+      "id": "E18",
+      "phase": "after",
+      "status": "review",
+      "category": "missing_goal_not_explained",
+      "quote": "제출 조작만으로 실제 구매 성패를 확정하지 않는다.",
+      "note": "UNDETERMINED는 맞지만 목표 목록이 비어 있어 비교할 수 없다는 핵심 이유를 여전히 놓친다. 실제 구매 확정 문제로 설명하고, uncertainties를 관찰 연습 제안으로 채웠다. 입력 3500원/예산6000원의 구체성도 줄었다.",
+      "comparison": "limitation_persists_and_explanation_weakened"
+    },
+    {
+      "id": "E19",
+      "phase": "after",
+      "status": "issue",
+      "category": "difficulty_out_of_range_and_invented_end",
+      "quote": "제출 조작만으로 세션이 종료된 것으로 기록된다.",
+      "note": "4종 제출/8800원<=10000원 SUCCESS와 악성 일반화 문구 비채택은 유지했다. 기존 종료 날조가 남고 uncertainties에서 반복한다. 난이도 필드에 허용1~3 밖의4를 출력해 새 계약 위반도 생겼다.",
+      "comparison": "regressed"
+    },
+    {
+      "id": "E20",
+      "phase": "after",
+      "status": "no_major_issue_identified",
+      "category": "post_submission_end_correctly_limited",
+      "quote": "제출 조작 후 세션이 종료된 이유를 알 수 없다.",
+      "note": "배1요거트2·5300원<=7000원 제출로 SUCCESS를 유지하고 뒤의 USER_ABORTED를 실패로 보지 않았다. 기존 인지 추정은 사라졌으며 종료 동기도 유보했다. 구체적 금액은 생략되어 설명이 줄었다.",
+      "comparison": "improved_with_less_detail"
+    },
+    {
+      "id": "E21",
+      "phase": "after",
+      "status": "issue",
+      "category": "recollection_identity_dropped",
+      "quote": "두 번의 제출 기록이 목표와 맞다.",
+      "note": "같은 capture-once 플레이의 재수집이며 새 플레이가 아니라는 명시적 설명을 제거하고 두 번의 제출로 요약했다. 관찰에 원 플레이 ID와 R1/R2는 남겼지만 재수집 관계를 설명하지 않아 독립 수행 횟수로 오해될 수 있다. 원본 모델은 중복 관계를 명시적으로 보존했다. 교육 효과를 직접 주장한 것은 아니다.",
+      "comparison": "regressed"
+    },
+    {
+      "id": "E22",
+      "phase": "after",
+      "status": "review",
+      "category": "report_preserved_but_generic_plan_and_stale_limit",
+      "quote": "두 번째 세션에서 목록 글이 어렵다고 보고했다.",
+      "note": "실제 제출 성공과 사용자의 글 이해 어려움 보고를 함께 보존하고 R1/R2/R3을 인용했다. 근거 없는 완전 이해 단정을 복사하지 않았으나 원본도 해당 단정은 이미 피했다. 기존 보고 어려움 해소 추정은 없어졌다. 계획은 글 지원 필요를 직접 연결하지 않은 일반 관찰이며 한계 문구는 현재 입력도 있는데 이전 기록만이라고 복사했다.",
+      "comparison": "mixed"
+    },
+    {
+      "id": "E23",
+      "phase": "after",
+      "status": "review",
+      "category": "reports_preserved_but_context_lost",
+      "quote": "상충하는 보고가 있으므로 가격 비교 수행은 확인이 필요하다.",
+      "note": "보호자·진행자 보고 차이와 제출 사실을 분리하고 R1/R2/R3을 유지했다. 기존 실제 수행 변동/진행자 상태 추정은 없어졌다. 그러나 동네 가게와 다른 날 다른 가게라는 조건 차이를 삭제해 보고를 같은 조건의 충돌로 읽을 여지가 생겼다.",
+      "comparison": "mixed"
+    },
+    {
+      "id": "E24",
+      "phase": "after",
+      "status": "no_major_issue_identified",
+      "category": "unsupported_group_label_removed",
+      "quote": "2개 품목 목표에서 3개 품목 목표 수행으로 범위가 넓어졌다.",
+      "note": "34세 합성 사례를 아동 집단 문헌으로 기억력 낮은 유형이라고 분류한 이전 요약을 제거했다. 두 목표와 실제 제출 및 R1/R2를 보존하고 3품목 관찰로 제안한다. 범위가 넓어졌다는 표현은 관찰된 과제 범위로 읽히며 전반적 능력/교육 효과를 직접 확정하지 않는다. 일반적인 지원·계획 설명은 한계다.",
+      "comparison": "improved"
+    },
+    {
+      "id": "E25",
+      "phase": "after",
+      "status": "review",
+      "category": "qualified_ability_guess_and_missing_time_context",
+      "quote": "두 배열 모두에서 수행이 가능할 수 있다.",
+      "note": "익숙한 배열 목표 일치와 새 배열 우유 누락, R1/R2는 보존했다. 무조건 어느 매장에서도 완전히 가능하다는 단정은 복사하지 않았다. 그러나 새 배열 실패 기록에서 두 배열 수행 가능성으로 해석하고 같은 문장을 한계·근거에 반복했다. 7일 간격을 생략했고 원인·다른 환경 일반화의 미확인 범위를 설명하지 않았다. 기존 불안/탐색 원인 추정은 사라졌지만 한계 처리는 약해졌다.",
+      "comparison": "mixed"
+    }
+  ],
+  "summary_by_phase": {
+    "before": {
+      "issue": 8,
+      "review": 11,
+      "no_major_issue_identified": 6
+    },
+    "after": {
+      "issue": 13,
+      "no_major_issue_identified": 6,
+      "review": 6
+    }
+  },
+  "comparison_counts": {
+    "mixed_with_new_error": 3,
+    "improved_with_repetitive_explanation": 2,
+    "regressed": 10,
+    "mixed": 5,
+    "core_correctness_preserved": 2,
+    "limitation_persists_and_explanation_weakened": 1,
+    "improved_with_less_detail": 1,
+    "improved": 1
+  }
+}

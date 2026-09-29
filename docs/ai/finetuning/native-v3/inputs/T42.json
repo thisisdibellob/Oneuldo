@@ -1,0 +1,47 @@
+{
+  "id": "03b1e97a-81a1-5d77-9edc-0f055e958c02",
+  "schemaVersion": "synthetic-native-v2",
+  "generatedAt": "2026-01-31T00:00:00Z",
+  "sessionCount": 1,
+  "eventCount": 1,
+  "input": {
+    "schemaVersion": "synthetic-native-v2",
+    "datasetId": "03b1e97a-81a1-5d77-9edc-0f055e958c02",
+    "generatedAt": "2026-01-31T00:00:00Z",
+    "analysisWindow": null,
+    "anonymousSubjectId": "T42-synthetic",
+    "sessionCount": 1,
+    "eventCount": 1,
+    "sessions": [
+      {
+        "sessionId": "4e99808f-16e2-5405-aadc-412b54f1721f",
+        "startedAt": "2026-01-01T00:00:00Z",
+        "endedAt": null,
+        "integrity": null,
+        "events": [
+          {
+            "behaviorLogId": "01cbf99a-f23b-5763-8aa4-e36692eccc44",
+            "sequence": 1,
+            "elapsedFromSessionStartMs": 10000,
+            "occurredAt": "2026-01-01T00:00:10Z",
+            "receivedAt": "2026-01-01T00:00:10Z",
+            "eventSchemaVersion": "synthetic-native-v2",
+            "action": {
+              "eventCode": "SHOP.CHECKOUT_SUBMITTED"
+            },
+            "payload": {
+              "type": "SHOPPING",
+              "marketContent": {
+                "cart": {
+                  "사과": 2,
+                  "생수": 1
+                }
+              },
+              "cartTotalAmount": 3200
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

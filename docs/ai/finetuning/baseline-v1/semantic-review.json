@@ -1,0 +1,281 @@
+{
+  "reviewer": "Codex",
+  "independent_expert_review": false,
+  "status": "complete",
+  "method": "동결된 입력·사건·문헌 카드 범위·rubric과 응답을 읽고 의미를 대조. 문구 일치 점수나 임상 평가 아님.",
+  "cases": [
+    {
+      "id": "E01",
+      "status": "needs_revision",
+      "issue_types": [
+        "unsupported_inference",
+        "coverage_semantics",
+        "plan_conflict"
+      ],
+      "explanation": "기록에 없는 피로·흥미·상품 찾기 어려움을 대안으로 만들고 자신감 회복이 우선이라고 제안했다. coverage=COMPLETE를 목표 품목 충족으로 오해했다. 품목 수를 줄이라는 문장과 현재/추천 모두 2종인 설정도 맞지 않는다.",
+      "evidence_excerpt": "“피로도나 다른 외부 요인”, “자신감을 회복하는 것이 우선”, “커버리지(COVERAGE: COMPLETE)”",
+      "label_policy_note": "FAILURE 대 UNDETERMINED는 중단을 과제 미완료로 볼지 수행능력 미측정으로 볼지에 따른 라벨 정책 차이도 있다. 불일치만으로 모델 오답이라 집계하지 않는다."
+    },
+    {
+      "id": "E02",
+      "status": "needs_revision",
+      "issue_types": [
+        "unsupported_inference",
+        "causal_overclaim",
+        "unsupported_capability"
+      ],
+      "explanation": "눈 불편감 보고와 렌더링 오류는 보존했지만 인지 부하 증가와 종료 원인으로 연결했다. 입력에 없는 글자 크기·고대비 설정을 지원 제안으로 넣었다.",
+      "evidence_excerpt": "“인지 부하를 증가시켰을 가능성”, “시스템 오류와 결합하여 세션 조기 종료로 이어졌습니다”",
+      "label_policy_note": "FAILURE 대 UNDETERMINED는 관찰 불능과 과제 미완료의 구분을 명확히 해야 한다. 원인 확정은 별개로 근거 부족이다."
+    },
+    {
+      "id": "E03",
+      "status": "needs_revision",
+      "issue_types": [
+        "unsupported_inference"
+      ],
+      "explanation": "3종 목표와 예산 성공은 올바르다. 다만 최종 제출만으로 목록의 인식 능력이 관찰됐다고 표현했다. 여러 난이도 축을 올리는 제안은 효과가 검증된 처방으로 받아들이면 안 된다.",
+      "evidence_excerpt": "“품목과 수량을 인식하고 … 반영하는 능력을 보였습니다”",
+      "label_policy_note": null
+    },
+    {
+      "id": "E04",
+      "status": "needs_revision",
+      "issue_types": [
+        "ignored_context",
+        "plan_conflict",
+        "unsupported_inference"
+      ],
+      "explanation": "보호자 보고의 실제 매장 맥락이 이미 주어졌는데 본 세션인지 과거인지 불명확하다고 했다. 4종 지원 제안과 itemCount=3이 불일치한다. 최종 제출로 목표 이해를 추정했다.",
+      "evidence_excerpt": "“품목 수를 4개로”, “본 세션 내의 특정 오류를 지칭하는지 … 명확하지 않음”",
+      "label_policy_note": null
+    },
+    {
+      "id": "E05",
+      "status": "needs_revision",
+      "issue_types": [
+        "unsupported_inference",
+        "preference_not_preserved",
+        "coverage_semantics"
+      ],
+      "explanation": "짧은 목록을 계속 보고 싶다는 요청을 요약했지만 3종·일반 문자로 전환하며 선호를 계획에 반영하지 않았다. 자동 채움이나 이전 목록 기억을 근거 없는 대안으로 만들었다.",
+      "evidence_excerpt": "“시스템이 자동으로 품목을 채워주고”, “textSupport”: “STANDARD”",
+      "label_policy_note": null
+    },
+    {
+      "id": "E06",
+      "status": "needs_revision",
+      "issue_types": [
+        "unsupported_inference"
+      ],
+      "explanation": "두 시점의 성공·수량 미충족 및 14일 간격은 보존했다. 그러나 의도적 감소·화면 오류·주의력 분산을 뒷받침하는 기록 없이 대안 원인으로 열거했다.",
+      "evidence_excerpt": "“화면 표시 오류”, “주의력 분산으로 인해 수량 확인을 소홀히”",
+      "label_policy_note": null
+    },
+    {
+      "id": "E07",
+      "status": "needs_revision",
+      "issue_types": [
+        "output_schema"
+      ],
+      "explanation": "두 성공과 품목 수·지원 조건의 변화는 보존했다. 다만 alternativeExplanations 필드를 alternativeExplainations로 출력하여 계약을 위반했다.",
+      "evidence_excerpt": "“alternativeExplainations”",
+      "label_policy_note": null
+    },
+    {
+      "id": "E08",
+      "status": "needs_revision",
+      "issue_types": [
+        "unsupported_inference"
+      ],
+      "explanation": "같은 난이도로 다른 물건을 원한다는 선호는 계획에 반영했다. 그러나 기록에 없는 품목 익숙함·시각적 단서를 대안 원인으로 추가하고 두 성공을 기본 기술의 안정성으로 확대했다.",
+      "evidence_excerpt": "“품목이 익숙하거나 시각적 단서가 명확하여”, “기본 선택 기술은 안정적으로”",
+      "label_policy_note": null
+    },
+    {
+      "id": "E09",
+      "status": "needs_revision",
+      "issue_types": [
+        "plan_conflict",
+        "report_uncertainty"
+      ],
+      "explanation": "현재 성공과 이전 결과 미확인은 구분했다. 목표 문장은 2종 유지인데 itemCount는 3이다. 또한 피곤해 보일 수도 있다는 추정 보고를 인용할 때 수도를 생략했다.",
+      "evidence_excerpt": "“2개 품목 선택 및 제출 능력 유지 및 확인” 대 itemCount=3",
+      "label_policy_note": null
+    },
+    {
+      "id": "E10",
+      "status": "acceptable_with_caveats",
+      "issue_types": [],
+      "explanation": "수량 목표가 다른 두 세션의 성공을 보존하고 수량 감소를 퇴행으로 해석하지 않았다. 목표 이해를 시사한다는 표현과 3종 확대는 제한된 해석·다음 관찰 제안으로 보며 능력 숙달이나 교육 효과를 확정하지는 않았다.",
+      "evidence_excerpt": "“다른 품목 조합이나 더 높은 예산 압력 … 확인되지 않았습니다”",
+      "label_policy_note": null
+    },
+    {
+      "id": "E11",
+      "status": "needs_revision",
+      "issue_types": [
+        "causal_overclaim",
+        "unsupported_inference"
+      ],
+      "explanation": "상충한 두 최종 값과 판단 보류는 맞다. 하지만 자료 충돌 원인을 시스템 오류·중복 제출로 판단했다고 쓰고, 뒤에서는 수집 오류인지 사용자 행동인지 모른다고 했다. 수정 후 재제출이라는 과정도 입력에는 없다.",
+      "evidence_excerpt": "“시스템 오류나 중복 제출로 인한 데이터 충돌로 판단됨”",
+      "label_policy_note": null
+    },
+    {
+      "id": "E12",
+      "status": "needs_revision",
+      "issue_types": [
+        "wrong_task_context",
+        "wrong_judgment",
+        "unsupported_inference"
+      ],
+      "explanation": "새 목표 두부 2·생수 1을 이전 목표 두부 1·생수 2로 바꿔 읽어 두 번째 제출을 SUCCESS로 판정했다. 복원된 상태를 성공 경험 활용으로 추측하고 잘못된 성공에 근거해 품목을 늘렸다.",
+      "evidence_excerpt": "“목표 품목(두부 1, 생수 2)을 유지했고 … 목표와 일치”",
+      "label_policy_note": null
+    },
+    {
+      "id": "E13",
+      "status": "needs_revision",
+      "issue_types": [
+        "ignored_context",
+        "unsupported_inference",
+        "support_withdrawal"
+      ],
+      "explanation": "대리 조작이어서 사용자 수행 판단을 보류한 것은 맞다. 그러나 선택부터 제출까지 진행자가 조작했다는 명시와 달리 사용자가 선택하고 버튼만 대신 눌렀을 가능성을 추가했다. 지원 필요를 알 수 없는데 도움 없는 연습과 개입 최소화를 우선했다.",
+      "evidence_excerpt": "“사용자가 선택을 완료했으나 최종 제출 버튼 클릭을 조력자가 대신함”",
+      "label_policy_note": null
+    },
+    {
+      "id": "E14",
+      "status": "needs_revision",
+      "issue_types": [
+        "report_as_fact",
+        "unsupported_inference",
+        "support_withdrawal",
+        "coverage_semantics"
+      ],
+      "explanation": "읽지 않았다는 자기보고를 텍스트 지원 없이 수행한 객관 사실로 바꿨다. 이전 경험·이미지 이용을 근거 없는 대안으로 넣고 지원을 REDUCED로 줄였다. 목표 성공 자체는 맞다.",
+      "evidence_excerpt": "“텍스트 지원 없이도 … 능력이 관찰됩니다”, “textSupport”: “REDUCED”",
+      "label_policy_note": null
+    },
+    {
+      "id": "E15",
+      "status": "needs_revision",
+      "issue_types": [
+        "unsupported_inference",
+        "fabricated_condition",
+        "support_withdrawal"
+      ],
+      "explanation": "세 시점의 성공·실패·지원 후 성공과 장기 유지 미확인은 보존했다. 다만 주의 산만·외부 지원 의존성을 근거 없이 원인 후보로 넣었고, 입력에 없는 현재 난이도 1을 사실로 사용했다. 지원 필요 확인 없이 외부 도움 제거를 제안했다.",
+      "evidence_excerpt": "“현재 수준(난이도 1, 품목 2개)”, “외부 지원에 대한 의존성 때문”",
+      "label_policy_note": null
+    },
+    {
+      "id": "E16",
+      "status": "needs_revision",
+      "issue_types": [
+        "nonbehavior_finding",
+        "coverage_semantics"
+      ],
+      "explanation": "실제 제공 0회와 판단 보류는 정확하다. 하지만 수행 관찰이 전혀 없는데 기술 미제공 상황을 구매 수행 finding으로 만들었다. 이는 이 사례의 빈 findings 요구와 어긋난다. COMPLETE를 과제 속성처럼 표현하기도 했다.",
+      "evidence_excerpt": "“완전 커버리지 과제”, F1 skill=“구매 과제 수행”",
+      "label_policy_note": null
+    },
+    {
+      "id": "E17",
+      "status": "acceptable_with_caveats",
+      "issue_types": [],
+      "explanation": "현재 3종 성공과 다음 4종 시도 희망을 구분하고, 4종 숙달은 아직 판단할 수 없다고 명시했다. 계획에도 itemCount=4를 반영했다. 현재 3종 능력이 확보되었다는 표현은 관찰 범위에 한정해서 읽어야 한다.",
+      "evidence_excerpt": "“아직 실행되지 않았으므로 능력 판정의 근거로 삼을 수 없습니다”",
+      "label_policy_note": null
+    },
+    {
+      "id": "E18",
+      "status": "needs_revision",
+      "issue_types": [
+        "unsupported_inference",
+        "ignored_context"
+      ],
+      "explanation": "서버·표시 목표 모두 보존하고 판단을 보류했다. 다만 실제로 어느 목표가 최종인지 미해결인데 표시 목표가 최종이라고 안내하는 선택지를 제안했다. 3,500원과 예산 6,000원이 주어졌는데 예산 내 제출 금액의 적절성도 미확인이라고 과도하게 유보했다. 채점 버그라는 원인은 근거가 없다.",
+      "evidence_excerpt": "“현재 표시된 지시가 최종 목표임을 명확히 안내”, “예산(6000원) 내에서 제출 금액(3500원)이 적절했는지 … 기록에 없습니다”",
+      "label_policy_note": null
+    },
+    {
+      "id": "E19",
+      "status": "needs_revision",
+      "issue_types": [
+        "source_comparison_incomplete",
+        "coverage_semantics"
+      ],
+      "explanation": "보편적 기억 한계라는 메모를 그대로 믿지 않고 4종 성공을 보존했다. 그러나 P16 실제 카드의 연구 대상·인지적 이질성과 메모를 대조하지 않고 주로 개인 수행과의 불일치로 설명했다. COMPLETE는 수신 범위인데 목표 충족 조건으로 사용했다.",
+      "evidence_excerpt": "“COMPLETE 커버리지 조건을 충족”, “해당 일반화가 개인에게 적용되지 않음”",
+      "label_policy_note": null
+    },
+    {
+      "id": "E20",
+      "status": "acceptable_with_caveats",
+      "issue_types": [],
+      "explanation": "목표 완료 후 종료 요청이라는 순서를 보존하고 종료를 실패나 회피로 되돌리지 않았다. 외부 도움 여부 미확인도 남겼다. 다음 3종 제안은 향후 연습 제안이며 현재 중단 의사에 반해 즉시 계속하라는 지시는 없다.",
+      "evidence_excerpt": "“세션 종료는 사용자의 의지에 따른 것으로, 수행 실패로 간주되지 않습니다”",
+      "label_policy_note": null
+    },
+    {
+      "id": "E21",
+      "status": "needs_revision",
+      "issue_types": [
+        "duplicate_evidence_wording"
+      ],
+      "explanation": "재수집이며 새 수행이 아니라고 정확히 명시했다. 그러나 동시에 일관된 목표 달성을 확인했다고 쓰고 두 세션에서 모두 수행했다고 묘사해 독립 반복 성취처럼 읽힌다. 한 번의 목표 제출과 재수집 확인으로 일관되게 표현해야 한다.",
+      "evidence_excerpt": "“새로운 수행 능력을 입증하지는 않으나, 일관된 목표 달성을 확인했다”",
+      "label_policy_note": null
+    },
+    {
+      "id": "E22",
+      "status": "needs_revision",
+      "issue_types": [
+        "unsupported_inference"
+      ],
+      "explanation": "최신 분석의 문자 이해 확정을 받아들이지 않고 사용자 보고와 수행을 구분한 것은 맞다. 다만 이미지 선택·이전 경험·일반적 불확실성 표현이라는 기록 없는 대안을 추가했다. 특히 보고가 실제 이해 부족을 뜻하지 않을 수 있다는 대안은 근거 없이 자기보고를 약화한다.",
+      "evidence_excerpt": "“보고는 일반적인 불확실성 표현일 뿐 실제 이해 부족을 의미하지 않을 수 있음”",
+      "label_policy_note": null
+    },
+    {
+      "id": "E23",
+      "status": "needs_revision",
+      "issue_types": [
+        "ignored_context",
+        "unsupported_inference",
+        "wrong_task_context"
+      ],
+      "explanation": "상반된 정보원과 예산 내 제출을 언급하고 한쪽 보고를 오류로 단정하지 않은 점은 맞다. 그러나 실제 매장에서 한 보고를 게임 선택 과정과 연결하고, 상반된 이유를 상황적 변인이라고 단정했다. 보호자의 긍정 보고 내용을 구체적으로 보존하지 않았으며, 제출이 없는 이전 세션이 예산 내 제출에 성공했다고 계획 근거에 썼다.",
+      "evidence_excerpt": "“정보원 간 차이는 오류가 아닌 상황적 변인”, “이전 세션에서 예산 내 제출에 성공”",
+      "label_policy_note": null
+    },
+    {
+      "id": "E24",
+      "status": "needs_revision",
+      "issue_types": [
+        "source_scope_omitted",
+        "unsupported_inference"
+      ],
+      "explanation": "두 세션의 2종·3종 성공을 보존하고 과거 기억력 유형 확정을 거부했다. 다만 P16의 7~18세 연구와 34세 개인의 연령 차이를 설명하지 않았다. 기록에 없는 음성 지원과 반복 과제의 영향을 대안으로 추가했다.",
+      "evidence_excerpt": "“화면 표시나 음성/문자 지원이 명확하여”, 연구 연령 차이 설명 누락",
+      "label_policy_note": null
+    },
+    {
+      "id": "E25",
+      "status": "needs_revision",
+      "issue_types": [
+        "ignored_time",
+        "unsupported_inference",
+        "profile_correction_incomplete"
+      ],
+      "explanation": "익숙한 배열의 성공과 새 배열의 우유 누락은 보존했다. 그러나 7일 간격을 누락하고 주의 분산·탐색 전략 미흡을 근거 없이 제시했다. 이전 프로필의 모든 매장·배열에서 완전 수행 가능하다는 주장을 명시적으로 철회하지 않았다.",
+      "evidence_excerpt": "“탐색 전략이 미흡했음을 시사”, “주의 분산 가능성”, 7일 간격 누락",
+      "label_policy_note": null
+    }
+  ],
+  "case_count": 25,
+  "interpretation": "needs_revision은 사소한 표현부터 명백한 오판까지 하나 이상의 수정 지점을 뜻하며, 사례 전체 오답 또는 임상적 부적합 판정이 아니다."
+}

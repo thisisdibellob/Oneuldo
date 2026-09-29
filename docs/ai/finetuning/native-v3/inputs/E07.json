@@ -1,0 +1,124 @@
+{
+  "id": "abf1b225-9132-5c2e-9dbe-7b44e20cf8df",
+  "schemaVersion": "synthetic-native-v2",
+  "generatedAt": "2026-01-31T00:00:00Z",
+  "sessionCount": 2,
+  "eventCount": 2,
+  "input": {
+    "schemaVersion": "synthetic-native-v2",
+    "datasetId": "abf1b225-9132-5c2e-9dbe-7b44e20cf8df",
+    "generatedAt": "2026-01-31T00:00:00Z",
+    "analysisWindow": null,
+    "anonymousSubjectId": "E07-synthetic",
+    "sessionCount": 2,
+    "eventCount": 2,
+    "sessions": [
+      {
+        "sessionId": "004b2e3f-e752-5e4b-adfd-3bb1f44e22f1",
+        "startedAt": "2026-01-01T00:00:00Z",
+        "endedAt": null,
+        "integrity": null,
+        "events": [
+          {
+            "behaviorLogId": "a7099a28-664c-59bb-8a73-8ca862a2bd38",
+            "sequence": 1,
+            "elapsedFromSessionStartMs": 300000,
+            "occurredAt": "2026-01-01T00:05:00Z",
+            "receivedAt": "2026-01-01T00:05:00Z",
+            "eventSchemaVersion": "synthetic-native-v2",
+            "action": {
+              "eventCode": "SHOP.CHECKOUT_SUBMITTED"
+            },
+            "payload": {
+              "type": "SHOPPING",
+              "marketContent": {
+                "cart": {
+                  "달걀": 1,
+                  "우유": 2,
+                  "빵": 1
+                },
+                "sceneSnapshot": {
+                  "schemaVersion": "market-scene-v1",
+                  "mission": {
+                    "id": "E07-mission",
+                    "description": "목표 목록의 물건과 수량을 담고 총액은 예산 이하로 제출하세요.",
+                    "budget": 10000,
+                    "objectives": [
+                      {
+                        "productId": "달걀",
+                        "quantity": 1,
+                        "label": "달걀"
+                      },
+                      {
+                        "productId": "우유",
+                        "quantity": 2,
+                        "label": "우유"
+                      },
+                      {
+                        "productId": "빵",
+                        "quantity": 1,
+                        "label": "빵"
+                      }
+                    ]
+                  },
+                  "layoutVersion": "synthetic-layout-v2"
+                }
+              },
+              "cartTotalAmount": 9500
+            }
+          }
+        ]
+      },
+      {
+        "sessionId": "dbb7c4ff-ba09-533e-b3ca-1dae5338d293",
+        "startedAt": "2026-01-02T00:00:00Z",
+        "endedAt": null,
+        "integrity": null,
+        "events": [
+          {
+            "behaviorLogId": "87e8c999-e5ca-578a-8a7e-ce20687babb1",
+            "sequence": 1,
+            "elapsedFromSessionStartMs": 90000,
+            "occurredAt": "2026-01-02T00:01:30Z",
+            "receivedAt": "2026-01-02T00:01:30Z",
+            "eventSchemaVersion": "synthetic-native-v2",
+            "action": {
+              "eventCode": "SHOP.CHECKOUT_SUBMITTED"
+            },
+            "payload": {
+              "type": "SHOPPING",
+              "marketContent": {
+                "cart": {
+                  "달걀": 1,
+                  "우유": 1
+                },
+                "sceneSnapshot": {
+                  "schemaVersion": "market-scene-v1",
+                  "mission": {
+                    "id": "E07-mission",
+                    "description": "목표 목록의 물건과 수량을 담고 총액은 예산 이하로 제출하세요.",
+                    "budget": 10000,
+                    "objectives": [
+                      {
+                        "productId": "달걀",
+                        "quantity": 1,
+                        "label": "달걀"
+                      },
+                      {
+                        "productId": "우유",
+                        "quantity": 1,
+                        "label": "우유"
+                      }
+                    ]
+                  },
+                  "layoutVersion": "synthetic-layout-v2"
+                }
+              },
+              "cartTotalAmount": 5800
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

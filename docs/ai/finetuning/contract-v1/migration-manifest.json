@@ -1,0 +1,1774 @@
+{
+  "version": 1,
+  "stage": "WHOLE_SOURCE_FINAL_DRAFT",
+  "training_approved": false,
+  "source_sha256": {
+    "train": "7700650031337085d5048d25358414820353a20199d0da196136cdc4a09514ee",
+    "eval": "48498007238a24a442d23d775fd915efb8c98521fa32a5a2713269eff84c85a2"
+  },
+  "original_train_count": 60,
+  "original_eval_count": 25,
+  "fixtures_are_synthetic": true,
+  "runtime_or_server_changes": false,
+  "fixture_limits": [
+    "Only existing event IDs/order and supplied goal/cart/quantity values are mapped.",
+    "COMPLETE does not populate SessionIntegrity; integrity is null.",
+    "Native fixture is a provided-event excerpt, not proof of whole-play coverage.",
+    "Missing event times use coincident synthetic transport timestamps; not observed durations.",
+    "Partial scene goal is attached to first existing event; no new start/submit/finish event.",
+    "Product labels remain synthetic IDs; no current prices/catalog are substituted.",
+    "Output cards omitted because chosen production path supplies no cards; semantic review still pending.",
+    "Profile/review/observation training is outside this stage; no silent mixing."
+  ],
+  "cases": [
+    {
+      "id": "T01",
+      "split": "train",
+      "task": "session_analysis",
+      "title": "목표 달성을 명확히 판단",
+      "input_mapping_issues": [],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": true,
+      "removed_output_card_ids": [
+        "G01"
+      ],
+      "target_status": "TRANSPORT_PREVIEW_REQUIRES_SEMANTIC_REVIEW"
+    },
+    {
+      "id": "T02",
+      "split": "train",
+      "task": "session_analysis",
+      "title": "제출 수량이 목표보다 적음",
+      "input_mapping_issues": [],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": true,
+      "removed_output_card_ids": [
+        "P01"
+      ],
+      "target_status": "TRANSPORT_PREVIEW_REQUIRES_SEMANTIC_REVIEW"
+    },
+    {
+      "id": "T03",
+      "split": "train",
+      "task": "session_analysis",
+      "title": "품목 누락이 확인된 최종 제출",
+      "input_mapping_issues": [],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": true,
+      "removed_output_card_ids": [
+        "P01"
+      ],
+      "target_status": "TRANSPORT_PREVIEW_REQUIRES_SEMANTIC_REVIEW"
+    },
+    {
+      "id": "T04",
+      "split": "train",
+      "task": "session_analysis",
+      "title": "품목은 맞지만 예산 초과",
+      "input_mapping_issues": [
+        "UNMAPPED_CONTEXT_FIELD:catalog",
+        "UNMAPPED_CONTEXT_FIELD:pricePolicy",
+        "UNMAPPED_CONTEXT_FIELD:substitutionAllowed"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false,
+      "removed_output_card_ids": [
+        "P03"
+      ],
+      "target_status": "TRANSPORT_PREVIEW_REQUIRES_SEMANTIC_REVIEW"
+    },
+    {
+      "id": "T05",
+      "split": "train",
+      "task": "session_analysis",
+      "title": "제출 기록이 없는 부분 로그",
+      "input_mapping_issues": [
+        "PARTIAL_SCOPE_REQUIRES_REAUTHORING: do not convert observation coverage into transport integrity",
+        "UNMAPPED_EVENT_TYPE:shelf_opened"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false,
+      "removed_output_card_ids": [
+        "G01"
+      ],
+      "target_status": "TRANSPORT_PREVIEW_REQUIRES_SEMANTIC_REVIEW"
+    },
+    {
+      "id": "T06",
+      "split": "train",
+      "task": "session_analysis",
+      "title": "장바구니 열기를 의도로 단정하지 않음",
+      "input_mapping_issues": [
+        "PARTIAL_SCOPE_REQUIRES_REAUTHORING: do not convert observation coverage into transport integrity"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false,
+      "removed_output_card_ids": [
+        "P14"
+      ],
+      "target_status": "TRANSPORT_PREVIEW_REQUIRES_SEMANTIC_REVIEW"
+    },
+    {
+      "id": "T07",
+      "split": "train",
+      "task": "session_analysis",
+      "title": "선반 근처 이동은 시선 증거가 아님",
+      "input_mapping_issues": [
+        "UNMAPPED_EVENT_TYPE:position"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false,
+      "removed_output_card_ids": [
+        "G04"
+      ],
+      "target_status": "TRANSPORT_PREVIEW_REQUIRES_SEMANTIC_REVIEW"
+    },
+    {
+      "id": "T08",
+      "split": "train",
+      "task": "session_analysis",
+      "title": "오래 걸려도 목표 달성은 달성",
+      "input_mapping_issues": [
+        "UNMAPPED_CONTEXT_FIELD:timeLimit"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false,
+      "removed_output_card_ids": [
+        "P40"
+      ],
+      "target_status": "TRANSPORT_PREVIEW_REQUIRES_SEMANTIC_REVIEW"
+    },
+    {
+      "id": "T09",
+      "split": "train",
+      "task": "session_analysis",
+      "title": "입력 지연이 직접 기록된 세션",
+      "input_mapping_issues": [
+        "UNMAPPED_EVENT_TYPE:input_ignored",
+        "UNMAPPED_EVENT_TYPE:ui_blocked"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false,
+      "removed_output_card_ids": [
+        "P40"
+      ],
+      "target_status": "TRANSPORT_PREVIEW_REQUIRES_SEMANTIC_REVIEW"
+    },
+    {
+      "id": "T10",
+      "split": "train",
+      "task": "session_analysis",
+      "title": "촉구를 받고 달성한 수행",
+      "input_mapping_issues": [
+        "UNMAPPED_EVENT_TYPE:external_support"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false,
+      "removed_output_card_ids": [
+        "P01"
+      ],
+      "target_status": "TRANSPORT_PREVIEW_REQUIRES_SEMANTIC_REVIEW"
+    },
+    {
+      "id": "T11",
+      "split": "train",
+      "task": "session_analysis",
+      "title": "수량 실수를 스스로 수정한 기록",
+      "input_mapping_issues": [
+        "UNMAPPED_CONTEXT_FIELD:supportLog",
+        "UNMAPPED_EVENT_FIELD:quantity_changed.actor"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false,
+      "removed_output_card_ids": [
+        "M01"
+      ],
+      "target_status": "TRANSPORT_PREVIEW_REQUIRES_SEMANTIC_REVIEW"
+    },
+    {
+      "id": "T12",
+      "split": "train",
+      "task": "session_analysis",
+      "title": "실패라는 사건 이름보다 실제 값 우선",
+      "input_mapping_issues": [
+        "UNMAPPED_CONTEXT_FIELD:collectorNotes",
+        "UNMAPPED_EVENT_FIELD:submission.legacyLabel"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false,
+      "removed_output_card_ids": [
+        "M01"
+      ],
+      "target_status": "TRANSPORT_PREVIEW_REQUIRES_SEMANTIC_REVIEW"
+    },
+    {
+      "id": "T13",
+      "split": "train",
+      "task": "session_analysis",
+      "title": "과거 가격에 현재 가격을 덮어쓰지 않음",
+      "input_mapping_issues": [
+        "UNMAPPED_CONTEXT_FIELD:catalog",
+        "UNMAPPED_CONTEXT_FIELD:catalogVersion",
+        "UNMAPPED_EVENT_FIELD:submission.catalogVersion",
+        "UNMAPPED_INPUT_FIELD:unmatchedCurrentCatalog"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false,
+      "removed_output_card_ids": [
+        "P03"
+      ],
+      "target_status": "TRANSPORT_PREVIEW_REQUIRES_SEMANTIC_REVIEW"
+    },
+    {
+      "id": "T14",
+      "split": "train",
+      "task": "session_analysis",
+      "title": "수신 완료와 전체 플레이 관찰은 다름",
+      "input_mapping_issues": [
+        "PARTIAL_SCOPE_REQUIRES_REAUTHORING: do not convert observation coverage into transport integrity",
+        "UNMAPPED_CONTEXT_FIELD:transportIntegrity",
+        "UNMAPPED_CONTEXT_FIELD:window"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false,
+      "removed_output_card_ids": [
+        "M01"
+      ],
+      "target_status": "TRANSPORT_PREVIEW_REQUIRES_SEMANTIC_REVIEW"
+    },
+    {
+      "id": "T15",
+      "split": "train",
+      "task": "session_analysis",
+      "title": "중간 요약이 원본 수량과 충돌",
+      "input_mapping_issues": [
+        "UNMAPPED_INPUT_FIELD:chunkAnalyses"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false,
+      "removed_output_card_ids": [
+        "M01"
+      ],
+      "target_status": "TRANSPORT_PREVIEW_REQUIRES_SEMANTIC_REVIEW"
+    },
+    {
+      "id": "T16",
+      "split": "train",
+      "task": "session_analysis",
+      "title": "쉬운 문구 변경 후 수행의 인과 한계",
+      "input_mapping_issues": [
+        "UNMAPPED_EVENT_TYPE:external_support",
+        "UNMAPPED_EVENT_TYPE:instruction"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false,
+      "removed_output_card_ids": [
+        "P27"
+      ],
+      "target_status": "TRANSPORT_PREVIEW_REQUIRES_SEMANTIC_REVIEW"
+    },
+    {
+      "id": "T17",
+      "split": "train",
+      "task": "session_analysis",
+      "title": "익숙한 배열 성공과 새 배열의 수행 구분",
+      "input_mapping_issues": [
+        "UNMAPPED_CONTEXT_FIELD:layout"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false,
+      "removed_output_card_ids": [
+        "P11"
+      ],
+      "target_status": "TRANSPORT_PREVIEW_REQUIRES_SEMANTIC_REVIEW"
+    },
+    {
+      "id": "T18",
+      "split": "train",
+      "task": "session_analysis",
+      "title": "빠른 실패와 느린 성공을 분리",
+      "input_mapping_issues": [
+        "UNMAPPED_CONTEXT_FIELD:textSupport"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false,
+      "removed_output_card_ids": [
+        "P02"
+      ],
+      "target_status": "TRANSPORT_PREVIEW_REQUIRES_SEMANTIC_REVIEW"
+    },
+    {
+      "id": "T19",
+      "split": "train",
+      "task": "session_analysis",
+      "title": "문헌이 없으면 출처를 만들지 않음",
+      "input_mapping_issues": [],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": true,
+      "removed_output_card_ids": [],
+      "target_status": "TRANSPORT_PREVIEW_REQUIRES_SEMANTIC_REVIEW"
+    },
+    {
+      "id": "T20",
+      "split": "train",
+      "task": "session_analysis",
+      "title": "로그 내부 명령을 데이터로 취급",
+      "input_mapping_issues": [
+        "UNMAPPED_EVENT_TYPE:note"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false,
+      "removed_output_card_ids": [
+        "M01"
+      ],
+      "target_status": "TRANSPORT_PREVIEW_REQUIRES_SEMANTIC_REVIEW"
+    },
+    {
+      "id": "T21",
+      "split": "train",
+      "task": "profile_update",
+      "title": "같은 플레이 재분석을 새 성취로 세지 않음",
+      "input_mapping_issues": [
+        "PROFILE_STAGE_SEPARATE: production profile has previous/current analyses and R references, not the seed raw timeline/cards",
+        "PROFILE_PREVIOUS_FIELDS_MISSING:findings,practicePlan,uncertainties,usedEvidenceCardIds"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false
+    },
+    {
+      "id": "T22",
+      "split": "train",
+      "task": "profile_update",
+      "title": "기존 프로필의 검증 의도 추정을 철회",
+      "input_mapping_issues": [
+        "PROFILE_STAGE_SEPARATE: production profile has previous/current analyses and R references, not the seed raw timeline/cards",
+        "PROFILE_PREVIOUS_FIELDS_MISSING:findings,practicePlan,uncertainties,usedEvidenceCardIds"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false
+    },
+    {
+      "id": "T23",
+      "split": "train",
+      "task": "profile_update",
+      "title": "쉬워진 과제의 성공을 능력 향상으로 일반화하지 않음",
+      "input_mapping_issues": [
+        "PROFILE_STAGE_SEPARATE: production profile has previous/current analyses and R references, not the seed raw timeline/cards",
+        "PROFILE_TARGET_EVIDENCE_NOT_AVAILABLE:1",
+        "PROFILE_PREVIOUS_FIELDS_MISSING:findings,practicePlan,uncertainties,usedEvidenceCardIds"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false
+    },
+    {
+      "id": "T24",
+      "split": "train",
+      "task": "profile_update",
+      "title": "새 원본으로 수량 오류 해석 정정",
+      "input_mapping_issues": [
+        "PROFILE_STAGE_SEPARATE: production profile has previous/current analyses and R references, not the seed raw timeline/cards",
+        "PROFILE_PREVIOUS_FIELDS_MISSING:findings,practicePlan,uncertainties,usedEvidenceCardIds"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false
+    },
+    {
+      "id": "T25",
+      "split": "train",
+      "task": "profile_update",
+      "title": "새 부분 기록으로 기존 확인 사실을 지우지 않음",
+      "input_mapping_issues": [
+        "PROFILE_STAGE_SEPARATE: production profile has previous/current analyses and R references, not the seed raw timeline/cards",
+        "PROFILE_TARGET_EVIDENCE_NOT_AVAILABLE:1",
+        "PROFILE_PREVIOUS_FIELDS_MISSING:findings,practicePlan,uncertainties,usedEvidenceCardIds"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false
+    },
+    {
+      "id": "T26",
+      "split": "train",
+      "task": "profile_update",
+      "title": "지원 감소와 수행 변화의 조건 보존",
+      "input_mapping_issues": [
+        "PROFILE_STAGE_SEPARATE: production profile has previous/current analyses and R references, not the seed raw timeline/cards",
+        "PROFILE_TARGET_EVIDENCE_NOT_AVAILABLE:2",
+        "PROFILE_PREVIOUS_FIELDS_MISSING:findings,practicePlan,uncertainties,usedEvidenceCardIds"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false
+    },
+    {
+      "id": "T27",
+      "split": "train",
+      "task": "profile_update",
+      "title": "기술 지연을 프로필의 주의력 문제로 남기지 않음",
+      "input_mapping_issues": [
+        "PROFILE_STAGE_SEPARATE: production profile has previous/current analyses and R references, not the seed raw timeline/cards",
+        "PROFILE_TARGET_EVIDENCE_NOT_AVAILABLE:1",
+        "PROFILE_PREVIOUS_FIELDS_MISSING:findings,practicePlan,uncertainties,usedEvidenceCardIds"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false
+    },
+    {
+      "id": "T28",
+      "split": "train",
+      "task": "profile_update",
+      "title": "반복 성공을 교육 효과로 확대하지 않음",
+      "input_mapping_issues": [
+        "PROFILE_STAGE_SEPARATE: production profile has previous/current analyses and R references, not the seed raw timeline/cards",
+        "PROFILE_TARGET_EVIDENCE_NOT_AVAILABLE:1",
+        "PROFILE_PREVIOUS_FIELDS_MISSING:findings,practicePlan,uncertainties,usedEvidenceCardIds"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false
+    },
+    {
+      "id": "T29",
+      "split": "train",
+      "task": "profile_update",
+      "title": "원본이 없는 과거 평가를 확정 근거로 계승하지 않음",
+      "input_mapping_issues": [
+        "PROFILE_STAGE_SEPARATE: production profile has previous/current analyses and R references, not the seed raw timeline/cards",
+        "PROFILE_PREVIOUS_FIELDS_MISSING:findings,practicePlan,uncertainties,usedEvidenceCardIds"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false
+    },
+    {
+      "id": "T30",
+      "split": "train",
+      "task": "profile_update",
+      "title": "프로필 문장과 연습 설정의 품목 수 일치",
+      "input_mapping_issues": [
+        "PROFILE_STAGE_SEPARATE: production profile has previous/current analyses and R references, not the seed raw timeline/cards",
+        "PROFILE_TARGET_EVIDENCE_NOT_AVAILABLE:1",
+        "PROFILE_PREVIOUS_FIELDS_MISSING:findings,uncertainties,usedEvidenceCardIds"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false
+    },
+    {
+      "id": "T31",
+      "split": "train",
+      "task": "session_analysis",
+      "title": "예산과 같은 금액의 제출",
+      "input_mapping_issues": [
+        "UNMAPPED_CONTEXT_FIELD:budgetRule",
+        "UNMAPPED_CONTEXT_FIELD:catalog"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false,
+      "removed_output_card_ids": [
+        "P03"
+      ],
+      "target_status": "TRANSPORT_PREVIEW_REQUIRES_SEMANTIC_REVIEW"
+    },
+    {
+      "id": "T32",
+      "split": "train",
+      "task": "session_analysis",
+      "title": "추가 품목이 허용된 과제",
+      "input_mapping_issues": [
+        "UNMAPPED_CONTEXT_FIELD:extrasAllowed"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false,
+      "removed_output_card_ids": [
+        "P01"
+      ],
+      "target_status": "TRANSPORT_PREVIEW_REQUIRES_SEMANTIC_REVIEW"
+    },
+    {
+      "id": "T33",
+      "split": "train",
+      "task": "session_analysis",
+      "title": "추가 품목이 금지된 과제",
+      "input_mapping_issues": [
+        "UNMAPPED_CONTEXT_FIELD:extrasAllowed",
+        "UNMAPPED_EVENT_TYPE:instruction"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false,
+      "removed_output_card_ids": [
+        "M01"
+      ],
+      "target_status": "TRANSPORT_PREVIEW_REQUIRES_SEMANTIC_REVIEW"
+    },
+    {
+      "id": "T34",
+      "split": "train",
+      "task": "session_analysis",
+      "title": "묶음 단위가 확인되지 않은 수량",
+      "input_mapping_issues": [
+        "UNMAPPED_CONTEXT_FIELD:unitMapping"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false,
+      "removed_output_card_ids": [
+        "P03"
+      ],
+      "target_status": "TRANSPORT_PREVIEW_REQUIRES_SEMANTIC_REVIEW"
+    },
+    {
+      "id": "T35",
+      "split": "train",
+      "task": "session_analysis",
+      "title": "허용 품종과 내부 분류 이름 구별",
+      "input_mapping_issues": [
+        "UNMAPPED_CONTEXT_FIELD:acceptedItems",
+        "UNMAPPED_CONTEXT_FIELD:internalLabels"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false,
+      "removed_output_card_ids": [
+        "P01"
+      ],
+      "target_status": "TRANSPORT_PREVIEW_REQUIRES_SEMANTIC_REVIEW"
+    },
+    {
+      "id": "T36",
+      "split": "train",
+      "task": "session_analysis",
+      "title": "대체 상품이 허용되지 않은 목표",
+      "input_mapping_issues": [
+        "UNMAPPED_CONTEXT_FIELD:acceptedItems",
+        "UNMAPPED_CONTEXT_FIELD:substitutionAllowed"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false,
+      "removed_output_card_ids": [
+        "P01"
+      ],
+      "target_status": "TRANSPORT_PREVIEW_REQUIRES_SEMANTIC_REVIEW"
+    },
+    {
+      "id": "T37",
+      "split": "train",
+      "task": "session_analysis",
+      "title": "추가 상품을 제거한 뒤 정확히 제출",
+      "input_mapping_issues": [
+        "UNMAPPED_CONTEXT_FIELD:extrasAllowed",
+        "UNMAPPED_EVENT_FIELD:quantity_changed.actor"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false,
+      "removed_output_card_ids": [
+        "M01"
+      ],
+      "target_status": "TRANSPORT_PREVIEW_REQUIRES_SEMANTIC_REVIEW"
+    },
+    {
+      "id": "T38",
+      "split": "train",
+      "task": "session_analysis",
+      "title": "시도와 최종 확정 제출을 구별",
+      "input_mapping_issues": [
+        "UNMAPPED_CONTEXT_FIELD:completionRule",
+        "UNMAPPED_EVENT_FIELD:submission.committed",
+        "UNMAPPED_EVENT_TYPE:submission_attempt"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false,
+      "removed_output_card_ids": [
+        "M01"
+      ],
+      "target_status": "TRANSPORT_PREVIEW_REQUIRES_SEMANTIC_REVIEW"
+    },
+    {
+      "id": "T39",
+      "split": "train",
+      "task": "session_analysis",
+      "title": "재전송 로그를 별도 행동으로 세지 않음",
+      "input_mapping_issues": [
+        "UNMAPPED_EVENT_FIELD:quantity_changed.operationId",
+        "UNMAPPED_EVENT_TYPE:retransmission"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false,
+      "removed_output_card_ids": [
+        "P40"
+      ],
+      "target_status": "TRANSPORT_PREVIEW_REQUIRES_SEMANTIC_REVIEW"
+    },
+    {
+      "id": "T40",
+      "split": "train",
+      "task": "session_analysis",
+      "title": "서버 도착 시각과 행동 순서를 구별",
+      "input_mapping_issues": [
+        "UNMAPPED_CONTEXT_FIELD:orderSemantics",
+        "UNMAPPED_EVENT_FIELD:quantity_changed.clientTimeMs",
+        "UNMAPPED_EVENT_FIELD:quantity_changed.receivedMs",
+        "UNMAPPED_EVENT_FIELD:submission.clientTimeMs",
+        "UNMAPPED_EVENT_FIELD:submission.receivedMs"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false,
+      "removed_output_card_ids": [],
+      "target_status": "TRANSPORT_PREVIEW_REQUIRES_SEMANTIC_REVIEW"
+    },
+    {
+      "id": "T41",
+      "split": "train",
+      "task": "session_analysis",
+      "title": "가격표와 제출 총액이 모순인 기록",
+      "input_mapping_issues": [
+        "UNMAPPED_CONTEXT_FIELD:catalog",
+        "UNMAPPED_CONTEXT_FIELD:catalogVersion",
+        "UNMAPPED_CONTEXT_FIELD:pricePolicy",
+        "UNMAPPED_CONTEXT_FIELD:submissionCatalogVersion"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false,
+      "removed_output_card_ids": [
+        "P03"
+      ],
+      "target_status": "TRANSPORT_PREVIEW_REQUIRES_SEMANTIC_REVIEW"
+    },
+    {
+      "id": "T42",
+      "split": "train",
+      "task": "session_analysis",
+      "title": "목표가 전달되지 않은 제출 기록",
+      "input_mapping_issues": [
+        "MISSING_GOAL_REQUIRES_REAUTHORING",
+        "UNMAPPED_CONTEXT_FIELD:taskMissing"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false,
+      "removed_output_card_ids": [
+        "G01"
+      ],
+      "target_status": "TRANSPORT_PREVIEW_REQUIRES_SEMANTIC_REVIEW"
+    },
+    {
+      "id": "T43",
+      "split": "train",
+      "task": "session_analysis",
+      "title": "버튼 누름과 실제 수량 변경을 구별",
+      "input_mapping_issues": [
+        "UNMAPPED_EVENT_TYPE:tap"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false,
+      "removed_output_card_ids": [
+        "P40"
+      ],
+      "target_status": "TRANSPORT_PREVIEW_REQUIRES_SEMANTIC_REVIEW"
+    },
+    {
+      "id": "T44",
+      "split": "train",
+      "task": "session_analysis",
+      "title": "자동 열린 장바구니를 사용자 의도로 읽지 않음",
+      "input_mapping_issues": [
+        "UNMAPPED_EVENT_FIELD:cart_opened.trigger"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false,
+      "removed_output_card_ids": [],
+      "target_status": "TRANSPORT_PREVIEW_REQUIRES_SEMANTIC_REVIEW"
+    },
+    {
+      "id": "T45",
+      "split": "train",
+      "task": "session_analysis",
+      "title": "도움 로그가 없다는 것과 무지원 입증의 차이",
+      "input_mapping_issues": [
+        "UNMAPPED_CONTEXT_FIELD:supportCoverage"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false,
+      "removed_output_card_ids": [
+        "P01"
+      ],
+      "target_status": "TRANSPORT_PREVIEW_REQUIRES_SEMANTIC_REVIEW"
+    },
+    {
+      "id": "T46",
+      "split": "train",
+      "task": "session_analysis",
+      "title": "도움 제안을 거절한 뒤 수행",
+      "input_mapping_issues": [
+        "UNMAPPED_EVENT_TYPE:external_support_offer",
+        "UNMAPPED_EVENT_TYPE:report"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false,
+      "removed_output_card_ids": [
+        "G04"
+      ],
+      "target_status": "TRANSPORT_PREVIEW_REQUIRES_SEMANTIC_REVIEW"
+    },
+    {
+      "id": "T47",
+      "split": "train",
+      "task": "session_analysis",
+      "title": "명시된 무촉구 조건과 품목 달성을 구별",
+      "input_mapping_issues": [
+        "LABEL_POLICY_PENDING_FROM_CONTENT_REVIEW",
+        "UNMAPPED_CONTEXT_FIELD:supportPolicy",
+        "UNMAPPED_CONTEXT_FIELD:taskPurpose",
+        "UNMAPPED_EVENT_TYPE:external_support"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false,
+      "removed_output_card_ids": [
+        "P01"
+      ],
+      "target_status": "TRANSPORT_PREVIEW_REQUIRES_SEMANTIC_REVIEW"
+    },
+    {
+      "id": "T48",
+      "split": "train",
+      "task": "session_analysis",
+      "title": "총 낱개 수와 품목 종류 수 구별",
+      "input_mapping_issues": [],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": true,
+      "removed_output_card_ids": [
+        "M01"
+      ],
+      "target_status": "TRANSPORT_PREVIEW_REQUIRES_SEMANTIC_REVIEW"
+    },
+    {
+      "id": "T49",
+      "split": "train",
+      "task": "session_analysis",
+      "title": "목록 닫기까지 있으나 최종 사건 유실",
+      "input_mapping_issues": [
+        "PARTIAL_SCOPE_REQUIRES_REAUTHORING: do not convert observation coverage into transport integrity",
+        "UNMAPPED_EVENT_TYPE:collector_gap"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false,
+      "removed_output_card_ids": [
+        "P40"
+      ],
+      "target_status": "TRANSPORT_PREVIEW_REQUIRES_SEMANTIC_REVIEW"
+    },
+    {
+      "id": "T50",
+      "split": "train",
+      "task": "session_analysis",
+      "title": "시작 신호만 있을 때 관찰을 만들어 채우지 않음",
+      "input_mapping_issues": [
+        "PARTIAL_SCOPE_REQUIRES_REAUTHORING: do not convert observation coverage into transport integrity"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false,
+      "removed_output_card_ids": [
+        "G01"
+      ],
+      "target_status": "TRANSPORT_PREVIEW_REQUIRES_SEMANTIC_REVIEW"
+    },
+    {
+      "id": "T51",
+      "split": "train",
+      "task": "profile_update",
+      "title": "뒤늦게 확인된 목표 버전으로 같은 세션 정정",
+      "input_mapping_issues": [
+        "PROFILE_STAGE_SEPARATE: production profile has previous/current analyses and R references, not the seed raw timeline/cards",
+        "PROFILE_PREVIOUS_FIELDS_MISSING:findings,practicePlan,uncertainties,usedEvidenceCardIds"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false
+    },
+    {
+      "id": "T52",
+      "split": "train",
+      "task": "profile_update",
+      "title": "문자 지원이 줄어든 조건의 성공 범위",
+      "input_mapping_issues": [
+        "PROFILE_STAGE_SEPARATE: production profile has previous/current analyses and R references, not the seed raw timeline/cards",
+        "PROFILE_TARGET_EVIDENCE_NOT_AVAILABLE:1",
+        "PROFILE_PREVIOUS_FIELDS_MISSING:findings,practicePlan,uncertainties,usedEvidenceCardIds"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false
+    },
+    {
+      "id": "T53",
+      "split": "train",
+      "task": "profile_update",
+      "title": "이전의 선호 추측을 직접 보고로 수정",
+      "input_mapping_issues": [
+        "PROFILE_STAGE_SEPARATE: production profile has previous/current analyses and R references, not the seed raw timeline/cards",
+        "PROFILE_TARGET_EVIDENCE_NOT_AVAILABLE:1",
+        "PROFILE_PREVIOUS_FIELDS_MISSING:findings,practicePlan,uncertainties,usedEvidenceCardIds"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false
+    },
+    {
+      "id": "T54",
+      "split": "train",
+      "task": "profile_update",
+      "title": "새 예산 실패가 확인된 품목 수행까지 지우지 않음",
+      "input_mapping_issues": [
+        "PROFILE_STAGE_SEPARATE: production profile has previous/current analyses and R references, not the seed raw timeline/cards",
+        "PROFILE_TARGET_EVIDENCE_NOT_AVAILABLE:1",
+        "PROFILE_PREVIOUS_FIELDS_MISSING:findings,practicePlan,uncertainties,usedEvidenceCardIds"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false
+    },
+    {
+      "id": "T55",
+      "split": "train",
+      "task": "profile_update",
+      "title": "이전 결과가 없으면 향상의 출발점을 가정하지 않음",
+      "input_mapping_issues": [
+        "PROFILE_STAGE_SEPARATE: production profile has previous/current analyses and R references, not the seed raw timeline/cards",
+        "PROFILE_TARGET_EVIDENCE_NOT_AVAILABLE:1",
+        "PROFILE_PREVIOUS_FIELDS_MISSING:findings,practicePlan,uncertainties,usedEvidenceCardIds"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false
+    },
+    {
+      "id": "T56",
+      "split": "train",
+      "task": "profile_update",
+      "title": "과거의 과장된 성공 횟수를 근거로 쓰지 않음",
+      "input_mapping_issues": [
+        "PROFILE_STAGE_SEPARATE: production profile has previous/current analyses and R references, not the seed raw timeline/cards",
+        "PROFILE_TARGET_EVIDENCE_NOT_AVAILABLE:1",
+        "PROFILE_PREVIOUS_FIELDS_MISSING:findings,practicePlan,uncertainties,usedEvidenceCardIds"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false
+    },
+    {
+      "id": "T57",
+      "split": "train",
+      "task": "profile_update",
+      "title": "기술 문제 해결을 사용자 인지 회복으로 설명하지 않음",
+      "input_mapping_issues": [
+        "PROFILE_STAGE_SEPARATE: production profile has previous/current analyses and R references, not the seed raw timeline/cards",
+        "PROFILE_TARGET_EVIDENCE_NOT_AVAILABLE:1",
+        "PROFILE_PREVIOUS_FIELDS_MISSING:findings,practicePlan,uncertainties,usedEvidenceCardIds"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false
+    },
+    {
+      "id": "T58",
+      "split": "train",
+      "task": "profile_update",
+      "title": "다른 수량에서도 네 품목 수행이 확인된 경우",
+      "input_mapping_issues": [
+        "PROFILE_STAGE_SEPARATE: production profile has previous/current analyses and R references, not the seed raw timeline/cards",
+        "PROFILE_TARGET_EVIDENCE_NOT_AVAILABLE:1",
+        "PROFILE_PREVIOUS_FIELDS_MISSING:findings,practicePlan,uncertainties,usedEvidenceCardIds"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false
+    },
+    {
+      "id": "T59",
+      "split": "train",
+      "task": "profile_update",
+      "title": "일시적 오류 관찰을 평생 특성으로 유지하지 않음",
+      "input_mapping_issues": [
+        "PROFILE_STAGE_SEPARATE: production profile has previous/current analyses and R references, not the seed raw timeline/cards",
+        "PROFILE_TARGET_EVIDENCE_NOT_AVAILABLE:2",
+        "PROFILE_PREVIOUS_FIELDS_MISSING:findings,practicePlan,uncertainties,usedEvidenceCardIds"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false
+    },
+    {
+      "id": "T60",
+      "split": "train",
+      "task": "profile_update",
+      "title": "기존 프로필의 미지원 기능 제안 수정",
+      "input_mapping_issues": [
+        "PROFILE_STAGE_SEPARATE: production profile has previous/current analyses and R references, not the seed raw timeline/cards",
+        "PROFILE_PREVIOUS_FIELDS_MISSING:findings,practicePlan,uncertainties,usedEvidenceCardIds"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false
+    },
+    {
+      "id": "E01",
+      "split": "eval",
+      "task": "session_analysis",
+      "title": "부분 성공과 중단을 분리한 새 목표",
+      "input_mapping_issues": [
+        "UNMAPPED_END_REASON:USER_REQUEST",
+        "UNMAPPED_EVENT_TYPE:report"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false,
+      "removed_output_card_ids": [
+        "G06"
+      ],
+      "target_status": "TRANSPORT_PREVIEW_REQUIRES_SEMANTIC_REVIEW"
+    },
+    {
+      "id": "E02",
+      "split": "eval",
+      "task": "session_analysis",
+      "title": "불편감 보고와 기술 오류가 함께 있는 기록",
+      "input_mapping_issues": [
+        "UNMAPPED_END_REASON:USER_REQUEST",
+        "UNMAPPED_EVENT_TYPE:render_error",
+        "UNMAPPED_EVENT_TYPE:report"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false,
+      "removed_output_card_ids": [
+        "G07"
+      ],
+      "target_status": "TRANSPORT_PREVIEW_REQUIRES_SEMANTIC_REVIEW"
+    },
+    {
+      "id": "E03",
+      "split": "eval",
+      "task": "session_analysis",
+      "title": "같은 진단 정보가 다른 수행을 덮어쓰지 않음",
+      "input_mapping_issues": [
+        "UNMAPPED_CONTEXT_FIELD:background"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false,
+      "removed_output_card_ids": [
+        "P16"
+      ],
+      "target_status": "TRANSPORT_PREVIEW_REQUIRES_SEMANTIC_REVIEW"
+    },
+    {
+      "id": "E04",
+      "split": "eval",
+      "task": "session_analysis",
+      "title": "보호자 보고와 게임 기록의 관찰 범위",
+      "input_mapping_issues": [
+        "UNMAPPED_EVENT_TYPE:report"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false,
+      "removed_output_card_ids": [
+        "P20"
+      ],
+      "target_status": "TRANSPORT_PREVIEW_REQUIRES_SEMANTIC_REVIEW"
+    },
+    {
+      "id": "E05",
+      "split": "eval",
+      "task": "session_analysis",
+      "title": "도움을 원한다는 당사자 보고를 존중",
+      "input_mapping_issues": [
+        "UNMAPPED_EVENT_TYPE:report"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false,
+      "removed_output_card_ids": [
+        "P30"
+      ],
+      "target_status": "TRANSPORT_PREVIEW_REQUIRES_SEMANTIC_REVIEW"
+    },
+    {
+      "id": "E06",
+      "split": "eval",
+      "task": "session_analysis",
+      "title": "시간 경과 후 유지 결과를 별도로 기록",
+      "input_mapping_issues": [],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": true,
+      "removed_output_card_ids": [
+        "P10"
+      ],
+      "target_status": "TRANSPORT_PREVIEW_REQUIRES_SEMANTIC_REVIEW"
+    },
+    {
+      "id": "E07",
+      "split": "eval",
+      "task": "session_analysis",
+      "title": "여러 조건이 동시에 바뀐 빠른 성공",
+      "input_mapping_issues": [
+        "UNMAPPED_CONTEXT_FIELD:textSupport"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false,
+      "removed_output_card_ids": [
+        "M02"
+      ],
+      "target_status": "TRANSPORT_PREVIEW_REQUIRES_SEMANTIC_REVIEW"
+    },
+    {
+      "id": "E08",
+      "split": "eval",
+      "task": "profile_update",
+      "title": "새로운 선호를 누적 프로필에 반영",
+      "input_mapping_issues": [
+        "PROFILE_STAGE_SEPARATE: production profile has previous/current analyses and R references, not the seed raw timeline/cards",
+        "PROFILE_TARGET_EVIDENCE_NOT_AVAILABLE:1",
+        "PROFILE_PREVIOUS_FIELDS_MISSING:findings,practicePlan,uncertainties,usedEvidenceCardIds"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false
+    },
+    {
+      "id": "E09",
+      "split": "eval",
+      "task": "profile_update",
+      "title": "불확실성을 가진 보고를 누적 사실로 바꾸지 않음",
+      "input_mapping_issues": [
+        "PROFILE_STAGE_SEPARATE: production profile has previous/current analyses and R references, not the seed raw timeline/cards",
+        "PROFILE_TARGET_EVIDENCE_NOT_AVAILABLE:2",
+        "PROFILE_PREVIOUS_FIELDS_MISSING:findings,practicePlan,uncertainties,usedEvidenceCardIds"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false
+    },
+    {
+      "id": "E10",
+      "split": "eval",
+      "task": "profile_update",
+      "title": "목표 수량 변경을 수행 저하로 오해하지 않음",
+      "input_mapping_issues": [
+        "PROFILE_STAGE_SEPARATE: production profile has previous/current analyses and R references, not the seed raw timeline/cards",
+        "PROFILE_TARGET_EVIDENCE_NOT_AVAILABLE:1",
+        "PROFILE_PREVIOUS_FIELDS_MISSING:findings,practicePlan,uncertainties,usedEvidenceCardIds"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false
+    },
+    {
+      "id": "E11",
+      "split": "eval",
+      "task": "session_analysis",
+      "title": "서로 충돌하는 두 최종 스냅샷",
+      "input_mapping_issues": [
+        "UNMAPPED_CONTEXT_FIELD:completionEvidence",
+        "UNMAPPED_CONTEXT_FIELD:orderSemantics",
+        "UNMAPPED_EVENT_TYPE:final_snapshot"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false,
+      "removed_output_card_ids": [
+        "M02"
+      ],
+      "target_status": "TRANSPORT_PREVIEW_REQUIRES_SEMANTIC_REVIEW"
+    },
+    {
+      "id": "E12",
+      "split": "eval",
+      "task": "session_analysis",
+      "title": "이전 성공의 장바구니가 새 과제로 이월된 경우",
+      "input_mapping_issues": [
+        "UNMAPPED_EVENT_TYPE:cart_restored"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false,
+      "removed_output_card_ids": [
+        "P16"
+      ],
+      "target_status": "TRANSPORT_PREVIEW_REQUIRES_SEMANTIC_REVIEW"
+    },
+    {
+      "id": "E13",
+      "split": "eval",
+      "task": "session_analysis",
+      "title": "진행자가 대신 조작한 결과",
+      "input_mapping_issues": [
+        "UNMAPPED_CONTEXT_FIELD:taskPurpose",
+        "UNMAPPED_EVENT_FIELD:submission.actor",
+        "UNMAPPED_EVENT_TYPE:operator_changed"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false,
+      "removed_output_card_ids": [
+        "P20"
+      ],
+      "target_status": "TRANSPORT_PREVIEW_REQUIRES_SEMANTIC_REVIEW"
+    },
+    {
+      "id": "E14",
+      "split": "eval",
+      "task": "session_analysis",
+      "title": "읽지 않았다는 보고와 맞는 제출이 함께 있음",
+      "input_mapping_issues": [
+        "UNMAPPED_EVENT_TYPE:report"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false,
+      "removed_output_card_ids": [
+        "P30"
+      ],
+      "target_status": "TRANSPORT_PREVIEW_REQUIRES_SEMANTIC_REVIEW"
+    },
+    {
+      "id": "E15",
+      "split": "eval",
+      "task": "session_analysis",
+      "title": "복습 뒤 재성공과 장기 유지의 차이",
+      "input_mapping_issues": [
+        "UNMAPPED_EVENT_TYPE:external_support"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false,
+      "removed_output_card_ids": [
+        "P10"
+      ],
+      "target_status": "TRANSPORT_PREVIEW_REQUIRES_SEMANTIC_REVIEW"
+    },
+    {
+      "id": "E16",
+      "split": "eval",
+      "task": "session_analysis",
+      "title": "계획한 교육과 실제 제공된 교육을 구별",
+      "input_mapping_issues": [
+        "UNMAPPED_EVENT_TYPE:delivery_record",
+        "UNMAPPED_EVENT_TYPE:scheduled_practice"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false,
+      "removed_output_card_ids": [
+        "M02"
+      ],
+      "target_status": "TRANSPORT_PREVIEW_REQUIRES_SEMANTIC_REVIEW"
+    },
+    {
+      "id": "E17",
+      "split": "eval",
+      "task": "session_analysis",
+      "title": "더 어려운 과제를 원하는 선호와 능력 구분",
+      "input_mapping_issues": [
+        "UNMAPPED_EVENT_TYPE:report"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false,
+      "removed_output_card_ids": [
+        "P31"
+      ],
+      "target_status": "TRANSPORT_PREVIEW_REQUIRES_SEMANTIC_REVIEW"
+    },
+    {
+      "id": "E18",
+      "split": "eval",
+      "task": "session_analysis",
+      "title": "서버 목표와 표시 목표가 서로 다른 과제",
+      "input_mapping_issues": [
+        "UNMAPPED_CONTEXT_FIELD:goalAuthority",
+        "UNMAPPED_CONTEXT_FIELD:taskVersion",
+        "UNMAPPED_EVENT_TYPE:instruction_rendered"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false,
+      "removed_output_card_ids": [
+        "M02"
+      ],
+      "target_status": "TRANSPORT_PREVIEW_REQUIRES_SEMANTIC_REVIEW"
+    },
+    {
+      "id": "E19",
+      "split": "eval",
+      "task": "session_analysis",
+      "title": "로그에 적힌 논문 해석을 출처 사실로 믿지 않음",
+      "input_mapping_issues": [
+        "UNMAPPED_EVENT_TYPE:note"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false,
+      "removed_output_card_ids": [
+        "P16"
+      ],
+      "target_status": "TRANSPORT_PREVIEW_REQUIRES_SEMANTIC_REVIEW"
+    },
+    {
+      "id": "E20",
+      "split": "eval",
+      "task": "session_analysis",
+      "title": "완료 뒤 중단 요청을 실패로 되돌리지 않음",
+      "input_mapping_issues": [
+        "UNMAPPED_END_REASON:USER_REQUEST",
+        "UNMAPPED_EVENT_TYPE:report"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false,
+      "removed_output_card_ids": [
+        "G06"
+      ],
+      "target_status": "TRANSPORT_PREVIEW_REQUIRES_SEMANTIC_REVIEW"
+    },
+    {
+      "id": "E21",
+      "split": "eval",
+      "task": "profile_update",
+      "title": "다른 ID로 재수집된 같은 플레이",
+      "input_mapping_issues": [
+        "PROFILE_STAGE_SEPARATE: production profile has previous/current analyses and R references, not the seed raw timeline/cards",
+        "PROFILE_TARGET_EVIDENCE_NOT_AVAILABLE:1",
+        "PROFILE_PREVIOUS_FIELDS_MISSING:findings,practicePlan,uncertainties,usedEvidenceCardIds"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false
+    },
+    {
+      "id": "E22",
+      "split": "eval",
+      "task": "profile_update",
+      "title": "현재 AI 분석에 들어온 과잉해석도 정정",
+      "input_mapping_issues": [
+        "PROFILE_STAGE_SEPARATE: production profile has previous/current analyses and R references, not the seed raw timeline/cards",
+        "PROFILE_TARGET_EVIDENCE_NOT_AVAILABLE:1",
+        "PROFILE_PREVIOUS_FIELDS_MISSING:findings,practicePlan,uncertainties,usedEvidenceCardIds"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false
+    },
+    {
+      "id": "E23",
+      "split": "eval",
+      "task": "profile_update",
+      "title": "보호자와 진행자의 상반된 보고를 함께 보존",
+      "input_mapping_issues": [
+        "PROFILE_STAGE_SEPARATE: production profile has previous/current analyses and R references, not the seed raw timeline/cards",
+        "PROFILE_TARGET_EVIDENCE_NOT_AVAILABLE:1",
+        "PROFILE_PREVIOUS_FIELDS_MISSING:findings,practicePlan,uncertainties,usedEvidenceCardIds"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false
+    },
+    {
+      "id": "E24",
+      "split": "eval",
+      "task": "profile_update",
+      "title": "아동 집단 연구를 성인 개인의 특성으로 옮기지 않음",
+      "input_mapping_issues": [
+        "PROFILE_STAGE_SEPARATE: production profile has previous/current analyses and R references, not the seed raw timeline/cards",
+        "PROFILE_TARGET_EVIDENCE_NOT_AVAILABLE:1",
+        "PROFILE_PREVIOUS_FIELDS_MISSING:findings,practicePlan,uncertainties,usedEvidenceCardIds"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false
+    },
+    {
+      "id": "E25",
+      "split": "eval",
+      "task": "profile_update",
+      "title": "일반화 성공 보고 뒤 실제 실패가 나온 경우",
+      "input_mapping_issues": [
+        "PROFILE_STAGE_SEPARATE: production profile has previous/current analyses and R references, not the seed raw timeline/cards",
+        "PROFILE_TARGET_EVIDENCE_NOT_AVAILABLE:1",
+        "PROFILE_PREVIOUS_FIELDS_MISSING:findings,practicePlan,uncertainties,usedEvidenceCardIds"
+      ],
+      "training_approved": false,
+      "source_review": {
+        "status": "draft",
+        "domain_expert_reviewed": false,
+        "source_rights_reviewed": false,
+        "training_approved": false
+      },
+      "native_fixture": false
+    }
+  ]
+}

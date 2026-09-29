@@ -1,0 +1,106 @@
+{
+  "id": "931ddd89-f674-5812-8e4c-33f2d7e4e6fe",
+  "schemaVersion": "synthetic-native-v2",
+  "generatedAt": "2026-01-31T00:00:00Z",
+  "sessionCount": 1,
+  "eventCount": 3,
+  "input": {
+    "schemaVersion": "synthetic-native-v2",
+    "datasetId": "931ddd89-f674-5812-8e4c-33f2d7e4e6fe",
+    "generatedAt": "2026-01-31T00:00:00Z",
+    "analysisWindow": null,
+    "anonymousSubjectId": "T37-synthetic",
+    "sessionCount": 1,
+    "eventCount": 3,
+    "sessions": [
+      {
+        "sessionId": "d547f021-ddc6-58c4-bbd4-c7537737e86d",
+        "startedAt": "2026-01-01T00:00:00Z",
+        "endedAt": null,
+        "integrity": null,
+        "events": [
+          {
+            "behaviorLogId": "cb6f8bd2-5309-5eca-88f5-6f7ea0b3ae13",
+            "sequence": 1,
+            "elapsedFromSessionStartMs": 10000,
+            "occurredAt": "2026-01-01T00:00:10Z",
+            "receivedAt": "2026-01-01T00:00:10Z",
+            "eventSchemaVersion": "synthetic-native-v2",
+            "action": {
+              "eventCode": "SHOP.CART_OPENED"
+            },
+            "payload": {
+              "type": "SHOPPING",
+              "marketContent": {
+                "cart": {
+                  "사과": 2,
+                  "생수": 1,
+                  "과자": 1
+                },
+                "sceneSnapshot": {
+                  "schemaVersion": "market-scene-v1",
+                  "mission": {
+                    "id": "T37-mission",
+                    "description": "목표 목록의 물건과 수량을 담고 총액은 예산 이하로 제출하세요. 목록의 물건만 담으세요.",
+                    "budget": 4000,
+                    "objectives": [
+                      {
+                        "productId": "사과",
+                        "quantity": 2,
+                        "label": "사과"
+                      },
+                      {
+                        "productId": "생수",
+                        "quantity": 1,
+                        "label": "생수"
+                      }
+                    ]
+                  },
+                  "layoutVersion": "synthetic-layout-v2"
+                }
+              }
+            }
+          },
+          {
+            "behaviorLogId": "59cc585a-dbb1-5f09-b42c-49c1f86e7cfc",
+            "sequence": 2,
+            "elapsedFromSessionStartMs": 20000,
+            "occurredAt": "2026-01-01T00:00:20Z",
+            "receivedAt": "2026-01-01T00:00:20Z",
+            "eventSchemaVersion": "synthetic-native-v2",
+            "action": {
+              "eventCode": "SHOP.QUANTITY_CHANGED"
+            },
+            "payload": {
+              "type": "SHOPPING",
+              "itemId": "과자",
+              "quantityBefore": 1,
+              "quantityAfter": 0
+            }
+          },
+          {
+            "behaviorLogId": "898caa47-97f2-562b-b961-0d9dce1ffffd",
+            "sequence": 3,
+            "elapsedFromSessionStartMs": 30000,
+            "occurredAt": "2026-01-01T00:00:30Z",
+            "receivedAt": "2026-01-01T00:00:30Z",
+            "eventSchemaVersion": "synthetic-native-v2",
+            "action": {
+              "eventCode": "SHOP.CHECKOUT_SUBMITTED"
+            },
+            "payload": {
+              "type": "SHOPPING",
+              "marketContent": {
+                "cart": {
+                  "사과": 2,
+                  "생수": 1
+                }
+              },
+              "cartTotalAmount": 3200
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

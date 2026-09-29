@@ -1,0 +1,134 @@
+{
+  "device": "NVIDIA TITAN RTX",
+  "torch": "2.10.0+cu128",
+  "results": [
+    {
+      "dtype": "torch.float32",
+      "train_head": false,
+      "chunk_size": 1,
+      "loss_abs_error": 4.76837158203125e-07,
+      "max_gradient_error": 2.0954757928848267e-09,
+      "passed": true
+    },
+    {
+      "dtype": "torch.float32",
+      "train_head": false,
+      "chunk_size": 7,
+      "loss_abs_error": 4.76837158203125e-07,
+      "max_gradient_error": 2.561137080192566e-09,
+      "passed": true
+    },
+    {
+      "dtype": "torch.float32",
+      "train_head": false,
+      "chunk_size": 32,
+      "loss_abs_error": 0.0,
+      "max_gradient_error": 1.3969838619232178e-09,
+      "passed": true
+    },
+    {
+      "dtype": "torch.float32",
+      "train_head": false,
+      "chunk_size": 99,
+      "loss_abs_error": 0.0,
+      "max_gradient_error": 0.0,
+      "passed": true
+    },
+    {
+      "dtype": "torch.float32",
+      "train_head": true,
+      "chunk_size": 1,
+      "loss_abs_error": 4.76837158203125e-07,
+      "max_gradient_error": 2.2351741790771484e-08,
+      "passed": true
+    },
+    {
+      "dtype": "torch.float32",
+      "train_head": true,
+      "chunk_size": 7,
+      "loss_abs_error": 4.76837158203125e-07,
+      "max_gradient_error": 2.2351741790771484e-08,
+      "passed": true
+    },
+    {
+      "dtype": "torch.float32",
+      "train_head": true,
+      "chunk_size": 32,
+      "loss_abs_error": 0.0,
+      "max_gradient_error": 7.450580596923828e-09,
+      "passed": true
+    },
+    {
+      "dtype": "torch.float32",
+      "train_head": true,
+      "chunk_size": 99,
+      "loss_abs_error": 0.0,
+      "max_gradient_error": 0.0,
+      "passed": true
+    },
+    {
+      "dtype": "torch.float16",
+      "train_head": false,
+      "chunk_size": 1,
+      "loss_abs_error": 0.0,
+      "max_gradient_error": 1.9073486328125e-06,
+      "passed": true
+    },
+    {
+      "dtype": "torch.float16",
+      "train_head": false,
+      "chunk_size": 7,
+      "loss_abs_error": 0.0,
+      "max_gradient_error": 1.9073486328125e-06,
+      "passed": true
+    },
+    {
+      "dtype": "torch.float16",
+      "train_head": false,
+      "chunk_size": 32,
+      "loss_abs_error": 0.0,
+      "max_gradient_error": 0.0,
+      "passed": true
+    },
+    {
+      "dtype": "torch.float16",
+      "train_head": false,
+      "chunk_size": 99,
+      "loss_abs_error": 0.0,
+      "max_gradient_error": 0.0,
+      "passed": true
+    },
+    {
+      "dtype": "torch.float16",
+      "train_head": true,
+      "chunk_size": 1,
+      "loss_abs_error": 4.76837158203125e-07,
+      "max_gradient_error": 0.00030517578125,
+      "passed": true
+    },
+    {
+      "dtype": "torch.float16",
+      "train_head": true,
+      "chunk_size": 7,
+      "loss_abs_error": 4.76837158203125e-07,
+      "max_gradient_error": 6.103515625e-05,
+      "passed": true
+    },
+    {
+      "dtype": "torch.float16",
+      "train_head": true,
+      "chunk_size": 32,
+      "loss_abs_error": 4.76837158203125e-07,
+      "max_gradient_error": 6.103515625e-05,
+      "passed": true
+    },
+    {
+      "dtype": "torch.float16",
+      "train_head": true,
+      "chunk_size": 99,
+      "loss_abs_error": 0.0,
+      "max_gradient_error": 0.0,
+      "passed": true
+    }
+  ]
+}

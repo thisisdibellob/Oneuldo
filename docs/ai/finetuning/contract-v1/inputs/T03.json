@@ -1,0 +1,99 @@
+{
+  "id": "f03706e3-854e-547f-a81a-85e009da7221",
+  "schemaVersion": "synthetic-contract-fixture-v1",
+  "generatedAt": "2026-01-01T00:00:00Z",
+  "sessionCount": 1,
+  "eventCount": 3,
+  "input": {
+    "schemaVersion": "synthetic-contract-fixture-v1",
+    "datasetId": "f03706e3-854e-547f-a81a-85e009da7221",
+    "generatedAt": "2026-01-01T00:00:00Z",
+    "analysisWindow": null,
+    "anonymousSubjectId": "T03-synthetic",
+    "sessionCount": 1,
+    "eventCount": 3,
+    "sessions": [
+      {
+        "sessionId": "faa82d38-e6ef-55d8-856e-3f1f2ab3ddc6",
+        "startedAt": "2026-01-01T00:00:00Z",
+        "endedAt": null,
+        "integrity": null,
+        "events": [
+          {
+            "behaviorLogId": "bf53c0c2-0b5a-5fc2-8e27-30fdb6816299",
+            "sequence": 1,
+            "occurredAt": "2026-01-01T00:00:00Z",
+            "receivedAt": "2026-01-01T00:00:00Z",
+            "elapsedFromSessionStartMs": 0,
+            "eventSchemaVersion": "synthetic-contract-fixture-v1",
+            "action": {
+              "eventCode": "SHOP.CART_OPENED"
+            },
+            "payload": {
+              "type": "SHOPPING",
+              "marketContent": {
+                "cart": {
+                  "사과": 2
+                },
+                "sceneSnapshot": {
+                  "mission": {
+                    "budget": 4000,
+                    "objectives": [
+                      {
+                        "productId": "사과",
+                        "quantity": 2,
+                        "label": "사과"
+                      },
+                      {
+                        "productId": "생수",
+                        "quantity": 1,
+                        "label": "생수"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          {
+            "behaviorLogId": "eeddba08-7d96-5611-8dca-38ebc3bb9db4",
+            "sequence": 2,
+            "occurredAt": "2026-01-01T00:00:00Z",
+            "receivedAt": "2026-01-01T00:00:00Z",
+            "elapsedFromSessionStartMs": 0,
+            "eventSchemaVersion": "synthetic-contract-fixture-v1",
+            "action": {
+              "eventCode": "SHOP.CHECKOUT_SUBMITTED"
+            },
+            "payload": {
+              "type": "SHOPPING",
+              "marketContent": {
+                "cart": {
+                  "사과": 2
+                }
+              },
+              "cartTotalAmount": 2400
+            }
+          },
+          {
+            "behaviorLogId": "c6fafd12-e29e-536a-8020-6ad61ee8c157",
+            "sequence": 3,
+            "occurredAt": "2026-01-01T00:00:00Z",
+            "receivedAt": "2026-01-01T00:00:00Z",
+            "elapsedFromSessionStartMs": 0,
+            "eventSchemaVersion": "synthetic-contract-fixture-v1",
+            "action": {
+              "eventCode": "SHOP.SESSION_ENDED"
+            },
+            "payload": {
+              "type": "SHOPPING"
+            },
+            "sessionEnd": {
+              "reason": "USER_ABORTED"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

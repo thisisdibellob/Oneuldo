@@ -1,0 +1,68 @@
+{
+  "id": "f7097381-39e7-54a4-ab24-e6590c817303",
+  "schemaVersion": "synthetic-native-v2",
+  "generatedAt": "2026-01-31T00:00:00Z",
+  "sessionCount": 1,
+  "eventCount": 1,
+  "input": {
+    "schemaVersion": "synthetic-native-v2",
+    "datasetId": "f7097381-39e7-54a4-ab24-e6590c817303",
+    "generatedAt": "2026-01-31T00:00:00Z",
+    "analysisWindow": null,
+    "anonymousSubjectId": "T34-synthetic",
+    "sessionCount": 1,
+    "eventCount": 1,
+    "sessions": [
+      {
+        "sessionId": "78dffb0f-ecc0-55e3-8bcb-0e59de35f1b3",
+        "startedAt": "2026-01-01T00:00:00Z",
+        "endedAt": null,
+        "integrity": null,
+        "events": [
+          {
+            "behaviorLogId": "1a8914c4-4e62-531f-afe2-2a2a84b0c959",
+            "sequence": 1,
+            "elapsedFromSessionStartMs": 10000,
+            "occurredAt": "2026-01-01T00:00:10Z",
+            "receivedAt": "2026-01-01T00:00:10Z",
+            "eventSchemaVersion": "synthetic-native-v2",
+            "action": {
+              "eventCode": "SHOP.CHECKOUT_SUBMITTED"
+            },
+            "payload": {
+              "type": "SHOPPING",
+              "marketContent": {
+                "cart": {
+                  "생수묶음": 1,
+                  "빵": 1
+                },
+                "sceneSnapshot": {
+                  "schemaVersion": "market-scene-v1",
+                  "mission": {
+                    "id": "T34-mission",
+                    "description": "목표 목록의 물건과 수량을 담고 총액은 예산 이하로 제출하세요.",
+                    "budget": 6000,
+                    "objectives": [
+                      {
+                        "productId": "생수병",
+                        "quantity": 2,
+                        "label": "생수병"
+                      },
+                      {
+                        "productId": "빵",
+                        "quantity": 1,
+                        "label": "빵"
+                      }
+                    ]
+                  },
+                  "layoutVersion": "synthetic-layout-v2"
+                }
+              },
+              "cartTotalAmount": 4500
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

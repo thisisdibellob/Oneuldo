@@ -1,0 +1,10 @@
+{
+  "java_tests": 3,
+  "java_failures": 0,
+  "production_roundtrips": 85,
+  "python_data_tests": 6,
+  "gpu_loss_numerical_cases": 16,
+  "gpu_embedding_dtype_cases": 2,
+  "v3_hashes_match": true,
+  "eval_bytes_unchanged": true
+}

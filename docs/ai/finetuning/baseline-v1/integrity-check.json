@@ -1,0 +1,11 @@
+{
+  "evaluation_cases": 25,
+  "frozen_source_bytes_match": true,
+  "eval_sha256": "48498007238a24a442d23d775fd915efb8c98521fa32a5a2713269eff84c85a2",
+  "request_hashes_match": 25,
+  "only_system_user_sent": 25,
+  "returned_model_tag_matches": 25,
+  "semantic_review_cases": 25,
+  "api_key_absent_from_artifacts": true,
+  "original_responses_preserved": true
+}

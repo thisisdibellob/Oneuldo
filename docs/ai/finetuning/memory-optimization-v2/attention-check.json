@@ -1,0 +1,26 @@
+{
+  "torch": "2.10.0+cu128",
+  "device": "NVIDIA TITAN RTX",
+  "compute_capability": [
+    7,
+    5
+  ],
+  "results": [
+    {
+      "repeat_kv": false,
+      "passed": false,
+      "type": "RuntimeError",
+      "error": "No available kernel. Aborting execution."
+    },
+    {
+      "repeat_kv": true,
+      "passed": true,
+      "max_absolute_errors_output_q_k_v": [
+        0.001953125,
+        0.001953125,
+        0.00390625,
+        0.0078125
+      ]
+    }
+  ]
+}

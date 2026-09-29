@@ -1,0 +1,110 @@
+{
+  "id": "359ee99d-9a43-50f0-8fba-128a7c66b8b7",
+  "schemaVersion": "synthetic-contract-fixture-v1",
+  "generatedAt": "2026-01-01T00:00:00Z",
+  "sessionCount": 2,
+  "eventCount": 2,
+  "input": {
+    "schemaVersion": "synthetic-contract-fixture-v1",
+    "datasetId": "359ee99d-9a43-50f0-8fba-128a7c66b8b7",
+    "generatedAt": "2026-01-01T00:00:00Z",
+    "analysisWindow": null,
+    "anonymousSubjectId": "E06-synthetic",
+    "sessionCount": 2,
+    "eventCount": 2,
+    "sessions": [
+      {
+        "sessionId": "b4cf07a3-e30b-5c89-9d8b-d37c0128554e",
+        "startedAt": "2026-01-01T00:00:00Z",
+        "endedAt": null,
+        "integrity": null,
+        "events": [
+          {
+            "behaviorLogId": "070bcfce-d84d-58a2-a1fb-5960f5abf1bd",
+            "sequence": 1,
+            "occurredAt": "2026-01-01T00:00:00Z",
+            "receivedAt": "2026-01-01T00:00:00Z",
+            "elapsedFromSessionStartMs": 0,
+            "eventSchemaVersion": "synthetic-contract-fixture-v1",
+            "action": {
+              "eventCode": "SHOP.CHECKOUT_SUBMITTED"
+            },
+            "payload": {
+              "type": "SHOPPING",
+              "marketContent": {
+                "cart": {
+                  "바나나": 2,
+                  "요거트": 1
+                },
+                "sceneSnapshot": {
+                  "mission": {
+                    "budget": 6000,
+                    "objectives": [
+                      {
+                        "productId": "바나나",
+                        "quantity": 2,
+                        "label": "바나나"
+                      },
+                      {
+                        "productId": "요거트",
+                        "quantity": 1,
+                        "label": "요거트"
+                      }
+                    ]
+                  }
+                }
+              },
+              "cartTotalAmount": 4800
+            }
+          }
+        ]
+      },
+      {
+        "sessionId": "a5447bea-2c00-5df2-90e4-2a9ed26aeaf5",
+        "startedAt": "2026-01-15T00:00:00Z",
+        "endedAt": null,
+        "integrity": null,
+        "events": [
+          {
+            "behaviorLogId": "b1c0ec47-38ef-5d31-904f-49fdae0263bc",
+            "sequence": 1,
+            "occurredAt": "2026-01-15T00:00:00Z",
+            "receivedAt": "2026-01-15T00:00:00Z",
+            "elapsedFromSessionStartMs": 0,
+            "eventSchemaVersion": "synthetic-contract-fixture-v1",
+            "action": {
+              "eventCode": "SHOP.CHECKOUT_SUBMITTED"
+            },
+            "payload": {
+              "type": "SHOPPING",
+              "marketContent": {
+                "cart": {
+                  "바나나": 1,
+                  "요거트": 1
+                },
+                "sceneSnapshot": {
+                  "mission": {
+                    "budget": 6000,
+                    "objectives": [
+                      {
+                        "productId": "바나나",
+                        "quantity": 2,
+                        "label": "바나나"
+                      },
+                      {
+                        "productId": "요거트",
+                        "quantity": 1,
+                        "label": "요거트"
+                      }
+                    ]
+                  }
+                }
+              },
+              "cartTotalAmount": 3300
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

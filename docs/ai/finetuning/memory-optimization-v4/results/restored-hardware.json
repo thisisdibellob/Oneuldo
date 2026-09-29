@@ -1,0 +1,28 @@
+{
+  "at": "2026-09-24T06:57:55.542964+00:00",
+  "services": {
+    "exit_code": 0,
+    "output": "active\nactive\nactive\n",
+    "stderr": ""
+  },
+  "gpus": {
+    "exit_code": 0,
+    "output": "0, GPU-3d59f888-6fbf-36ca-144e-a9803ff027e9, 64 MiB, 0 %\n1, GPU-215716d9-f53e-fc5f-566e-f54fcbc700b1, 17203 MiB, 0 %\n",
+    "stderr": ""
+  },
+  "ollama": {
+    "exit_code": 0,
+    "output": "NAME                  ID              SIZE     PROCESSOR    CONTEXT    UNTIL              \nqwen3.6:27b-q4_K_M    3a40c32f1450    16 GB    100% GPU     8192       8 minutes from now    \n",
+    "stderr": ""
+  },
+  "probe_processes": {
+    "exit_code": 1,
+    "output": "",
+    "stderr": ""
+  },
+  "memory": {
+    "exit_code": 0,
+    "output": "              total        used        free      shared  buff/cache   available\nMem:          63980        2672       38167         753       23140       59840\nSwap:          2047        1383         664\n",
+    "stderr": ""
+  }
+}

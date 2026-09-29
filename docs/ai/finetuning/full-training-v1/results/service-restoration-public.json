@@ -1,0 +1,57 @@
+{
+  "endpoint": "https://oneuldo.duckdns.org",
+  "checks": [
+    {
+      "path": "/healthz",
+      "authenticated": false,
+      "status": 200,
+      "body": {
+        "status": "up"
+      },
+      "elapsed_seconds": 0.2877167919650674
+    },
+    {
+      "path": "/api/tags",
+      "authenticated": false,
+      "status": 401,
+      "elapsed_seconds": 0.03823924995958805
+    },
+    {
+      "path": "/api/tags",
+      "authenticated": true,
+      "status": 200,
+      "body": {
+        "models": [
+          {
+            "model": "qwen3.6:27b-q4_K_M",
+            "name": "qwen3.6:27b-q4_K_M"
+          }
+        ]
+      },
+      "elapsed_seconds": 0.08142770803533494
+    },
+    {
+      "path": "/api/chat",
+      "authenticated": true,
+      "status": 200,
+      "body": {
+        "model": "qwen3.6:27b-q4_K_M",
+        "created_at": "2026-09-24T15:56:56.719184685Z",
+        "message": {
+          "role": "assistant",
+          "content": "연결 성공"
+        },
+        "done": true,
+        "done_reason": "stop",
+        "total_duration": 16282040185,
+        "load_duration": 15907541381,
+        "prompt_eval_count": 23,
+        "prompt_eval_cached_count": 0,
+        "prompt_eval_duration": 243739000,
+        "eval_count": 4,
+        "eval_duration": 120086000
+      },
+      "elapsed_seconds": 20.759562958031893
+    }
+  ]
+}

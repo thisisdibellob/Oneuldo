@@ -1,0 +1,517 @@
+[
+  {
+    "id": "T04",
+    "reason": "불가능한 목표·예산의 원인 구분",
+    "changes": [
+      {
+        "path": "/messages/1/content/taskContext/0/pricePolicy",
+        "before": null,
+        "after": "표시된 단가 고정, 할인·쿠폰·대체 상품 없음"
+      },
+      {
+        "path": "/messages/1/content/taskContext/0/substitutionAllowed",
+        "before": null,
+        "after": false
+      },
+      {
+        "path": "/messages/2/content/findings/0/interpretation",
+        "before": "품목 조건은 충족했으나 이번 예산 4000원을 넘었다.",
+        "after": "지정 수량의 필수 총액이 예산보다 커서 품목·수량과 예산 조건을 동시에 만족할 수 없다. 과제 설정을 먼저 수정해야 하며 이 결과를 사용자의 계산 능력 부족으로 해석하지 않는다."
+      },
+      {
+        "path": "/messages/2/content/findings/0/suggestedSupport",
+        "before": "다음 2개 품목 과제에서는 예산 여유를 두고 총액과 예산을 비교하도록 문자 지원을 제공한다.",
+        "after": "다음 2개 품목 과제는 목표 수량을 담을 수 있는 예산으로 수정한 뒤 관찰한다."
+      },
+      {
+        "path": "/messages/2/content/practicePlan/goal",
+        "before": "2개 품목의 총액과 예산 비교",
+        "after": "달성 가능한 예산의 2개 품목 선택"
+      },
+      {
+        "path": "/messages/2/content/practicePlan/rationale",
+        "before": "도구를 이용한 금전 과제 수행과 암산 능력을 구분하여 지원한다.",
+        "after": "필수 총액보다 작은 예산을 먼저 수정한다. 계산 훈련이 필요하다고 추정하지 않는다."
+      },
+      {
+        "path": "/messages/2/content/sessionAssessments/0/explanation",
+        "before": "제출 총액이 예산보다 400원 많다.",
+        "after": "제출 총액은 예산보다 400원 많다. 다만 고정 단가의 필수 수량 자체가 예산을 초과하므로 과제 조건 미충족이며 사용자 능력 실패를 뜻하지 않는다."
+      },
+      {
+        "path": "/messages/2/content/summary",
+        "before": "목표 품목·수량을 담았지만 총액 4400원으로 제출했다.",
+        "after": "목표 수량의 필수 총액은 4400원으로 예산 4000원을 넘는다. 제출은 목표 수량과 같으며 과제 설정 수정이 필요하다."
+      },
+      {
+        "path": "/messages/2/content/uncertainties",
+        "before": [
+          "총액을 계산했는지, 화면에서 읽었는지는 알 수 없다."
+        ],
+        "after": [
+          "총액을 계산했는지, 화면에서 읽었는지는 알 수 없다.",
+          "이 과제로 사용자의 예산 조절 능력을 평가할 수 없다."
+        ]
+      },
+      {
+        "path": "/rubric/must_include",
+        "before": [
+          "품목 성공과 예산 미충족 구분"
+        ],
+        "after": [
+          "품목 성공과 예산 미충족 구분",
+          "목표·예산의 동시 충족 불가능과 과제 설정 수정 우선"
+        ]
+      },
+      {
+        "path": "/rubric/must_not_claim",
+        "before": [
+          "암산 불가능 확정"
+        ],
+        "after": [
+          "암산 불가능 확정",
+          "불가능한 예산 조건을 사용자의 계산 능력 부족으로 해석"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "T06",
+    "reason": "사건 참조 보완·의도 추측 제거",
+    "changes": [
+      {
+        "path": "/messages/2/content/findings/0/evidenceEventIds",
+        "before": [
+          "d3c881d1-44e2-5ee5-b558-f2e380f1c6fc",
+          "7347a23b-dd50-5311-90f1-96b2b461afc9"
+        ],
+        "after": [
+          "8eec5651-2f74-5533-8a1f-b83b0e320f47",
+          "d3c881d1-44e2-5ee5-b558-f2e380f1c6fc",
+          "7347a23b-dd50-5311-90f1-96b2b461afc9"
+        ]
+      },
+      {
+        "path": "/messages/2/content/findings/0/interpretation",
+        "before": "선택 결과를 확인했을 가능성은 있으나 읽기나 검증 의도는 측정되지 않았다.",
+        "after": "수량 변경 후 화면을 두 번 연 조작은 확인된다. 읽기나 확인 의도는 이 기록에서 판단할 수 없다."
+      }
+    ]
+  },
+  {
+    "id": "T10",
+    "reason": "중복 관찰 제거",
+    "changes": [
+      {
+        "path": "/messages/2/content/findings",
+        "before": [
+          {
+            "id": "F1",
+            "skill": "지원이 있는 과제 수행",
+            "observation": "진행자의 목록 촉구 뒤 생수 1개를 담고 목표대로 제출했다.",
+            "interpretation": "도움이 제공된 조건의 성공이다. 무지원 수행을 입증하지 않는다.",
+            "suggestedSupport": "다음 2개 품목 과제에서는 간단한 문자 목록을 제공하고 추가 도움 여부를 구분해 관찰한다.",
+            "alternativeExplanations": [],
+            "evidenceEventIds": [
+              "20d05c87-10b7-5068-b32a-42b80558b6db",
+              "bf26db80-6948-50cb-9768-0130b7f5c558",
+              "499df416-17cf-5b5a-98b9-0a3d6d4a8bad"
+            ]
+          },
+          {
+            "id": "F2",
+            "skill": "최종 품목·수량",
+            "observation": "마지막 제출에는 사과 2개와 생수 1개가 담겼다.",
+            "interpretation": "촉구가 제공된 조건에서 목표 수량 선택을 마쳤다.",
+            "alternativeExplanations": [],
+            "evidenceEventIds": [
+              "499df416-17cf-5b5a-98b9-0a3d6d4a8bad"
+            ],
+            "suggestedSupport": "2개 품목 문자 목록을 유지하며 추가 도움 여부를 따로 기록한다."
+          }
+        ],
+        "after": [
+          {
+            "id": "F1",
+            "skill": "지원이 있는 과제 수행",
+            "observation": "진행자의 목록 촉구 뒤 생수 1개를 담고 목표대로 제출했다.",
+            "interpretation": "도움이 제공된 조건의 성공이다. 무지원 수행을 입증하지 않는다.",
+            "suggestedSupport": "다음 2개 품목 과제에서는 간단한 문자 목록을 제공하고 추가 도움 여부를 구분해 관찰한다.",
+            "alternativeExplanations": [],
+            "evidenceEventIds": [
+              "20d05c87-10b7-5068-b32a-42b80558b6db",
+              "bf26db80-6948-50cb-9768-0130b7f5c558",
+              "499df416-17cf-5b5a-98b9-0a3d6d4a8bad"
+            ]
+          }
+        ]
+      },
+      {
+        "path": "/messages/2/content/practicePlan/targetFindingIds",
+        "before": [
+          "F1",
+          "F2"
+        ],
+        "after": [
+          "F1"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "T22",
+    "reason": "입력 분석의 닫기 사건 참조 보완",
+    "changes": [
+      {
+        "path": "/messages/1/content/currentAnalysis/findings/0/evidenceEventIds",
+        "before": [
+          "e61ac330-c112-5430-be66-c7256d69f9a1",
+          "6bc638dd-52dc-5507-aa59-2c05514346b0"
+        ],
+        "after": [
+          "e61ac330-c112-5430-be66-c7256d69f9a1",
+          "04946627-c67d-55b9-a531-c107c5ec1f7a",
+          "6bc638dd-52dc-5507-aa59-2c05514346b0"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "T25",
+    "reason": "시작 사건 참조 보완",
+    "changes": [
+      {
+        "path": "/messages/2/content/findings/0/evidenceEventIds",
+        "before": [
+          "b59c0b58-7f0d-50f5-9d7f-e4174beeae42",
+          "376a603c-aa8a-5387-be94-09a0c6b6a457"
+        ],
+        "after": [
+          "b59c0b58-7f0d-50f5-9d7f-e4174beeae42",
+          "6a33b274-4ee5-5341-a4e5-1edc11a87204",
+          "376a603c-aa8a-5387-be94-09a0c6b6a457"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "T27",
+    "reason": "중복 관찰 제거",
+    "changes": [
+      {
+        "path": "/messages/2/content/findings",
+        "before": [
+          {
+            "id": "F1",
+            "skill": "기술 조건과 반복 수행",
+            "observation": "두 세션 모두 목표를 달성했고 새 세션에는 180초 입력 차단이 기록됐다.",
+            "interpretation": "소요 시간 증가를 주의력 저하로 누적할 근거가 없다.",
+            "suggestedSupport": "2개 품목 과제 조건을 유지하고 입력 차단 없는 수행을 비교한다.",
+            "alternativeExplanations": [],
+            "evidenceEventIds": [
+              "9030cacf-71fa-5dff-b03f-6b25fb77026b",
+              "d4503a82-e31d-52cf-8fc0-f47c3446e764",
+              "adc613da-dd3a-55f3-bd73-0bb434e353b3"
+            ]
+          },
+          {
+            "id": "F2",
+            "skill": "반복된 목표 선택",
+            "observation": "서로 다른 두 세션에서 사과 2개와 생수 1개를 제출했다.",
+            "interpretation": "두 관찰의 성공은 유지하지만 지연 중단을 능력의 변화로 해석하지 않는다.",
+            "alternativeExplanations": [],
+            "evidenceEventIds": [
+              "9030cacf-71fa-5dff-b03f-6b25fb77026b",
+              "adc613da-dd3a-55f3-bd73-0bb434e353b3"
+            ],
+            "suggestedSupport": "다음에도 2개 품목 조건을 유지한다."
+          }
+        ],
+        "after": [
+          {
+            "id": "F1",
+            "skill": "기술 조건과 반복 수행",
+            "observation": "두 세션 모두 목표를 달성했고 새 세션에는 180초 입력 차단이 기록됐다.",
+            "interpretation": "소요 시간 증가를 주의력 저하로 누적할 근거가 없다.",
+            "suggestedSupport": "2개 품목 과제 조건을 유지하고 입력 차단 없는 수행을 비교한다.",
+            "alternativeExplanations": [],
+            "evidenceEventIds": [
+              "9030cacf-71fa-5dff-b03f-6b25fb77026b",
+              "d4503a82-e31d-52cf-8fc0-f47c3446e764",
+              "adc613da-dd3a-55f3-bd73-0bb434e353b3"
+            ]
+          }
+        ]
+      },
+      {
+        "path": "/messages/2/content/practicePlan/targetFindingIds",
+        "before": [
+          "F1",
+          "F2"
+        ],
+        "after": [
+          "F1"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "T30",
+    "reason": "중복 관찰 제거·계획 이유 보존",
+    "changes": [
+      {
+        "path": "/messages/2/content/findings",
+        "before": [
+          {
+            "id": "F1",
+            "skill": "수량 선택의 세션 차이",
+            "observation": "이전에는 사과가 1개 부족했고 새 세션은 목표 수량을 제출했다.",
+            "interpretation": "두 결과의 차이는 확인되지만 지속적 숙달로 단정하지 않는다.",
+            "suggestedSupport": "다음에는 2개 품목을 유지하고 한 품목의 수량 조건을 바꿔 관찰한다.",
+            "alternativeExplanations": [],
+            "evidenceEventIds": [
+              "698d55f0-c0f2-5f60-b60e-f5cabbdaeabe",
+              "776264e1-58df-5a12-86f8-d1ea4d0fc885"
+            ]
+          },
+          {
+            "id": "F2",
+            "skill": "기존 계획의 정정",
+            "observation": "이전에는 사과 1개를, 새 세션에는 사과 2개를 제출했다.",
+            "interpretation": "현재 과제의 수량 조건을 달리해 관찰할 수 있으나 품목 4개로 늘릴 근거는 충분하지 않다.",
+            "alternativeExplanations": [],
+            "evidenceEventIds": [
+              "698d55f0-c0f2-5f60-b60e-f5cabbdaeabe",
+              "776264e1-58df-5a12-86f8-d1ea4d0fc885"
+            ],
+            "suggestedSupport": "다음에는 품목 2개를 유지하고 한 품목의 목표 수량만 바꾼다."
+          }
+        ],
+        "after": [
+          {
+            "id": "F1",
+            "skill": "수량 선택의 세션 차이",
+            "observation": "이전에는 사과가 1개 부족했고 새 세션은 목표 수량을 제출했다.",
+            "interpretation": "두 결과의 차이는 확인되지만 지속적 숙달로 단정하지 않는다.",
+            "suggestedSupport": "다음에는 2개 품목을 유지하고 한 품목의 수량 조건을 바꿔 관찰한다.",
+            "alternativeExplanations": [],
+            "evidenceEventIds": [
+              "698d55f0-c0f2-5f60-b60e-f5cabbdaeabe",
+              "776264e1-58df-5a12-86f8-d1ea4d0fc885"
+            ]
+          }
+        ]
+      },
+      {
+        "path": "/messages/2/content/practicePlan/rationale",
+        "before": "명확한 과제 조건을 유지하면서 변경된 수량 선택을 관찰한다.",
+        "after": "품목 4개로 늘릴 근거는 충분하지 않다. 품목 2개를 유지하고 수량 조건만 달리하는 관찰용 제안이다."
+      },
+      {
+        "path": "/messages/2/content/practicePlan/targetFindingIds",
+        "before": [
+          "F1",
+          "F2"
+        ],
+        "after": [
+          "F1"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "T32",
+    "reason": "근거 부족한 필수 품목 증가 제거",
+    "changes": [
+      {
+        "path": "/messages/2/content/findings/0/suggestedSupport",
+        "before": "다음 3개 품목 과제에는 허용되는 선택 조건을 명확히 제시한다.",
+        "after": "다음 2개 품목 과제에도 필수 품목과 추가 선택 허용 여부를 명확히 제시한다."
+      },
+      {
+        "path": "/messages/2/content/practicePlan/goal",
+        "before": "3개 품목의 선택 조건 확인",
+        "after": "2개 필수 품목의 선택 조건 확인"
+      },
+      {
+        "path": "/messages/2/content/practicePlan/itemCount",
+        "before": 3,
+        "after": 2
+      },
+      {
+        "path": "/messages/2/content/practicePlan/rationale",
+        "before": "과제 단계와 실제 허용 조건을 함께 보고 다음 연습을 제안한다.",
+        "after": "자발적으로 상품을 추가한 기록은 세 가지 필수 목표를 기억한 증거가 아니다. 필수 품목 수를 유지해 관찰한다."
+      },
+      {
+        "path": "/rubric/must_include",
+        "before": [
+          "추가 품목 허용 조건 반영"
+        ],
+        "after": [
+          "추가 품목 허용 조건 반영",
+          "추가 상품 선택과 필수 목표 수 증가의 구별"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "T40",
+    "reason": "직접 근거가 아닌 문헌 인용 제거",
+    "changes": [
+      {
+        "path": "/messages/2/content/practicePlan/rationale",
+        "before": "명확한 단계 정보와 실제 행동의 연결을 유지한다.",
+        "after": "제공된 과제와 검증된 사건 순서에 근거한 관찰용 제안이다. 접근성 문헌은 서버 수신 순서의 기술 근거로 사용하지 않는다."
+      },
+      {
+        "path": "/messages/2/content/usedEvidenceCardIds",
+        "before": [
+          "M01"
+        ],
+        "after": []
+      }
+    ]
+  },
+  {
+    "id": "T44",
+    "reason": "직접 근거가 아닌 문헌 인용 제거",
+    "changes": [
+      {
+        "path": "/messages/2/content/practicePlan/rationale",
+        "before": "기억이나 확인 동기를 추정하지 않고 직접 기록된 행동을 본다.",
+        "after": "자동 열림이라는 입력 사건에 근거한다. 작업기억 문헌으로 화면 조작의 주체나 의도를 입증하지 않는다."
+      },
+      {
+        "path": "/messages/2/content/usedEvidenceCardIds",
+        "before": [
+          "P14"
+        ],
+        "after": []
+      }
+    ]
+  },
+  {
+    "id": "T53",
+    "reason": "합성 발화의 의미 명확화",
+    "changes": [
+      {
+        "path": "/messages/1/content/sourceEventDetails/1/text",
+        "before": "목록은 짧은 글씨로 보고 싶어요",
+        "after": "목록은 짧은 문장으로 보고 싶어요"
+      }
+    ]
+  },
+  {
+    "id": "T54",
+    "reason": "불가능한 목표·예산의 원인 구분",
+    "changes": [
+      {
+        "path": "/messages/1/content/currentAnalysis/sessionAssessments/0/explanation",
+        "before": "새 총액이 200원 초과다.",
+        "after": "새 총액은 200원 초과이며 필수 수량을 담아도 예산을 지킬 수 없는 과제 설정이다."
+      },
+      {
+        "path": "/messages/1/content/taskContext/1/pricePolicy",
+        "before": null,
+        "after": "표시된 단가 고정, 할인·쿠폰·대체 상품 없음"
+      },
+      {
+        "path": "/messages/1/content/taskContext/1/substitutionAllowed",
+        "before": null,
+        "after": false
+      },
+      {
+        "path": "/messages/2/content/findings/1/interpretation",
+        "before": "이전 성공과 새 예산 미충족을 조건별로 기록한다.",
+        "after": "지정 수량의 필수 총액이 예산보다 커서 품목·수량과 예산 조건을 동시에 만족할 수 없다. 과제 설정을 먼저 수정해야 하며 이 결과를 사용자의 계산 능력 부족으로 해석하지 않는다."
+      },
+      {
+        "path": "/messages/2/content/findings/1/suggestedSupport",
+        "before": "다음 2개 품목 과제에는 예산 여유를 두고 총액을 비교하게 한다.",
+        "after": "다음 2개 품목 과제는 목표 수량을 담을 수 있는 예산으로 수정한 뒤 관찰한다."
+      },
+      {
+        "path": "/messages/2/content/practicePlan/goal",
+        "before": "2개 품목의 가격과 예산 비교",
+        "after": "달성 가능한 예산의 2개 품목 선택"
+      },
+      {
+        "path": "/messages/2/content/practicePlan/rationale",
+        "before": "특정 가격 조건에서의 금전 수행과 품목 선택을 분리한다.",
+        "after": "필수 총액보다 작은 예산을 먼저 수정한다. 계산 훈련이 필요하다고 추정하지 않는다."
+      },
+      {
+        "path": "/messages/2/content/summary",
+        "before": "두 세션 모두 사과 2개와 생수 1개를 제출했다. 새 가격에서 총액 4200원으로 4000원 예산을 넘었다.",
+        "after": "두 세션의 품목·수량은 목표와 같았다. 새 가격에서는 필수 총액 4200원이 예산 4000원을 넘어 과제 설정 수정이 필요하다."
+      },
+      {
+        "path": "/messages/2/content/uncertainties",
+        "before": [
+          "가격 차이를 알아차렸는지나 계산 방법은 알 수 없다."
+        ],
+        "after": [
+          "가격 차이를 알아차렸는지나 계산 방법은 알 수 없다.",
+          "이 과제로 사용자의 예산 조절 능력을 평가할 수 없다."
+        ]
+      },
+      {
+        "path": "/rubric/must_include",
+        "before": [
+          "품목 성취 보존",
+          "예산 조건 변화"
+        ],
+        "after": [
+          "품목 성취 보존",
+          "예산 조건 변화",
+          "목표·예산의 동시 충족 불가능과 과제 설정 수정 우선"
+        ]
+      },
+      {
+        "path": "/rubric/must_not_claim",
+        "before": [
+          "모든 장보기 능력 저하"
+        ],
+        "after": [
+          "모든 장보기 능력 저하",
+          "불가능한 예산 조건을 사용자의 계산 능력 부족으로 해석"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "T57",
+    "reason": "입력 가능 상태의 사건 참조 보완",
+    "changes": [
+      {
+        "path": "/messages/2/content/findings/0/evidenceEventIds/1",
+        "before": "01829ab3-7261-57b2-87c8-3f2a4b8196dc",
+        "after": "b02cd9d3-db83-5121-85fb-f83634cf1c24"
+      }
+    ]
+  },
+  {
+    "id": "T58",
+    "reason": "미제공 장애명 언급·부적합 문헌 인용 제거",
+    "changes": [
+      {
+        "path": "/messages/2/content/findings/0/interpretation",
+        "before": "두 조건의 수행을 보존하며 장애명 때문에 품목 수를 일괄 줄이지 않는다.",
+        "after": "서로 다른 수량의 4개 품목을 수행한 두 관찰을 유지한다. 더 많은 품목의 수행이나 생활 전반의 숙달은 확인하지 않았다."
+      },
+      {
+        "path": "/messages/2/content/practicePlan/rationale",
+        "before": "개별 수행과 지원 조건을 바탕으로 현재 범위를 유지한다.",
+        "after": "기록된 4개 품목과 일반 문구 조건을 유지하는 관찰용 제안이다. 사진·영상 비교 연구가 이 개인에게 4개 품목을 권고한 것으로 해석하지 않는다."
+      },
+      {
+        "path": "/messages/2/content/usedEvidenceCardIds",
+        "before": [
+          "P02"
+        ],
+        "after": []
+      }
+    ]
+  }
+]

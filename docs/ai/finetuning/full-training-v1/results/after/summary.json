@@ -1,0 +1,252 @@
+[
+  {
+    "id": "E01",
+    "task": "session_analysis",
+    "phase": "after",
+    "seconds": 82.90029683010653,
+    "prefill_seconds": 3.73837205208838,
+    "output_tokens": 323,
+    "stop_reason": "eos",
+    "peak_allocated_mib": 16390.8037109375
+  },
+  {
+    "id": "E02",
+    "task": "session_analysis",
+    "phase": "after",
+    "seconds": 64.73497704206966,
+    "prefill_seconds": 4.023967815097421,
+    "output_tokens": 249,
+    "stop_reason": "eos",
+    "peak_allocated_mib": 16398.6826171875
+  },
+  {
+    "id": "E03",
+    "task": "session_analysis",
+    "phase": "after",
+    "seconds": 254.71843087486923,
+    "prefill_seconds": 4.159834207035601,
+    "output_tokens": 1024,
+    "stop_reason": "length",
+    "peak_allocated_mib": 16365.2060546875
+  },
+  {
+    "id": "E04",
+    "task": "session_analysis",
+    "phase": "after",
+    "seconds": 84.37249390385114,
+    "prefill_seconds": 3.970761074917391,
+    "output_tokens": 328,
+    "stop_reason": "eos",
+    "peak_allocated_mib": 16393.5244140625
+  },
+  {
+    "id": "E05",
+    "task": "session_analysis",
+    "phase": "after",
+    "seconds": 116.17182767298073,
+    "prefill_seconds": 4.185774754034355,
+    "output_tokens": 456,
+    "stop_reason": "eos",
+    "peak_allocated_mib": 16372.7998046875
+  },
+  {
+    "id": "E06",
+    "task": "session_analysis",
+    "phase": "after",
+    "seconds": 66.92878027795814,
+    "prefill_seconds": 4.322472986066714,
+    "output_tokens": 256,
+    "stop_reason": "eos",
+    "peak_allocated_mib": 16502.361328125
+  },
+  {
+    "id": "E07",
+    "task": "session_analysis",
+    "phase": "after",
+    "seconds": 119.91809979989193,
+    "prefill_seconds": 4.072111014975235,
+    "output_tokens": 475,
+    "stop_reason": "eos",
+    "peak_allocated_mib": 16523.373046875
+  },
+  {
+    "id": "E08",
+    "task": "profile_update",
+    "phase": "after",
+    "seconds": 92.67404399998486,
+    "prefill_seconds": 2.5024131920654327,
+    "output_tokens": 369,
+    "stop_reason": "eos",
+    "peak_allocated_mib": 15866.826171875
+  },
+  {
+    "id": "E09",
+    "task": "profile_update",
+    "phase": "after",
+    "seconds": 59.463845561025664,
+    "prefill_seconds": 2.7380914390087128,
+    "output_tokens": 233,
+    "stop_reason": "eos",
+    "peak_allocated_mib": 15917.44677734375
+  },
+  {
+    "id": "E10",
+    "task": "profile_update",
+    "phase": "after",
+    "seconds": 73.80465885903686,
+    "prefill_seconds": 2.3766708238981664,
+    "output_tokens": 293,
+    "stop_reason": "eos",
+    "peak_allocated_mib": 15815.63330078125
+  },
+  {
+    "id": "E11",
+    "task": "session_analysis",
+    "phase": "after",
+    "seconds": 88.22429155698046,
+    "prefill_seconds": 3.9629078290890902,
+    "output_tokens": 341,
+    "stop_reason": "eos",
+    "peak_allocated_mib": 16395.53125
+  },
+  {
+    "id": "E12",
+    "task": "session_analysis",
+    "phase": "after",
+    "seconds": 71.72816149704158,
+    "prefill_seconds": 4.711966593982652,
+    "output_tokens": 269,
+    "stop_reason": "eos",
+    "peak_allocated_mib": 16529.6767578125
+  },
+  {
+    "id": "E13",
+    "task": "session_analysis",
+    "phase": "after",
+    "seconds": 64.34577756817453,
+    "prefill_seconds": 3.852158800000325,
+    "output_tokens": 245,
+    "stop_reason": "eos",
+    "peak_allocated_mib": 16340.61083984375
+  },
+  {
+    "id": "E14",
+    "task": "session_analysis",
+    "phase": "after",
+    "seconds": 163.37333491398022,
+    "prefill_seconds": 4.183036444010213,
+    "output_tokens": 649,
+    "stop_reason": "eos",
+    "peak_allocated_mib": 16373.08642578125
+  },
+  {
+    "id": "E15",
+    "task": "session_analysis",
+    "phase": "after",
+    "seconds": 89.44835989899002,
+    "prefill_seconds": 4.586251538014039,
+    "output_tokens": 348,
+    "stop_reason": "eos",
+    "peak_allocated_mib": 16630.77587890625
+  },
+  {
+    "id": "E16",
+    "task": "session_analysis",
+    "phase": "after",
+    "seconds": 69.97052352991886,
+    "prefill_seconds": 4.013757801847532,
+    "output_tokens": 271,
+    "stop_reason": "eos",
+    "peak_allocated_mib": 16318.16552734375
+  },
+  {
+    "id": "E17",
+    "task": "session_analysis",
+    "phase": "after",
+    "seconds": 159.36709604295902,
+    "prefill_seconds": 4.112603625049815,
+    "output_tokens": 634,
+    "stop_reason": "eos",
+    "peak_allocated_mib": 16343.90771484375
+  },
+  {
+    "id": "E18",
+    "task": "session_analysis",
+    "phase": "after",
+    "seconds": 67.9975817122031,
+    "prefill_seconds": 3.5257055771071464,
+    "output_tokens": 265,
+    "stop_reason": "eos",
+    "peak_allocated_mib": 16262.3876953125
+  },
+  {
+    "id": "E19",
+    "task": "session_analysis",
+    "phase": "after",
+    "seconds": 85.88481704192236,
+    "prefill_seconds": 4.002442636992782,
+    "output_tokens": 341,
+    "stop_reason": "eos",
+    "peak_allocated_mib": 16418.119140625
+  },
+  {
+    "id": "E20",
+    "task": "session_analysis",
+    "phase": "after",
+    "seconds": 63.02639405080117,
+    "prefill_seconds": 3.685056977905333,
+    "output_tokens": 248,
+    "stop_reason": "eos",
+    "peak_allocated_mib": 16393.5244140625
+  },
+  {
+    "id": "E21",
+    "task": "profile_update",
+    "phase": "after",
+    "seconds": 59.05855066282675,
+    "prefill_seconds": 2.429182942956686,
+    "output_tokens": 232,
+    "stop_reason": "eos",
+    "peak_allocated_mib": 15837.216796875
+  },
+  {
+    "id": "E22",
+    "task": "profile_update",
+    "phase": "after",
+    "seconds": 58.43629788397811,
+    "prefill_seconds": 2.48497808794491,
+    "output_tokens": 230,
+    "stop_reason": "eos",
+    "peak_allocated_mib": 15863.24462890625
+  },
+  {
+    "id": "E23",
+    "task": "profile_update",
+    "phase": "after",
+    "seconds": 81.93352198111825,
+    "prefill_seconds": 2.4984449381008744,
+    "output_tokens": 326,
+    "stop_reason": "eos",
+    "peak_allocated_mib": 15866.6826171875
+  },
+  {
+    "id": "E24",
+    "task": "profile_update",
+    "phase": "after",
+    "seconds": 96.57707308093086,
+    "prefill_seconds": 2.3826702809892595,
+    "output_tokens": 387,
+    "stop_reason": "eos",
+    "peak_allocated_mib": 15836.2138671875
+  },
+  {
+    "id": "E25",
+    "task": "profile_update",
+    "phase": "after",
+    "seconds": 61.46118558594026,
+    "prefill_seconds": 2.3899746080860496,
+    "output_tokens": 243,
+    "stop_reason": "eos",
+    "peak_allocated_mib": 15835.498046875
+  }
+]

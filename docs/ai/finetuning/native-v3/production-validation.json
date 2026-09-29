@@ -1,0 +1,511 @@
+[ {
+  "id" : "T01",
+  "task" : "session_analysis",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "T02",
+  "task" : "session_analysis",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "T03",
+  "task" : "session_analysis",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "T04",
+  "task" : "session_analysis",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "T05",
+  "task" : "session_analysis",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "T06",
+  "task" : "session_analysis",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "T07",
+  "task" : "session_analysis",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "T08",
+  "task" : "session_analysis",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "T09",
+  "task" : "session_analysis",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "T10",
+  "task" : "session_analysis",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "T11",
+  "task" : "session_analysis",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "T12",
+  "task" : "session_analysis",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "T13",
+  "task" : "session_analysis",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "T14",
+  "task" : "session_analysis",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "T15",
+  "task" : "session_analysis",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "T16",
+  "task" : "session_analysis",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "T17",
+  "task" : "session_analysis",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "T18",
+  "task" : "session_analysis",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "T19",
+  "task" : "session_analysis",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "T20",
+  "task" : "session_analysis",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "T21",
+  "task" : "profile_update",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "T22",
+  "task" : "profile_update",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "T23",
+  "task" : "profile_update",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "T24",
+  "task" : "profile_update",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "T25",
+  "task" : "profile_update",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "T26",
+  "task" : "profile_update",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "T27",
+  "task" : "profile_update",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "T28",
+  "task" : "profile_update",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "T29",
+  "task" : "profile_update",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "T30",
+  "task" : "profile_update",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "T31",
+  "task" : "session_analysis",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "T32",
+  "task" : "session_analysis",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "T33",
+  "task" : "session_analysis",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "T34",
+  "task" : "session_analysis",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "T35",
+  "task" : "session_analysis",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "T36",
+  "task" : "session_analysis",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "T37",
+  "task" : "session_analysis",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "T38",
+  "task" : "session_analysis",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "T39",
+  "task" : "session_analysis",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "T40",
+  "task" : "session_analysis",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "T41",
+  "task" : "session_analysis",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "T42",
+  "task" : "session_analysis",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "T43",
+  "task" : "session_analysis",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "T44",
+  "task" : "session_analysis",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "T45",
+  "task" : "session_analysis",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "T46",
+  "task" : "session_analysis",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "T47",
+  "task" : "session_analysis",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "T48",
+  "task" : "session_analysis",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "T49",
+  "task" : "session_analysis",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "T50",
+  "task" : "session_analysis",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "T51",
+  "task" : "profile_update",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "T52",
+  "task" : "profile_update",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "T53",
+  "task" : "profile_update",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "T54",
+  "task" : "profile_update",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "T55",
+  "task" : "profile_update",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "T56",
+  "task" : "profile_update",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "T57",
+  "task" : "profile_update",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "T58",
+  "task" : "profile_update",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "T59",
+  "task" : "profile_update",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "T60",
+  "task" : "profile_update",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "E01",
+  "task" : "session_analysis",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "E02",
+  "task" : "session_analysis",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "E03",
+  "task" : "session_analysis",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "E04",
+  "task" : "session_analysis",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "E05",
+  "task" : "session_analysis",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "E06",
+  "task" : "session_analysis",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "E07",
+  "task" : "session_analysis",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "E08",
+  "task" : "profile_update",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "E09",
+  "task" : "profile_update",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "E10",
+  "task" : "profile_update",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "E11",
+  "task" : "session_analysis",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "E12",
+  "task" : "session_analysis",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "E13",
+  "task" : "session_analysis",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "E14",
+  "task" : "session_analysis",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "E15",
+  "task" : "session_analysis",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "E16",
+  "task" : "session_analysis",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "E17",
+  "task" : "session_analysis",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "E18",
+  "task" : "session_analysis",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "E19",
+  "task" : "session_analysis",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "E20",
+  "task" : "session_analysis",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "E21",
+  "task" : "profile_update",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "E22",
+  "task" : "profile_update",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "E23",
+  "task" : "profile_update",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "E24",
+  "task" : "profile_update",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+}, {
+  "id" : "E25",
+  "task" : "profile_update",
+  "round_trip" : true,
+  "production_validator" : true,
+  "actual_factory" : true
+} ]

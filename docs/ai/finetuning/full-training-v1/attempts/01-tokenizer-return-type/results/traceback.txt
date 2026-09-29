@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "/home/duream/.local/share/oneuldo/full-training-v1/run_experiment.py", line 56, in <module>
+    assert ids[:len(prefix)]==prefix and len(ids)<=4096 and len(ids)>len(prefix)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError

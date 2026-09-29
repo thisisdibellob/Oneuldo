@@ -1,0 +1,52 @@
+{
+  "status": "PASS",
+  "scope": "구조·참조·출처/세션 분리·게임 실행 범위 검사. 의미 타당성·전문가 검토·학습 품질 검증 아님.",
+  "training_cases": 60,
+  "evaluation_cases": 25,
+  "task_counts": {
+    "train": {
+      "session_analysis": 40,
+      "profile_update": 20
+    },
+    "eval": {
+      "session_analysis": 17,
+      "profile_update": 8
+    }
+  },
+  "checks": {
+    "counts": 5,
+    "split": 7,
+    "uniqueness": 2,
+    "messages": 85,
+    "provenance": 170,
+    "rubric": 85,
+    "references": 724,
+    "schema": 1418,
+    "capabilities": 259,
+    "sources": 337
+  },
+  "train_source_ids": [
+    "G01",
+    "G04",
+    "M01",
+    "P01",
+    "P02",
+    "P03",
+    "P11",
+    "P14",
+    "P27",
+    "P40"
+  ],
+  "eval_source_ids": [
+    "G06",
+    "G07",
+    "M02",
+    "P10",
+    "P16",
+    "P20",
+    "P30",
+    "P31"
+  ],
+  "training_approved_cases": 0,
+  "errors": []
+}

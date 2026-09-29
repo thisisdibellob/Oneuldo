@@ -1,0 +1,53 @@
+{
+  "status": "failed",
+  "gpu_uuid": "GPU-215716d9-f53e-fc5f-566e-f54fcbc700b1",
+  "rank": 8,
+  "batch_size": 1,
+  "gradient_checkpointing": true,
+  "quantization": "NF4 double quantization",
+  "compute_dtype": "float16",
+  "max_sequence_length": 4096,
+  "steps": [
+    {
+      "case": "T54",
+      "task": "profile_update",
+      "tokens": 2044,
+      "loss_tokens": 402,
+      "loss": 1.2146852016448975,
+      "gradient_norm": 0.9494954347610474,
+      "step_seconds": 13.767395382979885,
+      "peak_allocated_mib": 20648.24755859375,
+      "peak_reserved_mib": 22948.0,
+      "sample_adapter_changed": true
+    }
+  ],
+  "deployment": false,
+  "full_training": false,
+  "eval_examples_used_for_training": false,
+  "torch": "2.10.0+cu128",
+  "cuda": "12.8",
+  "compute_capability": [
+    7,
+    5
+  ],
+  "gpu_name": "NVIDIA TITAN RTX",
+  "checkpoint": "/home/duream/.local/share/oneuldo/qlora-smoke-v1/hf-cache/hub/models--Qwen--Qwen3.6-27B/snapshots/6a9e13bd6fc8f0983b9b99948120bc37f49c13e9",
+  "train_sha256": "3059b0d36d77e5f1304ac6ccbc5ba5fb5ab910cfcca4f68f876692b33c9669a3",
+  "selected_examples": [
+    {
+      "id": "T54",
+      "total_tokens": 2044,
+      "prompt_tokens": 1642
+    },
+    {
+      "id": "T18",
+      "total_tokens": 3557,
+      "prompt_tokens": 3219
+    }
+  ],
+  "frozen_embedding_head_dtype": "float16_without_intermediate_fp32",
+  "trainable_parameters": 58363904,
+  "error_type": "OutOfMemoryError",
+  "error": "CUDA out of memory. Tried to allocate 290.00 MiB. GPU 0 has a total capacity of 23.46 GiB of which 11.00 MiB is free. Including non-PyTorch memory, this process has 23.44 GiB memory in use. Of the allocated memory 22.52 GiB is allocated by PyTorch, and 733.60 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)",
+  "total_seconds": 62.96329200686887
+}

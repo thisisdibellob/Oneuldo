@@ -1,0 +1,96 @@
+{
+  "previousSourceSessionId": "b775f7f7-8acd-5204-90f1-5bb241f2df48",
+  "previousProfile": {
+    "summary": "시작 기록만 있어 성패를 알 수 없다.",
+    "findings": [
+      {
+        "id": "F1",
+        "skill": "장보기 수행과 근거 범위",
+        "observation": "목표는 사과 2개·생수 1개, 예산은 4000원이다. 제공된 관찰은 부분 구간이다. 세션 시작이 기록됐다.",
+        "interpretation": "제공된 관찰·보고의 범위로 한정한다.",
+        "alternativeExplanations": [],
+        "evidenceEventIds": [
+          "9cc30091-ff8b-54f1-a92e-09828abf9acc"
+        ],
+        "suggestedSupport": "같은 조건의 과제에서 추가 관찰한다."
+      },
+      {
+        "id": "F2",
+        "skill": "장보기 수행과 근거 범위",
+        "observation": "목표는 사과 2개·생수 1개, 예산은 4000원이다. 제공된 관찰은 부분 구간이다. 수집 누락 기록: 선택 이후 전체.",
+        "interpretation": "제공된 관찰·보고의 범위로 한정한다.",
+        "alternativeExplanations": [],
+        "evidenceEventIds": [
+          "464c30d5-1145-509d-8264-29c4a64e784a"
+        ],
+        "suggestedSupport": "같은 조건의 과제에서 추가 관찰한다."
+      }
+    ],
+    "sessionAssessments": [],
+    "uncertainties": [
+      "제공된 이전 기록의 범위만 사용할 수 있다."
+    ],
+    "practicePlan": {
+      "targetFindingIds": [
+        "F1",
+        "F2"
+      ],
+      "goal": "두 종류의 명확한 목표 수량과 여유 있는 예산에서 제출을 다시 관찰한다.",
+      "rationale": "제공된 수행 범위 안에서 다음 관찰 조건을 정하며 능력이나 교육 효과를 확정하지 않는다.",
+      "recommendedDifficulty": 2,
+      "itemCount": 2,
+      "quantityComplexity": "LOW",
+      "budgetPressure": "LOW",
+      "textSupport": "SIMPLIFIED",
+      "reasonCodes": [
+        "OBSERVATION_PRACTICE"
+      ]
+    },
+    "usedEvidenceCardIds": []
+  },
+  "currentAnalysis": {
+    "summary": "현재 목표 달성이 확인된다.",
+    "findings": [
+      {
+        "id": "F1",
+        "skill": "장보기 수행과 근거 범위",
+        "observation": "목표는 사과 2개·생수 1개, 예산은 4000원이다. 사과 2개·생수 1개를 총액 3200원으로 제출했다.",
+        "interpretation": "제공된 관찰·보고의 범위로 한정한다.",
+        "alternativeExplanations": [],
+        "evidenceEventIds": [
+          "81cf76ff-8fdd-50de-972e-6f2dfa1f4a74"
+        ],
+        "suggestedSupport": "같은 조건의 과제에서 추가 관찰한다."
+      }
+    ],
+    "sessionAssessments": [
+      {
+        "sessionId": "f0c87f98-e631-52c1-b007-afb368467176",
+        "judgment": "SUCCESS",
+        "explanation": "목표를 충족했다.",
+        "evidenceEventIds": [
+          "81cf76ff-8fdd-50de-972e-6f2dfa1f4a74"
+        ]
+      }
+    ],
+    "uncertainties": [
+      "다른 조건의 수행은 확인하지 않았다."
+    ],
+    "practicePlan": {
+      "targetFindingIds": [
+        "F1"
+      ],
+      "goal": "2개 품목 선택 관찰",
+      "rationale": "제공된 세션 기록에 근거한 관찰용 제안이다.",
+      "recommendedDifficulty": 2,
+      "itemCount": 2,
+      "quantityComplexity": "LOW",
+      "budgetPressure": "LOW",
+      "textSupport": "SIMPLIFIED",
+      "reasonCodes": [
+        "OBSERVATION_PRACTICE"
+      ]
+    },
+    "usedEvidenceCardIds": []
+  }
+}

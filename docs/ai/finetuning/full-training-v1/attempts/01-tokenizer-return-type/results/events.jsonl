@@ -1,0 +1,2 @@
+{"event": "failed", "unix_time": 1790234886.9232612, "stage": "preflight", "error": ""}
+{"event": "finished", "unix_time": 1790234886.9234245, "status": "failed", "seconds": 6.655699452850968}

@@ -1,0 +1,27 @@
+{
+  "device": "NVIDIA TITAN RTX",
+  "results": [
+    {
+      "cached_query_length": 1,
+      "passed": true
+    },
+    {
+      "cached_query_length": 3,
+      "passed": true
+    },
+    {
+      "small_qwen_hybrid_cache_matches_full": true,
+      "greedy_matches_full_recompute": true,
+      "repeat_exact": true,
+      "eos_and_length_stop_passed": true
+    },
+    {
+      "adapter_saved_and_reloaded_exactly": true,
+      "tensor_count": 4
+    },
+    {
+      "conditional_generation_mixed_dtypes_cpu_embedding_cached_matches_full": true,
+      "zero_adapter_matches_disabled": true
+    }
+  ]
+}

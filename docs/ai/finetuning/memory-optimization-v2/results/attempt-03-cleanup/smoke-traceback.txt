@@ -1,0 +1,46 @@
+Traceback (most recent call last):
+  File "/home/duream/.local/share/oneuldo/qlora-memory-v2/smoke_qlora.py", line 116, in <module>
+    scaler.scale(loss).backward();scaler.unscale_(optimizer)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/duream/miniconda3/envs/qwen35_9b/lib/python3.11/site-packages/torch/_tensor.py", line 630, in backward
+    torch.autograd.backward(
+  File "/home/duream/miniconda3/envs/qwen35_9b/lib/python3.11/site-packages/torch/autograd/__init__.py", line 364, in backward
+    _engine_run_backward(
+  File "/home/duream/miniconda3/envs/qwen35_9b/lib/python3.11/site-packages/torch/autograd/graph.py", line 865, in _engine_run_backward
+    return Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/duream/miniconda3/envs/qwen35_9b/lib/python3.11/site-packages/torch/utils/checkpoint.py", line 1173, in unpack_hook
+    _run_fn_with_dynamo_disabled(frame.recompute_fn, *args)
+  File "/home/duream/miniconda3/envs/qwen35_9b/lib/python3.11/site-packages/torch/_compile.py", line 54, in inner
+    return disable_fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/duream/miniconda3/envs/qwen35_9b/lib/python3.11/site-packages/torch/_dynamo/eval_frame.py", line 1181, in _fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File "/home/duream/miniconda3/envs/qwen35_9b/lib/python3.11/site-packages/torch/utils/checkpoint.py", line 1139, in _run_fn_with_dynamo_disabled
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File "/home/duream/miniconda3/envs/qwen35_9b/lib/python3.11/site-packages/torch/utils/checkpoint.py", line 1591, in recompute_fn
+    fn(*args, **kwargs)
+  File "/home/duream/miniconda3/envs/qwen35_9b/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1776, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/duream/miniconda3/envs/qwen35_9b/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1787, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/duream/.local/share/oneuldo/qlora-smoke-v1/venv/lib/python3.11/site-packages/transformers/models/qwen3_5/modeling_qwen3_5.py", line 897, in forward
+    hidden_states, _ = self.self_attn(
+                       ^^^^^^^^^^^^^^^
+  File "/home/duream/miniconda3/envs/qwen35_9b/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1776, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/duream/miniconda3/envs/qwen35_9b/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1787, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/duream/.local/share/oneuldo/qlora-smoke-v1/venv/lib/python3.11/site-packages/transformers/models/qwen3_5/modeling_qwen3_5.py", line 806, in forward
+    attn_output, attn_weights = attention_interface(
+                                ^^^^^^^^^^^^^^^^^^^^
+  File "/home/duream/.local/share/oneuldo/qlora-smoke-v1/venv/lib/python3.11/site-packages/transformers/integrations/sdpa_attention.py", line 158, in sdpa_attention_forward
+    attn_output = torch.nn.functional.scaled_dot_product_attention(
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 290.00 MiB. GPU 0 has a total capacity of 23.46 GiB of which 207.00 MiB is free. Including non-PyTorch memory, this process has 23.25 GiB memory in use. Of the allocated memory 22.78 GiB is allocated by PyTorch, and 262.72 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)

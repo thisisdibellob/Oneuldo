@@ -1,0 +1,96 @@
+{
+  "previousSourceSessionId": "a60f4721-bae2-5849-963e-8eb07c2871bc",
+  "previousProfile": {
+    "summary": "촉구 후 모든 목표 품목을 제출했다.",
+    "findings": [
+      {
+        "id": "F1",
+        "skill": "장보기 수행과 근거 범위",
+        "observation": "목표는 사과 2개·생수 1개, 예산은 4000원이다. 외부 지원 기록의 내용은 ‘남은 품목 안내’이다.",
+        "interpretation": "제공된 관찰·보고의 범위로 한정한다.",
+        "alternativeExplanations": [],
+        "evidenceEventIds": [
+          "aae6b7e4-42d2-5296-8746-8de08972bcc5"
+        ],
+        "suggestedSupport": "같은 조건의 과제에서 추가 관찰한다."
+      },
+      {
+        "id": "F2",
+        "skill": "장보기 수행과 근거 범위",
+        "observation": "목표는 사과 2개·생수 1개, 예산은 4000원이다. 사과 2개·생수 1개를 총액 3200원으로 제출했다.",
+        "interpretation": "제공된 관찰·보고의 범위로 한정한다.",
+        "alternativeExplanations": [],
+        "evidenceEventIds": [
+          "41cb5c26-aec1-59dc-94c7-c8128eda3947"
+        ],
+        "suggestedSupport": "같은 조건의 과제에서 추가 관찰한다."
+      }
+    ],
+    "sessionAssessments": [],
+    "uncertainties": [
+      "제공된 이전 기록의 범위만 사용할 수 있다."
+    ],
+    "practicePlan": {
+      "targetFindingIds": [
+        "F1",
+        "F2"
+      ],
+      "goal": "두 종류의 명확한 목표 수량과 여유 있는 예산에서 제출을 다시 관찰한다.",
+      "rationale": "제공된 수행 범위 안에서 다음 관찰 조건을 정하며 능력이나 교육 효과를 확정하지 않는다.",
+      "recommendedDifficulty": 2,
+      "itemCount": 2,
+      "quantityComplexity": "LOW",
+      "budgetPressure": "LOW",
+      "textSupport": "SIMPLIFIED",
+      "reasonCodes": [
+        "OBSERVATION_PRACTICE"
+      ]
+    },
+    "usedEvidenceCardIds": []
+  },
+  "currentAnalysis": {
+    "summary": "이번 제출에는 생수가 없다.",
+    "findings": [
+      {
+        "id": "F1",
+        "skill": "장보기 수행과 근거 범위",
+        "observation": "목표는 사과 2개·생수 1개, 예산은 4000원이다. 지원 기록 범위: complete_no_external_prompt. 사과 2개를 총액 2400원으로 제출했다.",
+        "interpretation": "제공된 관찰·보고의 범위로 한정한다.",
+        "alternativeExplanations": [],
+        "evidenceEventIds": [
+          "0d76ca4b-0f38-5416-8575-16ca3321ce77"
+        ],
+        "suggestedSupport": "같은 조건의 과제에서 추가 관찰한다."
+      }
+    ],
+    "sessionAssessments": [
+      {
+        "sessionId": "7afb0bbd-0290-57b0-b439-fd31625653a3",
+        "judgment": "FAILURE",
+        "explanation": "최종 제출에 생수가 없다.",
+        "evidenceEventIds": [
+          "0d76ca4b-0f38-5416-8575-16ca3321ce77"
+        ]
+      }
+    ],
+    "uncertainties": [
+      "다른 조건의 수행은 확인하지 않았다."
+    ],
+    "practicePlan": {
+      "targetFindingIds": [
+        "F1"
+      ],
+      "goal": "2개 품목 선택 관찰",
+      "rationale": "제공된 세션 기록에 근거한 관찰용 제안이다.",
+      "recommendedDifficulty": 2,
+      "itemCount": 2,
+      "quantityComplexity": "LOW",
+      "budgetPressure": "LOW",
+      "textSupport": "SIMPLIFIED",
+      "reasonCodes": [
+        "OBSERVATION_PRACTICE"
+      ]
+    },
+    "usedEvidenceCardIds": []
+  }
+}

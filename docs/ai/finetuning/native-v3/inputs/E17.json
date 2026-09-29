@@ -1,0 +1,74 @@
+{
+  "id": "655a73ed-fc6b-5d03-a921-a4f549b71c4a",
+  "schemaVersion": "synthetic-native-v2",
+  "generatedAt": "2026-01-31T00:00:00Z",
+  "sessionCount": 1,
+  "eventCount": 1,
+  "input": {
+    "schemaVersion": "synthetic-native-v2",
+    "datasetId": "655a73ed-fc6b-5d03-a921-a4f549b71c4a",
+    "generatedAt": "2026-01-31T00:00:00Z",
+    "analysisWindow": null,
+    "anonymousSubjectId": "E17-synthetic",
+    "sessionCount": 1,
+    "eventCount": 1,
+    "sessions": [
+      {
+        "sessionId": "6a0f625d-c9be-5b78-aa47-9a8f5698675b",
+        "startedAt": "2026-01-01T00:00:00Z",
+        "endedAt": null,
+        "integrity": null,
+        "events": [
+          {
+            "behaviorLogId": "f67081c0-6b09-5544-b571-d76f114e22ed",
+            "sequence": 1,
+            "elapsedFromSessionStartMs": 10000,
+            "occurredAt": "2026-01-01T00:00:10Z",
+            "receivedAt": "2026-01-01T00:00:10Z",
+            "eventSchemaVersion": "synthetic-native-v2",
+            "action": {
+              "eventCode": "SHOP.CHECKOUT_SUBMITTED"
+            },
+            "payload": {
+              "type": "SHOPPING",
+              "marketContent": {
+                "cart": {
+                  "배": 1,
+                  "우유": 1,
+                  "빵": 1
+                },
+                "sceneSnapshot": {
+                  "schemaVersion": "market-scene-v1",
+                  "mission": {
+                    "id": "E17-mission",
+                    "description": "목표 목록의 물건과 수량을 담고 총액은 예산 이하로 제출하세요.",
+                    "budget": 9000,
+                    "objectives": [
+                      {
+                        "productId": "배",
+                        "quantity": 1,
+                        "label": "배"
+                      },
+                      {
+                        "productId": "우유",
+                        "quantity": 1,
+                        "label": "우유"
+                      },
+                      {
+                        "productId": "빵",
+                        "quantity": 1,
+                        "label": "빵"
+                      }
+                    ]
+                  },
+                  "layoutVersion": "synthetic-layout-v2"
+                }
+              },
+              "cartTotalAmount": 7200
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

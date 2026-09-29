@@ -1,0 +1,82 @@
+{
+  "previousSourceSessionId": "d530de77-1d1c-56ce-8a5d-0dedf0ef013b",
+  "previousProfile": {
+    "summary": "사과 3개를 최종 제출해 수량 실수가 지속된다.",
+    "findings": [],
+    "sessionAssessments": [],
+    "uncertainties": [
+      "이전 요약의 독립 근거는 제공되지 않았으며 현재 분석과 대조해야 한다."
+    ],
+    "practicePlan": {
+      "targetFindingIds": [],
+      "goal": "두 종류의 명확한 목표 수량과 여유 있는 예산에서 제출을 다시 관찰한다.",
+      "rationale": "제공된 수행 범위 안에서 다음 관찰 조건을 정하며 능력이나 교육 효과를 확정하지 않는다.",
+      "recommendedDifficulty": 2,
+      "itemCount": 2,
+      "quantityComplexity": "LOW",
+      "budgetPressure": "LOW",
+      "textSupport": "SIMPLIFIED",
+      "reasonCodes": [
+        "OBSERVATION_PRACTICE"
+      ]
+    },
+    "usedEvidenceCardIds": []
+  },
+  "currentAnalysis": {
+    "summary": "최종 사과 수량은 2개다.",
+    "findings": [
+      {
+        "id": "F1",
+        "skill": "장보기 수행과 근거 범위",
+        "observation": "목표는 사과 2개·생수 1개, 예산은 4000원이다. 사과 수량을 3개에서 2개로 바꿨다.",
+        "interpretation": "제공된 관찰·보고의 범위로 한정한다.",
+        "alternativeExplanations": [],
+        "evidenceEventIds": [
+          "de0072d8-c415-5705-b601-db2adb9a25f1"
+        ],
+        "suggestedSupport": "같은 조건의 과제에서 추가 관찰한다."
+      },
+      {
+        "id": "F2",
+        "skill": "장보기 수행과 근거 범위",
+        "observation": "목표는 사과 2개·생수 1개, 예산은 4000원이다. 사과 2개·생수 1개를 총액 3200원으로 제출했다.",
+        "interpretation": "제공된 관찰·보고의 범위로 한정한다.",
+        "alternativeExplanations": [],
+        "evidenceEventIds": [
+          "8b02299a-d88a-5b57-a367-08fb46b94bce"
+        ],
+        "suggestedSupport": "같은 조건의 과제에서 추가 관찰한다."
+      }
+    ],
+    "sessionAssessments": [
+      {
+        "sessionId": "d530de77-1d1c-56ce-8a5d-0dedf0ef013b",
+        "judgment": "SUCCESS",
+        "explanation": "수정 후 제출이 목표에 맞다.",
+        "evidenceEventIds": [
+          "8b02299a-d88a-5b57-a367-08fb46b94bce"
+        ]
+      }
+    ],
+    "uncertainties": [
+      "다른 조건의 수행은 확인하지 않았다."
+    ],
+    "practicePlan": {
+      "targetFindingIds": [
+        "F1",
+        "F2"
+      ],
+      "goal": "2개 품목 선택 관찰",
+      "rationale": "제공된 세션 기록에 근거한 관찰용 제안이다.",
+      "recommendedDifficulty": 2,
+      "itemCount": 2,
+      "quantityComplexity": "LOW",
+      "budgetPressure": "LOW",
+      "textSupport": "SIMPLIFIED",
+      "reasonCodes": [
+        "OBSERVATION_PRACTICE"
+      ]
+    },
+    "usedEvidenceCardIds": []
+  }
+}

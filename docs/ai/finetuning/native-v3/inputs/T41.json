@@ -1,0 +1,82 @@
+{
+  "id": "d152a6a3-f256-5609-a9fa-a39c6c65b58b",
+  "schemaVersion": "synthetic-native-v2",
+  "generatedAt": "2026-01-31T00:00:00Z",
+  "sessionCount": 1,
+  "eventCount": 1,
+  "input": {
+    "schemaVersion": "synthetic-native-v2",
+    "datasetId": "d152a6a3-f256-5609-a9fa-a39c6c65b58b",
+    "generatedAt": "2026-01-31T00:00:00Z",
+    "analysisWindow": null,
+    "anonymousSubjectId": "T41-synthetic",
+    "sessionCount": 1,
+    "eventCount": 1,
+    "sessions": [
+      {
+        "sessionId": "fc042a02-79e5-5f90-b7db-ba481ee59fd4",
+        "startedAt": "2026-01-01T00:00:00Z",
+        "endedAt": null,
+        "integrity": null,
+        "events": [
+          {
+            "behaviorLogId": "242d56b3-a2ef-5783-b836-9a60c26f917d",
+            "sequence": 1,
+            "elapsedFromSessionStartMs": 10000,
+            "occurredAt": "2026-01-01T00:00:10Z",
+            "receivedAt": "2026-01-01T00:00:10Z",
+            "eventSchemaVersion": "synthetic-native-v2",
+            "action": {
+              "eventCode": "SHOP.CHECKOUT_SUBMITTED"
+            },
+            "payload": {
+              "type": "SHOPPING",
+              "marketContent": {
+                "cart": {
+                  "사과": 2,
+                  "생수": 1
+                },
+                "sceneSnapshot": {
+                  "schemaVersion": "market-scene-v1",
+                  "mission": {
+                    "id": "T41-mission",
+                    "description": "목표 목록의 물건과 수량을 담고 총액은 예산 이하로 제출하세요. 추가 비용 없음",
+                    "budget": 4000,
+                    "objectives": [
+                      {
+                        "productId": "사과",
+                        "quantity": 2,
+                        "label": "사과"
+                      },
+                      {
+                        "productId": "생수",
+                        "quantity": 1,
+                        "label": "생수"
+                      }
+                    ]
+                  },
+                  "layoutVersion": "synthetic-layout-v2",
+                  "catalogVersion": "v1",
+                  "products": [
+                    {
+                      "id": "사과",
+                      "name": "사과",
+                      "price": 1200
+                    },
+                    {
+                      "id": "생수",
+                      "name": "생수",
+                      "price": 800
+                    }
+                  ]
+                }
+              },
+              "cartTotalAmount": 5000,
+              "catalogVersion": "v1"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

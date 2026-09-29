@@ -1,0 +1,96 @@
+{
+  "previousSourceSessionId": "b7021eda-16f3-57e4-b049-baf5da27a152",
+  "previousProfile": {
+    "summary": "목표대로 제출했다.",
+    "findings": [
+      {
+        "id": "F1",
+        "skill": "장보기 수행과 근거 범위",
+        "observation": "목표는 당근 1개·생수 1개, 예산은 5000원이다. 당근 1개·생수 1개를 총액 2300원으로 제출했다.",
+        "interpretation": "제공된 관찰·보고의 범위로 한정한다.",
+        "alternativeExplanations": [],
+        "evidenceEventIds": [
+          "bca7fc3f-8499-52e4-b045-b7897bc41ed7"
+        ],
+        "suggestedSupport": "같은 조건의 과제에서 추가 관찰한다."
+      }
+    ],
+    "sessionAssessments": [],
+    "uncertainties": [
+      "제공된 이전 기록의 범위만 사용할 수 있다."
+    ],
+    "practicePlan": {
+      "targetFindingIds": [
+        "F1"
+      ],
+      "goal": "두 종류의 명확한 목표 수량과 여유 있는 예산에서 제출을 다시 관찰한다.",
+      "rationale": "제공된 수행 범위 안에서 다음 관찰 조건을 정하며 능력이나 교육 효과를 확정하지 않는다.",
+      "recommendedDifficulty": 2,
+      "itemCount": 2,
+      "quantityComplexity": "LOW",
+      "budgetPressure": "LOW",
+      "textSupport": "SIMPLIFIED",
+      "reasonCodes": [
+        "OBSERVATION_PRACTICE"
+      ]
+    },
+    "usedEvidenceCardIds": []
+  },
+  "currentAnalysis": {
+    "summary": "지시를 완전히 이해해서 성공했다.",
+    "findings": [
+      {
+        "id": "F1",
+        "skill": "장보기 수행과 근거 범위",
+        "observation": "목표는 당근 1개·생수 1개, 예산은 5000원이다. 보고자 user, 맥락 별도 기재 없음: ‘목록 글은 잘 모르겠어요’라고 보고했다.",
+        "interpretation": "제공된 관찰·보고의 범위로 한정한다.",
+        "alternativeExplanations": [],
+        "evidenceEventIds": [
+          "e0069336-2c10-5363-a6f4-0b9256768393"
+        ],
+        "suggestedSupport": "같은 조건의 과제에서 추가 관찰한다."
+      },
+      {
+        "id": "F2",
+        "skill": "장보기 수행과 근거 범위",
+        "observation": "목표는 당근 1개·생수 1개, 예산은 5000원이다. 당근 1개·생수 1개를 총액 2300원으로 제출했다.",
+        "interpretation": "글의 의미를 완전히 이해한 것이 확실하다.",
+        "alternativeExplanations": [],
+        "evidenceEventIds": [
+          "5534e161-77f4-5b45-9850-f04ef91ecf09"
+        ],
+        "suggestedSupport": "같은 조건의 과제에서 추가 관찰한다."
+      }
+    ],
+    "sessionAssessments": [
+      {
+        "sessionId": "2e3a4ae3-00ea-56a5-ab04-9305d82d25dc",
+        "judgment": "SUCCESS",
+        "explanation": "새 제출도 목표에 맞다.",
+        "evidenceEventIds": [
+          "5534e161-77f4-5b45-9850-f04ef91ecf09"
+        ]
+      }
+    ],
+    "uncertainties": [
+      "없음"
+    ],
+    "practicePlan": {
+      "targetFindingIds": [
+        "F1",
+        "F2"
+      ],
+      "goal": "2개 품목 선택 관찰",
+      "rationale": "제공된 세션 기록에 근거한 관찰용 제안이다.",
+      "recommendedDifficulty": 2,
+      "itemCount": 2,
+      "quantityComplexity": "LOW",
+      "budgetPressure": "LOW",
+      "textSupport": "SIMPLIFIED",
+      "reasonCodes": [
+        "OBSERVATION_PRACTICE"
+      ]
+    },
+    "usedEvidenceCardIds": []
+  }
+}

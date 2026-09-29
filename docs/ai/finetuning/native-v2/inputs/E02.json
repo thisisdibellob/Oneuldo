@@ -1,0 +1,97 @@
+{
+  "id": "0f81f75e-a63c-58aa-8073-3a93abcb3ff9",
+  "schemaVersion": "synthetic-native-v2",
+  "generatedAt": "2026-01-31T00:00:00Z",
+  "sessionCount": 1,
+  "eventCount": 3,
+  "input": {
+    "schemaVersion": "synthetic-native-v2",
+    "datasetId": "0f81f75e-a63c-58aa-8073-3a93abcb3ff9",
+    "generatedAt": "2026-01-31T00:00:00Z",
+    "analysisWindow": null,
+    "anonymousSubjectId": "E02-synthetic",
+    "sessionCount": 1,
+    "eventCount": 3,
+    "sessions": [
+      {
+        "sessionId": "3c31e8b5-1c4d-5d30-9192-f36a809cf85e",
+        "startedAt": "2026-01-01T00:00:00Z",
+        "endedAt": null,
+        "integrity": null,
+        "events": [
+          {
+            "behaviorLogId": "af132007-dd4c-5348-a35f-2b858d8d62d5",
+            "sequence": 1,
+            "elapsedFromSessionStartMs": 0,
+            "occurredAt": "2026-01-01T00:00:00Z",
+            "receivedAt": "2026-01-01T00:00:00Z",
+            "eventSchemaVersion": "synthetic-native-v2",
+            "action": {
+              "eventCode": "SHOP.SESSION_STARTED"
+            },
+            "payload": {
+              "type": "SHOPPING",
+              "marketContent": {
+                "sceneSnapshot": {
+                  "schemaVersion": "market-scene-v1",
+                  "mission": {
+                    "id": "E02-mission",
+                    "description": "목표 목록의 물건과 수량을 담고 총액은 예산 이하로 제출하세요.",
+                    "budget": 18000,
+                    "objectives": [
+                      {
+                        "productId": "쌀",
+                        "quantity": 1,
+                        "label": "쌀"
+                      },
+                      {
+                        "productId": "물티슈",
+                        "quantity": 1,
+                        "label": "물티슈"
+                      }
+                    ]
+                  },
+                  "layoutVersion": "synthetic-layout-v2"
+                }
+              }
+            }
+          },
+          {
+            "behaviorLogId": "f49c1350-9a27-56de-85df-272201684431",
+            "sequence": 2,
+            "elapsedFromSessionStartMs": 30000,
+            "occurredAt": "2026-01-01T00:00:30Z",
+            "receivedAt": "2026-01-01T00:00:30Z",
+            "eventSchemaVersion": "synthetic-native-v2",
+            "action": {
+              "eventCode": "SHOP.APP_BACKGROUNDED"
+            },
+            "payload": {
+              "type": "SHOPPING"
+            },
+            "presentation": {
+              "appBackgrounded": true
+            }
+          },
+          {
+            "behaviorLogId": "95ed760e-be34-597a-84c4-9713bba5d63b",
+            "sequence": 3,
+            "elapsedFromSessionStartMs": 40000,
+            "occurredAt": "2026-01-01T00:00:40Z",
+            "receivedAt": "2026-01-01T00:00:40Z",
+            "eventSchemaVersion": "synthetic-native-v2",
+            "action": {
+              "eventCode": "SHOP.SESSION_ENDED"
+            },
+            "payload": {
+              "type": "SHOPPING"
+            },
+            "sessionEnd": {
+              "reason": "USER_ABORTED"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

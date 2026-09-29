@@ -1,0 +1,52 @@
+{
+  "run": "full-training-v1",
+  "scope": "experimental_training_and_comparison_only",
+  "deployment": false,
+  "seed": 240924,
+  "gpu_uuid": "GPU-215716d9-f53e-fc5f-566e-f54fcbc700b1",
+  "base_model": "Qwen/Qwen3.6-27B",
+  "revision": "6a9e13bd6fc8f0983b9b99948120bc37f49c13e9",
+  "quantization": "NF4 double quant FP16 compute",
+  "attention": "oneuldo_efficient",
+  "frozen_input_embedding": "CPU FP16",
+  "frozen_output_head": "GPU FP16",
+  "other_nonquantized_base_parameters": "FP32",
+  "train": {
+    "examples": 60,
+    "epochs": 1,
+    "steps": 60,
+    "batch_size": 1,
+    "rank": 8,
+    "alpha": 16,
+    "dropout": 0,
+    "learning_rate": 1e-05,
+    "weight_decay": 0.01,
+    "max_grad_norm": 1.0,
+    "loss": "assistant tokens only, exact token mean CE with 32-token head chunks",
+    "max_sequence_length": 4096,
+    "shuffle_seed": 240924,
+    "optimizer": "AdamW foreach=False constant learning rate",
+    "eval_examples_used": false
+  },
+  "eval": {
+    "examples": 25,
+    "passes": 2,
+    "decoding": "greedy cached, no schema enforcement or repair",
+    "enable_thinking": false,
+    "max_new_tokens": 1024,
+    "context_limit": 8192,
+    "per_case_timeout_seconds": 360,
+    "retry": false,
+    "warmup_tokens": 4,
+    "generation_backend": "local HF, not HTTP/Ollama",
+    "blind_holdout": false,
+    "clinical_validity": false
+  },
+  "global_timeout_seconds": 10800,
+  "sha256": {
+    "train.candidate.jsonl": "3e1038b2833964786047a5c6864552ff27d2b411fd74e852e9762f238cb86dfc",
+    "eval.prompts.jsonl": "f04d5ada49ce519dc44be397ed380d68523d44675609358ef6576744ce5f0d5c"
+  },
+  "frozen_eval_full_sha256": "dd3a5a90476969a52263955d6bfc52ac33546519e4179774834aa202765bbeca",
+  "authorization": "User requested steps 1 through 3; no production replacement. Frozen historical data-approval metadata is not rewritten."
+}

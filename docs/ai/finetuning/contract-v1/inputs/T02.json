@@ -1,0 +1,83 @@
+{
+  "id": "95e72adc-9a87-5ba0-bb6f-74387571977b",
+  "schemaVersion": "synthetic-contract-fixture-v1",
+  "generatedAt": "2026-01-01T00:00:00Z",
+  "sessionCount": 1,
+  "eventCount": 2,
+  "input": {
+    "schemaVersion": "synthetic-contract-fixture-v1",
+    "datasetId": "95e72adc-9a87-5ba0-bb6f-74387571977b",
+    "generatedAt": "2026-01-01T00:00:00Z",
+    "analysisWindow": null,
+    "anonymousSubjectId": "T02-synthetic",
+    "sessionCount": 1,
+    "eventCount": 2,
+    "sessions": [
+      {
+        "sessionId": "0463228d-90cb-5a58-8189-bc3ff450b61a",
+        "startedAt": "2026-01-01T00:00:00Z",
+        "endedAt": null,
+        "integrity": null,
+        "events": [
+          {
+            "behaviorLogId": "eae685b2-1607-54b2-b1c9-de476f561bc6",
+            "sequence": 1,
+            "occurredAt": "2026-01-01T00:00:00Z",
+            "receivedAt": "2026-01-01T00:00:00Z",
+            "elapsedFromSessionStartMs": 0,
+            "eventSchemaVersion": "synthetic-contract-fixture-v1",
+            "action": {
+              "eventCode": "SHOP.QUANTITY_CHANGED"
+            },
+            "payload": {
+              "type": "SHOPPING",
+              "itemId": "사과",
+              "quantityBefore": 0,
+              "quantityAfter": 1,
+              "marketContent": {
+                "sceneSnapshot": {
+                  "mission": {
+                    "budget": 4000,
+                    "objectives": [
+                      {
+                        "productId": "사과",
+                        "quantity": 2,
+                        "label": "사과"
+                      },
+                      {
+                        "productId": "생수",
+                        "quantity": 1,
+                        "label": "생수"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          {
+            "behaviorLogId": "3d37545c-1dfa-5a30-8bfd-78ddec5106a4",
+            "sequence": 2,
+            "occurredAt": "2026-01-01T00:00:00Z",
+            "receivedAt": "2026-01-01T00:00:00Z",
+            "elapsedFromSessionStartMs": 0,
+            "eventSchemaVersion": "synthetic-contract-fixture-v1",
+            "action": {
+              "eventCode": "SHOP.CHECKOUT_SUBMITTED"
+            },
+            "payload": {
+              "type": "SHOPPING",
+              "marketContent": {
+                "cart": {
+                  "사과": 1,
+                  "생수": 1
+                }
+              },
+              "cartTotalAmount": 2000
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

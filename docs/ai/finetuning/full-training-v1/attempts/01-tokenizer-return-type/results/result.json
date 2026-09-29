@@ -1,0 +1,10 @@
+{
+  "status": "failed",
+  "deployment": false,
+  "training_steps": [],
+  "protocol_sha256": "308d21e81cc05272a2776f66d6efcd139ba158c0381a5f22936476e77add1bb3",
+  "failed_stage": "preflight",
+  "error_type": "AssertionError",
+  "error": "",
+  "elapsed_seconds": 6.655699452850968
+}

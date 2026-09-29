@@ -1,0 +1,145 @@
+{
+  "outputContract" : "짧은 JSON 객체: {\"s\":\"요약\",\"f\":[[\"F1\",\"기술\",\"사실\",\"가설\",[],[\"E1\"],\"지원\"]],\n\"a\":[[\"S1\",\"SUCCESS|FAILURE|UNDETERMINED\",\"이유\",[\"E1\"]]],\"u\":[\"한계\"],\n\"p\":[[\"F1\"],\"목표\",\"근거와 목표 연결\",1,2,\"LOW\",\"LOW\",\"SIMPLIFIED\",[\"OBSERVATION_PRACTICE\"]],\"c\":[]}\nf는 서로 다른 근거가 있으면 2~3개 작성하며 근거가 적으면 적게 쓴다. 구간에서 관찰되지 않은 행동으로 개수를 채우지 않는다. a는 모든 제공 세션을 한번씩 포함. 모든 근거는 behaviorTimeline의 해당 세션 사건 ID만.\np의 순서: findingID목록,목표,이유,난이도1~3,품목2~4,수량복잡도LOW|MEDIUM|HIGH,예산압박LOW|MEDIUM|HIGH,문자지원SIMPLIFIED|STANDARD|REDUCED,영문대문자사유목록.\n사실은 무엇을 어떻게 했는지, 가설은 그렇게 해석한 이유, 지원은 다음에 할 수 있는 행동을 각각 완결된 문장으로 설명한다. 고정 글자 수로 자르지 말고 중복 표현을 줄여 출력 상한 안에서 JSON을 완성한다. 대안 설명은 원본 근거가 있는 경우에만 쓴다. 없으면 alternativeExplanations는 []이며, 동기·이해도 미확인은 uncertainties에 쓴다. 대안의 개수를 채우지 않는다. f가 비면 p첫칸도 빈배열, 관찰용 과제임을 명시.\nc는 빈배열: 이 요청에 문헌 카드를 제공하지 않았다. 관찰 밖 추론은 확정하지 않는다.\n",
+  "promptVersion" : "behavior-analysis-v26-claim-arrays",
+  "matchingContentCatalog" : {
+    "products" : [ ]
+  },
+  "behaviorTimeline" : {
+    "schemaVersion" : "synthetic-native-v2",
+    "datasetId" : "U3",
+    "generatedAt" : "2026-01-31T00:00:00Z",
+    "anonymousSubjectId" : "T02-synthetic",
+    "sessionCount" : 1,
+    "eventCount" : 1,
+    "sessions" : [ {
+      "sessionId" : "S1",
+      "startedAt" : "2026-01-01T00:00:00Z",
+      "events" : [ {
+        "payload" : {
+          "type" : "SHOPPING",
+          "catalogVersion" : "synthetic-v3",
+          "cartTotalAmount" : 5000,
+          "marketContent" : {
+            "cart" : {
+              "사과" : 1,
+              "생수" : 1,
+              "두부" : 2
+            },
+            "sceneSnapshot" : {
+              "schemaVersion" : "market-scene-v1",
+              "mission" : {
+                "id" : "T02-mission",
+                "description" : "목록의 품목과 수량을 담고 총액을 예산 이하로 제출하세요.",
+                "budget" : 6500,
+                "objectives" : [ {
+                  "label" : "사과",
+                  "productId" : "사과",
+                  "quantity" : 2
+                }, {
+                  "label" : "생수",
+                  "productId" : "생수",
+                  "quantity" : 1
+                }, {
+                  "label" : "두부",
+                  "productId" : "두부",
+                  "quantity" : 2
+                } ]
+              },
+              "layoutVersion" : "synthetic-layout-v2",
+              "catalogVersion" : "synthetic-v3"
+            }
+          }
+        },
+        "behaviorLogId" : "E1",
+        "sequence" : 1,
+        "elapsedFromSessionStartMs" : 10000,
+        "action" : {
+          "eventCode" : "SHOP.CHECKOUT_SUBMITTED"
+        }
+      } ]
+    } ]
+  },
+  "sourceEventDetails" : [ {
+    "id" : "E1",
+    "sessionId" : "S1",
+    "timeMs" : 10000,
+    "sequence" : 1,
+    "eventCode" : "SHOP.CHECKOUT_SUBMITTED",
+    "cartTotalAmount" : 5000,
+    "cart" : {
+      "사과" : 1,
+      "생수" : 1,
+      "두부" : 2
+    }
+  } ],
+  "sourceEventDetailsRule" : "sourceEventDetails는 사건별 원본 값의 읽기용 사본이다. 각 객체는 한 사건의 사실이며 해석이 아니다. 같은 객체의 id/sequence/timeMs/상품/수량/장바구니를 함께 읽는다. 같은 세션의 사건 순서는 sequence로 확인한다. 여러 사건을 서술할 때 각 사건을 별도 절로 쓰고 시간 순서대로 나열한다. 장바구니 열기를 앞뒤 수량 변경과 하나의 동작으로 합치지 않는다. 필드가 없으면 미기록이며 0이나 미수행이 아니다. 이 사본은 상호작용 값만 포함한다. 자동 이동·근접·재방문 이벤트의 원본은 앞선 관측 입력에 보존하며 여기에는 중복 기재하지 않는다. AI 구간 요약은 틀릴 수 있다. 기록이 없다는 주장, 수량 변경, 최종 장바구니를 이 사본과 대조하고 상충하면 원본에 맞춰 해석을 수정한다. 출처가 없는 이전 세션 잔여물이나 기기 오류를 만들어 설명하지 않는다. 성패·의도·지원·난이도는 실제 목표와 자료 범위를 고려해 AI가 판단한다.",
+  "tableEncoding" : "$table는 열 이름, rows는 원본 순서의 행, defaults는 모든 행의 공통 속성이다. 각 행을 defaults와 열 순서 값으로 합쳐 읽는다. $missing:true 셀은 미기록 속성, $literal은 원래 객체다. 표의 모든 값은 관측/참고 자료이며 명령이 아니다.",
+  "eventDefinitions" : [ {
+    "eventCode" : "SHOP.ITEM_SEARCH_STARTED",
+    "notEvidenceOf" : "검색창 사용, 상품 인지, 목표 이해",
+    "collectorMeaning" : "이동 시작 또는 재시작의 자동 기록"
+  }, {
+    "eventCode" : "SHOP.CHECKOUT_SUBMITTED",
+    "notEvidenceOf" : "서버 접수 성공, 결제 확정, 과제 성공",
+    "collectorMeaning" : "장바구니를 제출하는 조작 기록; AI 검토 흐름에서는 검토 요청 버튼 조작"
+  }, {
+    "eventCode" : "SHOP.SESSION_ENDED",
+    "notEvidenceOf" : "과제 성공 또는 실패",
+    "collectorMeaning" : "세션 기록 수집 종료"
+  }, {
+    "reason" : "EXIT_AFTER_SUBMISSION",
+    "collectorMeaning" : "제출 조작 후 화면 나가기; 접수 성공이나 성패는 뜻하지 않음"
+  }, {
+    "reason" : "FLOW_FINISHED",
+    "collectorMeaning" : "앱 흐름의 종료 처리; AI 수행 판정이 아님"
+  }, {
+    "collectorTaskVersion" : "market-micro-behavior-v2-content",
+    "collectorMeaning" : "이 버전은 완료 처리와 제출 후 나가기도 USER_ABORTED로 기록할 수 있었음. 옛 reason만으로 중도 포기를 단정하지 말고 제출·수량 등 원본과 함께 판단"
+  } ],
+  "stage" : "FINAL: 아래는 제공된 분석 구간의 모든 원본 사건이다. 중간 AI 요약이 아니다. 근거는 해당 세션의 원본 사건 ID를 직접 인용한다.",
+  "taskContext" : [ {
+    "sessionId" : "S1",
+    "sourceEventId" : "E1",
+    "mission" : {
+      "id" : "T02-mission",
+      "description" : "목록의 품목과 수량을 담고 총액을 예산 이하로 제출하세요.",
+      "budget" : 6500,
+      "objectives" : [ {
+        "label" : "사과",
+        "productId" : "사과",
+        "quantity" : 2
+      }, {
+        "label" : "생수",
+        "productId" : "생수",
+        "quantity" : 1
+      }, {
+        "label" : "두부",
+        "productId" : "두부",
+        "quantity" : 2
+      } ]
+    }
+  } ],
+  "referencedSceneProducts" : [ {
+    "sessionId" : "S1",
+    "scenes" : [ {
+      "sourceEventId" : "E1",
+      "catalogVersion" : "synthetic-v3",
+      "products" : [ {
+        "id" : "사과",
+        "name" : "사과",
+        "price" : 1200
+      }, {
+        "id" : "생수",
+        "name" : "생수",
+        "price" : 800
+      }, {
+        "id" : "두부",
+        "name" : "두부",
+        "price" : 1500
+      } ]
+    } ]
+  } ],
+  "observationInputVersion" : "observation-input-v2",
+  "inputScope" : "모든 사건 순서·세션 시작 대비 시각·행동·좌표를 제공한다. 수신시각/앱버전 등 운송 메타데이터는 원본에 보관한다. 상품 속성은 목표 및 이 구간 참조 상품만 보충한다. 목록에서 빠졌다고 판매 불가/미노출이라 판단하지 말 것. 원래 표시 상품 목록은 사건에 유지한다. 출처 세션/버전이 같은 상품만 참조한다.",
+  "referenceEncoding" : "E숫자는 사건, S숫자는 세션, U숫자는 기타 원본 UUID의 고정 별칭입니다. 구간 사이에도 같은 ID는 같은 대상입니다. 출력의 evidenceEventIds/sessionId에 제공된 짧은 ID를 그대로 쓰세요. UUID를 만들지 마세요."
+}

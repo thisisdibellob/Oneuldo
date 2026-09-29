@@ -1,0 +1,62 @@
+{
+  "torch": "2.10.0+cu128",
+  "device": "NVIDIA TITAN RTX",
+  "results": [
+    {
+      "case": "causal",
+      "passed": true,
+      "max_absolute_errors": [
+        0.001953125,
+        0.001953125,
+        0.00390625,
+        0.0078125
+      ]
+    },
+    {
+      "case": "bool_mask",
+      "passed": true,
+      "max_absolute_errors": [
+        0.001953125,
+        0.001953125,
+        0.00390625,
+        0.0078125
+      ]
+    },
+    {
+      "case": "float_mask",
+      "passed": true,
+      "max_absolute_errors": [
+        0.001953125,
+        0.001953125,
+        0.00390625,
+        0.0078125
+      ]
+    },
+    {
+      "case": "noncausal",
+      "passed": true,
+      "max_absolute_errors": [
+        0.00048828125,
+        0.0009765625,
+        0.001953125,
+        0.001953125
+      ]
+    },
+    {
+      "case": "future_tokens_do_not_change_past",
+      "passed": true
+    }
+  ],
+  "statistics": {
+    "calls": 6,
+    "query_shapes": [
+      [
+        1,
+        24,
+        64,
+        256
+      ]
+    ],
+    "backend": "EFFICIENT_ATTENTION_ONLY"
+  }
+}

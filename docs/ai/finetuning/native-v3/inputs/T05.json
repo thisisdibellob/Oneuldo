@@ -1,0 +1,90 @@
+{
+  "id": "007e4e41-29a3-5d5c-b97b-2119b425b7e6",
+  "schemaVersion": "synthetic-native-v2",
+  "generatedAt": "2026-01-31T00:00:00Z",
+  "sessionCount": 1,
+  "eventCount": 1,
+  "input": {
+    "schemaVersion": "synthetic-native-v2",
+    "datasetId": "007e4e41-29a3-5d5c-b97b-2119b425b7e6",
+    "generatedAt": "2026-01-31T00:00:00Z",
+    "analysisWindow": null,
+    "anonymousSubjectId": "T05-synthetic",
+    "sessionCount": 1,
+    "eventCount": 1,
+    "sessions": [
+      {
+        "sessionId": "cfd0314b-7f75-5ba6-86f4-8c44d34ce540",
+        "startedAt": "2026-01-01T00:00:00Z",
+        "endedAt": null,
+        "integrity": null,
+        "events": [
+          {
+            "behaviorLogId": "237258cd-85a4-5534-a492-1b08117510c4",
+            "sequence": 1,
+            "elapsedFromSessionStartMs": 10000,
+            "occurredAt": "2026-01-01T00:00:10Z",
+            "receivedAt": "2026-01-01T00:00:10Z",
+            "eventSchemaVersion": "synthetic-native-v2",
+            "action": {
+              "eventCode": "SHOP.QUANTITY_CHANGED"
+            },
+            "payload": {
+              "type": "SHOPPING",
+              "itemId": "사과",
+              "quantityBefore": 0,
+              "quantityAfter": 1,
+              "marketContent": {
+                "sceneSnapshot": {
+                  "schemaVersion": "market-scene-v1",
+                  "mission": {
+                    "id": "T05-mission",
+                    "description": "목록의 품목과 수량을 담고 총액을 예산 이하로 제출하세요.",
+                    "budget": 6500,
+                    "objectives": [
+                      {
+                        "productId": "사과",
+                        "quantity": 1,
+                        "label": "사과"
+                      },
+                      {
+                        "productId": "생수",
+                        "quantity": 1,
+                        "label": "생수"
+                      },
+                      {
+                        "productId": "두부",
+                        "quantity": 1,
+                        "label": "두부"
+                      }
+                    ]
+                  },
+                  "layoutVersion": "synthetic-layout-v2",
+                  "catalogVersion": "synthetic-v3",
+                  "products": [
+                    {
+                      "id": "사과",
+                      "name": "사과",
+                      "price": 1200
+                    },
+                    {
+                      "id": "생수",
+                      "name": "생수",
+                      "price": 800
+                    },
+                    {
+                      "id": "두부",
+                      "name": "두부",
+                      "price": 1500
+                    }
+                  ]
+                }
+              },
+              "catalogVersion": "synthetic-v3"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

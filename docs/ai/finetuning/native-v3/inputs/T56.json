@@ -1,0 +1,96 @@
+{
+  "previousSourceSessionId": "6c2352d7-bcc5-5299-b1b4-1bda316b0da0",
+  "previousProfile": {
+    "summary": "제공된 이전 관찰.",
+    "findings": [
+      {
+        "id": "F1",
+        "skill": "장보기 수행과 근거 범위",
+        "observation": "이전 목표는 사과 1개·생수 1개·두부 1개·우유 1개, 예산 10000원이며 7000원으로 목표대로 제출했다.",
+        "interpretation": "제공된 관찰·보고의 범위로 한정한다.",
+        "alternativeExplanations": [],
+        "evidenceEventIds": [
+          "923c7184-dade-5367-9f1b-5ac18fdfe8b3"
+        ],
+        "suggestedSupport": "같은 조건의 과제에서 추가 관찰한다."
+      }
+    ],
+    "sessionAssessments": [],
+    "uncertainties": [
+      "실제 참여자의 기록이 아닌 합성된 이전/현재 관찰이다."
+    ],
+    "practicePlan": {
+      "targetFindingIds": [
+        "F1"
+      ],
+      "goal": "4종류의 제출을 관찰한다.",
+      "rationale": "제공된 수행 범위 안에서 다음 관찰 조건을 정하며 능력이나 교육 효과를 확정하지 않는다.",
+      "recommendedDifficulty": 2,
+      "itemCount": 4,
+      "quantityComplexity": "LOW",
+      "budgetPressure": "LOW",
+      "textSupport": "STANDARD",
+      "reasonCodes": [
+        "OBSERVATION_PRACTICE"
+      ]
+    },
+    "usedEvidenceCardIds": []
+  },
+  "currentAnalysis": {
+    "summary": "열 차례 연속 성공으로 장보기 교육 효과가 증명됐다.",
+    "findings": [
+      {
+        "id": "F1",
+        "skill": "장보기 수행과 근거 범위",
+        "observation": "새 목표는 사과 2개·생수 1개·두부 2개·우유 1개, 예산 10000원이며 9700원으로 목표대로 제출했다.",
+        "interpretation": "열 차례 연속 성공으로 장보기 교육 효과가 증명됐다.",
+        "alternativeExplanations": [],
+        "evidenceEventIds": [
+          "e766180f-f920-570a-8fe1-a7fbfc21c235"
+        ],
+        "suggestedSupport": "같은 조건의 과제에서 추가 관찰한다."
+      },
+      {
+        "id": "F2",
+        "skill": "장보기 수행과 근거 범위",
+        "observation": "보고자 user: “품명과 수량만 있는 짧은 표시로 다음에도 네 종류를 하고 싶어요.”",
+        "interpretation": "제공된 관찰·보고의 범위로 한정한다.",
+        "alternativeExplanations": [],
+        "evidenceEventIds": [
+          "2b40a8b3-2610-50d5-9af8-cfb857d6414c"
+        ],
+        "suggestedSupport": "같은 조건의 과제에서 추가 관찰한다."
+      }
+    ],
+    "sessionAssessments": [
+      {
+        "sessionId": "e84977e4-d278-5be3-a76e-f39f19a28946",
+        "judgment": "SUCCESS",
+        "explanation": "새 목표는 사과 2개·생수 1개·두부 2개·우유 1개, 예산 10000원이며 9700원으로 목표대로 제출했다.",
+        "evidenceEventIds": [
+          "e766180f-f920-570a-8fe1-a7fbfc21c235"
+        ]
+      }
+    ],
+    "uncertainties": [
+      "실제 참여자의 기록이 아닌 합성된 이전/현재 관찰이다."
+    ],
+    "practicePlan": {
+      "targetFindingIds": [
+        "F1",
+        "F2"
+      ],
+      "goal": "4종류의 제출을 관찰한다.",
+      "rationale": "제공된 수행 범위 안에서 다음 관찰 조건을 정하며 능력이나 교육 효과를 확정하지 않는다.",
+      "recommendedDifficulty": 2,
+      "itemCount": 4,
+      "quantityComplexity": "LOW",
+      "budgetPressure": "LOW",
+      "textSupport": "STANDARD",
+      "reasonCodes": [
+        "OBSERVATION_PRACTICE"
+      ]
+    },
+    "usedEvidenceCardIds": []
+  }
+}

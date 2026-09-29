@@ -1,0 +1,25 @@
+[ {
+  "id" : "T01",
+  "localBpePromptPlus64" : 3007,
+  "assistantTextTokens" : 300
+}, {
+  "id" : "T02",
+  "localBpePromptPlus64" : 2916,
+  "assistantTextTokens" : 200
+}, {
+  "id" : "T03",
+  "localBpePromptPlus64" : 2986,
+  "assistantTextTokens" : 185
+}, {
+  "id" : "T19",
+  "localBpePromptPlus64" : 2819,
+  "assistantTextTokens" : 175
+}, {
+  "id" : "T48",
+  "localBpePromptPlus64" : 2819,
+  "assistantTextTokens" : 194
+}, {
+  "id" : "E06",
+  "localBpePromptPlus64" : 3129,
+  "assistantTextTokens" : 245
+} ]

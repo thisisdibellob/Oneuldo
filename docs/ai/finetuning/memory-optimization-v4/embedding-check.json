@@ -1,0 +1,16 @@
+{
+  "device": "NVIDIA TITAN RTX",
+  "results": [
+    {
+      "dtype": "torch.float32",
+      "lookup_exact_match": true,
+      "downstream_gradient_exact_match": true
+    },
+    {
+      "dtype": "torch.float16",
+      "lookup_exact_match": true,
+      "downstream_gradient_exact_match": true
+    }
+  ],
+  "trainable_embedding_rejected": true
+}

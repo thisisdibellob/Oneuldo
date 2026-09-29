@@ -1,0 +1,48 @@
+{
+  "route": "ssh-local-forward:11881",
+  "checks": [
+    {
+      "path": "/healthz",
+      "status": 200,
+      "seconds": 0.04430229100398719,
+      "response": {
+        "status": "up"
+      }
+    },
+    {
+      "path": "/api/tags",
+      "status": 200,
+      "seconds": 0.07275766716338694,
+      "response": {
+        "models": [
+          {
+            "model": "qwen3.6:27b-q4_K_M",
+            "name": "qwen3.6:27b-q4_K_M"
+          }
+        ]
+      }
+    },
+    {
+      "path": "/api/chat",
+      "status": 200,
+      "seconds": 20.393547666957602,
+      "response": {
+        "model": "qwen3.6:27b-q4_K_M",
+        "created_at": "2026-09-24T06:56:37.218154013Z",
+        "message": {
+          "role": "assistant",
+          "content": "연결 성공"
+        },
+        "done": true,
+        "done_reason": "stop",
+        "total_duration": 15811094231,
+        "load_duration": 15442543998,
+        "prompt_eval_count": 23,
+        "prompt_eval_cached_count": 0,
+        "prompt_eval_duration": 242653000,
+        "eval_count": 4,
+        "eval_duration": 120566000
+      }
+    }
+  ]
+}
