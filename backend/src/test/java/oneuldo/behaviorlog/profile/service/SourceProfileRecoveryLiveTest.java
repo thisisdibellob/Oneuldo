@@ -63,7 +63,7 @@ class SourceProfileRecoveryLiveTest {
         ReflectionTestUtils.setField(budget, "requestTokens", 18000);
         ReflectionTestUtils.setField(budget, "finalOutputTokens", 1800);
         var service = new AiUserProfileService(repository, new AiUserProfilePromptFactory(mapper),
-                new AiUserProfileValidator(new MarketAiDifficultyValidator()), client, mapper, budget);
+                new AiUserProfileValidator(new MarketAiDifficultyValidator()), client, mapper, budget, org.mockito.Mockito.mock(oneuldo.behaviorlog.personalization.service.PracticeHistoryService.class));
         var result = service.updateFromSession(member, old.sourceSessionId(), current);
         assertThat(result.status()).isEqualTo("READY");
         assertThat(result.sourceSessionId()).isEqualTo(old.sourceSessionId());

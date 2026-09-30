@@ -1,6 +1,7 @@
 package oneuldo.behaviorlog.analysis.service;
 
 import ai.djl.huggingface.tokenizers.HuggingFaceTokenizer;
+import ai.djl.huggingface.tokenizers.jni.TokenizersLibrary;
 import java.util.HexFormat;
 import java.util.Map;
 import java.security.MessageDigest;
@@ -23,7 +24,18 @@ public final class QwenTokenCounter {
         }
     }
     public static int count(String text) {
-        try { return Holder.TOKENIZER.encode(text).getIds().length; }
+        java.util.Objects.requireNonNull(text, "text");
+        if (Thread.currentThread().isInterrupted()) throw new java.util.concurrent.CancellationException("Token counting interrupted");
+        // This pinned, hash-checked tokenizer has no Java-side prefix/lowercase/accent
+        // preprocessing. Use the same native encoding, but fetch only IDs: encode()
+        // additionally materializes token strings, masks and character spans we never use.
+        // Keep the native encoding alive until the IDs are copied, then always release it.
+        try {
+            var library = TokenizersLibrary.LIB;
+            long encoding = library.encode(Holder.TOKENIZER.getHandle(), text, false);
+            try { return library.getTokenIds(encoding).length; }
+            finally { library.deleteEncoding(encoding); }
+        }
         catch (LinkageError failure) { throw new IllegalStateException("QWEN_TOKENIZER_UNAVAILABLE", failure); }
     }
     // Actual text tokens + conservative allowance for the provider's private message framing.

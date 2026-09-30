@@ -42,12 +42,26 @@ public final class TimelineAnalysisPipeline {
     }
     public String model() { return model; }
     public List<BehaviorAnalysisInputResponse> partition(BehaviorAnalysisInputResponse input,int limit) {
+        return partition(input,limit,new AnalysisReferences(mapper,input));
+    }
+    private List<BehaviorAnalysisInputResponse> partition(BehaviorAnalysisInputResponse input,int limit,AnalysisReferences refs) {
         List<BehaviorAnalysisInputResponse> chunks=new ArrayList<>();
-        var refs=new AnalysisReferences(mapper,input);
         int from=0;
         while(from<input.eventCount()) {
             if(chunks.size()>=maxChunks)throw new IllegalArgumentException("CHUNK_CALL_BUDGET_EXCEEDED");
-            int low=from+1,high=input.eventCount(),best=from;
+            // Bracket a fitting prefix locally. Starting every search at half of all
+            // remaining events repeatedly encoded thousands of events for a small chunk.
+            int best=from,remaining=input.eventCount()-from;
+            int size=Math.min(remaining,chunks.isEmpty()?32:chunks.getLast().eventCount());
+            int high;
+            while(true) {
+                int end=from+size;
+                if(observationCost(slice(input,from,end),input,refs)>limit) {high=end-1;break;}
+                best=end;
+                if(end==input.eventCount()) {high=end;break;}
+                size=(int)Math.min(remaining,(long)size*2);
+            }
+            int low=best+1;
             while(low<=high) {
                 int end=(low+high)/2;
                 if(observationCost(slice(input,from,end),input,refs)<=limit) {best=end;low=end+1;}
@@ -55,6 +69,7 @@ public final class TimelineAnalysisPipeline {
             }
             if(best==from)throw new IllegalArgumentException("SINGLE_EVENT_EXCEEDS_LIMIT: required="+observationCost(slice(input,from,from+1),input,refs)+", limit="+limit);
             chunks.add(slice(input,from,best));from=best;
+            AnalysisProgress.stage("PREPARING",from,input.eventCount());
         }
         return chunks;
     }
@@ -100,7 +115,11 @@ public final class TimelineAnalysisPipeline {
     }
     private record Group(BehaviorAnalysisInputResponse scope,AiObservationDigest digest) {}
     public AiBehaviorAnalysis analyze(BehaviorAnalysisInputResponse input,int limit,List<AiBehaviorAnalysisRun.Attempt> audit) {
-        var refs=new AnalysisReferences(mapper,input);
+        return analyze(input,limit,audit,new AnalysisReferences(mapper,input),null);
+    }
+    // Reuse the run's aliases and fingerprint prompt; never share user data across runs.
+    AiBehaviorAnalysis analyze(BehaviorAnalysisInputResponse input,int limit,List<AiBehaviorAnalysisRun.Attempt> audit,
+            AnalysisReferences refs,String preparedWhole) {
         // The school profile uses larger context; explicit 8K clients retain the older path.
         if(limit>8192) {
             String source=refs.encode(prompts.wholeSourcePrompt(input));
@@ -110,13 +129,13 @@ public final class TimelineAnalysisPipeline {
                 AnalysisProgress.stage("FINALIZING",1,1);return result;
             }
         }
-        String whole=refs.encode(prompts.userPrompt(input));
+        String whole=preparedWhole!=null?preparedWhole:refs.encode(prompts.userPrompt(input));
         if(finalEstimate(prompts.systemPrompt(),whole,refs).required()+200<=limit) {
             AnalysisProgress.stage("FINALIZING",0,1);
             var result=finalCall(prompts.systemPrompt(),whole,refs,limit,audit,raw->validator.validate(refs.read(raw),input));
             AnalysisProgress.stage("FINALIZING",1,1);return result;
         }
-        var chunks=partition(input,limit);
+        var chunks=partition(input,limit,refs);
         log.info("AI analysis partition: events={}, chunks={}",input.eventCount(),chunks.size());
         List<Group> groups=new ArrayList<>();
         plannedObservations=chunks.size();
@@ -278,7 +297,7 @@ public final class TimelineAnalysisPipeline {
         }
         merge.put("scopeRule","각 한계는 해당 구간 범위에 한정한다. 다른 자식 구간에 기록이 있으면 그 원본 근거 ID로 확인하고 전체 미확인으로 확대하지 않는다.");
         merge.put("outputContract",prompts.reductionContract());
-        return refs.encode(mapper.writeValueAsString(merge));
+        return prompts.compactReductionPrompt(refs.encode(mapper.writeValueAsString(merge)));
     }
     private String finalPrompt(BehaviorAnalysisInputResponse input,List<Group> groups,AnalysisReferences refs) {
         return AnalysisSynthesisPrompt.build(mapper,prompts,input,groups.stream().map(Group::digest).toList(),refs,movementDetailLimited,

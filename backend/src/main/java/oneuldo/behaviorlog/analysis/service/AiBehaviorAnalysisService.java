@@ -70,7 +70,8 @@ public class AiBehaviorAnalysisService {
     private AiBehaviorAnalysisResponse analyzeInput(UUID memberId, BehaviorAnalysisInputResponse input) {
         long start = System.nanoTime();
         String system = prompts.systemPrompt();
-        String prompt = new AnalysisReferences(mapper, input).encode(prompts.userPrompt(input));
+        var references = new AnalysisReferences(mapper, input);
+        String prompt = references.encode(prompts.userPrompt(input));
         String requestKey=oneuldo.ai.service.AiRequestFingerprint.of(mapper,memberId,input.id(),configuredModel,
                 system,mapper.readTree(prompt),prompts.observationSystem(),prompts.digestContract(),prompts.reductionContract(),
                 FinalAnalysisPromptCompactor.systemPrompt(),FinalAnalysisPromptCompactor.VERSION,
@@ -92,7 +93,7 @@ public class AiBehaviorAnalysisService {
             var pipeline = new TimelineAnalysisPipeline(prompts, validator, client, mapper, maxChunks, budget, pacer).withQualityReview(qualityReview);
             if(checkpointStore!=null) pipeline.withCheckpoints(checkpointStore.scope(memberId,input.id()));
             try {
-                analysis = pipeline.analyze(input, budget.requestTokens(), attempts);
+                analysis = pipeline.analyze(input, budget.requestTokens(), attempts, references, prompt);
                 model = pipeline.model(); status = "READY";
             } catch (IllegalArgumentException tooLarge) {
                 status = "INPUT_TOO_LARGE"; error = tooLarge.getMessage();

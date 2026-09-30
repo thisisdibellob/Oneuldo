@@ -24,10 +24,11 @@ for (const personaId of ['mild-intellectual-disability-adult', 'careful-checker'
     assert.equal(content.observation.readObjectives, undefined);
     assert.equal(content.observation.stock, undefined);
     assert.deepEqual(content.observation.products, []);
-    assert.equal(content.personalState.hasReadList, false);
+    assert.equal(content.experience.kind, 'episodic-actor-v2');
+    assert.equal(content.behaviorParameters, undefined);
     assert.equal(content.collisionFreeLocalMoves, undefined);
     return { ok: true, json: async () => ({ choices: [{ message: { content: JSON.stringify({
-      action: { type: requests.length === 1 ? 'viewHelp' : 'giveUp' }, delayMs: 900, reason: '안내를 확인하고 오늘은 그만한다.',
+      choiceId: content.availableChoices.find(c=>c.action.type===(requests.length===1?'viewHelp':'giveUp')).id, delayMs: 900, reason: '안내를 확인하고 오늘은 그만한다.',
     }) } }] }) };
   };
   let trace;
@@ -102,7 +103,7 @@ test('provider HTTP and malformed JSON failures propagate without invoking a sto
       global.fetch = async () => { calls++; return response.response; };
       await assert.rejects(generateTrace({ personaId: 'quick-decider', seed: 'provider-error', snapshot: snapshot(), mode: 'llm',
         llm: { model: 'fixture', baseUrl: 'http://127.0.0.1:1/v1' } }), response.expected);
-      assert.equal(calls, 1);
+      assert.equal(calls, response.response.ok ? 3 : 1);
     }
   } finally { global.fetch = original; }
 });

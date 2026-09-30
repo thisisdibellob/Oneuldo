@@ -103,7 +103,7 @@ export function AbilityAnalysisScreen({ accessToken }: { accessToken: string | n
             {loading || active ? <ActivityIndicator accessibilityLabel="사용자 프로필 로딩" color={colors.mint} /> : null}
             {active && job ? <View accessibilityLiveRegion="polite" style={styles.card}>
               <Text style={styles.body}>{stages[job.stage] ?? '분석 중이에요.'}</Text>
-              {job.total > 0 ? <Text style={styles.note}>{job.total}개 구간 중 {job.completed}개 완료</Text> : null}
+              {job.total > 0 ? <Text style={styles.note}>{job.total}개 {job.stage === 'PREPARING' ? '기록 중' : '구간 중'} {job.completed}개 {job.stage === 'PREPARING' ? '준비' : '완료'}</Text> : null}
               {job.waitUntil && Date.parse(job.waitUntil) > Date.now() ? <Text style={styles.note}>AI 호출 한도 대기 중 · 약 {Math.ceil((Date.parse(job.waitUntil) - Date.now()) / 1000)}초 후 재개</Text> : null}
               <Text style={styles.note}>앱을 닫아도 서버에서 계속 진행해요. 완료 전까지 이전 프로필을 볼 수 있어요.</Text>
             </View> : null}

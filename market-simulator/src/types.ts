@@ -10,7 +10,7 @@ export type PolicyAction = Exclude<MarketAgentAction, { type: 'move' }> | { type
   | { type: 'pause'; durationMs: number }
   | { type: 'lookAround'; durationMs: number }
   | { type: 'browse'; durationMs: number; scrollFraction: number };
-export type Decision = { action: PolicyAction; delayMs: number; reason: string; attentionTag?: string; cueRefs?: string[];
+export type Decision = { action: PolicyAction; delayMs: number; reason: string; currentTask?: string; attentionTag?: string; cueRefs?: string[];
   exchange?: { request: unknown; response: unknown } };
 export type PrimitiveDecision = { action: MarketAgentAction; delayMs: number; reason: string };
 export type TraceEntry = Decision;
@@ -57,6 +57,8 @@ export type ActorObservation = {
   listAvailable: boolean;
   /** Present for one observation after an accepted readList, never prefilled at entry. */
   readObjectives?: ActorObjective[];
+  /** Text actually shown by the app. No analysis, hidden goals or expected answer. */
+  instructions?: { phase: 'entry' | 'checkout'; lines: string[] };
   cart: Record<string, number> | null;
   cashiers: Partial<Record<string, boolean>>;
   lastActionError?: string | null;
@@ -84,11 +86,15 @@ export type AttentionExperience = {
   layoutKey?: string;
   previousLayoutKey?: string;
   memory?: AttentionMemory;
+  learning?: import('./actorLearning').ConfirmedLearning;
 };
 export type TraceOptions = {
   personaId: string; seed: string | number; snapshot: MarketReplaySnapshot;
   mode?: 'stochastic' | 'llm'; maxActions?: number; timeBudgetMs?: number;
-  llm?: { baseUrl?: string; model?: string; apiKeyEnv?: string; maxCalls?: number; timeoutMs?: number };
+  /** Compact is a test execution schedule, not an estimate of a person's speed. */
+  timingProfile?: 'original' | 'compact';
+  llm?: { baseUrl?: string; model?: string; apiKeyEnv?: string; maxCalls?: number; timeoutMs?: number;
+    protocol?: 'openai' | 'ollama' };
   /** Optional local model contract. A failed LLM call is never replaced by stochastic actions. */
   decisionProvider?: (observation: Observation, history: TraceEntry[], persona: Persona) => Promise<Decision>;
   attentionExperience?: AttentionExperience;

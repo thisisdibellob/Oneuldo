@@ -20,7 +20,7 @@ class AiUserProfileReanalysisTest {
         var refs=new AiUserProfileReferences(mapper,previous,current);
         var wire=(tools.jackson.databind.node.ObjectNode)mapper.readTree(refs.encode(mapper.writeValueAsString(analysis)));
         assertThat(wire.path("allowedEvidenceEventIds").get(0).asString()).isEqualTo("R1");
-        assertThat(wire.path("findings").get(0).path("observation").asString()).isEqualTo("사과 2개(E105)");
+        assertThat(wire.path("findings").get(0).path("observation").asString()).isEqualTo("사과 2개");
         assertThat(wire.path("findings").get(0).path("evidenceEventIds").get(0).asString()).isEqualTo("R1");
         wire.remove(List.of("sessionAssessments","allowedEvidenceEventIds","referenceEncoding"));
         assertThat(refs.read(mapper.writeValueAsString(wire)).findings().getFirst().evidenceEventIds()).containsExactly(event);

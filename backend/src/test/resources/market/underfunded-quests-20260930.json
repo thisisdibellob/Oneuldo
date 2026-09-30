@@ -1,0 +1,74 @@
+[
+  {
+    "checkoutDialogue": [
+      "장바구니 내용을 확인해 주세요.",
+      "총 금액이 예산 범위 내에 있는지 살펴보세요."
+    ],
+    "title": "3가지 품목 구매 연습",
+    "briefing": [
+      "과일, 냉장, 조리식품 선반을 방문하세요.",
+      "정확한 규격과 수량을 선택해 장바구니에 담으세요.",
+      "예산 6,000원 내에서 구매를 완료하세요."
+    ],
+    "objectives": [
+      {
+        "quantity": 1,
+        "productId": "banana"
+      },
+      {
+        "quantity": 1,
+        "productId": "milk"
+      },
+      {
+        "quantity": 1,
+        "productId": "curry"
+      }
+    ],
+    "difficulty": 2,
+    "successMessage": "정확한 규격과 수량을 선택해 예산 내 구매를 완료했습니다.",
+    "adaptationSummary": "이전 세션에서 규격 선택이 개선됨을 확인했습니다. 이번에는 품목 수를 3개로 늘리고 예산 압박을 추가해 다양한 선반 탐색과 선택 정확도를 유지하는지 관찰합니다.",
+    "reasonCodes": [
+      "ITEM_COUNT_INCREASE",
+      "BUDGET_CONSTRAINT"
+    ],
+    "description": "바나나 1송이, 흰 우유 900mL 1개, 순한 카레 4인분 1개를 선택합니다. 각 선반에서 올바른 규격을 식별하고 예산을 초과하지 않도록 주의하세요.",
+    "budget": 6000,
+    "scenarioId": "CUSTOM"
+  },
+  {
+    "checkoutDialogue": [
+      "장바구니에 담은 물건을 확인해 주세요.",
+      "총 금액이 예산 범위 안에 있는지 살펴보세요."
+    ],
+    "title": "3가지 물품 장보기",
+    "briefing": [
+      "과일, 냉장, 조리 식품 선반을 방문하세요.",
+      "정확한 규격과 수량을 선택하세요.",
+      "예산 8,000원 내에서 구매하세요."
+    ],
+    "objectives": [
+      {
+        "quantity": 1,
+        "productId": "banana"
+      },
+      {
+        "quantity": 1,
+        "productId": "milk"
+      },
+      {
+        "quantity": 1,
+        "productId": "curry"
+      }
+    ],
+    "difficulty": 2,
+    "successMessage": "정확한 규격과 수량으로 예산 내 구매 완료했습니다.",
+    "adaptationSummary": "이전 세션에서 규격 식별 성공을 확인했습니다. 품목 수를 3개로 늘리고 예산 압박을 추가하여 다양한 선반 탐색 및 선택 정확도를 유지하는지 관찰합니다.",
+    "reasonCodes": [
+      "ITEM_COUNT_INCREASE",
+      "BUDGET_CONSTRAINT"
+    ],
+    "description": "바나나 1송이, 흰 우유 900mL 1개, 순한 카레 4인분 1개를 찾습니다. 각 선반에서 정확한 규격을 확인하고 장바구니에 담습니다.",
+    "budget": 8000,
+    "scenarioId": "CUSTOM"
+  }
+]

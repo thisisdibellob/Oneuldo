@@ -5,7 +5,9 @@ import { replayPresentationKey, validateReplayPresentation } from '../game/marke
 
 export type ReplayProgress = {
   status: 'running' | 'completed' | 'failed' | 'stopped'; stepIndex: number; stepId?: string;
-  error?: string; report: ReturnType<typeof createMotionReport> & { startedAt: string; endedAt?: string; acknowledged: boolean; completedSteps: { id: string; type: string; startedAt: string; finishedAt: string; reason: string }[] };
+  error?: string; report: ReturnType<typeof createMotionReport> & { startedAt: string; endedAt?: string; acknowledged: boolean;
+    submission?: { cart: Record<string, number>; capturedAt: string; source: 'app-ui-before-submit' };
+    completedSteps: { id: string; type: string; startedAt: string; finishedAt: string; reason: string }[] };
 };
 export async function playMarketTrace(trace: MarketReplayTrace, getUi: () => ReplayUiPort | null,
   motion: ReplayMotionPort, signal: AbortSignal, onProgress: (progress: ReplayProgress) => void): Promise<void> {
@@ -125,6 +127,7 @@ export async function playMarketTrace(trace: MarketReplayTrace, getUi: () => Rep
         await interact(step.checkoutId, signal); await replayUntil(() => ui().read().phase === 'checkout', signal); return;
       case 'submitForReview':
         if (ui().read().phase !== 'checkout') throw new Error('Purchase confirmation is not visible');
+        report.submission = { cart: { ...ui().read().cart }, capturedAt: new Date().toISOString(), source: 'app-ui-before-submit' };
         // Existing app handlers own their HTTP calls. Stop waiting without issuing a next input.
         await replayAwait(() => ui().submit(), signal);
         if (ui().read().reviewError) throw new Error(ui().read().reviewError!);

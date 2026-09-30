@@ -22,7 +22,7 @@ bash backend/scripts/run-home-ai.sh
 
 Windows에서는 `gradlew.bat`를 사용한다. IDE 실행 시 Active profiles에 `ollama`를 지정하고, 프로그램 인수에 `--spring.config.additional-location=optional:file:./local.properties,optional:file:./backend/local.properties`를 추가한다. 로컬 파일이 프로필 기본값보다 우선하도록 하기 위한 설정이다. 실행 스크립트에는 이 설정이 포함돼 있다. 다른 프로필이 필요한 환경이라면 기존 프로필에 `ollama`를 추가한다. 실행 중이던 백엔드는 재시작해야 변경된 설정이 적용된다.
 
-수동 설정을 원하면 `backend/local.properties`에 아래 항목을 설정한다. 기존 `local.properties`의 8K 값이 새 기본값보다 우선하므로 기존 사용자도 함께 갱신한다.
+수동 설정을 원하면 `backend/local.properties`에 아래 항목을 설정한다. 기존 `local.properties`의 8K 값이나 최종 출력 1,800 값이 새 기본값보다 우선하므로 기존 사용자도 함께 갱신한다. 학교 서버 사용자는 `ai.behavior-analysis.final-output-tokens=2400`으로 수정하고 백엔드를 재시작하면 된다. 키 재발급은 필요하지 않다.
 
 ```properties
 ai.ollama.base-url=https://oneuldo.duckdns.org
@@ -31,7 +31,7 @@ ai.ollama.timeout=PT30M
 ai.ollama.context-length=18432
 ai.behavior-analysis.request-token-budget=18000
 ai.behavior-analysis.chunk-output-tokens=1800
-ai.behavior-analysis.final-output-tokens=1800
+ai.behavior-analysis.final-output-tokens=2400
 ai.behavior-analysis.quality-review=true
 ```
 
@@ -80,9 +80,9 @@ python3 backend/scripts/configure-home-ai.py --server laptop
 
 학교 서버로 돌아오려면 `--server school`로 실행한다. 학교와 노트북의 키는 서로 대체할 수 없다. 노트북 주소는 `https://bluem.myvnc.com`이며 해당 No-IP 호스트의 정기 확인은 계속 필요하다. 스크립트 파일명의 `home`은 기존 명령과의 호환을 위해 유지한다.
 
-## 응답 한도와 긴 요청 (2026-09-13)
+## 응답 한도와 긴 요청 (2026-09-29)
 
-학교 Ollama 프로필의 기본 요청 예산은 입력·출력을 합쳐 18,000토큰이다. 구간 관찰/통합 응답과 최종 응답은 각각 최대 1,800토큰이며, 컨텍스트는 18,432토큰이다. 게이트웨이의 추가 메시지 여유분 32토큰을 포함해도 18,176토큰 방어 한도 안에 들어간다. 노트북 설정은 컨텍스트 8,192 / 요청 예산 7,800을 사용한다. 입력이 커지면 원본 사건을 유지한 채 구간을 나눈다. 최대 출력은 예약 한도이며 항상 그만큼 생성하는 것은 아니다.
+학교 Ollama 프로필의 기본 요청 예산은 입력·출력을 합쳐 18,000토큰이다. 구간 관찰/통합 응답은 최대 1,800토큰, 최종 분석·프로필 응답은 최대 2,400토큰이며, 컨텍스트는 18,432토큰이다. 게이트웨이의 추가 메시지 여유분 32토큰을 포함해도 18,176토큰 방어 한도 안에 들어간다. 노트북 설정은 컨텍스트 8,192 / 요청 예산 7,800 / 최종 출력 1,800을 사용한다. 입력이 커지면 원본 사건을 유지한 채 구간을 나눈다. 최대 출력은 예약 한도이며 항상 그만큼 생성하는 것은 아니다.
 
 `run-home-ai.sh`는 macOS에서 실행 중인 동안 `caffeinate -i`로 유휴 절전을 방지한다. 수동 잠자기나 덮개 닫힘까지 방지하는 기능은 아니므로 긴 테스트에서는 맥북 덮개를 열어둔다. 백엔드를 종료하면 절전 방지 요청도 해제되며 시스템 설정은 바꾸지 않는다.
 

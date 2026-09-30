@@ -9,6 +9,7 @@ import { Random } from './random';
 import { TraceGuard, validateTrace } from './traceValidation';
 import type { Decision, TraceOptions, TraceEntry, TraceSummary, Observation, Persona } from './types';
 import { generateAttentionTrace } from './attentionSimulator';
+import { compactTraceTiming } from './traceTiming';
 export { listPersonas } from './personas';
 export { generateBatch } from './batch';
 export { validateTrace } from './traceValidation';
@@ -18,12 +19,23 @@ type StepIntent = MarketReplayStep extends infer S ? S extends MarketReplayStep 
 
 /** Produces intentions only. No BehaviorLogRequest, episode export, HTTP write, or UI process. */
 export async function generateTrace(options: TraceOptions): Promise<MarketReplayTrace> {
+  const timing = options?.timingProfile ?? 'compact';
+  if (!['original', 'compact'].includes(timing)) throw new Error('Unknown timingProfile');
+  // Generate all decisions first: faster replay must not change memory, choices or RNG.
+  const trace = await generateOriginalTrace(options);
+  const result = timing === 'original' ? trace : compactTraceTiming(trace);
+  const check = validateTrace(result, options.snapshot);
+  if (!check.valid) throw new Error(`Timed trace failed validation: ${check.errors.join('; ')}`);
+  return result;
+}
+
+async function generateOriginalTrace(options: TraceOptions): Promise<MarketReplayTrace> {
   if (!options || !['string', 'number'].includes(typeof options.seed) || !String(options.seed).trim()
     || String(options.seed).length > 200 || (typeof options.seed === 'number' && !Number.isFinite(options.seed))) throw new Error('A finite numeric or non-empty string seed is required.');
   const snapshotCheck = validateMarketReplaySnapshot(options.snapshot);
   if (!snapshotCheck.valid) throw new Error(snapshotCheck.errors.join('; '));
   const persona = getPersona(options.personaId);
-  const mode = options.mode ?? 'stochastic';
+  const mode = options.mode ?? 'llm';
   if (!['stochastic', 'llm'].includes(mode)) throw new Error('mode must be stochastic or llm.');
   const maxActions = options.maxActions ?? 1000;
   if (!Number.isInteger(maxActions) || maxActions < 1 || maxActions > 2000) throw new Error('maxActions must be 1..2000 high-level decisions.');
@@ -34,7 +46,7 @@ export async function generateTrace(options: TraceOptions): Promise<MarketReplay
   if (!model) throw new Error('LLM mode requires an explicit model identifier.');
   if (persona.attention) return generateAttentionTrace(options, persona, mode === 'stochastic' ? 'stochastic-policy/5' : model);
   const guard = new TraceGuard(options.snapshot, persona.id, persona.version, model);
-  const policy = new StochasticPolicy(persona, options.seed);
+  const policy = mode === 'stochastic' ? new StochasticPolicy(persona, options.seed) : null;
   const provider = mode === 'llm' ? options.decisionProvider ?? createLlmPolicy(options.llm ?? {}, options.timeBudgetMs) : null;
   // Gesture and presentation sampling must not consume the persona decision RNG.
   const motor = new Random(`${options.seed}:presentation:${persona.id}:${persona.version}`);
@@ -58,11 +70,13 @@ export async function generateTrace(options: TraceOptions): Promise<MarketReplay
     const limit = history.length >= maxActions ? 'action-limit'
       : mode === 'llm' && history.length >= maxCalls ? 'model-call-limit'
       : options.timeBudgetMs !== undefined && plannedMs >= options.timeBudgetMs ? 'planned-time-budget' : null;
+    if (limit && mode === 'llm') throw new Error(`ATTENTION_GENERATION_LIMIT: ${limit}`);
     if (limit) decision = { action: { type: 'giveUp' }, delayMs: 1, reason: limit };
     else decision = provider ? await provider(before, history, persona)
-      : policy.next(before, options.timeBudgetMs === undefined ? undefined : options.timeBudgetMs - plannedMs);
+      : policy!.next(before, options.timeBudgetMs === undefined ? undefined : options.timeBudgetMs - plannedMs);
     assertDecision(decision);
     if (options.timeBudgetMs !== undefined && plannedMs + decision.delayMs >= options.timeBudgetMs) {
+      if (mode === 'llm') throw new Error('ATTENTION_GENERATION_LIMIT: planned-time-budget');
       decision = { action: { type: 'giveUp' }, delayMs: 1, reason: 'planned-time-budget' };
     }
     if (decision.action.type === 'walkTo' && decision.reason.startsWith('look-around-before')) {
@@ -95,13 +109,13 @@ export async function generateTrace(options: TraceOptions): Promise<MarketReplay
     }
     // One observed semantic transition updates memory. Rendering ticks do not count as decisions.
     const actual = applied.actions.at(-1);
-    if (actual) policy.onResult(actual, applied.before, applied.after);
+    if (actual) policy?.onResult(actual, applied.before, applied.after);
     if (decision.action.type === 'closeView' && resumeAfterView) {
       const resume = { action: { type: 'interact' as const, station: resumeAfterView }, delayMs: Math.round(persona.parameters.reactionMedianMs * .35),
         reason: 'return-to-the-previous-station-after-checking-the-hud-view' };
       const restored = append(projectDecision(resume, guard.observe(), persona, options.snapshot, options.seed, steps.length, motor), resume.delayMs, resume.reason);
       const reopened = restored.actions.at(-1);
-      if (reopened) policy.onResult(reopened, restored.before, restored.after);
+      if (reopened) policy?.onResult(reopened, restored.before, restored.after);
       resumeAfterView = null;
     }
     if (intent.type === 'openShelf') append({ type: 'browse', durationMs: Math.round(motor.between(.35, .75) * persona.parameters.reactionMedianMs + 300), scrollFraction: 0 }, 0, 'look-over-the-visible-products-before-selecting');

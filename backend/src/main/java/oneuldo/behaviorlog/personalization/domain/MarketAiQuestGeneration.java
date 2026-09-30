@@ -24,7 +24,12 @@ import org.hibernate.type.SqlTypes;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class MarketAiQuestGeneration {
 
-    public record Attempt(int sequence, String rawOutput, String failureReason) {}
+    public record Attempt(int sequence, String rawOutput, String failureReason,
+            java.util.Map<String, Object> validationDetails) {
+        public Attempt(int sequence, String rawOutput, String failureReason) {
+            this(sequence, rawOutput, failureReason, null);
+        }
+    }
 
     @Id
     private UUID id;

@@ -17,6 +17,7 @@ SERVERS = {
     "laptop": "https://bluem.myvnc.com",
 }
 SERVER_BUDGETS = {"school": (18432, 18000), "laptop": (8192, 7800)}
+SERVER_FINAL_OUTPUT = {"school": 2400, "laptop": 1800}
 BACKEND = Path(__file__).resolve().parents[1]
 
 
@@ -68,6 +69,7 @@ def main():
     target = BACKEND / "local.properties"
     original = target.read_text() if target.exists() else ""
     context, budget = SERVER_BUDGETS[args.server]
+    final_output = SERVER_FINAL_OUTPUT[args.server]
     updates = {
         "ai.ollama.base-url": base_url,
         "ai.ollama.api-key": key,
@@ -75,7 +77,7 @@ def main():
         "ai.ollama.context-length": str(context),
         "ai.behavior-analysis.request-token-budget": str(budget),
         "ai.behavior-analysis.chunk-output-tokens": "1800",
-        "ai.behavior-analysis.final-output-tokens": "1800",
+        "ai.behavior-analysis.final-output-tokens": str(final_output),
         "ai.behavior-analysis.quality-review": "true",
     }
     lines = [line for line in original.splitlines()
@@ -91,7 +93,7 @@ def main():
         if os.path.exists(temporary):
             os.unlink(temporary)
     print("API 인증 성공. backend/local.properties에 저장했습니다 (키는 출력하지 않습니다).")
-    print(f"분석 설정: context={context}, requestBudget={budget}, observation/finalOutput=1800, qualityReview=true")
+    print(f"분석 설정: context={context}, requestBudget={budget}, observationOutput=1800, finalOutput={final_output}, qualityReview=true")
     print("실행: bash backend/scripts/run-home-ai.sh (프로젝트 루트에서)")
 
 

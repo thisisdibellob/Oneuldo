@@ -2,6 +2,7 @@ package oneuldo.behaviorlog.personalization.service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import oneuldo.ai.client.GroqChatClient;
@@ -21,6 +22,7 @@ public class MarketAiQuestService {
     private final oneuldo.behaviorlog.profile.service.AiUserProfileService profileService;
     private final GroqChatClient groqChatClient;
     private final ObjectMapper objectMapper;
+    private final PracticeHistoryService history;
     private final oneuldo.ai.service.SingleFlight<UUID,MarketAiQuestResponse> activeRequests=new oneuldo.ai.service.SingleFlight<>();
     @org.springframework.beans.factory.annotation.Value("${ai.cache-identity:${ai.groq.model:qwen/qwen3.6-27b}}")
     private String configuredModel="qwen/qwen3.6-27b";
@@ -38,21 +40,26 @@ public class MarketAiQuestService {
         String model = null;
         long startedAt = System.nanoTime();
         MarketAiQuestDraft draft = null;
-        String userPrompt = promptFactory.userPrompt(analysis, recommendation);
+        String validationFeedback = "";
+        Map<String, Object> validationDetails = Map.of();
+        String userPrompt = promptFactory.withPracticeHistory(promptFactory.userPrompt(analysis, recommendation), history.forProfile(memberId, profile));
         // Recommendation IDs/times change on every read; only its AI plan/settings affect generation.
         var semanticPrompt=(tools.jackson.databind.node.ObjectNode)new oneuldo.behaviorlog.analysis.service.LosslessTables(objectMapper).decode(objectMapper.readTree(userPrompt));
         if(semanticPrompt.path("aiDifficultyRecommendation") instanceof tools.jackson.databind.node.ObjectNode rec)
             rec.remove(List.of("recommendationId","profileId","generatedAt"));
         if(semanticPrompt.path("aiUserAnalysis") instanceof tools.jackson.databind.node.ObjectNode record)
             record.remove(List.of("createdAt","latencyMs"));
-        String requestKey=oneuldo.ai.service.AiRequestFingerprint.of(objectMapper,memberId,configuredModel,promptFactory.systemPrompt(),semanticPrompt,900,0.2,"quest-reuse-v1");
+        String requestKey=oneuldo.ai.service.AiRequestFingerprint.of(objectMapper,memberId,configuredModel,promptFactory.systemPrompt(),semanticPrompt,900,0.2,"quest-reuse-v2-budget-repair");
         var reusable=auditService.findReusable(memberId,requestKey);
         if(reusable.isPresent()) return reusable.get();
         for (int number = 1; number <= 2; number++) {
             GroqChatClient.GroqChatResult result;
             try {
                 result = groqChatClient.complete(promptFactory.systemPrompt(), userPrompt + (number == 2
-                        ? "\n이전 응답이 구조/상품/가격 검사를 통과하지 못했습니다. 제약을 다시 확인하고 JSON만 출력하세요." : ""), 900, 0.2);
+                        ? "\n이전 응답 검증 오류: " + validationFeedback
+                          + "\n서버가 검산한 오류 정보: " + objectMapper.writeValueAsString(validationDetails)
+                          + "\nlineItems는 이전 선택의 상품·수량과 카탈로그 가격이다. 목표를 유지하면 허용 범위 안에서 예산을 다시 선택하고, "
+                          + "상품이나 수량을 바꾸면 합계를 다시 계산하세요. briefing/description의 금액도 budget과 일치시켜 전체 JSON을 출력하세요." : ""), 900, 0.2);
                 model = result.model();
             } catch (RuntimeException unavailable) {
                 attempts.add(new MarketAiQuestGeneration.Attempt(number, null,
@@ -69,7 +76,17 @@ public class MarketAiQuestService {
                 break;
             } catch (RuntimeException invalid) {
                 draft = null;
-                attempts.add(new MarketAiQuestGeneration.Attempt(number, result.text(), "INVALID_AI_QUEST"));
+                // Only our validator's bounded error labels enter the retry, never parser/model text.
+                validationFeedback = invalid instanceof IllegalArgumentException
+                        && invalid.getMessage() != null
+                        && (invalid.getMessage().startsWith("AI 장보기 퀘스트 검증 실패: ")
+                            || invalid.getMessage().equals("AI_PLAN_ITEM_COUNT_MISMATCH"))
+                        ? invalid.getMessage() : "JSON 구조 또는 필드 타입 오류";
+                validationDetails = invalid instanceof MarketQuestValidationException failure
+                        ? failure.details() : Map.of("reason", validationFeedback,
+                            "expectedObjectiveCount", recommendation.adjustments().itemCount(),
+                            "expectedDifficulty", recommendation.recommendedDifficulty());
+                attempts.add(new MarketAiQuestGeneration.Attempt(number, result.text(), "INVALID_AI_QUEST", validationDetails));
             }
         }
         long latency = (System.nanoTime() - startedAt) / 1_000_000L;

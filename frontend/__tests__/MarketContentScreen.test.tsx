@@ -16,8 +16,26 @@ jest.mock('expo-haptics', () => ({ ImpactFeedbackStyle: { Light: 'light' }, impa
 
 beforeEach(() => { jest.useFakeTimers(); jest.clearAllMocks(); });
 afterEach(() => { jest.useRealTimers(); });
-async function setup(scenario: 'S01'|'S02', station: 'fresh'|'produce') {
-  const mission=buildMarketScenarioMission(scenario);
+
+it('추천 안내가 규격을 생략해도 브리핑과 HUD에서 규격과 예산을 읽을 수 있다', async () => {
+  const mission = { ...buildMarketScenarioMission('S01'), scenarioId: 'CUSTOM', budget: 7000,
+    objectives: [{ productId: 'milk', quantity: 1 }, { productId: 'water', quantity: 1 }],
+    briefing: ['우유와 생수를 사세요.'] };
+  const screen = render(<MarketSimulationScreen mission={mission} onExit={jest.fn()} />);
+  try {
+    expect(screen.getByText('흰 우유 900mL')).toBeTruthy();
+    expect(screen.getByText('생수 500mL')).toBeTruthy();
+    expect(screen.getByText('예산 7,000원')).toBeTruthy();
+    fireEvent.press(screen.getByText('장보기 시작'));
+    await act(async () => { jest.advanceTimersByTime(300); await Promise.resolve(); });
+    expect(screen.getByText('흰 우유 900mL')).toBeTruthy();
+    expect(screen.getByText('생수 500mL')).toBeTruthy();
+    expect(screen.getByText('예산 7,000원')).toBeTruthy();
+    expect(startSessionAnalysisJob).not.toHaveBeenCalled();
+  } finally { screen.unmount(); }
+});
+async function setup(scenario: 'S01'|'S02', station: 'fresh'|'produce', override?: ReturnType<typeof buildMarketScenarioMission>) {
+  const mission=override ?? buildMarketScenarioMission(scenario);
   const environment=createMarketEnvironment({seed:'merged-content',cashierCount:2});
   const position={current:environment.stations[station]};
   const required=station==='fresh'?['milk','milk-small']:['apple','apple-green'];
@@ -97,4 +115,28 @@ it('AI가 작성한 여러 단계 안내와 계산대 안내를 생략하지 않
     await act(async () => { jest.advanceTimersByTime(300); await Promise.resolve(); });
     for (const line of mission.checkoutDialogue) expect(screen.getByText(line)).toBeTruthy();
   } finally { screen.unmount(); }
+});
+
+
+it('1품목 과제에서 안내한 기존 상품 제거와 규격 교체를 실제 조작·제출 로그에 보존한다', async () => {
+  const base=buildMarketScenarioMission('S01');
+  const mission={...base,scenarioId:'CUSTOM',budget:4200,objectives:[base.objectives[0]],
+    briefing:['우유 카드의 숫자를 보세요.','900mL를 1개 골라요.'],
+    checkoutDialogue:['장바구니의 우유가 900mL인지 보세요.','200mL면 진열대에서 수량을 0으로 줄이고 900mL를 담아요.']};
+  const {screen,checkout}=await setup('S01','fresh',mission);
+  try {
+    act(()=>{screen.UNSAFE_getByType(MarketShelfScene).props.onDropProduct('milk-small');});
+    act(()=>{screen.UNSAFE_getByType(MarketShelfScene).props.onChangeQuantity('milk-small',-1);});
+    act(()=>{screen.UNSAFE_getByType(MarketShelfScene).props.onDropProduct('milk');});
+    const cart=screen.UNSAFE_getByType(MarketShelfScene).props.cart;
+    expect(cart.milk).toBe(1);expect(cart['milk-small'] ?? 0).toBe(0);
+    await checkout();
+    const events=jest.mocked(enqueueBehaviorEvents).mock.calls.flatMap(call=>call[1].map(row=>row.event));
+    const start=events.find(e=>e.action.eventCode==='SHOP.SESSION_STARTED')!;
+    expect((start.payload?.marketContent as any).sceneSnapshot.mission.objectives).toHaveLength(1);
+    const submit=events.find(e=>e.action.eventCode==='SHOP.CHECKOUT_SUBMITTED')!;
+    expect((submit.payload?.marketContent as any).cart.milk).toBe(1);
+    expect((submit.payload?.marketContent as any).cart['milk-small'] ?? 0).toBe(0);
+    expect(startSessionAnalysisJob).toHaveBeenCalledTimes(1);
+  } finally {screen.unmount();}
 });

@@ -112,6 +112,7 @@ import {
 import { CashierSimulationScreen } from './CashierSimulationScreen';
 import { CookingSimulationScreen } from './CookingSimulationScreen';
 import type { ReplayMotionPort, ReplayUiPort } from '../replay/ports';
+import { pilotScenario } from '../replay/pilotScenario';
 import type { ReplayPresentation } from '../game/marketReplayPerception';
 
 // Add ?muteAudio=1 to developer preview URLs for silent interaction checks.
@@ -662,6 +663,18 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
       };
     }
 
+    const fixedPilotMission = pilotScenario(__DEV__ && MARKET_REPLAY_ENABLED,
+      __DEV__ && MARKET_REPLAY_ENABLED && typeof window !== 'undefined' && window.location
+        ? new URLSearchParams(window.location.search).get('marketPilotScenario') ?? undefined : undefined);
+    if (fixedPilotMission) {
+      setMarketAiRequestToken(accessToken);
+      setMarketAiStatus('baseline');
+      setPersonalizedMarketMission(fixedPilotMission);
+      setMarketDifficulty(2);
+      setMarketSimulation(undefined);
+      return () => { active = false; };
+    }
+
     if (!accessToken) {
       const randomMission = buildRandomMarketScenarioMission();
       setMarketAiRequestToken(accessToken);
@@ -972,7 +985,9 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
     prepareMapTransition();
     setMarketAiStatus('loading');
     marketVisitNumber.current += 1;
-    const environment = createMarketEnvironment({ seed: `market-${Date.now()}-${marketVisitNumber.current}` });
+    const pilotLayout = __DEV__ && MARKET_REPLAY_ENABLED && typeof window !== 'undefined' && window.location
+      ? new URLSearchParams(window.location.search).get('marketPilotLayout') : null;
+    const environment = createMarketEnvironment({ seed: pilotLayout || `market-${Date.now()}-${marketVisitNumber.current}` });
     marketEnvironmentRef.current = environment;
     setMarketEnvironment(environment);
     marketCashierCalledRef.current = {};
@@ -2654,9 +2669,11 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
         />
       ) : null}
 
-      {__DEV__ && MARKET_REPLAY_ENABLED ? <View pointerEvents="none" style={{ position: 'absolute', left: 12, top: 40, maxWidth: 480,
+      {__DEV__ && MARKET_REPLAY_ENABLED ? <View style={{ position: 'absolute', left: 12, top: 40, maxWidth: 480,
         backgroundColor: '#f4fff3', borderColor: '#3b6b3b', borderWidth: 1, borderRadius: 8, padding: 8, zIndex: 10000 }}>
         <Text accessibilityLiveRegion="polite" testID="market-replay-status" style={{ fontSize: 12, color: '#234b23' }}>{replayStatus}</Text>
+        {worldMap === 'village' ? <Pressable accessibilityRole="button" accessibilityLabel="실험용 매장 입구로 이동"
+          onPress={event => handlePortalPress(event, 'market')}><Text>실험용 매장 입구로 이동</Text></Pressable> : null}
       </View> : null}
 
       {fridgeMenuOpen ? (

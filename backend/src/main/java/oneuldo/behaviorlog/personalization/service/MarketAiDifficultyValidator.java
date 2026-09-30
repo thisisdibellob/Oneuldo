@@ -15,7 +15,7 @@ public class MarketAiDifficultyValidator {
         if (draft.recommendedDifficulty() < 1 || draft.recommendedDifficulty() > 3) {
             throw invalid("추천 난이도");
         }
-        if (draft.itemCount() < 2 || draft.itemCount() > 4) throw invalid("품목 수");
+        if (draft.itemCount() < 1 || draft.itemCount() > 4) throw invalid("품목 수");
         if (!COMPLEXITY.contains(draft.quantityComplexity())) throw invalid("수량 복잡도");
         if (!COMPLEXITY.contains(draft.budgetPressure())) throw invalid("예산 압박");
         if (!TEXT_SUPPORT.contains(draft.textSupport())) throw invalid("문장 지원");

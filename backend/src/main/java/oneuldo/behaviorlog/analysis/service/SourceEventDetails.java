@@ -48,6 +48,13 @@ public final class SourceEventDetails {
             var payload = source.path("payload");
             for (String field : VALUES) copy(payload, field, row, field);
             copy(payload.path("marketContent"), "cart", row, "cart");
+            // Preserve the selected SKU's recorded label and package unit, not the target family label.
+            var item = payload.path("marketContent").path("item");
+            if (item.isObject()) {
+                var product = row.putObject("selectedProduct");
+                for (String field : List.of("id", "name", "detail", "salesUnit", "attributes", "price"))
+                    copy(item, field, product, field);
+            }
             copy(payload.path("marketContent").path("sceneSnapshot").path("startingConditions"), "cart", row, "initialCart");
         }
         return result;

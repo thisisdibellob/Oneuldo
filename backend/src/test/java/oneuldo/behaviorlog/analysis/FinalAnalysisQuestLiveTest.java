@@ -128,7 +128,7 @@ class FinalAnalysisQuestLiveTest {
                 report.set("questError",mapper.valueToTree(call.getArgument(5)));write();return null;
             }).when(questAudit).record(any(),any(),any(),any(),any(),any(),any());
             var quests=new MarketAiQuestService(new MarketAiQuestPromptFactory(mapper),new MarketAiQuestValidator(),
-                    recommendations,questAudit,profiles,new LiveClient(),mapper);
+                    recommendations,questAudit,profiles,new LiveClient(),mapper, org.mockito.Mockito.mock(oneuldo.behaviorlog.personalization.service.PracticeHistoryService.class));
             report.set("recommendation",mapper.valueToTree(recommendation));write();
             var quest=quests.generate(MEMBER);
             report.set("questResponse",mapper.valueToTree(quest));

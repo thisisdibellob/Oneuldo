@@ -12,7 +12,7 @@ export type MarketDifficultyRecommendation = {
   recommendedDifficulty: 1 | 2 | 3;
   personalizationMode: 'AI_ANALYSIS' | 'AI_PROFILE';
   adjustments: {
-    itemCount: 2 | 3 | 4;
+    itemCount: 1 | 2 | 3 | 4;
     quantityComplexity: 'LOW' | 'MEDIUM' | 'HIGH';
     budgetPressure: 'LOW' | 'MEDIUM' | 'HIGH';
     textSupport: 'SIMPLIFIED' | 'STANDARD' | 'REDUCED';

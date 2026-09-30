@@ -284,7 +284,7 @@ export function getObjectiveQuantity(cart: MarketCart, objective: MarketObjectiv
 export type MarketMissionRecommendation = {
   recommendedDifficulty: 1 | 2 | 3;
   adjustments: {
-    itemCount: 2 | 3 | 4;
+    itemCount: 1 | 2 | 3 | 4;
     quantityComplexity: 'LOW' | 'MEDIUM' | 'HIGH';
     budgetPressure: 'LOW' | 'MEDIUM' | 'HIGH';
     textSupport: 'SIMPLIFIED' | 'STANDARD' | 'REDUCED';

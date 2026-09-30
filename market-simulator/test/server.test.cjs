@@ -50,7 +50,7 @@ test('MCP generates only an intention file bound to the supplied snapshot and va
   const original = global.fetch;
   global.fetch = () => { throw new Error('Unexpected network access'); };
   try {
-    const result = await service.invokeTool('generate_trace', { personaId: 'careful-checker', seed: 'mcp-test', snapshot, outputPath });
+    const result = await service.invokeTool('generate_trace', { mode:'stochastic', personaId: 'careful-checker', seed: 'mcp-test', snapshot, outputPath });
     const trace = JSON.parse(fs.readFileSync(outputPath, 'utf8'));
     assert.equal(result.traceId, trace.traceId);
     assert.equal(trace.traceSchemaVersion, '2'); assert.equal(trace.policyVersion, '5');
@@ -62,7 +62,7 @@ test('MCP generates only an intention file bound to the supplied snapshot and va
     for (const property of ['episode', 'behaviorLogs', 'run', 'summary']) assert.ok(!Object.hasOwn(trace, property));
     assert.deepEqual(await service.invokeTool('validate_trace', { traceFilePath: outputPath, snapshot }), { valid: true, errors: [] });
     assert.deepEqual(await service.invokeTool('validate_trace', { traceFilePath: outputPath, snapshotFilePath: result.snapshotFilePath }), { valid: true, errors: [] });
-    await assert.rejects(service.invokeTool('generate_trace', { personaId: 'careful-checker', seed: 'mcp-test', snapshot, outputPath }), /EEXIST/);
+    await assert.rejects(service.invokeTool('generate_trace', { mode:'stochastic', personaId: 'careful-checker', seed: 'mcp-test', snapshot, outputPath }), /EEXIST/);
     const changed = createMarketReplaySnapshot(createMarketSession({ seed: 'changed-mission' }));
     assert.equal((await service.invokeTool('validate_trace', { trace, snapshot: changed })).valid, false);
   } finally { global.fetch = original; await service.close(); fs.rmSync(directory, { recursive: true, force: true }); }

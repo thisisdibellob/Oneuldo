@@ -4,7 +4,7 @@ import { Point } from './prototypeWorld';
 
 export type MarketMatchRule = 'family' | 'exact';
 export type MarketTaskObjectiveInput = { productId: string; quantity: number; match?: MarketMatchRule };
-export type MarketTaskObjective = MarketTaskObjectiveInput & { id: string; match: MarketMatchRule; label: string; familyId: string };
+export type MarketTaskObjective = MarketTaskObjectiveInput & { id: string; match: MarketMatchRule; label: string; familyId: string; quantityUnit?: string };
 export type MarketProvenance = { source: 'human' | 'synthetic'; participantId?: string; agentModel?: string; personaId?: string; personaVersion?: string; notes?: string };
 export type MarketSessionConfig = {
   seed: string | number;

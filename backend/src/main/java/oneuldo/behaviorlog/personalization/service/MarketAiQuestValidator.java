@@ -1,6 +1,8 @@
 package oneuldo.behaviorlog.personalization.service;
 
 import java.util.HashSet;
+import java.util.ArrayList;
+import java.util.Map;
 import oneuldo.behaviorlog.personalization.domain.MarketAiQuestDraft;
 import org.springframework.stereotype.Component;
 
@@ -15,23 +17,37 @@ public class MarketAiQuestValidator {
         text(draft.description(), 120, "설명");
         text(draft.successMessage(), 80, "성공 문장");
         text(draft.adaptationSummary(), 120, "조정 요약");
-        if (draft.objectives() == null || draft.objectives().size() < 2
+        if (draft.objectives() == null || draft.objectives().size() < 1
                 || draft.objectives().size() > 4) throw invalid("목표 개수");
         var productIds = new HashSet<String>();
         int total = 0;
+        var lineItems = new ArrayList<Map<String, Object>>();
         for (var objective : draft.objectives()) {
             if (objective == null || !productIds.add(objective.productId())) {
                 throw invalid("중복 상품");
             }
             var product = MarketQuestCatalog.require(objective.productId());
             if (objective.quantity() < 1 || objective.quantity() > 3) throw invalid("수량");
-            total += product.price() * objective.quantity();
+            int subtotal = product.price() * objective.quantity();
+            total += subtotal;
+            lineItems.add(Map.of("productId", product.id(), "unitPrice", product.price(),
+                    "quantity", objective.quantity(), "subtotal", subtotal));
         }
-        if (draft.budget() < total || draft.budget() > total + 4000) throw invalid("예산");
+        if (draft.budget() < total || draft.budget() > total + 4000) {
+            boolean custom = "CUSTOM".equals(draft.scenarioId());
+            int minimum = custom ? total : MarketQuestCatalog.requireScenario(draft.scenarioId()).budget();
+            int maximum = custom ? total + 4000 : minimum;
+            throw new MarketQuestValidationException("예산", Map.of(
+                    "code", "BUDGET_OUT_OF_RANGE", "submittedBudget", draft.budget(),
+                    "objectiveTotal", total, "minimumBudget", minimum, "maximumBudget", maximum,
+                    "lineItems", lineItems));
+        }
         if (!"CUSTOM".equals(draft.scenarioId())) {
             var scenario = MarketQuestCatalog.requireScenario(draft.scenarioId());
             if (draft.budget() != scenario.budget() || draft.objectives().size() != scenario.objectives().size()) {
-                throw invalid("시나리오 콘텐츠 계약");
+                throw new MarketQuestValidationException("시나리오 콘텐츠 계약", Map.of(
+                        "code", "FIXED_SCENARIO_CONTRACT", "scenarioId", scenario.id(),
+                        "requiredBudget", scenario.budget(), "requiredObjectives", scenario.objectives()));
             }
             for (var objective : scenario.objectives()) {
                 if (draft.objectives().stream().noneMatch(o -> o.productId().equals(objective.productId())

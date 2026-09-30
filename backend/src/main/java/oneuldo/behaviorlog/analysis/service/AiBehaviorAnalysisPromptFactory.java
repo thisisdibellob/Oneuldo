@@ -12,7 +12,7 @@ import tools.jackson.databind.node.ObjectNode;
 /** 원본 스냅샷은 변경하지 않고 기존 판정 필드만 AI 입력에서 분리한다. */
 @Component
 public class AiBehaviorAnalysisPromptFactory {
-    public static final String VERSION = "behavior-analysis-v26-claim-arrays";
+    public static final String VERSION = "behavior-analysis-v29-sku-support";
     public static final String EVIDENCE_VERSION = EvidenceIndex.VERSION;
     private final ObjectMapper mapper;
     @org.springframework.beans.factory.annotation.Value("${ai.behavior-analysis.movement-max-error:0}")
@@ -112,7 +112,7 @@ public class AiBehaviorAnalysisPromptFactory {
                 "excludedLegacyFields", Map.of("scope", "전체 사건에 공통 적용한 기존 판정 필드 제외 정책. 사건별 제외 내역은 원본 스냅샷과 비교 가능.", "paths", omitted),
                 "evidenceCards", EvidenceIndex.retrieve(input.eventCount() > 0 ? "interface" : ""),
                 "availablePracticeScenarios", oneuldo.behaviorlog.personalization.service.MarketQuestCatalog.ENABLED_SCENARIOS,
-                "practiceCapabilities", "S01/S02는 품목 2개의 고정 목표·예산이다. CUSTOM은 60상품 중 2~4품목의 구매만 지원한다. "
+                "practiceCapabilities", "S01/S02는 품목 2개의 고정 목표·예산이다. CUSTOM은 60상품 중 1~4품목의 구매만 지원한다. "
                         + "시나리오와 난이도는 AI가 연습 목적에 맞춰 제안하라. 아직 품절·예약·직원 문의·음성 기능은 없으므로 있다고 제안하지 말라.",
                 "matchingContentCatalog", new AnalysisContentScope(mapper).catalog(full),
                 "outputContract", """
@@ -134,7 +134,7 @@ public class AiBehaviorAnalysisPromptFactory {
                         모든 finding은 실제 사건을 참조. targetFindingIds는 반환한 finding만 참조.
                         findings가 없으면 targetFindingIds도 빈 배열, uncertainties에 불확실성을 기재.
                         각 세션 판정은 해당 세션의 실제 사건을 1개 이상 참조.
-                        현재 게임 실행 범위: recommendedDifficulty 1~3, itemCount 2~4,
+                        현재 게임 실행 범위: recommendedDifficulty 1~3, itemCount 1~4,
                         quantityComplexity/budgetPressure LOW|MEDIUM|HIGH, textSupport SIMPLIFIED|STANDARD|REDUCED.
                         이 범위는 게임 지원 범위이며 능력 판정 기준이 아니다. reasonCodes는 영문 대문자/숫자/밑줄 2~50자, 1~8개.
                         """));
@@ -214,7 +214,11 @@ public class AiBehaviorAnalysisPromptFactory {
                 + "원문에 있는 상품 규격·수량·금액과 종료 사유를 관찰에 인용할 때 수치를 보존한다. 의도나 성패로 바꾸지 않는다. 반증/도움/자료 한계를 숨기지 않는다. 관찰이 없으면 uncertainties에 이유. 구간 밖 사실은 쓰지 않는다.";
     }
     public String reductionContract() {
-        return digestContract()+" 근거는 자식 관찰에 인용된 ID만 사용한다. uncertainties는 필수이며 축약으로 빠진 관찰과 상충을 명시한다. 인과를 지어내지 않는다.";
+        return digestContract()+" 근거는 자식 관찰에 인용된 ID만 사용한다. allowedEvidenceEventIds는 이번 통합에서 인용 가능한 전체 목록이다. "
+                + "summary/uncertainties의 사건 번호와 chunkScopes의 범위 경계는 관찰 근거가 아니다. 목록 밖 ID로 새 관찰을 만들지 않는다. "
+                + "허용 근거가 없는 자식의 자료 한계는 uncertainties에 유지하고 evidenceEventIds로 승격하지 않는다. "
+                + "allowedEvidenceEventIds가 비어 있으면 observations는 []로 두고 불확실성을 보존한다. "
+                + "uncertainties는 필수이며 축약으로 빠진 관찰과 상충을 명시한다. 인과를 지어내지 않는다.";
     }
     /** Replace instructions only; the saved child interpretations remain byte-for-byte JSON-equivalent. */
     public String compactReductionPrompt(String json) {
@@ -222,6 +226,12 @@ public class AiBehaviorAnalysisPromptFactory {
         if (!root.path("stage").asString().startsWith("REDUCE:"))
             throw new IllegalArgumentException("NOT_REDUCTION_REQUEST");
         root.put("outputContract", reductionContract());
+        // Mirror the existing validator's citation boundary, never infer evidence from prose or scope.
+        var allowed = new java.util.TreeSet<String>();
+        for (var child : root.path("chunkAnalyses"))
+            for (var observation : child.path("observations"))
+                for (var id : observation.path("evidenceEventIds")) allowed.add(id.asString());
+        root.set("allowedEvidenceEventIds", mapper.valueToTree(allowed));
         return mapper.writeValueAsString(root);
     }
     public tools.jackson.databind.JsonNode tasks(BehaviorAnalysisInputResponse full) {

@@ -36,7 +36,8 @@ export type MarketReplayTrace = {
   experienceMode?: 'first-play' | 'revisit';
   attentionExperience?: { layoutKey: string; memory: Record<string, unknown>; source: 'planned-trace' };
   /** Fresh LLM requests are not seed deterministic. A captured trace is replayable. */
-  generation?: { model: string; reproducibility: 'seed-and-snapshot' | 'captured-trace'; requestId?: string };
+  generation?: { model: string; reproducibility: 'seed-and-snapshot' | 'captured-trace'; requestId?: string;
+    timingProfile?: 'compact-v1'; sourceTraceId?: string; actorPolicyVersion?: 'episodic-choice-v1' | 'episodic-choice-v2' | 'episodic-choice-v3' | 'episodic-choice-v4' };
   target: { snapshotId: string; scenarioId?: string; missionId?: string; completionMode: 'ai-review' };
   steps: MarketReplayStep[];
 };

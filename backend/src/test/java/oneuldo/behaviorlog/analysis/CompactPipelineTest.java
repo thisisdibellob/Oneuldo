@@ -22,6 +22,43 @@ class CompactPipelineTest {
         "p":[["F1"],"목표 확인","이동 관찰과 연결",1,2,"LOW","LOW","SIMPLIFIED",["OBSERVATION_PRACTICE"]],"c":[]}
         """;
 
+    @Test
+    @org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable(named="UNIT_SUPPORT_SAVED_OUTPUTS",matches="true")
+    void saved_single_plan_failures_are_read_without_changing_the_models_verdict() throws Exception {
+        var dir=java.nio.file.Path.of("../output/unit-support-loop-20260930/supported-1");
+        var input=mapper.readValue(java.nio.file.Files.readString(dir.resolve("input.json")),BehaviorAnalysisInputResponse.class);
+        var refs=new AnalysisReferences(mapper,input);
+        var attempts=mapper.readTree(java.nio.file.Files.readString(dir.resolve("attempts.json")));
+        for(int i=attempts.size()-2;i<attempts.size();i++) {
+            var raw=attempts.get(i).path("rawOutput").asString();
+            var value=validator.validate(refs.read(raw),input);
+            assertThat(value.sessionAssessments().getFirst().judgment()).isEqualTo(mapper.readTree(raw).path("a").get(0).get(1).asString());
+            assertThat(value.summary()).isEqualTo(mapper.readTree(raw).path("s").asString());
+        }
+    }
+
+    @Test void single_wrapped_plan_and_single_finding_preserve_all_analysis_values() {
+        var input=fixture.input(fixture.fixture());var refs=new AnalysisReferences(mapper,input);
+        var normal=validator.validate(refs.read(finalJson),input);
+        var alternate=(tools.jackson.databind.node.ObjectNode)mapper.readTree(finalJson);
+        var plan=(tools.jackson.databind.node.ArrayNode)alternate.path("p").deepCopy();
+        plan.set(0,mapper.valueToTree("F1"));
+        alternate.putArray("p").add(plan);
+        assertThat(validator.validate(refs.read(alternate.toString()),input)).isEqualTo(normal);
+        ((tools.jackson.databind.node.ArrayNode)alternate.path("p")).add(plan);
+        assertThatThrownBy(()->refs.read(alternate.toString())).hasMessage("INVALID_COMPACT_ROW");
+    }
+
+    @Test void wrapped_plan_does_not_accept_unknown_finding_or_invalid_value_types() {
+        var input=fixture.input(fixture.fixture());var refs=new AnalysisReferences(mapper,input);
+        var root=(tools.jackson.databind.node.ObjectNode)mapper.readTree(finalJson);
+        var plan=(tools.jackson.databind.node.ArrayNode)root.path("p").deepCopy();
+        plan.set(0,mapper.valueToTree("F999"));root.putArray("p").add(plan);
+        assertThatThrownBy(()->validator.validate(refs.read(root.toString()),input)).isInstanceOf(IllegalArgumentException.class);
+        plan.set(0,mapper.valueToTree(42));
+        assertThatThrownBy(()->refs.read(root.toString())).isInstanceOf(RuntimeException.class);
+    }
+
     @Test void review_retry_receives_exact_unknown_reference_and_audit_keeps_both_failures() {
         var input=fixture.input(fixture.fixture());
         var review=new ReviewedClaimOutputTest().envelope();

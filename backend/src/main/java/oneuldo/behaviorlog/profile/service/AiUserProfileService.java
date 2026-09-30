@@ -27,6 +27,7 @@ public class AiUserProfileService {
     private final GroqChatClient client;
     private final ObjectMapper mapper;
     private final oneuldo.behaviorlog.analysis.service.AnalysisTokenBudget tokenBudget;
+    private final oneuldo.behaviorlog.personalization.service.PracticeHistoryService history;
     private final oneuldo.ai.service.SingleFlight<String, AiUserProfileResponse> requests = new oneuldo.ai.service.SingleFlight<>();
 
     public AiUserProfileResponse updateFromSession(UUID memberId, UUID sessionId,
@@ -48,13 +49,14 @@ public class AiUserProfileService {
         long started = System.nanoTime();
         String system = prompts.systemPrompt();
         var references = new AiUserProfileReferences(mapper, previous, current);
-        String prompt = references.encode(prompts.userPrompt(previous, current));
+        String prompt = references.encode(prompts.withPracticeHistory(prompts.userPrompt(previous, current), history.forUpdate(memberId, previous, current)));
         List<AiBehaviorAnalysisRun.Attempt> attempts = new ArrayList<>();
         AiBehaviorAnalysis profile = null;
         String model = null, error = null;
         int outputMax = tokenBudget.finalOutputTokens();
+        String retryFeedback = "";
         for (int number = 1; number <= 2; number++) {
-            String submitted = prompt + (number == 1 ? "" : "\n이전 응답이 형식 또는 근거 검사를 통과하지 못했습니다. 제공된 ID만 사용해 짧은 JSON 객체 하나로 수정하세요.");
+            String submitted = prompt + retryFeedback;
             GroqChatClient.GroqChatResult response = null;
             long attemptStarted = System.nanoTime();
             try {
@@ -74,9 +76,15 @@ public class AiUserProfileService {
                 var transport = failure instanceof oneuldo.ai.exception.AiTransportException t ? t : null;
                 error = transport != null ? transport.code().name() : response == null ? "AI_UNAVAILABLE" : "INVALID_USER_PROFILE";
                 var audit = attempt(number, submitted, outputMax, response, error);
+                var validation = failure instanceof oneuldo.behaviorlog.analysis.service.ReviewEvidenceException v ? v.details() : null;
+                retryFeedback = "\n이전 응답이 검사를 통과하지 못했습니다. 오류: "
+                        + (validation == null ? ("length".equals(response == null ? null : response.finishReason()) ? "OUTPUT_TRUNCATED" : "INVALID_PROFILE_CONTRACT")
+                            : mapper.writeValueAsString(validation))
+                        + ". 입력의 allowedEvidenceEventIds와 각 원본 evidenceEventIds 배열을 다시 확인하세요. "
+                        + "옛 본문 번호를 복사하거나 무관한 ID로 치환하지 말고, 해당 근거가 지지하는 문장만 다시 작성하세요. JSON 객체 하나를 완성하세요.";
                 attempts.add(new AiBehaviorAnalysisRun.Attempt(audit.number(),audit.inputPrompt(),audit.rawOutput(),audit.errorCode(),
                         audit.source(),audit.systemPrompt(),audit.outputMax(),audit.finishReason(),audit.inputTokens(),audit.outputTokens(),
-                        elapsed(attemptStarted),transport == null ? null : transport.details()));
+                        elapsed(attemptStarted),transport == null ? null : transport.details(),validation));
                 if (response == null) break;
             }
         }

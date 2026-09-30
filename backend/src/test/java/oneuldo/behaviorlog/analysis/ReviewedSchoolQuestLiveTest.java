@@ -55,7 +55,7 @@ class ReviewedSchoolQuestLiveTest {
         report.set("practicePlan",mapper.valueToTree(plan));
         doAnswer(call->{report.set("attempts",mapper.valueToTree(call.getArgument(4)));return null;})
                 .when(audit).record(any(),any(),any(),any(),any(),any(),any());
-        var service=new MarketAiQuestService(new MarketAiQuestPromptFactory(mapper),new MarketAiQuestValidator(),recommendations,audit,profiles,client,mapper);
+        var service=new MarketAiQuestService(new MarketAiQuestPromptFactory(mapper),new MarketAiQuestValidator(),recommendations,audit,profiles,client,mapper, org.mockito.Mockito.mock(oneuldo.behaviorlog.personalization.service.PracticeHistoryService.class));
         long started=System.nanoTime();
         try {
             var quest=service.generate(member);report.set("quest",mapper.valueToTree(quest));

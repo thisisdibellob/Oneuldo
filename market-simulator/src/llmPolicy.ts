@@ -1,3 +1,5 @@
+import { actorChoices } from './actorChoices';
+import type { ActorLearningMemory } from './actorLearning';
 import type { Decision, TraceOptions, Observation, Persona, TraceEntry, ActorObservation } from './types';
 import { PersonaContext } from './personaContext';
 
@@ -23,6 +25,7 @@ export function assertDecision(value: unknown): asserts value is Decision {
   if (['readList', 'browse', 'pause', 'lookAround'].includes(d.action.type)
     && (!Number.isInteger(action.durationMs) || Number(action.durationMs) < 1 || Number(action.durationMs) > 30000)) throw new Error('durationMs must be 1..30000');
   if (d.action.type === 'browse' && (typeof action.scrollFraction !== 'number' || !Number.isFinite(action.scrollFraction) || action.scrollFraction < 0 || action.scrollFraction > 1)) throw new Error('browse requires scrollFraction 0..1');
+  if (d.currentTask !== undefined && (typeof d.currentTask !== 'string' || d.currentTask.length > 160)) throw new Error('currentTask must be a short task intention, not reasoning.');
   if (d.attentionTag !== undefined && (typeof d.attentionTag !== 'string' || d.attentionTag.length > 100)) throw new Error('Invalid attentionTag');
   if (d.cueRefs !== undefined && (!Array.isArray(d.cueRefs) || d.cueRefs.length > 20 || d.cueRefs.some(x => typeof x !== 'string' || !x.length || x.length > 200))) throw new Error('Invalid cueRefs');
 }
@@ -32,30 +35,47 @@ export function createAttentionLlmPolicy(options: NonNullable<TraceOptions['llm'
   const baseUrl = options.baseUrl ?? process.env.MARKET_LLM_BASE_URL;
   const model = options.model ?? process.env.MARKET_LLM_MODEL;
   if (!baseUrl || !model) throw new Error('LLM mode requires llm.baseUrl/model or MARKET_LLM_MODEL.');
-  const url = new URL(baseUrl.replace(/\/$/, '') + '/chat/completions');
+  if (options.protocol !== undefined && !['openai', 'ollama'].includes(options.protocol)) throw new Error('Unsupported LLM protocol');
+  const url = new URL(baseUrl.replace(/\/$/, '') + (options.protocol === 'ollama' ? '/api/chat' : '/chat/completions'));
   if (url.username || url.password || url.search || url.hash) throw new Error('LLM URL must not contain credentials, query, or fragment.');
   if (url.protocol !== 'https:' && !(url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname))) throw new Error('LLM endpoint requires HTTPS or local HTTP.');
   const token = process.env[options.apiKeyEnv ?? 'MARKET_LLM_API_KEY'];
   if (!token && url.protocol === 'https:') throw new Error('LLM API key environment variable is not set.');
   if (options.timeoutMs !== undefined && (!Number.isInteger(options.timeoutMs) || options.timeoutMs < 1000 || options.timeoutMs > 120000)) throw new Error('LLM timeoutMs must be 1000..120000.');
+  let calls = 0;
   return async (observation: ActorObservation, history: TraceEntry[], persona: Persona, state: unknown): Promise<Decision> => {
-    const request = { model, response_format: { type: 'json_object' }, max_completion_tokens: 1200, messages: [
-      { role: 'system', content: `${persona.prompt}\nDecide ONE next high-level action for this adult's app replay. The game goal, the person's remembered goal, and current interest can differ. First-play layout and controls are unfamiliar even when products are familiar. Allow orientation search, unrelated interests, lingering, optional purchases, spontaneous recall and missed goals. Never invent a visible cue or automatically fix every off-list purchase. No full map or automatic objective list is provided. readList attends to the actual visible HUD; readObjectives arrives only after that action. Products include only the currently exposed shelf rows. Browse before choosing a product that has not been seen. walkToAnchor selects a currently visible local anchor; no coordinates or paths. interact is only for a visible near station. Close panels before walking. State estimates and reasons are synthetic, not measured cognition. Return a brief observable action description, no private reasoning or diagnosis. submit requests AI review then exits after acceptance; no immediate verdict or retry is available. JSON only: {"action":{...},"delayMs":positive integer,"reason":"short action description","attentionTag":"optional focus label","cueRefs":["optional observed cue IDs"]}. Allowed actions: ${JSON.stringify(actionFields)}.` },
-      { role: 'user', content: JSON.stringify({ observation, personaCharacter: persona.character, attentionProfile: persona.attention,
-        shoppingStyle: persona.shoppingStyle, behaviorParameters: persona.parameters,
-        personalState: state,
-        // Do not restore forgotten goals via a perfect transcript of previous purchases/readings.
-        recentActions: history.slice(-4).map(({ action }) => ({ type: action.type })),
-        cueReferenceFormat: 'list (visible HUD only), station:<id>, product:<id>, anchor:<id>; IDs must be in the current observation or retained personal memory.' }) },
-    ] };
-    const response = await fetch(url, { method: 'POST', redirect: 'error', signal: AbortSignal.timeout(options.timeoutMs ?? 45000),
-      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(request) });
-    if (!response.ok) throw new Error(`LLM provider returned HTTP ${response.status}; no stochastic fallback.`);
-    const body = await response.json() as { choices?: { message?: { content?: string } }[] };
-    let decision: unknown;
-    try { decision = JSON.parse(body.choices?.[0]?.message?.content ?? ''); } catch { throw new Error('LLM provider returned invalid JSON.'); }
-    assertDecision(decision);
-    return { ...decision, exchange: { request, response: body } };
+    const observed=(state as Partial<ReturnType<ActorLearningMemory['getState']>> | null)?.observedThisVisit;
+    const choices = actorChoices(observation, observed ? {anchors:observed.discoveries.anchors,currentAnchor:observed.currentAnchor} : undefined);
+    if (!choices.length) throw new Error('No supported UI controls in this phase');
+    const attempts: unknown[] = [];
+    let feedback = '';
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (++calls > (options.maxCalls ?? 300)) throw new Error('ATTENTION_GENERATION_LIMIT: model-call-limit (including format repairs)');
+      const messages = [
+        { role:'system', content: `Choose ONE next high-level action for a fictional adult shopping in an app. This is one individual, not a representative of intellectual disability. Use the stable personal traits supplied. Do not force mistakes, helplessness, improvement or perfect performance. Use only displayed cues and provided experience; no hidden map or correct-answer feedback exists. Learn from concrete observations and any actually displayed help, but do not assume that seeing instructions means understanding or mastery. Past choices may have been wrong. Previous task items are not the current shopping list. Experience can guide a choice but does not guarantee transfer. lookAround and pause only wait; they do not reveal a new aisle. Movement is necessary to see another area. Reading the list exposes its contents. The lastReadList and instructions in observedThisVisit remain available after movement; absence from the current screen does not erase that recorded information. You may consult them or read again if you choose. Use current visible cues together with your recorded sightings and traveled edges; unseen areas remain unknown. submit requests analysis; it does not reveal a verdict. Choose exactly one ID from availableChoices. The program only translates that ID into the corresponding UI action. Return JSON: {"choiceId":"C1","delayMs":500,"reason":"brief observable action description","currentTask":"short current activity, not an explanation"}. Maintain or revise currentTask yourself; it is a provisional intention and may be mistaken. Do not return an action object, diagnosis, ability score or private reasoning.` },
+        { role:'user', content:JSON.stringify({observation, personaCharacter:persona.character ?? {description:persona.description},
+          experience:state, availableChoices:choices, ...(feedback ? {formatCorrection:feedback}:{} )}) },
+      ];
+      const wire = options.protocol === 'ollama'
+        ? { model,messages,think:false,stream:false,options:{num_ctx:18432,num_predict:500,temperature:0.2} }
+        : {model,messages,response_format:{type:'json_object'},max_completion_tokens:500};
+      const response=await fetch(url,{method:'POST',redirect:'error',signal:AbortSignal.timeout(options.timeoutMs??45000),
+        headers:{'Content-Type':'application/json',...(token?{Authorization:`Bearer ${token}`}:{})},body:JSON.stringify(wire)});
+      if(!response.ok) throw new Error(`LLM provider returned HTTP ${response.status}; no stochastic fallback.`);
+      const body=await response.json() as {choices?:{message?:{content?:string}}[];message?:{content?:string}};
+      attempts.push({request:wire,response:body});
+      try {
+        const selection=JSON.parse((options.protocol==='ollama'?body.message?.content:body.choices?.[0]?.message?.content)??'');
+        const choice=choices.find(c=>c.id===selection.choiceId);
+        if(!choice || Object.keys(selection).some(k=>!['choiceId','delayMs','reason','currentTask'].includes(k))) throw new Error('invalid choice');
+        const decision={action:choice.action,delayMs:selection.delayMs,reason:selection.reason,...(selection.currentTask !== undefined ? {currentTask:selection.currentTask}:{})};
+        assertDecision(decision);
+        return {...decision,exchange:{request:wire,response:{attempts}}};
+      } catch {
+        feedback='Invalid JSON or choice format. Return ONLY choiceId from availableChoices, delayMs (integer 1..120000), reason (short string), and optional currentTask (string up to 160 characters). No action object. No game action has executed for this invalid response.';
+      }
+    }
+    throw new Error('LLM provider returned invalid JSON/choice after 3 attempts; no stochastic fallback.');
   };
 }
 

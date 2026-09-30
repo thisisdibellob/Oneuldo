@@ -34,6 +34,13 @@ public final class MarketQuestCatalog {
         return ENABLED_SCENARIOS.stream().filter(s -> s.id().equals(id)).findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("아직 실행할 수 없는 시나리오"));
     }
+    /** Mechanical content compatibility only; the AI retains task and ability decisions. */
+    public static List<String> eligibleScenarioIds(int itemCount) {
+        var result = new ArrayList<>(ENABLED_SCENARIOS.stream()
+                .filter(s -> s.objectives().size() == itemCount).map(Scenario::id).toList());
+        result.add("CUSTOM");
+        return List.copyOf(result);
+    }
     public static Map<String, Object> contentContext() {
         return Map.of("catalogVersion", VERSION, "scenarioVersion", SCENARIO_VERSION,
                 "products", PRODUCTS, "enabledScenarios", ENABLED_SCENARIOS,

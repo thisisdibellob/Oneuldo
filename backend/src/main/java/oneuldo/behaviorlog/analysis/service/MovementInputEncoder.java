@@ -18,9 +18,11 @@ public final class MovementInputEncoder {
         ObjectNode candidate = root.deepCopy();
         candidate.set("behaviorTimeline", new LosslessEventColumns(mapper).encode(expanded));
         ObjectNode packed = (ObjectNode) tables.encode(candidate);
-        ObjectNode best=QwenTokenCounter.count(packed.toString()) < QwenTokenCounter.count(source.toString()) ? packed : source;
+        int packedTokens=QwenTokenCounter.count(packed.toString()), sourceTokens=QwenTokenCounter.count(source.toString());
+        ObjectNode best=packedTokens < sourceTokens ? packed : source;
+        int bestTokens=Math.min(packedTokens,sourceTokens);
         candidate.set("behaviorTimeline",new GroupedEventInput(mapper).encode(expanded));
         ObjectNode grouped=(ObjectNode)tables.encode(candidate);
-        return QwenTokenCounter.count(grouped.toString()) < QwenTokenCounter.count(best.toString()) ? grouped : best;
+        return QwenTokenCounter.count(grouped.toString()) < bestTokens ? grouped : best;
     }
 }

@@ -21,8 +21,8 @@ public class AiUserProfileValidator {
     public AiUserProfileDraft validate(AiUserProfileDraft draft, AiUserProfile previous,
             AiBehaviorAnalysisResponse current) {
         require(draft != null); text(draft.summary());
-        require(draft.findings() != null && !draft.findings().isEmpty() && draft.findings().size() <= 4);
-        require(draft.uncertainties() != null && !draft.uncertainties().isEmpty() && draft.uncertainties().size() <= 12);
+        require(draft.findings() != null && draft.findings().size() <= 12);
+        require(draft.uncertainties() != null && draft.uncertainties().size() <= 20);
         draft.uncertainties().forEach(this::text);
         Set<UUID> allowed = new HashSet<>();
         previous.getProfile().findings().forEach(f -> allowed.addAll(f.evidenceEventIds()));
@@ -37,11 +37,12 @@ public class AiUserProfileValidator {
                     && finding.alternativeExplanations().size() <= 8);
             finding.alternativeExplanations().forEach(this::text);
             require(finding.evidenceEventIds() != null && !finding.evidenceEventIds().isEmpty()
-                    && finding.evidenceEventIds().size() <= 8 && allowed.containsAll(finding.evidenceEventIds()));
+                    && finding.evidenceEventIds().size() <= 30 && allowed.containsAll(finding.evidenceEventIds()));
         }
         var plan = draft.practicePlan(); require(plan != null);
-        require(plan.targetFindingIds() != null && !plan.targetFindingIds().isEmpty()
+        require(plan.targetFindingIds() != null
                 && findingIds.containsAll(plan.targetFindingIds()));
+        require(!findingIds.isEmpty() ? !plan.targetFindingIds().isEmpty() : !draft.uncertainties().isEmpty());
         text(plan.goal()); text(plan.rationale());
         difficulty.validate(new MarketAiDifficultyDraft(plan.recommendedDifficulty(), plan.itemCount(),
                 plan.quantityComplexity(), plan.budgetPressure(), plan.textSupport(), plan.reasonCodes()));

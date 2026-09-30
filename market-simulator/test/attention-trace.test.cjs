@@ -1,7 +1,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 require('../runtime.cjs');
-const { generateTrace } = require('../src/simulator.ts');
+const { generateTrace: originalGenerateTrace } = require('../src/simulator.ts');
+const generateTrace = options => originalGenerateTrace({mode:'stochastic',...options});
 const { TraceGuard, validateTrace } = require('../src/traceValidation.ts');
 const { createMarketSession } = require('../../frontend/src/game/marketSession.ts');
 const { createMarketReplaySnapshot } = require('../../frontend/src/game/marketReplayTrace.ts');

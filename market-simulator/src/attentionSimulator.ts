@@ -4,6 +4,7 @@ import { AttentionPolicy } from './attentionPolicy';
 import { assertDecision, createAttentionLlmPolicy } from './llmPolicy';
 import { TraceGuard, validateTrace } from './traceValidation';
 import { projectDecision } from './simulator';
+import { ActorLearningMemory } from './actorLearning';
 import { Random } from './random';
 import type { ActorObservation, AttentionExperience, Decision, Persona, TraceEntry, TraceOptions } from './types';
 
@@ -11,7 +12,7 @@ type StepIntent = MarketReplayStep extends infer S ? S extends MarketReplayStep 
 
 /** Whole-trace planner. Raw game facts stay in the guard, not in actor input. */
 export async function generateAttentionTrace(options: TraceOptions, persona: Persona, model: string): Promise<MarketReplayTrace> {
-  const mode = options.mode ?? 'stochastic';
+  const mode = options.mode ?? 'llm';
   if (options.actorDecisionProvider && mode !== 'llm') throw new Error('actorDecisionProvider requires llm mode; stochastic traces must be seed-reproducible');
   const layoutKey = marketReplayFingerprint(options.snapshot.environment);
   const supplied = options.attentionExperience;
@@ -19,7 +20,8 @@ export async function generateAttentionTrace(options: TraceOptions, persona: Per
   if (supplied?.visit === 'first-play' && supplied.memory) throw new Error('First-play cannot import prior gameplay memory');
   if (supplied?.visit === 'revisit' && (!supplied.memory || !supplied.previousLayoutKey)) throw new Error('Revisit requires memory and previousLayoutKey from a previous trace');
   const experience: AttentionExperience = { ...supplied, visit: supplied?.visit ?? 'first-play', layoutKey };
-  const policy = new AttentionPolicy(persona, options.seed, experience);
+  if (supplied?.learning && (mode !== 'llm' || experience.visit !== 'revisit')) throw new Error('Learning experience requires an AI revisit');
+  const policy = mode === 'stochastic' ? new AttentionPolicy(persona, options.seed, experience) : new ActorLearningMemory(supplied?.learning);
   const provider = mode === 'llm' && !options.actorDecisionProvider && !options.decisionProvider ? createAttentionLlmPolicy(options.llm ?? {}) : null;
   if (options.decisionProvider && !options.actorDecisionProvider) throw new Error('Attention personas require actorDecisionProvider; raw game observations are not exposed');
   const guard = new TraceGuard(options.snapshot, persona.id, persona.version, model, true);
@@ -46,12 +48,12 @@ export async function generateAttentionTrace(options: TraceOptions, persona: Per
     const before = guard.observeActor();
     policy.observe(before);
     const decision = options.actorDecisionProvider ? await options.actorDecisionProvider(before, history, persona)
-      : provider ? await provider(before, history, persona, policy.getState()) : policy.next(before);
+      : provider ? await provider(before, history, persona, policy.getState()) : (policy as AttentionPolicy).next(before);
     assertDecision(decision);
     assertActorDecision(decision, before);
     assertCueReferences(decision, before, policy);
     if (options.timeBudgetMs !== undefined && plannedMs + decision.delayMs >= options.timeBudgetMs) throw new Error('ATTENTION_GENERATION_LIMIT: planned-time-budget; incomplete plan was not exported');
-    if (mode === 'llm' || options.actorDecisionProvider) policy.acceptDecision(decision);
+    // AI mode has no stochastic policy, forced forgetting, or probability-based behavior.
     const raw = guard.observe();
     const activeKind = raw.environment.stationDetails.find(s => s.id === raw.activeStation)?.kind;
     if ((decision.action.type === 'viewHelp' || decision.action.type === 'viewCart' && activeKind !== 'shelf') && raw.activeStation) {
@@ -77,7 +79,7 @@ export async function generateAttentionTrace(options: TraceOptions, persona: Per
     traceSchemaVersion: '2', personaId: persona.id, personaVersion: persona.version, seed: options.seed,
     generationPolicy: mode, policyVersion: '5', experienceMode: experience.visit,
     attentionExperience: { layoutKey, memory: policy.getMemory(), source: 'planned-trace' },
-    generation: { model, reproducibility: mode === 'stochastic' ? 'seed-and-snapshot' : 'captured-trace', ...(mode === 'llm' ? { requestId: randomUUID() } : {}) },
+    generation: { model, reproducibility: mode === 'stochastic' ? 'seed-and-snapshot' : 'captured-trace', ...(mode === 'llm' ? { requestId: randomUUID(), actorPolicyVersion: 'episodic-choice-v4' as const } : {}) },
     target: { snapshotId: options.snapshot.snapshotId, completionMode: 'ai-review',
       ...(options.snapshot.mission ? { missionId: options.snapshot.mission.id,
         ...(options.snapshot.mission.scenarioId ? { scenarioId: options.snapshot.mission.scenarioId } : {}) } : {}) }, steps,
@@ -88,7 +90,7 @@ export async function generateAttentionTrace(options: TraceOptions, persona: Per
   return trace;
 }
 
-function assertCueReferences(d: Decision, o: ActorObservation, policy: AttentionPolicy) {
+function assertCueReferences(d: Decision, o: ActorObservation, policy: Pick<AttentionPolicy, 'getMemory'>) {
   const memory = policy.getMemory();
   const available = new Set([
     ...(o.listAvailable ? ['list'] : []),

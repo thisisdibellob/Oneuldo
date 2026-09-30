@@ -12,9 +12,11 @@ class FinalAnalysisBudgetTest {
     final AnalysisTokenBudget budget = new AnalysisTokenBudget();
     final AiBehaviorAnalysisPromptFactory prompts = new AiBehaviorAnalysisPromptFactory(fixture.mapper);
 
-    @Test void estimates_actual_review_template_for_short_medium_and_large_sources() {
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(ints={1800,2400})
+    void estimates_actual_review_template_for_short_medium_and_large_sources(int outputLimit) {
         ReflectionTestUtils.setField(budget,"requestTokens",18000);
-        ReflectionTestUtils.setField(budget,"finalOutputTokens",1800);
+        ReflectionTestUtils.setField(budget,"finalOutputTokens",outputLimit);
         int previous = 0;
         for (int count : List.of(3, 60, 6000)) {
             ObjectNode root = fixture.fixture();
@@ -33,7 +35,7 @@ class FinalAnalysisBudgetTest {
             var estimate = FinalAnalysisBudget.estimate(fixture.mapper,budget,prompts.wholeSourceSystem(),source,refs,true,"");
             var draft = refs.read(new CompactPipelineTest().finalJson);
             String actualReview = AnalysisReviewPrompt.build(fixture.mapper,source,draft,refs);
-            assertThat(estimate.reviewRequest()).isGreaterThanOrEqualTo(budget.total(AnalysisReviewPrompt.system(),actualReview,1800));
+            assertThat(estimate.reviewRequest()).isGreaterThanOrEqualTo(budget.total(AnalysisReviewPrompt.system(),actualReview,outputLimit));
             assertThat(estimate.required()).isEqualTo(Math.max(estimate.draftRequest(),estimate.reviewRequest()));
             assertThat(estimate.required()).isGreaterThan(previous);
             previous=estimate.required();

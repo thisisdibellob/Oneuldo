@@ -68,6 +68,15 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 100
+        },
+        "timingProfile": {
+          "enum": ["compact-v1"]
+        },
+        "actorPolicyVersion": { "enum": ["episodic-choice-v1", "episodic-choice-v2", "episodic-choice-v3", "episodic-choice-v4"] },
+        "sourceTraceId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
         }
       },
       "required": [

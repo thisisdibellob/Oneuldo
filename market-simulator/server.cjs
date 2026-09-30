@@ -9,11 +9,11 @@ const { ReplayBridge, loadReplayConfig } = require('./replay-bridge.cjs');
 const string = { type: 'string', minLength: 1 };
 const seed = { anyOf: [string, { type: 'number' }] };
 const object = { type: 'object' };
-const llm = { type: 'object', additionalProperties: false, properties: { baseUrl: string, model: string, apiKeyEnv: string, maxCalls: { type: 'integer', minimum: 1, maximum: 2000 }, timeoutMs: { type: 'integer', minimum: 1, maximum: 300000 } } };
+const llm = { type: 'object', additionalProperties: false, properties: { protocol: { enum: ['openai', 'ollama'] }, baseUrl: string, model: string, apiKeyEnv: string, maxCalls: { type: 'integer', minimum: 1, maximum: 2000 }, timeoutMs: { type: 'integer', minimum: 1, maximum: 300000 } } };
 const schema = (properties, required = []) => ({ type: 'object', additionalProperties: false, properties, required });
 const definitions = [
   { name: 'list_personas', description: 'List available personas for intent trace generation.', inputSchema: schema({}), annotations: { readOnlyHint: true } },
-  { name: 'generate_trace', description: 'Generate an intent-level trace for a registered tab mission or explicit snapshot. Stochastic generation is offline. Saves JSON; never uploads gameplay logs.', inputSchema: schema({ personaId: string, seed, tabId: string, snapshot: object, snapshotFilePath: string, outputPath: string, mode: { enum: ['stochastic', 'llm'] }, maxActions: { type: 'integer', minimum: 1, maximum: 2000 }, timeBudgetMs: { type: 'integer', minimum: 1000, maximum: 3600000 }, attentionExperience: schema({ visit: { enum: ['first-play', 'revisit'] }, previousLayoutKey: string, memory: object }, ['visit']), llm }, ['personaId', 'seed']) },
+  { name: 'generate_trace', description: 'AI is the default; stochastic is explicit regression-only. Generate an intent-level trace for a registered tab mission or explicit snapshot. Stochastic generation is offline. Saves JSON; never uploads gameplay logs.', inputSchema: schema({ personaId: string, seed, tabId: string, snapshot: object, snapshotFilePath: string, outputPath: string, mode: { enum: ['stochastic', 'llm'] }, timingProfile: { enum: ['original', 'compact'] }, maxActions: { type: 'integer', minimum: 1, maximum: 2000 }, timeBudgetMs: { type: 'integer', minimum: 1000, maximum: 3600000 }, attentionExperience: schema({ visit: { enum: ['first-play', 'revisit'] }, previousLayoutKey: string, memory: object, learning: object }, ['visit']), llm }, ['personaId', 'seed']) },
   { name: 'validate_trace', description: 'Validate a trace and its target mission snapshot with the shared schema and game guards.', inputSchema: schema({ trace: object, traceFilePath: string, tabId: string, snapshot: object, snapshotFilePath: string }), annotations: { readOnlyHint: true } },
   { name: 'pair_app_session', description: 'Issue a five-minute, one-use pairing URL for one allowlisted local/staging test account. Open it in the development web app and log in with that account.', inputSchema: schema({ appOrigin: string, backendOrigin: string, memberId: string }, ['appOrigin', 'backendOrigin', 'memberId']) },
   { name: 'list_app_sessions', description: 'List authenticated development app tabs, mission readiness and per-tab replay status.', inputSchema: schema({}), annotations: { readOnlyHint: true } },
@@ -68,6 +68,10 @@ function createService(options = {}) {
     if (name === 'generate_trace') {
       const snapshot = await getSnapshot(args);
       const { tabId, snapshot: supplied, snapshotFilePath, outputPath, ...settings } = args;
+      if (tabId && settings.attentionExperience?.learning) {
+        const session=(await getBridge()).list().sessions.find(s=>s.tabId===tabId);
+        if(settings.attentionExperience.learning.memberId!==session?.memberId) throw new Error('Learning cannot cross test accounts');
+      }
       const trace = await require('./src/simulator.ts').generateTrace({ ...settings, snapshot });
       const validation = validate(trace, snapshot);
       if (!validation.valid) throw new Error(`Generated trace invalid: ${validation.errors.join('; ')}`);

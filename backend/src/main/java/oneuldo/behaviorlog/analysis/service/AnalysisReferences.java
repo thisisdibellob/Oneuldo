@@ -139,8 +139,14 @@ public final class AnalysisReferences {
         for(var row:source.path("f")) {requireRow(row,7);var item=findings.addObject();int i=0;for(String key:List.of("id","skill","observation","interpretation","alternativeExplanations","evidenceEventIds","suggestedSupport")) item.set(key,row.get(i++));}
         var assessments=root.putArray("sessionAssessments");
         for(var row:source.path("a")) {requireRow(row,4);var item=assessments.addObject();int i=0;for(String key:List.of("sessionId","judgment","explanation","evidenceEventIds")) item.set(key,row.get(i++));}
-        var plan=source.path("p");requireRow(plan,9);var item=root.putObject("practicePlan");int i=0;
+        var plan=source.path("p");
+        // A single wrapped row is unambiguous transport syntax; preserve every value.
+        // Do not flatten multiple plans or reinterpret the model's judgment.
+        if(plan.isArray() && plan.size()==1 && plan.get(0).isArray()) plan=plan.get(0);
+        requireRow(plan,9);var item=root.putObject("practicePlan");int i=0;
         for(String key:List.of("targetFindingIds","goal","rationale","recommendedDifficulty","itemCount","quantityComplexity","budgetPressure","textSupport","reasonCodes"))item.set(key,plan.get(i++));
+        if(item.path("targetFindingIds").isString())
+            item.set("targetFindingIds",mapper.createArrayNode().add(item.path("targetFindingIds").asString()));
         return root;
     }
     private String restore(String reference, String prefix) {

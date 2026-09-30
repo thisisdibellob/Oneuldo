@@ -33,8 +33,9 @@ public final class LosslessEventColumns {
     }
 
     private ObjectNode series(List<JsonNode> values) {
-        ObjectNode best = mapper.createObjectNode(); best.set("values", mapper.valueToTree(values));
-        if (values.isEmpty()) return best;
+        ObjectNode literal = mapper.createObjectNode(); literal.set("values", mapper.valueToTree(values));
+        var best = new Choice(literal);
+        if (values.isEmpty()) return best.node;
         JsonNode first = values.getFirst();
         if (values.stream().allMatch(first::equals)) return mapper.createObjectNode().set("same", first);
         Map<JsonNode,Integer> ids = new LinkedHashMap<>();
@@ -43,7 +44,7 @@ public final class LosslessEventColumns {
         if (ids.size() < values.size()) {
             ObjectNode dictionary = mapper.createObjectNode();
             dictionary.set("dictionary", mapper.valueToTree(ids.keySet())); dictionary.set("refs", refs);
-            best = smaller(best, dictionary);
+            best.consider(dictionary);
         }
         if (values.stream().allMatch(JsonNode::isString)) {
             String prefix = first.asString();
@@ -58,13 +59,13 @@ public final class LosslessEventColumns {
                 int length=prefix.length();
                 var prefixed=mapper.createObjectNode().put("prefix",prefix);
                 prefixed.set("suffixes",series(values.stream().map(v -> (JsonNode)mapper.getNodeFactory().stringNode(v.asString().substring(length))).toList()));
-                best=smaller(best,prefixed);
+                best.consider(prefixed);
             }
         }
         if (values.stream().allMatch(JsonNode::isObject)) {
             Map<Set<String>,List<Integer>> shapes = new LinkedHashMap<>();
             for (int i=0; i<values.size(); i++) shapes.computeIfAbsent(new TreeSet<>(((ObjectNode)values.get(i)).propertyNames()), ignored -> new ArrayList<>()).add(i);
-            if (shapes.size()==1) best = smaller(best, fields(values));
+            if (shapes.size()==1) best.consider(fields(values));
             else {
                 Set<String> common = new TreeSet<>(((ObjectNode)first).propertyNames());
                 values.forEach(v -> common.retainAll(((ObjectNode)v).propertyNames()));
@@ -73,17 +74,17 @@ public final class LosslessEventColumns {
                     for(String field:common) shared.set(field,series(values.stream().map(v -> v.get(field)).toList()));
                     List<JsonNode> remainders=values.stream().map(v -> {ObjectNode copy=((ObjectNode)v).deepCopy();copy.remove(common);return (JsonNode)copy;}).toList();
                     var factored=mapper.createObjectNode();factored.set("fields",shared);factored.set("rest",series(remainders));
-                    best=smaller(best,factored);
+                    best.consider(factored);
                 }
                 var groups = mapper.createArrayNode();
                 for (var positions : shapes.values()) {
                     var group = fields(positions.stream().map(values::get).toList());
                     group.set("positions", mapper.valueToTree(positions)); groups.add(group);
                 }
-                best = smaller(best, mapper.createObjectNode().set("groups", groups));
+                best.consider(mapper.createObjectNode().set("groups", groups));
             }
         }
-        return best;
+        return best.node;
     }
 
     private ObjectNode fields(List<JsonNode> values) {
@@ -92,8 +93,16 @@ public final class LosslessEventColumns {
             fields.set(key, series(values.stream().map(v -> v.get(key)).toList()));
         return mapper.createObjectNode().set("fields", fields);
     }
-    private ObjectNode smaller(ObjectNode a, ObjectNode b) {
-        return QwenTokenCounter.count(b.toString()) < QwenTokenCounter.count(a.toString()) ? b : a;
+    /** A candidate is not mutated while it is being compared in this series call. */
+    private static final class Choice {
+        private ObjectNode node;
+        private int tokens = -1;
+        private Choice(ObjectNode node) { this.node = node; }
+        private void consider(ObjectNode candidate) {
+            if (tokens < 0) tokens = QwenTokenCounter.count(node.toString());
+            int candidateTokens = QwenTokenCounter.count(candidate.toString());
+            if (candidateTokens < tokens) { node = candidate; tokens = candidateTokens; }
+        }
     }
 
     public ObjectNode decode(JsonNode encoded) {

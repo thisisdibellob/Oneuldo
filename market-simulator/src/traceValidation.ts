@@ -17,6 +17,7 @@ export class TraceGuard {
   private sequence = 0;
   private lastResult?: ActorObservation['result'];
   private readonly presentation;
+  private readonly mission;
   constructor(snapshot: MarketReplaySnapshot, personaId = 'trace-validator', personaVersion = '1', model = 'trace-validation/1', private readonly attentionMode = false) {
     const valid = validateMarketReplaySnapshot(snapshot);
     if (!valid.valid) throw new Error(valid.errors.join('; '));
@@ -24,6 +25,7 @@ export class TraceGuard {
       provenance: { source: 'synthetic', agentModel: model, personaId, personaVersion },
     }, snapshot.environment);
     this.presentation = snapshot.presentation ?? DEFAULT_REPLAY_PRESENTATION;
+    this.mission = snapshot.mission;
   }
   observe(): Observation { return this.adapter.observe(); }
   /** This is the only observation sent to attention policies. Raw state remains guard-owned. */
@@ -46,6 +48,11 @@ export class TraceGuard {
       ...(this.lastResult ? { result: { ...this.lastResult } } : {}),
       ...(this.lastResult?.actionType === 'readList' ? { readObjectives: o.objectives.map(x => ({ ...x })) } : {}),
       lastActionError: o.lastActionError,
+      ...(this.mission && (this.sequence <= 1 || o.phase === 'checkout') ? {
+        instructions: o.phase === 'checkout'
+          ? { phase: 'checkout' as const, lines: [...this.mission.checkoutDialogue] }
+          : { phase: 'entry' as const, lines: [this.mission.description, ...this.mission.briefing] },
+      } : {}),
     };
     if (o.phase === 'checkout' && o.selectedCheckoutId) result.cashiers[o.selectedCheckoutId] = o.cashierAvailability[o.selectedCheckoutId];
     // These empty-counter request buttons are actually displayed by the staff dialogue.

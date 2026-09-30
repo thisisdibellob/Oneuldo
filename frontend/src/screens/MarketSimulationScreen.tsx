@@ -28,6 +28,7 @@ import type { MarketMission, MarketCategoryId } from '../game/scenarios';
 import { marketMission, marketProducts } from '../game/scenarios';
 import { MARKET_CATALOG_VERSION, MARKET_SCENARIO_VERSION, enabledMarketScenarios } from '../game/marketContent';
 import { fonts } from '../theme';
+import { marketObjectiveLabel } from '../game/marketObjectiveLabel';
 import { listMarketEpisodes, saveMarketEpisode, MarketStoredEpisode } from '../game/marketEpisodeStore';
 import type { ReplayUiPort, ReplayShelfPort } from '../replay/ports';
 import type { ReplayPresentation } from '../game/marketReplayPerception';
@@ -51,7 +52,11 @@ function createMissionSession(config: Partial<MarketSessionConfig>, mission?: Ma
     if (mandatory.length > 12) throw new Error('시나리오 필수 상품이 진열대 용량을 초과했어요.');
     inventoryProductIds[category.id] = [...mandatory, ...draft.shelfSlots[category.id].filter(id => !required.has(id))].slice(0, 12);
   }
-  return createMarketSession({ ...draft.config, inventoryProductIds }, draft.environment);
+  const session = createMarketSession({ ...draft.config, inventoryProductIds }, draft.environment);
+  return { ...session, objectives: session.objectives.map((objective, index) => ({
+    ...objective, label: marketObjectiveLabel(mission.objectives[index]),
+    quantityUnit: getMarketProduct(objective.productId)?.salesUnit ?? '개',
+  })) };
 }
 
 export type MarketStationId = MarketEnvironmentStationId;
@@ -515,6 +520,7 @@ export function MarketSimulationScreen({
       ? <MarketHud
         replayListRef={__DEV__ && replayUiRef ? replayList : undefined}
         objectives={session.objectives}
+        budget={mission?.budget}
         score={aiAssessment ? undefined : session.score}
         topInset={hudTopInset ?? (embedded ? Math.max(112, (insets?.top ?? 0) + 64) : Math.max(12, insets?.top ?? 0))}
         controlMode={embedded ? undefined : controlMode}
@@ -577,12 +583,13 @@ export function MarketSimulationScreen({
             ? '종류가 같으면 괜찮아요. 예: 우유는 맛과 지방 함량에 관계없이 골라요.'
             : '목록에 적힌 상품을 정확히 골라요. 예: 저지방 우유는 저지방 우유만 골라요.'}
         </Text>
+        {mission && <Text style={s.body}>예산 {mission.budget.toLocaleString('ko-KR')}원</Text>}
         <View style={s.requirements}>
           {session.objectives.map(o => <View key={o.id} style={s.row}>
             <Text style={s.body}>
               {o.label}
             </Text>
-            <Text style={s.quantity}>{o.quantity}개</Text>
+            <Text style={s.quantity}>{o.quantity}{o.quantityUnit ?? '개'}</Text>
           </View>)}
         </View>
         <Button

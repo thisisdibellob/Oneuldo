@@ -9,6 +9,8 @@ import tools.jackson.databind.node.*;
 public final class ReviewedClaimOutput {
     public static final String FORMAT = "claim-evidence-v2";
     private static final Pattern INLINE_REFERENCE = Pattern.compile("(?<![A-Za-z0-9])E[0-9]+(?![A-Za-z0-9])");
+    private static final Pattern REFERENCE_ANNOTATION = Pattern.compile(
+            "[（(\\[]\\s*E[0-9]+(?:\\s*[,，;·]\\s*E[0-9]+)*\\s*[）)\\]]");
     private final ObjectMapper mapper;
     private final AnalysisReferences refs;
 
@@ -97,8 +99,6 @@ public final class ReviewedClaimOutput {
     private Claim claim(JsonNode value,String path,boolean required) {
         keys(value,Set.of("text","evidenceEventIds"),path);
         text(value.path("text"),path+"/text");
-        var inline=INLINE_REFERENCE.matcher(value.path("text").asString());
-        if(inline.find()) fail("INLINE_REVIEW_REFERENCE_NOT_ALLOWED",path,List.of());
         array(value.path("evidenceEventIds"),path+"/evidenceEventIds",required?1:0,30);
         var ids=new ArrayList<String>();
         for(var id:value.path("evidenceEventIds")) {
@@ -108,7 +108,22 @@ public final class ReviewedClaimOutput {
         }
         if(new HashSet<>(ids).size()!=ids.size()) fail("DUPLICATE_REVIEW_EVIDENCE",path,ids);
         order(ids,path);
-        return new Claim(value.path("text").asString(),List.copyOf(ids));
+        // Accept redundant annotations only when this very claim already owns every cited event.
+        // Do not attach, infer or substitute evidence to make a claim pass.
+        var annotations=REFERENCE_ANNOTATION.matcher(value.path("text").asString());
+        StringBuilder cleaned=new StringBuilder();
+        while(annotations.find()) {
+            var references=INLINE_REFERENCE.matcher(annotations.group());
+            while(references.find()) if(!ids.contains(references.group()))
+                fail("INLINE_REVIEW_REFERENCE_NOT_ALLOWED",path,List.of(references.group()));
+            annotations.appendReplacement(cleaned,"");
+        }
+        annotations.appendTail(cleaned);
+        String prose=cleaned.toString().strip();
+        var remaining=INLINE_REFERENCE.matcher(prose);
+        if(remaining.find()) fail("INLINE_REVIEW_REFERENCE_NOT_ALLOWED",path,List.of(remaining.group()));
+        if(prose.isBlank()) fail("INVALID_REVIEW_CLAIM_TEXT",path+"/text",List.of());
+        return new Claim(prose,List.copyOf(ids));
     }
 
     private void order(List<String> ids,String path) {

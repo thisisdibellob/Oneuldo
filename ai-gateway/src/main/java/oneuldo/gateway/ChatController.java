@@ -22,6 +22,7 @@ import tools.jackson.databind.ObjectMapper;
 @RestController
 public class ChatController {
     static final String MODEL = "qwen3.6:27b-q4_K_M";
+    static final int MAX_OUTPUT_TOKENS = 2400;
     static final int MAX_BYTES = 131072;
     private final ObjectMapper mapper;
     private final InferenceGate gate;
@@ -34,6 +35,11 @@ public class ChatController {
     }
     @GetMapping("/healthz") public Map<String, String> health() { return Map.of("status", "up"); }
     @GetMapping("/api/tags") public Object tags() { return Map.of("models", List.of(Map.of("name", MODEL, "model", MODEL))); }
+
+    @GetMapping("/api/limits") public Object limits() {
+        return Map.of("model", MODEL, "maxOutputTokens", MAX_OUTPUT_TOKENS,
+                "contextLengths", List.of(8192, 18432));
+    }
 
     // Read a bounded body explicitly; callers cannot reach Ollama management endpoints or select URLs.
     @PostMapping(value="/api/chat", consumes=MediaType.APPLICATION_JSON_VALUE, produces=MediaType.APPLICATION_JSON_VALUE)
@@ -80,7 +86,7 @@ public class ChatController {
         if (body.has("options") && !options.isObject()) throw error(HttpStatus.BAD_REQUEST, "INVALID_OPTIONS");
         if (options.has("num_ctx") && (!options.path("num_ctx").isIntegralNumber() || !List.of(8192,18432).contains(options.path("num_ctx").asInt()))) throw error(HttpStatus.BAD_REQUEST, "UNSUPPORTED_CONTEXT_LENGTH");
         if (options.has("num_predict") && (!options.path("num_predict").isIntegralNumber()
-                || options.path("num_predict").asLong() < 1 || options.path("num_predict").asLong() > 1800)) throw error(HttpStatus.BAD_REQUEST, "INVALID_OUTPUT_LIMIT");
+                || options.path("num_predict").asLong() < 1 || options.path("num_predict").asLong() > MAX_OUTPUT_TOKENS)) throw error(HttpStatus.BAD_REQUEST, "INVALID_OUTPUT_LIMIT");
         if (options.has("temperature") && (!options.path("temperature").isNumber()
                 || options.path("temperature").asDouble() < 0 || options.path("temperature").asDouble() > 2)) throw error(HttpStatus.BAD_REQUEST, "INVALID_TEMPERATURE");
     }

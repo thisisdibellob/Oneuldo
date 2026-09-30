@@ -57,10 +57,10 @@ class ConnectionTest(unittest.TestCase):
                 self.assertEqual(original, target.read_text())
 
     def test_school_and_laptop_setup_replace_stale_budgets_and_preserve_other_settings(self):
-        for server, context, budget in [("school", "18432", "18000"), ("laptop", "8192", "7800")]:
+        for server, context, budget, final_output in [("school", "18432", "18000", "2400"), ("laptop", "8192", "7800", "1800")]:
             with self.subTest(server=server), tempfile.TemporaryDirectory() as directory:
                 target = Path(directory) / "local.properties"
-                target.write_text("spring.datasource.password=private\nai.ollama.context-length=8192\nai.behavior-analysis.request-token-budget=7800\nai.behavior-analysis.chunk-output-tokens=400\n")
+                target.write_text("spring.datasource.password=private\nai.ollama.context-length=8192\nai.behavior-analysis.request-token-budget=7800\nai.behavior-analysis.chunk-output-tokens=400\nai.behavior-analysis.final-output-tokens=900\n")
                 secret = "b" * 64
                 output = io.StringIO()
                 with patch.object(config, "BACKEND", Path(directory)), patch("sys.argv", ["configure-home-ai.py", "--server", server]), \
@@ -74,6 +74,8 @@ class ConnectionTest(unittest.TestCase):
                 self.assertIn("ai.ollama.context-length=" + context, text)
                 self.assertIn("ai.behavior-analysis.request-token-budget=" + budget, text)
                 self.assertIn("ai.behavior-analysis.chunk-output-tokens=1800", text)
+                self.assertEqual(1, text.count("ai.behavior-analysis.final-output-tokens="))
+                self.assertIn("ai.behavior-analysis.final-output-tokens=" + final_output, text)
                 self.assertIn("ai.behavior-analysis.quality-review=true", text)
                 self.assertNotIn(secret, output.getvalue())
                 self.assertEqual(0o600, target.stat().st_mode & 0o777)

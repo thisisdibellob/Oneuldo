@@ -6,8 +6,9 @@ import { fonts } from '../../theme';
 
 export type MarketHudControlMode = 'joystick' | 'touch';
 export type MarketHudProps = {
-  objectives: readonly { id: string; label: string; quantity: number }[];
+  objectives: readonly { id: string; label: string; quantity: number; quantityUnit?: string }[];
   score?: number;
+  budget?: number;
   topInset?: number;
   controlMode?: MarketHudControlMode;
   onControlModeChange?: (mode: MarketHudControlMode) => void;
@@ -19,7 +20,7 @@ export type MarketHudProps = {
 
 /** A quiet shopping note: only the required quantities and explicit cart access. */
 export function MarketHud({
-  objectives, score, topInset = 12, controlMode, onControlModeChange,
+  objectives, score, budget, topInset = 12, controlMode, onControlModeChange,
   onGiveUp, onOpenCart, onOpenHelp, replayListRef,
 }: MarketHudProps) {
   const list = useRef<ScrollView>(null);
@@ -33,6 +34,7 @@ export function MarketHud({
     <View style={s.card} testID="market-hud-card">
       <View style={s.header}>
         <Text style={s.title} numberOfLines={1}>하늘마트</Text>
+        {budget !== undefined && <Text style={s.budget}>예산 {budget.toLocaleString('ko-KR')}원</Text>}
         {score !== undefined && <Text accessibilityLabel={'현재 점수 ' + score + '점'} style={[s.score, score < 100 && s.penalty]}>{score}점</Text>}
         {controlMode && onControlModeChange ? <PressScale accessibilityRole="button"
           accessibilityLabel={controlMode === 'joystick' ? '터치 이동으로 변경' : '조이스틱 이동으로 변경'}
@@ -55,7 +57,7 @@ export function MarketHud({
             contentContainerStyle={s.items} accessibilityLabel="사야 할 물품과 개수" keyboardShouldPersistTaps="handled">
             {objectives.map(objective => <View key={objective.id} style={s.item}>
               <Text style={s.itemName} numberOfLines={2}>{objective.label}</Text>
-              <Text style={s.itemQuantity}>{objective.quantity}개</Text>
+              <Text style={s.itemQuantity}>{objective.quantity}{objective.quantityUnit ?? '개'}</Text>
             </View>)}
           </ScrollView>
         </View>
@@ -81,6 +83,7 @@ const s = StyleSheet.create({
   },
   header: { minHeight: 44, paddingLeft: 14, paddingRight: 2, flexDirection: 'row', alignItems: 'center', gap: 2 },
   title: { flex: 1, color: '#405D50', fontFamily: fonts.laundryBold, fontSize: 17, lineHeight: 24 },
+  budget: { color: '#536457', fontFamily: fonts.medium, fontSize: 12, lineHeight: 18, marginRight: 4 },
   score: { color: '#647668', fontFamily: fonts.semibold, fontSize: 13, lineHeight: 20, fontVariant: ['tabular-nums'], marginRight: 4 },
   penalty: { color: '#9A604E' },
   iconButton: { width: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },

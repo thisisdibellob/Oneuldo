@@ -76,6 +76,48 @@ class EvidenceAndTimelineTest {
         verifyNoInteractions(client);
     }
 
+    @Test void different_sized_events_across_sessions_keep_exact_coverage_and_retry_headroom() throws Exception {
+        var tree=(tools.jackson.databind.node.ObjectNode)mapper.valueToTree(input(96));
+        var raw=(tools.jackson.databind.node.ObjectNode)tree.path("input");
+        var originalSession=(tools.jackson.databind.node.ObjectNode)raw.path("sessions").get(0);
+        var originalEvents=originalSession.path("events");
+        var sessions=raw.putArray("sessions");
+        for(int s=0;s<3;s++) {
+            var session=originalSession.deepCopy();session.put("sessionId",UUID.randomUUID().toString());
+            var events=session.putArray("events");
+            for(int i=s*32;i<(s+1)*32;i++) {
+                var event=(tools.jackson.databind.node.ObjectNode)originalEvents.get(i).deepCopy();
+                event.put("sequence",i%32+1);
+                ((tools.jackson.databind.node.ObjectNode)event.path("payload").path("marketContent"))
+                        .put("rawText",i+" 서로 다른 길이의 원문 ".repeat(1+(i%9)*20));
+                events.add(event);
+            }
+            sessions.add(session);
+        }
+        tree.put("sessionCount",3);raw.put("sessionCount",3);
+        var input=mapper.treeToValue(tree,BehaviorAnalysisInputResponse.class);
+        String unchanged=mapper.writeValueAsString(input);
+        var prompts=new AiBehaviorAnalysisPromptFactory(mapper);
+        var refs=new AnalysisReferences(mapper,input);var budget=new AnalysisTokenBudget();
+        var client=mock(GroqChatClient.class);
+        var pipeline=new TimelineAnalysisPipeline(prompts,new AiBehaviorAnalysisValidator(new MarketAiDifficultyValidator()),client,mapper);
+        var progress=new ArrayList<AnalysisProgress.Update>();
+        List<BehaviorAnalysisInputResponse> chunks;
+        try(var ignored=AnalysisProgress.bind(progress::add)) {chunks=pipeline.partition(input,7000);}
+        assertThat(chunks.size()).isGreaterThan(1);
+        assertThat(chunks.stream().flatMap(c->c.input().sessions().stream()).flatMap(s->s.events().stream()).toList())
+                .containsExactlyElementsOf(input.input().sessions().stream().flatMap(s->s.events().stream()).toList());
+        for(var chunk:chunks) {
+            String prompt=refs.encode(prompts.observationPrompt(chunk,input))
+                    +"\n구간 64/64: 세션 일부이며 구간 밖 행동을 가정하지 마세요.\n구조와 실제 사건 참조를 수정하세요. JSON 하나만 출력하세요.";
+            assertThat(budget.total(prompts.observationSystem(),prompt,900)+200).isLessThanOrEqualTo(7000);
+        }
+        assertThat(progress.getLast().completed()).isEqualTo(96);
+        assertThat(progress.getLast().total()).isEqualTo(96);
+        assertThat(mapper.writeValueAsString(input)).isEqualTo(unchanged);
+        verifyNoInteractions(client);
+    }
+
     @Test void 공급자한도는_재시도하지_않고_감사기록에_남긴다() {
         var prompts = new AiBehaviorAnalysisPromptFactory(mapper);
         var client = mock(GroqChatClient.class, inv -> inv.getMethod().getName().equals("completeDigest")
@@ -198,6 +240,26 @@ class EvidenceAndTimelineTest {
         verify(client,times(1)).complete(anyString(),anyString(),anyInt(),anyDouble());
     }
 
+    @Test void 통합_허용목록은_불확실성과_범위의_ID를_근거로_승격하지_않는다() {
+        var prompts=new AiBehaviorAnalysisPromptFactory(mapper);
+        String saved="""
+            {"stage":"REDUCE: 통합","chunkAnalyses":[
+              {"summary":"E1~E3 구매 기록 없음","observations":[],"uncertainties":["E1~E3은 이동만 있음"]},
+              {"summary":"E4 이동","observations":[{"observation":"이동","interpretation":"탐색 가능",
+               "alternativeExplanations":[],"evidenceEventIds":["E4","E5","E4"]}],"uncertainties":["E6 의도 미확인"]}],
+             "chunkScopes":[{"firstEventId":"E1","lastEventId":"E6"}],"allowedEvidenceEventIds":["E1","E6"]}
+            """;
+        var result=mapper.readTree(prompts.compactReductionPrompt(saved));
+        assertThat(result.path("allowedEvidenceEventIds")).isEqualTo(mapper.readTree("[\"E4\",\"E5\"]"));
+        assertThat(result.path("chunkAnalyses")).isEqualTo(mapper.readTree(saved).path("chunkAnalyses"));
+        assertThat(result.path("chunkScopes")).isEqualTo(mapper.readTree(saved).path("chunkScopes"));
+        var empty=mapper.readTree(prompts.compactReductionPrompt("""
+            {"stage":"REDUCE:","chunkAnalyses":[{"observations":[],"uncertainties":["E1~E4 이동만 존재"]}]}
+            """));
+        assertThat(empty.path("allowedEvidenceEventIds").isEmpty()).isTrue();
+        assertThat(empty.path("outputContract").asString()).contains("observations는 []", "uncertainties에 유지");
+    }
+
     @Test void 출력잘림은_최종에서_중간요약으로_내리고_4개를_2개로_나눠_완료한다() {
         var tree=mapper.valueToTree(input(6));
         for(var event:tree.path("input").path("sessions").get(0).path("events"))
@@ -220,6 +282,10 @@ class EvidenceAndTimelineTest {
                 var expanded=new CompactBehaviorTimeline(mapper).decodeWithTables(root.path("behaviorTimeline"));
                 id=expanded.path("sessions").get(0).path("events").get(0).path("behaviorLogId").asString();
             } else if(root.path("stage").asString().startsWith("REDUCE:")) {
+                var cited=new TreeSet<String>();
+                root.path("chunkAnalyses").forEach(child->child.path("observations").forEach(o->
+                        o.path("evidenceEventIds").forEach(ref->cited.add(ref.asString()))));
+                assertThat(root.path("allowedEvidenceEventIds")).isEqualTo(mapper.valueToTree(cited));
                 batches.add(root.path("chunkAnalyses").size());
                 if(!root.path("outputContract").asString().contains("핵심 관찰 1~2개"))
                     return new GroqChatClient.GroqChatResult("{","mock","length",100,900,1L);

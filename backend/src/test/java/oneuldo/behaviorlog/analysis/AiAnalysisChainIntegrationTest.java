@@ -257,7 +257,7 @@ class AiAnalysisChainIntegrationTest {
         var service=new MarketAiQuestService(gatedPrompts,new oneuldo.behaviorlog.personalization.service.MarketAiQuestValidator(),
                 context.getBean(oneuldo.behaviorlog.personalization.service.MarketDifficultyRecommendationService.class),
                 context.getBean(oneuldo.behaviorlog.personalization.service.MarketAiQuestAuditService.class),
-                context.getBean(oneuldo.behaviorlog.profile.service.AiUserProfileService.class),client,mapper);
+                context.getBean(oneuldo.behaviorlog.profile.service.AiUserProfileService.class),client,mapper, context.getBean(oneuldo.behaviorlog.personalization.service.PracticeHistoryService.class));
         var first=new java.util.concurrent.FutureTask<>(()->service.generate(owner.getId()));Thread.ofPlatform().start(first);
         assertThat(entered.await(10,java.util.concurrent.TimeUnit.SECONDS)).isTrue();
         var second=new java.util.concurrent.FutureTask<>(()->service.generate(owner.getId()));var t2=Thread.ofPlatform().start(second);

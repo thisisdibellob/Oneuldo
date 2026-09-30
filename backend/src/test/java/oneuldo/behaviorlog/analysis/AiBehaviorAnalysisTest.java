@@ -52,7 +52,7 @@ class AiBehaviorAnalysisTest {
         var response = service.analyze(memberId, new BehaviorAnalysisInputRequest(null, null));
         assertThat(response.status()).isEqualTo("READY");
         assertThat(response.analysis().sessionAssessments().getFirst().judgment()).isEqualTo("UNDETERMINED");
-        verify(client).complete(eq(AnalysisReviewPrompt.system()), contains("draftToReview"), anyInt(), anyDouble());
+        verify(client).complete(eq(AnalysisReviewPrompt.system()), contains("reviewSourcePolicy"), anyInt(), anyDouble());
         verify(repository).save(argThat(run -> run.getAttempts().size()==2
                 && run.getAttempts().get(1).inputPrompt().contains("behaviorTimeline")
                 && run.getAttempts().get(1).inputPrompt().contains("SUCCESS")));
@@ -104,12 +104,38 @@ class AiBehaviorAnalysisTest {
         assertThat(fact.path("quantityBefore").asInt()).isEqualTo(1);
         assertThat(fact.path("quantityAfter").asInt()).isEqualTo(2);
         var context=review.path("chunkAnalyses").get(0);
-        assertThat(context.path("observations").get(0).path("observation").asString()).isEqualTo("수량 1에서 2 변경");
-        assertThat(context.path("observations").get(0).path("evidenceEventIds").get(0).asString()).isEqualTo("E1");
-        assertThat(context.path("uncertainties").get(0).asString()).isEqualTo("동기는 미확인");
+        assertThat(context.path("observations").isEmpty()).isTrue();
+        assertThat(review.path("rawBackedObservationsNotRepeated").asInt()).isEqualTo(1);
+        assertThat(context.path("localLimitationsToRecheck").get(0).asString()).isEqualTo("동기는 미확인");
         assertThat(context.toString()).doesNotContain("중간 단계의 의도 추측", "중간 단계의 우연한 조작 추측");
-        assertThat(review.path("draftToReview").isArray()).isTrue();
+        assertThat(review.has("draftToReview")).isFalse();
+        // Independent review input is unchanged when only the previous verdict changes.
+        assertThat(AnalysisReviewPrompt.build(mapper,source,valid("FAILURE"),refs)).isEqualTo(review.toString());
+        assertThat(new LosslessTables(mapper).decode(review).path("taskContext"))
+                .isEqualTo(new LosslessTables(mapper).decode(mapper.readTree(source)).path("taskContext"));
         assertThat(digest.observations().getFirst().alternativeExplanations()).containsExactly("중간 단계의 우연한 조작 추측");
+    }
+
+    @Test void 독립검토는_원본이_없는_이동관찰과_부분적으로만_있는_관찰을_보존한다() {
+        var data=input(true);var refs=new AnalysisReferences(mapper,data);
+        var source=mapper.createObjectNode();
+        source.putArray(SourceEventDetails.FIELD).addObject().put("id","E1").put("quantityAfter",2);
+        var chunk=source.putArray("chunkAnalyses").addObject();
+        chunk.putArray("uncertainties").add("이동 이유 미확인");
+        var observations=chunk.putArray("observations");
+        var covered=observations.addObject().put("observation","수량 변경");
+        covered.putArray("evidenceEventIds").add("E1");
+        var movement=observations.addObject().put("observation","계산대 쪽으로 이동");
+        movement.putArray("evidenceEventIds").add("E2");
+        var mixed=observations.addObject().put("observation","변경 후 이동");
+        mixed.putArray("evidenceEventIds").add("E1").add("E2");
+        var review=mapper.readTree(AnalysisReviewPrompt.build(mapper,source.toString(),valid("SUCCESS"),refs));
+        assertThat(review.path(SourceEventDetails.FIELD)).isEqualTo(source.path(SourceEventDetails.FIELD));
+        assertThat(review.path("rawBackedObservationsNotRepeated").asInt()).isEqualTo(1);
+        var retained=review.path("chunkAnalyses").get(0).path("observations");
+        assertThat(retained.size()).isEqualTo(2);
+        assertThat(retained.get(0)).isEqualTo(movement);
+        assertThat(retained.get(1)).isEqualTo(mixed);
     }
 
     @Test

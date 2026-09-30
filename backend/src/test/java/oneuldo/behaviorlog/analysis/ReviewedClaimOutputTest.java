@@ -46,6 +46,22 @@ class ReviewedClaimOutputTest {
         assertThat(result.sessionAssessments().getFirst().judgment()).isEqualTo("UNDETERMINED");
         assertThat(source.toString()).isEqualTo(before);
     }
+    @Test void redundant_inline_annotations_are_equivalent_to_the_same_claim_without_annotations() {
+        var source=envelope();
+        observation(source,0).put("text","장바구니를 열었습니다(E2).");
+        observation(source,1).put("text","수량을 변경했습니다[E4].");
+        String before=source.toString();
+        assertThat(read(source)).isEqualTo(read(envelope()));
+        assertThat(source.toString()).isEqualTo(before);
+    }
+    @Test void inline_evidence_from_another_claim_or_an_empty_annotation_only_claim_still_fails() {
+        for(String text:List.of("장바구니를 열었습니다(E4).","장바구니를 열었습니다(E999).")) {
+            var source=envelope();observation(source,0).put("text",text);
+            assertThatThrownBy(()->read(source)).hasMessage("INLINE_REVIEW_REFERENCE_NOT_ALLOWED");
+        }
+        var empty=envelope();observation(empty,0).put("text","(E2)");
+        assertThatThrownBy(()->read(empty)).hasMessage("INVALID_REVIEW_CLAIM_TEXT");
+    }
     @Test void changing_a_claims_evidence_cannot_leave_a_stale_parent_list_or_check_table() {
         var source=envelope();
         observation(source,1).putArray("evidenceEventIds").add("E5");
