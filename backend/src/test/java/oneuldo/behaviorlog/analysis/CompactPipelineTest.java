@@ -12,6 +12,8 @@ import static org.mockito.Mockito.*;
 import static org.mockito.ArgumentMatchers.*;
 
 class CompactPipelineTest {
+    // Match the supported 8K Ollama preset, reserving space for framing and output.
+    static final int LAPTOP_REQUEST_TOKEN_BUDGET=7800;
     final JsonMapper mapper=JsonMapper.builder().findAndAddModules().build();
     final MovementProjectionTest fixture=new MovementProjectionTest();
     final AiBehaviorAnalysisPromptFactory prompts=new AiBehaviorAnalysisPromptFactory(mapper);
@@ -94,7 +96,8 @@ class CompactPipelineTest {
         var digest=new AiObservationDigest("요약",List.of(new AiObservationDigest.Observation("사실","가설",List.of("대안"),List.of(source))),List.of("한계"));
         String prompt=AnalysisSynthesisPrompt.build(mapper,prompts,input,List.of(digest),refs,false);
         assertThat(prompt).doesNotContain("behaviorTimeline","sceneSnapshot");
-        assertThat(QwenTokenCounter.inputTokens(FinalAnalysisPromptCompactor.systemPrompt(),prompt)+900).isLessThan(7000);
+        assertThat(QwenTokenCounter.inputTokens(FinalAnalysisPromptCompactor.systemPrompt(),prompt)+900)
+                .isLessThanOrEqualTo(LAPTOP_REQUEST_TOKEN_BUDGET);
         assertThat(validator.validate(refs.read(finalJson),input).findings().getFirst().evidenceEventIds()).containsExactly(source);
         assertThatThrownBy(()->refs.read(finalJson.replace("E1","E999"))).hasMessage("UNKNOWN_ANALYSIS_REFERENCE");
     }
@@ -134,7 +137,7 @@ class CompactPipelineTest {
         });
         var progress=new ArrayList<AnalysisProgress.Update>();
         try(var ignored=AnalysisProgress.bind(progress::add)) {
-            var result=new TimelineAnalysisPipeline(prompts,validator,client,mapper).analyze(input,7000,new ArrayList<>());
+            var result=new TimelineAnalysisPipeline(prompts,validator,client,mapper).analyze(input,LAPTOP_REQUEST_TOKEN_BUDGET,new ArrayList<>());
             assertThat(result.summary()).isEqualTo("좌표 이동 관측");
         }
         assertThat(progress).anyMatch(p->"OBSERVING".equals(p.stage())&&p.completed()==2&&p.total()==2);

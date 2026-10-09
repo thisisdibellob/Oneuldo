@@ -4,13 +4,19 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-// Flyway 전체 이력과 JPA Entity 구조가 함께 적용되는지 확인한다.
+// Run against an isolated PostgreSQL database supplied by the test runner.
+// H2's PostgreSQL mode cannot validate timestamptz or partial unique indexes in V37.
+// Supply MIGRATION_TEST_JDBC_URL and MIGRATION_TEST_DB_USER; never use the application database.
+@EnabledIfEnvironmentVariable(named = "MIGRATION_TEST_JDBC_URL", matches = "jdbc:postgresql:.*")
 @SpringBootTest(properties = {
-        "spring.datasource.url=jdbc:h2:mem:oneuldo-migration;MODE=PostgreSQL;DB_CLOSE_DELAY=-1",
-        "spring.datasource.driver-class-name=org.h2.Driver",
+        "spring.datasource.url=${MIGRATION_TEST_JDBC_URL}",
+        "spring.datasource.driver-class-name=org.postgresql.Driver",
+        "spring.datasource.username=${MIGRATION_TEST_DB_USER:postgres}",
+        "spring.datasource.password=${MIGRATION_TEST_DB_PASSWORD:}",
         "spring.flyway.enabled=true",
         // 테스트 전용 TestRecord Entity는 Flyway 대상이 아니므로 스키마 검증은 분리한다.
         "spring.jpa.hibernate.ddl-auto=none"
