@@ -53,7 +53,7 @@ type BufferedEvent = { event: BehaviorLogRequest; priority: BehaviorPriority };
 
 export class MarketBehaviorTracker {
   readonly questInstanceId: string;
-  readonly sessionId = randomUUID();
+  readonly sessionId: string;
 
   private buffer: BufferedEvent[] = [];
   private closed = false;
@@ -69,6 +69,7 @@ export class MarketBehaviorTracker {
   private sequence = 0;
   private readonly startedAt = Date.now();
   private readonly contentSource: BehaviorSimulationContext['contentSource'];
+  private readonly agentContext?: { personaId: string; personaVersion?: string; agentModel: string };
   private uploadTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly movementDetector: MarketMovementDetector;
   private readonly movementLogs = new MovementLogReducer<TrackInput>((event, span) => ({
@@ -83,7 +84,15 @@ export class MarketBehaviorTracker {
     private readonly difficulty = 2,
     simulation?: Omit<BehaviorSimulationContext, 'simulationStarted'>,
     private readonly stations = MARKET_STATIONS,
+    options?: {
+      sessionId?: string;
+      initialControlMode?: MarketTelemetryControlMode;
+      agentContext?: { personaId: string; personaVersion?: string; agentModel: string };
+    },
   ) {
+    this.sessionId = options?.sessionId ?? randomUUID();
+    this.controlMode = options?.initialControlMode ?? 'joystick';
+    this.agentContext = options?.agentContext;
     this.movementDetector = new MarketMovementDetector(stations, 105);
     this.questInstanceId = mission.scene?.questInstanceId ?? simulation?.questInstanceId ?? randomUUID();
     this.contentSource = simulation?.contentSource ?? 'STATIC';
@@ -184,7 +193,7 @@ export class MarketBehaviorTracker {
       },
       accessibility: {
         audioEnabled: false,
-        controllerMode: this.controlMode === 'accessibility' ? 'SWITCH' : 'TOUCH',
+        controllerMode: this.controlMode === 'accessibility' ? 'SWITCH' : this.controlMode === 'agent' ? 'OTHER' : 'TOUCH',
         instructionMode: 'TEXT',
         symbolSupport: true,
         textLevel: 'STANDARD',
@@ -198,6 +207,7 @@ export class MarketBehaviorTracker {
         thresholdRuleVersion: DETECTION_RULE_VERSION,
         ...input.payload,
         marketContent: { ...(input.payload?.marketContent as object ?? {}), sceneRef: this.questInstanceId, layoutVersion: this.mission.scene?.layoutVersion, seed: this.mission.scene?.seed,
+          ...(this.agentContext ? { controlSource: 'AGENT', agentContext: this.agentContext } : {}),
           movementContext: { coordinateSpace: 'market-world', stations: this.stations, interactionRadius: 105,
             ...MOVEMENT_SAMPLING } },
       },

@@ -1,6 +1,7 @@
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
 
 import App from '../App';
+import { OnboardingScreen } from '../src/screens/OnboardingScreen';
 
 jest.mock('../src/api/auth', () => ({
   login: jest.fn(async () => ({ accessToken: 'test-access-token' })),
@@ -55,6 +56,13 @@ jest.mock('react-native-safe-area-context', () => {
 });
 
 describe('로그인 화면', () => {
+  it('AI 전용 진입은 이메일 로그인 폼을 바로 표시한다', () => {
+    const screen = render(<OnboardingScreen initialStep="credentials" onEnter={jest.fn()} />);
+    expect(screen.getByLabelText('이메일')).toBeTruthy();
+    expect(screen.getByLabelText('비밀번호')).toBeTruthy();
+    expect(screen.getByRole('button', { name: '시작하기' })).toBeTruthy();
+  });
+
   it('아이디 로그인 화면에서 입력과 비밀번호 표시를 제어한 뒤 앱에 진입한다', async () => {
     const screen = render(<App />);
 

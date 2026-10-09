@@ -48,6 +48,7 @@ function clampMarketPoint(point: MarketPoint, bounds: MarketEnvironment['world']
 export function MarketMap({
   environment,
   cashierCalled = {},
+  controlledPlayerPosition,
   onPositionChange,
   hintedStation,
   interactive,
@@ -56,6 +57,7 @@ export function MarketMap({
 }: {
   environment: MarketEnvironment;
   cashierCalled?: Partial<MarketCashierAvailability>;
+  controlledPlayerPosition?: MarketPoint;
   onPositionChange?: (point: MarketPoint) => void;
   hintedStation: MarketStationId | null;
   interactive: boolean;
@@ -242,6 +244,21 @@ export function MarketMap({
   useEffect(() => {
     if (!interactive) stopMovement();
   }, [interactive, stopMovement]);
+
+  useEffect(() => {
+    if (!controlledPlayerPosition) return;
+    const previous = playerPoint.current;
+    playerPoint.current = { ...controlledPlayerPosition };
+    if (previous.x !== controlledPlayerPosition.x || previous.y !== controlledPlayerPosition.y) {
+      setFacing(current => facingFromVector(
+        controlledPlayerPosition.x - previous.x,
+        controlledPlayerPosition.y - previous.y,
+        current,
+      ));
+    }
+    updateCamera(controlledPlayerPosition);
+    updateStationProximity(controlledPlayerPosition);
+  }, [controlledPlayerPosition?.x, controlledPlayerPosition?.y, updateCamera, updateStationProximity]);
 
   const handleViewportLayout = (event: LayoutChangeEvent) => {
     viewport.current = event.nativeEvent.layout;

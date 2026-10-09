@@ -63,3 +63,12 @@ attention 정책의 액션/시간 상한 초과는 기술적 생성 실패다. �
 발화·억양·표정·유도 질문이 없는 게임에서 그런 행동을 만들어내거나 동의 편향의 임상적 타당성을 주장하지 않는다. 장애나 연기 사실을 게임 행동에 노출하지 않되 실험 보고에는 합성 정책 출처와 실제 사용 모드를 명시한다.
 
 MCP를 사용할 수 없으면 `cli.cjs interactive`의 지속형 프로세스로 같은 도구를 호출한다. 단독 파일 생성·검증은 `cli.cjs generate`/`validate`를 사용한다. 전역 Codex 설정이나 플러그인을 자동 설치하지 않는다.
+
+
+## 브라우저 MCP 제어 연결
+
+브라우저에서 직접 행동을 제어하는 도구는 [market-agent-mcp](../market-agent-mcp/README.md)에 통합되어 있다. `market_bridge_status`, `market_start`, `market_observe`, `market_move`, `market_act`, `market_stop`, `market_export_episode`를 제공한다. 기존 앱 재생 입력과 MCP 제어는 서로 다른 실행 경로이므로 실제 사용 경로를 기록하고 같은 조건으로 혼합하지 않는다.
+
+현재 연구 참고 학습 실험에서는 [직접 배우 학습 규약](assistant-learning-protocol.md)에 따라 배우 자신의 관찰과 회상을 사용한다. MCP를 사용해도 선택한 실제 페르소나 ID·버전·실행 ID를 기록하며, 예전 단일 페르소나를 자동으로 대신 적용하지 않는다. MCP 관찰과 종료 감사 기록의 공개 범위를 구분하고 숨은 상품·정답·사후 분석을 행동 입력으로 사용하지 않는다.
+
+[이전 MCP 실행 절차](references/legacy-mcp-workflow.md)는 과거 방식의 재현용 참고 자료로 유지한다.

@@ -85,9 +85,31 @@ async function exercise(Tracker: typeof MarketBehaviorTracker, ending: Ending, s
 beforeEach(() => jest.useFakeTimers());
 afterEach(() => { jest.clearAllTimers(); jest.useRealTimers(); });
 
-test('production tracker is restored byte-for-byte to the independently frozen f124a95 source', () => {
+test('the independently frozen f124a95 lifecycle reference remains unchanged', () => {
   expect(createHash('sha256').update(reference).digest('hex')).toBe(referenceHash);
-  expect(fs.readFileSync(path.join(__dirname, '../src/behavior/marketBehaviorTracker.ts'), 'utf8')).toBe(reference);
+});
+
+test('agent provenance binds the recorded session without adding an automatic success verdict', async () => {
+  jest.clearAllMocks();
+  jest.setSystemTime(start);
+  let sequence = 0;
+  jest.mocked(randomUUID).mockImplementation(() => `10000000-0000-4000-8000-${String(++sequence).padStart(12, '0')}`);
+  const sessionId = '20000000-0000-4000-8000-000000000001';
+  const agentContext = { agentModel: 'test-model', personaId: 'test-persona', personaVersion: '1' };
+  const tracker = new MarketBehaviorTracker('test-token', buildMarketScenarioMission('S02'), 2,
+    undefined, undefined, { sessionId, initialControlMode: 'agent', agentContext });
+  await tracker.complete({ milk: 1 });
+  const events = jest.mocked(queue.enqueueBehaviorEvents).mock.calls.flatMap(call => call[1]).map(row => row.event);
+  expect(events.length).toBeGreaterThan(0);
+  for (const event of events) {
+    expect(event.identity.sessionId).toBe(sessionId);
+    expect(event.accessibility?.controllerMode).toBe('OTHER');
+    expect(event.payload?.marketContent).toMatchObject({ controlSource: 'AGENT', agentContext });
+    expect(event.taskResult?.taskCompleted).toBeUndefined();
+    expect(event.taskResult?.completionQuality).toBeUndefined();
+  }
+  expect(events.at(-1)?.sessionEnd?.reason).toBe('FLOW_FINISHED');
+  expect(jest.getTimerCount()).toBe(0);
 });
 
 test.each([

@@ -25,11 +25,15 @@ import {
 import { AppShell } from './src/screens/AppShell';
 import { OnboardingScreen } from './src/screens/OnboardingScreen';
 import { MarketSimulationScreen } from './src/screens/MarketSimulationScreen';
+import { MarketAgentHost } from './src/agent/MarketAgentHost';
 import { colors, fonts } from './src/theme';
 
 export default function App() {
   const [marketLabVisit, setMarketLabVisit] = useState(0);
   const marketLab = __DEV__ && Platform.OS === 'web' && typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('marketLab') === '1';
+  const marketAgentEnabled = __DEV__ && Platform.OS === 'web' && typeof window !== 'undefined'
+    && (process.env.EXPO_PUBLIC_MARKET_AGENT_ENABLED === 'true'
+      || new URLSearchParams(window.location.search).get('marketAgent') === '1');
   const [entered, setEntered] = useState(false);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const aiVariation = useAiVariationSettings();
@@ -144,28 +148,31 @@ export default function App() {
     );
   }
 
+  // Agent mode must never reuse the guest AppShell as if it were an authenticated session.
+  // This also handles switching the current SPA tab to ?marketAgent=1 after guest entry.
+  const requiresMarketAgentLogin = marketAgentEnabled && !accessToken;
+  const appContent = entered && !requiresMarketAgentLogin ? <AppShell
+    accessToken={accessToken}
+    aiVariation={aiVariation}
+    onRefreshQuests={() => {
+      if (!accessToken) return;
+      void getRecommendedQuests(accessToken).then(setQuests).catch((refreshError: unknown) => {
+        console.warn('[QuestDifficulty] 다음 견본을 불러오지 못했습니다.', refreshError);
+      });
+    }}
+    quests={quests}
+    questsError={questsError}
+    questsLoading={questsLoading}
+  /> : <OnboardingScreen initialStep={marketAgentEnabled ? 'credentials' : 'welcome'} onEnter={enterApp} />;
+
   return (
     <SafeAreaProvider>
       <StatusBar style="dark" />
-      {marketLab ? <MarketSimulationScreen key={marketLabVisit} onExit={() => setMarketLabVisit(visit => visit + 1)} /> :
-      entered ? (
-        <AppShell
-          accessToken={accessToken}
-          aiVariation={aiVariation}
-          onRefreshQuests={() => {
-            if (!accessToken) return;
-            // 연습을 마치고 돌아오면 같은 카드의 다음 난이도 견본을 준비한다.
-            void getRecommendedQuests(accessToken).then(setQuests).catch((refreshError: unknown) => {
-              console.warn('[QuestDifficulty] 다음 견본을 불러오지 못했습니다.', refreshError);
-            });
-          }}
-          quests={quests}
-          questsError={questsError}
-          questsLoading={questsLoading}
-        />
-      ) : (
-        <OnboardingScreen onEnter={enterApp} />
-      )}
+      {marketLab
+        ? <MarketSimulationScreen key={marketLabVisit} onExit={() => setMarketLabVisit(visit => visit + 1)} />
+        : marketAgentEnabled
+          ? <MarketAgentHost accessToken={accessToken} fallback={appContent} />
+          : appContent}
     </SafeAreaProvider>
   );
 }

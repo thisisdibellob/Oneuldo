@@ -1,0 +1,4 @@
+interface:
+  display_name: "장보기 연구 페르소나"
+  short_description: "연구용 성인 페르소나로 장보기 시뮬레이션 수행"
+  default_prompt: "Use $market-persona-skill to perform the Oneuldo market simulation with the maintained research persona."
