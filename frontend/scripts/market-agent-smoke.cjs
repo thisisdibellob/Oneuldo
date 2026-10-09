@@ -17,11 +17,15 @@ require.extensions['.ts'] = (module, filename) => {
 };
 
 const { createMarketAgentAdapter } = require('../src/game/marketSession.ts');
+const { normalizeMarketLearningConfig } = require('../src/game/marketLearning.ts');
 const { isMarketEnvironmentBlocked, isNearMarketStation } = require('../src/game/marketEnvironment.ts');
 const args = process.argv.slice(2);
 const option = (name) => { const index = args.indexOf(name); if (index >= 0 && !args[index + 1]) throw new Error(`${name} requires a path.`); return index < 0 ? undefined : args[index + 1]; };
 const configPath = option('--config') || path.resolve(__dirname, '../docs/market-environment.example.json');
 const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+const learning = normalizeMarketLearningConfig(config.learning);
+assert.ok(!learning.stockoutEnabled && !learning.budgetChoiceEnabled,
+  'This fixed-list smoke policy requires learning.stockoutEnabled:false and learning.budgetChoiceEnabled:false. The exception/choice/kiosk flow is covered by __tests__/marketLearning.test.ts.');
 const adapter = createMarketAgentAdapter(config);
 
 function act(action) {
@@ -68,13 +72,16 @@ function routeTo(stationId) {
   return act({ type: 'interact', station: stationId });
 }
 
-if (!adapter.observe().cashierAvailable) {
+let checkoutId = Object.entries(adapter.observe().cashierAvailability).find(([, available]) => available)?.[0];
+if (!checkoutId) {
   const staff = adapter.observe().environment.stationDetails.find((station) => station.kind === 'employee');
   routeTo(staff.id);
   assert.equal(adapter.observe().cashierAvailable, false, 'Talking alone must not call the cashier.');
-  act({ type: 'requestCashier' });
+  const response = act({ type: 'requestCashier' });
+  assert.equal(response.cashierRequestFeedback?.accepted, true, 'A fully unstaffed market accepts the single cashier request.');
+  checkoutId = response.cashierRequestFeedback.checkoutIds[0];
 }
-routeTo('checkout');
+routeTo(checkoutId);
 act({ type: 'submit' });
 assert.deepEqual(adapter.observe().feedback, { success: false }, 'First failure must not disclose corrections.');
 act({ type: 'retry' });
@@ -113,11 +120,11 @@ assert.deepEqual(adapter.observe().cart, basketBeforeReturn, 'The employee conve
 const scoreBeforeReturn = adapter.observe().score;
 act({ type: 'requestReturn', productId: returnProduct.id });
 assert.equal(adapter.observe().cart[returnProduct.id] ?? 0, basketBeforeReturn[returnProduct.id] - 1);
-assert.equal(adapter.observe().score, scoreBeforeReturn, 'Asking an employee for help has no score penalty.');
+assert.equal(adapter.observe().score, scoreBeforeReturn, 'Asking an employee to return a product has no score penalty.');
 assert.equal(adapter.observe().feedback, null, 'Return help must not reveal purchase correctness.');
 routeTo(returnProduct.categoryId);
 act({ type: 'add', productId: returnProduct.id });
-routeTo('checkout');
+routeTo(checkoutId);
 act({ type: 'submit' });
 assert.equal(adapter.observe().outcome, 'success');
 assert.equal(adapter.observe().attempts, 2);

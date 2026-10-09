@@ -3,7 +3,7 @@ import { getMarketPersonAppearance, type MarketPersonKind } from '../../game/mar
 import { marketPeopleArt } from '../../game/marketPeopleArt';
 import { getMarketPersonGeometry, MARKET_PERSON_WIDTH } from '../../game/marketPersonLayout';
 
-/** Match the player's visible adult height and keep every age on one floor anchor. */
+/** Balance adult NPCs against the SD player and keep every age on one floor anchor. */
 export function MarketPersonIllustration({ kind, appearance, active = false, testID }: {
   kind: MarketPersonKind;
   appearance: number;

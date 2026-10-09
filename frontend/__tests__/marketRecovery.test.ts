@@ -63,7 +63,7 @@ it('avoids actual employee, customer and newly called cashier footprints in seed
   for (const { id: layoutId } of MARKET_LAYOUT_OPTIONS) for (const entranceConstruction of [false, true]) for (let seed = 0; seed < 6; seed += 1) {
     const env = createMarketEnvironment({ layoutId, entranceConstruction, seed, employeeCount: 3, customerCount: 5, pillarCount: 4, cashierCount: 0 });
     for (const current of [...env.employees, ...env.customers].map(person => person.point)
-      .concat(env.checkouts.map(counter => counter.cashierPoint))) {
+      .concat(env.checkouts.filter(counter => counter.kind !== 'kiosk').map(counter => counter.cashierPoint))) {
       expect(isMarketEnvironmentBlocked(env, current, called)).toBe(true);
       const recovered = getMarketRecoveryPoint(env, current, called);
       expectSafeSameSide(env, current, recovered);

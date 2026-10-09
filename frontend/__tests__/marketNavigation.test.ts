@@ -29,7 +29,7 @@ it('keeps an unobstructed same-aisle route direct and returns no movement when a
   expect(getMarketNavigationPath(environment, from, from)).toEqual([]);
 });
 
-it('walks around the reduced checkout corner into its customer aisle instead of stopping at the counter', () => {
+it('walks around the enlarged checkout corner into its customer aisle instead of stopping at the counter', () => {
   const from = { x: 680, y: 980 }; const to = environment.checkouts[0].point;
   expect(isMarketNavigationSegmentClear(environment, from, to, true)).toBe(false);
   expect(verifyRoute(from, to).length).toBeGreaterThan(1);
@@ -41,7 +41,7 @@ it('crosses the real forty-pixel gap between vertical shelf units', () => {
 });
 
 it('finds the designated side doorway around a solid sales-floor wall and rejects a destination inside the wall', () => {
-  verifyRoute({ x: 240, y: 500 }, { x: 327, y: 412 });
+  verifyRoute({ x: 240, y: 500 }, { x: 327, y: 400 });
   expect(getMarketNavigationPath(environment, { x: 240, y: 500 }, { x: 298, y: 500 })).toBeNull();
   expect(getMarketNavigationPath(environment, { x: 240, y: 500 }, { x: NaN, y: 500 })).toBeNull();
 });

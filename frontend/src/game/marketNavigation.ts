@@ -1,4 +1,4 @@
-import { getMarketEnvironmentObstacles, MARKET_ENVIRONMENT_PLAYER_RADIUS, isMarketEnvironmentBlocked, type MarketEnvironment, type MarketCashierAvailability } from './marketEnvironment';
+import { getMarketWrongWayGate, getMarketEnvironmentObstacles, MARKET_ENVIRONMENT_PLAYER_RADIUS, isMarketEnvironmentBlocked, type MarketEnvironment, type MarketCashierAvailability } from './marketEnvironment';
 import type { Point, Rect } from './prototypeWorld';
 
 type CashierState = boolean | Partial<MarketCashierAvailability>;
@@ -74,7 +74,9 @@ class MinHeap {
 export function getMarketNavigationPath(environment: MarketEnvironment, from: Point, to: Point, cashierCalled: CashierState = false): Point[] | null {
   if (isMarketEnvironmentBlocked(environment, from, cashierCalled) || isMarketEnvironmentBlocked(environment, to, cashierCalled)) return null;
   if (Math.hypot(to.x - from.x, to.y - from.y) < 0.001) return [];
-  if (isMarketNavigationSegmentClear(environment, from, to, cashierCalled)) return [{ ...to }];
+  const canRoute = (start: Point, end: Point) => !getMarketWrongWayGate(environment, start, end)
+    && isMarketNavigationSegmentClear(environment, start, end, cashierCalled);
+  if (canRoute(from, to)) return [{ ...to }];
   const columns = Math.floor(environment.world.width / GRID_STEP) + 1;
   const rows = Math.floor(environment.world.height / GRID_STEP) + 1;
   const size = columns * rows;
@@ -87,18 +89,18 @@ export function getMarketNavigationPath(environment: MarketEnvironment, from: Po
     if (free[node] === 0) free[node] = isMarketEnvironmentBlocked(environment, pointFor(node), cashierCalled) ? 2 : 1;
     return free[node] === 1;
   };
-  const anchors = (point: Point) => {
+  const anchors = (point: Point, destination = false) => {
     const matches: number[] = [];
     const centerX = Math.round(point.x / GRID_STEP); const centerY = Math.round(point.y / GRID_STEP);
     for (let dy = -2; dy <= 2; dy += 1) for (let dx = -2; dx <= 2; dx += 1) {
       const x = centerX + dx; const y = centerY + dy;
       if (x < 0 || y < 0 || x >= columns || y >= rows) continue;
       const node = y * columns + x;
-      if (nodeIsFree(node) && isMarketNavigationSegmentClear(environment, point, pointFor(node), cashierCalled)) matches.push(node);
+      if (nodeIsFree(node) && (destination ? canRoute(pointFor(node), point) : canRoute(point, pointFor(node)))) matches.push(node);
     }
     return matches;
   };
-  const destinations = new Set(anchors(to));
+  const destinations = new Set(anchors(to, true));
   if (!destinations.size) return null;
   const queue = new MinHeap();
   for (const node of anchors(from)) {
@@ -122,7 +124,7 @@ export function getMarketNavigationPath(environment: MarketEnvironment, from: Po
       if (closed[neighbor] || !nodeIsFree(neighbor)) continue;
       const next = pointFor(neighbor);
       const nextCost = costs[node] + Math.hypot(dx, dy) * GRID_STEP;
-      if (nextCost >= costs[neighbor] || !isMarketNavigationSegmentClear(environment, current, next, cashierCalled)) continue;
+      if (nextCost >= costs[neighbor] || !canRoute(current, next)) continue;
       costs[neighbor] = nextCost; parents[neighbor] = node;
       queue.push({ node: neighbor, score: nextCost + Math.hypot(next.x - to.x, next.y - to.y) });
     }
@@ -135,7 +137,7 @@ export function getMarketNavigationPath(environment: MarketEnvironment, from: Po
   const result: Point[] = [];
   for (let index = 0; index < raw.length - 1;) {
     let next = raw.length - 1;
-    while (next > index + 1 && !isMarketNavigationSegmentClear(environment, raw[index], raw[next], cashierCalled)) next -= 1;
+    while (next > index + 1 && !canRoute(raw[index], raw[next])) next -= 1;
     result.push(raw[next]); index = next;
   }
   return result.filter((point, index) => index === 0 ? Math.hypot(point.x - from.x, point.y - from.y) >= 0.001

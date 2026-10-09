@@ -56,20 +56,23 @@ test('a planned nearby station remains inside the real interaction range across 
 
 test('a visible employee standing area remains reachable when the coarse grid misses the interaction space', () => {
   const e = createMarketSession({ seed: 'same-store' }).environment;
-  const from = { x: 640, y: 160 }, target = { x: 680, y: 206 };
-  expect(visibleStations(e, from, DEFAULT_REPLAY_PRESENTATION).some(s => s.id === 'staff:employee-1')).toBe(true);
-  const choice = visibleAnchors(e, from, DEFAULT_REPLAY_PRESENTATION).find(a => {
-    const point = resolveReplayAnchor(e, from, a.id, DEFAULT_REPLAY_PRESENTATION);
+  // The new fixture footprint blocks the former diagonal. Use its free aisle,
+  // retaining the 1.3-zoom condition whose off-grid standing area is under test.
+  const from = { x: 680, y: 300 }, target = { x: 680, y: 206 };
+  const presentation = { ...DEFAULT_REPLAY_PRESENTATION, zoom: 1.3 };
+  expect(visibleStations(e, from, presentation).some(s => s.id === 'staff:employee-1')).toBe(true);
+  const choice = visibleAnchors(e, from, presentation).find(a => {
+    const point = resolveReplayAnchor(e, from, a.id, presentation);
     return point?.x === target.x && point?.y === target.y;
   });
   expect(choice).toBeDefined();
   expect(Object.keys(choice!).sort()).toEqual(['direction', 'distanceBand', 'id', 'label']);
   for (const dx of [-.6, 0, .6]) for (const dy of [-.6, 0, .6]) {
-    expect(resolveReplayAnchor(e, { x: from.x + dx, y: from.y + dy }, choice!.id, DEFAULT_REPLAY_PRESENTATION)).toEqual(target);
-    expect(visibleStations(e, { x: target.x + dx, y: target.y + dy }, DEFAULT_REPLAY_PRESENTATION, {}, 0)
+    expect(resolveReplayAnchor(e, { x: from.x + dx, y: from.y + dy }, choice!.id, presentation)).toEqual(target);
+    expect(visibleStations(e, { x: target.x + dx, y: target.y + dy }, presentation, {}, 0)
       .some(s => s.id === 'staff:employee-1' && s.near)).toBe(true);
   }
-  expect(resolveReplayAnchor(e, e.spawn, choice!.id, DEFAULT_REPLAY_PRESENTATION)).toBeNull();
+  expect(resolveReplayAnchor(e, e.spawn, choice!.id, presentation)).toBeNull();
 });
 
 test('visible station cues expose neither geometry nor off-screen global station availability', () => {
@@ -78,6 +81,20 @@ test('visible station cues expose neither geometry nor off-screen global station
   for (const station of stations) expect(Object.keys(station).sort()).toEqual(['direction', 'distanceBand', 'id', 'kind', 'label', 'near']);
   const zoomed = visibleStations(e, e.spawn, { ...DEFAULT_REPLAY_PRESENTATION, zoom: 2 });
   expect(zoomed.length).toBeLessThanOrEqual(stations.length);
+});
+
+test('offered passages keep the full arrival tolerance outside crowded fixture footprints', () => {
+  const e = createMarketSession({ seed: 'same-store', environment: { employeeCount: 2, cashierCount: 0 } }).environment;
+  const from = { x: 680, y: 300 };
+  const presentation = { ...DEFAULT_REPLAY_PRESENTATION, zoom: 1.3 };
+  const choices = visibleAnchors(e, from, presentation);
+  expect(choices.length).toBeGreaterThan(0);
+  for (const choice of choices) {
+    const target = resolveReplayAnchor(e, from, choice.id, presentation)!;
+    for (const dx of [-1, 0, 1]) for (const dy of [-1, 0, 1]) {
+      expect(isMarketEnvironmentBlocked(e, { x: target.x + dx, y: target.y + dy })).toBe(false);
+    }
+  }
 });
 
 test('shelf observation changes through actual row-sized page fractions and never exposes a partial row', () => {

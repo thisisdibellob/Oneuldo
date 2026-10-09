@@ -1,4 +1,4 @@
-import type { ImageSourcePropType, StyleProp, ViewStyle } from 'react-native';
+import type { ImageProps, ImageSourcePropType, StyleProp, ViewStyle } from 'react-native';
 import { Image, StyleSheet, View } from 'react-native';
 
 export const MODULAR_CHARACTER_CANVAS = {
@@ -30,6 +30,9 @@ export type CharacterLayerSlot = (typeof MODULAR_CHARACTER_LAYER_ORDER)[number];
 
 export type CharacterArtLayer = {
   id: string;
+  onLoad?: ImageProps['onLoad'];
+  onError?: ImageProps['onError'];
+  fadeDuration?: ImageProps['fadeDuration'];
   opacity?: number;
   slot: CharacterLayerSlot;
   source: ImageSourcePropType;
@@ -85,6 +88,9 @@ export function ModularCharacter({
         <Image
           accessibilityIgnoresInvertColors
           key={layer.id}
+          onLoad={layer.onLoad}
+          onError={layer.onError}
+          fadeDuration={layer.fadeDuration}
           resizeMode="contain"
           source={layer.source}
           style={[styles.layer, { height, opacity: layer.opacity ?? 1, width }]}

@@ -9,6 +9,10 @@ import { marketObjectiveLabel } from './marketObjectiveLabel';
 export function createMissionSession(config: Partial<MarketSessionConfig>, mission?: MarketMission, environment?: MarketEnvironment) {
   if (!mission) return createMarketSession(config, environment);
   const missionConfig = { ...config, difficulty: 'exact' as const,
+    // The AI mission contract contains its purchase requirements, not optional
+    // stockout, requester, drink-choice or receipt-error training objectives.
+    learning: { ...config.learning, stockoutEnabled: false, budgetChoiceEnabled: false, checkoutReviewMode: 'normal' as const },
+    environment: { ...config.environment, kioskLane: config.environment?.kioskLane ?? 'none' as const },
     objectives: mission.objectives.map(({ productId, quantity }) => ({ productId, quantity, match: 'exact' as const })) };
   const draft = createMarketSession(missionConfig, environment);
   const preset = enabledMarketScenarios.find(candidate => candidate.id === mission.scenarioId);

@@ -42,7 +42,8 @@ it.each(MARKET_LAYOUT_OPTIONS)('$label 공사 펜스는 관측·상호작용·�
   expect(getMarketObservation(game).environment.stationDetails.find(station => station.id === 'entrance')!.available).toBe(false);
   expect(getMarketStationApproachPoint(env, 'entrance', outside)).toBeNull();
   game = applyMarketAction(game, { type: 'setPosition', point: outside });
-  expect(applyMarketAction(game, { type: 'interact', station: 'entrance' }).lastActionError).toBeTruthy();
+  expect(applyMarketAction(game, { type: 'interact', station: 'entrance' }).lastActionError).toBe('안쪽 입구를 이용해 주세요.');
+  expect(applyMarketAction(game, { type: 'move', dx: 0, dy: -32 }).lastActionError).toBe('안쪽 입구를 이용해 주세요.');
   expect(applyMarketAction(game, { type: 'move', dx: 0, dy: -32 }).playerPosition).toEqual(outside);
   expect(applyMarketAction(game, { type: 'setPosition', point: env.entrance.point }).lastActionError).toBeTruthy();
   for (const current of [outside, { x: outside.x, y: env.entrance.alarmBoundaryY - 48 }]) {
@@ -72,7 +73,7 @@ it.each(states)('$label 공사=$entranceConstruction의 열린 모든 경보기�
       if (state === 'unpaid') {
         expect(game.events.filter(event => event.type === 'entrance_alarm').at(-1)!.payload.gateId).toBe(gate.id);
         game = walk(game, inside); expect(game.alarmArmed).toBe(true);
-        game = walk(game, outside); expect(game.alarmCount).toBe(2); expect(game.score).toBe(80);
+        game = walk(game, outside); expect(game.alarmCount).toBe(2); expect(game.wrongWayEntryCount).toBe(gate.id === 'exit' ? 1 : 0); expect(game.score).toBe(gate.id === 'exit' ? 70 : 80);
       }
     }
   }

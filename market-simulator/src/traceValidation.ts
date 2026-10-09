@@ -36,6 +36,14 @@ export class TraceGuard {
     const shelfOpen = o.phase === 'shopping' && o.view === 'world' && o.products.length > 0;
     const page = shelfOpen ? getReplayShelfPage(o.products.map(p => p.id), this.presentation, this.scrollFraction) : null;
     const visible = new Set(page?.visibleProductIds ?? []);
+    const cashiers: ActorObservation['cashiers'] = Object.fromEntries(stations
+      .filter(s => s.kind === 'checkout' && /계산 가능|직원 호출/.test(s.label))
+      .map(s => [s.id, o.cashierAvailability[s.id as 'checkout' | 'checkout-2']]));
+    // The opened staff dialogue explicitly names these staffed counters. This is
+    // displayed feedback, not permission to expose the rest of the hidden map.
+    if (o.activeStation?.startsWith('staff:')) {
+      for (const id of o.cashierRequestFeedback?.checkoutIds ?? []) cashiers[id] = true;
+    }
     const result: ActorObservation = {
       schemaVersion: 'attention-observation-v1', phase: o.phase, view: o.view, activeStation: o.activeStation,
       visibleStations: stations, anchors: world ? visibleAnchors(o.environment, o.playerPosition, this.presentation, o.cashierAvailability) : [],
@@ -43,7 +51,7 @@ export class TraceGuard {
       shelf: page ? { page: page.page, pageCount: page.pageCount, scrollFraction: this.scrollFraction,
         pageFractions: replayShelfPageFractions(o.products.map(p => p.id), this.presentation) } : null,
       listAvailable: world, cart: o.view === 'cart' || o.phase === 'checkout' ? o.cart : null,
-      cashiers: Object.fromEntries(stations.filter(s => s.kind === 'checkout' && /계산 가능|직원 호출/.test(s.label)).map(s => [s.id, o.cashierAvailability[s.id as 'checkout' | 'checkout-2']])),
+      cashiers,
       sequence: this.sequence, elapsedMs: this.time - Date.parse('2000-01-01T00:00:00.000Z'),
       ...(this.lastResult ? { result: { ...this.lastResult } } : {}),
       ...(this.lastResult?.actionType === 'readList' ? { readObjectives: o.objectives.map(x => ({ ...x })) } : {}),

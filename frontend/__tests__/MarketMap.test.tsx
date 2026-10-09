@@ -1,6 +1,8 @@
 import { act, fireEvent, render } from '@testing-library/react-native';
 import { Animated, BackHandler, PanResponder, Platform, StyleSheet } from 'react-native';
 
+import { DirectionalAvatar } from '../src/components/game/DirectionalAvatar';
+import { AVATAR_WALK_CYCLE_DISTANCE } from '../src/game/avatarAnimation';
 import { MarketMap } from '../src/components/game/MarketMap';
 import { createMarketEnvironment, isMarketEnvironmentBlocked, MARKET_ENVIRONMENT_PLAYER_RADIUS, type MarketCashierAvailability } from '../src/game/marketEnvironment';
 import { MarketSimulationScreen } from '../src/screens/MarketSimulationScreen';
@@ -54,6 +56,7 @@ it('처음 만들어진 조이스틱 핸들러도 호출된 계산원의 새 충
     });
     advance(2);
     expect(onPositionChange.mock.calls.at(-1)![0].y).toBeGreaterThan(environment.spawn.y);
+    expect(screen.UNSAFE_getByType(DirectionalAvatar).props.motion).toBe('walk');
     screen.rerender(element({ checkout: true })); expect(screen.getByTestId('market-cashier')).toBeTruthy();
     advance(30);
     const latest = onPositionChange.mock.calls.at(-1)![0];
@@ -61,6 +64,11 @@ it('처음 만들어진 조이스틱 핸들러도 호출된 계산원의 새 충
     expect(latest.y).toBeLessThanOrEqual(collisionBoundary);
     expect(latest.y).toBeGreaterThan(collisionBoundary - 8);
     expect(isMarketEnvironmentBlocked(environment, latest, { checkout: true })).toBe(false);
+    expect(screen.UNSAFE_getByType(DirectionalAvatar).props.motion).toBe('idle');
+    const gait = screen.UNSAFE_getByType(DirectionalAvatar).props.walkCycle;
+    const stoppedPhase = gait.frameIndex(1000);
+    advance(10);
+    expect(gait.frameIndex(1000)).toBe(stoppedPhase);
   } finally {
     screen.unmount(); responder.mockRestore(); cancel.mockRestore(); raf.mockRestore();
   }
@@ -70,13 +78,23 @@ it('모달 잠금과 입력 필드에서는 웹 방향키와 접근성 이동이
   // The Jest native renderer does not mount DOM nodes when Platform.OS is web.
   // Ignore the joystick's cosmetic native-driver spring, while testing real movement callbacks.
   const spring = jest.spyOn(Animated, 'spring').mockImplementation(() => ({ start: jest.fn(), stop: jest.fn(), reset: jest.fn() }));
+  const frames = new Map<number, FrameRequestCallback>();
+  let frameId = 0, time = 0;
+  const raf = jest.spyOn(globalThis, 'requestAnimationFrame').mockImplementation(callback => {
+    frames.set(++frameId, callback); return frameId;
+  });
+  const cancel = jest.spyOn(globalThis, 'cancelAnimationFrame').mockImplementation(id => { if (id != null) frames.delete(id); });
+  const advance = () => { for (let i = 0; i < 2; i++) act(() => {
+    time += 32; const callbacks = [...frames.values()]; frames.clear(); callbacks.forEach(callback => callback(time));
+  }); };
   const originalOS = Object.getOwnPropertyDescriptor(Platform, 'OS');
   const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
   const listeners = new Set<(event: KeyboardEvent) => void>();
+  const releaseListeners = new Set<(event: KeyboardEvent) => void>();
   Object.defineProperty(Platform, 'OS', { configurable: true, value: 'web' });
   Object.defineProperty(globalThis, 'window', { configurable: true, value: {
-    addEventListener: (name: string, listener: (event: KeyboardEvent) => void) => { if (name === 'keydown') listeners.add(listener); },
-    removeEventListener: (name: string, listener: (event: KeyboardEvent) => void) => { if (name === 'keydown') listeners.delete(listener); },
+    addEventListener: (name: string, listener: (event: KeyboardEvent) => void) => { if (name === 'keydown') listeners.add(listener); if (name === 'keyup') releaseListeners.add(listener); },
+    removeEventListener: (name: string, listener: (event: KeyboardEvent) => void) => { if (name === 'keydown') listeners.delete(listener); if (name === 'keyup') releaseListeners.delete(listener); },
   } });
   const environment = cleanEnvironment(), onPositionChange = jest.fn(), onNearbyStationChange = jest.fn();
   const element = (interactive: boolean) => <MarketMap environment={environment} interactive={interactive} hintedStation={null}
@@ -84,20 +102,27 @@ it('모달 잠금과 입력 필드에서는 웹 방향키와 접근성 이동이
   const screen = render(element(true));
   const key = (tagName = 'DIV') => act(() => listeners.forEach(listener => listener({ key: 'ArrowRight', target: { tagName }, preventDefault: jest.fn() } as unknown as KeyboardEvent)));
   try {
-    key(); expect(onPositionChange).toHaveBeenLastCalledWith({ x: environment.spawn.x + 24, y: environment.spawn.y });
+    key(); advance();
+    expect(onPositionChange.mock.calls.at(-1)![0].x).toBeCloseTo(environment.spawn.x + 190 * 0.032);
+    expect(screen.UNSAFE_getByType(DirectionalAvatar).props.motion).toBe('walk');
     onPositionChange.mockClear(); screen.rerender(element(false));
     key(); fireEvent(screen.getByLabelText('하늘마트 매장'), 'accessibilityAction', { nativeEvent: { actionName: 'moveRight' } });
     expect(onPositionChange).not.toHaveBeenCalled();
     screen.rerender(element(true)); key('INPUT'); key('TEXTAREA'); key('SELECT');
     expect(onPositionChange).not.toHaveBeenCalled();
-    key(); expect(onPositionChange).toHaveBeenLastCalledWith({ x: environment.spawn.x + 48, y: environment.spawn.y });
+    key(); advance();
+    expect(onPositionChange.mock.calls.at(-1)![0].x).toBeCloseTo(environment.spawn.x + 190 * 0.032 * 2);
+    act(() => releaseListeners.forEach(listener => listener({ key: 'ArrowRight' } as KeyboardEvent)));
+    expect(screen.UNSAFE_getByType(DirectionalAvatar).props.motion).toBe('idle');
+    const callCount = onPositionChange.mock.calls.length; advance();
+    expect(onPositionChange).toHaveBeenCalledTimes(callCount);
     screen.unmount(); expect(listeners.size).toBe(0);
   } finally {
     screen.unmount();
     if (originalOS) Object.defineProperty(Platform, 'OS', originalOS);
     if (originalWindow) Object.defineProperty(globalThis, 'window', originalWindow);
     else Reflect.deleteProperty(globalThis, 'window');
-    spring.mockRestore();
+    spring.mockRestore(); cancel.mockRestore(); raf.mockRestore();
   }
 });
 
@@ -137,8 +162,13 @@ it('나란한 진열대 사이에서는 실제 가까운 진열대를 선택하�
     const map = screen.getByLabelText('하늘마트 매장');
     const moveRight = () => fireEvent(map, 'accessibilityAction', { nativeEvent: { actionName: 'moveRight' } });
     moveRight(); expect(onNearbyStationChange).toHaveBeenLastCalledWith('household');
-    moveRight(); expect(onNearbyStationChange).toHaveBeenLastCalledWith(null);
     moveRight(); expect(onNearbyStationChange).toHaveBeenLastCalledWith('meal');
+    // Enlarged fixtures have overlapping reach ranges here: choose the nearer
+    // shelf, then hide the action after walking clear of both actual surfaces.
+    for (let step = 0; step < 5; step++) {
+      fireEvent(map, 'accessibilityAction', { nativeEvent: { actionName: 'moveDown' } });
+    }
+    expect(onNearbyStationChange).toHaveBeenLastCalledWith(null);
   } finally { screen.unmount(); }
 });
 
@@ -186,4 +216,55 @@ it('모퉁이 지점은 자체 월드 크기·공동문 스폰을 사용하고 �
     expect(read(world.transform![0].translateX)).toBeCloseTo(expected.translation.x);
     expect(read(world.transform![1].translateY)).toBeCloseTo(expected.translation.y);
   } finally { screen.unmount(); }
+});
+
+it('독립 마트의 보행 위상은 조이스틱 세기와 달리기의 실제 이동거리를 따른다', () => {
+  const frames = new Map<number, FrameRequestCallback>();
+  let frameId = 0, time = 0;
+  const raf = jest.spyOn(globalThis, 'requestAnimationFrame').mockImplementation(callback => {
+    frames.set(++frameId, callback); return frameId;
+  });
+  const cancel = jest.spyOn(globalThis, 'cancelAnimationFrame').mockImplementation(id => { if (id != null) frames.delete(id); });
+  let handlers: Parameters<typeof PanResponder.create>[0] | undefined;
+  const responder = jest.spyOn(PanResponder, 'create').mockImplementation(value => {
+    handlers ??= value; return { panHandlers: {} };
+  });
+  const environment = cleanEnvironment();
+  const onPositionChange = jest.fn();
+  const screen = render(<MarketMap environment={environment} interactive hintedStation={null} nearbyStation={null}
+    onPositionChange={onPositionChange} onNearbyStationChange={jest.fn()} />);
+  const advance = (count: number) => {
+    for (let index = 0; index < count; index++) act(() => {
+      time += 32; const callbacks = [...frames.values()]; frames.clear(); callbacks.forEach(callback => callback(time));
+    });
+  };
+  const pose = () => screen.UNSAFE_getByType(DirectionalAvatar).props;
+  try {
+    act(() => {
+      handlers!.onPanResponderGrant!({ nativeEvent: { locationX: 76, locationY: 174 } } as never, {} as never);
+      handlers!.onPanResponderMove!({} as never, { dx: 17, dy: 0 } as never);
+    });
+    advance(5); // Four elapsed frames after the initial timestamp.
+    const halfDistance = onPositionChange.mock.calls.at(-1)![0].x - environment.spawn.x;
+    expect(halfDistance).toBeCloseTo(190 * 0.5 * 0.032 * 4);
+    expect(pose().motion).toBe('walk');
+    expect(pose().walkCycle.frameIndex(10000)).toBe(Math.floor(halfDistance / AVATAR_WALK_CYCLE_DISTANCE * 10000));
+    act(() => handlers!.onPanResponderMove!({} as never, { dx: 34, dy: 0 } as never));
+    advance(4);
+    const fullDistance = onPositionChange.mock.calls.at(-1)![0].x - environment.spawn.x;
+    expect(fullDistance - halfDistance).toBeCloseTo(halfDistance * 2);
+    fireEvent.press(screen.getByRole('button', { name: '마트에서 달리기 켜기' }));
+    advance(4);
+    const runningDistance = onPositionChange.mock.calls.at(-1)![0].x - environment.spawn.x;
+    expect(pose().motion).toBe('sprint');
+    expect(runningDistance - fullDistance).toBeCloseTo(halfDistance * 2 * 1.55);
+    expect(pose().walkCycle.frameIndex(10000)).toBe(Math.floor(runningDistance / AVATAR_WALK_CYCLE_DISTANCE * 10000));
+    fireEvent.press(screen.getByRole('button', { name: '마트에서 달리기 끄기' }));
+    advance(2);
+    expect(pose().motion).toBe('walk');
+    act(() => handlers!.onPanResponderRelease!({} as never, {} as never));
+    expect(pose().motion).toBe('idle');
+  } finally {
+    screen.unmount(); responder.mockRestore(); cancel.mockRestore(); raf.mockRestore();
+  }
 });

@@ -9,6 +9,7 @@
     { "productId": "zero-cola", "quantity": 1 },
     { "productId": "aa-batteries", "quantity": 2 }
   ],
+  "learning": { "stockoutEnabled": false, "budgetChoiceEnabled": false },
   "stockPerProduct": 6,
   "alarmPenaltyPoints": 10,
   "stockOverrides": { "low-fat-milk": 3 },
@@ -18,7 +19,7 @@
     "pillarCount": 2,
     "chairCount": 0,
     "cashierCount": 0,
-    "kioskPresent": true,
+    "kioskLane": "checkout-2",
     "shelfOrder": ["produce", "fresh", "household", "meal", "drink"]
   },
   "provenance": {

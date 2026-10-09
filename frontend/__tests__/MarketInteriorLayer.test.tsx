@@ -2,7 +2,7 @@ import { fireEvent, render } from '@testing-library/react-native';
 import { Image, StyleSheet, View } from 'react-native';
 import {
   MarketCategoryFixture, MarketCheckoutFixture, MarketEnvironmentObjects,
-  MarketExitMarker, MarketInteriorBackdrop, MarketPersonFixture, MarketShelfTarget,
+  MarketExitMarker, MarketInteriorBackdrop, MarketPersonFixture, MarketShelfTarget, MarketKioskFixture,
 } from '../src/components/game/MarketInteriorLayer';
 import { marketCategories } from '../src/game/scenarios';
 import { createMarketEnvironment, getMarketRenderDepth, isMarketEnvironmentBlocked, MARKET_LAYOUT_OPTIONS, type MarketEnvironment } from '../src/game/marketEnvironment';
@@ -25,16 +25,14 @@ it('다섯 분류는 통일된 가구에 서로 다른 상품 두 묶음과 하�
     // Explicit sizes prevent RN Web from using the source PNG's large intrinsic dimensions.
     for (const artwork of [first, second]) {
       const size = StyleSheet.flatten(artwork.props.style);
-      expect(size.width).toBeGreaterThan(100);
-      expect(size.width).toBeLessThanOrEqual(141);
-      expect(size.height).toBeGreaterThan(60);
-      expect(size.height).toBeLessThanOrEqual(94);
+      expect(size.width).toBeCloseTo(category.id === 'produce' ? 148.35 : 162.15);
+      expect(size.height).toBeCloseTo(category.id === 'produce' ? 98.9 : 108.1);
     }
     expect(screen.getByTestId(`market-facing-${category.id}-1-0-0`).props.source)
       .not.toEqual(screen.getByTestId(`market-facing-${category.id}-2-0-0`).props.source);
     expect(screen.getAllByText(category.label)).toHaveLength(1);
     const aisleIndex = marketCategories.findIndex(item => item.id === category.id) + 1;
-    expect(screen.getByText(String(aisleIndex).padStart(2, '0'))).toBeTruthy();
+    expect(screen.queryByText(String(aisleIndex).padStart(2, '0'))).toBeNull();
   }
 });
 
@@ -53,14 +51,15 @@ it('가로와 세로 묶음 모두 선택 강조로 가구 크기와 발 위치�
     const before = screen.UNSAFE_getAllByType(Image).map(image => StyleSheet.flatten(image.props.style));
     screen.rerender(<MarketCategoryFixture active category={category} orientation={orientation} />);
     expect(screen.UNSAFE_getAllByType(Image).map(image => StyleSheet.flatten(image.props.style))).toEqual(before);
-    expect(StyleSheet.flatten(screen.getByTestId(`market-retail-shelf-${category.id}-1`).props.style))
-      .toEqual(expect.objectContaining({ width: 141, height: 94 }));
+    const shelfArt = StyleSheet.flatten(screen.getByTestId(`market-retail-shelf-${category.id}-1`).props.style);
+    expect(shelfArt.width).toBeCloseTo(162.15);
+    expect(shelfArt.height).toBeCloseTo(108.1);
     screen.unmount();
   }
 });
 
 it('두 세로 계산대는 각 번호와 계산원을 따로 표시하며 같은 접근 통로를 사용한다', () => {
-  const environment = createMarketEnvironment({ cashierCount: 2 });
+  const environment = createMarketEnvironment({ cashierCount: 2, kioskLane: 'none' });
   const screen = render(<View>{environment.checkouts.map((counter, index) => <MarketCheckoutFixture key={counter.id}
     counter={counter} index={index} active={false} cashierPresent={counter.cashierPresent} />)}</View>);
   expect(screen.getByText('1')).toBeTruthy();
@@ -81,12 +80,14 @@ it('두 세로 계산대는 각 번호와 계산원을 따로 표시하며 같�
     expect(counter.cashierPoint.x).toBeLessThan(counter.rect.x);
     expect(counter.point.x).toBeGreaterThan(counter.rect.x + counter.rect.width);
     const art = StyleSheet.flatten(screen.getAllByTestId('market-checkout-art')[index].props.style);
-    expect(art.width).toBe(96 * 0.75);
-    expect(art.height).toBe(190 * 0.75);
+    expect(art.width).toBeCloseTo(96 * 0.75 * 1.15);
+    expect(art.height).toBeCloseTo(190 * 0.75 * 1.15);
+    expect(art.left + art.width / 2).toBeCloseTo(counter.rect.width / 2);
     expect(art.transform).toBeUndefined();
     const shadow = StyleSheet.flatten(screen.getAllByTestId('market-checkout-shadow')[index].props.style);
-    expect(shadow.width).toBe(72 * 0.75);
-    expect(shadow.height).toBe(158 * 0.75);
+    expect(shadow.width).toBeCloseTo(72 * 0.75 * 1.15);
+    expect(shadow.height).toBeCloseTo(158 * 0.75 * 1.15);
+    expect(shadow.left + shadow.width / 2).toBeCloseTo(counter.rect.width / 2);
     const mat = StyleSheet.flatten(screen.getAllByTestId('market-cashier-workspace')[index].props.style);
     const footprint = getMarketPersonCollider(counter.cashierPoint, 'employee', counter.cashierAppearance!);
     expect(mat.width).toBe(footprint.width);
@@ -109,14 +110,26 @@ it('두 세로 계산대는 각 번호와 계산원을 따로 표시하며 같�
   expect(screen.getByText('직원 호출')).toBeTruthy();
 });
 
+it('키오스크 충돌 폭을 넓혀도 이미지 크기와 줄 중심은 유지한다', () => {
+  const environment = createMarketEnvironment({ kioskLane: 'checkout-2' });
+  for (const kiosk of environment.kiosks) {
+    const screen = render(<MarketKioskFixture kiosk={kiosk} />);
+    const art = StyleSheet.flatten(screen.getByTestId(`market-kiosk-art-${kiosk.id}`).props.style);
+    expect(art.width).toBeCloseTo(73.6);
+    expect(art.height).toBeCloseTo(103.5);
+    expect(art.left + art.width / 2).toBeCloseTo(kiosk.rect.width / 2);
+    screen.unmount();
+  }
+});
+
 it('안쪽 입구와 출구는 이동 표지이며 공동 출입문에서만 마을로 나간다', () => {
   const screen = render(<View>
     <MarketExitMarker active={false} entrance />
     <MarketExitMarker active={false} />
     <MarketExitMarker active={false} kind="common-door" />
   </View>);
-  expect(screen.getByText('입구 · 경보기')).toBeTruthy();
-  expect(screen.getByText('출구 · 경보기')).toBeTruthy();
+  expect(screen.getByText('입구')).toBeTruthy();
+  expect(screen.getByText('출구')).toBeTruthy();
   expect(screen.getByText('공동 출입문')).toBeTruthy();
   for (const kind of ['entrance', 'exit', 'common-door']) {
     const marker = StyleSheet.flatten(screen.getByTestId(`market-wayfinding-${kind}`).props.style);
@@ -128,8 +141,8 @@ it('안쪽 입구와 출구는 이동 표지이며 공동 출입문에서만 마
     <MarketExitMarker active kind="exit" />
     <MarketExitMarker active kind="common-door" />
   </View>);
-  expect(screen.getByText('입구 · 경보기')).toBeTruthy();
-  expect(screen.getByText('출구 · 경보기')).toBeTruthy();
+  expect(screen.getByText('입구')).toBeTruthy();
+  expect(screen.getByText('출구')).toBeTruthy();
   expect(screen.getAllByText('마을로 나가기')).toHaveLength(1);
 });
 
@@ -213,9 +226,9 @@ it('두 진열대는 같은 상품을 열되 중간 40px 통로는 터치 영역
   const second = screen.getByTestId('market-shelf-touch-household-2', { includeHiddenElements: true });
   const a = StyleSheet.flatten(first.props.style);
   const b = StyleSheet.flatten(second.props.style);
-  expect(a).toEqual(expect.objectContaining({ top: 0, left: 0, width: 110, height: 64 }));
-  expect(b).toEqual(expect.objectContaining({ top: 104, left: 0, width: 110, height: 64 }));
-  expect(b.top - a.top - a.height).toBe(40);
+  expect(a).toEqual(expect.objectContaining({ top: 0, left: 0, width: expect.closeTo(139.15), height: expect.closeTo(73.6) }));
+  expect(b).toEqual(expect.objectContaining({ top: expect.closeTo(113.6), left: 0, width: expect.closeTo(139.15), height: expect.closeTo(73.6) }));
+  expect(b.top - a.top - a.height).toBeCloseTo(40);
   expect(first.props.hitSlop).toBeUndefined();
   expect(second.props.hitSlop).toBeUndefined();
   expect(screen.getAllByRole('button')).toHaveLength(1);
@@ -243,7 +256,7 @@ it('기둥과 세로 진열대 각각은 발판 바닥 순서로 겹치며 통�
   const front = screen.getByTestId('market-shelf-target-household-second');
   const column = screen.getByTestId('market-object-depth-pillar');
   const depth = (node: typeof column) => StyleSheet.flatten(node.props.style).zIndex!;
-  expect(depth(back)).toBe(getMarketRenderDepth(placement.y + 64));
+  expect(depth(back)).toBe(getMarketRenderDepth(placement.y + 73.6));
   expect(depth(column)).toBe(getMarketRenderDepth(pillar.rect.y + pillar.rect.height));
   expect(depth(back)).toBeLessThan(depth(column));
   expect(depth(column)).toBeLessThan(depth(front));
@@ -310,13 +323,13 @@ it.each(MARKET_LAYOUT_OPTIONS)('$label의 공사는 같은 충돌 사각형에�
   expect(art.bottom + (793 - 704) * art.width / 1983).toBeCloseTo(0);
   expect(closed.obstacles).toContainEqual(zone.rect);
   expect(isMarketEnvironmentBlocked(closed, closed.entrance.point)).toBe(true);
-  expect(screen.getByText('공사 중')).toBeTruthy();
-  expect(screen.getByText('입구 · 공사 중')).toBeTruthy();
+  expect(screen.queryByText('공사 중')).toBeNull();
+  expect(screen.getByText('입구')).toBeTruthy();
   screen.rerender(<View><MarketEnvironmentObjects environment={open} />
     <MarketExitMarker kind="entrance" active={false} /></View>);
   expect(screen.queryByTestId(`market-construction-${zone.id}`)).toBeNull();
   expect(screen.queryByText('공사 중')).toBeNull();
-  expect(screen.getByText('입구 · 경보기')).toBeTruthy();
+  expect(screen.getByText('입구')).toBeTruthy();
   expect(isMarketEnvironmentBlocked(open, open.entrance.point)).toBe(false);
   screen.unmount();
 });

@@ -325,8 +325,8 @@ export class AttentionPolicy {
     if (a.type === 'lookAround' && this.orientationRemaining) this.orientationRemaining--;
     if (a.type === 'closeStation') this.targetStation = null;
     if (a.type === 'requestCashier') {
-      const id = a.checkoutId ?? this.checkoutNeedsStaff;
-      if (id) this.cashierMemory.set(id, true);
+      // A valid request can be declined or answered with another counter. Only
+      // subsequent observed availability/visible staff feedback updates memory.
       this.checkoutNeedsStaff = null;
     }
     this.observe(after);
@@ -386,7 +386,12 @@ export class AttentionPolicy {
       this.focus = 'orient'; return this.choose({ type: 'lookAround', durationMs: this.duration(1300, 2800) }, 'look-at-the-unfamiliar-controls-and-visible-surroundings');
     }
     if (this.checkoutNeedsStaff) {
-      const staff = [...this.stations.values()].find(s => s.kind === 'employee');
+      // Legacy stochastic previews should not walk past an observed reachable
+      // employee forever while pursuing an older, no-longer-visible staff cue.
+      // This class is not instantiated by the AI actor/research learner modes.
+      const staff = o.visibleStations.find(s => s.kind === 'employee' && s.near)
+        ?? o.visibleStations.find(s => s.kind === 'employee')
+        ?? [...this.stations.values()].find(s => s.kind === 'employee');
       if (o.activeStation?.startsWith('staff:')) return this.choose({ type: 'requestCashier', checkoutId: this.checkoutNeedsStaff }, 'ask-the-employee-about-the-counter-just-visited', [`station:${o.activeStation}`]);
       if (o.activeStation) return this.choose({ type: 'closeStation' }, 'leave-this-station-to-find-counter-help');
       return this.navigate(o, staff?.id ?? null, 'look-for-a-visible-employee-after-the-empty-counter');
@@ -438,7 +443,7 @@ export class AttentionPolicy {
       const knownCheckouts = [...this.stations.values()].filter(s => s.kind === 'checkout');
       const staffed = knownCheckouts.filter(s => this.cashierMemory.get(s.id) === true);
       const checkouts = staffed.length ? staffed : knownCheckouts.filter(s => this.cashierMemory.get(s.id) !== false);
-      if (!checkouts.length && knownCheckouts.length) {
+      if (!checkouts.length && knownCheckouts.length && ![...this.cashierMemory.values()].some(available => available)) {
         this.checkoutNeedsStaff = knownCheckouts[0].id === 'checkout-2' ? 'checkout-2' : 'checkout';
         return this.explore(o, 'look-for-staff-after-observing-empty-counters');
       }

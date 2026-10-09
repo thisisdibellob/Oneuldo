@@ -1,23 +1,23 @@
 import { Ionicons } from '@expo/vector-icons';
-import type { ComponentProps } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, Animated, BackHandler, Easing, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { ImageSourcePropType } from 'react-native';
 
 import { icons } from '../../assets';
+import { createCalculatorState, pressCalculatorKey } from '../../game/calculator';
 import type {
   DailyQuestId,
   DailyQuestItem,
 } from '../../game/dailyQuests';
 import { PressScale } from '../PressScale';
 import { colors, fonts } from '../../theme';
+import { GamePhonePanel } from './GamePhonePanel';
+import type { PhoneAction, PhoneContact } from './GamePhonePanel';
 
 export type { DailyQuestItem } from '../../game/dailyQuests';
 
 type ControlMode = 'joystick' | 'touch';
 type MenuKey = 'bag' | 'diary' | 'phone' | 'settings';
-type PhoneAction = 'exit' | 'emergency' | null;
-type IoniconName = ComponentProps<typeof Ionicons>['name'];
 type InventoryFilter = 'search' | 'recent' | 'alphabetical';
 
 type InventoryItem = {
@@ -77,6 +77,8 @@ export function GameHud({
   onEmergencyExit,
   onExit,
   onMenuVisibilityChange,
+  onContactRequester,
+  onCallContact,
 }: {
   controlMode: ControlMode;
   dailyQuests: readonly DailyQuestItem[];
@@ -84,13 +86,16 @@ export function GameHud({
   onEmergencyExit: () => void;
   onExit: () => void;
   onMenuVisibilityChange: (open: boolean) => void;
+  onContactRequester?: () => void;
+  requesterLabel?: string;
+  onCallContact?: (contact: PhoneContact) => void;
 }) {
   const [menu, setMenu] = useState<MenuKey | null>(null);
   const [phoneAction, setPhoneAction] = useState<PhoneAction>(null);
+  const [calculator, setCalculator] = useState(createCalculatorState);
   const [notice, setNotice] = useState<string | null>(null);
   const [reduceMotionEnabled, setReduceMotionEnabled] = useState(false);
   const panelProgress = useRef(new Animated.Value(0)).current;
-  const wobble = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     let mounted = true;
@@ -105,34 +110,11 @@ export function GameHud({
   }, []);
 
   useEffect(() => {
-    if (!menu || reduceMotionEnabled) {
-      wobble.stopAnimation();
-      wobble.setValue(0);
-      if (reduceMotionEnabled) {
-        panelProgress.stopAnimation();
-        panelProgress.setValue(menu ? 1 : 0);
-      }
-      return undefined;
+    if (reduceMotionEnabled) {
+      panelProgress.stopAnimation();
+      panelProgress.setValue(menu ? 1 : 0);
     }
-    const animation = Animated.loop(
-      Animated.sequence([
-        Animated.timing(wobble, {
-          duration: 1800,
-          easing: Easing.inOut(Easing.sin),
-          toValue: 1,
-          useNativeDriver: true,
-        }),
-        Animated.timing(wobble, {
-          duration: 1800,
-          easing: Easing.inOut(Easing.sin),
-          toValue: 0,
-          useNativeDriver: true,
-        }),
-      ]),
-    );
-    animation.start();
-    return () => animation.stop();
-  }, [menu, panelProgress, reduceMotionEnabled, wobble]);
+  }, [menu, panelProgress, reduceMotionEnabled]);
 
   useEffect(() => {
     if (!notice) return undefined;
@@ -141,8 +123,8 @@ export function GameHud({
   }, [notice]);
 
   const openMenu = (next: MenuKey) => {
-    setPhoneAction(null);
-    setMenu(next);
+    setPhoneAction(next === 'settings' ? 'settings' : null);
+    setMenu(next === 'settings' ? 'phone' : next);
     onMenuVisibilityChange(true);
     panelProgress.stopAnimation();
     if (reduceMotionEnabled) {
@@ -159,13 +141,16 @@ export function GameHud({
     }).start();
   };
 
-  const closeMenu = useCallback(() => {
+  const closeMenu = useCallback((afterClose?: () => void) => {
+    // Press events must never become an after-close callback, even at an untyped UI boundary.
+    const complete = typeof afterClose === 'function' ? afterClose : undefined;
     panelProgress.stopAnimation();
     if (reduceMotionEnabled) {
       panelProgress.setValue(0);
       setPhoneAction(null);
       setMenu(null);
       onMenuVisibilityChange(false);
+      complete?.();
       return;
     }
     Animated.timing(panelProgress, {
@@ -178,6 +163,7 @@ export function GameHud({
       setPhoneAction(null);
       setMenu(null);
       onMenuVisibilityChange(false);
+      complete?.();
     });
   }, [onMenuVisibilityChange, panelProgress, reduceMotionEnabled]);
 
@@ -192,7 +178,7 @@ export function GameHud({
   }, [closeMenu, menu, phoneAction]);
 
   const toggleMenu = (next: MenuKey) => {
-    if (menu === next) {
+    if (menu === (next === 'settings' ? 'phone' : next) && (next !== 'settings' || phoneAction === 'settings')) {
       closeMenu();
       return;
     }
@@ -203,36 +189,6 @@ export function GameHud({
     onEmergencyExit();
     setNotice('안전한 위치로 이동했어요');
     closeMenu();
-  };
-
-  const panelMotion = {
-    opacity: panelProgress,
-    transform: [
-      {
-        translateY: panelProgress.interpolate({
-          inputRange: [0, 1],
-          outputRange: [32, 0],
-        }),
-      },
-      {
-        scale: panelProgress.interpolate({
-          inputRange: [0, 1],
-          outputRange: [0.92, 1],
-        }),
-      },
-      {
-        translateX: wobble.interpolate({
-          inputRange: [0, 1],
-          outputRange: [-1.5, 1.5],
-        }),
-      },
-      {
-        rotate: wobble.interpolate({
-          inputRange: [0, 1],
-          outputRange: ['-0.22deg', '0.22deg'],
-        }),
-      },
-    ],
   };
 
   const inventoryPanelMotion = {
@@ -257,8 +213,8 @@ export function GameHud({
     <View pointerEvents="box-none" testID="game-hud" style={[StyleSheet.absoluteFill, menu && styles.menuRoot]}>
       <View pointerEvents="none" testID="game-top-hud" style={styles.topHud}>
         <OutlinedHudText>11:45</OutlinedHudText>
-        <View style={styles.coinCounter}>
-          <OutlinedHudText>515</OutlinedHudText>
+        <View accessible accessibilityLabel="현재 소지금 30,000원" style={styles.coinCounter}>
+          <OutlinedHudText>30,000</OutlinedHudText>
           <Image resizeMode="contain" source={icons.gameCoin} style={styles.coinIcon} />
         </View>
       </View>
@@ -300,53 +256,37 @@ export function GameHud({
           />
           <Animated.View
             accessibilityViewIsModal={menu !== 'bag' && menu !== 'diary'}
+            testID={menu === 'phone' ? 'phone-case' : undefined}
             style={[
               styles.blobPanel,
               menu === 'bag' && styles.inventoryPanel,
               menu === 'diary' && styles.questPanel,
-              menu === 'bag' || menu === 'diary' ? inventoryPanelMotion : panelMotion,
+              menu === 'phone' && styles.phonePanel,
+              inventoryPanelMotion,
             ]}
           >
-            {menu !== 'bag' && menu !== 'diary' ? <View pointerEvents="none" style={styles.blobPatternOne} /> : null}
-            {menu !== 'bag' && menu !== 'diary' ? <View pointerEvents="none" style={styles.blobPatternTwo} /> : null}
-            {menu !== 'bag' && menu !== 'diary' ? (
-              <PressScale
-                accessibilityLabel="게임 메뉴 닫기"
-                accessibilityRole="button"
-                hitSlop={8}
-                onPress={(event) => {
-                  event?.stopPropagation?.();
-                  closeMenu();
-                }}
-                scaleTo={0.9}
-                style={styles.closeButton}
-              >
-                <Ionicons color="#6F6758" name="close" size={27} />
-              </PressScale>
-            ) : null}
-
             {menu === 'bag' ? <BagPanel /> : null}
             {menu === 'diary' ? <DiaryPanel quests={dailyQuests} /> : null}
-            {menu === 'settings' ? (
-              <SettingsPanel
-                controlMode={controlMode}
-                onControlModeChange={(mode) => {
-                  onControlModeChange(mode);
-                  closeMenu();
-                }}
-              />
-            ) : null}
             {menu === 'phone' ? (
-              <PhonePanel
+              <GamePhonePanel
                 action={phoneAction}
+                calculator={calculator}
                 onAction={setPhoneAction}
-                onCancel={() => setPhoneAction(null)}
+                onCalculatorKey={(key) => setCalculator((current) => pressCalculatorKey(current, key))}
+                onClose={() => closeMenu()}
+                onCallContact={(contact) => closeMenu(() => {
+                  if (onCallContact) onCallContact(contact);
+                  else if (contact === 'jiyoung' && onContactRequester) onContactRequester();
+                  else setNotice('지금은 통화를 연결할 수 없어요');
+                })}
+                controlMode={controlMode}
+                onControlModeChange={onControlModeChange}
+                reduceMotion={reduceMotionEnabled}
                 onEmergencyExit={handleEmergencyExit}
                 onExit={() => {
                   closeMenu();
                   onExit();
                 }}
-                onOpenSettings={() => openMenu('settings')}
               />
             ) : null}
           </Animated.View>
@@ -370,15 +310,6 @@ function OutlinedHudText({ children }: { children: string }) {
         </Text>
       ))}
       <Text style={styles.hudText}>{children}</Text>
-    </View>
-  );
-}
-
-function PanelTitle({ children, icon }: { children: string; icon: number }) {
-  return (
-    <View style={styles.panelTitleRow}>
-      <Image resizeMode="contain" source={icon} style={styles.panelTitleIcon} />
-      <Text style={styles.panelTitle}>{children}</Text>
     </View>
   );
 }
@@ -557,144 +488,6 @@ function PanelTail({ fill, placement }: { fill: string; placement: 'bag' | 'diar
   );
 }
 
-function SettingsPanel({
-  controlMode,
-  onControlModeChange,
-}: {
-  controlMode: ControlMode;
-  onControlModeChange: (mode: ControlMode) => void;
-}) {
-  return (
-    <View>
-      <PanelTitle icon={icons.gameSettings}>설정</PanelTitle>
-      <Text style={styles.settingSectionTitle}>조작법 변경</Text>
-      <ControlOption
-        checked={controlMode === 'joystick'}
-        icon="game-controller"
-        label="슬라이드 패드"
-        onPress={() => onControlModeChange('joystick')}
-      />
-      <ControlOption
-        checked={controlMode === 'touch'}
-        icon="hand-left"
-        label="터치 이동"
-        onPress={() => onControlModeChange('touch')}
-      />
-    </View>
-  );
-}
-
-function ControlOption({
-  checked,
-  icon,
-  label,
-  onPress,
-}: {
-  checked: boolean;
-  icon: 'game-controller' | 'hand-left';
-  label: string;
-  onPress: () => void;
-}) {
-  return (
-    <PressScale
-      accessibilityRole="radio"
-      accessibilityState={{ checked }}
-      onPress={(event) => {
-        event?.stopPropagation?.();
-        onPress();
-      }}
-      style={[styles.controlOption, checked && styles.controlOptionSelected]}
-    >
-      <Ionicons color="#4D5F53" name={icon} size={22} />
-      <Text style={styles.controlOptionText}>{label}</Text>
-      {checked ? <Ionicons color={colors.mint} name="checkmark-circle" size={23} /> : null}
-    </PressScale>
-  );
-}
-
-function PhonePanel({
-  action,
-  onAction,
-  onCancel,
-  onEmergencyExit,
-  onExit,
-  onOpenSettings,
-}: {
-  action: PhoneAction;
-  onAction: (action: PhoneAction) => void;
-  onCancel: () => void;
-  onEmergencyExit: () => void;
-  onExit: () => void;
-  onOpenSettings: () => void;
-}) {
-  if (action) {
-    const exiting = action === 'exit';
-    return (
-      <View style={styles.confirmPanel}>
-        <Image resizeMode="contain" source={icons.gamePhone} style={styles.confirmPhoneIcon} />
-        <Text style={styles.confirmTitle}>{exiting ? '게임에서 나갈까요?' : '안전한 곳으로 이동할까요?'}</Text>
-        <Text style={styles.confirmDescription}>
-          {exiting ? '현재 게임 화면을 닫고 메뉴로 돌아갑니다.' : '길을 잃었을 때 시작 위치로 바로 이동합니다.'}
-        </Text>
-        <View style={styles.confirmActions}>
-          <PressScale accessibilityRole="button" onPress={onCancel} style={styles.cancelButton}>
-            <Text style={styles.cancelButtonText}>취소</Text>
-          </PressScale>
-          <PressScale
-            accessibilityRole="button"
-            onPress={exiting ? onExit : onEmergencyExit}
-            style={[styles.confirmButton, exiting && styles.exitConfirmButton]}
-            testID={exiting ? 'game-exit' : 'emergency-exit'}
-          >
-            <Text style={styles.confirmButtonText}>{exiting ? '나가기' : '이동하기'}</Text>
-          </PressScale>
-        </View>
-      </View>
-    );
-  }
-
-  return (
-    <View>
-      <PanelTitle icon={icons.gamePhone}>내 휴대폰</PanelTitle>
-      <View style={styles.phoneGrid}>
-        <PhoneApp color="#FFE1D8" icon="log-out-outline" label="게임 나가기" onPress={() => onAction('exit')} />
-        <PhoneApp color="#FFF0B9" icon="shield-checkmark-outline" label="비상 탈출" onPress={() => onAction('emergency')} />
-        <PhoneApp color="#DBF4E7" icon="options-outline" label="조작 설정" onPress={onOpenSettings} />
-      </View>
-    </View>
-  );
-}
-
-function PhoneApp({
-  color,
-  icon,
-  label,
-  onPress,
-}: {
-  color: string;
-  icon: 'log-out-outline' | 'shield-checkmark-outline' | 'options-outline';
-  label: string;
-  onPress: () => void;
-}) {
-  return (
-    <PressScale
-      accessibilityLabel={label}
-      accessibilityRole="button"
-      onPress={(event) => {
-        event?.stopPropagation?.();
-        onPress();
-      }}
-      scaleTo={0.92}
-      style={styles.phoneApp}
-    >
-      <View style={[styles.phoneAppIcon, { backgroundColor: color }]}>
-        <Ionicons color="#4E554F" name={icon} size={30} />
-      </View>
-      <Text style={styles.phoneAppLabel}>{label}</Text>
-    </PressScale>
-  );
-}
-
 const styles = StyleSheet.create({
   menuRoot: { zIndex: 50 },
   topHud: {
@@ -757,6 +550,21 @@ const styles = StyleSheet.create({
     width: '90%',
     zIndex: 1,
   },
+  phonePanel: {
+    backgroundColor: '#576A5B',
+    borderColor: '#8B9A84',
+    borderRadius: 39,
+    borderWidth: 2,
+    height: 540,
+    maxHeight: '96%',
+    maxWidth: 330,
+    minHeight: 0,
+    padding: 8,
+    paddingBottom: 8,
+    paddingHorizontal: 8,
+    paddingTop: 8,
+    width: '90%',
+  },
   inventoryPanel: {
     backgroundColor: '#4B4B4B',
     borderColor: '#4B4B4B',
@@ -788,55 +596,6 @@ const styles = StyleSheet.create({
     paddingTop: 0,
     shadowOpacity: 0,
     width: 356,
-  },
-  blobPatternOne: {
-    backgroundColor: 'rgba(242,201,99,0.10)',
-    borderRadius: 90,
-    height: 180,
-    left: -70,
-    position: 'absolute',
-    top: 80,
-    width: 180,
-  },
-  blobPatternTwo: {
-    backgroundColor: 'rgba(255,255,255,0.24)',
-    borderRadius: 75,
-    bottom: -54,
-    height: 150,
-    position: 'absolute',
-    right: -35,
-    width: 150,
-  },
-  closeButton: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.52)',
-    borderColor: 'rgba(112,103,88,0.12)',
-    borderRadius: 21,
-    borderWidth: 1,
-    height: 42,
-    justifyContent: 'center',
-    position: 'absolute',
-    right: 22,
-    top: 18,
-    width: 42,
-    zIndex: 4,
-  },
-  inventoryCloseButton: {
-    backgroundColor: 'rgba(255,255,255,0.10)',
-    borderColor: 'rgba(255,255,255,0.16)',
-    right: 12,
-    top: 10,
-  },
-  panelTitleRow: { alignItems: 'center', flexDirection: 'row', marginBottom: 24, paddingRight: 40 },
-  panelTitleIcon: { height: 52, marginRight: 9, width: 52 },
-  panelTitle: {
-    color: '#403B33',
-    fontFamily: fonts.laundryBold,
-    fontSize: 24,
-    letterSpacing: -0.6,
-    textShadowColor: 'rgba(255,255,255,0.72)',
-    textShadowOffset: { height: 1, width: 0 },
-    textShadowRadius: 1,
   },
   inventoryContent: { flex: 1, overflow: 'visible' },
   inventoryHeader: {
@@ -1113,47 +872,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: 1,
   },
-  settingSectionTitle: { color: '#6F685B', fontFamily: fonts.semibold, fontSize: 14, marginBottom: 10, marginLeft: 4 },
-  controlOption: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.50)',
-    borderColor: 'transparent',
-    borderRadius: 22,
-    borderWidth: 2,
-    flexDirection: 'row',
-    height: 58,
-    marginBottom: 9,
-    paddingHorizontal: 16,
-  },
-  controlOptionSelected: { backgroundColor: 'rgba(228,251,238,0.88)', borderColor: '#A9DFC1' },
-  controlOptionText: { color: '#465248', flex: 1, fontFamily: fonts.semibold, fontSize: 16, marginLeft: 11 },
-  phoneGrid: { flexDirection: 'row', gap: 14, justifyContent: 'center', paddingTop: 8 },
-  phoneApp: { alignItems: 'center', width: 82 },
-  phoneAppIcon: {
-    alignItems: 'center',
-    borderColor: 'rgba(255,255,255,0.86)',
-    borderRadius: 24,
-    borderWidth: 2,
-    elevation: 3,
-    height: 70,
-    justifyContent: 'center',
-    shadowColor: '#574F40',
-    shadowOffset: { height: 4, width: 0 },
-    shadowOpacity: 0.10,
-    shadowRadius: 7,
-    width: 70,
-  },
-  phoneAppLabel: { color: '#49453E', fontFamily: fonts.semibold, fontSize: 13, lineHeight: 18, marginTop: 8, textAlign: 'center' },
-  confirmPanel: { alignItems: 'center', paddingTop: 8 },
-  confirmPhoneIcon: { height: 68, width: 68 },
-  confirmTitle: { color: '#403B33', fontFamily: fonts.laundryBold, fontSize: 24, marginTop: 8, textAlign: 'center' },
-  confirmDescription: { color: '#746D61', fontFamily: fonts.regular, fontSize: 14, lineHeight: 21, marginTop: 10, textAlign: 'center' },
-  confirmActions: { flexDirection: 'row', gap: 10, marginTop: 25 },
-  cancelButton: { alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.68)', borderRadius: 22, height: 52, justifyContent: 'center', width: 112 },
-  cancelButtonText: { color: '#625D54', fontFamily: fonts.semibold, fontSize: 16 },
-  confirmButton: { alignItems: 'center', backgroundColor: '#E7B945', borderRadius: 22, height: 52, justifyContent: 'center', width: 128 },
-  exitConfirmButton: { backgroundColor: '#E97A67' },
-  confirmButtonText: { color: colors.white, fontFamily: fonts.bold, fontSize: 16 },
   notice: {
     alignSelf: 'center',
     backgroundColor: 'rgba(35,45,38,0.86)',

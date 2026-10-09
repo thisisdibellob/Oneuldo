@@ -1,17 +1,19 @@
 import { getMarketPersonAppearance, type MarketPersonAppearanceId, type MarketPersonKind } from './marketPeople';
 import type { Point, Rect } from './prototypeWorld';
 
-// The playable front-idle PNG has 344 opaque rows at @2x. ModularCharacter
-// displays it at scale 0.5, so an adult's visible standing height is 86 world px.
+// The SD player stands about 86 world px tall with a wider head and body.
+// Give the slimmer adult NPC art 104 world px of height to balance its presence.
 // NPC images have 504 opaque rows on a 256 x 512 canvas (8 clear rows above).
 export const MARKET_PERSON_SOURCE_WIDTH = 256;
 export const MARKET_PERSON_SOURCE_HEIGHT = 512;
 export const MARKET_PERSON_OPAQUE_SOURCE_HEIGHT = 504;
-export const MARKET_PERSON_VISIBLE_HEIGHT = 86;
+export const MARKET_PERSON_VISIBLE_HEIGHT = 104;
 export const MARKET_PERSON_SCALE = MARKET_PERSON_VISIBLE_HEIGHT / MARKET_PERSON_OPAQUE_SOURCE_HEIGHT;
 export const MARKET_PERSON_HEIGHT = MARKET_PERSON_SOURCE_HEIGHT * MARKET_PERSON_SCALE;
 // This is the accessible press frame, never the physical collision rectangle.
-export const MARKET_PERSON_WIDTH = 44;
+export const MARKET_PERSON_WIDTH = Math.max(44, Math.ceil(MARKET_PERSON_SOURCE_WIDTH * MARKET_PERSON_SCALE));
+// Include a small shoe-edge margin in source pixels so it grows with the art.
+const MARKET_PERSON_SOURCE_FOOT_PADDING = 12;
 
 /** Alpha >= 32 bounds of the lowest 10% of each runtime PNG, including both shoes.
  * Keep this pure metadata available to the headless agent and native/web renderers.
@@ -40,7 +42,7 @@ export function getMarketPersonGeometry(kind: MarketPersonKind, appearance: numb
   const variant = getMarketPersonAppearance(kind, appearance);
   const sourceScale = MARKET_PERSON_SCALE * variant.heightScale;
   const shoes = SHOE_BOUNDS[variant.id];
-  const footprintWidth = (shoes.right - shoes.left + 1) * sourceScale + 2 * variant.heightScale;
+  const footprintWidth = (shoes.right - shoes.left + 1 + MARKET_PERSON_SOURCE_FOOT_PADDING) * sourceScale;
   return {
     imageWidth: MARKET_PERSON_SOURCE_WIDTH * sourceScale,
     imageHeight: MARKET_PERSON_SOURCE_HEIGHT * sourceScale,

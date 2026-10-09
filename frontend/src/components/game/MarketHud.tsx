@@ -16,12 +16,13 @@ export type MarketHudProps = {
   onOpenCart: () => void;
   onOpenHelp: () => void;
   replayListRef?: { current: ((fraction: number) => void) | null };
+  onContactRequester?: () => void;
 };
 
 /** A quiet shopping note: only the required quantities and explicit cart access. */
 export function MarketHud({
   objectives, score, budget, topInset = 12, controlMode, onControlModeChange,
-  onGiveUp, onOpenCart, onOpenHelp, replayListRef,
+  onGiveUp, onOpenCart, onOpenHelp, replayListRef, onContactRequester,
 }: MarketHudProps) {
   const list = useRef<ScrollView>(null);
   const extent = useRef({ viewport: 0, content: 0 });
@@ -41,6 +42,9 @@ export function MarketHud({
           onPress={() => onControlModeChange(controlMode === 'joystick' ? 'touch' : 'joystick')}
           style={s.iconButton}>
           <Ionicons name={controlMode === 'joystick' ? 'hand-left-outline' : 'game-controller-outline'} color="#587565" size={20} />
+        </PressScale> : null}
+        {onContactRequester ? <PressScale accessibilityRole="button" accessibilityLabel="지영에게 전화" onPress={onContactRequester} style={s.iconButton}>
+          <Ionicons name="call-outline" color="#587565" size={21} />
         </PressScale> : null}
         <PressScale accessibilityRole="button" accessibilityLabel="이용 방법" onPress={onOpenHelp} style={s.iconButton}>
           <Ionicons name="help-circle-outline" color="#68796D" size={22} />

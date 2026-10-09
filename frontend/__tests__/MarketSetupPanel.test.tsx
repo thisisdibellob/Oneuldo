@@ -53,3 +53,50 @@ it('전달용 모퉁이 공사 JSON 예제는 실제 설정으로 가져올 수 
   expect(game.environment.spawn).toEqual({ x: 1060, y: 1210 });
   expect(game.environment.constructionZones).toHaveLength(1);
 });
+
+
+it('계산원 확인 감점을 별도로 적용하고 JSON 왕복에서 유지한다', () => {
+  const config = createMarketSession().config;
+  const onApply = jest.fn();
+  const screen = render(<MarketSetupPanel config={config} onApply={onApply} onClose={jest.fn()} />);
+  expect(screen.getByLabelText('계산원 확인 감점').props.value).toBe('10');
+  fireEvent.changeText(screen.getByLabelText('계산원 확인 감점'), '7');
+  fireEvent.press(screen.getByRole('button', { name: '설정 적용' }));
+  expect(parseMarketSessionConfig(JSON.stringify(onApply.mock.calls[0][0]))).toMatchObject({ cashierRequestPenaltyPoints: 7, alarmPenaltyPoints: config.alarmPenaltyPoints });
+  fireEvent.changeText(screen.getByLabelText('계산원 확인 감점'), '101');
+  fireEvent.press(screen.getByRole('button', { name: '설정 적용' }));
+  expect(onApply).toHaveBeenCalledTimes(1);
+  expect(screen.getByRole('alert').props.children).toMatch(/0~100/);
+});
+
+it('셀프 계산 줄과 학습 조건을 저장하고 예산 입력 중 빈 값은 화면을 깨뜨리지 않는다', () => {
+  const onApply = jest.fn();
+  const screen = render(<MarketSetupPanel config={createMarketSession({ learning: {} }).config} onApply={onApply} onClose={jest.fn()} />);
+  fireEvent.press(screen.getByRole('button', { name: '1번 줄을 셀프 계산대' }));
+  fireEvent.press(screen.getByRole('button', { name: '원래 상품만 구매' }));
+  fireEvent.changeText(screen.getByLabelText('선택 상품 예산'), '');
+  fireEvent.press(screen.getByRole('button', { name: '설정 적용' }));
+  expect(onApply).not.toHaveBeenCalled();
+  expect(screen.getByRole('alert').props.children).toMatch(/예산/);
+  fireEvent.changeText(screen.getByLabelText('선택 상품 예산'), '3500');
+  fireEvent.press(screen.getByRole('button', { name: '설정 적용' }));
+  expect(onApply).toHaveBeenCalledTimes(1);
+  expect(onApply.mock.calls[0][0]).toMatchObject({ environment: { kioskLane: 'checkout' }, learning: { allowSubstitution: false, choiceBudget: 3500 } });
+});
+
+it.each([
+  ['항상 정상 계산', 'normal'],
+  ['계산 실수 있음', 'overcharge'],
+  ['계산 실수 랜덤', 'random'],
+] as const)('%s 조건을 선택하면 다른 학습 설정과 함께 저장하고 JSON으로 다시 불러온다', (label, mode) => {
+  const config = createMarketSession({ learning: { stockoutEnabled: false, budgetChoiceEnabled: false } }).config;
+  const onApply = jest.fn();
+  const screen = render(<MarketSetupPanel config={config} onApply={onApply} onClose={jest.fn()} />);
+  fireEvent.press(screen.getByRole('button', { name: label }));
+  expect(screen.getByRole('button', { name: label }).props.accessibilityState.selected).toBe(true);
+  fireEvent.press(screen.getByRole('button', { name: '설정 적용' }));
+  expect(onApply).toHaveBeenCalledTimes(1);
+  const applied = parseMarketSessionConfig(JSON.stringify(onApply.mock.calls[0][0]));
+  expect(applied.learning).toMatchObject({ checkoutReviewMode: mode, stockoutEnabled: false, budgetChoiceEnabled: false });
+  expect(applied.seed).toBe(config.seed);
+});

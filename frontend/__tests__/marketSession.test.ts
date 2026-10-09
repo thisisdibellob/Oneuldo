@@ -6,7 +6,7 @@ import { MarketEnvironmentStationId } from '../src/game/marketEnvironment';
 import { getMarketProduct, marketProducts } from '../src/game/scenarios';
 
 function session(overrides: Parameters<typeof createMarketSession>[0] = {}) {
-  return createMarketSession({ seed: 'session-test', startedAt: '2026-09-11T00:00:00.000Z', environment: { cashierCount: 2 }, ...overrides });
+  return createMarketSession({ seed: 'session-test', startedAt: '2026-09-11T00:00:00.000Z', learning: { stockoutEnabled: false, budgetChoiceEnabled: false }, ...overrides, environment: { kioskLane: 'none', cashierCount: 2, ...overrides.environment } });
 }
 function visit(current: MarketSession, station: MarketEnvironmentStationId) {
   const moved = applyMarketAction(current, { type: 'setPosition', point: current.environment.stations[station] });
@@ -24,23 +24,125 @@ function add(current: MarketSession, productId: string, quantity = 1) {
 function submit(current: MarketSession) { return applyMarketAction(visit(current, 'checkout'), { type: 'submit' }); }
 
 describe('configurable market session', () => {
-  it('keeps the two checkout attendants independent and calls staff to the selected empty counter', () => {
+  it.each([undefined, 'checkout', 'checkout-2'] as const)('calls only the first counter when both are empty, ignoring former selection and legacy destination %s', (checkoutId) => {
     let game = session({ environment: { cashierCount: 0 } });
     game = visit(game, 'checkout-2');
     expect(game.selectedCheckoutId).toBe('checkout-2');
     expect(applyMarketAction(game, { type: 'submit' }).attempts).toBe(0);
     const staff = game.environment.stationDetails.find(station => station.kind === 'employee')!.id;
     game = visit(game, staff);
-    game = applyMarketAction(game, { type: 'requestCashier' });
-    expect(game.cashierAvailability).toEqual({ checkout: false, 'checkout-2': true });
-    expect(game.events.at(-1)?.payload.checkoutId).toBe('checkout-2');
+    const before = game;
+    game = applyMarketAction(game, { type: 'requestCashier', ...(checkoutId === undefined ? {} : { checkoutId }) });
+    expect(game).toMatchObject({ cashierAvailability: { checkout: true, 'checkout-2': false }, selectedCheckoutId: 'checkout', cashierAvailable: true,
+      score: before.score, penaltyPoints: before.penaltyPoints, attempts: 0, paid: false, phase: 'shopping', activeStation: staff, lastActionError: null });
+    expect(game.cart).toEqual(before.cart);
+    expect(game.stock).toEqual(before.stock);
+    expect(game.events.at(-1)).toMatchObject({ type: 'cashier_requested', payload: { staffStation: staff, checkoutId: 'checkout', playerPosition: game.playerPosition } });
+    expect(game.events.at(-1)?.payload.legacyRequestedCheckoutId).toBe(checkoutId);
+    expect(getMarketObservation(game).cashierRequestFeedback).toMatchObject({ accepted: true, checkoutIds: ['checkout'], penaltyPoints: 0 });
     game = visit(game, 'checkout');
-    expect(game.cashierAvailable).toBe(false);
-    expect(applyMarketAction(game, { type: 'submit' }).lastActionError).toContain('종업원');
+    expect(applyMarketAction(game, { type: 'submit' }).attempts).toBe(1);
+  });
+
+  it.each([['checkout'], ['checkout-2'], ['checkout', 'checkout-2']])('declines with a normal staff reply and preserves purchases when staffed counters are %j', (...availableCheckoutIds) => {
+    let game: MarketSession | undefined;
+    for (let index = 0; index < 100; index++) {
+      const candidate = session({ seed: 'staffed-counter-' + index, environment: { cashierCount: availableCheckoutIds.length as 1 | 2 } });
+      if (availableCheckoutIds.every(id => candidate.cashierAvailability[id as 'checkout' | 'checkout-2'])) { game = candidate; break; }
+    }
+    expect(game).toBeDefined();
+    game = add(game!, 'milk');
+    game = visit(game, 'checkout-2');
+    const staff = game.environment.stationDetails.find(station => station.kind === 'employee')!.id;
     game = visit(game, staff);
-    game = applyMarketAction(game, { type: 'requestCashier', checkoutId: 'checkout' });
-    expect(game.cashierAvailability).toEqual({ checkout: true, 'checkout-2': true });
-    expect(applyMarketAction(game, { type: 'requestCashier', checkoutId: 'checkout' }).lastActionError).toContain('이미');
+    const before = game;
+    game = applyMarketAction(game, { type: 'requestCashier' });
+    expect(game.lastActionError).toBeNull();
+    expect(game).toMatchObject({ score: 90, penaltyPoints: 10, alarmCount: 0, attempts: before.attempts, paid: before.paid,
+      cart: before.cart, stock: before.stock, phase: before.phase, activeStation: before.activeStation,
+      cashierAvailability: before.cashierAvailability, selectedCheckoutId: before.selectedCheckoutId, cashierAvailable: before.cashierAvailable });
+    expect(game.events).toHaveLength(before.events.length + 1);
+    expect(game.events.at(-1)).toMatchObject({ type: 'cashier_request_declined', payload: {
+      reason: 'cashier-already-available', availableCheckoutIds, staffStation: staff, requestedPenaltyPoints: 10,
+      delta: -10, score: 90, penaltyPoints: 10, playerPosition: game.playerPosition,
+    } });
+    expect(game.events.at(-1)?.payload.message).toContain('계산대를 이용해 주세요');
+    expect(getMarketObservation(game).cashierRequestFeedback).toEqual({ accepted: false, message: game.events.at(-1)?.payload.message, checkoutIds: availableCheckoutIds, penaltyPoints: 10 });
+    expect(getMarketObservation(game)).not.toHaveProperty('events');
+    expect(getMarketObservation(game).products).toEqual([]);
+    expect(getMarketObservation(applyMarketAction(game, { type: 'closeStation' })).cashierRequestFeedback).toBeNull();
+  });
+
+  it('deducts for each intentional new request after acceptance or reopening a staff conversation', () => {
+    let game = session({ environment: { cashierCount: 0 } });
+    const staff = game.environment.stationDetails.find(station => station.kind === 'employee')!.id;
+    game = applyMarketAction(visit(game, staff), { type: 'requestCashier' });
+    game = applyMarketAction(game, { type: 'requestCashier' });
+    expect(game).toMatchObject({ score: 90, penaltyPoints: 10, cashierAvailability: { checkout: true, 'checkout-2': false } });
+    game = applyMarketAction(game, { type: 'closeStation' });
+    game = applyMarketAction(visit(game, staff), { type: 'requestCashier', checkoutId: 'checkout-2' });
+    expect(game).toMatchObject({ score: 80, penaltyPoints: 20, attempts: 0, alarmCount: 0 });
+    expect(game.events.filter(event => event.type === 'cashier_requested')).toHaveLength(1);
+    expect(game.events.filter(event => event.type === 'cashier_request_declined')).toHaveLength(2);
+    expect(game.events.at(-1)?.payload.legacyRequestedCheckoutId).toBe('checkout-2');
+  });
+
+  it.each([0, 65])('uses the independent configured penalty %s and records only actual capped deductions', (cashierRequestPenaltyPoints) => {
+    let game = session({ cashierRequestPenaltyPoints, alarmPenaltyPoints: 7 });
+    const staff = game.environment.stationDetails.find(station => station.kind === 'employee')!.id;
+    game = visit(game, staff);
+    for (let request = 0; request < 3; request++) game = applyMarketAction(game, { type: 'requestCashier' });
+    expect(game).toMatchObject({ score: cashierRequestPenaltyPoints ? 0 : 100, penaltyPoints: cashierRequestPenaltyPoints ? 100 : 0, attempts: 0, alarmCount: 0 });
+    expect(game.events.filter(event => event.type === 'cashier_request_declined').map(event => event.payload.delta)).toEqual(cashierRequestPenaltyPoints ? [-65, -35, 0] : [0, 0, 0]);
+    expect(getMarketObservation(game).cashierRequestFeedback?.penaltyPoints).toBe(0);
+    const exported = exportMarketEpisode(applyMarketAction(game, { type: 'giveUp' }));
+    expect(JSON.parse(JSON.stringify(exported)).config.cashierRequestPenaltyPoints).toBe(cashierRequestPenaltyPoints);
+    expect(exported.penaltyPoints).toBe(game.penaltyPoints);
+  });
+
+  it('keeps cashier-request and alarm deductions independent and accumulates both in the score', () => {
+    let game = add(session({ cashierRequestPenaltyPoints: 30, alarmPenaltyPoints: 7 }), 'milk');
+    const staff = game.environment.stationDetails.find(station => station.kind === 'employee')!.id;
+    game = applyMarketAction(visit(game, staff), { type: 'requestCashier' });
+    game = applyMarketAction(game, { type: 'setPosition', point: { x: 470, y: 970 } });
+    game = applyMarketAction(game, { type: 'setPosition', point: { x: 470, y: 1060 } });
+    expect(game).toMatchObject({ score: 63, penaltyPoints: 37, attempts: 0, alarmCount: 1 });
+    expect(game.events.find(event => event.type === 'cashier_request_declined')?.payload.delta).toBe(-30);
+    expect(game.events.find(event => event.type === 'entrance_alarm')?.payload.delta).toBe(-7);
+  });
+
+  it('never penalizes remote, closed, wrong-view, wrong-phase or invalid legacy requests', () => {
+    const initial = session();
+    const staff = initial.environment.stationDetails.find(station => station.kind === 'employee')!.id;
+    const talking = visit(initial, staff);
+    const invalidStates = [initial, applyMarketAction(talking, { type: 'closeStation' }),
+      applyMarketAction(talking, { type: 'viewCart' }), applyMarketAction(talking, { type: 'viewHelp' }),
+      { ...talking, playerPosition: initial.environment.spawn }, { ...talking, phase: 'checkout' as const },
+      submit(initial), applyMarketAction(talking, { type: 'giveUp' })];
+    for (const state of invalidStates) {
+      const rejected = applyMarketAction(state, { type: 'requestCashier' });
+      expect(rejected).toMatchObject({ score: state.score, penaltyPoints: state.penaltyPoints, attempts: state.attempts,
+        cashierAvailability: state.cashierAvailability, cart: state.cart, stock: state.stock });
+      expect(rejected.lastActionError).toBeTruthy();
+      expect(rejected.events.at(-1)?.type).toBe('action_rejected');
+      expect(getMarketObservation(rejected).cashierRequestFeedback).toBeNull();
+    }
+    const badId = applyMarketAction(talking, { type: 'requestCashier', checkoutId: 'missing-counter' } as never);
+    expect(badId).toMatchObject({ score: 100, penaltyPoints: 0 });
+    expect(badId.events.at(-1)?.type).toBe('action_rejected');
+  });
+
+  it('defaults missing legacy config to 10 and validates the independent cashier penalty', () => {
+    expect(parseMarketSessionConfig('{"seed":42}').cashierRequestPenaltyPoints).toBe(10);
+    for (const value of [0, 10, 100]) {
+      const parsed = parseMarketSessionConfig(JSON.stringify({ cashierRequestPenaltyPoints: value, alarmPenaltyPoints: 7 }));
+      expect(parsed.cashierRequestPenaltyPoints).toBe(value);
+      expect(parsed.alarmPenaltyPoints).toBe(7);
+      expect(parseMarketSessionConfig(JSON.stringify(parsed))).toEqual(parsed);
+    }
+    for (const cashierRequestPenaltyPoints of [-1, 101, 0.5, null, '10', true]) {
+      expect(() => parseMarketSessionConfig(JSON.stringify({ cashierRequestPenaltyPoints }))).toThrow('계산원 확인 감점');
+    }
   });
 
   it('deducts only when an unpaid basket crosses the entrance and rearms after a real return inside', () => {
@@ -327,7 +429,7 @@ describe('configurable market session', () => {
     game = visit(game, 'checkout');
     game = applyMarketAction(game, { type: 'submit' });
     expect(game.attempts).toBe(0);
-    expect(game.lastActionError).toContain('종업원');
+    expect(game.lastActionError).toContain('유인 계산대가 비어 있으면');
     const staff = game.environment.stationDetails.find((station) => station.kind === 'employee')!.id;
     const remote = applyMarketAction(game, { type: 'interact', station: staff });
     expect(remote.cashierAvailable).toBe(false);
@@ -492,9 +594,10 @@ it('deducts at the exit once per outward crossing after rearm and records its ga
   expect(game.alarmArmed).toBe(true);
   game = applyMarketAction(game, { type: 'setPosition', point: { x: 930, y: 1018 } });
   game = applyMarketAction(game, { type: 'move', dx: 0, dy: 24 });
-  expect(game).toMatchObject({ score: 80, penaltyPoints: 20, alarmCount: 2 });
+  expect(game).toMatchObject({ score: 60, penaltyPoints: 40, alarmCount: 2, wrongWayEntryCount: 2 });
+  expect(game.events.filter(event => event.type === 'wrong_way_entry')).toHaveLength(2);
   expect(game.events.filter(event => event.type === 'entrance_alarm').map(event => event.payload.gateId)).toEqual(['exit', 'exit']);
-  expect(exportMarketEpisode(applyMarketAction(game, { type: 'giveUp' }))).toMatchObject({ score: 80, alarmCount: 2, penaltyPoints: 20 });
+  expect(exportMarketEpisode(applyMarketAction(game, { type: 'giveUp' }))).toMatchObject({ score: 60, alarmCount: 2, penaltyPoints: 40, wrongWayEntryCount: 2 });
 });
 
 it.each(['entrance', 'exit', 'west-door'] as const)('%s exempts empty and already-paid baskets on an actual outward crossing', gateId => {
@@ -504,7 +607,8 @@ it.each(['entrance', 'exit', 'west-door'] as const)('%s exempts empty and alread
     const gate = game.environment.alarmGates.find(candidate => candidate.id === gateId)!;
     const inside = gate.axis === 'x' ? { x: gate.boundary + 12, y: gate.gate.y + gate.gate.height / 2 }
       : { x: gate.gate.x + gate.gate.width / 2, y: gate.boundary - 12 };
-    game = applyMarketAction(game, { type: 'setPosition', point: inside });
+    // Start on the sales-floor side: this test isolates an outward crossing, not how the player entered.
+    game = { ...game, playerPosition: inside, activeStation: null, phase: 'shopping', view: 'world' };
     expect(game.lastActionError).toBeNull();
     game = applyMarketAction(game, { type: 'move', dx: gate.axis === 'x' ? -24 : 0, dy: gate.axis === 'y' ? 24 : 0 });
     expect(game.lastActionError).toBeNull();

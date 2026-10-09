@@ -103,11 +103,18 @@ export const MARKET_COMMON_DOOR_POINT: Point = { x: 710, y: 1430 };
 
 // The checkout footprint is shared by both the village-embedded market and its
 // standalone preview. Leave a real staff aisle between the back wall and counter.
-export const MARKET_CHECKOUT_SCALE = 0.7 * 0.75;
-// Retain the original front floor edge when reducing both counters to 75%.
+export const MARKET_CHECKOUT_SIZE_MULTIPLIER = 1.15;
+export const MARKET_CHECKOUT_SCALE = 0.7 * 0.75 * MARKET_CHECKOUT_SIZE_MULTIPLIER;
+// The visible counter base is about 53.3 source px after contain scaling.
+// Its ground box must cover both outer edges, not only the conveyor belt.
+export const MARKET_CHECKOUT_WIDTH = 54 * MARKET_CHECKOUT_SIZE_MULTIPLIER;
+export const MARKET_KIOSK_WIDTH = 50 * MARKET_CHECKOUT_SIZE_MULTIPLIER;
+export const MARKET_CHECKOUT_LENGTH = 117 * MARKET_CHECKOUT_SIZE_MULTIPLIER;
+// Keep the front floor edge and lane centers fixed as furniture grows.
 export const MARKET_CHECKOUT_FRONT_Y = 946;
-export const MARKET_CHECKOUT_RECT: Rect = { x: 720, y: MARKET_CHECKOUT_FRONT_Y - 117, width: 48, height: 117 };
-export const MARKET_CHECKOUT_POINT: Point = { x: 807, y: MARKET_CHECKOUT_RECT.y + 60 };
+export const MARKET_CHECKOUT_RECT: Rect = { x: 744 - MARKET_CHECKOUT_WIDTH / 2,
+  y: MARKET_CHECKOUT_FRONT_Y - MARKET_CHECKOUT_LENGTH, width: MARKET_CHECKOUT_WIDTH, height: MARKET_CHECKOUT_LENGTH };
+export const MARKET_CHECKOUT_POINT: Point = { x: 807, y: MARKET_CHECKOUT_RECT.y + 60 * MARKET_CHECKOUT_SIZE_MULTIPLIER };
 export const MARKET_CASHIER_POINT: Point = { x: 684, y: MARKET_CHECKOUT_POINT.y };
 export const MARKET_CASHIER_COLLIDER: Rect = {
   height: 18,
@@ -115,8 +122,9 @@ export const MARKET_CASHIER_COLLIDER: Rect = {
   x: MARKET_CASHIER_POINT.x - 13,
   y: MARKET_CASHIER_POINT.y - 10,
 };
-export const MARKET_SECOND_CHECKOUT_RECT: Rect = { x: 925, y: MARKET_CHECKOUT_FRONT_Y - 117, width: 48, height: 117 };
-export const MARKET_SECOND_CHECKOUT_POINT: Point = { x: 1012, y: MARKET_SECOND_CHECKOUT_RECT.y + 60 };
+export const MARKET_SECOND_CHECKOUT_RECT: Rect = { x: 949 - MARKET_CHECKOUT_WIDTH / 2,
+  y: MARKET_CHECKOUT_FRONT_Y - MARKET_CHECKOUT_LENGTH, width: MARKET_CHECKOUT_WIDTH, height: MARKET_CHECKOUT_LENGTH };
+export const MARKET_SECOND_CHECKOUT_POINT: Point = { x: 1012, y: MARKET_SECOND_CHECKOUT_RECT.y + 60 * MARKET_CHECKOUT_SIZE_MULTIPLIER };
 export const MARKET_SECOND_CASHIER_POINT: Point = { x: 889, y: MARKET_SECOND_CHECKOUT_POINT.y };
 
 export const HOUSE_ENTRANCE_POINT: Point = { x: 2050, y: 1210 };

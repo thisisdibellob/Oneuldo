@@ -3,6 +3,7 @@ import { Platform, ScrollView, Share, StyleSheet, Text, TextInput, View } from '
 import { PressScale } from '../PressScale';
 import { MarketSessionConfig, parseMarketSessionConfig } from '../../game/marketSession';
 import { MARKET_LAYOUT_OPTIONS, type MarketCount } from '../../game/marketEnvironment';
+import { DEFAULT_MARKET_LEARNING_CONFIG } from '../../game/marketLearning';
 import { fonts } from '../../theme';
 
 /** Configuration is applied atomically before an episode, never halfway through an attempt. */
@@ -20,6 +21,9 @@ export function MarketSetupPanel({ config, onApply, onClose }: {
     setJson(JSON.stringify(next, null, 2));
     setError('');
   };
+  // Keep intermediate input (such as an empty budget) editable; validate only on apply/export.
+  const learning = { ...DEFAULT_MARKET_LEARNING_CONFIG, ...draft.learning };
+  const learn = (next: Partial<typeof learning>) => update({ ...draft, learning: { ...learning, ...next } });
   const env = (next: Partial<MarketSessionConfig['environment']>) => update({ ...draft, environment: { ...draft.environment, ...next } });
   const apply = () => {
     try {
@@ -110,12 +114,12 @@ export function MarketSetupPanel({ config, onApply, onClose }: {
         <Choice text="입구 공사 중" selected={draft.environment.entranceConstruction === true}
           onPress={() => env({ entranceConstruction: true })} />
       </View>
-      <Text style={s.description}>매장 안쪽 입구 하나를 펜스로 막아요. 공동 출입문은 열려 있고, 옆 출입문이나 출구로 돌아갈 수 있어요.</Text>
+      <Text style={s.description}>바깥 입구 하나를 펜스로 막아요. 공동 출입문은 열려 있어요. 안쪽 입구를 이용해 주세요.</Text>
       {count('매장 종업원', 'employeeCount', 1, 3)}
       {count('손님', 'customerCount', 1, 5)}
       {count('기둥', 'pillarCount', 0, 4)}
       <Text style={s.description}>매장과 공용 로비에는 의자 · 원형 테이블 · 의자 휴게석이 두 묶음씩 있어요. 엘리베이터와 ATM은 장식이며 이용할 수 없어요.</Text>
-      <Text style={s.label}>유인 계산대 2개 · 계산원</Text>
+      <Text style={s.label}>계산원</Text>
       <View style={s.options}>
         {(['random', 0, 1, 2] as const).map(value => <Choice
           key={value}
@@ -124,15 +128,15 @@ export function MarketSetupPanel({ config, onApply, onClose }: {
           onPress={() => env({ cashierCount: value })}
         />)}
       </View>
-      <Text style={s.label}>무인 계산대 (배치만, 이용 불가)</Text>
+      <Text style={s.label}>계산대 구성</Text>
       <View style={s.options}>
-        {(['random', false, true] as const).map(value => <Choice
-          key={String(value)}
-          text={value === 'random' ? '랜덤' : value ? '있음' : '없음'}
-          selected={(draft.environment.kioskPresent ?? 'random') === value}
-          onPress={() => env({ kioskPresent: value })}
-        />)}
+        {([{ id: 'none', label: '유인 계산대 두 줄' }, { id: 'checkout', label: '1번 줄을 셀프 계산대' },
+          { id: 'checkout-2', label: '2번 줄을 셀프 계산대' }, { id: 'random', label: '랜덤' }] as const).map(option => <Choice
+          key={option.id} text={option.label}
+          selected={(draft.environment.kioskLane ?? (draft.environment.kioskPresent === 'random' ? 'random' : draft.environment.kioskPresent ? 'checkout-2' : 'none')) === option.id}
+          onPress={() => env({ kioskLane: option.id })} />)}
       </View>
+      <Text style={s.description}>셀프 계산대는 한 줄에 두 대를 놓아요. 남은 유인 계산대의 계산원은 최대 한 명이에요. 상품을 직접 스캔하고 결제할 수 있어요.</Text>
       <Text style={s.label}>진열대 위치</Text>
       <View style={s.options}>
         <Choice
@@ -151,6 +155,16 @@ export function MarketSetupPanel({ config, onApply, onClose }: {
         value={String(draft.alarmPenaltyPoints)}
         onChangeText={text => update({ ...draft, alarmPenaltyPoints: Number(text) })} style={s.input} />
       <Text style={s.description}>100점에서 시작해요. 계산하지 않은 물건을 담고 입구·출구·측면 출입문의 빨간 경보기를 지나 매장 밖으로 나갈 때 적용돼요.</Text>
+      <Text style={s.label}>출구 역진입 감점</Text>
+      <TextInput accessibilityLabel="출구 역진입 감점" keyboardType="number-pad"
+        value={String(draft.wrongWayPenaltyPoints)}
+        onChangeText={text => update({ ...draft, wrongWayPenaltyPoints: Number(text) })} style={s.input} />
+      <Text style={s.description}>장바구니가 비어 있어도 출구로 매장에 들어오면 적용돼요. 입구가 공사 중이면 복도를 따라 안쪽 입구를 이용해 주세요.</Text>
+      <Text style={s.label}>계산원 확인 감점</Text>
+      <TextInput accessibilityLabel="계산원 확인 감점" keyboardType="number-pad"
+        value={String(draft.cashierRequestPenaltyPoints)}
+        onChangeText={text => update({ ...draft, cashierRequestPenaltyPoints: Number(text) })} style={s.input} />
+      <Text style={s.description}>계산원이 있는데 없다고 요청하면 적용돼요. 두 계산대가 모두 비어 있을 때 계산을 부탁하면 감점 없이 도와줘요. 0점으로 설정하면 감점하지 않아요.</Text>
       <Text style={s.label}>상품 고르기 조건</Text>
       <View style={s.options}>
         <Choice
@@ -172,6 +186,33 @@ export function MarketSetupPanel({ config, onApply, onClose }: {
           })}
         />
       </View>
+      <Text style={s.label}>계산 내역 확인 연습</Text>
+      <View style={s.options}>
+        <Choice text="항상 정상 계산" selected={learning.checkoutReviewMode === 'normal'} onPress={() => learn({ checkoutReviewMode: 'normal' })} />
+        <Choice text="계산 실수 있음" selected={learning.checkoutReviewMode === 'overcharge'} onPress={() => learn({ checkoutReviewMode: 'overcharge' })} />
+        <Choice text="계산 실수 랜덤" selected={learning.checkoutReviewMode === 'random'} onPress={() => learn({ checkoutReviewMode: 'random' })} />
+      </View>
+      <Text style={s.description}>유인 계산대에서 상품 하나가 한 개 더 찍힐 수 있어요. 장바구니와 계산 내역을 비교하고 직원에게 수량 확인을 부탁해요. 랜덤은 정상 계산과 계산 실수를 절반 확률로 정해요.</Text>
+      <Text style={s.label}>품절 상황 연습</Text>
+      <View style={s.options}>
+        <Choice text="품절 상황 있음" selected={learning.stockoutEnabled} onPress={() => learn({ stockoutEnabled: true })} />
+        <Choice text="품절 상황 없음" selected={!learning.stockoutEnabled} onPress={() => learn({ stockoutEnabled: false })} />
+      </View>
+      <View style={s.options}>
+        <Choice text="대체 상품 허용" selected={learning.allowSubstitution} onPress={() => learn({ allowSubstitution: true })} />
+        <Choice text="원래 상품만 구매" selected={!learning.allowSubstitution} onPress={() => learn({ allowSubstitution: false })} />
+      </View>
+      <Text style={s.description}>목록 중 한 상품이 품절돼요. 진열대에서 확인하고 직원에게 재고를 물은 뒤, 부탁한 사람에게 대체 상품이나 사지 못한 이유를 전할 수 있어요.</Text>
+      <Text style={s.label}>예산 안에서 직접 고르기</Text>
+      <View style={s.options}>
+        <Choice text="선택 장보기 있음" selected={learning.budgetChoiceEnabled} onPress={() => learn({ budgetChoiceEnabled: true })} />
+        <Choice text="목록만 장보기" selected={!learning.budgetChoiceEnabled} onPress={() => learn({ budgetChoiceEnabled: false })} />
+      </View>
+      {learning.budgetChoiceEnabled ? <>
+        <Text style={s.description}>정해진 예산 안에서 마음에 드는 음료 한 개를 직접 골라요. 휴대폰의 계산기를 사용할 수 있어요.</Text>
+        <TextInput accessibilityLabel="선택 상품 예산" keyboardType="number-pad" value={String(learning.choiceBudget)}
+          onChangeText={value => learn({ choiceBudget: Number(value) })} style={s.input} />
+      </> : null}
       <Text style={s.label}>상품별 기본 재고</Text>
       <TextInput
         accessibilityLabel="상품별 기본 재고"

@@ -13,6 +13,10 @@ const { createMarketSession, createMarketAgentAdapter } = require('../../fronten
 const { createMarketReplaySnapshot, validateMarketReplaySnapshot, validateMarketReplayTrace, marketReplayTraceId, marketReplayFingerprint } = require('../../frontend/src/game/marketReplayTrace.ts');
 const { marketProducts, marketMission } = require('../../frontend/src/game/scenarios.ts');
 const snapshot = (overrides = {}) => createMarketReplaySnapshot(createMarketSession({ seed: 'same-store', ...overrides }));
+// Retained v1 assistance-workflow fixtures explicitly use their original phone frame.
+// Real browser snapshots bind the current measured presentation independently.
+const assistancePresentation = { viewport: { width: 390, height: 844 }, zoom: 1.3,
+  fontScale: 1, safeArea: { top: 0, bottom: 0 } };
 const reseal = t => { t.traceId = marketReplayTraceId(t); return t; };
 const isWalk = step => step.type === 'walkTo' || step.type === 'walkToAnchor';
 const guardFor = (initial, trace) => new TraceGuard(initial, trace.personaId, trace.personaVersion, trace.generation.model, trace.traceSchemaVersion === '2');
@@ -131,7 +135,8 @@ test('semantic guard rejects remote shelf access, hidden products and unavailabl
 
 test('missing cashier uses an employee conversation before review', async () => {
   for (const employeeCount of [1, 2]) {
-    const initial = snapshot({ environment: { cashierCount: 0, employeeCount } });
+    const initial = createMarketReplaySnapshot(createMarketSession({ seed: 'same-store',
+      environment: { cashierCount: 0, employeeCount } }), undefined, assistancePresentation);
     const trace = await generateTrace({ personaId: 'careful-checker', seed: 'cashier', snapshot: initial });
     assert.ok(validateTrace(trace, initial).valid);
     assert.ok(trace.steps.some(s => s.type === 'talkToStaff' && s.choice === 'requestCashier'));
@@ -221,13 +226,18 @@ test('an inline cart overlay blocks both product dragging and browsing despite v
 });
 
 test('cashier requests name the actual empty checkout button and the schema rejects an implicit default', async () => {
-  const initial = snapshot({ environment: { cashierCount: 0, employeeCount: 1 } });
+  const initial = createMarketReplaySnapshot(createMarketSession({ seed: 'same-store',
+    environment: { cashierCount: 0, employeeCount: 1 } }), undefined, assistancePresentation);
   const trace = await generateTrace({ personaId: 'careful-checker', seed: 'cashier-button', snapshot: initial });
   const index = trace.steps.findIndex(s => s.type === 'talkToStaff' && s.choice === 'requestCashier');
   assert.ok(index >= 0);
   const firstCheckout = trace.steps.slice(index + 1).find(s => s.type === 'checkout');
   assert.ok(firstCheckout);
-  assert.equal(trace.steps[index].checkoutId, firstCheckout.checkoutId, 'the requested counter is the one subsequently used');
+  assert.equal(initial.cashierAvailability[trace.steps[index].checkoutId], false, 'the request names an actual empty counter button');
+  const replyGuard = guardFor(initial, trace);
+  for (const step of trace.steps.slice(0, index + 1)) replyGuard.execute(step);
+  assert.ok(replyGuard.observe().cashierRequestFeedback.checkoutIds.includes(firstCheckout.checkoutId),
+    'the next visit follows the staff reply, which may name another counter');
   assert.ok(validateTrace(trace, initial).valid);
   const missing = structuredClone(trace);
   delete missing.steps[index].checkoutId;

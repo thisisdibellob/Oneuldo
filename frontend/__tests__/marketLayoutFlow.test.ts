@@ -26,6 +26,7 @@ function visit(game: MarketSession, station: MarketEnvironmentStationId) {
 
 it.each(MARKET_LAYOUT_OPTIONS.flatMap(layout => [false, true].map(entranceConstruction => ({ ...layout, entranceConstruction }))))('$label 공사=$entranceConstruction에서 반납·직원 도움·계산원 호출을 걸어서 수행하고 구매에 성공한다', ({ id: layoutId, entranceConstruction }) => {
   let game = createMarketSession({ seed: 'both-layout-return-route', difficulty: 'exact', objectives: [{ productId: 'milk', quantity: 1 }],
+    learning: { stockoutEnabled: false, budgetChoiceEnabled: false },
     environment: { layoutId, entranceConstruction, shelfOrder: 'random', cashierCount: 0, employeeCount: 3, customerCount: 5, pillarCount: 4, kioskPresent: true } });
   game = visit(game, 'fresh');
   game = applyMarketAction(game, { type: 'add', productId: 'milk', quantity: 3 });
@@ -41,9 +42,9 @@ it.each(MARKET_LAYOUT_OPTIONS.flatMap(layout => [false, true].map(entranceConstr
   game = visit(game, staff);
   game = applyMarketAction(game, { type: 'requestReturn', productId: 'milk' });
   expect(game.cart.milk).toBe(1);
-  game = applyMarketAction(game, { type: 'requestCashier', checkoutId: 'checkout-2' });
-  expect(game.cashierAvailability['checkout-2']).toBe(true);
-  game = visit(game, 'checkout-2');
+  game = applyMarketAction(game, { type: 'requestCashier' });
+  expect(game.cashierAvailability).toEqual({ checkout: true, 'checkout-2': false });
+  game = visit(game, 'checkout');
   game = applyMarketAction(game, { type: 'submit' });
   expect(game).toMatchObject({ outcome: 'success', attempts: 1, paid: true, score: 100, alarmCount: 0 });
   expect(exportMarketEpisode(game).environment.config.layoutId).toBe(layoutId);

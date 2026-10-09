@@ -93,7 +93,8 @@ export function MarketStaffDialogue({
     { paddingTop: Math.max(24, insets?.top ?? 0), paddingBottom: Math.max(bottomInset, insets?.bottom ?? 0) },
   ]} testID="market-staff-dialogue">
     <ScrollView style={s.scroll} contentContainerStyle={s.content}
-      keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator
+      keyboardShouldPersistTaps="handled" scrollEnabled showsVerticalScrollIndicator={false}
+      bounces={false} overScrollMode="never"
       testID="market-staff-dialogue-scroll">
       <Animated.View style={{ opacity: entrance, transform: [
         { translateY: entrance.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) },
@@ -181,11 +182,12 @@ const s = StyleSheet.create({
   choices: { alignItems: 'stretch', gap: 10, paddingTop: 14 },
   choice: {
     alignItems: 'center', alignSelf: 'center', backgroundColor: 'rgba(255,255,255,0.96)',
-    borderRadius: 25, minHeight: 50, justifyContent: 'center', maxWidth: 335,
-    width: '100%', overflow: 'hidden', paddingHorizontal: 20, paddingVertical: 12,
+    borderRadius: 25, minHeight: 50, justifyContent: 'center', maxWidth: '100%',
+    // Village NPC pill width follows its text; longer/large-font labels may wrap.
+    overflow: 'hidden', paddingHorizontal: 42, paddingVertical: 12,
   },
   choiceText: {
     color: '#333333', flexShrink: 1, fontFamily: fonts.cafe24Ssurround, fontSize: 17,
-    lineHeight: 23, textAlign: 'center', transform: [{ translateY: 1 }],
+    lineHeight: 20, textAlign: 'center', transform: [{ translateY: 1 }],
   },
 });

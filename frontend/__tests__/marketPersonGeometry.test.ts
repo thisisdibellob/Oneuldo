@@ -6,14 +6,14 @@ const variants = [
   ...MARKET_CUSTOMER_APPEARANCES.map((variant, appearance) => ({ variant, appearance, kind: 'customer' as MarketPersonKind })),
 ];
 
-it('모든 성인 외형을 실제 플레이어 PNG의 86px 키에 맞추고 어린이는 76%로 표시한다', () => {
-  // The existing player PNG's alpha bounds span rows 26..369 on a @2x asset,
-  // displayed by ModularCharacter at 0.5. This is independent of the NPC canvas.
-  const playerVisibleHeight = (369 - 26 + 1) / 2 * 0.5;
+it('모든 성인 외형을 104px 키로 표시하고 어린이는 76% 비율과 발 기준 프레임을 유지한다', () => {
+  const frame = getMarketPersonFrame({ x: 0, y: 0 });
   for (const { variant, appearance, kind } of variants) {
     const geometry = getMarketPersonGeometry(kind, appearance);
-    expect(geometry.visibleHeight).toBeCloseTo(playerVisibleHeight * (variant.age === 'child' ? 0.76 : 1));
+    expect(geometry.visibleHeight).toBeCloseTo(104 * (variant.age === 'child' ? 0.76 : 1));
     expect(geometry.imageWidth / geometry.imageHeight).toBe(0.5);
+    expect(geometry.imageWidth).toBeLessThanOrEqual(frame.width);
+    expect(geometry.imageHeight).toBeLessThanOrEqual(frame.height);
   }
 });
 
@@ -23,14 +23,14 @@ it('NPC 몸통 위쪽의 빈 바닥은 막지 않고 실제 두 신발 너비만
     const geometry = getMarketPersonGeometry(kind, appearance);
     const collider = getMarketPersonCollider(point, kind, appearance);
     const pressFrame = getMarketPersonFrame(point);
-    expect(collider.y).toBeGreaterThan(point.y - 11);
-    expect(collider.y + collider.height).toBeLessThan(point.y + 4);
+    expect(collider.y).toBeGreaterThan(point.y - 13);
+    expect(collider.y + collider.height).toBeLessThan(point.y + 5);
     expect(collider.x).toBeLessThan(point.x);
     expect(collider.x + collider.width).toBeGreaterThan(point.x);
     expect(collider.width).toBeLessThan(pressFrame.width * 0.55);
     expect(collider.height).toBeLessThan(geometry.visibleHeight * 0.17);
-    expect(collider.width).toBeGreaterThan(variant.age === 'child' ? 13 : 17);
-    expect(collider.width).toBeLessThan(variant.age === 'child' ? 17 : 24);
+    expect(collider.width).toBeGreaterThan(variant.age === 'child' ? 15 : 20);
+    expect(collider.width).toBeLessThan(variant.age === 'child' ? 20 : 28);
   }
   // These two employees have visibly different shoe spans in the runtime PNGs.
   expect(getMarketPersonCollider(point, 'employee', 1).width)

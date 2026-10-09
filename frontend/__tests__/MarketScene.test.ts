@@ -10,6 +10,17 @@ jest.mock('../src/behavior/behaviorEventQueue', () => ({
   assertBehaviorEventsAcknowledged: jest.fn(async () => undefined),
 }));
 
+it('AI missions keep their recorded purchase requirements without implicit stockout or extra choice exercises', () => {
+  const mission = buildMarketScenarioMission('S01');
+  const session = createMissionSession({ seed: 'ai-mission-contract',
+    learning: { stockoutEnabled: true, budgetChoiceEnabled: true, checkoutReviewMode: 'overcharge' } }, mission);
+  expect(session.learning.stockout).toBeNull();
+  expect(session.learning.choiceTask).toBeNull();
+  expect(session.config.learning).toMatchObject({ stockoutEnabled: false, budgetChoiceEnabled: false, checkoutReviewMode: 'normal' });
+  expect(session.environment.stationDetails.map(station => station.id)).toEqual(expect.arrayContaining(['checkout', 'checkout-2']));
+  for (const target of mission.objectives) expect(session.stock[target.productId]).toBeGreaterThanOrEqual(target.quantity);
+});
+
 it.each(['S01','S02'])('%s seed 반복 시 동일한 24개 슬롯과 목표·허용 대안을 보존한다', id => {
   for (let seed = 0; seed < 50; seed++) {
     const mission = buildMarketScenarioMission(id);

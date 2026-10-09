@@ -23,6 +23,27 @@ test('entry guidance is delivered once, checkout guidance only at checkout, hidd
   assert.equal(guard.observeActor().objectives, undefined);
 });
 
+test('a cashier request exposes the actual staff reply and displayed empty-counter buttons without pretending fulfillment', () => {
+  const session = createMarketSession({ seed: 'visible-staff-reply', environment: {
+    cashierCount: 1, kioskLane: 'none', employeeCount: { min: 1, max: 1 },
+  } });
+  const staffed = Object.keys(session.cashierAvailability).find(id => session.cashierAvailability[id]);
+  const empty = Object.keys(session.cashierAvailability).find(id => !session.cashierAvailability[id]);
+  const employee = session.environment.stationDetails.find(station => station.kind === 'employee').id;
+  const guard = new TraceGuard(createMarketReplaySnapshot(session));
+  guard.execute(step('start'));
+  guard.execute(step('walkTo', { target: { stationId: employee }, movement: {
+    style: 'steady', speedMultiplier: 1, motorSeed: 'staff-reply',
+  } }));
+  guard.execute(step('talkToStaff', { stationId: employee, choice: 'open' }));
+  guard.execute(step('talkToStaff', { stationId: employee, choice: 'requestCashier', checkoutId: empty }));
+  assert.equal(guard.observe().cashierRequestFeedback.accepted, false);
+  const actor = guard.observeActor();
+  assert.equal(actor.cashiers[staffed], true);
+  assert.equal(actor.cashiers[empty], false);
+  assert.equal(actor.activeStation, employee);
+});
+
 test('Ollama actor forwards displayed instruction text and authenticates without outputting secrets', async () => {
   const original = global.fetch;
   process.env.ACTOR_TEST_KEY='fixture-only-secret';

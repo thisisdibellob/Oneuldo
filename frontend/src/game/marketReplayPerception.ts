@@ -93,7 +93,8 @@ function localAnchors(environment: MarketEnvironment, position: Point, p: Replay
   const add = (point: Point) => {
     const distance = Math.hypot(point.x - position.x, point.y - position.y);
     if (distance < 45 || distance > REPLAY_ANCHOR_MAX_DISTANCE || !visiblePoint(environment, position, point, p)
-      || isMarketEnvironmentBlocked(environment, point, cashiers) || !isMarketNavigationSegmentClear(environment, position, point, cashiers)) return;
+      || arrivalPositions(point, REPLAY_ARRIVAL_MARGIN).some(arrival => isMarketEnvironmentBlocked(environment, arrival, cashiers))
+      || !isMarketNavigationSegmentClear(environment, position, point, cashiers)) return;
     const id = anchorId(environment, point);
     if (!result.some(a => a.id === id)) result.push({ id, point });
   };
@@ -109,7 +110,15 @@ function localAnchors(environment: MarketEnvironment, position: Point, p: Replay
   // Offer their visible free standing area as another opaque local choice. It is a
   // straight visible segment under the same guards, never a route to an unseen person.
   for (const station of environment.stationDetails) {
-    if (station.kind === 'employee' && visiblePoint(environment, position, marker(environment, station), p)) add(station.point);
+    if (station.kind === 'employee' && visiblePoint(environment, position, marker(environment, station), p)) {
+      add(station.point);
+      // The updated fixtures can block the single diagonal to a standing point.
+      // Offer other locally visible free passages, without ranking or choosing an
+      // action for the actor. Existing collision/visibility/arrival checks still apply.
+      for (const dx of [-32, -16, 0, 16, 32]) for (const dy of [-32, -16, 0, 16, 32]) {
+        add({ x: station.point.x + dx, y: station.point.y + dy });
+      }
+    }
   }
   return result;
 }

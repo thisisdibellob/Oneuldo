@@ -1,10 +1,13 @@
 import { createElement } from 'react';
-import { render } from '@testing-library/react-native';
-import { Image } from 'react-native';
+import { fireEvent, render } from '@testing-library/react-native';
+import { Image, StyleSheet } from 'react-native';
 import type { ImageSourcePropType } from 'react-native';
 
 import { DirectionalAvatar } from '../src/components/game/DirectionalAvatar';
 import {
+  AVATAR_WALK_CYCLE_DISTANCE,
+  createAvatarWalkCycle,
+  getAvatarMovement,
   facingFromVector,
   resolveAvatarFrame,
   type AvatarAnimationManifest,
@@ -67,6 +70,14 @@ describe('avatarAnimation', () => {
     expect(resolveAvatarFrame(manifest, 'front', 'walk', -1)).toBe(13);
   });
 
+  test('uses dedicated sprint frames and falls back to directional walk for legacy manifests', () => {
+    expect(resolveAvatarFrame(manifest, 'right', 'sprint', 1)).toBe(42);
+    const running = { ...manifest, right: { ...manifest.right, sprint: [frame(101), frame(102)] } };
+    expect(resolveAvatarFrame(running, 'right', 'sprint', 1)).toBe(102);
+    const emptySprint = { ...manifest, right: { ...manifest.right, sprint: [] } };
+    expect(resolveAvatarFrame(emptySprint, 'right', 'sprint', 0)).toBe(41);
+  });
+
   test('uses the front animation when a directional frame list is empty', () => {
     const withFallback: AvatarAnimationManifest = {
       ...manifest,
@@ -76,7 +87,7 @@ describe('avatarAnimation', () => {
     expect(resolveAvatarFrame(withFallback, 'left', 'walk', 2)).toBe(13);
   });
 
-  test('loads the correct diagonal animation without keeping unrelated directions mounted', () => {
+  test('keeps the loaded pose until the new diagonal image is ready', () => {
     const screen = render(
       createElement(DirectionalAvatar, {
         facing: 'front',
@@ -88,6 +99,7 @@ describe('avatarAnimation', () => {
     const mountedSources = () =>
       screen.UNSAFE_getAllByType(Image).map((image) => image.props.source);
     const before = mountedSources();
+    fireEvent(screen.UNSAFE_getAllByType(Image)[0], 'load');
 
     screen.rerender(
       createElement(DirectionalAvatar, {
@@ -98,7 +110,57 @@ describe('avatarAnimation', () => {
       }),
     );
 
-    expect(before).toEqual([11, 12, 13]);
-    expect(mountedSources()).toEqual([61, 62]);
+    expect(before).toEqual([11]);
+    expect(mountedSources()).toEqual([11, 61]);
+    const visible = () => screen.UNSAFE_getAllByType(Image)
+      .filter(image => StyleSheet.flatten(image.props.style).opacity === 1)
+      .map(image => image.props.source);
+    expect(visible()).toEqual([11]);
+    fireEvent(screen.UNSAFE_getAllByType(Image)[1], 'load');
+    expect(visible()).toEqual([61]);
+    expect(mountedSources()).toHaveLength(2);
+    screen.unmount();
+  });
+});
+
+describe('distance-driven avatar gait', () => {
+  it('follows resolved displacement and stops completely at a wall', () => {
+    expect(getAvatarMovement({ x: 3, y: 4 }, { x: 3, y: 4 }, 'right'))
+      .toEqual({ distance: 0, facing: 'right', motion: 'idle' });
+    // A diagonal request can resolve to a vertical slide after collision.
+    expect(getAvatarMovement({ x: 3, y: 4 }, { x: 3, y: 7 }, 'right'))
+      .toEqual({ distance: 3, facing: 'front', motion: 'walk' });
+    // Very slow joystick movement still receives the correct facing.
+    expect(getAvatarMovement({ x: 0, y: 0 }, { x: -0.01, y: 0 }, 'front'))
+      .toEqual({ distance: 0.01, facing: 'left', motion: 'walk' });
+  });
+
+  it('uses sprint only for resolved movement and still settles to idle at a wall', () => {
+    expect(getAvatarMovement({ x: 0, y: 0 }, { x: 4, y: 0 }, 'front', 'sprint'))
+      .toEqual({ distance: 4, facing: 'right', motion: 'sprint' });
+    expect(getAvatarMovement({ x: 4, y: 0 }, { x: 4, y: 0 }, 'right', 'sprint'))
+      .toEqual({ distance: 0, facing: 'right', motion: 'idle' });
+  });
+
+  it('covers the same cycle for the same travel distance regardless of update rate', () => {
+    const slow = createAvatarWalkCycle(), fast = createAvatarWalkCycle();
+    for (let index = 0; index < 24; index++) slow.advance(AVATAR_WALK_CYCLE_DISTANCE / 32);
+    fast.advance(AVATAR_WALK_CYCLE_DISTANCE * 0.75);
+    expect(slow.frameIndex(8)).toBe(6);
+    expect(fast.frameIndex(8)).toBe(6);
+    fast.advance(AVATAR_WALK_CYCLE_DISTANCE / 4);
+    expect(fast.frameIndex(8)).toBe(0);
+  });
+
+  it('does not count blocked or invalid travel and releases listeners', () => {
+    const clock = createAvatarWalkCycle();
+    const listener = jest.fn(), unsubscribe = clock.subscribe(listener);
+    [0, -5, NaN, Infinity].forEach(clock.advance);
+    expect(listener).not.toHaveBeenCalled();
+    clock.advance(36);
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(clock.frameIndex(8)).toBe(2);
+    unsubscribe(); clock.advance(36);
+    expect(listener).toHaveBeenCalledTimes(1);
   });
 });
