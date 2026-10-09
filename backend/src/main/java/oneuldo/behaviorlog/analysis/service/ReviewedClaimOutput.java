@@ -107,6 +107,12 @@ public final class ReviewedClaimOutput {
             ids.add(id.asString());
         }
         if(new HashSet<>(ids).size()!=ids.size()) fail("DUPLICATE_REVIEW_EVIDENCE",path,ids);
+        // A claim owns a set of citations. Normalize that set's display order only;
+        // never move claims, drop a reference, rewrite prose, or choose new evidence.
+        // Observation clauses still must follow the source chronology above.
+        var unknown=ids.stream().filter(id->!refs.eventIds().contains(id)).toList();
+        if(!unknown.isEmpty()) fail("UNKNOWN_REVIEW_EVIDENCE",path,unknown);
+        ids.sort(Comparator.comparingInt(id->Integer.parseInt(id.substring(1))));
         order(ids,path);
         // Accept redundant annotations only when this very claim already owns every cited event.
         // Do not attach, infer or substitute evidence to make a claim pass.

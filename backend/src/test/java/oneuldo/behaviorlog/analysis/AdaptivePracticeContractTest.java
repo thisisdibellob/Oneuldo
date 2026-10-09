@@ -17,6 +17,24 @@ class AdaptivePracticeContractTest {
     final MovementProjectionTest fixture = new MovementProjectionTest();
     final tools.jackson.databind.json.JsonMapper mapper = fixture.mapper;
 
+    @Test void practice_history_keeps_instruction_transition_values_separate_from_purchase_and_ai_judgments() {
+        var data=fixture.fixture();
+        var event=(ObjectNode)data.path("input").path("sessions").get(0).path("events").get(0);
+        ((ObjectNode)event.path("action")).put("eventCode","SHOP.BRIEFING_ADVANCED");
+        ((ObjectNode)event.path("payload")).put("briefingIndex",1);
+        var input=fixture.input(data);
+        var history=PracticeHistoryService.project(mapper,input,input.input().sessions().getFirst().sessionId());
+        var recorded=history.path("recordedInstructionEvents");
+        assertThat(recorded.size()).isEqualTo(1);
+        assertThat(recorded.get(0).path("eventCode").asString()).isEqualTo("SHOP.BRIEFING_ADVANCED");
+        assertThat(recorded.get(0).path("briefingIndex").asInt()).isEqualTo(1);
+        assertThat(recorded.get(0).path("sequence").asLong()).isEqualTo(event.path("sequence").asLong());
+        assertThat(recorded.get(0).has("id")).isFalse();
+        assertThat(history.path("purchaseEvents").isEmpty()).isTrue();
+        assertThat(history.toString()).doesNotContain("SUCCESS","FAILURE","mastered","supportDependent");
+        assertThat(event.path("payload").path("briefingIndex").asInt()).isEqualTo(1);
+    }
+
     @Test void selected_sku_unit_survives_final_review_without_becoming_the_goal_label() {
         var data=fixture.fixture();var e=(ObjectNode)data.path("input").path("sessions").get(0).path("events").get(0);
         ((ObjectNode)e.path("action")).put("eventCode","SHOP.QUANTITY_CHANGED");
@@ -66,5 +84,22 @@ class AdaptivePracticeContractTest {
         assertThat(rows.get(1).path("currentSession").asBoolean()).isTrue();
         assertThat(rows.get(1).path("playOrder").asInt()).isEqualTo(2);
         verify(snapshots,never()).findByIdAndMemberId(repeated.getSourceDatasetId(),member);
+    }
+
+    @Test void earlier_practice_survives_more_than_three_distinct_plays_without_copying_ai_verdicts() {
+        UUID member=UUID.randomUUID();
+        var analysis=new AnalysisReferences(mapper,fixture.input(fixture.fixture())).read(new CompactPipelineTest().finalJson);
+        var repo=mock(AiUserProfileRepository.class);var snapshots=mock(BehaviorAnalysisInputSnapshotRepository.class);
+        AiUserProfile previous=null;UUID earliest=null;
+        for(int n=1;n<=6;n++) {
+            UUID session=UUID.randomUUID();if(n==1)earliest=session;
+            var next=new AiUserProfile(member,n,previous==null?null:previous.getId(),UUID.randomUUID(),UUID.randomUUID(),session,"READY","test","test","","",List.of(),analysis,null,0);
+            when(repo.findByIdAndMemberIdAndStatus(next.getId(),member,"READY")).thenReturn(Optional.of(next));previous=next;
+        }
+        var rows=new PracticeHistoryService(repo,snapshots,mapper).forProfile(member,AiUserProfileResponse.from(previous));
+        assertThat(rows.size()).isEqualTo(6);
+        assertThat(rows.get(0).path("sessionId").asString()).isEqualTo(earliest.toString());
+        assertThat(rows.get(0).path("sourceAvailable").asBoolean()).isFalse();
+        assertThat(rows.get(5).path("currentSession").asBoolean()).isTrue();
     }
 }

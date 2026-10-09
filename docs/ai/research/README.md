@@ -9,6 +9,8 @@
 | [근거 검토](intellectual-disability/evidence-review.ko.md) | 수집 자료의 근거와 한계 정리 |
 | [통합 검토](intellectual-disability/integrated-review.ko.md) | 자료를 모아 읽은 종합 정리 |
 | [자료별 내용 정리](intellectual-disability/source-content-review.ko.md) | 각 자료 자체가 다룬 내용 |
+| [연구 참고 학습 구조 v2](intellectual-disability/learning-model-adjustment-2026-10-01.ko.md) | 2026-10-01 추가 조사, 가상 사용자의 경험·회상·독립 수행·유지·전이 구분과 구현 범위 |
+| [학습 구조의 출처/읽기 기록](intellectual-disability/learning-model-sources-2026-10-01.json) | 논문 6편·공식 자료 2건의 저자, DOI, 원출처와 실제 확인 범위 |
 
 같은 디렉터리의 Word 문서는 각각 다음 파일이다.
 

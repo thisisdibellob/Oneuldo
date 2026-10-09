@@ -58,6 +58,8 @@ public class MarketAiQuestService {
                 result = groqChatClient.complete(promptFactory.systemPrompt(), userPrompt + (number == 2
                         ? "\n이전 응답 검증 오류: " + validationFeedback
                           + "\n서버가 검산한 오류 정보: " + objectMapper.writeValueAsString(validationDetails)
+                          + "\nUNKNOWN_PRODUCT_ID이면 해당 목표를 카탈로그의 실제 상품 ID로 다시 선택하세요. 분석에서 예로 든 상품은 실제 판매 상품이라는 뜻이 아닙니다. "
+                          + "새 상품의 카탈로그 이름·규격·판매 단위로 안내도 다시 작성하세요. 없는 상품의 ID를 임의로 만들거나 기존 ID로 이름만 바꾸지 마세요. "
                           + "\nlineItems는 이전 선택의 상품·수량과 카탈로그 가격이다. 목표를 유지하면 허용 범위 안에서 예산을 다시 선택하고, "
                           + "상품이나 수량을 바꾸면 합계를 다시 계산하세요. briefing/description의 금액도 budget과 일치시켜 전체 JSON을 출력하세요." : ""), 900, 0.2);
                 model = result.model();

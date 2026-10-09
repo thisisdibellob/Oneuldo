@@ -67,12 +67,17 @@ public class AiBehaviorAnalysisValidator {
         require(!digest.observations().isEmpty() || !digest.uncertainties().isEmpty());
         Set<UUID> allowed = new HashSet<>();
         input.input().sessions().forEach(s -> s.events().forEach(e -> allowed.add(e.behaviorLogId())));
-        for (var observation : digest.observations()) {
+        for (int index = 0; index < digest.observations().size(); index++) {
+            var observation = digest.observations().get(index);
             require(observation != null); text(observation.observation()); text(observation.interpretation());
             require(observation.alternativeExplanations() != null
                     && observation.alternativeExplanations().size() <= 8);
             observation.alternativeExplanations().forEach(this::text);
-            evidence(observation.evidenceEventIds(), allowed);
+            var ids = observation.evidenceEventIds();
+            require(ids != null && !ids.isEmpty() && ids.size() <= 30);
+            var outside = ids.stream().filter(id -> !allowed.contains(id)).map(String::valueOf).toList();
+            if (!outside.isEmpty()) throw new ReviewEvidenceException("DIGEST_EVIDENCE_OUTSIDE_CHUNK",
+                    "observations[" + index + "].evidenceEventIds", outside);
         }
         return digest;
     }

@@ -5,7 +5,7 @@ import tools.jackson.databind.ObjectMapper;
 
 /** Synthesizes observations whose source IDs have been checked, without replaying raw scene blobs. */
 public final class AnalysisSynthesisPrompt {
-    public static final String VERSION="synthesis-v7-sku-support";
+    public static final String VERSION="synthesis-v8-support-evidence";
     public static final String CONTRACT="""
         짧은 JSON 객체: {"s":"요약","f":[["F1","기술","사실","가설",[],["E1"],"지원"]],
         "a":[["S1","SUCCESS|FAILURE|UNDETERMINED","이유",["E1"]]],"u":["한계"],

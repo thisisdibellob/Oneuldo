@@ -90,8 +90,8 @@ class ReviewedClaimOutputTest {
         ((ObjectNode)source.path("analysis")).set("summary",source.path("analysis").path("summary").get(0).deepCopy());
         assertThatThrownBy(()->read(source)).hasMessage("INVALID_REVIEW_CLAIM_ARRAY");
     }
-    @Test void rejects_unknown_empty_duplicate_and_reversed_claim_evidence() {
-        for(var ids:List.of(List.of("E999"),List.<String>of(),List.of("E4","E4"),List.of("E4","E2"),List.of("S1"))) {
+    @Test void rejects_unknown_empty_duplicate_and_non_event_claim_evidence() {
+        for(var ids:List.of(List.of("E999"),List.<String>of(),List.of("E4","E4"),List.of("S1"))) {
             var source=envelope();observation(source,0).set("evidenceEventIds",fixture.mapper.valueToTree(ids));
             assertThatThrownBy(()->read(source)).isInstanceOf(ReviewEvidenceException.class);
         }
@@ -128,6 +128,14 @@ class ReviewedClaimOutputTest {
             assertThat(error.details().path()).isEqualTo("/findings/0/observation/0");
             assertThat(error.details().offendingIds()).containsExactly("E2","E2");
         });
+    }
+    @Test void citation_set_order_is_normalized_without_changing_the_claim_or_chosen_evidence() {
+        var source=envelope();var clause=observation(source,0);
+        clause.putArray("evidenceEventIds").add("E4").add("E2");
+        observation(source,1).putArray("evidenceEventIds").add("E4");
+        var normalized=fixture.mapper.readTree(read(source)).path("findings").get(0);
+        assertThat(normalized.path("observation").asString()).startsWith("(E2, E4) 장바구니를 열었습니다.");
+        assertThat(normalized.path("evidenceEventIds").toString()).isEqualTo("[\"E2\",\"E4\"]");
     }
     @Test void rejects_returning_to_earlier_events_even_when_the_event_was_already_cited() {
         for(var ids:List.of(List.of("E1"),List.of("E2"),List.of("E3"),List.of("E2","E4"))) {

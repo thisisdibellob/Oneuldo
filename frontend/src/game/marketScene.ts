@@ -1,4 +1,5 @@
 import { randomUUID } from 'expo-crypto';
+import { getMarketContrastProductIds } from './marketAlternatives';
 import type { MarketMission, MarketProduct } from './scenarios';
 import { marketProducts, getObjectiveProductIds } from './scenarios';
 import { MARKET_CATALOG_VERSION, MARKET_SCENARIO_VERSION, getEnabledMarketScenario } from './marketContent';
@@ -27,6 +28,13 @@ export function createMarketScene(mission: MarketMission, seed: number, questIns
   if (mission.scenarioId && mission.scenarioId !== 'CUSTOM') {
     const preset = getEnabledMarketScenario(mission.scenarioId);
     [...preset.mandatoryProductIds, ...preset.distractorProductIds].forEach(id => required.add(id));
+  }
+  // A scene preview has six slots per category. The rendered twelve-slot shelf
+  // separately reserves every contrast, including those beyond this preview capacity.
+  for (const id of getMarketContrastProductIds(mission)) {
+    const product = marketProducts.find(p => p.id === id)!;
+    const count = marketProducts.filter(p => p.categoryId === product.categoryId && required.has(p.id)).length;
+    if (count < 6) required.add(id);
   }
   for (const id of required) if (!marketProducts.some(p => p.id === id)) throw new Error('UNKNOWN_SCENE_PRODUCT');
   const products = ['fresh', 'produce', 'meal', 'drink'].flatMap(category => {
@@ -60,4 +68,3 @@ export function restoreMarketScene(scene: MarketScene): MarketMission {
   const copy = JSON.parse(JSON.stringify(scene)) as MarketScene;
   return { ...copy.mission, catalogVersion: copy.catalogVersion, scenarioVersion: copy.scenarioVersion, scene: copy };
 }
-

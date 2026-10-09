@@ -10,7 +10,7 @@ import tools.jackson.databind.ObjectMapper;
 @Component
 public class MarketAiQuestPromptFactory {
 
-    public static final String PROMPT_VERSION = "market-ai-quest-v11-actionable-support";
+    public static final String PROMPT_VERSION = "market-ai-quest-v15-next-focus";
     private final ObjectMapper objectMapper;
 
     public MarketAiQuestPromptFactory(ObjectMapper objectMapper) {
@@ -20,9 +20,9 @@ public class MarketAiQuestPromptFactory {
     public String withPracticeHistory(String prompt, tools.jackson.databind.JsonNode history) {
         var root = (tools.jackson.databind.node.ObjectNode)objectMapper.readTree(prompt);
         root.set("practiceHistory", history == null ? objectMapper.createArrayNode() : history);
-        root.put("practiceHistoryScope", "최근 최대3개 서로 다른 실제 플레이의 과제·안내·구매 원본이다. 같은 세션 재분석은 반복 플레이로 세지 않는다. "
+        root.put("practiceHistoryScope", "최근 최대12개 서로 다른 실제 플레이의 과제·안내·구매 원본이다. 전체 이력이 아니므로 누락된 품목을 처음 나온 품목이나 해결된 오류로 판단하지 않는다. 같은 세션 재분석은 반복 플레이로 세지 않는다. "
                 + "판정은 기존AI해석이며 원본 값과 충돌하면 원본을 우선한다. 없는 이력을 실패나 성공으로 채우지 않는다. "
-                + "현재와 과거의 목표·실제 구매·제공된 안내를 비교해 반복된 어려움과 바꿀 부담/지원 조건을 AI가 선택한다. "
+                + "현재와 과거의 목표·실제 구매·제공된 안내를 비교해 반복된 어려움과 바꿀 부담/지원 조건을 AI가 선택한다. recordedInstructionEvents는 실제 안내 전환·계산 진입·도움 요청 사건이며 읽기·이해·도움 의존 판정이 아니다. "
                 + "이 이력은 맥락 자료다. 프로필 근거는 별도로 허용된 evidenceEventIds만 사용한다.");
         return objectMapper.writeValueAsString(root);
     }
@@ -33,7 +33,9 @@ public class MarketAiQuestPromptFactory {
                 + "의학적 진단, IQ, 장애 정도를 추정하지 말고 사용자의 개인정보나 상태를 퀘스트 문장에 노출하지 마세요. "
                 + "분석의 '미확인·확인 불가'를 '인지 부족·실패·이해하지 못함'으로 바꾸지 마세요. 장바구니 열기는 읽기·이해를 확정하는 증거가 아닙니다. "
                 + "adaptationSummary는 관찰된 행동과 연습 목표의 연결만 설명하고 새로운 사용자 능력 판정을 만들지 마세요. 불확실한 것은 추가 관찰을 위한 연습이라고 설명하세요. "
-                + "허용된 상품과 가격만 사용하세요. 예산 압박은 필수 상품을 살 수 없는 예산을 뜻하지 않습니다. "
+                + "허용된 상품과 가격만 사용하세요. productId는 unitPriceWon의 키와 contentContext.products의 실제 id 중에서만 선택하세요. "
+                + "분석의 예시 상품이 카탈로그에 없으면 같은 연습 목표를 구현할 다른 실제 상품을 AI가 선택하세요. 예시의 이름을 상품 ID로 만들지 마세요. "
+                + "예산 압박은 필수 상품을 살 수 없는 예산을 뜻하지 않습니다. "
                 + "먼저 상품과 수량을 정하고 unitPriceWon의 단가×수량을 모두 더한 뒤 예산을 선택하세요. "
                 + "상품 규격은 카탈로그 그대로 안내하고, briefing/description에 쓴 예산도 budget 숫자와 일치시켜야 합니다. "
                 + "사용자에게 보이는 문장은 쉬운 한국어로 쓰고 중국어 등 다른 언어의 낱말을 섞지 마세요. 단위·상품명은 카탈로그 표기를 유지하세요. 반드시 JSON 하나만 출력하세요.";
@@ -45,7 +47,12 @@ public class MarketAiQuestPromptFactory {
         context.put("promptVersion", PROMPT_VERSION);
         context.put("goal", analysis.analysis().practicePlan().goal());
         context.put("learningEvidence", oneuldo.behaviorlog.analysis.service.LearningEvidenceGuidance.PRACTICE);
+        context.put("supportImplementation", "현재 practicePlan의 연습 단계와 textSupport를 구현한다. 지원 수준은 aiDifficultyRecommendation.adjustments.textSupport의 구조화된 값을 따른다. goal의 문장에 다른 지원 이름이 섞여 있어도 그 문장을 복사하여 지원 수준을 바꾸지 않는다. SIMPLIFIED는 구체적인 비교·수정 동작을 안내한다. STANDARD는 목표 목록과 짧은 절차 힌트만 제공하고 특정 오답을 제거하라는 답 지시를 반복하지 않는다. REDUCED는 목표 목록과 중립적인 제출/중단 안내만 제공하며 숫자 찾기·상품 대조·오답 수정 힌트를 추가하지 않는다. 도움 감소 중에는 같은 목표 규격·수량·예산 조건을 유지할 수 있으며 새로운 품목을 추가할 필요가 없다. 목표 목록의 명확성은 모든 단계에서 유지한다. "
+                + "CUSTOM도 같은 상품 이름의 다른 규격·포장 단위가 진열되도록 앱이 보존한다. 특정 선택지를 제거하거나 배치를 바꿨다고 안내하지 않는다. 목표와 맞는 허용 대안은 오답이라고 부르지 않는다.");
         context.put("adaptiveTeaching", "practiceHistory의 실제 과제·안내·제출과 현재 연습 계획을 대조한다. 과거 AI 판정은 오류가 가능한 해석이며 원본 값과 충돌하면 따라 쓰지 않는다. "
+                + "현재 연습 계획이 선택한 구체적인 초점과 미해결 요구를 실제 objectives·briefing으로 구현한다. 성공한 규격을 기계적으로 재사용하여 미재검사 요구를 빠뜨리지 않는다. "
+                + "목표 목록에 상품명·규격·수량을 쓰는 것은 필수 요구이며 추가 힌트 제거와 충돌하지 않는다. REDUCED이면 목표 목록과 중립적 선택 안내만 남기고 '표시를 찾아요/목록과 비교해요/맞는지 확인해요/다르면 바꿔요'라는 절차 힌트를 넣지 않는다. "
+                + "이전 과제와 목표·수량·예산·지원 문장을 대조한 뒤 adaptationSummary에 이번에 실제 달라진 조건 또는 동일 조건을 재확인해야 하는 구체적인 질문을 설명한다. 이전에도 같은 REDUCED 안내였다면 이번에 처음 지원을 줄였다고 쓰지 않는다. '문자 안내 없이'라고 쓰지 말고 목표 목록과 추가 비교·수정 힌트의 유무를 구분한다. "
                 + "반복 실패 뒤에는 목표명 재진술만 한 동일 과제를 내지 말고, 계획이 정한 초점 기술은 유지하면서 품목 수·수량 부담·예산 여유·구체적 안내 중 무엇이 달라지는지 adaptationSummary에 쓴다. "
                 + "SIMPLIFIED는 짧고 구체적인 한 단계씩의 안내다. 규격 연습이라면 목표 표시를 찾기→선택 상품 표시와 비교하기→다르면 진열대에서 바꾸기의 실제 가능한 동작을 안내한다. "
                 + "과거에 작은 우유를 골랐어도 이번에도 이미 골랐다고 말하지 않는다. '200mL를 담았다면 진열대에서900mL로 바꿔요'처럼 조건부로 쓴다. "
@@ -81,7 +88,7 @@ public class MarketAiQuestPromptFactory {
                 "quantity", "각 1~3개",
                 "budget", "S01/S02는 contentContext의 해당 시나리오 budget과 정확히 같아야 한다. 목표 총액으로 바꾸지 않는다. CUSTOM만 목표 총액 이상, 목표 총액+4000원 이하에서 선택한다.",
                 "briefing", "1~3문장, 각 80자 이하",
-                "checkoutDialogue", "정확히 2문장, 각 80자 이하. 구매 제출 전에 보여주는 안내다. SIMPLIFIED이면 첫 문장은 현재 목표의 어느 표시·수량을 대조할지, 둘째 문장은 다를 때 진열대에서 기존 상품 수량을 줄이고 목표 상품을 담는 방법을 안내한다. 단순히 다시 확인하라고만 하지 않는다. 목록·수량·예산을 대조하도록 안내하며 아직 계산·구매가 완료됐거나 성공했다고 말하지 않는다. 완료 문구는 successMessage에만 쓴다.",
+                "checkoutDialogue", "정확히 2문장, 각 80자 이하. 구매 제출 전에 보여주는 안내다. SIMPLIFIED이면 첫 문장은 현재 목표의 어느 표시·수량을 대조할지, 둘째 문장은 다를 때 진열대에서 기존 상품 수량을 줄이고 목표 상품을 담는 방법을 안내한다. STANDARD는 짧은 절차 힌트로 대조를 제안하되 특정 오답을 찾아 없애라는 지시를 하지 않는다. REDUCED는 제출 또는 계속 장보기·중단 선택에 대한 중립적인 안내만 쓰며 비교·수정 힌트를 주지 않는다. 아직 계산·구매가 완료됐거나 성공했다고 말하지 않는다. 완료 문구는 successMessage에만 쓴다.",
                 "assessmentRule", "분석의 practicePlan과 targetFindingIds에 연결된 연습을 구현. 새로운 사용자 판정은 하지 않음",
                 "safetyRule", "시간 압박, 위험 행동, 실제 결제를 만들지 않음"
         ));
@@ -107,6 +114,10 @@ public class MarketAiQuestPromptFactory {
             var root=(tools.jackson.databind.node.ObjectNode)new oneuldo.behaviorlog.analysis.service.LosslessTables(objectMapper).encode(objectMapper.valueToTree(context));
             var prices = new LinkedHashMap<String, Integer>();
             for (var product : MarketQuestCatalog.PRODUCTS) prices.put(product.id(), product.price());
+            var presentation = new LinkedHashMap<String, Object>();
+            for (var product : MarketQuestCatalog.PRODUCTS) presentation.put(product.id(), Map.of(
+                    "name", product.name(), "detail", product.detail(), "salesUnit", product.salesUnit()));
+            root.set("productPresentationById", objectMapper.valueToTree(presentation));
             // Keep arithmetic lookup outside table encoding so a price is unambiguous by product ID.
             root.set("unitPriceWon", objectMapper.valueToTree(prices));
             root.put("budgetCalculation", "목표별 unitPriceWon[productId] × quantity의 합이 목표 총액이다. "
@@ -115,7 +126,10 @@ public class MarketAiQuestPromptFactory {
             root.put("tableEncoding","$table는 열, rows는 원래 순서의 값, defaults는 공통 속성이다. 합쳐 원본 객체로 읽는다. $missing:true는 누락, $literal은 원본 객체다. 상품은 contentContext.products 전체 목록을 사용한다.");
             root.put("finalObjectiveCount", objectiveCount);
             root.put("finalInstruction", "objectives 배열은 정확히 " + objectiveCount
-                    + "개여야 한다. 각 목표를 규격·구매 수량과 함께 briefing에 안내한다. 분석에 선반 위치 변경이 언급돼도 현재 구현할 수 없으므로 그런 환경이 바뀌었다고 안내하지 않는다. "
+                    + "개여야 한다. productPresentationById에서 각 productId의 실제 name·detail·salesUnit을 조회해 그 상품을 규격·구매 수량과 함께 briefing에 안내한다. "
+                    + "title/description/briefing/checkoutDialogue/adaptationSummary 모두 objectives의 실제 상품과 일치해야 한다. "
+                    + "분석에서 예로 든 상품을 다른 실제 상품으로 바꾸었으면 이름·규격도 모든 문장에서 함께 바꾼다. ID만 바꾸고 원래 예시 상품을 안내하면 사용할 수 없는 과제다. "
+                    + "분석에 선반 위치 변경이 언급돼도 현재 구현할 수 없으므로 그런 환경이 바뀌었다고 안내하지 않는다. "
                     + "SIMPLIFIED 계획의 규격 선택 연습은 briefing에서 진열대 상품 카드의 어떤 숫자·단위를 목록과 비교할지 구체적으로 안내한다. checkoutDialogue는 그 표시를 비교하는 문장과, 다르면 해당 진열대에서 잘못 담은 상품 수량을0으로 줄이고 목표 상품을 담는 조건부 수정 문장으로 쓴다. "
                     + "이전 suggestedSupport가 '확인하세요' 또는 '아닙니다'로 끝나도 그대로 복사하지 말고 실제 조작 방법까지 구현한다. 이는 과제 안내이며 사용자가 이미 이해하거나 수행했다는 뜻이 아니다.");
             return objectMapper.writeValueAsString(root);

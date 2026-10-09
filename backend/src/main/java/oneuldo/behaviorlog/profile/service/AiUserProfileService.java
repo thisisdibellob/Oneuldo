@@ -81,6 +81,9 @@ public class AiUserProfileService {
                         + (validation == null ? ("length".equals(response == null ? null : response.finishReason()) ? "OUTPUT_TRUNCATED" : "INVALID_PROFILE_CONTRACT")
                             : mapper.writeValueAsString(validation))
                         + ". 입력의 allowedEvidenceEventIds와 각 원본 evidenceEventIds 배열을 다시 확인하세요. "
+                        + "PROFILE_EVIDENCE_COUNT_EXCEEDS_LIMIT는 한 finding의 근거가 최대 30개를 초과한 오류입니다. "
+                        + "허용된 ID 전체를 나열하지 말고 그 관찰을 실제로 지지하는 근거만 선택하세요. "
+                        + "서로 다른 행동의 모든 근거가 필요하면 관찰을 구분하고 각 문장에 해당하는 근거를 인용하세요. "
                         + "옛 본문 번호를 복사하거나 무관한 ID로 치환하지 말고, 해당 근거가 지지하는 문장만 다시 작성하세요. JSON 객체 하나를 완성하세요.";
                 attempts.add(new AiBehaviorAnalysisRun.Attempt(audit.number(),audit.inputPrompt(),audit.rawOutput(),audit.errorCode(),
                         audit.source(),audit.systemPrompt(),audit.outputMax(),audit.finishReason(),audit.inputTokens(),audit.outputTokens(),

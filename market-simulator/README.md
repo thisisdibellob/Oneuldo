@@ -172,6 +172,8 @@ AI 경로는 AttentionPolicy의 확률 선택·기억 소실·감정/능력 수�
 
 다음 `generate_trace`에는 `attentionExperience: {visit, previousLayoutKey, memory, learning}`을 전달한다. 첫 방문/확률 모드에는 learning을 허용하지 않으며, 앱 탭에 실행할 때 계정도 일치해야 한다. 배운 전략을 정답 문장으로 삽입하거나 반복마다 오류 확률을 낮추지 않는다. AI가 구체적인 경험을 참고하는 과정이며 실제 인간의 학습/망각/전이를 입증한 모델이 아니다. 별도 실제 참여자 자료로 보정하고 평가해야 한다.
 
+사용자가 Codex 어시스턴트의 직접 플레이를 요청한 경우 이 생성기로 행동을 대신 정하지 않는다. 새 실험은 [직접 역할 수행 규약 v2](../market-persona-skill/assistant-learning-protocol.md)를 따른다. [민재 연구 참고 사례](personas/research-learning-minjae-v2.json)의 빈 기억에서 시작하고, 실제 UI 원본/sessionId/시각/해시를 연결한 `ResearchArchive`와 배우의 `ResearchMemory`, 현재 `ResearchRecall`을 분리한다. `researchEncodingContext`에는 최근 관찰과 자신의 연상만, `researchRetrievalContext`에는 자신의 연상과 현재 UI만, `researchLearnerContext`에는 선택한 회상과 현재 UI만 전달한다. 전체 원본과 분석/채점은 행동 입력에 넣지 않는다. 회상 오류를 정답으로 덮어쓰거나 자동 숙달을 만들지 않는다. CLI `scripts/prepare-research-learner.cjs`가 실제 원본 파일 해시를 확인하며, 내용의 진실성과 UI 일치는 별도로 확인한다. [출처와 구현 범위](../docs/ai/research/intellectual-disability/learning-model-adjustment-2026-10-01.ko.md)를 함께 읽는다. 기존 `AssistantExperience` / `assistantLearnerContext`는 v1 기록을 읽는 경로로 보존하며 새 조건에 이식하지 않는다.
+
 실행 확인 경험에는 읽은 목록, 표시 안내, 열어 본 상품 페이지, 담기/빼기, 장바구니 확인을 담는다. 현재 계획 중 기억에도 선택한 이동/매대와 관찰한 상품을 함께 보관한다. 행동 이름만 남겨 무엇을 봤는지 잃는 문제를 줄이기 위한 변경이다. 실제 요청 검사와 미해결 탐색 반복은 [2026-09-30 검증 기록](../docs/ai/actor-learning-2026-09-30.md)을 따른다.
 
 

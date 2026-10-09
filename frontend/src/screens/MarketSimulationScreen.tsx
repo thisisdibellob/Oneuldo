@@ -26,38 +26,13 @@ import { MarketBehaviorTracker } from '../behavior/marketBehaviorTracker';
 import type { MarketTelemetryControlMode, MarketTelemetryPoint } from '../behavior/marketMovementDetector';
 import type { MarketMission, MarketCategoryId } from '../game/scenarios';
 import { marketMission, marketProducts } from '../game/scenarios';
-import { MARKET_CATALOG_VERSION, MARKET_SCENARIO_VERSION, enabledMarketScenarios } from '../game/marketContent';
+import { MARKET_CATALOG_VERSION, MARKET_SCENARIO_VERSION } from '../game/marketContent';
 import { fonts } from '../theme';
-import { marketObjectiveLabel } from '../game/marketObjectiveLabel';
 import { listMarketEpisodes, saveMarketEpisode, MarketStoredEpisode } from '../game/marketEpisodeStore';
 import type { ReplayUiPort, ReplayShelfPort } from '../replay/ports';
 import type { ReplayPresentation } from '../game/marketReplayPerception';
 import type { MarketReplaySnapshot } from '../game/marketReplayTrace';
-
-/** Preserve the mission's offered alternatives while using the new shelf layout. */
-function createMissionSession(config: Partial<MarketSessionConfig>, mission?: MarketMission, environment?: MarketEnvironment) {
-  if (!mission) return createMarketSession(config, environment);
-  const missionConfig = { ...config, difficulty: 'exact' as const,
-    objectives: mission.objectives.map(({ productId, quantity }) => ({ productId, quantity, match: 'exact' as const })) };
-  const draft = createMarketSession(missionConfig, environment);
-  const preset = enabledMarketScenarios.find(candidate => candidate.id === mission.scenarioId);
-  const required = new Set([
-    ...mission.objectives.flatMap(objective => [objective.productId, ...(objective.acceptedProductIds ?? [])]),
-    ...(preset?.mandatoryProductIds ?? []), ...(preset?.distractorProductIds ?? []),
-    ...(mission.scene?.products.map(product => product.id) ?? []),
-  ]);
-  const inventoryProductIds = { ...draft.shelfSlots };
-  for (const category of marketCategories) {
-    const mandatory = marketProducts.filter(product => product.categoryId === category.id && required.has(product.id)).map(product => product.id);
-    if (mandatory.length > 12) throw new Error('시나리오 필수 상품이 진열대 용량을 초과했어요.');
-    inventoryProductIds[category.id] = [...mandatory, ...draft.shelfSlots[category.id].filter(id => !required.has(id))].slice(0, 12);
-  }
-  const session = createMarketSession({ ...draft.config, inventoryProductIds }, draft.environment);
-  return { ...session, objectives: session.objectives.map((objective, index) => ({
-    ...objective, label: marketObjectiveLabel(mission.objectives[index]),
-    quantityUnit: getMarketProduct(objective.productId)?.salesUnit ?? '개',
-  })) };
-}
+import { createMissionSession } from '../game/marketMissionSession';
 
 export type MarketStationId = MarketEnvironmentStationId;
 export type MarketInteractionRequest = {
@@ -579,7 +554,7 @@ export function MarketSimulationScreen({
           />
         </View>}
         <Text style={s.small}>
-          {aiAssessment ? '목록의 규격과 수량을 살펴보세요. 수행 판단은 AI가 검토합니다.' : session.config.difficulty === 'family'
+          {aiAssessment ? '아래는 이번 장보기 목록이에요. 언제든 그만둘 수 있어요.' : session.config.difficulty === 'family'
             ? '종류가 같으면 괜찮아요. 예: 우유는 맛과 지방 함량에 관계없이 골라요.'
             : '목록에 적힌 상품을 정확히 골라요. 예: 저지방 우유는 저지방 우유만 골라요.'}
         </Text>

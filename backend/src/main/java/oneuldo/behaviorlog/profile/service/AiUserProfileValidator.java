@@ -30,14 +30,18 @@ public class AiUserProfileValidator {
         current.analysis().findings().forEach(f -> allowed.addAll(f.evidenceEventIds()));
         current.analysis().sessionAssessments().forEach(s -> allowed.addAll(s.evidenceEventIds()));
         Set<String> findingIds = new HashSet<>();
-        for (var finding : draft.findings()) {
+        for (int index = 0; index < draft.findings().size(); index++) {
+            var finding = draft.findings().get(index);
             require(finding != null); text(finding.id()); require(findingIds.add(finding.id()));
             text(finding.skill()); text(finding.observation()); text(finding.interpretation()); text(finding.suggestedSupport());
             require(finding.alternativeExplanations() != null
                     && finding.alternativeExplanations().size() <= 8);
             finding.alternativeExplanations().forEach(this::text);
-            require(finding.evidenceEventIds() != null && !finding.evidenceEventIds().isEmpty()
-                    && finding.evidenceEventIds().size() <= 30 && allowed.containsAll(finding.evidenceEventIds()));
+            require(finding.evidenceEventIds() != null && !finding.evidenceEventIds().isEmpty());
+            if (finding.evidenceEventIds().size() > 30)
+                throw new oneuldo.behaviorlog.analysis.service.ReviewEvidenceException(
+                        "PROFILE_EVIDENCE_COUNT_EXCEEDS_LIMIT", "/findings/" + index + "/evidenceEventIds", List.of());
+            require(allowed.containsAll(finding.evidenceEventIds()));
         }
         var plan = draft.practicePlan(); require(plan != null);
         require(plan.targetFindingIds() != null

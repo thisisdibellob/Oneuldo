@@ -44,6 +44,8 @@ Node 생성기는 행동 의도 trace를 만든다. 앱이 trace 전체를 받�
 
 ## 주의·경험과 계획의 범위
 
+사용자가 어시스턴트의 직접 역할 수행을 요청한 경우 [연구 참고 학습 규약 v2](assistant-learning-protocol.md)를 적용한다. 기본 직접 배우는 [민재 v2](../market-simulator/personas/research-learning-minjae-v2.json)이고, [학술/공식 근거와 한계](../docs/ai/research/intellectual-disability/learning-model-adjustment-2026-10-01.ko.md)를 확인한다. 전체 관찰 원본은 감사 기록으로 두고, 배우가 남긴 짧은 연상과 현재 회상을 분리한다. `researchEncodingContext` → `researchRetrievalContext` → `researchLearnerContext` 순서로 AI가 경험 반영과 행동을 선택한다. 실제 UI 파일의 해시 검사와 내용/계정 대조를 함께 수행한다. 도움을 받은 연습·독립 확인·유지·전이를 구분하며, 성공 횟수로 숙달을 자동 작성하지 않는다. 기존 v1 결과는 보존하고 새 조건에 가져오지 않는다.
+
 현재 세 프로필 모두 trace v2/정책 v5를 사용한다. 저장된 기존 v1 trace도 재생할 수 있다. v2의 segment 앵커는 목적지의 일부 구간이며 전체 trace 안에 들어간다. `readList`는 실제 HUD 목록을 처음부터 끝까지 스크롤해 읽고, `browse`는 선반 페이지를 살핀다. 노출되지 않은 상품이나 전체 정답을 먼저 알고 선택하지 않는다.
 
 상품 경험과 배치·조작 경험을 구분한다. `attentionExperience.visit`의 `first-play`/`revisit`로 회차 조건을 정하고, 반복 방문에는 이전 trace의 layoutKey와 memory를 명시적으로 넘긴다. 현재 배치 키는 생성기가 계산한다. 다른 배치에서는 공간 기억을 이월하지 않고 학습한 조작을 별도로 유지한다. [실행 안내의 회차 경험](../market-simulator/README.md#주의-정책의-회차-경험과-재생)에 옵션 예시가 있다.

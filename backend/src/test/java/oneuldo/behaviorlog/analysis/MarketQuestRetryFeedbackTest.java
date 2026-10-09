@@ -13,6 +13,18 @@ import oneuldo.behaviorlog.profile.service.AiUserProfileService;
 import tools.jackson.databind.json.JsonMapper;
 
 class MarketQuestRetryFeedbackTest {
+    @Test void missing_catalog_product_reports_the_exact_objective_and_real_choices() {
+        var draft=new MarketAiQuestDraft(2,"CUSTOM","우유와 빵","규격 비교 연습",6200,
+            List.of(new MarketAiQuestDraft.Objective("milk",1),new MarketAiQuestDraft.Objective("bread",1)),
+            List.of("우유와 빵을 담아요."),List.of("목록을 비교해요.","다르면 바꿔요."),"완료","새 품목 연습",List.of("PRACTICE"));
+        assertThatThrownBy(()->new MarketAiQuestValidator().validate(draft))
+            .isInstanceOfSatisfying(MarketQuestValidationException.class,e->{
+                assertThat(e.details()).containsEntry("code","UNKNOWN_PRODUCT_ID")
+                    .containsEntry("path","/objectives/1/productId");
+                assertThat((List<String>)e.details().get("allowedProductIds")).contains("milk","banana").doesNotContain("bread");
+            });
+        assertThat(draft.objectives().get(1).productId()).isEqualTo("bread");
+    }
     @Test void three_item_plan_cannot_reuse_a_two_item_fixed_scenario() {
         assertThat(MarketQuestCatalog.eligibleScenarioIds(3)).contains("CUSTOM").doesNotContain("S01");
         assertThat(MarketQuestCatalog.eligibleScenarioIds(2)).contains("S01", "CUSTOM");

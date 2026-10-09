@@ -43,6 +43,39 @@ class AiBehaviorAnalysisTest {
         when(repository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
     }
 
+    @Test void 부분관찰의_구간밖_근거는_정확한_경로와_별칭으로_보고한다() {
+        var digest = new AiObservationDigest("관찰", List.of(new AiObservationDigest.Observation(
+                "수량 변경", "기록된 조작", List.of(), List.of(eventId))), List.of("동기는 미확인"));
+        assertThat(validator.validateDigest(digest, input(true))).isSameAs(digest);
+        var failure = catchThrowableOfType(ReviewEvidenceException.class,
+                () -> validator.validateDigest(digest, input(false)));
+        assertThat(failure.details().code()).isEqualTo("DIGEST_EVIDENCE_OUTSIDE_CHUNK");
+        assertThat(failure.details().path()).isEqualTo("observations[0].evidenceEventIds");
+        assertThat(failure.details().offendingIds()).containsExactly(eventId.toString());
+        var refs = new AnalysisReferences(mapper, input(true));
+        var feedback = mapper.readTree(refs.encode(mapper.writeValueAsString(failure.details())));
+        assertThat(feedback.path("offendingIds").get(0).asString()).isEqualTo("E1");
+        assertThat(feedback.toString()).doesNotContain(eventId.toString());
+    }
+
+    @Test void 부분관찰_재시도는_구간밖_별칭을_알리고_모델이_낸_자료한계를_보존한다() {
+        var refs = new AnalysisReferences(mapper,input(true));
+        var pipeline = new TimelineAnalysisPipeline(prompts,validator,client,mapper,64,budget,new AnalysisCallPacer());
+        when(client.complete(anyString(),anyString(),anyInt(),anyDouble())).thenReturn(
+                new GroqChatClient.GroqChatResult("{\"summary\":\"구간\",\"observations\":[{\"observation\":\"없음\",\"interpretation\":\"미확인\",\"alternativeExplanations\":[],\"evidenceEventIds\":[\"E1\"]}],\"uncertainties\":[]}","test"),
+                new GroqChatClient.GroqChatResult("{\"summary\":\"구간\",\"observations\":[],\"uncertainties\":[\"이 구간에는 선택 기록이 없음\"]}","test"));
+        var audit = new ArrayList<AiBehaviorAnalysisRun.Attempt>();
+        java.util.function.Function<String,AiObservationDigest> parse = raw -> ReflectionTestUtils.invokeMethod(
+                pipeline,"validateDigestReferences",refs.readDigest(raw),input(false),refs);
+        AiObservationDigest result = ReflectionTestUtils.invokeMethod(pipeline,"callDigest",prompts.observationSystem(),"{}",900,12000,audit,parse);
+        assertThat(result.observations()).isEmpty();
+        assertThat(result.uncertainties()).containsExactly("이 구간에는 선택 기록이 없음");
+        assertThat(audit).hasSize(2);
+        assertThat(audit.getFirst().validationFailure().offendingIds()).containsExactly("E1");
+        assertThat(audit.get(1).inputPrompt()).contains("DIGEST_EVIDENCE_OUTSIDE_CHUNK","observations[0].evidenceEventIds","E1","무관한 구간 안 ID로 치환하지").doesNotContain(eventId.toString());
+        verify(client,times(2)).complete(anyString(),anyString(),anyInt(),anyDouble());
+    }
+
     @Test
     void AI검토가_초안을_정정하면_검토결과를_보존한다() {
         ReflectionTestUtils.setField(service, "qualityReview", true);

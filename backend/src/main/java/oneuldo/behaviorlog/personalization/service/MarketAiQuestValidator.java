@@ -26,6 +26,11 @@ public class MarketAiQuestValidator {
             if (objective == null || !productIds.add(objective.productId())) {
                 throw invalid("중복 상품");
             }
+            if (MarketQuestCatalog.PRODUCTS.stream().noneMatch(p -> p.id().equals(objective.productId()))) {
+                throw new MarketQuestValidationException("상품 ID", Map.of(
+                        "code", "UNKNOWN_PRODUCT_ID", "path", "/objectives/" + lineItems.size() + "/productId",
+                        "allowedProductIds", MarketQuestCatalog.PRODUCTS.stream().map(MarketQuestCatalog.Product::id).toList()));
+            }
             var product = MarketQuestCatalog.require(objective.productId());
             if (objective.quantity() < 1 || objective.quantity() > 3) throw invalid("수량");
             int subtotal = product.price() * objective.quantity();

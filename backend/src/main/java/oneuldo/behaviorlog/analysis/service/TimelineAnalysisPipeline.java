@@ -237,7 +237,7 @@ public final class TimelineAnalysisPipeline {
         var digest=callDigest(prompts.observationSystem(),prompt,budget.chunkOutputTokens(),limit,audit,raw->{
             var value=refs.readDigest(raw);
             projection.expand(value.requestedSegmentIds()); // reject fabricated/cross-session segment requests
-            return validator.validateDigest(value,visible);
+            return validateDigestReferences(value,visible,refs);
         });
         if(digest.requestedSegmentIds().isEmpty()) return disclose(digest,projection,visible);
         var expanded=projection.expand(digest.requestedSegmentIds());
@@ -249,12 +249,20 @@ public final class TimelineAnalysisPipeline {
             return new AiObservationDigest("추가 원본 확인이 필요한 이동 구간",List.of(),limits);
         }
         var result=callDigest(prompts.observationSystem(),detail,budget.chunkOutputTokens(),limit,audit,raw->{
-            var value=refs.readDigest(raw);noRequests(value);return validator.validateDigest(value,expanded);
+            var value=refs.readDigest(raw);noRequests(value);return validateDigestReferences(value,expanded,refs);
         });
         return disclose(result,projection,expanded);
     }
     private void noRequests(AiObservationDigest digest) {
         if(!digest.requestedSegmentIds().isEmpty()) throw new IllegalArgumentException("MOVEMENT_REQUEST_NOT_ALLOWED");
+    }
+    private AiObservationDigest validateDigestReferences(AiObservationDigest value,BehaviorAnalysisInputResponse scope,AnalysisReferences refs) {
+        try { return validator.validateDigest(value,scope); }
+        catch(ReviewEvidenceException failure) {
+            var encoded=mapper.readTree(refs.encode(mapper.writeValueAsString(failure.details())));
+            List<String> aliases=new ArrayList<>();encoded.path("offendingIds").forEach(id->aliases.add(id.asString()));
+            throw new ReviewEvidenceException(failure.details().code(),failure.details().path(),aliases);
+        }
     }
     private AiObservationDigest disclose(AiObservationDigest digest,MovementProjection projection,BehaviorAnalysisInputResponse visible) {
         Set<UUID> ids=new HashSet<>();visible.input().sessions().forEach(s->s.events().forEach(e->ids.add(e.behaviorLogId())));
@@ -363,6 +371,10 @@ public final class TimelineAnalysisPipeline {
                         + "문장 사이에서는 직전 문장의 마지막 사건을 다시 인용할 수 있습니다. "
                         + "REVIEW_EVIDENCE_OUT_OF_ORDER는 앞선 사건으로 돌아간 오류이므로 관찰 절과 근거 순서를 바로잡으세요. "
                         + "무관한 사건을 추가하지 말고 수정된 전체 JSON을 반환하세요.";
+                if(validation!=null && "DIGEST_EVIDENCE_OUTSIDE_CHUNK".equals(validation.code()))
+                    correction += "\n참고 상품표/과제 문맥의 sourceEventId는 이번 구간 관찰 근거가 아닙니다. "
+                            + "behaviorTimeline에 실제로 포함된 사건만 인용하세요. 기록 부재 설명은 uncertainties에 쓰고 "
+                            + "관련 원본 사건이 없는 관찰은 제거하세요. 구간 밖 ID를 무관한 구간 안 ID로 치환하지 마세요.";
                 continue;
             }
             audit.add(attempt(audit.size()+1,system,submitted,output,response,null,"LIVE"));

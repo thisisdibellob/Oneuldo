@@ -2,6 +2,8 @@ import { createMarketScene, restoreMarketScene } from '../src/game/marketScene';
 import { buildMarketScenarioMission, getMarketCartTotal, getMarketProduct } from '../src/game/scenarios';
 import { MarketBehaviorTracker } from '../src/behavior/marketBehaviorTracker';
 import { enqueueBehaviorEvents } from '../src/behavior/behaviorEventQueue';
+import { createMissionSession } from '../src/game/marketMissionSession';
+import { getMarketContrastProductIds } from '../src/game/marketAlternatives';
 jest.mock('expo-crypto', () => ({ randomUUID: () => '10000000-0000-4000-8000-000000000001' }));
 jest.mock('../src/behavior/behaviorEventQueue', () => ({
   enqueueBehaviorEvents: jest.fn(async () => 0), flushBehaviorEventQueue: jest.fn(async () => undefined),
@@ -26,6 +28,28 @@ it('seed 변경은 배치만 바꾸고 원래 미션을 수정하지 않는다',
   expect(createMarketScene(mission, 1).slots).not.toEqual(createMarketScene(mission, 2).slots);
   expect(mission.scene).toBeUndefined();
   expect(() => createMarketScene(mission, -1)).toThrow();
+});
+it.each([
+  ['milk', ['milk-small','milk-large']], ['banana', ['banana-single']],
+  ['curry', ['curry-one-mild']], ['juice', ['orange-juice-small']],
+])('한 품목 CUSTOM %s도 실제 다른 규격을 제거하지 않는다', (id, contrasts) => {
+  for (let seed = 0; seed < 50; seed++) {
+    const mission = { ...buildMarketScenarioMission('S01'), scenarioId: 'CUSTOM', objectives: [{ productId: id as string, quantity: 1 }] };
+    const scene = createMarketScene(mission, seed);
+    expect(getMarketContrastProductIds(mission)).toEqual(expect.arrayContaining(contrasts as string[]));
+    expect(scene.products.map(p => p.id)).toEqual(expect.arrayContaining(contrasts as string[]));
+    const rendered = createMissionSession({ seed: String(seed) }, { ...mission, scene });
+    expect(Object.values(rendered.shelfSlots).flat()).toEqual(expect.arrayContaining([id, ...contrasts]));
+    expect(mission.objectives).toEqual([{productId:id,quantity:1}]);
+  }
+});
+it('여러 규격이 미리보기 여섯 슬롯을 넘더라도 실제 진열대에 모두 남는다', () => {
+  const mission = { ...buildMarketScenarioMission('S01'), scenarioId: 'CUSTOM',
+    objectives: ['milk','premium-eggs','tofu','sausage'].map(productId => ({productId,quantity:1})) };
+  const scene = createMarketScene(mission, 3);
+  const rendered = createMissionSession({ seed: 'capacity' }, { ...mission, scene });
+  expect(rendered.shelfSlots.fresh).toHaveLength(12);
+  expect(rendered.shelfSlots.fresh).toEqual(expect.arrayContaining(getMarketContrastProductIds(mission)));
 });
 it('카탈로그가 바뀌어도 저장된 가격으로 복원하며 변조된 슬롯을 거부한다', () => {
   const scene = createMarketScene(buildMarketScenarioMission('S01'), 1);
@@ -56,4 +80,3 @@ it('시작 스냅샷과 실제 제공 목록·장바구니를 저장하고 성�
   expect(events.some(e => /WRONG|MATCHED|OVERSHOT|COMPLETED/.test(e.action.eventCode))).toBe(false);
   jest.useRealTimers();
 });
-

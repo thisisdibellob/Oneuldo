@@ -16,6 +16,7 @@ import tools.jackson.databind.node.*;
 @Service
 @RequiredArgsConstructor
 public class PracticeHistoryService {
+    public static final int MAX_DISTINCT_SESSIONS = 12;
     private final AiUserProfileRepository profiles;
     private final BehaviorAnalysisInputSnapshotRepository snapshots;
     private final ObjectMapper mapper;
@@ -25,7 +26,7 @@ public class PracticeHistoryService {
         var entries = new ArrayList<ObjectNode>();
         var seen = new HashSet<UUID>();
         for (var assessment : current.analysis().sessionAssessments()) {
-            if (entries.size() == 3) break;
+            if (entries.size() == MAX_DISTINCT_SESSIONS) break;
             if (seen.add(assessment.sessionId()))
                 entries.add(entry(member, current.datasetId(), assessment.sessionId(), current.analysis()));
         }
@@ -44,7 +45,7 @@ public class PracticeHistoryService {
     private void collect(UUID member, AiUserProfile profile, Set<UUID> seen, List<ObjectNode> entries) {
         var visited = new HashSet<UUID>();
         // Reanalysis versions of one session must not masquerade as repeated plays.
-        for (int depth = 0; profile != null && entries.size() < 3 && depth < 20; depth++) {
+        for (int depth = 0; profile != null && entries.size() < MAX_DISTINCT_SESSIONS && depth < 100; depth++) {
             if (!member.equals(profile.getMemberId()) || !visited.add(profile.getId())) break;
             if (seen.add(profile.getSourceSessionId()))
                 entries.add(entry(member, profile.getSourceDatasetId(), profile.getSourceSessionId(), profile.getProfile()));
@@ -73,13 +74,20 @@ public class PracticeHistoryService {
         for (var task : new AiBehaviorAnalysisPromptFactory(mapper).tasks(input))
             if (session.toString().equals(task.path("sessionId").asString())) tasks.add(task.deepCopy());
         var events = result.putArray("purchaseEvents");
-        for (var event : SourceEventDetails.build(mapper, input))
-            if (session.toString().equals(event.path("sessionId").asString())
-                    && (event.has("selectedProduct") || "SHOP.CHECKOUT_SUBMITTED".equals(event.path("eventCode").asString())))
+        var instructions = result.putArray("recordedInstructionEvents");
+        for (var event : SourceEventDetails.build(mapper, input)) {
+            if (!session.toString().equals(event.path("sessionId").asString())) continue;
+            if (event.has("selectedProduct") || "SHOP.CHECKOUT_SUBMITTED".equals(event.path("eventCode").asString()))
                 events.add(event.deepCopy());
+            // Collector events, not a judgment that the text was read, understood or needed.
+            if (Set.of("SHOP.BRIEFING_ADVANCED", "SHOP.CHECKOUT_ENTERED", "SHOP.STAFF_HELP_REQUESTED")
+                    .contains(event.path("eventCode").asString()))
+                instructions.add(event.deepCopy());
+        }
         // Remove only citation anchors, not product or mission identifiers.
         tasks.forEach(t -> ((ObjectNode)t).remove("sourceEventId"));
         events.forEach(e -> ((ObjectNode)e).remove("id"));
+        instructions.forEach(e -> ((ObjectNode)e).remove("id"));
         return result;
     }
 

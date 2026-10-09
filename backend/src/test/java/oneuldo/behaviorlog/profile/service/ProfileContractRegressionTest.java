@@ -100,4 +100,24 @@ class ProfileContractRegressionTest {
         assertThatThrownBy(()->validator.validate(mapper.convertValue(root,AiUserProfileDraft.class),previous(),current()))
                 .hasMessage("INVALID_USER_PROFILE_CONTRACT");
     }
+
+    @Test void oversized_evidence_reports_the_exact_field_and_retries_without_trimming_in_java() {
+        var ids=java.util.stream.IntStream.range(0,33).mapToObj(i->UUID.randomUUID()).toList();
+        var broken=draft();var array=((ObjectNode)broken.path("findings").get(0)).putArray("evidenceEventIds");ids.forEach(id->array.add(id.toString()));
+        var priorAnalysis=mapper.convertValue(mapper.valueToTree(analysis()),AiBehaviorAnalysis.class);
+        var priorRoot=(ObjectNode)mapper.valueToTree(priorAnalysis);
+        ((ObjectNode)priorRoot.path("findings").get(0)).set("evidenceEventIds",mapper.valueToTree(ids));
+        var prior=new AiUserProfile(member,1,null,UUID.randomUUID(),UUID.randomUUID(),session,"READY","old","model","","",List.of(),mapper.treeToValue(priorRoot,AiBehaviorAnalysis.class),null,0);
+        var valid=broken.deepCopy();((ObjectNode)valid.path("findings").get(0)).set("evidenceEventIds",mapper.valueToTree(ids.subList(0,30)));
+        var repository=mock(AiUserProfileRepository.class);when(repository.findFirstByMemberIdAndStatusOrderByCreatedAtDesc(member,"READY")).thenReturn(Optional.of(prior));when(repository.save(any())).thenAnswer(i->i.getArgument(0));
+        var client=mock(GroqChatClient.class);when(client.complete(anyString(),anyString(),anyInt(),anyDouble())).thenReturn(new GroqChatClient.GroqChatResult(broken.toString(),"model"),new GroqChatClient.GroqChatResult(valid.toString(),"model"));
+        var budget=new AnalysisTokenBudget();ReflectionTestUtils.setField(budget,"requestTokens",18000);
+        var service=new AiUserProfileService(repository,new AiUserProfilePromptFactory(mapper),new AiUserProfileValidator(new MarketAiDifficultyValidator()),client,mapper,budget,mock(oneuldo.behaviorlog.personalization.service.PracticeHistoryService.class));
+        var result=service.updateFromSession(member,session,current());assertThat(result.status()).isEqualTo("READY");
+        assertThat(result.profile().findings().getFirst().evidenceEventIds()).containsExactlyElementsOf(ids.subList(0,30));
+        var saved=org.mockito.ArgumentCaptor.forClass(AiUserProfile.class);verify(repository).save(saved.capture());var attempts=saved.getValue().getAttempts();
+        assertThat(mapper.readTree(attempts.getFirst().rawOutput()).path("findings").get(0).path("evidenceEventIds").size()).isEqualTo(33);
+        assertThat(attempts.getFirst().validationFailure().code()).isEqualTo("PROFILE_EVIDENCE_COUNT_EXCEEDS_LIMIT");
+        assertThat(attempts.get(1).inputPrompt()).contains("/findings/0/evidenceEventIds","최대 30개","그 관찰을 실제로 지지하는 근거만 선택");
+    }
 }
