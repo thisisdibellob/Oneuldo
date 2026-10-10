@@ -19,8 +19,10 @@ type StepIntent = MarketReplayStep extends infer S ? S extends MarketReplayStep 
 
 /** Produces intentions only. No BehaviorLogRequest, episode export, HTTP write, or UI process. */
 export async function generateTrace(options: TraceOptions): Promise<MarketReplayTrace> {
-  const timing = options?.timingProfile ?? 'compact';
+  const preserved = options?.actorPolicyVersion === 'whole-trace-v3';
+  const timing = options?.timingProfile ?? (preserved ? 'original' : 'compact');
   if (!['original', 'compact'].includes(timing)) throw new Error('Unknown timingProfile');
+  if (preserved && timing !== 'original') throw new Error('Whole-trace-v3 preserves actor judgment timing; use original');
   // Generate all decisions first: faster replay must not change memory, choices or RNG.
   const trace = await generateOriginalTrace(options);
   const result = timing === 'original' ? trace : compactTraceTiming(trace);
@@ -193,5 +195,6 @@ export function summarizeTrace(trace: MarketReplayTrace): TraceSummary {
     helpRequests: trace.steps.filter(s => s.type === 'viewHelp' || (s.type === 'talkToStaff' && s.choice !== 'open')).length,
     productsDragged: trace.steps.reduce((sum, s) => sum + (s.type === 'dragProduct' && s.gesture.outcome === 'drop' ? s.quantity : 0), 0),
     plannedReactionMs: trace.steps.reduce((sum, s) => sum + s.reactionDelayMs, 0),
-    ending: trace.steps.some(s => s.type === 'submitForReview') ? 'review-requested' : 'gave-up' };
+    ending: trace.generation?.systemCompletion ? 'assisted-review-requested' : trace.generation?.controlledStop?.reason === 'action-limit' ? 'action-limit-incomplete'
+      : trace.generation?.controlledStop ? 'controlled-stop' : trace.steps.some(s => s.type === 'submitForReview') ? 'review-requested' : 'gave-up' };
 }

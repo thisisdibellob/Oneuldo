@@ -4,7 +4,8 @@ import { isMarketNavigationSegmentClear } from '../src/game/marketNavigation';
 import { createMarketReplaySnapshot, marketReplayTraceId, validateMarketReplaySnapshot, validateMarketReplayTrace,
   type MarketReplayTrace } from '../src/game/marketReplayTrace';
 import { DEFAULT_REPLAY_PRESENTATION, getReplayShelfPage, replayShelfPageFractions, resolveReplayAnchor,
-  visibleAnchors, visibleStations } from '../src/game/marketReplayPerception';
+  replayPresentationKey, visibleAnchors, visibleStations, wholeReplayWaypointCatalog,
+  wholeReplayWaypointGraph } from '../src/game/marketReplayPerception';
 
 const environment = () => createMarketEnvironment({ seed: 'replay-motor-test', employeeCount: 1, customerCount: 1,
   employeeSlotIds: ['staff-southwest'], customerSlotIds: ['customer-southeast'], cashierCount: 2, pillarCount: 0, kioskPresent: false });
@@ -24,6 +25,103 @@ test('public exploration offers only opaque nearby straight, collision-safe choi
   }
   expect(resolveReplayAnchor(e, e.spawn, 'area:720:1280', DEFAULT_REPLAY_PRESENTATION)).toBeNull();
   expect(visibleAnchors(e, e.spawn, DEFAULT_REPLAY_PRESENTATION)).toEqual(anchors);
+});
+
+test('whole-world graph mirrors unranked local movement and nearby controls at the caller current position', () => {
+  const e = environment(), p = DEFAULT_REPLAY_PRESENTATION, position = { x: 160, y: 400 };
+  const cashiers = { checkout: true, 'checkout-2': true }, catalog = wholeReplayWaypointCatalog(e, cashiers);
+  const before = JSON.stringify(e), original = visibleAnchors(e, position, p, cashiers);
+  const graph = wholeReplayWaypointGraph(e, position, p, cashiers, catalog);
+  const byAnchorId = new Map(catalog.map(waypoint => [waypoint.anchorId, waypoint.waypointId]));
+  const expectedMovement = (from: { x: number; y: number }) => visibleAnchors(e, from, p, cashiers)
+    .map(anchor => byAnchorId.get(anchor.id)!).sort();
+  const expectedControls = (from: { x: number; y: number }) => visibleStations(e, from, p, cashiers)
+    .filter(station => station.near).map(({ id, kind, label }) => ({ id, kind, label })).sort((a, b) => a.id.localeCompare(b.id));
+  expect(graph).toMatchObject({ schemaVersion: '1', view: 'world', presentationKey: replayPresentationKey(p),
+    world: e.world, cashierAvailability: cashiers });
+  expect(graph.startAllowedWaypointIds).toEqual(expectedMovement(position));
+  expect(graph.startAllowedWaypointIds.length).toBeGreaterThan(1);
+  expect(graph.startAllowedWaypointIds).not.toEqual(expectedMovement(e.spawn));
+  expect(graph.startNearbyStations).toEqual(expectedControls(position));
+  expect(graph.nodes.map(node => node.waypointId)).toEqual(catalog.map(waypoint => waypoint.waypointId).sort());
+  let controlCount = 0;
+  for (const waypoint of catalog) {
+    const node = graph.nodes.find(candidate => candidate.waypointId === waypoint.waypointId)!;
+    expect(node.allowedWaypointIds).toEqual(expectedMovement(waypoint.point));
+    expect(node.nearbyStations).toEqual(expectedControls(waypoint.point));
+    expect(node.allowedWaypointIds).not.toContain(node.waypointId);
+    controlCount += node.nearbyStations.length;
+  }
+  expect(controlCount).toBeGreaterThan(0);
+  expect(wholeReplayWaypointGraph(e, position, p, cashiers, [...catalog].reverse())).toEqual(graph);
+  expect(visibleAnchors(e, position, p, cashiers)).toEqual(original);
+  expect(JSON.stringify(e)).toBe(before);
+  expect(() => wholeReplayWaypointGraph(e, position, { viewport: { width: 0, height: 0 }, zoom: 1.3 })).toThrow(/presentation/);
+});
+
+test('saved failure snapshot graph omits W087 to W086 and W102 to W101 while preserving positive directed choices', () => {
+  // This seed reconstructs snapshot-a3017cab8e0f4d19129e659da5ae2813's saved environment.
+  const e = createMarketEnvironment({ seed: 'market-1790906391403-1' });
+  const p = { viewport: { width: 668, height: 853 }, zoom: 1.3, fontScale: 1, safeArea: { top: 0, bottom: 0 } };
+  const cashiers = { checkout: true, 'checkout-2': true }, catalog = wholeReplayWaypointCatalog(e, cashiers);
+  const graph = wholeReplayWaypointGraph(e, e.spawn, p, cashiers, catalog);
+  const point = (id: string) => catalog.find(waypoint => waypoint.waypointId === id)!.point;
+  const neighbors = (id: string) => graph.nodes.find(node => node.waypointId === id)!.allowedWaypointIds;
+  expect(point('W087')).toEqual({ x: 720, y: 1120 });
+  expect(point('W086')).toEqual({ x: 720, y: 960 });
+  expect(point('W102')).toEqual({ x: 800, y: 1120 });
+  expect(point('W101')).toEqual({ x: 800, y: 960 });
+  expect(neighbors('W087')).not.toContain('W086');
+  expect(neighbors('W102')).not.toContain('W101');
+  expect(isMarketNavigationSegmentClear(e, point('W087'), point('W086'), cashiers)).toBe(false);
+  expect(isMarketNavigationSegmentClear(e, point('W102'), point('W101'), cashiers)).toBe(false);
+  expect(neighbors('W087')).toContain('W102');
+  expect(neighbors('W102')).toContain('W087');
+  expect(neighbors('W102')).toContain('W114');
+  expect(graph.startAllowedWaypointIds.length).toBeGreaterThan(1);
+  // Both straight segments are clear; the HUD makes only the southward hop visible.
+  expect(isMarketNavigationSegmentClear(e, point('W002'), point('W004'), cashiers)).toBe(true);
+  expect(isMarketNavigationSegmentClear(e, point('W004'), point('W002'), cashiers)).toBe(true);
+  expect(neighbors('W002')).toContain('W004');
+  expect(neighbors('W004')).not.toContain('W002');
+});
+
+test('cashier occupancy graph variants retain initial IDs and remove choices from newly blocked waypoints', () => {
+  const e = createMarketEnvironment({ seed: 'graph-cashier', employeeCount: 1, customerCount: 1,
+    pillarCount: 0, chairCount: 0, cashierCount: 0, kioskPresent: false });
+  const p = { viewport: { width: 668, height: 853 }, zoom: 1.3 }, called = { 'checkout-2': true };
+  const catalog = wholeReplayWaypointCatalog(e), initial = wholeReplayWaypointGraph(e, e.spawn, p, {}, catalog);
+  const graph = wholeReplayWaypointGraph(e, e.spawn, p, called, catalog);
+  const blocked = catalog.filter(waypoint => isMarketEnvironmentBlocked(e, waypoint.point, called));
+  expect(blocked.length).toBeGreaterThan(0);
+  expect(wholeReplayWaypointCatalog(e, called).length).toBeLessThan(catalog.length);
+  expect(graph.nodes.map(node => node.waypointId)).toEqual(initial.nodes.map(node => node.waypointId));
+  expect(initial.cashierAvailability).toEqual({ checkout: false, 'checkout-2': false });
+  expect(graph.cashierAvailability).toEqual({ checkout: false, 'checkout-2': true });
+  for (const waypoint of blocked) {
+    expect(initial.nodes.find(node => node.waypointId === waypoint.waypointId)!.allowedWaypointIds.length).toBeGreaterThan(0);
+    expect(graph.nodes.find(node => node.waypointId === waypoint.waypointId)).toEqual({
+      waypointId: waypoint.waypointId, allowedWaypointIds: [], nearbyStations: [],
+    });
+    expect(graph.startAllowedWaypointIds).not.toContain(waypoint.waypointId);
+    expect(graph.nodes.every(node => !node.allowedWaypointIds.includes(waypoint.waypointId))).toBe(true);
+    const blockedStart = wholeReplayWaypointGraph(e, waypoint.point, p, called, catalog);
+    expect(blockedStart.startAllowedWaypointIds).toEqual([]);
+    expect(blockedStart.startNearbyStations).toEqual([]);
+  }
+});
+
+test('passage labels use screen directions and only already visible local signs, with no goal-dependent ordering', () => {
+  const e = environment();
+  const hidden = e.stationDetails.filter(s => !visibleStations(e, e.spawn, DEFAULT_REPLAY_PRESENTATION).some(c => c.id === s.id));
+  const original = visibleAnchors(e, e.spawn, DEFAULT_REPLAY_PRESENTATION);
+  const mutated = { ...e, stationDetails: e.stationDetails.map(s => hidden.some(h => h.id === s.id) ? { ...s, categoryId: 'meal' as const } : s) };
+  expect(visibleAnchors(mutated, e.spawn, DEFAULT_REPLAY_PRESENTATION)).toEqual(original);
+  for (const anchor of original) {
+    expect(anchor.label).toMatch(/화면.+통로/);
+    const point = resolveReplayAnchor(e, e.spawn, anchor.id, DEFAULT_REPLAY_PRESENTATION)!;
+    expect(Math.hypot(point.x - e.spawn.x, point.y - e.spawn.y)).toBeGreaterThanOrEqual(45);
+  }
 });
 
 test('planning excludes a HUD-edge anchor lost after a valid 0.55px arrival residual, without expanding actual visibility', () => {

@@ -5,6 +5,7 @@ import { MarketShelfScene } from '../src/components/game/MarketShelfScene';
 import { createMarketEnvironment, type MarketEnvironmentStationId } from '../src/game/marketEnvironment';
 import { createMarketSession, type MarketSessionConfig } from '../src/game/marketSession';
 import { getMarketProduct } from '../src/game/scenarios';
+import { getMarketHelpLines } from '../src/game/marketHelp';
 import { evaluateMarketProductDrop, MarketInteractionRequest, MarketSimulationScreen, type MarketSimulationScreenProps } from '../src/screens/MarketSimulationScreen';
 
 jest.mock('expo-audio', () => ({
@@ -72,6 +73,19 @@ function setup(config: Partial<MarketSessionConfig> = {}, cashierCount: 0 | 1 | 
 describe('마트 장보기의 최종 결정과 재시도', () => {
   beforeEach(() => { jest.useFakeTimers(); });
   afterEach(() => { jest.useRealTimers(); });
+  it('공유된 도움말 내용을 실제 화면에 표시하고 닫으면 숨긴다', async () => {
+    const game = setup({ alarmPenaltyPoints: 27 });
+    try {
+      await game.start();
+      const text = getMarketHelpLines(27).join('\n\n');
+      expect(game.screen.queryByText(text)).toBeNull();
+      fireEvent.press(game.screen.getByRole('button', { name: '이용 방법' }));
+      expect(game.screen.getByText(text)).toBeTruthy();
+      fireEvent.press(game.screen.getByRole('button', { name: '알겠어요' }));
+      await finishTransition();
+      expect(game.screen.queryByText(text)).toBeNull();
+    } finally { game.screen.unmount(); }
+  });
   it('마트 HUD는 마을 시간·코인 아래 중앙에 있고 외부 메뉴의 입력을 소비하지 않는다', async () => {
     const game = setup({}, 0, { controlMode: 'joystick', onControlModeChange: jest.fn() });
     try {

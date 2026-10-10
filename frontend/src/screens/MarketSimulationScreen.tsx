@@ -29,10 +29,11 @@ import { marketMission, marketProducts } from '../game/scenarios';
 import { MARKET_CATALOG_VERSION, MARKET_SCENARIO_VERSION, enabledMarketScenarios } from '../game/marketContent';
 import { fonts } from '../theme';
 import { marketObjectiveLabel } from '../game/marketObjectiveLabel';
+import { getMarketHelpLines, marketCashierResponse, marketReturnResponse } from '../game/marketHelp';
 import { listMarketEpisodes, saveMarketEpisode, MarketStoredEpisode } from '../game/marketEpisodeStore';
 import type { ReplayUiPort, ReplayShelfPort } from '../replay/ports';
 import type { ReplayPresentation } from '../game/marketReplayPerception';
-import type { MarketReplaySnapshot } from '../game/marketReplayTrace';
+import { canonicalMarketReplayJson, type MarketReplaySnapshot } from '../game/marketReplayTrace';
 
 /** Preserve the mission's offered alternatives while using the new shelf layout. */
 function createMissionSession(config: Partial<MarketSessionConfig>, mission?: MarketMission, environment?: MarketEnvironment) {
@@ -352,6 +353,7 @@ export function MarketSimulationScreen({
   }, [shelf, settings, historyOpen, cartOpen, helpOpen, staffMessage, staffReturnHelp, session.phase, giveUp, dispatch, panelPresent, panelVisible, externalMenuOpen]);
   const configure = (config: Partial<MarketSessionConfig>) => {
     replaySnapshot.current = null;
+    briefingShownAt.current = Date.now();
     const next = createMissionSession({ ...config, startedAt: new Date().toISOString() }, mission);
     live.current = next;
     setSession(next);
@@ -362,7 +364,7 @@ export function MarketSimulationScreen({
   };
   const submitForReview = async () => {
     if (!aiAssessment) { dispatch({ type: 'submit' }); return; }
-    if (reviewing.current) return;
+    if (reviewing.current || reviewAccepted.current) return;
     reviewing.current = true;
     reviewAccepted.current = false;
     reviewError.current = null;
@@ -370,9 +372,9 @@ export function MarketSimulationScreen({
     try {
       const current = tracker.current;
       if (!current || !accessToken) throw new Error('로그인 후 AI 검토를 사용할 수 있어요.');
-      current.checkoutSubmitted(live.current.cart);
-      await current.flushConfirmed();
-      await startSessionAnalysisJob(accessToken, current.sessionId);
+      await current.completeForReview(live.current.cart);
+      const job = await startSessionAnalysisJob(accessToken, current.sessionId);
+      if (!job || job.sessionId !== current.sessionId || job.status === 'FAILED') throw new Error('이번 수행의 분석 접수를 확인하지 못했어요. 다시 시도해 주세요.');
       reviewAccepted.current = true;
       if (mounted.current) setReview('분석을 접수했어요. 다른 화면으로 이동해도 계속 진행됩니다. 분석 탭에서 진행 상태와 결과를 확인해 주세요.');
     } catch (error) { reviewError.current = error instanceof Error ? error.message : '검토를 접수하지 못했어요.'; if (mounted.current) setReview(reviewError.current); }
@@ -424,7 +426,7 @@ export function MarketSimulationScreen({
   };
   const requestProductReturn = (productId: string, quantity: number) => {
     const next = dispatch({ type: 'requestReturn', productId, quantity }, true);
-    if (!next.lastActionError) setStaffResponse(`${getMarketProduct(productId)?.name} ${quantity}개를 제자리에 놓아드렸어요.`);
+    if (!next.lastActionError) setStaffResponse(marketReturnResponse(getMarketProduct(productId)!.name, quantity));
   };
   // These handlers are shared by the visible buttons and the development input port.
   const advanceBriefing = () => {
@@ -438,7 +440,7 @@ export function MarketSimulationScreen({
   const closeHelp = () => { dispatch({ type: 'closeView' }); setHelpOpen(false); };
   const requestCashier = (checkoutId: 'checkout' | 'checkout-2') => {
     const next = dispatch({ type: 'requestCashier', checkoutId }, true);
-    if (!next.lastActionError) setStaffResponse(`${checkoutId === 'checkout' ? 1 : 2}번 계산대로 와 주세요. 계산을 도와드릴게요.`);
+    if (!next.lastActionError) setStaffResponse(marketCashierResponse(checkoutId));
   };
   const openReturnHelp = () => { setStaffReturnHelp(true); setStaffResponse(''); };
   const backToStaff = () => { setStaffReturnHelp(false); setStaffResponse(''); };
@@ -468,6 +470,11 @@ export function MarketSimulationScreen({
       closeView: () => { if (helpOpen) closeHelp(); else if (cartOpen) closeCart(); else if (replayShelf.current) replayShelf.current.viewCart(false); },
       closeStation: () => replayShelf.current ? replayShelf.current.close() : closeStation(),
       requestCashier, requestReturn: requestProductReturn, openReturnHelp, backToStaff, submit: submitForReview, giveUp,
+      beginSystemCompletion: metadata => {
+        if (canonicalMarketReplayJson(live.current.cart) !== canonicalMarketReplayJson(metadata.cartAtStart)) throw new Error('System completion basket differs from the actual app basket');
+        if (!tracker.current) throw new Error('System completion requires an active behavior tracker');
+        tracker.current.beginSystemCompletion(metadata);
+      },
       skipRating: () => finishRating(false),
       leave: async () => { const current = tracker.current; await leave(); await current?.flushConfirmed(); },
     };
@@ -555,7 +562,9 @@ export function MarketSimulationScreen({
       />
       : null}
     <MarketPanelTransition visible={panelVisible} transitionKey={panelKey} onPresenceChange={setPanelPresent}>
-    {review !== null ? modal('AI 수행 검토', <><Text style={s.body}>{review}</Text><Button text="마을로 돌아가기" onPress={leave} /></>) : null}
+    {review !== null ? modal('AI 수행 검토', <><Text style={s.body}>{review}</Text>
+      {reviewError.current && !reviewing.current ? <Button text="분석 접수 다시 시도" onPress={() => { void submitForReview(); }} /> : null}
+      <Button text="마을로 돌아가기" onPress={leave} /></>) : null}
     {review === null && briefing && !settings && !historyOpen
       ? modal('마트에서 장보기', <>
         <Text style={s.body}>
@@ -651,7 +660,7 @@ export function MarketSimulationScreen({
       : null}
     {helpOpen
       ? modal('이렇게 이용해요', <>
-        <Text style={s.body}>1. 사야 할 물품과 개수를 읽어요.{'\n\n'}2. 진열대 가까이 가서 물건을 살펴봐요.{'\n\n'}3. 장바구니를 눌러 담은 물건을 확인해요.{'\n\n'}4. 내려놓을 물건은 그 물건의 진열대로 돌아가 장바구니를 펼쳐 내려놓아요. 어렵다면 종업원에게 제자리에 놓아 달라고 부탁해요.{'\n\n'}5. 출구 옆 두 계산대 중 하나에서 구매를 확정해요. 계산원이 없으면 매장 직원을 찾아 말을 걸어요.{'\n\n'}6. 계산하지 않은 물건을 담고 입구·출구·측면 출입문의 빨간 경보기를 지나 매장 밖으로 나가면 {session.config.alarmPenaltyPoints}점이 줄어요. 입구와 출구는 공용 복도로 이어져요. 복도 끝 공동 출입문에서 마을로 나갈 수 있어요.</Text>
+        <Text style={s.body}>{getMarketHelpLines(session.config.alarmPenaltyPoints).join('\n\n')}</Text>
         <Button text="알겠어요" onPress={closeHelp} />
       </>, undefined, closeHelp)
       : null}

@@ -39,6 +39,10 @@ function arrivalPositions(position: Point, margin: number): Point[] {
   return margin > 0 ? [-margin, 0, margin].flatMap(dx => [-margin, 0, margin].map(dy => ({ x: position.x + dx, y: position.y + dy }))) : [position];
 }
 const directions: ReplayDirection[] = ['east', 'southeast', 'south', 'southwest', 'west', 'northwest', 'north', 'northeast'];
+const screenDirections: Record<ReplayDirection, string> = {
+  north: '위', northeast: '오른쪽 위', east: '오른쪽', southeast: '오른쪽 아래',
+  south: '아래', southwest: '왼쪽 아래', west: '왼쪽', northwest: '왼쪽 위',
+};
 function relative(from: Point, to: Point): RelativeCue {
   const distance = Math.hypot(to.x - from.x, to.y - from.y);
   const octant = (Math.round(Math.atan2(to.y - from.y, to.x - from.x) / (Math.PI / 4)) + 8) % 8;
@@ -83,10 +87,34 @@ export function visibleStations(environment: MarketEnvironment, position: Point,
 
 export const REPLAY_ANCHOR_SPACING = 80;
 export const REPLAY_ANCHOR_MAX_DISTANCE = 180;
+export type WholeReplayWaypoint = { waypointId: string; anchorId: string; point: Point };
+export type WholeReplayNearbyStation = Pick<ReplayVisibleStation, 'id' | 'kind' | 'label'>;
+export type WholeReplayWaypointGraph = {
+  schemaVersion: '1'; view: 'world'; presentationKey: string;
+  world: MarketEnvironment['world']; cashierAvailability: Partial<MarketCashierAvailability>;
+  startAllowedWaypointIds: string[]; startNearbyStations: WholeReplayNearbyStation[];
+  /** IDs are sorted for serialization, never ranked by desirability or route cost. */
+  nodes: { waypointId: string; allowedWaypointIds: string[]; nearbyStations: WholeReplayNearbyStation[] }[];
+};
 function anchorId(environment: MarketEnvironment, point: Point): string {
   let hash = 2166136261;
   for (const char of `${environment.seed}:${environment.config.layoutId ?? 'classic'}:${point.x}:${point.y}`) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619);
   return `anchor-${(hash >>> 0).toString(16).padStart(8, '0')}`;
+}
+/** Full-world planning catalog only. Incremental actor observations never expose it. */
+export function wholeReplayWaypointCatalog(environment: MarketEnvironment, cashiers: Partial<MarketCashierAvailability> = {}): WholeReplayWaypoint[] {
+  const points: Point[] = [];
+  for (let x = REPLAY_ANCHOR_SPACING; x < environment.world.width; x += REPLAY_ANCHOR_SPACING)
+    for (let y = REPLAY_ANCHOR_SPACING; y < environment.world.height; y += REPLAY_ANCHOR_SPACING)
+      points.push({ x, y });
+  points.push(...environment.stationDetails.filter(s => s.kind === 'employee').map(s => ({ ...s.point })));
+  const seen = new Set<string>();
+  return points.filter(point => {
+    const id = anchorId(environment, point);
+    if (seen.has(id) || isMarketEnvironmentBlocked(environment, point, cashiers)) return false;
+    seen.add(id); return true;
+  }).sort((a, b) => a.x - b.x || a.y - b.y)
+    .map((point, i) => ({ waypointId: `W${String(i + 1).padStart(3, '0')}`, anchorId: anchorId(environment, point), point }));
 }
 function localAnchors(environment: MarketEnvironment, position: Point, p: ReplayPresentation, cashiers: Partial<MarketCashierAvailability>) {
   const result: { id: string; point: Point }[] = [];
@@ -118,12 +146,58 @@ export function visibleAnchors(environment: MarketEnvironment, position: Point, 
   cashiers: Partial<MarketCashierAvailability> = {}): ReplayVisibleAnchor[] {
   if (!validateReplayPresentation(presentation)) throw new Error('Invalid replay presentation');
   const positions = arrivalPositions(position, REPLAY_ARRIVAL_MARGIN);
+  // Describe only currently visible sign/standing-marker relations. Never name an
+  // off-screen destination, consult the shopping goal, or rank a route to it.
+  const signs = visibleStations(environment, position, presentation, cashiers).flatMap(cue => {
+    const station = environment.stationDetails.find(candidate => candidate.id === cue.id)!;
+    const point = marker(environment, station);
+    return positions.every(from => visiblePoint(environment, from, point, presentation)) ? [{ label: cue.label, point }] : [];
+  });
   return localAnchors(environment, position, presentation, cashiers).filter(anchor => positions.every(point => {
     const distance = Math.hypot(anchor.point.x - point.x, anchor.point.y - point.y);
     return distance >= 45 && distance <= REPLAY_ANCHOR_MAX_DISTANCE && visiblePoint(environment, point, anchor.point, presentation)
       && isMarketNavigationSegmentClear(environment, point, anchor.point, cashiers);
-  })).map(anchor => ({ id: anchor.id,
-    label: '눈앞의 통로', ...relative(position, anchor.point) }));
+  })).map(anchor => {
+    const cue = relative(position, anchor.point);
+    const landmarks = signs.filter(sign => Math.hypot(sign.point.x - anchor.point.x, sign.point.y - anchor.point.y) <= 110)
+      .map(sign => Math.hypot(sign.point.x - anchor.point.x, sign.point.y - anchor.point.y) <= 1
+        ? `보이는 ${sign.label} 표시 부근`
+        : `보이는 ${sign.label} 표시 ${screenDirections[relative(sign.point, anchor.point).direction]} 쪽`);
+    return { id: anchor.id,
+      label: [`화면 ${screenDirections[cue.direction]}의 ${cue.distanceBand === 'near' ? '가까운 ' : ''}통로`, ...landmarks].join(' · '), ...cue };
+  });
+}
+/**
+ * Full-world planning adjacency under the same one-hop actor visibility guards.
+ * Edges are directed: a passage can be under the HUD in only one direction.
+ * Reuse the initial catalog when cashier occupancy changes to preserve its IDs.
+ * This describes allowed choices; it neither selects nor repairs a movement.
+ */
+export function wholeReplayWaypointGraph(environment: MarketEnvironment, position: Point, presentation: ReplayPresentation,
+  cashiers: Partial<MarketCashierAvailability> = {},
+  waypoints: readonly WholeReplayWaypoint[] = wholeReplayWaypointCatalog(environment, cashiers)): WholeReplayWaypointGraph {
+  if (!validateReplayPresentation(presentation)) throw new Error('Invalid replay presentation');
+  const byAnchorId = new Map(waypoints.map(waypoint => [waypoint.anchorId, waypoint.waypointId]));
+  const choices = (from: Point) => {
+    if (isMarketEnvironmentBlocked(environment, from, cashiers)) return { allowedWaypointIds: [], nearbyStations: [] };
+    return {
+      allowedWaypointIds: visibleAnchors(environment, from, presentation, cashiers).flatMap(anchor => {
+        const id = byAnchorId.get(anchor.id);
+        return id === undefined ? [] : [id];
+      }).sort(),
+      nearbyStations: visibleStations(environment, from, presentation, cashiers).filter(station => station.near)
+        .map(({ id, kind, label }) => ({ id, kind, label })).sort((a, b) => a.id.localeCompare(b.id)),
+    };
+  };
+  const start = choices(position);
+  return {
+    schemaVersion: '1', view: 'world', presentationKey: replayPresentationKey(presentation), world: { ...environment.world },
+    cashierAvailability: Object.fromEntries(environment.checkouts.map(checkout =>
+      [checkout.id, cashiers[checkout.id] ?? checkout.cashierPresent])),
+    startAllowedWaypointIds: start.allowedWaypointIds, startNearbyStations: start.nearbyStations,
+    nodes: [...waypoints].sort((a, b) => a.waypointId.localeCompare(b.waypointId))
+      .map(waypoint => ({ waypointId: waypoint.waypointId, ...choices(waypoint.point) })),
+  };
 }
 /** Trusted motor/guard only. Never include the returned point in policy input or a trace. */
 export function resolveReplayAnchor(environment: MarketEnvironment, position: Point, id: string, presentation: ReplayPresentation,

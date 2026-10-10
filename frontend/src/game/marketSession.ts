@@ -206,7 +206,8 @@ export function createMarketSession(input: Partial<MarketSessionConfig> = {}, en
   return session;
 }
 
-function matchesObjective(productId: string, objective: MarketTaskObjective) {
+/** Shared game judgement; synthetic post-execution audits use this exact rule too. */
+export function matchesObjective(productId: string, objective: MarketTaskObjective) {
   return objective.match === 'exact' ? productId === objective.productId : familyOf(productOrThrow(productId)) === objective.familyId;
 }
 function evaluate(session: MarketSession): MarketFeedback {

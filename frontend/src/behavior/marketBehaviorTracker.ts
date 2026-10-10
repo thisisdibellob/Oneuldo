@@ -7,6 +7,7 @@ import type {
   BehaviorStepOutcome,
 } from '../api/behaviorLog';
 import type { MarketCart, MarketEvaluation, MarketMission } from '../game/scenarios';
+import type { MarketReplaySystemCompletion } from '../game/marketReplayTrace';
 import { getObjectiveProductIds, getObjectiveQuantity, getMarketCartTotal, getMarketProduct, marketProducts } from '../game/scenarios';
 import { MARKET_CATALOG_VERSION, MARKET_SCENARIO_VERSION, MARKET_INITIAL_STOCK, MARKET_SUPPORT_OPTIONS } from '../game/marketContent';
 import { enqueueBehaviorEvents, flushBehaviorEventQueue, assertBehaviorEventsAcknowledged } from './behaviorEventQueue';
@@ -58,6 +59,7 @@ export class MarketBehaviorTracker {
   private buffer: BufferedEvent[] = [];
   private closed = false;
   private submissionRequested = false;
+  private systemCompletion: MarketReplaySystemCompletion | null = null;
   private controlMode: MarketTelemetryControlMode = 'joystick';
   private firstUserActionAt: number | null = null;
   private interruptionCount = 0;
@@ -198,6 +200,7 @@ export class MarketBehaviorTracker {
         thresholdRuleVersion: DETECTION_RULE_VERSION,
         ...input.payload,
         marketContent: { ...(input.payload?.marketContent as object ?? {}), sceneRef: this.questInstanceId, layoutVersion: this.mission.scene?.layoutVersion, seed: this.mission.scene?.seed,
+          ...(this.systemCompletion ? { replaySystemCompletion: this.systemCompletion } : {}),
           movementContext: { coordinateSpace: 'market-world', stations: this.stations, interactionRadius: 105,
             ...MOVEMENT_SAMPLING } },
       },
@@ -212,7 +215,8 @@ export class MarketBehaviorTracker {
         simulationStarted: true,
       },
       support: input.support,
-      validity: input.validity,
+      validity: this.systemCompletion ? { ...input.validity, assistantIntervention: true,
+        invalidReason: 'ASSISTANT_INTERVENTION' } : input.validity,
       ...input.finalContext,
     };
     this.buffer.push({ event, priority: input.priority ?? 'normal' });
@@ -377,6 +381,27 @@ export class MarketBehaviorTracker {
 
   async complete(cart: MarketCart, _legacyEvaluation?: MarketEvaluation) {
     await this.closeSession(cart, 'FLOW_FINISHED');
+  }
+
+  /** Preserve the boundary before assisted navigation, including pending actor movement. */
+  beginSystemCompletion(metadata: MarketReplaySystemCompletion) {
+    if (this.closed) throw new Error('Cannot begin system completion after the session has ended');
+    if (this.systemCompletion) {
+      if (JSON.stringify(this.systemCompletion) !== JSON.stringify(metadata)) throw new Error('System completion metadata changed');
+      return;
+    }
+    this.trackMovementEvents(this.movementDetector.stop(Date.now(), this.controlMode));
+    this.endIdleIfNeeded(Date.now(), 'SYSTEM_COMPLETION_STARTED');
+    this.movementLogs.flush().forEach(event => this.record(event));
+    this.systemCompletion = JSON.parse(JSON.stringify(metadata)) as MarketReplaySystemCompletion;
+  }
+
+  /** Freeze and acknowledge the full session before the backend creates its immutable analysis input. */
+  async completeForReview(cart: MarketCart) {
+    if (this.closed && !this.submissionRequested) throw new Error('An aborted session cannot be submitted for review');
+    if (!this.submissionRequested) this.checkoutSubmitted(cart);
+    await this.closeSession(cart, 'FLOW_FINISHED');
+    await this.flushConfirmed();
   }
 
   async abort(cart: MarketCart) {

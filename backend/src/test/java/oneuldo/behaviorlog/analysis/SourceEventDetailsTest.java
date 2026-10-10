@@ -83,6 +83,57 @@ class SourceEventDetailsTest {
         assertThat(mapper.writeValueAsString(input)).isEqualTo(original);
     }
 
+    @Test void system_completion_provenance_survives_chunk_synthesis_and_independent_review() {
+        var tree=(ObjectNode)mapper.valueToTree(fixture());
+        var events=tree.path("input").path("sessions").get(0).path("events");
+        ((ObjectNode)events.get(3)).putObject("validity").put("assistantIntervention",false);
+        var checkout=(ObjectNode)events.get(8);
+        checkout.putObject("validity").put("assistantIntervention",true);
+        var completion=((ObjectNode)checkout.path("payload").path("marketContent"))
+                .putObject("replaySystemCompletion").put("reason","action-limit")
+                .put("afterDecisions",100).put("actionLimit",100).put("firstStepId","step-0102")
+                .put("checkoutId","checkout-2");
+        completion.putObject("cartAtStart").put("apple",2).put("water",1);
+        var end=(ObjectNode)events.get(11);
+        ((ObjectNode)end.path("action")).put("eventCode","SHOP.SESSION_ENDED");
+        end.putObject("validity").put("assistantIntervention",true);
+        ((ObjectNode)end.path("payload").path("marketContent")).set("replaySystemCompletion",completion.deepCopy());
+        var input=mapper.convertValue(tree,BehaviorAnalysisInputResponse.class);
+        var original=mapper.writeValueAsString(input);
+        var full=input.input().sessions().getFirst();
+        // The observed chunk ends before system assistance. Final synthesis must still
+        // receive the uncited controller provenance from the complete source input.
+        var part=new BehaviorAnalysisInputResponse(input.id(),input.schemaVersion(),input.generatedAt(),1,6,
+                new BehaviorAnalysisInput(input.input().schemaVersion(),input.id(),input.generatedAt(),input.input().analysisWindow(),
+                        input.input().anonymousSubjectId(),1,6,List.of(new BehaviorAnalysisInput.SessionTimeline(
+                        full.sessionId(),full.startedAt(),full.endedAt(),full.integrity(),full.events().subList(0,6)))));
+        var digest=new AiObservationDigest("독립적으로 결제했다는 구간 해석",List.of(),List.of());
+        var refs=new AnalysisReferences(mapper,input);
+        var source=AnalysisSynthesisPrompt.build(mapper,new AiBehaviorAnalysisPromptFactory(mapper),input,
+                List.of(digest),refs,false,List.of(part));
+        var finalWire=new LosslessTables(mapper).decode(mapper.readTree(source));
+        var draft=new AiBehaviorAnalysis("검토 전 해석",List.of(),List.of(),List.of(),null);
+        var reviewWire=new LosslessTables(mapper).decode(mapper.readTree(AnalysisReviewPrompt.build(mapper,source,draft,refs)));
+        for(var wire:List.of(finalWire,reviewWire)) {
+            var details=wire.path(SourceEventDetails.FIELD);
+            assertThat(details).hasSize(4);
+            assertThat(details.get(0).path("assistantIntervention").isBoolean()).isTrue();
+            assertThat(details.get(0).path("assistantIntervention").asBoolean()).isFalse();
+            assertThat(details.get(0).has("replaySystemCompletion")).isFalse();
+            assertThat(details.get(1).has("assistantIntervention")).isFalse();
+            assertThat(details.get(1).has("replaySystemCompletion")).isFalse();
+            for(int i:List.of(2,3)) {
+                assertThat(details.get(i).path("assistantIntervention").asBoolean()).isTrue();
+                assertThat(details.get(i).path("replaySystemCompletion")).isEqualTo(completion);
+            }
+            assertThat(wire.path("sourceEventDetailsRule").asString()).isEqualTo(SourceEventDetails.RULE)
+                    .contains("독립 완수나 능력 향상으로 간주하지 않고", "이전에 기록된 선택과 분리해 평가한다");
+        }
+        assertThat(finalWire.path("chunkScopes").get(0).path("providedEventCount").asInt()).isEqualTo(6);
+        assertThat(finalWire.path("sourceCoverage").path("providedEventCount").asInt()).isEqualTo(12);
+        assertThat(mapper.writeValueAsString(input)).isEqualTo(original);
+    }
+
     @Test
     @org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable(named="AI_SOURCE_REPORT", matches=".+")
     void recorded_live_observation_matches_the_current_production_prompt() throws Exception {

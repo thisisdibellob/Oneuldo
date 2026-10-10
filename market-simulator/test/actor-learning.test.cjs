@@ -70,7 +70,7 @@ test('AI revisit request receives confirmed experiences but not stochastic abili
   assert.deepEqual(wire.experience.previousExecutedExperience,learning.episodes);
   assert.equal(wire.observation.readObjectives,undefined);
   assert.equal(wire.personaCharacter.parameters,undefined);
-  assert.equal(trace.generation.actorPolicyVersion,'episodic-choice-v4');
+  assert.equal(trace.generation.actorPolicyVersion,'episodic-choice-v9');
  }finally{global.fetch=original;}
 });
 

@@ -1,4 +1,4 @@
-import type { MarketReplaySnapshot } from '../game/marketReplayTrace';
+import type { MarketReplaySnapshot, MarketReplaySystemCompletion } from '../game/marketReplayTrace';
 import type { MarketCashierAvailability, MarketEnvironment, MarketEnvironmentStationId } from '../game/marketEnvironment';
 import type { Point } from '../game/prototypeWorld';
 import type { ReplayPresentation } from '../game/marketReplayPerception';
@@ -43,6 +43,7 @@ export interface ReplayUiPort {
   requestReturn(productId: string, quantity: number): void;
   openReturnHelp(): void;
   backToStaff(): void;
+  beginSystemCompletion?(metadata: MarketReplaySystemCompletion): void;
   submit(): Promise<void>;
   giveUp(): void;
   skipRating(): void;

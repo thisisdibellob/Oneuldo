@@ -1,14 +1,17 @@
 ---
 name: market-persona
-description: Generate seeded Oneuldo shopping intent traces with persona policies or an LLM, then replay them through real inputs in an isolated development web app. Use for persona gameplay samples, visible replay, movement and drag verification, and comparisons using app-recorded logs.
+description: Generate Oneuldo persona action traces with a whole-trace Luna plan or incremental AI decisions, replay them in an isolated development app, and compare personalized quests using confirmed individual memory.
 ---
 
 # Oneuldo 페르소나 의도 생성과 앱 재생
 
 Node 생성기는 행동 의도 trace를 만든다. 앱이 trace 전체를 받아 기존 이동·버튼·드래그 입력으로 실시간 플레이하고 기존 tracker·queue가 로그를 기록·전송한다. 생성기에서 게임 로그를 만들거나 백엔드에 직접 올리지 않는다. 화면 실행 없이 생성한 trace는 실제 플레이 완료 결과가 아니다.
 
-- **A — `stochastic`:** 세 프로필 모두 attention 설정으로 제한된 관찰·기억·주의 전환을 계획하고, shoppingStyle로 상품 비교·목록 확인·익숙한 선택·이동 방향 유지 성향을 적용한다. LLM이 매 행동을 결정한 것으로 설명하지 않는다.
-- **B — `llm`:** 전체 페르소나 프롬프트와 관찰·누적 경험을 실제 모델에 전달한다. 사용자가 요청한 경우 켜며 실제 모델 호출의 시간과 비용을 고려한다. 원문 전달과 실제 사람 행동의 검증을 구분한다.
+- **확률 회귀 모드 — `stochastic`:** 세 프로필 모두 attention 설정으로 제한된 관찰·기억·주의 전환을 계획하고, shoppingStyle로 상품 비교·목록 확인·익숙한 선택·이동 방향 유지 성향을 적용한다. LLM이 매 행동을 결정한 것으로 설명하지 않는다.
+- **Luna 전체 계획 모드 — `whole-trace`:** Luna는 전체 세계를 참고해 종료까지의 행동 배열을 한 번 작성한다. 같은 프로필 JSON의 개인 지침을 유지하고 매 행동의 `actorState`, 알려진 단서와 사용한 목표 기억을 선언한다. 새 기본 bundle 8 / candidate 7은 관찰 원장·작업 기억·계속 수행 중인 목표를 구분하며, 관심이나 탐색으로 focus가 바뀌어도 열린 목표의 기억을 유지한다. Node가 제출 후 화면 전개·기억 변화·행동 근거를 검증하며 그 상태를 Luna의 다음 판단에 실시간 주입하지 않는다. 관심·배회·재방문과 선택권을 유지하며 행동마다 모델을 호출하지 않는다. 이 모드에서는 [전체 계획 절차](references/whole-trace.md)를 읽는다. 같은 모델 문맥에 전체 세계가 있으므로 감사 통과가 숨은 정보의 영향 차단을 입증하지는 않는다.
+- **기존 AI 모드 — `llm`/직접 증분 계획:** 현재 관찰과 관련 경험을 실제 모델에 전달해 다음 행동을 결정한다. 원격 provider에는 모델 연결이 필요하고 Codex 직접 계획에는 외부 API 키가 필요 없다. 원자료 전문은 프로필에 보존하지만 매 요청에 전체 원문을 보내지는 않는다. 두 AI 경로 모두 실패를 확률 모드로 대체하지 않는다. 아래 실험의 A/B/C는 생성 모드와 별개다.
+
+Luna 계획을 실행하는 Codex 세션은 실제로 `gpt-6-luna`/`low`로 설정한다. MCP가 모델을 전환하거나 Luna 세션을 자동 생성하지 않는다. 다른 모델은 사용자가 이양을 허용한 기존 Luna 세션에 전체 계획 작성을 맡긴다. trace의 모델 라벨만으로 실제 모델·API 호출 횟수를 입증하지 않는다.
 
 ## 페르소나 선택
 
@@ -18,43 +21,71 @@ Node 생성기는 행동 의도 trace를 만든다. 앱이 trace 전체를 받�
 
 | ID | 특성 |
 | --- | --- |
-| `mild-intellectual-disability-adult` | v5. 지민, 32세. 구체적인 한 항목씩 처리하며 여러 목표와 관심 전환 뒤의 기억 부담을 목록·장바구니·도움으로 보완한다. 카레를 좋아하고 스스로 목표로 복귀할 수도 있다 |
-| `careful-checker` | v3. 서연, 38세. 신중하고 절약을 중시한다. 연습한 확인 순서는 강점이며 낯선 배치·조작과 여러 조건을 처리할 때 시간을 갖고, 비교·목록·장바구니 확인을 지원 전략으로 쓴다 |
-| `quick-decider` | v3. 민수, 29세. 익숙한 상품에서는 빠르게 결정한다. 이름·규격·수량을 함께 기억해야 할 때 일부 조건을 놓칠 수 있고, 실제 불일치와 명확한 단서를 확인하면 선택을 수정한다. 좋아하는 상품은 짧게 살핀다 |
+| `mild-intellectual-disability-adult` | v6. 지민, 32세. 구체적인 한 항목씩 처리하며 여러 목표와 관심 전환 뒤의 기억 부담을 목록·장바구니·도움으로 보완한다. 카레를 좋아하고 스스로 목표로 복귀할 수도 있다 |
+| `careful-checker` | v4. 서연, 38세. 신중하고 절약을 중시한다. 연습한 확인 순서는 강점이며 낯선 배치·조작과 여러 조건을 처리할 때 시간을 갖고, 비교·목록·장바구니 확인을 지원 전략으로 쓴다 |
+| `quick-decider` | v4. 민수, 29세. 익숙한 상품에서는 빠르게 결정한다. 이름·규격·수량을 함께 기억해야 할 때 일부 조건을 놓칠 수 있고, 실제 불일치와 명확한 단서를 확인하면 선택을 수정한다. 좋아하는 상품은 짧게 살핀다 |
 
-실행 정의의 단일 원본은 [지민](../market-simulator/personas/mild-intellectual-disability-adult.json), [서연](../market-simulator/personas/careful-checker.json), [민수](../market-simulator/personas/quick-decider.json)의 구조화된 JSON이다. 세 명 모두 **경도 지적장애가 있는 허구의 성인**이며 선택한 인지·적응 특성과 개인 성격이 서로 다르다. 각자의 강점·취향·경험·선택권을 유지하고 모든 어려움을 한 인물에게 합치지 않는다. 절약·빠른 결정·카레 선호 자체를 장애 특성으로 설명하지 않는다. 확률 수치는 합성 정책의 설계값이며 사람이나 장애 집단에서 추정한 통계가 아니다. 자연어 prompt는 B에 전달하고, A가 자연어의 모든 문장을 해석한다고 설명하지 않는다.
+실행 정의의 단일 원본은 [지민](../market-simulator/personas/mild-intellectual-disability-adult.json), [서연](../market-simulator/personas/careful-checker.json), [민수](../market-simulator/personas/quick-decider.json)의 구조화된 JSON이다. 전체 계획과 증분 계획은 같은 JSON에서 개인 특성을 읽고 모드별로 성격을 다시 정의하지 않는다. 세 명 모두 **경도 지적장애가 있는 허구의 성인**이며 선택한 인지·적응 특성과 개인 성격이 서로 다르다. 각자의 강점·취향·경험·선택권을 유지하고 모든 어려움을 한 인물에게 합치지 않는다. 절약·빠른 결정·카레 선호 자체를 장애 특성으로 설명하지 않는다. 확률 수치는 합성 정책의 설계값이며 사람이나 장애 집단에서 추정한 통계가 아니다. AI 모드는 character를 전달하며 practicedStrategies는 시작 시점의 습관이다. learningProfile은 관찰할 연습 영역과 전이 조건이며 행동 의무나 숙달 점수가 아니다. 확률 모드가 자연어의 모든 문장을 해석한다고 설명하지 않는다.
 
-세 프로필의 근거를 확인하거나 수정할 때는 [사용자 역할 요청](../market-simulator/personas/references/persona-role-request.ko.md), [행동 이해 자료 전문](../market-simulator/personas/references/intellectual-disability-behavior-analysis.ko.md), [대응과 한계](../market-simulator/personas/audit.md)를 읽는다. [지민 v5](../market-simulator/personas/persona-mild-intellectual-disability-adult-v5.md), [서연 v3](../market-simulator/personas/persona-careful-checker-v3.md), [민수 v3](../market-simulator/personas/persona-quick-decider-v3.md) 사본은 각각 JSON prompt와 같다. 세 prompt에 두 원자료 전문을 보존하되, 자료 전체의 특성을 매번 모두 연기하지 않는다. 원문을 전달하거나 게임 행동 차이를 확인한 사실을 임상적 타당성 검증으로 설명하지 않는다.
+세 프로필의 근거를 확인하거나 수정할 때는 [사용자 역할 요청](../market-simulator/personas/references/persona-role-request.ko.md), [행동 이해 자료 전문](../market-simulator/personas/references/intellectual-disability-behavior-analysis.ko.md), [대응과 한계](../market-simulator/personas/audit.md)를 읽는다. [지민 v6](../market-simulator/personas/persona-mild-intellectual-disability-adult-v6.md), [서연 v4](../market-simulator/personas/persona-careful-checker-v4.md), [민수 v4](../market-simulator/personas/persona-quick-decider-v4.md) 사본은 각각 JSON prompt와 같다. 세 prompt에 두 원자료 전문을 보존하되, 자료 전체의 특성을 매번 모두 연기하지 않는다. 원문을 전달하거나 게임 행동 차이를 확인한 사실을 임상적 타당성 검증으로 설명하지 않는다.
+
+전체 계획의 `bundle.persona.behavior`는 같은 JSON에서 상세 개인 지침, 목표 기억 용량, 반응/보행 기준과 상황별 인지 설정을 가져온다. 관심 전환, 유사 상품 구분, 수량 추적에 연결하는 설정은 합성 부담의 설계값이며 강제 오답 확률이나 임상 척도가 아니다. 새 성격을 정의하거나 원자료의 모든 어려움을 추가하지 않는다. candidate 7은 매 결정에 nullable `basis.goalId`와 배열 `basis.memoryUses`를 적고, 선택적 `actorState.taskUpdate`로 목표의 선택·완료·포기를 선언한다. `focusedGoalId:null`이나 관심·탐색 전환만으로 열린 목표를 `heldGoalIds`에서 지울 수 없다. `actorState.memoryUpdate`는 믿는 값·불확실성의 선언이며 목표 종료를 대신하지 않는다. 작업 기억과 과제 상태 snapshot은 코드가 계산한다. 관찰 원장에 정확한 목표가 남아 있거나 컴파일러가 objective proof를 연결했다는 이유로 잊힌 세부를 정확하게 복원하지 않는다. focus와 기억·과제 계약, 표시된 목록·장바구니의 범위는 [전체 계획 절차](references/whole-trace.md)를 따른다. 이 상태와 근거는 허구의 공개 행동 요약이며 실제 내면 사고·발화·심리 측정이 아니다.
 
 ## 연결과 생성
 
 1. [실행 안내](../market-simulator/README.md)에 따라 전용 DB·인증키·테스트 계정과 개발용 웹앱을 준비한다. `MARKET_REPLAY_CONFIG`의 private 파일에 정확한 app/backend origin, 계정 allowlist, `isolated:true`를 설정한다. 운영 대상은 지원하지 않는다. 이 설정은 격리의 원격 증명이 아니므로 이미 실제 분리를 확인한 환경을 사용한다.
 2. 지속 실행되는 MCP에서 `pair_app_session({appOrigin,backendOrigin,memberId})`을 호출한다. 반환 URL을 새 개발용 앱 탭으로 열고 지정 계정으로 로그인한다. URL의 일회성 토큰은 저장·공유·보고서 기록하지 않는다. 앱은 fragment를 메모리로 읽고 주소에서 제거한다.
 3. 장보기 미션 시작 화면에서 `list_app_sessions`로 계정·백엔드·`ready:true`·`visible:true`와 snapshot ID를 확인한다. 사용자가 시작 버튼을 미리 누르지 않도록 한다. trace의 `start`가 기존 버튼을 누른다.
-4. `generate_trace({personaId,seed,tabId})`로 해당 미션의 trace를 파일에 저장한다. 오프라인 생성에는 실제 시작 전 snapshot 또는 snapshotFilePath를 대신 사용한다. LLM 모드 키는 `llm.apiKeyEnv`에 환경변수 이름으로만 전달한다.
-5. `validate_trace({traceFilePath,tabId})`가 성공한 뒤 `play_trace({traceFilePath,tabId})`로 전체 trace를 전달한다. 미션이 달라졌으면 새 snapshot으로 다시 생성한다. 좌표·로그·대상 ID를 사후 변조하지 않는다.
+4. Luna 전체 계획은 `prepare_whole_trace({personaId,seed,tabId})` → bundle의 현재 선택지로 전체 행동 계획 작성 → `submit_whole_trace({requestId,candidate})`로 저장한다. 새 기본 형식은 bundle 8 / candidate 7이며 행동은 현재 화면·위치에 묶인 `choiceRef`로 선택한다. 매 결정의 `basis.goalId`·`memoryUses`와 필요한 `actorState.taskUpdate`·`memoryUpdate`는 [전체 계획 절차](references/whole-trace.md)의 계약을 따른다. 기존 candidate 6/5/4/3은 각자의 형식과 검증 의미를 유지한다. 기존 증분 provider 생성은 `generate_trace({personaId,seed,tabId})`를 사용한다. 오프라인 생성에는 실제 시작 전 snapshot 또는 snapshotFilePath를 대신 사용한다. 원격 LLM 모드 키는 `llm.apiKeyEnv`에 환경변수 이름으로만 전달한다.
+5. `validate_trace({traceFilePath,tabId})`가 성공한 뒤 `play_trace({traceFilePath,tabId})`로 전체 trace를 전달한다. 미션이 달라졌으면 새 snapshot으로 다시 생성한다. 좌표·로그·대상 ID를 사후 변조하지 않는다. 생성·검증만 요청받으면 저장된 snapshot으로 생성하고 검증까지만 수행하며, 앱 재생·DB 전송·분석 요청은 실행하지 않는다.
+
+전체 계획의 기술 수정은 `maxRepairs:1`일 때 `repair_whole_trace`로 실패한 뒤쪽 결정만 다시 제출한다. 서버는 이미 수락한 정확한 앞부분을 유지하고 같은 candidate 형식과 원래 종료 의도를 요구한다. `maxRepairs:0`이면 수정할 수 없다. 오류의 `repairContext`에는 최신 관측·현재 선택지·알려진 단서가 있으므로 이를 기준으로 스키마·선택 참조만 고친다. 미관찰 근거 오류를 자발적 포기로 바꾸거나 구매 결과를 최적화하지 않는다. 세부 요청 형식은 [전체 계획 절차](references/whole-trace.md)를 따른다.
+
+### 기존 Codex 증분 계획
+
+학교 서버 모델을 행동마다 부르는 대신 현재 Codex 세션 모델이 actor가 되어야 할 때 `begin_actor_plan({personaId,seed,tabId})`을 호출한다. 응답의 `sessionId`로 `observe_actor_plan`을 읽고, 현재 관측과 페르소나, 실제 관찰 기억, `availableChoices`만 사용해 `append_actor_plan({sessionId,revision,choiceIds,delayMs,reasons})`을 제출한다. provenance는 `gpt-6-luna`, reasoning `low`, 정책 `episodic-choice-v10`/trace policy `6`이다. API 키를 설정하지 않는다.
+
+묶음은 1~3개이며 3개를 채울 필요가 없다. 각 항목은 현재 choice ID, 자체 지연, 짧은 행동 이유를 갖는다. 실행기는 동일한 attention loop와 TraceGuard를 사용하고 각 행동 직전 choice 목록을 다시 계산한다. 관측이나 선택 집합이 달라지면 잔여 계획은 폐기되고 새 revision이 발행된다. 단계가 바뀌거나 화면·장바구니·목록·상품·단서가 바뀐 경우 이전 ID를 재사용하지 말고 새 관측을 읽는다. 잘못된 revision/ID, 중복 제출, 빈 계획, 네 개 이상인 묶음은 거절된다.
+
+계획은 오프라인 trace만 구성한다. 마지막에 `finalize_actor_plan`으로 저장 결과를 받은 다음 일반 `validate_trace`를 통과시켜 전체 trace를 한 번에 `play_trace`한다. 계획 중 앱 입력 RPC를 보내지 않는다. 현재 MCP가 없다면 `node market-simulator/cli.cjs interactive`를 켜고 같은 네 도구를 한 줄 JSON 프로토콜로 호출한다.
 
 ## 재생과 검증
 
 `replay_status({replayId})`로 실제 앱의 진행·완료·실패·측정값을 확인한다. AI 분석 흐름은 요청 수락을 기다린 후 나가기까지 수행한다. 중단은 `stop_replay({tabId})`로 요청하며 앱 확인까지 lease가 유지된다. 연결 상실·heartbeat 만료·화면 숨김·미션/계정 변경 시 중단을 해결하고 새 pairing으로 시작한다. 다른 계정의 앱 탭은 병렬 실행할 수 있다. 같은 계정·탭 중복 실행은 허용하지 않는다.
 
-이동은 실제 앱의 joystick과 게임 루프를 사용하고 상품은 기존 드래그 경로를 거친다. 시간 배속, 순간이동, 숨겨진 정답 사용, trace를 작은 이동명령으로 나눠 RPC 전송하는 방식은 사용하지 않는다. 화면 움직임·드래그와 실제 앱 측정값을 확인한다. trace 스키마 통과나 생성기의 실행 가능성 검사만으로 부드러운 화면 재생·백엔드 수락이 검증됐다고 보고하지 않는다.
+이동은 실제 앱의 joystick과 게임 루프를 사용하고 상품은 기존 드래그 경로를 거친다. 순간이동이나 trace를 작은 이동명령으로 나눠 RPC 전송하는 방식은 사용하지 않는다. 증분 계획은 관찰하지 않은 정답을 주입하지 않는다. 전체 계획에서도 세계 참고 자료의 미발견 상품·장소를 인물의 지식으로 사용하지 않는다. Node의 화면·발견 기억 감사와 기존 이동·재고 가드는 선언된 행동 근거를 검사하며 모델 내부의 판단까지 증명하지는 못한다. 화면 움직임·드래그와 실제 앱 측정값을 확인한다. `whole-trace-v3`는 `timingProfile` 기본값/허용값이 `original`이며 Luna의 행동 전 지연과 개인 보행 기준을 보존한다. 명시적 `compact`는 거절하고 결과에 `actor-preserved-v1`을 기록한다. 다른 경로의 compact 재생 일정은 시험 시간을 줄이는 설정이며 사람의 반응 속도·능력 향상 지표가 아니다. trace 스키마 통과나 생성기의 실행 가능성 검사만으로 부드러운 화면 재생·백엔드 수락이 검증됐다고 보고하지 않는다.
 
 `replay-manifest.jsonl`로 trace/hash·replay·탭·테스트 계정·questInstanceId·실제 tracker sessionId를 연결한다. 기존 `BehaviorLogRequest`에 합성 태그를 추가하지 않으므로 전용 DB/계정 격리를 유지한다. 보고에는 실행 모드, 페르소나/정책 버전, seed, trace 파일과 replay ID, 실제 완료 상태 및 확인한 앱 지표를 남긴다. 인증정보나 pairing URL은 제외한다.
 
 ## 주의·경험과 계획의 범위
 
-현재 세 프로필 모두 trace v2/정책 v5를 사용한다. 저장된 기존 v1 trace도 재생할 수 있다. v2의 segment 앵커는 목적지의 일부 구간이며 전체 trace 안에 들어간다. `readList`는 실제 HUD 목록을 처음부터 끝까지 스크롤해 읽고, `browse`는 선반 페이지를 살핀다. 노출되지 않은 상품이나 전체 정답을 먼저 알고 선택하지 않는다.
+세 프로필의 trace 형식은 v2이며 provider/확률 정책은 policy `5`, Codex 직접 계획과 전체 계획은 policy `6`이다. 현재 actor 정책은 각각 `episodic-choice-v9`, `episodic-choice-v10`, `whole-trace-v3`이다. 전체 계획의 새 기본 bundle 8 / candidate 7은 `taskContract:"persistent-task-memory-v1"`·`taskStateVersion:"persistent-task-v1"`에 기존 `memoryContract:"working-memory-v1"`·`cognitionVersion:"context-cognition-v1"`를 연결한다. candidate 7 knowledge audit는 `auditVersion:"6"`이며 열린 목표와 선택·완료·포기, focus와 기억 사용을 기록한다. legacy 6은 audit 5와 기존 기억 계약, 5는 focus 계약, 4와 명시형 3은 기존 검증을 유지한다. 기존 후보·trace를 새 계약으로 소급 변환하지 않는다. 정책 이름이 같아도 과제·기억 계약이 다른 표본을 같은 생성 조건으로 비교하지 않는다. 목표·상품 focus는 기억 내용이나 실제 구매를 자동 교정하지 않으며 목록을 읽는 결정 직전에는 그 행동으로 얻을 목표가 아직 알려져 있지 않다. 관심 동안 유지된 목표가 없으면 기억 부담은 `unexercised`로 보고하고 개선 증거로 삼지 않는다. 관심 매대를 열고 닫은 것과 실제 상품 집중·비교도 구분한다. 세계 참고 자료, 기억 분리와 repair 절차는 [전체 계획 절차](references/whole-trace.md)를 따른다.
 
-상품 경험과 배치·조작 경험을 구분한다. `attentionExperience.visit`의 `first-play`/`revisit`로 회차 조건을 정하고, 반복 방문에는 이전 trace의 layoutKey와 memory를 명시적으로 넘긴다. 현재 배치 키는 생성기가 계산한다. 다른 배치에서는 공간 기억을 이월하지 않고 학습한 조작을 별도로 유지한다. [실행 안내의 회차 경험](../market-simulator/README.md#주의-정책의-회차-경험과-재생)에 옵션 예시가 있다.
+상품 경험과 배치·조작 경험을 구분한다. `attentionExperience.visit`의 `first-play`/`revisit`로 회차 조건을 정하고, 반복 실험에는 create_learner로 만든 개인별 archive를 사용하고 실제 재생·DB 확인 경험만 이월한다. 단독 생성은 generate_trace의 learnerFile로 자동 로드한다. 이전 계획의 memory를 실제 수행 경험으로 승격하지 않는다. 현재 배치 키는 생성기가 계산한다. 다른 배치에서는 공간 기억을 이월하지 않고 학습한 조작을 별도로 유지한다. [실행 안내의 회차 경험](../market-simulator/README.md#주의-정책의-회차-경험과-재생)에 옵션 예시가 있다.
 
 `trace.attentionExperience.source`는 `planned-trace`다. 미리 만든 계획의 기억을 실제 앱 학습의 증거로 보고하지 않는다. 주의 이탈·복귀는 생성 단계에서 계획되며 실제 재생 중 관찰에 따라 새로 결정하는 적응 분기는 없다. 앱에 완성된 trace 전체를 전달하고 실제 수행 여부는 재생 결과로 확인한다.
 
-attention 정책의 액션/시간 상한 초과는 기술적 생성 실패다. 이를 인물의 포기 행동으로 바꾸거나 완료한 표본에 포함하지 않는다. `attentionTag`·`cueRefs` 같은 기록은 생성 조건의 감사 정보이며 인물의 발화·실측 심리 상태가 아니다.
+`maxActions`·`timeBudgetMs`·증분 LLM `maxCalls`는 기술 실행 예산이다. 이를 초과한 생성은 기술 실패이며 인물의 포기나 완성 trace로 바꾸지 않는다. 아래 AI 행동 100회 관찰 상한과 별개여서 너무 작은 예산은 100회 전에 오류를 낼 수 있다. 전체 계획은 후보 제출 횟수·수정 횟수를 별도로 기록하며 `maxCalls`를 모델 행동 수로 보고하지 않는다. `attentionTag`·`cueRefs` 같은 기록은 생성 조건의 감사 정보이며 인물의 발화·실측 심리 상태가 아니다.
+
+AI 정책 `episodic-choice-v9`는 새 관측·도착 여부·반복 이동 결과를 기록하되, 반복을 이유로 재검토를 지시하거나 종료하지 않는다. 모델이 선택하는 첫 100회에는 배회·관심 전환·재방문·휴식·도움·포기를 계속 허용하며, 다른 길이나 정답을 강제로 선택하지 않는다. 선택지는 행동마다 안정적인 ID를 갖고 seed/판단 순번에 따라 정답과 무관하게 제시된다.
+
+모델이 선택해 적용한 상위 행동을 최대 100회 관찰한다. 게임 시작·이동의 세부 입력·이후 시스템 처리 단계는 이 수에 포함하지 않는다. 100번째를 포함해 모델이 제출·자발적 포기를 선택하면 그 결과를 따른다. 100회 후에도 진행 중일 때만 **그때의 장바구니 그대로 계산·분석 접수하는 시스템 구간**을 추가한다. 빈 장바구니도 그대로 제출하며 상품을 담거나 빼거나 정답으로 보정하지 않는다. 기존 이동 입력으로 계산대까지 이동하고, 직원이 없으면 직원에게 호출을 요청한 뒤 `submitForReview → awaitReviewAccepted → leave`로 끝낸다. [행동 상한 기준](../market-simulator/README.md#행동-100회-상한과-시스템-계산)은 관찰 범위이며 장애 특성이나 임상 기준이 아니다. 확률 모드의 종료 정책은 바뀌지 않는다.
+
+`generation.systemCompletion = {reason:"action-limit", afterDecisions:100, actionLimit:100, firstStepId, checkoutId, cartAtStart}`로 시스템 구간과 당시 장바구니를 기록한다. `firstStepId`부터는 시스템이 결정한 처리이므로 페르소나가 스스로 계산대를 찾아 제출한 능력으로 보고하지 않는다. 실행·DB 증거와 실제 제출 장바구니의 일치를 확인한 뒤 **시스템 구간 이전의 경험만** 개인 기억으로 저장한다. 자동 이동·계산·직원 호출은 다음 회차 경험에 넣지 않는다. 이 회차는 `assisted-submission`으로 분석·다음 퀘스트 연결을 이어갈 수 있지만, `performanceEligible:false`와 `metrics:null`로 독립 완수 비교에서 제외한다. 제출 내용의 누락·초과 등은 별도 측정에 남긴다. 계획에 분석 접수 단계가 있어도 실제 서버 접수·분석 `READY`는 별도로 확인한다. 생성 중 `.generation/` 진단 자료는 완성 trace·실행 경험 대신 사용하지 않는다. 새 정책 실험은 이전 개인·실험을 덮어쓰지 않고 별도로 만든다.
+
+기존 v6/v7의 반복 정체 종료와 v8의 100회 포기 종료는 `generation.controlledStop`으로 계속 구분한다. 호환 검증을 유지하되 v9의 시스템 계산과 섞거나 메타데이터를 지워 자발적 수행으로 바꾸지 않는다. 기술 오류로 생성이 끊긴 자료도 시스템 계산을 완료한 trace로 보고하지 않는다.
+
+## 맞춤 퀘스트와 경험의 반복 검증
+
+반복 학습·맞춤 과제 효과 요청에는 [학습 실험 절차](references/learning-trials.md)를 읽는다. 기존 provider 경로는 create_learner → create_learning_trial → generate_learning_round → play_trace → 실행/DB 증거 수집 → record_learning_round → 다음 분석 READY/AI 퀘스트 확인을 이어 간다. compare_learning_trial로 미완료와 기술 실패를 포함해 보고한다. 전체 계획은 `create_whole_trace_learner`로 새 개인을 만들고 `whole-trace-v3` 새 trial에서 `prepare_whole_trace({trialFile,arm,...})` → 후보 작성·제출을 사용한다. 나머지 실행·증거·다음 분석 절차는 동일하며 [전체 계획 절차](references/whole-trace.md)에 예시가 있다. 이전 전체 계획 정책의 개인·trial은 덮어쓰지 않고 기존 provider 실험·기억과도 섞지 않는다. 전체 계획 도구만 호출하고 앱 실행·분석이 완료됐다고 보고하지 않는다.
+
+같은 개인의 성격·모델·정책과 호출 상한을 고정한다. A는 일반 과제+기억, B는 맞춤 과제+기억, C는 맞춤 과제+이전 기억 미전달이다. 계정을 분리하고 기준/평가 과제를 사전 고정한다. 기억 없는 C도 같은 회차 안의 관찰은 유지한다. 시간·도움 횟수 감소를 자동 성장으로 해석하지 않는다. 개선되지 않은 결과도 그대로 보존한다.
+
+도움과 직원 응답은 실제 앱과 공유한 문구만 전달한다. 안내가 있었다는 사실은 이해했다는 뜻이 아니다. reason은 모델이 만든 행동 설명이며 성장이나 내면 상태의 증거로 쓰지 않는다. 현재 도구는 회차 준비·기억 전달·증거 검증을 자동화하고, 앱 진입·분석 응답 수집·다음 미션 로딩은 Codex가 기존 앱/서버 도구로 수행한다. 준비 도구만 호출하고 실제 플레이·학습이 완료됐다고 보고하지 않는다.
 
 ## 표본 차이와 재현
 
-**새 표본에는 새 seed를 쓴다.** 같은 snapshot·정책/페르소나 버전·seed·입력 attentionExperience는 A 모드 재현용이다. 같은 seed를 독립 표본으로 중복 보고하지 않는다. B 모드 새 모델 호출은 seed 재현을 보장하지 않으므로 저장된 완성 trace를 다시 재생한다. 모델 실패를 A로 조용히 바꾸지 않는다.
+**새 독립 표본에는 새 seed를 쓴다.** 반복 실험의 회차 seed는 trialId에서 생성되고 고정되므로 수동 변경하지 않는다. 독립 반복에는 새 trialId와 개인 파일을 만든다. 같은 snapshot·정책/페르소나 버전·seed·입력 attentionExperience는 확률 모드 재현용이다. 같은 seed를 독립 표본으로 중복 보고하지 않는다. AI 모드 새 모델 호출은 seed 재현을 보장하지 않으므로 저장된 완성 trace를 다시 재생한다. 모델 실패를 확률 모드로 조용히 바꾸지 않는다.
 
 같은 미션의 여러 seed와 다른 페르소나를 비교한다. 지연시간뿐 아니라 비교한 선반 페이지·선택 후 목록 확인·계산 전 확인·친숙한 상품 선택·관심 구간·방향 전환·복귀 차이를 보고한다. 대안이 없는 지정 상품에서 가격 비교의 효과를 부풀리지 않는다. “이유 없는 반복 금지”를 “모든 행동이 구매에 직접 유용해야 한다”로 해석하지 않는다. 실수·이탈 quota나 제출 전 완벽한 장바구니 복구를 강제하지 않는다. `reason`은 짧은 관찰 기술도 허용하며 인물의 자기설명이나 내부 사고 과정을 요구하지 않는다.
 

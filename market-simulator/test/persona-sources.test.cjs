@@ -8,7 +8,7 @@ const personaDirectory = path.resolve(__dirname, '../personas');
 const referencesDirectory = path.join(personaDirectory, 'references');
 const metadata = JSON.parse(fs.readFileSync(path.join(referencesDirectory, 'sources.json'), 'utf8'));
 const profile = JSON.parse(fs.readFileSync(path.join(personaDirectory, 'mild-intellectual-disability-adult.json'), 'utf8'));
-const activeVersions = { 'mild-intellectual-disability-adult': '5', 'careful-checker': '3', 'quick-decider': '3' };
+const activeVersions = { 'mild-intellectual-disability-adult': '6', 'careful-checker': '4', 'quick-decider': '4' };
 const activeProfiles = Object.keys(activeVersions).map(id => JSON.parse(fs.readFileSync(path.join(personaDirectory, `${id}.json`), 'utf8')));
 const expectedChecksums = {
   source1: '2546f2f03482241343cc34dcf3b7928122de36180852eea08ac747967531e79b',
@@ -18,7 +18,7 @@ const source = (id) => fs.readFileSync(path.resolve(referencesDirectory, metadat
 
 test('both original persona sources retain their bytes, checksums and reference links', () => {
   assert.equal(metadata.personaId, profile.id);
-  assert.equal(metadata.personaVersion, '5');
+  assert.equal(metadata.personaVersion, '6');
   assert.deepEqual(metadata.profiles.map(p => [p.personaId, p.personaVersion]), Object.entries(activeVersions));
   for (const item of metadata.profiles) {
     assert.deepEqual(item.sourceIds, ['source1', 'source2']);
@@ -75,7 +75,7 @@ test('all nine source prohibitions and their limiting context remain in the acti
 });
 test('one stable adult character selects a bounded trait subset, strengths and personal preferences', () => {
   const character = profile.character;
-  assert.deepEqual(Object.keys(character).sort(), ['name', 'age', 'goal', 'selectedTraits', 'strengths', 'preferences', 'familiarCategories', 'familiarProductIds', 'practicedStrategies'].sort());
+  assert.deepEqual(Object.keys(character).sort(), ['name', 'age', 'goal', 'learningProfile', 'selectedTraits', 'strengths', 'preferences', 'familiarCategories', 'familiarProductIds', 'practicedStrategies'].sort());
   assert.equal(character.name, '지민');
   assert.equal(character.age, 32);
   assert.equal(character.selectedTraits.length, 4);

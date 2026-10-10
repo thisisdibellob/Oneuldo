@@ -13,6 +13,15 @@ export type MarketReplaySnapshot = {
 };
 type StepBase = { id: string; reactionDelayMs: number; timeoutMs: number; reason: string; attentionTag?: string; cueRefs?: string[] };
 export type ReplayMovement = { style: 'careful' | 'steady' | 'brisk'; speedMultiplier: number; running: false; motorSeed: string; accelerationMs: number };
+/** The generator ended an incomplete observation. Its terminal actions are never the persona's decision. */
+export type MarketReplayControlledStop =
+  | { reason: 'persistent-stagnation'; afterDecisions: number; reviewCount: number }
+  | { reason: 'action-limit'; afterDecisions: 100; actionLimit: 100 };
+/** Complete checkout with the actor's unchanged basket after the bounded observation. */
+export type MarketReplaySystemCompletion = {
+  reason: 'action-limit'; afterDecisions: 100; actionLimit: 100; firstStepId: string;
+  checkoutId: MarketCheckoutId; cartAtStart: Record<string, number>;
+};
 export type MarketReplayStep = StepBase & (
   | { type: 'start' | 'viewCart' | 'viewHelp' | 'closeView' | 'closeStation' | 'submitForReview' | 'awaitReviewAccepted' | 'giveUp' | 'skipRating' | 'leave' }
   | { type: 'walkTo'; target: { stationId: MarketEnvironmentStationId }; movement: ReplayMovement }
@@ -32,12 +41,20 @@ export type MarketReplayStep = StepBase & (
 );
 export type MarketReplayTrace = {
   traceSchemaVersion: '1' | '2'; traceId: string; personaId: string; personaVersion: string; seed: string | number;
-  generationPolicy: 'stochastic' | 'llm'; policyVersion: '3' | '4' | '5';
+  generationPolicy: 'stochastic' | 'llm'; policyVersion: '3' | '4' | '5' | '6';
   experienceMode?: 'first-play' | 'revisit';
   attentionExperience?: { layoutKey: string; memory: Record<string, unknown>; source: 'planned-trace' };
   /** Fresh LLM requests are not seed deterministic. A captured trace is replayable. */
   generation?: { model: string; reproducibility: 'seed-and-snapshot' | 'captured-trace'; requestId?: string;
-    timingProfile?: 'compact-v1'; sourceTraceId?: string; actorPolicyVersion?: 'episodic-choice-v1' | 'episodic-choice-v2' | 'episodic-choice-v3' | 'episodic-choice-v4' };
+    timingProfile?: 'compact-v1' | 'actor-preserved-v1'; sourceTraceId?: string; actorPolicyVersion?: 'episodic-choice-v1' | 'episodic-choice-v2' | 'episodic-choice-v3' | 'episodic-choice-v4' | 'episodic-choice-v5' | 'episodic-choice-v6' | 'episodic-choice-v7' | 'episodic-choice-v8' | 'episodic-choice-v9' | 'episodic-choice-v10' | 'whole-trace-v1' | 'whole-trace-v2' | 'whole-trace-v3';
+    reasoningEffort?: 'low';
+    planningMode?: 'whole-trace'; observationScope?: 'whole-world'; actorKnowledgeScope?: 'observed-and-remembered'; actorStateVersion?: '1'; planningSubmissions?: number; repairSubmissions?: number;
+    controlledStop?: MarketReplayControlledStop;
+    systemCompletion?: MarketReplaySystemCompletion;
+    experienceFingerprint?: string;
+    learnerIdentity?: { learnerId: string; memberId: string; personaId: string; personaVersion: string;
+      experimentId: string; arm: 'A' | 'B' | 'C'; model: string; policyVersion: string; reasoningEffort?: 'low' };
+    trialBinding?: { trialId: string; arm: 'A' | 'B' | 'C'; roundId: string; requestHash: string } };
   target: { snapshotId: string; scenarioId?: string; missionId?: string; completionMode: 'ai-review' };
   steps: MarketReplayStep[];
 };
@@ -151,7 +168,48 @@ export function validateMarketReplayTrace(value: unknown, snapshot?: MarketRepla
       || trace.steps.some(step => step.type === 'walkToAnchor' || step.type === 'readList' || step.attentionTag !== undefined || step.cueRefs !== undefined)) {
       errors.push('Attention intentions and metadata require trace schema 2 and policy 4.');
     }
-  } else if (!['4', '5'].includes(trace.policyVersion)) errors.push('Trace schema 2 requires policy 4 or 5.');
+  } else if (!['4', '5', '6'].includes(trace.policyVersion)) errors.push('Trace schema 2 requires policy 4, 5 or 6.');
+  const generation = trace.generation;
+  const wholeTrace = ['whole-trace-v1', 'whole-trace-v2', 'whole-trace-v3'].includes(generation?.actorPolicyVersion ?? '');
+  const wholeMetadata = generation && ['planningMode', 'observationScope', 'actorKnowledgeScope', 'actorStateVersion', 'planningSubmissions', 'repairSubmissions']
+    .some(key => Object.hasOwn(generation, key));
+  if (wholeTrace || wholeMetadata) {
+    if (!wholeTrace || generation?.planningMode !== 'whole-trace' || generation?.observationScope !== 'whole-world'
+      || trace.generationPolicy !== 'llm' || trace.traceSchemaVersion !== '2' || trace.policyVersion !== '6'
+      || generation?.model !== 'gpt-6-luna' || generation?.reasoningEffort !== 'low') {
+      errors.push('Whole-trace planning requires the whole-trace-v1, v2 or v3 Luna low policy, schema 2, policy 6 and explicit whole-world scope.');
+    }
+    if (generation?.actorPolicyVersion === 'whole-trace-v2' && generation.actorKnowledgeScope !== 'observed-and-remembered')
+      errors.push('Whole-trace-v2 requires explicit observed-and-remembered actor knowledge scope.');
+    if (generation?.actorPolicyVersion === 'whole-trace-v3') {
+      if (generation.actorKnowledgeScope !== 'observed-and-remembered')
+        errors.push('Whole-trace-v3 requires explicit observed-and-remembered actor knowledge scope.');
+      if (generation.actorStateVersion !== '1')
+        errors.push('Whole-trace-v3 requires actorStateVersion 1.');
+      if (generation.timingProfile !== 'actor-preserved-v1')
+        errors.push('Whole-trace-v3 requires actor-preserved-v1 timing.');
+    }
+    if (generation?.actorPolicyVersion === 'whole-trace-v1' && generation.actorKnowledgeScope !== undefined)
+      errors.push('Legacy whole-trace-v1 cannot claim the actor knowledge scope introduced by v2.');
+    if (!Number.isSafeInteger(generation?.planningSubmissions) || generation!.planningSubmissions! < 1
+      || !Number.isSafeInteger(generation?.repairSubmissions) || generation!.repairSubmissions! < 0
+      || generation!.repairSubmissions! >= generation!.planningSubmissions!) {
+      errors.push('Whole-trace submission counts must be safe integers with at least one initial planning submission.');
+    }
+    if (generation?.learnerIdentity && (generation.learnerIdentity.model !== generation.model || generation.learnerIdentity.reasoningEffort !== generation.reasoningEffort)) {
+      errors.push('Whole-trace learner identity differs from its planner policy, model or reasoning effort.');
+    }
+    if (generation?.learnerIdentity && generation.learnerIdentity.policyVersion !== generation.actorPolicyVersion)
+      errors.push('Learner policyVersion must match the generation actorPolicyVersion.');
+  } else if (['whole-trace-v1', 'whole-trace-v2', 'whole-trace-v3'].includes(generation?.learnerIdentity?.policyVersion ?? '')) {
+    errors.push('A whole-trace learner requires explicit whole-trace planning metadata.');
+  }
+  if (generation?.actorPolicyVersion !== 'whole-trace-v3') {
+    if (generation?.actorStateVersion !== undefined)
+      errors.push('Actor state metadata requires the whole-trace-v3 policy.');
+    if (generation?.timingProfile === 'actor-preserved-v1')
+      errors.push('Actor-preserved timing requires the whole-trace-v3 policy.');
+  }
   if (trace.attentionExperience && JSON.stringify(trace.attentionExperience).length > 250000) errors.push('Attention experience is too large.');
   if (trace.traceId !== marketReplayTraceId(trace)) errors.push('Trace identity does not match its contents.');
   if (new Set(trace.steps.map(step => step.id)).size !== trace.steps.length) errors.push('Step IDs must be unique.');
@@ -162,6 +220,41 @@ export function validateMarketReplayTrace(value: unknown, snapshot?: MarketRepla
   if ((submit >= 0) === (quit >= 0)) errors.push('An AI review trace must either submit for review or give up.');
   if (submit >= 0 && (submit !== trace.steps.length - 3 || trace.steps[submit + 1].type !== 'awaitReviewAccepted')) errors.push('AI review must terminate with submitForReview, awaitReviewAccepted, leave.');
   if (quit >= 0 && (quit !== trace.steps.length - 3 || trace.steps[quit + 1].type !== 'skipRating')) errors.push('giveUp must terminate with skipRating, leave.');
+  if (trace.generation?.controlledStop) {
+    const stop = trace.generation.controlledStop;
+    if (trace.generationPolicy !== 'llm' || trace.traceSchemaVersion !== '2' || !['5','6'].includes(trace.policyVersion)) errors.push('Controlled stops require an LLM trace with schema 2 and policy 5 or 6.');
+    if (quit < 0 || submit >= 0) errors.push('A controlled stop must terminate with giveUp, skipRating, leave; it cannot submit for review.');
+    if (stop.reason === 'persistent-stagnation') {
+      if (!['episodic-choice-v6', 'episodic-choice-v7'].includes(trace.generation.actorPolicyVersion ?? '')) errors.push('Persistent-stagnation stops require an episodic-choice-v6 or episodic-choice-v7 LLM trace.');
+      if (!Number.isSafeInteger(stop.afterDecisions) || !Number.isSafeInteger(stop.reviewCount)
+        || stop.reviewCount > stop.afterDecisions) errors.push('Controlled stop review count must not exceed its decision count.');
+    } else {
+      if (trace.generation.actorPolicyVersion !== 'episodic-choice-v8') errors.push('Action-limit stops require an episodic-choice-v8 LLM trace.');
+      // A decision may also emit a view-closing step, so this is a lower bound rather than an exact step count.
+      if (trace.steps.length - 4 < stop.afterDecisions) errors.push('An action-limit stop must contain at least 100 actor steps before its system terminal tail.');
+    }
+  }
+  if (trace.generation?.systemCompletion) {
+    const completion = trace.generation.systemCompletion;
+    if (trace.generation.controlledStop) errors.push('System completion and controlled stop are mutually exclusive.');
+    if (trace.generationPolicy !== 'llm' || trace.traceSchemaVersion !== '2' || !['5','6'].includes(trace.policyVersion)
+      || !['episodic-choice-v9','episodic-choice-v10','whole-trace-v1','whole-trace-v2','whole-trace-v3'].includes(trace.generation.actorPolicyVersion ?? '')) errors.push('System completion requires an episodic-choice-v9, v10 or whole-trace-v1/v2/v3 LLM trace with schema 2 and policy 5 or 6.');
+    const first = trace.steps.findIndex(step => step.id === completion.firstStepId);
+    if (first < 101 || first > submit) errors.push('System completion must begin after at least 100 actor steps and no later than submission.');
+    if (quit >= 0 || submit < 0) errors.push('System completion must submit for review, await acceptance and leave; it cannot give up.');
+    if (Object.entries(completion.cartAtStart).some(([id, quantity]) => !id.trim() || id.length > 100
+      || !Number.isSafeInteger(quantity) || quantity <= 0)) errors.push('System completion cart must contain positive integer product quantities.');
+    const employee = (id: string) => id.startsWith('staff:') && (snapshot === undefined
+      || snapshot.environment.stationDetails.some(station => station.id === id && station.kind === 'employee'));
+    for (const step of first >= 0 ? trace.steps.slice(first) : []) {
+      const permitted = ['viewCart', 'closeView', 'closeStation', 'submitForReview', 'awaitReviewAccepted', 'leave'].includes(step.type)
+        || step.type === 'walkTo' && (step.target.stationId === completion.checkoutId || employee(step.target.stationId))
+        || step.type === 'talkToStaff' && employee(step.stationId)
+          && (step.choice === 'open' || step.choice === 'requestCashier' && step.checkoutId === completion.checkoutId)
+        || step.type === 'checkout' && step.checkoutId === completion.checkoutId;
+      if (!permitted) errors.push(`System completion cannot perform ${step.type} at ${step.id}; only unchanged-basket checkout controls are permitted.`);
+    }
+  }
   if (trace.steps.filter(s => s.type === 'skipRating').length !== Number(quit >= 0)) errors.push('skipRating is supported only after giveUp.');
   if (trace.steps.filter(s => s.type === 'awaitReviewAccepted').length !== Number(submit >= 0)) errors.push('Review wait must follow the only submission.');
   if (snapshot) {
@@ -171,4 +264,13 @@ export function validateMarketReplayTrace(value: unknown, snapshot?: MarketRepla
     if (trace.target.missionId !== snapshot.mission?.id) errors.push('Trace mission differs from the bound mission.');
   }
   return { valid: !errors.length, errors };
+}
+
+/** Only a structurally validated controller suffix may use the full movement planner. */
+export function isMarketReplaySystemCompletionStep(trace: MarketReplayTrace, stepId: string): boolean {
+  const completion = trace.generation?.systemCompletion;
+  if (!completion || !validateMarketReplayTrace(trace).valid) return false;
+  const first = trace.steps.findIndex(step => step.id === completion.firstStepId);
+  const current = trace.steps.findIndex(step => step.id === stepId);
+  return current >= first;
 }

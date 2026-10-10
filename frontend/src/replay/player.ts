@@ -1,4 +1,5 @@
-import { validateMarketReplayTrace, type MarketReplayStep, type MarketReplayTrace } from '../game/marketReplayTrace';
+import { canonicalMarketReplayJson, isMarketReplaySystemCompletionStep, validateMarketReplayTrace,
+  type MarketReplayStep, type MarketReplayTrace, type MarketReplaySystemCompletion } from '../game/marketReplayTrace';
 import { assertReplayActive, replayAwait, replayDelay, replayStep, replayUntil, type ReplayMotionPort, type ReplayUiPort } from './ports';
 import { createMotionReport, dragProduct, walkToAnchor, walkToStation, walkToVisibleStation } from './motor';
 import { replayPresentationKey, validateReplayPresentation } from '../game/marketReplayPerception';
@@ -7,6 +8,8 @@ export type ReplayProgress = {
   status: 'running' | 'completed' | 'failed' | 'stopped'; stepIndex: number; stepId?: string;
   error?: string; report: ReturnType<typeof createMotionReport> & { startedAt: string; endedAt?: string; acknowledged: boolean;
     submission?: { cart: Record<string, number>; capturedAt: string; source: 'app-ui-before-submit' };
+    systemCompletion?: MarketReplaySystemCompletion & { observedCartAtStart: Record<string, number>;
+      startedAt: string; source: 'app-ui-before-system-completion' };
     completedSteps: { id: string; type: string; startedAt: string; finishedAt: string; reason: string }[] };
 };
 export async function playMarketTrace(trace: MarketReplayTrace, getUi: () => ReplayUiPort | null,
@@ -25,6 +28,17 @@ export async function playMarketTrace(trace: MarketReplayTrace, getUi: () => Rep
   checkPresentation();
   if (!ui().read().briefing || ui().read().briefingStep !== 0) throw new Error('Replay must start on the first page of an untouched mission briefing');
   const report: ReplayProgress['report'] = { ...createMotionReport(), startedAt: new Date().toISOString(), acknowledged: false, completedSteps: [] };
+  const systemFirstId = trace.generation?.systemCompletion?.firstStepId;
+  const systemSteps = new Set(systemFirstId && isMarketReplaySystemCompletionStep(trace, systemFirstId)
+    ? trace.steps.slice(trace.steps.findIndex(step => step.id === systemFirstId)).map(step => step.id) : []);
+  const checkSystemCart = () => {
+    const expected = trace.generation!.systemCompletion!.cartAtStart;
+    const current = ui().read().cart;
+    if (Object.values(current).some(quantity => !Number.isSafeInteger(quantity) || quantity < 0)) throw new Error('System completion observed an invalid basket');
+    const positive = Object.fromEntries(Object.entries(current).filter(([, quantity]) => quantity > 0));
+    if (canonicalMarketReplayJson(positive) !== canonicalMarketReplayJson(expected)) throw new Error('System completion basket changed from the actor boundary');
+    return positive;
+  };
   let index = 0;
   const progress = (status: ReplayProgress['status'], error?: string) => onProgress({ status, stepIndex: index,
     stepId: trace.steps[index]?.id, ...(error ? { error } : {}), report: JSON.parse(JSON.stringify(report)) });
@@ -37,6 +51,15 @@ export async function playMarketTrace(trace: MarketReplayTrace, getUi: () => Rep
   async function execute(step: MarketReplayStep, signal: AbortSignal): Promise<void> {
     assertReplayActive(signal);
     checkPresentation();
+    if (systemSteps.has(step.id)) {
+      const observedCartAtStart = checkSystemCart();
+      if (step.id === trace.generation!.systemCompletion!.firstStepId) {
+        if (!ui().beginSystemCompletion) throw new Error('System completion provenance logging is unavailable');
+        ui().beginSystemCompletion!(trace.generation!.systemCompletion!);
+        report.systemCompletion = { ...trace.generation!.systemCompletion!, observedCartAtStart,
+          startedAt: new Date().toISOString(), source: 'app-ui-before-system-completion' };
+      }
+    }
     switch (step.type) {
       case 'start': {
         let pages = 0;
@@ -50,7 +73,7 @@ export async function playMarketTrace(trace: MarketReplayTrace, getUi: () => Rep
         await replayUntil(() => !motion.read().locked, signal); return;
       }
       case 'walkTo':
-        if (strict) await walkToVisibleStation(motion, step.target.stationId, presentation!, step.movement, signal, report, step.timeoutMs);
+        if (strict && !systemSteps.has(step.id)) await walkToVisibleStation(motion, step.target.stationId, presentation!, step.movement, signal, report, step.timeoutMs);
         else await walkToStation(motion, step.target.stationId, step.movement, signal, report, step.timeoutMs);
         return;
       case 'walkToAnchor': await walkToAnchor(motion, step.target.anchorId, presentation!, step.movement, signal, report, step.timeoutMs); return;
@@ -156,7 +179,10 @@ export async function playMarketTrace(trace: MarketReplayTrace, getUi: () => Rep
       await replayStep(stepSignal => execute(step, stepSignal), signal, step.timeoutMs);
       assertReplayActive(signal);
       // Acknowledged leave deliberately unmounts this UI and restores the village camera.
-      if (step.type !== 'leave') checkPresentation();
+      if (step.type !== 'leave') {
+        checkPresentation();
+        if (systemSteps.has(step.id)) checkSystemCart();
+      }
       report.completedSteps.push({ id: step.id, type: step.type, reason: step.reason, startedAt, finishedAt: new Date().toISOString() });
       progress('running');
     }

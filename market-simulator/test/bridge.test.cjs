@@ -101,6 +101,22 @@ test('stop retains lease until app confirms; disconnect and heartbeat expiration
     assert.equal(state.bridge.status({ replayId: rb.replayId }).reason, 'app-disconnected');
   } finally { await state.close(); }
 });
+test('learner-bound traces cannot send input or record a replay in a different account even with a matching mission', async () => {
+  const state = setup(); await state.bridge.start();
+  try {
+    const b = await connect(state.bridge, 'test-b'); await b.next('ready');
+    const bound = { ...trace('test-b'), generation: { learnerIdentity: { memberId: 'test-a' } } };
+    assert.throws(() => state.bridge.play(b.pair.tabId, bound, 'owner'), /Learner trace cannot play in another test account/);
+    assert.equal(state.bridge.replays.size, 0);
+    assert.equal(state.bridge.tabs.get(b.pair.tabId).replayId, null);
+    assert.equal(fs.existsSync(state.config.manifestPath), false);
+    const matching = { ...bound, generation: { learnerIdentity: { memberId: 'test-b' } } };
+    const run = state.bridge.play(b.pair.tabId, matching, 'owner');
+    const sent = await b.next('play');
+    assert.equal(sent.replayId, run.replayId);
+    assert.equal(sent.trace.generation.learnerIdentity.memberId, 'test-b');
+  } finally { await state.close(); }
+});
 test('mission mismatch cannot play; identity changes and consumed pairing credentials cannot reconnect', async () => {
   const state = setup(); await state.bridge.start();
   try {

@@ -16,6 +16,7 @@ public final class SourceEventDetails {
             + "이 사본은 상호작용 값만 포함한다. 자동 이동·근접·재방문 이벤트의 원본은 앞선 관측 입력에 보존하며 여기에는 중복 기재하지 않는다. "
             + "AI 구간 요약은 틀릴 수 있다. 기록이 없다는 주장, 수량 변경, 최종 장바구니를 이 사본과 대조하고 "
             + "상충하면 원본에 맞춰 해석을 수정한다. 출처가 없는 이전 세션 잔여물이나 기기 오류를 만들어 설명하지 않는다. "
+            + "assistantIntervention=true 또는 replaySystemCompletion으로 기록된 시스템 보조 수행은 행위자의 독립 완수나 능력 향상으로 간주하지 않고, 그 이전에 기록된 선택과 분리해 평가한다. "
             + "성패·의도·지원·난이도는 실제 목표와 자료 범위를 고려해 AI가 판단한다.";
     private static final List<String> VALUES = List.of("itemId", "stationId", "requiredQuantity", "selectedQuantity",
             "quantityBefore", "quantityAfter", "cartItemCount", "cartTotalAmount", "remainingBudgetAmount",
@@ -43,11 +44,13 @@ public final class SourceEventDetails {
             if (code != null) row.put("eventCode", code);
             JsonNode source = mapper.valueToTree(event);
             copy(source, "sessionEnd", row, "sessionEnd");
+            copy(source.path("validity"), "assistantIntervention", row, "assistantIntervention");
             if ("SHOP.SESSION_STARTED".equals(code) || "SHOP.SESSION_ENDED".equals(code))
                 copy(source.path("task"), "taskVersion", row, "collectorTaskVersion");
             var payload = source.path("payload");
             for (String field : VALUES) copy(payload, field, row, field);
             copy(payload.path("marketContent"), "cart", row, "cart");
+            copy(payload.path("marketContent"), "replaySystemCompletion", row, "replaySystemCompletion");
             // Preserve the selected SKU's recorded label and package unit, not the target family label.
             var item = payload.path("marketContent").path("item");
             if (item.isObject()) {
