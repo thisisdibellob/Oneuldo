@@ -53,6 +53,36 @@ test('v4 staffed checkout submits unchanged empty basket naturally, preserving a
   assert.deepEqual(validateTrace(result.trace, settings.snapshot), { valid: true, errors: [] });
 });
 
+test('v7 checkout alias completes one whole plan locally and audits authored and resolved references', async t => {
+  t.mock.method(globalThis, 'fetch', () => { throw new Error('Checkout reference binding must not call a model or app'); });
+  const { settings, bundle } = fixture('checkout'), initial = bundle.initialChoiceFrame.source;
+  const plan = focusedCandidate(bundle, [
+    decision(initial, 'open/checkout', { intent: 'finish', activity: 'finish', delayMs: 2400, reason: '이 계산대를 이용한다' }),
+    decision(checkoutSource(initial), 'control/submit', { intent: 'finish', activity: 'finish', delayMs: 1900, reason: '장바구니를 제출한다' }),
+  ]);
+  plan.candidateVersion = '7';
+  for (const d of plan.decisions) Object.assign(d.basis, { goalId: null, memoryUses: [] });
+  const original = structuredClone(plan);
+  const result = await compileWholeTraceCandidate(settings, bundle, plan);
+  assert.deepEqual(plan, original);
+  assert.equal(result.acceptedActions, 2);
+  assert.equal(globalThis.fetch.mock.calls.length, 0);
+  assert.equal(result.trace.generation.systemCompletion, undefined);
+  assert.deepEqual(result.knowledgeAudit.map(entry => entry.delayMs), [2400, 1900]);
+  assert.deepEqual(result.knowledgeAudit.map(entry => entry.reason), plan.decisions.map(d => d.reason));
+  const audit = result.knowledgeAudit[0].choiceResolution;
+  assert.deepEqual(audit.choiceRef, plan.decisions[0].choiceRef);
+  assert.deepEqual(audit.resolvedChoiceRef, { ...plan.decisions[0].choiceRef, choiceId: 'checkout/checkout' });
+  assert.deepEqual(audit.normalization, { kind: 'checkout-open-v1', authoredChoiceId: 'open/checkout', canonicalChoiceId: 'checkout/checkout' });
+  assert.equal(result.knowledgeAudit[1].choiceResolution.normalization, undefined);
+  assert.deepEqual(result.knowledgeAudit[1].choiceResolution.resolvedChoiceRef, plan.decisions[1].choiceRef);
+  assert.deepEqual(validateTrace(result.trace, settings.snapshot), { valid: true, errors: [] });
+  const canonical = structuredClone(plan);
+  canonical.decisions[0].choiceRef.choiceId = 'checkout/checkout';
+  const exact = await compileWholeTraceCandidate(settings, bundle, canonical);
+  assert.deepEqual(result.trace.steps, exact.trace.steps, 'Binding the same checkout preserves every executable step');
+});
+
 test('v4 accepted local walk updates its source location and retains guarded actual movement at most 32px', async () => {
   const { settings, bundle } = fixture(), initial = bundle.initialChoiceFrame.source;
   const walk = bundle.initialChoiceFrame.availableChoices.find(choice => choice.action.type === 'walk'); assert.ok(walk);

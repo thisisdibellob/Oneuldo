@@ -22,6 +22,8 @@ export type WholeTraceTaskState = {
   taskStateVersion: 'persistent-task-v1'; decisionIndex: number;
   /** IDs are exposure metadata only: no goal label, requested quantity or task answer is stored. */
   knownGoalIds: string[]; openGoalIds: string[];
+  /** Accepted explicit completion declarations, not verified shopping success or restored memory. */
+  completedGoalIds: string[];
   purchaseEvidence: WholeTraceTaskPurchaseEvidence[];
   lastAction: ActionBinding | null; lastResultKey: string | null;
 };
@@ -35,8 +37,9 @@ export type WholeTraceTaskPreview = {
 
 export const WHOLE_TRACE_TASK_MEMORY_INSTRUCTIONS = `Pending tasks and momentary focus are separate. Node maintains openGoalIds after accepted actions; changing activity to interest/explore/rest, clearing focusedGoalId, or writing heldGoalIds=[] never silently removes a selected task. heldGoalIds must contain exactly the open goals so every working goal has a persistent task lifecycle and the actual working-memory engine applies its capacity and context pressure during a detour. No goal details are restored from the factual archive.
 Every decision has basis.goalId (a goal reference or null). task/recover intent requires one currently open goal; check/help may use null or an open goal; explore/interest/rest/finish require null. Any goal-bound action declares that goal's name in memoryUses; readList/viewCart/viewHelp may first seek external cues when the name is unavailable. Every declared memoryUse belongs to basis.goalId; non-goal decisions cannot use a goal detail while claiming no task connection. An add/remove for a task also declares requiredQuantity in memoryUses, but the selected product and action quantity are never corrected against that belief or the task answer.
-actorState.taskUpdate is optional and contains {type:"select|complete|abandon",goalId}. select requires that goal in the CURRENT actual readObjectives, or explicit selfRecall belief values in this same decision for a previously read goal. The memory engine independently validates those beliefs. After a real shopping-list read with no open task, select at least one displayed goal unless the actual action is checkout, submit, requestCashier or giveUp; a finish activity label alone is not an exception. The model chooses which goal: the system never chooses one automatically.
-complete releases a goal only after an earlier accepted add action explicitly bound to that goal and confirmed by its real observed result. This means the actor believes that selection is done; it never means a hidden correct product or requested quantity was verified. Incorrect legal purchases may complete a task. abandon explicitly releases a goal without a purchase and records that behavioral choice. Capacity bounds pending tasks and working memory. Checkout, finish and giveUp are allowed with unfinished tasks; no purchase, detour, mistake or recovery quota is imposed.`;
+actorState.taskUpdate is an optional ARRAY of updates, even for one update: taskUpdate:[{type:"select",goalId:"READ_GOAL_ID"}]. Omit it or use [] when unchanged. Each entry has one type: "select", "complete" or "abandon"; do not write a pipe-separated literal. READ_GOAL_ID is a placeholder for an actually read goal ID from this bundle, not a product ID or another request's goal. select requires that goal in the CURRENT actual readObjectives, or explicit selfRecall belief values in this same decision for a previously read goal. The memory engine independently validates those beliefs. After a real shopping-list read with no open task, select at least one displayed goal if any displayed goal lacks an accepted explicit complete declaration, unless the actual action is checkout, submit, requestCashier or giveUp; a finish activity label alone is not an exception. Re-reading a list whose displayed goals were all explicitly completed permits a non-goal-bound check or movement without selecting them again. completedGoalIds records only those declarations, not correct products, quantities or recalled details. Selecting a completed goal reopens it and clears its prior completion; abandon does not count as complete. The model chooses which goal: the system never chooses one automatically.
+Timing within one decision: first observe the PREVIOUS action result, then apply this decision's taskUpdate, then check heldGoalIds/basis/focus against the resulting open goals, then execute the current action. The readList decision itself does not yet know the goals that it will display; select them on a later decision with that observation.
+complete releases a goal only after an earlier accepted add action explicitly bound to that goal and confirmed by its real observed result. This means the actor believes that selection is done; it never means a hidden correct product or requested quantity was verified. Incorrect legal purchases may complete a task. When completing a goal, remove it from heldGoalIds in that SAME decision and stop binding basis.goalId, focusedGoalId and memoryUses to it. For a non-goal-bound check, use basis:{intent:"check",goalId:null,memoryUses:[]} and focusedGoalId:null. Retain every other open goal and its uncertainty. If a goal-bound check is still intended, complete that task in a later decision after the check. Do not auto-complete any goal just because an add succeeded. abandon explicitly releases a goal without a purchase and records that behavioral choice. Capacity bounds pending tasks and working memory. Checkout, finish and giveUp are allowed with unfinished tasks; no purchase, detour, mistake or recovery quota is imposed.`;
 
 function plain(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object' && !Array.isArray(value) && Object.getPrototypeOf(value) === Object.prototype;
@@ -62,7 +65,7 @@ export function validateWholeTraceTaskUpdate(value: unknown): { valid: boolean; 
 }
 function initialState(): WholeTraceTaskState {
   return { taskStateVersion: 'persistent-task-v1', decisionIndex: -1, knownGoalIds: [],
-    openGoalIds: [], purchaseEvidence: [], lastAction: null, lastResultKey: null };
+    openGoalIds: [], completedGoalIds: [], purchaseEvidence: [], lastAction: null, lastResultKey: null };
 }
 const recoveringActions = new Set<PolicyAction['type']>(['readList', 'viewCart', 'viewHelp']);
 const endingActions = new Set<PolicyAction['type']>(['checkout', 'submit', 'requestCashier', 'giveUp']);
@@ -131,6 +134,7 @@ export class WholeTraceTaskMemoryEngine {
           errors.push(`Selecting task ${update.goalId} requires a current displayed goal or explicit selfRecall name belief`); continue;
         }
         next.openGoalIds.push(update.goalId); newlySelected++;
+        next.completedGoalIds = next.completedGoalIds.filter(id => id !== update.goalId);
         events.push({ kind: 'selected', goalId: update.goalId, decisionIndex: next.decisionIndex + 1 });
       } else {
         if (!open) { errors.push(`Cannot ${update.type} unopened task ${update.goalId}`); continue; }
@@ -139,6 +143,7 @@ export class WholeTraceTaskMemoryEngine {
         }
         next.openGoalIds = next.openGoalIds.filter(id => id !== update.goalId);
         next.purchaseEvidence = next.purchaseEvidence.filter(item => item.goalId !== update.goalId);
+        if (update.type === 'complete') next.completedGoalIds.push(update.goalId);
         events.push({ kind: update.type === 'complete' ? 'completed' : 'abandoned', goalId: update.goalId,
           decisionIndex: next.decisionIndex + 1 });
       }
@@ -153,7 +158,8 @@ export class WholeTraceTaskMemoryEngine {
     }
     for (const goalId of held) if (!next.openGoalIds.includes(goalId))
       errors.push(`heldGoalIds contains unselected task ${goalId}; select or release it through taskUpdate`);
-    if (displayed.size && !this.state.openGoalIds.length && observation.phase === 'shopping'
+    const displayedUncompleted = [...displayed].some(goalId => !next.completedGoalIds.includes(goalId));
+    if (displayedUncompleted && !this.state.openGoalIds.length && observation.phase === 'shopping'
       && !endingActions.has(action.type) && !newlySelected)
       errors.push('After a real list read with no open task, select at least one currently displayed goal');
 

@@ -1,0 +1,10 @@
+'use strict';
+const crypto=require('node:crypto');
+const {scoreReview}=require('./personaValidationStatistics.cjs');
+const {actorEvents}=require('./personaValidationMetrics.cjs');
+const IDS=['mild-intellectual-disability-adult','careful-checker','quick-decider','neutral-adult-control'];
+function sanitize(trace,version,audit=null){const steps=actorEvents(trace,audit).map(s=>{const row={type:s.type,...(s.target?{target:s.target}:{}),...(s.stationId?{stationId:s.stationId}:{}),...(s.productId?{productId:s.productId}:{}),...(s.quantity!==undefined?{quantity:s.quantity}:{}),...(s.choice?{choice:s.choice}:{}),...(s.scrollFraction!==undefined?{scrollFraction:s.scrollFraction}:{}),reactionDelayMs:s.reactionDelayMs,...(s.gesture?{outcome:s.gesture.outcome}:{})};if(version==='B')row.reason=s.reason;return row});return{steps}}
+function build(samples,profiles){const rows=[],key=[];for(const version of ['A','B'])for(const sample of samples){const opaqueId=crypto.randomUUID();rows.push({opaqueId,version,trace:sanitize(sample.trace,version,sample.audit)});key.push({opaqueId,version,personaId:sample.personaId,tracePath:sample.tracePath})}for(let i=rows.length-1;i>0;i--){const j=crypto.randomInt(i+1);[rows[i],rows[j]]=[rows[j],rows[i]]}
+const publicProfiles=profiles.map(p=>({id:p.id,description:p.description,preferences:p.character?.preferences,selectedTraits:p.character?.selectedTraits}));const bundle={publicProfiles,panels:{A:rows.filter(r=>r.version==='A'),B:rows.filter(r=>r.version==='B')}};const serialized=JSON.stringify(bundle);for(const token of [...IDS,'지민','서연','민수'])if(serialized.includes(token)&&!JSON.stringify(publicProfiles).includes(token))throw new Error(`Blind bundle leaked ${token}`);for(const panel of Object.values(bundle.panels))for(const row of panel){const body=JSON.stringify(row);for(const token of [...IDS,'지민','서연','민수'])if(body.includes(token))throw new Error(`Blind trace leaked ${token}`)}return{bundle,key}}
+function grade(key,answers){return Object.fromEntries(['A','B'].map(version=>[version,scoreReview(key.filter(x=>x.version===version),answers,IDS)]))}
+module.exports={IDS,sanitize,build,grade};

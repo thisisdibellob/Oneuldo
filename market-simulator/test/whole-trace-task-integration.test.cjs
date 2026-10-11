@@ -168,6 +168,40 @@ test('real checkout and submit are allowed with a pending unbought goal', async 
   assert.deepEqual(validateTrace(result.trace, settings.snapshot), { valid: true, errors: [] });
 });
 
+test('completed-list recheck permits cart review and movement without reopening or correcting the purchase', async () => {
+  for (const nextAction of ['viewCart', 'walkToAnchor']) {
+    const { settings, bundle } = fixture(), source = bundle.initialChoiceFrame.source, goal = bundle.worldReference.objectives[0];
+    const shelf = { ...source, activeStation: 'fresh', pageIndex: 0 };
+    const prefix = [d(source, 'control/readList'), select(source, goal, 'open/fresh'),
+      d(shelf, 'add/milk', { intent: 'task', goalId: goal.id, quantity: 1,
+        uses: [use(goal), use(goal, 'requiredQuantity', 'remembered', 2)],
+        state: hold(goal, { activity: 'shop', focusedGoalId: goal.id, focusedProductId: 'milk' }) }),
+      d(shelf, 'control/closeStation', { state: { taskUpdate: [{ type: 'complete', goalId: goal.id }] } }),
+      d(source, 'control/readList')];
+    let suffix;
+    if (nextAction === 'viewCart') {
+      suffix = [d(source, 'control/viewCart'), d({ ...source, view: 'cart' }, 'control/closeView'), quit(source)];
+    } else {
+      const nav = bundle.choiceCatalog.navigation.find(item => item.navigationStateId === source.navigationStateId);
+      const choiceId = nav.locations.find(item => item.location === 'start').visibleWalkChoices[0].choiceId;
+      suffix = [d(source, choiceId), quit({ ...source, location: choiceId.slice('walk/'.length) })];
+    }
+    const wire = plan(bundle, [...prefix, ...suffix]), original = structuredClone(wire);
+    const result = await compileWholeTraceCandidate(settings, bundle, wire);
+    assert.deepEqual(wire, original, 'the compiler does not inject selections or change authored behavior');
+    const reviewed = result.knowledgeAudit[5];
+    assert.equal(reviewed.before.result.actionType, 'readList');
+    assert.equal(reviewed.action.type, nextAction);
+    assert.deepEqual(reviewed.taskMemory.state.completedGoalIds, [goal.id]);
+    assert.deepEqual(reviewed.taskMemory.state.openGoalIds, []);
+    assert.deepEqual(reviewed.taskMemory.events, []);
+    assert.deepEqual(reviewed.cognition.state.activeGoals, [], 'completion history never restores working-memory goal details');
+    assert.equal(result.knowledgeAudit[2].action.quantity, 1, 'the legal under-purchase remains unchanged');
+    assert.equal(result.acceptedActions, wire.decisions.length);
+    assert.deepEqual(validateTrace(result.trace, settings.snapshot), { valid: true, errors: [] });
+  }
+});
+
 test('v7 suffix repair retains committed task and cognition, never the rejected task proposal', async t => {
   const { settings } = fixture();
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'whole-task-session-'));

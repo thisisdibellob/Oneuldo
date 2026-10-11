@@ -10,9 +10,17 @@ export type WholeTraceChoiceEntry = {
   choiceId: string; label: string; action: WholeTraceChoiceAction; cueRefs: string[];
   quantityBounds?: { min: 1; max: number; instruction: string };
 };
+export type WholeTraceChoiceAlias = {
+  kind: 'checkout-open-v1'; aliasChoiceId: string; canonicalChoiceId: string;
+};
+export type WholeTraceChoiceNormalization = {
+  kind: WholeTraceChoiceAlias['kind']; authoredChoiceId: string; canonicalChoiceId: string;
+};
 /** Shared entries and panel templates, never a location × panel × quantity Cartesian product. */
 export type WholeTraceChoiceCatalog = {
   schemaVersion: 'state-choices-v1'; entries: WholeTraceChoiceEntry[];
+  /** Absent in saved bundles with the original exact-ID-only contract. */
+  referenceAliases?: WholeTraceChoiceAlias[];
   common: { world: string[]; shopping: string[]; cart: string[]; help: string[]; shelf: string[]; staff: string[]; checkout: string[] };
   navigation: { navigationStateId: string; locations: { location: string; choiceIds: string[]; visibleWalkChoices: { choiceId: string; label: string; direction: string; distanceBand: string }[] }[] }[];
   shelves: { stationId: string; pages: { pageIndex: number; choiceIds: string[] }[]; browseChoiceIds: string[] }[];
@@ -110,10 +118,15 @@ export function buildWholeTraceChoiceCatalog(world: ChoiceWorld): WholeTraceChoi
   });
   const cashierChoices = world.world.checkouts.map(checkout => put({ type: 'requestCashier', checkoutId: checkout.id }, `${checkout.id} 직원 호출하기`));
   return { schemaVersion: 'state-choices-v1', entries: [...entries.values()], common, navigation, shelves,
+    referenceAliases: world.world.checkouts.flatMap(checkout => {
+      const aliasChoiceId = `open/${checkout.id}`, canonicalChoiceId = `checkout/${checkout.id}`;
+      return !entries.has(aliasChoiceId) && entries.has(canonicalChoiceId)
+        ? [{ kind: 'checkout-open-v1' as const, aliasChoiceId, canonicalChoiceId }] : [];
+    }),
     staff: [...staffIds].map(stationId => ({ stationId, choiceIds: cashierChoices })),
     checkout: world.world.checkouts.map(checkout => ({ checkoutId: checkout.id, choiceIds: common.checkout })),
     cartProductChoiceIds: [...new Set(cartProductChoiceIds)],
-    instruction: 'Entries are controls, not a route or ranked recommendation. Every selection must include its exact pre-action source. Use the current navigation location menu plus matching panel/common controls. Shelf product entries apply only to their displayed page. Cart returns apply only where the existing UI offers that return button. Quantity is explicit, never automatically selected. World references remain unavailable actor knowledge until actually displayed.' };
+    instruction: 'Entries are controls, not a route or ranked recommendation. Every selection must include its exact pre-action source. Use the current navigation location menu plus matching panel/common controls. Use checkout/<checkoutId> for checkout entry, then control/submit in the checkout phase when available. A declared referenceAliases entry permits open/<checkoutId> only for that same checkout when its canonical control is currently available; it never authorizes a different target or source. Shelf product entries apply only to their displayed page. Cart returns apply only where the existing UI offers that return button. Quantity is explicit, never automatically selected. World references remain unavailable actor knowledge until actually displayed.' };
 }
 function acceptedFrame(bundle: WholeTraceBundle, frame: WholeTraceAcceptedFrame | string): WholeTraceAcceptedFrame {
   if (typeof frame !== 'string') return frame;
@@ -169,15 +182,30 @@ export function wholeTraceChoiceFrame(o: ActorObservation, bundle: WholeTraceBun
   return { source, availableChoices: [...availableSelection(o, bundle, source).values()].map(({ entry, quantities }) => ({ ...structuredClone(entry),
     ...(quantities.length ? { quantityBounds: { ...entry.quantityBounds!, max: Math.max(...quantities) } } : {}) })) };
 }
-/** Exact translation of a chosen menu entry, never another route, product, quantity, or shopping goal. */
+/** Resolve only the explicitly declared same-checkout alias; no fuzzy matching or target substitution. */
+function checkoutAlias(choiceId: string, bundle: WholeTraceBundle): WholeTraceChoiceAlias | undefined {
+  if (!choiceId.startsWith('open/') || bundle.choiceCatalog.entries.some(entry => entry.choiceId === choiceId)) return;
+  const checkoutId = choiceId.slice('open/'.length);
+  if (bundle.worldReference.world.checkouts.filter(checkout => checkout.id === checkoutId).length !== 1) return;
+  const aliases = bundle.choiceCatalog.referenceAliases?.filter(alias => alias.aliasChoiceId === choiceId) ?? [];
+  if (aliases.length !== 1 || aliases[0].kind !== 'checkout-open-v1'
+    || aliases[0].canonicalChoiceId !== `checkout/${checkoutId}`) return;
+  const entries = bundle.choiceCatalog.entries.filter(entry => entry.choiceId === aliases[0].canonicalChoiceId);
+  if (entries.length !== 1 || entries[0].action.type !== 'checkout' || entries[0].action.checkoutId !== checkoutId) return;
+  return aliases[0];
+}
+/** Translation of an exact menu entry or declared same-checkout alias; preserves the actor's target and timing. */
 export function resolveWholeTraceChoice(d: WholeTraceChoiceDecision, o: ActorObservation, bundle: WholeTraceBundle,
   tracked: WholeTraceAcceptedFrame | string, knowledge?: WholeTraceKnowledgeSnapshot): {
     decision: WholeTraceDecision; policyAction: PolicyAction; derivedCueRefs: string[]; source: WholeTraceChoiceSource;
+    resolvedChoiceRef: WholeTraceChoiceDecision['choiceRef']; normalization?: WholeTraceChoiceNormalization;
   } {
   const source = sourceFor(o, bundle, tracked);
   if (canonicalMarketReplayJson(d.choiceRef.source) !== canonicalMarketReplayJson(source))
     throw Object.assign(new Error('Choice source differs from the actual accepted location, navigation state or displayed panel/page'), { code: 'CHOICE_SOURCE_MISMATCH' });
-  const selected = availableSelection(o, bundle, source).get(d.choiceRef.choiceId);
+  const available = availableSelection(o, bundle, source);
+  const alias = checkoutAlias(d.choiceRef.choiceId, bundle);
+  const selected = available.get(alias?.canonicalChoiceId ?? d.choiceRef.choiceId);
   if (!selected) throw Object.assign(new Error(`Choice ${d.choiceRef.choiceId} is not available in this exact source`), { code: 'CHOICE_NOT_AVAILABLE' });
   const parameterized = selected.entry.action.type === 'add' || selected.entry.action.type === 'remove';
   if (parameterized && (d.choiceRef.quantity === undefined || !selected.quantities.includes(d.choiceRef.quantity)))
@@ -204,6 +232,8 @@ export function resolveWholeTraceChoice(d: WholeTraceChoiceDecision, o: ActorObs
     ...(focusedProductProof ? [focusedProductProof] : [])]
     .filter(ref => !ref.startsWith('objective:') || actualReadGoals.has(ref)))];
   return { policyAction: structuredClone(policyAction), derivedCueRefs, source,
+    resolvedChoiceRef: { ...structuredClone(d.choiceRef), choiceId: selected.entry.choiceId },
+    ...(alias ? { normalization: { kind: alias.kind, authoredChoiceId: d.choiceRef.choiceId, canonicalChoiceId: selected.entry.choiceId } } : {}),
     decision: { action, delayMs: d.delayMs, reason: d.reason,
       basis: { intent: d.basis.intent, cueRefs: [...new Set([...derivedCueRefs, ...(d.basis.cueRefs ?? [])])],
         ...(Object.hasOwn(d.basis, 'goalId') ? { goalId: d.basis.goalId } : {}),

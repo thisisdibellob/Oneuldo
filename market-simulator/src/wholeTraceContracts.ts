@@ -7,6 +7,7 @@ import type { WholeTracePersonaInput } from './wholeTracePersona';
 import type { WholeTraceChoiceCatalog, WholeTraceChoiceFrame, WholeTraceAcceptedFrame } from './wholeTraceChoices';
 import type { WholeTraceMemoryUse, WholeTraceCognitionState } from './wholeTraceCognition';
 import type { WholeTraceTaskState } from './wholeTraceTaskMemory';
+import type { WholeTraceAuthoringGuide } from './wholeTraceAuthoring';
 
 export const WHOLE_TRACE_BUNDLE_VERSION = '8' as const;
 export const WHOLE_TRACE_CANDIDATE_VERSION = '7' as const;
@@ -56,6 +57,8 @@ export type WholeTraceBundle = {
   bundleVersion: typeof WHOLE_TRACE_BUNDLE_VERSION; requestId: string; inputHash: string; policyVersion: typeof WHOLE_TRACE_POLICY_VERSION;
   model: typeof WHOLE_TRACE_MODEL; reasoningEffort: 'low'; observationScope: 'whole-world'; actorKnowledgeScope: 'observed-and-remembered';
   snapshotId: string; seed: string | number; persona: Pick<Persona, 'id' | 'version' | 'name' | 'description' | 'character'> & { behavior: WholeTracePersonaInput };
+  /** Optional in saved bundle 8 files predating the additive authoring guidance. */
+  authoringGuide?: WholeTraceAuthoringGuide;
   generationLimits: { acceptedActionHorizon: 100; technicalActionBudget: number; maxRepairs: number; plannedTimeBudgetMs?: number };
   worldReference: {
     world: MarketReplaySnapshot['environment']; presentation: NonNullable<MarketReplaySnapshot['presentation']>;

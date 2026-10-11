@@ -13,6 +13,11 @@ const seed = { anyOf: [string, { type: 'number' }] };
 const object = { type: 'object' };
 const llm = { type: 'object', additionalProperties: false, properties: { protocol: { enum: ['openai', 'ollama'] }, baseUrl: string, model: string, apiKeyEnv: string, maxCalls: { type: 'integer', minimum: 1, maximum: 2000 }, timeoutMs: { type: 'integer', minimum: 1, maximum: 300000 } } };
 const schema = (properties, required = []) => ({ type: 'object', additionalProperties: false, properties, required });
+const wholeTraceRepair = schema({
+  decisions:{type:'array',minItems:1,maxItems:100,items:object},
+  repairVersion:{const:'1'},requestId:string,baseAttempt:{type:'integer',minimum:1},
+  fromDecisionIndex:{type:'integer',minimum:0},candidateVersion:{enum:['3','4','5','6','7']},
+},['decisions']);
 const definitions = [
   { name: 'begin_actor_plan', description: 'Begin a private Luna low-reasoning actor trace session. Returns a session ID; use observe_actor_plan then append_actor_plan. Each plan is 1..3 choice IDs and is discarded when the actor observation changes. Supports a prepared v10 learning round and sends no app input.', inputSchema: schema({ personaId:string, seed, tabId:string, snapshot:object, snapshotFilePath:string, outputPath:string, learnerFile:string, trialFile:string, arm:{enum:['A','B','C']}, jobFilePath:string, generationFilePath:string, timingProfile:{enum:['original','compact']}, attentionExperience:object, maxActions:{type:'integer',minimum:1,maximum:2000} }) },
   { name: 'observe_actor_plan', description: 'Read the current actor-only observation, stable identity, observed experience and available choice IDs for an active plan session.', inputSchema: schema({sessionId:string}, ['sessionId']), annotations:{readOnlyHint:true} },
@@ -20,9 +25,14 @@ const definitions = [
   { name: 'finalize_actor_plan', description: 'Return the completed whole trace file and generation counts after the normal actor loop finishes.', inputSchema: schema({sessionId:string}, ['sessionId']), annotations:{readOnlyHint:true} },
   { name: 'prepare_whole_trace', description: 'Prepare bundle 8 with whole-world reference, persistent pending goals, capacity-bounded working memory, and exact source-bound choices for native Codex Luna low reasoning. Default candidate 7 binds goal-directed decisions independently of focus and retains pending-goal memory through interest/exploration. Separate expression coverage reports whether cognition was exercised. Legacy candidates 6/5/4/3 keep existing strict guards. Cognition is independently checked after the complete plan is submitted; actions are never replaced. Original actor timing is preserved. No per-action observation calls, provider requests or app input are sent. Optional suffix repair retains accepted behavior and does not automatically choose actions. Supports separate whole-trace-v3 learners and trials.', inputSchema: schema({personaId:string,seed,tabId:string,snapshot:object,snapshotFilePath:string,outputPath:string,learnerFile:string,trialFile:string,arm:{enum:['A','B','C']},jobFilePath:string,generationFilePath:string,timingProfile:{enum:['original']},attentionExperience:object,maxActions:{type:'integer',minimum:1,maximum:100},timeBudgetMs:{type:'integer',minimum:1000,maximum:3600000},maxRepairs:{type:'integer',minimum:0,maximum:1}}) },
   { name: 'submit_whole_trace', description: 'Submit the complete candidate for a prepared request. Candidate 4 selects a source-bound exact action and derived observed target cues; legacy 3 remains explicitly supported under strict existing guards. Saves trace, knowledge audit and independent persona review. Warnings never rewrite behavior. Does not call a model or app; use repair_whole_trace for a suffix-only technical repair when allowed.', inputSchema: schema({requestId:string,candidate:object,candidateFilePath:string},['requestId']) },
-  { name: 'repair_whole_trace', description: 'Repair only the failed suffix of an invalid request with remaining repair budget. Provide repairVersion:"1", requestId, exact baseAttempt/fromDecisionIndex, original candidateVersion and replacement suffix decisions. The server retains accepted prefix and terminal intent; stale repairs and new technical give-up are rejected. No automatic action choice, model or app calls.', inputSchema: schema({requestId:string,repair:object,repairFilePath:string},['requestId']) },
+  { name: 'repair_whole_trace', description: 'Repair only the failed suffix of an invalid request with remaining repair budget. Provide repair:{decisions:[...]} or a repairFilePath containing that object. The server fills repairVersion, requestId, baseAttempt, fromDecisionIndex and candidateVersion from the prepared request; explicitly supplied legacy metadata must still match. The server retains accepted prefix, terminal intent and the existing one-repair limit. No automatic action choice, model or app calls.', inputSchema: schema({requestId:string,repair:wholeTraceRepair,repairFilePath:string},['requestId']) },
   { name: 'whole_trace_status', description: 'Read a whole-trace request status and candidate submission counts. Counts are not native Codex inference-call telemetry.', inputSchema: schema({requestId:string},['requestId']),annotations:{readOnlyHint:true} },
   { name: 'list_personas', description: 'List available personas for intent trace generation.', inputSchema: schema({}), annotations: { readOnlyHint: true } },
+  { name: 'prepare_persona_validation', description: 'Create or refresh a persona fidelity run manifest; no traces are generated.', inputSchema: schema({runId:string,outputDirectory:string,snapshotFilePaths:schema({low:string,high:string},['low','high']),seeds:{type:'array'},personaIds:{type:'array'}},['runId','outputDirectory','snapshotFilePaths','seeds','personaIds']) },
+  { name: 'measure_persona_validation', description: 'Measure conditional metrics, paired effect sizes and prohibited patterns from saved traces.', inputSchema: schema({runDirectory:string,allowFixture:{type:'boolean'}},['runDirectory']) },
+  { name: 'prepare_blind_review', description: 'Create redacted panels and a separate answer key; panel B requires an already scored panel A.', inputSchema: schema({runDirectory:string,panel:{enum:['A','B']},allowFixture:{type:'boolean'}},['runDirectory']) },
+  { name: 'submit_blind_review', description: 'Score independently supplied blind answers without calling a model.', inputSchema: schema({runDirectory:string,panel:{enum:['A','B']},answers:object,reviewerModel:string,reviewerSession:string},['runDirectory','panel','answers','reviewerModel','reviewerSession']) },
+  { name: 'persona_validation_report', description: 'Save the persona fidelity JSON and Korean Markdown report.', inputSchema: schema({runDirectory:string},['runDirectory']) },
   { name: 'generate_trace', description: 'AI is the default; stochastic is explicit regression-only. Generate an intent-level trace for a registered tab mission or explicit snapshot. AI attention observes at most 100 model decisions; natural termination wins, otherwise the system walks to checkout and submits the unchanged current basket, including an empty basket, then waits for acceptance and exits. The controller suffix is marked separately from actor choices. Repetition alone does not stop generation. Smaller maxActions/maxCalls/time budgets remain technical errors. learnerFile loads verified personal experience and locks the actor identity. Saves JSON; never uploads gameplay logs.', inputSchema: schema({ personaId: string, seed, tabId: string, snapshot: object, snapshotFilePath: string, outputPath: string, learnerFile: string, mode: { enum: ['stochastic', 'llm'] }, timingProfile: { enum: ['original', 'compact'] }, maxActions: { type: 'integer', minimum: 1, maximum: 2000 }, timeBudgetMs: { type: 'integer', minimum: 1000, maximum: 3600000 }, attentionExperience: schema({ visit: { enum: ['first-play', 'revisit'] }, previousLayoutKey: string, memory: object, learning: object }, ['visit']), llm }, ['personaId', 'seed']) },
   { name: 'validate_trace', description: 'Validate a trace and its target mission snapshot with the shared schema and game guards.', inputSchema: schema({ trace: object, traceFilePath: string, tabId: string, snapshot: object, snapshotFilePath: string }), annotations: { readOnlyHint: true } },
   { name: 'pair_app_session', description: 'Issue a five-minute, one-use pairing URL for one allowlisted local/staging test account. Open it in the development web app and log in with that account.', inputSchema: schema({ appOrigin: string, backendOrigin: string, memberId: string }, ['appOrigin', 'backendOrigin', 'memberId']) },
@@ -52,6 +62,8 @@ function checkArguments(value, contract, at = 'arguments') {
     }
   }
   if (contract.type === 'string' && (typeof value !== 'string' || !value.trim())) throw new Error(`${at}: expected nonempty string`);
+  if (contract.type === 'array' && !Array.isArray(value)) throw new Error(`${at}: expected array`);
+  if (contract.type === 'boolean' && typeof value !== 'boolean') throw new Error(`${at}: expected boolean`);
   if (['number', 'integer'].includes(contract.type)) {
     if (typeof value !== 'number' || !Number.isFinite(value) || (contract.type === 'integer' && !Number.isInteger(value))) throw new Error(`${at}: expected ${contract.type}`);
     if ((contract.minimum !== undefined && value < contract.minimum) || (contract.maximum !== undefined && value > contract.maximum)) throw new Error(`${at}: out of range`);
@@ -120,6 +132,12 @@ function createService(options = {}) {
     if (name === 'list_personas') {
       const personas = require('./src/personas.ts').listPersonas();
       return { personas: personas.map(({ prompt, ...profile }) => profile) };
+    }
+    if (['prepare_persona_validation','measure_persona_validation','prepare_blind_review','submit_blind_review','persona_validation_report'].includes(name)) {
+      const runner=require('./src/personaValidationRun.cjs');
+      return ({prepare_persona_validation:runner.prepare,measure_persona_validation:runner.measure,
+        prepare_blind_review:runner.prepareBlind,submit_blind_review:runner.submitBlind,
+        persona_validation_report:runner.report})[name](args);
     }
     if (name === 'begin_actor_plan') {
       const snapshot=await getSnapshot(args), coordinator=args.trialFile?require('./learning-trial.cjs'):null;
@@ -225,7 +243,10 @@ function createService(options = {}) {
         settings={personaId:args.personaId,seed:args.seed,maxActions:args.maxActions??100,timingProfile:args.timingProfile??'original',
           ...(args.timeBudgetMs===undefined?{}:{timeBudgetMs:args.timeBudgetMs})};
       }
-      const persona=require('./src/personas.ts').getPersona(settings.personaId);
+      const controlSlot=settings.personaId==='neutral-adult-control'
+        ? require('./src/personaValidationRun.cjs').lookupControlSlot(args,snapshot) : null;
+      const persona=controlSlot?require('./src/personas.ts').withValidationPersona(()=>require('./src/personas.ts').getPersona(settings.personaId))
+        :require('./src/personas.ts').getPersona(settings.personaId);
       if(args.learnerFile){
         if(attentionExperience) throw new Error('learnerFile cannot be combined with manual experience');
         const store=require('./learner-store.cjs'),learner=store.readLearner(args.learnerFile);learnerIdentity=learner.identity;
@@ -247,14 +268,15 @@ function createService(options = {}) {
           if(member!==attentionExperience.learning.memberId) throw new Error('Learning cannot cross test accounts');}
       }
       const {WholeTraceSession}=require('./src/wholeTraceSession.ts');
-      const session=new WholeTraceSession({snapshot,personaId:settings.personaId,seed:settings.seed,
+      const createSession=()=>new WholeTraceSession({snapshot,personaId:settings.personaId,seed:settings.seed,
         ...(args.outputPath?{outputPath:path.resolve(args.outputPath)}:{}),timingProfile:settings.timingProfile,
         maxActions:settings.maxActions,maxRepairs:args.maxRepairs??0,
         ...(settings.timeBudgetMs===undefined?{}:{timeBudgetMs:settings.timeBudgetMs}),
         ...(settings.llm?{llm:settings.llm}:{}),
         ...(attentionExperience?{attentionExperience}:{}),...(learnerIdentity?{learnerIdentity}:{}),
         ...(settings.trialBinding?{trialBinding:settings.trialBinding}:{})});
-      const prepared=session.prepare();wholeTraceSessions.set(prepared.requestId,{session,trialRound,submitting:false,finished:false,trialFailureRecorded:false});
+      const session=controlSlot?require('./src/personas.ts').withValidationPersona(createSession):createSession();
+      const prepared=session.prepare();wholeTraceSessions.set(prepared.requestId,{session,trialRound,controlSlot,submitting:false,finished:false,trialFailureRecorded:false});
       return {...prepared,...(trialRound??{})};
     }
     if(name==='submit_whole_trace' || name==='repair_whole_trace' || name==='whole_trace_status'){
@@ -264,8 +286,10 @@ function createService(options = {}) {
       const inline=repairing?args.repair:args.candidate, file=repairing?args.repairFilePath:args.candidateFilePath;
       if(Boolean(inline)===Boolean(file)) throw new Error(repairing?'Provide exactly one of repair or repairFilePath':'Provide exactly one of candidate or candidateFilePath');
       const payload=inline??readJson(file);
-      if(payload.requestId!==args.requestId) throw new Error('Candidate or repair is bound to a different whole-trace request');
-      const deliver=()=>repairing?record.session.submitRepair(payload):record.session.submit(payload);
+      if((!repairing || payload?.requestId!==undefined) && payload?.requestId!==args.requestId)
+        throw new Error('Candidate or repair is bound to a different whole-trace request');
+      const deliver=()=>record.controlSlot?require('./src/personas.ts').withValidationPersona(()=>repairing?record.session.submitRepair(payload):record.session.submit(payload))
+        :repairing?record.session.submitRepair(payload):record.session.submit(payload);
       if(record.submitting) throw new Error('A whole-trace candidate is already being submitted');
       // The session returns the cached response for an identical delivery retry.
       // A changed candidate after closure is rejected without another trial failure.

@@ -92,8 +92,12 @@ test('legitimate abandonment explicitly releases a task without requiring a purc
     basis('explore', null, []));
   assert.equal(abandoned.events[0].kind, 'abandoned');
   assert.deepEqual(engine.snapshot().openGoalIds, []);
+  assert.deepEqual(engine.snapshot().completedGoalIds, [], 'abandonment never records completion');
   assert.deepEqual(engine.snapshot().purchaseEvidence, []);
   accept(engine, observation({ sequence: 3 }), actor([]), basis('interest', null, []));
+  const reread = engine.preview(observation({ sequence: 4, readObjectives: [goal()] }), actor([]), basis('check', null, []),
+    { type: 'viewCart' });
+  assert.match(reread.errors.join('; '), /select at least one currently displayed/);
 });
 
 test('selecting a previously seen but inactive goal requires a real new display or explicit own recall belief', () => {
@@ -138,7 +142,18 @@ test('complete requires a prior accepted goal-bound add, yet permits incorrect p
   assert.deepEqual(completed.events.map(e => e.kind), ['purchase-observed', 'completed']);
   assert.equal(completed.events[0].quantity, 7);
   assert.deepEqual(completed.state.openGoalIds, []);
+  assert.deepEqual(completed.state.completedGoalIds, ['goal-milk'], 'completion records the declaration without judging product or quantity');
   assert.deepEqual(completed.state.purchaseEvidence, [], 'evidence is consumed when completing');
+  for (const action of [{ type: 'viewCart' }, walk]) {
+    const reread = engine.preview(observation({ sequence: 4, readObjectives: [goal()] }), actor([]), basis('check', null, []), action);
+    assert.equal(reread.valid, true, reread.errors.join('; '));
+    assert.deepEqual(reread.state.openGoalIds, [], 'a completed-list review never reselects a goal automatically');
+    assert.deepEqual(reread.events, []);
+  }
+  const unfinished = engine.preview(observation({ sequence: 4, readObjectives: [goal(), goal('goal-banana')] }), actor([]),
+    basis('check', null, []), { type: 'viewCart' });
+  assert.match(unfinished.errors.join('; '), /select at least one currently displayed/,
+    'one completed goal cannot bypass selection when another displayed goal is unresolved');
 });
 
 test('unbound interest purchases and stale or mismatched results cannot satisfy an open task', () => {
@@ -171,9 +186,38 @@ test('completion evidence is scoped to the selection lifecycle and cannot be reu
     actor([], { taskUpdate: [{ type: 'complete', goalId: 'goal-milk' }] }), basis('check', null, []));
   accept(engine, observation({ sequence: 4, readObjectives: [goal()] }), actor(['goal-milk'],
     { taskUpdate: [{ type: 'select', goalId: 'goal-milk' }] }), basis());
+  assert.deepEqual(engine.snapshot().completedGoalIds, [], 'reselection invalidates the old completion declaration');
   const reused = engine.preview(observation({ sequence: 5 }), actor([], { taskUpdate: [{ type: 'complete', goalId: 'goal-milk' }] }),
     basis('check', null, []), walk);
   assert.match(reused.errors.join('; '), /earlier accepted add/);
+  accept(engine, observation({ sequence: 5 }), actor([], { taskUpdate: [{ type: 'abandon', goalId: 'goal-milk' }] }),
+    basis('check', null, []));
+  const reread = engine.preview(observation({ sequence: 6, readObjectives: [goal()] }), actor([]), basis('check', null, []), walk);
+  assert.match(reread.errors.join('; '), /select at least one currently displayed/,
+    'abandoning a reopened task must not restore its old completed status');
+});
+
+test('rejected and uncommitted completion previews never grant completed-list review', () => {
+  const engine = new WholeTraceTaskMemoryEngine(2);
+  select(engine);
+  accept(engine, observation({ sequence: 2 }), actor(), basis('task', 'goal-milk', [use(), use('requiredQuantity', 2)]),
+    { type: 'add', productId: 'milk', quantity: 1 });
+  const before = engine.snapshot();
+  const added = observation({ sequence: 3, result: { accepted: true, actionType: 'add', productId: 'milk', quantity: 1 } });
+  const complete = { taskUpdate: [{ type: 'complete', goalId: 'goal-milk' }] };
+  const rejected = engine.preview(added, actor([], { ...complete, focusedGoalId: 'goal-milk' }), basis('check', null, []), walk);
+  assert.equal(rejected.valid, false);
+  assert.deepEqual(rejected.state.completedGoalIds, ['goal-milk'], 'the rejected proposal contains only a tentative completion');
+  assert.deepEqual(engine.snapshot(), before);
+  assert.throws(() => engine.commit(), /valid preview/);
+  const uncommitted = engine.preview(added, actor([], complete), basis('check', null, []), walk);
+  assert.equal(uncommitted.valid, true);
+  assert.deepEqual(engine.snapshot(), before, 'valid previews also await acceptance and commit');
+  const dropped = engine.preview(observation({ sequence: 3, readObjectives: [goal()] }), actor([]), basis('check', null, []), walk);
+  assert.equal(dropped.valid, false);
+  assert.match(dropped.errors.join('; '), /must stay in heldGoalIds/);
+  assert.deepEqual(engine.snapshot(), before);
+  assert.throws(() => engine.commit(), /valid preview/);
 });
 
 test('actual checkout or giveUp remains possible with open unfinished tasks or immediately after list read', () => {

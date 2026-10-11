@@ -123,6 +123,75 @@ test('MCP suffix repair retains accepted behavior and stale input does not close
   assert.equal(repeated.metrics.planningSubmissions,2);
 });
 
+test('candidate 7 suffix-only file repair binds metadata on the server without a model or extra submissions',async t=>{
+  const f=setup(t),originalFetch=global.fetch;
+  global.fetch=()=>{throw new Error('Suffix transport must not call a model, provider or app');};
+  t.after(()=>{global.fetch=originalFetch;});
+  const prepared=await prepare(f,{maxRepairs:1}),source=prepared.bundle.initialChoiceFrame.source;
+  const decision=(choiceId,intent,activity)=>({choiceRef:{source,choiceId},delayMs:137,
+    reason:'현재 화면에서 선택한 행동을 진행한다',basis:{intent,goalId:null,memoryUses:[]},
+    actorState:{activity,task:'현재 선택한 행동',heldGoalIds:[],uncertainGoalIds:[],
+      focusedGoalId:null,focusedProductId:null,orientation:'unfamiliar'}});
+  const prefix=decision('control/pause','rest','rest'),ending=decision('control/giveUp','finish','finish');
+  const original={candidateVersion:'7',requestId:prepared.requestId,
+    decisions:[prefix,decision('walk/not-in-catalog','explore','orient'),ending]};
+  const failed=await f.service.invokeTool('submit_whole_trace',{requestId:prepared.requestId,candidate:original});
+  assert.equal(failed.status,'invalid');assert.equal(failed.validation.acceptedPrefixLength,1);
+  const minimal={decisions:[ending]},repairFilePath=path.join(f.directory,'suffix-only.json');
+  fs.writeFileSync(repairFilePath,JSON.stringify(minimal));
+  const saved=await f.service.invokeTool('repair_whole_trace',{requestId:prepared.requestId,repairFilePath});
+  assert.equal(saved.status,'complete');assert.equal(saved.metrics.planningSubmissions,2);
+  assert.equal(saved.metrics.repairSubmissions,1);assert.equal(saved.appExecuted,false);
+  const normalized=JSON.parse(fs.readFileSync(path.join(saved.diagnosticDirectory,'attempt-2.repair-suffix.json')));
+  assert.deepEqual(normalized,{repairVersion:'1',requestId:prepared.requestId,baseAttempt:1,
+    fromDecisionIndex:1,candidateVersion:'7',decisions:[ending]});
+  const assembled=JSON.parse(fs.readFileSync(path.join(saved.diagnosticDirectory,'attempt-2.candidate.json')));
+  assert.deepEqual(assembled.decisions,[prefix,ending]);
+  const repeated=await f.service.invokeTool('repair_whole_trace',{requestId:prepared.requestId,repair:minimal});
+  assert.deepEqual(repeated,saved);
+  const legacyRetry=await f.service.invokeTool('repair_whole_trace',{requestId:prepared.requestId,repair:normalized});
+  assert.deepEqual(legacyRetry,saved);
+  assert.deepEqual(definitions.find(tool=>tool.name==='repair_whole_trace').inputSchema.properties.repair.required,['decisions']);
+});
+
+test('suffix-only repair still rejects explicitly conflicting metadata without consuming a repair',async t=>{
+  const f=setup(t),prepared=await prepare(f,{maxRepairs:1});
+  const candidate=invalidSelection(prepared.requestId);candidate.decisions.unshift(rest());
+  await f.service.invokeTool('submit_whole_trace',{requestId:prepared.requestId,candidate});
+  const minimal={decisions:quit(prepared.requestId).decisions};
+  for(const [override,pattern] of [
+    [{requestId:'another-request'},/different whole-trace request/],
+    [{repairVersion:1},/repairVersion/], [{baseAttempt:0},/baseAttempt/],
+    [{fromDecisionIndex:0},/fromDecisionIndex/], [{candidateVersion:'7'},/candidateVersion/],
+    [{unexpected:true},/unknown (field|argument)/],
+  ]) {
+    await assert.rejects(f.service.invokeTool('repair_whole_trace',{requestId:prepared.requestId,
+      repair:{...minimal,...override}}),pattern);
+    const status=await f.service.invokeTool('whole_trace_status',{requestId:prepared.requestId});
+    assert.equal(status.attempts,1);assert.equal(status.canRepair,true);
+  }
+  // Partial legacy wrappers from the old actor workflow also receive missing fields.
+  const saved=await f.service.invokeTool('repair_whole_trace',{requestId:prepared.requestId,
+    repair:{...minimal,requestId:prepared.requestId,candidateVersion:'3',fromDecisionIndex:1}});
+  assert.equal(saved.status,'complete');assert.equal(saved.metrics.repairSubmissions,1);
+});
+
+test('an invalid suffix-only repair is cached after its prefix advances and cannot buy another attempt',async t=>{
+  const f=setup(t),prepared=await prepare(f,{maxRepairs:1});
+  const candidate=invalidSelection(prepared.requestId);candidate.decisions.unshift(rest());
+  await f.service.invokeTool('submit_whole_trace',{requestId:prepared.requestId,candidate});
+  const repair={decisions:[rest(),...candidate.decisions.slice(1)]};
+  const failed=await f.service.invokeTool('repair_whole_trace',{requestId:prepared.requestId,repair});
+  assert.equal(failed.status,'invalid');assert.equal(failed.canRepair,false);
+  assert.equal(failed.validation.acceptedPrefixLength,2);
+  const repeated=await f.service.invokeTool('repair_whole_trace',{requestId:prepared.requestId,repair});
+  assert.deepEqual(repeated,failed);
+  await assert.rejects(f.service.invokeTool('repair_whole_trace',{requestId:prepared.requestId,
+    repair:{decisions:quit(prepared.requestId).decisions}}),/budget exhausted/);
+  const status=await f.service.invokeTool('whole_trace_status',{requestId:prepared.requestId});
+  assert.equal(status.attempts,2);
+});
+
 test('legacy ungrounded candidate submissions are rejected rather than relabelled as knowledge-limited play',async t=>{
   for(const candidateVersion of ['1','2']) {
     const f=setup(t),prepared=await prepare(f);

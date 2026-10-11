@@ -13,6 +13,10 @@ Node 생성기는 행동 의도 trace를 만든다. 앱이 trace 전체를 받�
 
 Luna 계획을 실행하는 Codex 세션은 실제로 `gpt-6-luna`/`low`로 설정한다. MCP가 모델을 전환하거나 Luna 세션을 자동 생성하지 않는다. 다른 모델은 사용자가 이양을 허용한 기존 Luna 세션에 전체 계획 작성을 맡긴다. trace의 모델 라벨만으로 실제 모델·API 호출 횟수를 입증하지 않는다.
 
+전체 계획 작성은 **한 인물·한 조건·한 seed·한 request/bundle마다 새 actor 문맥**에서 수행한다. 저부하와 고부하, 다른 인물 또는 다른 요청의 bundle을 같은 작성 문맥에 함께 주지 않는다. 준비 결과의 `requestId`·`bundle.inputHash`를 해당 후보와 함께 기록하고 `bundle.authoringGuide`의 식별 정보·문법·상태 전이 예제를 확인한다. 호스트 MCP는 여러 요청을 관리할 수 있지만 서버가 actor 문맥의 분리를 강제하거나 입증하지는 않는다. 이는 기술적 일관성을 위한 작성 절차이며 페르소나 충실도의 개선을 보장하지 않는다.
+
+페르소나 충실도 측정은 생성과 별도 요청으로 실행한다. 절차와 한계는 [페르소나 충실도 검증](references/persona-validation.md)을 따른다.
+
 ## 페르소나 선택
 
 `list_personas`로 현재 버전과 설정을 확인한다.
@@ -29,17 +33,19 @@ Luna 계획을 실행하는 Codex 세션은 실제로 `gpt-6-luna`/`low`로 설�
 
 세 프로필의 근거를 확인하거나 수정할 때는 [사용자 역할 요청](../market-simulator/personas/references/persona-role-request.ko.md), [행동 이해 자료 전문](../market-simulator/personas/references/intellectual-disability-behavior-analysis.ko.md), [대응과 한계](../market-simulator/personas/audit.md)를 읽는다. [지민 v6](../market-simulator/personas/persona-mild-intellectual-disability-adult-v6.md), [서연 v4](../market-simulator/personas/persona-careful-checker-v4.md), [민수 v4](../market-simulator/personas/persona-quick-decider-v4.md) 사본은 각각 JSON prompt와 같다. 세 prompt에 두 원자료 전문을 보존하되, 자료 전체의 특성을 매번 모두 연기하지 않는다. 원문을 전달하거나 게임 행동 차이를 확인한 사실을 임상적 타당성 검증으로 설명하지 않는다.
 
-전체 계획의 `bundle.persona.behavior`는 같은 JSON에서 상세 개인 지침, 목표 기억 용량, 반응/보행 기준과 상황별 인지 설정을 가져온다. 관심 전환, 유사 상품 구분, 수량 추적에 연결하는 설정은 합성 부담의 설계값이며 강제 오답 확률이나 임상 척도가 아니다. 새 성격을 정의하거나 원자료의 모든 어려움을 추가하지 않는다. candidate 7은 매 결정에 nullable `basis.goalId`와 배열 `basis.memoryUses`를 적고, 선택적 `actorState.taskUpdate`로 목표의 선택·완료·포기를 선언한다. `focusedGoalId:null`이나 관심·탐색 전환만으로 열린 목표를 `heldGoalIds`에서 지울 수 없다. `actorState.memoryUpdate`는 믿는 값·불확실성의 선언이며 목표 종료를 대신하지 않는다. 작업 기억과 과제 상태 snapshot은 코드가 계산한다. 관찰 원장에 정확한 목표가 남아 있거나 컴파일러가 objective proof를 연결했다는 이유로 잊힌 세부를 정확하게 복원하지 않는다. focus와 기억·과제 계약, 표시된 목록·장바구니의 범위는 [전체 계획 절차](references/whole-trace.md)를 따른다. 이 상태와 근거는 허구의 공개 행동 요약이며 실제 내면 사고·발화·심리 측정이 아니다.
+전체 계획의 `bundle.persona.behavior`는 같은 JSON에서 상세 개인 지침, 목표 기억 용량, 반응/보행 기준과 상황별 인지 설정을 가져온다. 관심 전환, 유사 상품 구분, 수량 추적에 연결하는 설정은 합성 부담의 설계값이며 강제 오답 확률이나 임상 척도가 아니다. 새 성격을 정의하거나 원자료의 모든 어려움을 추가하지 않는다. candidate 7은 매 결정에 nullable `basis.goalId`와 배열 `basis.memoryUses`를 적고, 선택적 `actorState.taskUpdate`로 목표의 선택·완료·포기를 선언한다. `focusedGoalId:null`이나 관심·탐색 전환만으로 열린 목표를 `heldGoalIds`에서 지울 수 없다. `actorState.memoryUpdate`는 믿는 값·불확실성의 선언이며 목표 종료를 대신하지 않는다. 수락된 명시적 완료는 `taskMemory.completedGoalIds`에 ID만 기록한다. 표시된 모든 목표를 완료한 뒤 목록을 다시 확인해도 목표 재선택을 강제하지 않으며, 이 이력으로 이름·수량 기억이나 구매 정답을 복원하지 않는다. 작업 기억과 과제 상태 snapshot은 코드가 계산한다. 관찰 원장에 정확한 목표가 남아 있거나 컴파일러가 objective proof를 연결했다는 이유로 잊힌 세부를 정확하게 복원하지 않는다. focus와 기억·과제 계약, 표시된 목록·장바구니의 범위는 [전체 계획 절차](references/whole-trace.md)를 따른다. 이 상태와 근거는 허구의 공개 행동 요약이며 실제 내면 사고·발화·심리 측정이 아니다.
 
 ## 연결과 생성
 
 1. [실행 안내](../market-simulator/README.md)에 따라 전용 DB·인증키·테스트 계정과 개발용 웹앱을 준비한다. `MARKET_REPLAY_CONFIG`의 private 파일에 정확한 app/backend origin, 계정 allowlist, `isolated:true`를 설정한다. 운영 대상은 지원하지 않는다. 이 설정은 격리의 원격 증명이 아니므로 이미 실제 분리를 확인한 환경을 사용한다.
 2. 지속 실행되는 MCP에서 `pair_app_session({appOrigin,backendOrigin,memberId})`을 호출한다. 반환 URL을 새 개발용 앱 탭으로 열고 지정 계정으로 로그인한다. URL의 일회성 토큰은 저장·공유·보고서 기록하지 않는다. 앱은 fragment를 메모리로 읽고 주소에서 제거한다.
 3. 장보기 미션 시작 화면에서 `list_app_sessions`로 계정·백엔드·`ready:true`·`visible:true`와 snapshot ID를 확인한다. 사용자가 시작 버튼을 미리 누르지 않도록 한다. trace의 `start`가 기존 버튼을 누른다.
-4. Luna 전체 계획은 `prepare_whole_trace({personaId,seed,tabId})` → bundle의 현재 선택지로 전체 행동 계획 작성 → `submit_whole_trace({requestId,candidate})`로 저장한다. 새 기본 형식은 bundle 8 / candidate 7이며 행동은 현재 화면·위치에 묶인 `choiceRef`로 선택한다. 매 결정의 `basis.goalId`·`memoryUses`와 필요한 `actorState.taskUpdate`·`memoryUpdate`는 [전체 계획 절차](references/whole-trace.md)의 계약을 따른다. 기존 candidate 6/5/4/3은 각자의 형식과 검증 의미를 유지한다. 기존 증분 provider 생성은 `generate_trace({personaId,seed,tabId})`를 사용한다. 오프라인 생성에는 실제 시작 전 snapshot 또는 snapshotFilePath를 대신 사용한다. 원격 LLM 모드 키는 `llm.apiKeyEnv`에 환경변수 이름으로만 전달한다.
+4. Luna 전체 계획은 `prepare_whole_trace({personaId,seed,tabId})` → 해당 bundle만 받은 새 actor 문맥에서 전체 행동 계획 작성 → `submit_whole_trace({requestId,candidate})`로 저장한다. 새 기본 형식은 bundle 8 / candidate 7이며 행동은 현재 화면·위치에 묶인 `choiceRef`로 선택한다. 매 결정의 `basis.goalId`·`memoryUses`와 필요한 `actorState.taskUpdate`·`memoryUpdate`는 [전체 계획 절차](references/whole-trace.md)의 계약을 따른다. `taskUpdate`는 한 건이어도 배열이다. `basis.intent`와 `actorState.activity`는 서로 다른 허용값을 사용한다. 직전 행동 결과와 같은 결정의 taskUpdate를 반영한 행동 직전 상태를 작성한다. 기존 candidate 6/5/4/3은 각자의 형식과 검증 의미를 유지한다. 기존 증분 provider 생성은 `generate_trace({personaId,seed,tabId})`를 사용한다. 오프라인 생성에는 실제 시작 전 snapshot 또는 snapshotFilePath를 대신 사용한다. 원격 LLM 모드 키는 `llm.apiKeyEnv`에 환경변수 이름으로만 전달한다.
 5. `validate_trace({traceFilePath,tabId})`가 성공한 뒤 `play_trace({traceFilePath,tabId})`로 전체 trace를 전달한다. 미션이 달라졌으면 새 snapshot으로 다시 생성한다. 좌표·로그·대상 ID를 사후 변조하지 않는다. 생성·검증만 요청받으면 저장된 snapshot으로 생성하고 검증까지만 수행하며, 앱 재생·DB 전송·분석 요청은 실행하지 않는다.
 
-전체 계획의 기술 수정은 `maxRepairs:1`일 때 `repair_whole_trace`로 실패한 뒤쪽 결정만 다시 제출한다. 서버는 이미 수락한 정확한 앞부분을 유지하고 같은 candidate 형식과 원래 종료 의도를 요구한다. `maxRepairs:0`이면 수정할 수 없다. 오류의 `repairContext`에는 최신 관측·현재 선택지·알려진 단서가 있으므로 이를 기준으로 스키마·선택 참조만 고친다. 미관찰 근거 오류를 자발적 포기로 바꾸거나 구매 결과를 최적화하지 않는다. 세부 요청 형식은 [전체 계획 절차](references/whole-trace.md)를 따른다.
+전체 계획의 기술 수정은 `maxRepairs:1`일 때 `repair_whole_trace`로 실패한 뒤쪽 결정만 다시 제출한다. 권장 입력은 `{requestId,repair:{decisions:[...]}}`이며 `repairFilePath`에도 같은 decisions 객체를 쓴다. 서버가 요청 ID·버전·수정 시작 위치를 채우므로 모델이 wrapper를 다시 작성하지 않는다. 기존 wrapper를 명시한 경우에는 각 값의 일치를 계속 검사한다. 이 변경은 추가 모델 호출이나 행동별 통신을 만들지 않는다. 서버는 이미 수락한 정확한 앞부분을 유지하고 같은 candidate 형식과 원래 종료 의도를 요구한다. `maxRepairs:0`이면 수정할 수 없다. 오류의 `repairContext`에는 최신 관측·현재 선택지·알려진 단서가 있으므로 이를 기준으로 스키마·선택 참조만 고친다. 미관찰 근거 오류를 자발적 포기로 바꾸거나 구매 결과를 최적화하지 않는다. 세부 요청 형식은 [전체 계획 절차](references/whole-trace.md)를 따른다.
+
+계산대 이용은 `checkout/<계산대 ID>`(예: `checkout/checkout`), 열린 계산대에서 직원이 있을 때 제출은 `control/submit`을 쓴다. 새 `choiceCatalog.referenceAliases`에 명시된 `checkout-open-v1` 별칭만 `open/<ID>`를 같은 계산대의 `checkout/<ID>`로 연결한다. 현재 source가 정확히 일치하고 해당 정식 버튼이 사용 가능해야 하며, 별칭 없는 저장 bundle의 엄격한 해석은 유지한다. 원본 후보와 감사의 작성/실행 참조·정규화 내역을 보존한다. 이 로컬 참조 해석은 행동·경로·수량·종료를 대신 선택하거나 추가 AI 왕복을 만들지 않는다. 상세 범위는 [계산대 참조 별칭](references/whole-trace.md#계산대-참조-별칭)을 따른다.
 
 ### 기존 Codex 증분 계획
 

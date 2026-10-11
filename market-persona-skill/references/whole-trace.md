@@ -11,8 +11,8 @@ node market-simulator/cli.cjs interactive
 ```
 
 1. `list_personas`로 현재 버전을 확인한다. 오프라인에서는 시작 전 `snapshotFilePath`를 준비한다. 앱 재생까지 요청받았다면 스킬의 pairing 절차로 시작 전 탭을 준비한다.
-2. `prepare_whole_trace`에 `personaId`, 새 `seed`, `tabId` 또는 `snapshot` 또는 `snapshotFilePath` 중 정확히 하나를 전달한다. 결과의 `requestId`와 `bundle`을 보관한다. 출력 경로와 검증된 개인 기억 파일은 `outputPath`·`learnerFile`로 지정할 수 있다. 기본 `maxRepairs:0`을 유지하며 요청이 기술 수정 재제출을 허용하면 `1`을 지정한다.
-3. 같은 `bundle`의 세계 참고 자료·행동 계약·상세 페르소나·초기 지식·작업 기억·과제 상태를 읽고 후보 배열 전체를 작성한다. 각 행동 직전의 `actorState`, 필수 `basis.goalId`·`memoryUses`와 필요한 `actorState.taskUpdate`·`memoryUpdate`를 선언하며 현재 예상 화면·위치·계산대 상태를 갱신한다. 코드가 계산하는 기억·과제 snapshot을 임의로 덮어쓰지 않는다. 실제 게임을 실행하지 않고 중간 결과를 예상하는 계획이므로 예측이나 로컬 검증을 앱에서 확인한 경험으로 설명하지 않는다.
+2. `prepare_whole_trace`에 `personaId`, 새 `seed`, `tabId` 또는 `snapshot` 또는 `snapshotFilePath` 중 정확히 하나를 전달한다. 결과의 `requestId`와 `bundle`을 보관하고 `bundle.inputHash`를 후보의 출처 기록에 남긴다. 출력 경로와 검증된 개인 기억 파일은 `outputPath`·`learnerFile`로 지정할 수 있다. 기본 `maxRepairs:0`을 유지하며 요청이 기술 수정 재제출을 허용하면 `1`을 지정한다.
+3. 한 인물·한 조건·한 seed·한 request/bundle만 받는 새 actor 문맥에서 후보 배열 전체를 작성한다. 저부하·고부하를 같은 작성 문맥에 함께 주지 않으며 다른 요청의 목표 ID나 선택지를 복사하지 않는다. 해당 `bundle.authoringGuide`(`authoringVersion:"1"`)의 식별 정보·문법·예제를 먼저 확인한 뒤 세계 참고 자료·행동 계약·상세 페르소나·초기 지식·작업 기억·과제 상태를 읽는다. 각 행동 직전의 `actorState`, 필수 `basis.goalId`·`memoryUses`와 필요한 배열 `actorState.taskUpdate`·`memoryUpdate`를 선언하며 현재 예상 화면·위치·계산대 상태를 갱신한다. 코드가 계산하는 기억·과제 snapshot을 임의로 덮어쓰지 않는다. 실제 게임을 실행하지 않고 중간 결과를 예상하는 계획이므로 예측이나 로컬 검증을 앱에서 확인한 경험으로 설명하지 않는다.
 4. 기본 candidate 7의 각 결정은 `choiceRef`로 현재 위치·계산대 상태·화면에 묶인 선택지를 지정한다. 반환된 `initialChoiceFrame`에서 첫 선택을 시작한다. 전체 배열을 작성한 뒤 `submit_whole_trace({requestId,candidate})` 또는 `submit_whole_trace({requestId,candidateFilePath})`를 한 번 호출한다. 전달 방식은 하나만 쓴다.
 5. 오류 결과에 `canRepair:true`이고 처음 준비할 때 `maxRepairs:1`을 지정했다면 아래의 suffix-only `repair_whole_trace` 절차를 최대 한 번 사용한다. 성공하면 반환된 최종 trace 파일을 사용한다. 생성·검증만 요청받은 경우 여기서 끝낸다. 앱 재생까지 요청받았으면 `validate_trace` → `play_trace` → `replay_status`로 실제 실행을 확인한다. 미션 snapshot이 달라졌으면 새 요청을 준비한다.
 
@@ -31,12 +31,36 @@ interactive에서는 표준입력 한 줄에 같은 도구를 전달한다.
 파일 제출은 `submit_whole_trace({requestId,candidateFilePath})`로 한다. `maxRepairs:1`을 요청한 실행에서 실패 결과에 포함된 `repairContext`를 받았으면, 서버가 수락한 prefix 뒤의 결정만 담아 한 번 수정할 수 있다.
 
 ```json
-{"tool":"repair_whole_trace","arguments":{"requestId":"RETURNED_REQUEST_ID","repair":{"repairVersion":"1","requestId":"RETURNED_REQUEST_ID","baseAttempt":1,"fromDecisionIndex":3,"candidateVersion":"7","decisions":[{"choiceRef":{"source":{"location":"CURRENT_LOCATION","navigationStateId":"CURRENT_NAVIGATION_STATE","phase":"shopping","view":"world","activeStation":null,"pageIndex":null},"choiceId":"CURRENT_AVAILABLE_CHOICE_ID"},"delayMs":2100,"reason":"기존 목표를 위한 다음 이동 참조를 고친다.","basis":{"intent":"task","goalId":"CURRENT_OPEN_GOAL_ID","memoryUses":[{"goalId":"CURRENT_OPEN_GOAL_ID","field":"name","mode":"remembered","value":"CURRENT_CLEAR_GOAL_NAME"}]},"actorState":{"activity":"orient","task":"현재 목표를 위한 통로 이동","heldGoalIds":["CURRENT_OPEN_GOAL_ID"],"uncertainGoalIds":[],"focusedGoalId":null,"focusedProductId":null,"orientation":"recognizing"}}]}}}
+{"tool":"repair_whole_trace","arguments":{"requestId":"RETURNED_REQUEST_ID","repair":{"decisions":[{"choiceRef":{"source":{"location":"CURRENT_LOCATION","navigationStateId":"CURRENT_NAVIGATION_STATE","phase":"shopping","view":"world","activeStation":null,"pageIndex":null},"choiceId":"CURRENT_AVAILABLE_CHOICE_ID"},"delayMs":2100,"reason":"기존 목표를 위한 다음 이동 참조를 고친다.","basis":{"intent":"task","goalId":"CURRENT_OPEN_GOAL_ID","memoryUses":[{"goalId":"CURRENT_OPEN_GOAL_ID","field":"name","mode":"remembered","value":"CURRENT_CLEAR_GOAL_NAME"}]},"actorState":{"activity":"orient","task":"현재 목표를 위한 통로 이동","heldGoalIds":["CURRENT_OPEN_GOAL_ID"],"uncertainGoalIds":[],"focusedGoalId":null,"focusedProductId":null,"orientation":"recognizing"}}]}}}
 ```
 
-위 수정 예시는 필드 형태만 설명하며 열린 목표 하나와 clear 이름 기억을 전제로 한다. 실제 repair는 수락된 열린 목표·기억 상태와 원래 행동·종료 의도를 유지하고 진단에 맞는 기술 문제만 고친다. 여러 열린 목표나 uncertain/unavailable 상태를 이 예시의 값으로 덮어쓰지 않는다. `baseAttempt`, `fromDecisionIndex`, `candidateVersion`과 전체 source를 실제 `repairContext`·원본 후보에 맞춘다. `repairFilePath`도 사용할 수 있다. `repair-whole` CLI 별칭은 같은 persistent MCP/`interactive` 프로세스 안에서만 동작한다.
+위 수정 예시는 필드 형태만 설명하며 열린 목표 하나와 clear 이름 기억을 전제로 한다. 실제 repair는 수락된 열린 목표·기억 상태와 원래 행동·종료 의도를 유지하고 진단에 맞는 기술 문제만 고친다. 여러 열린 목표나 uncertain/unavailable 상태를 이 예시의 값으로 덮어쓰지 않는다. `repair`에는 `decisions` 배열만 쓰고, 실패한 위치 이후의 suffix와 각 결정의 source를 실제 `repairContext`·원본 후보에 맞춘다. 서버가 준비된 요청에서 `repairVersion`, `requestId`, `baseAttempt`, `fromDecisionIndex`, `candidateVersion`을 채운다. `repairFilePath`에는 같은 `{ "decisions": [...] }` 객체를 저장한다. 기존 전체 wrapper나 일부 필드를 적은 요청도 지원하지만, 명시한 값이 현재 요청과 다르면 거절한다. 동일한 수정안을 재전송하면 저장된 결과를 반환하며 수정 예산은 늘어나지 않는다. 전달 형식 오류로 도구가 예외를 반환하면 호스트는 요청 상태를 확인해 실제 후보 거부와 구분한다. 이 처리는 기존 수정 제출 안에서 끝나며 행동마다 모델을 호출하지 않는다. `repair-whole` CLI 별칭은 같은 persistent MCP/`interactive` 프로세스 안에서만 동작한다.
 
 진행이나 저장 결과를 다시 확인할 때 `whole_trace_status({requestId})`를 사용한다. 동기 제출이 완료된 뒤 행동마다 이 도구를 호출할 필요는 없다. `begin_actor_plan`/`observe_actor_plan`/`append_actor_plan`을 이 경로에 섞지 않는다.
+
+호스트 MCP/interactive 프로세스는 여러 요청을 관리할 수 있다. 새 문맥 규칙은 후보를 작성하는 actor에 적용하며 서버가 세션 분리나 다른 bundle의 미열람을 강제·입증하지는 않는다. `requestId`·`inputHash`는 출처 연결용이고 후보에 스키마 밖의 필드를 추가하지 않는다. 작성 안내의 개선은 기술 오류를 줄이기 위한 것으로 행동 선택·페르소나 지침·통과 기준을 바꾸거나 충실도 개선을 입증하지 않는다.
+
+## 작성 시점과 문법 확인
+
+`actorState`와 `choiceRef.source`는 **이번 행동을 실행하기 직전**을 적는다. 직전 행동이 만든 결과를 반영하고, 같은 결정의 `taskUpdate`로 바뀐 열린 목표 집합도 반영한다. 이번 행동으로 앞으로 보게 될 목록·상품·이동 결과를 앞당겨 쓰지 않는다. 이 예상 상태 기록은 전체 계획 작성의 일부이며 중간 실행 결과를 받아 행동마다 다시 계획하는 절차가 아니다.
+
+| 상황 | 작성 규칙 |
+| --- | --- |
+| 목표 상태 변경 | `taskUpdate:[{type:"select",goalId:"실제 목표 ID"}]`처럼 한 건도 배열로 쓴다. 변경이 없으면 생략하거나 `[]`를 쓴다. |
+| 목적과 활동 | `basis.intent`: `explore`, `interest`, `task`, `check`, `recover`, `help`, `finish`, `rest`. `actorState.activity`: `orient`, `shop`, `interest`, `recover`, `check`, `finish`, `rest`. 두 열의 값을 서로 복사하지 않는다. |
+| 초기 목표가 없는 첫 목록 읽기 | 아직 읽지 않은 목표를 같은 결정에서 select하지 않는다. `basis.goalId:null`, `memoryUses:[]`, 빈 목표 배열과 null goal focus로 읽고 다음 결정에서 표시된 목표를 선택한다. 재확인하는 목록 읽기에서 기존 pending 목표까지 비우지는 않는다. |
+| 이동 | 이번 source는 출발 위치다. 다음 결정은 도착 위치와 그때의 navigation state·화면 source를 쓴다. 출발점 `start`를 계속 복사하지 않는다. |
+| 매대 열기 | 다음 결정은 실제 열린 매대의 view·activeStation·표시 페이지를 쓴다. 상품 페이지가 열렸는데 pageIndex를 `null`로 쓰지 않는다. |
+| 계산대 이용·제출 | `checkout/<계산대 ID>`(예: `checkout/checkout`)를 쓴다. 수락 뒤 다음 source는 위치·navigationStateId를 유지하고 `phase:"checkout"`, `view:"world"`, `activeStation:"해당 계산대 ID"`, `pageIndex:null`이다. 그 계산대에 직원이 있고 제출을 선택했다면 이 source로 `control/submit`을 쓴다. |
+| 목표 완료·포기 | 이전 add 결과를 관찰한 뒤 complete를 선언하거나 목표를 abandon하면, 같은 결정의 heldGoalIds에서 그 목표를 뺀다. 완료·포기한 목표를 basis.goalId·focusedGoalId·memoryUses로 계속 참조하지 않는다. 다른 열린 목표는 유지하며 새 행동의 basis와 focus에 맞게 기록한다. |
+
+완료한 목표 하나를 해제한다는 이유로 다른 pending 목표까지 비우지 않는다. 새 행동이 목표에 연결되지 않으면 허용된 intent와 `basis.goalId:null`, `memoryUses:[]`, null goal focus를 쓰고, 다른 열린 목표를 수행한다면 그 목표의 실제 상태를 선언한다. 기술 예제는 상태·형식의 예시이며 구매·확인·실수·관심·포기의 횟수나 행동 순서를 강제하지 않는다.
+
+### 계산대 참조 별칭
+
+새로 준비한 `choiceCatalog.referenceAliases`는 `{aliasChoiceId,canonicalChoiceId,kind:"checkout-open-v1"}` 배열로 허용 별칭을 명시한다. 계산대 ID가 `checkout`이면 `open/checkout`을 `checkout/checkout`에 연결하는 항목이다. 작성할 때는 정식 `checkout/<계산대 ID>`를 사용한다. 컴파일러는 명시된 별칭에 한해 source가 현재 상태와 정확히 같고, 대상이 실제로 같은 계산대이며, 정식 버튼이 현재 사용 가능할 때 로컬에서 참조를 해석한다. 다른 계산대나 경로를 고르거나 구매·수량·종료를 자동 수정하지 않는다. 멀리 있는 계산대, 잘못된 source, 사용할 수 없는 버튼은 계속 거절한다. 별칭 항목이 없는 저장된 bundle은 기존의 엄격한 ID 일치를 유지한다.
+
+원본 후보는 그대로 보존한다. 감사 기록의 `choiceResolution.choiceRef`는 작성된 참조, `resolvedChoiceRef`는 실행한 참조이며, 별칭을 썼을 때만 `normalization:{kind,authoredChoiceId,canonicalChoiceId}`를 함께 기록한다. 행동 이유·대기 시간도 유지한다. 참조 해석은 제출 후 로컬 컴파일 단계에서 끝나므로 추가 AI 왕복이 없고, 전체 계획 1회와 허용된 최대 1회 기술 수정 절차를 유지한다.
 
 ## 세계 참고 자료와 인물의 지식
 
@@ -85,7 +109,9 @@ interactive에서는 표준입력 한 줄에 같은 도구를 전달한다.
 
 candidate 7의 `taskContract:"persistent-task-memory-v1"`는 순간 focus와 열린 과제 목표를 분리한다. `taskMemory.openGoalIds`는 선택·완료·포기 전이로 계산하며 `taskStateVersion:"persistent-task-v1"`로 기록한다. `heldGoalIds`는 열린 목표와 같은 집합이어야 하고 프로필 용량 안에 둔다. 관심·탐색·휴식으로 focus가 null이 되어도 열린 목표의 기억은 유지·감쇠한다. 모델이 held 배열을 비우거나 memoryUpdate.deactivate만 써서 pending 목표를 조용히 삭제할 수 없다.
 
-선택적 `actorState.taskUpdate`는 `[{type:"select"|"complete"|"abandon",goalId}]`다. select는 현재 실제 `readObjectives`의 항목 또는 같은 결정에서 명시적으로 자기회상한 이전 목표에만 적용한다. 목록을 읽은 다음 관찰에 열린 목표가 없으면 실제 표시된 목표를 하나 이상 선택한다. 예외는 실제 checkout/submit/requestCashier/giveUp 행동이며 finish label만으로 선택을 건너뛰지 않는다. complete는 해당 목표에 연결된 이전 add가 실제로 수락되고 그 결과가 관찰된 뒤에 선언한다. 이는 인물이 선택을 마쳤다는 표시이지 상품·수량 정답 검증이 아니다. abandon은 구매 없이 목표를 명시적으로 포기하는 선택이며 그 사실을 남긴다. 미완료 목표를 가진 채 계산·제출·포기하는 것도 허용하며 정답 장바구니를 요구하지 않는다.
+선택적 `actorState.taskUpdate`는 `[{type:"select"|"complete"|"abandon",goalId}]`다. select는 현재 실제 `readObjectives`의 항목 또는 같은 결정에서 명시적으로 자기회상한 이전 목표에만 적용한다. 목록을 읽은 다음 관찰에 열린 목표가 없고 표시된 목표 중 명시적 완료 이력이 없는 목표가 있으면 실제 표시된 목표를 하나 이상 선택한다. 예외는 실제 checkout/submit/requestCashier/giveUp 행동이며 finish label만으로 선택을 건너뛰지 않는다. complete는 해당 목표에 연결된 이전 add가 실제로 수락되고 그 결과가 관찰된 뒤에 선언한다. 이는 인물이 선택을 마쳤다는 표시이지 상품·수량 정답 검증이 아니다. abandon은 구매 없이 목표를 명시적으로 포기하는 선택이며 그 사실을 남긴다. 미완료 목표를 가진 채 계산·제출·포기하는 것도 허용하며 정답 장바구니를 요구하지 않는다.
+
+`taskMemory.completedGoalIds`는 수락된 `complete` 선언의 목표 ID만 보존한다. 표시된 모든 목표를 명시적으로 완료한 뒤 목록을 재확인하면, 목표를 다시 선택하지 않고 장바구니 확인이나 이동을 이어갈 수 있다. 완료 이력은 구매 정답 판정이나 작업 기억의 이름·수량 복원에 쓰지 않는다. 완료한 목표를 다시 select하면 이전 완료 이력을 해제하며, abandon은 완료로 간주하지 않는다. 아직 완료하지 않은 표시 목표가 있으면 기존 선택 규칙을 적용한다.
 
 매 판단의 `basis.goalId`는 필수다. task/recover는 열린 목표 ID, check/help는 열린 목표 ID 또는 null, explore/interest/rest/finish는 null을 쓴다. 목표가 연결된 판단은 이름 memoryUse를 선언하되 실제 readList/viewCart/viewHelp는 외부 확인을 먼저 할 수 있다. 관심 이외의 add/remove는 goalId가 필요하고, 목표에 연결된 add/remove는 name·requiredQuantity 사용을 선언한다. goal focus가 있으면 basis.goalId와 같아야 한다. 이 계약은 모델의 목표 선택과 잘못된 구매를 그대로 유지하며 행동 목적을 reason 문자열에서 추론하지 않는다. 과제·기억 상태는 행동이 수락된 뒤에만 commit한다.
 
@@ -186,7 +212,7 @@ legacy `candidateVersion:"6"`은 `{intent,cueRefs?,memoryUses}`와 기존 memory
 
 Node는 고정된 snapshot에서 후보를 처음부터 실행한다. 행동 직전 공용 `observeActor()`가 실제로 보여주는 단서만 지식 원장에 넣고 `basis`의 알려진 참조·대상 단서와 `actorState`의 알려진 목표·계기 단서를 검사한다. 인물의 지식에는 전체 지도·매대 목록·목표 정답이나 모델이 자체 작성한 발견 사실을 넣지 않는다. 가시성·패널·선반 페이지·재고도 확인하고 기존 `projectDecision`, `TraceGuard`, 게임 어댑터를 사용한다. 최종 trace도 기존 공용 구조/의미 검증을 통과해야 한다. 이동은 기존 보행 입력으로 변환하고 어댑터의 한 번에 32 이하인 이동 입력 상한을 유지하며 순간이동을 추가하지 않는다. 잘못된 이동 참조·미발견 근거·시점에 불가능한 행동을 대신 실행 가능한 정답 행동으로 바꾸지 않는다.
 
-첫 의미 오류가 나면 실패 위치·직전 상태·적용된 앞부분을 진단으로 반환한다. 실패한 앞부분은 완성 trace나 실제 플레이 기억이 아니다. `maxRepairs:0`이면 추가 후보를 제출하지 않는다. `maxRepairs:1`이면 오류의 `repairContext`가 제공하는 `baseAttempt`, `fromDecisionIndex`, 최신 `before`·`choiceFrame`·지식에 맞춘 suffix를 `repair_whole_trace`로 한 번만 보낼 수 있다. repair payload는 `repairVersion:"1"`, 원래 `candidateVersion`, 같은 `requestId`, 그리고 `decisions` suffix를 담는다. 서버는 수락한 정확한 prefix를 보존하고 suffix의 끝도 원래 후보의 종료 의도와 일치시킨다. 문제가 된 필드·단서·조작 참조만 기술적으로 바로잡고, 미관찰 근거·스키마·조작 오류를 자발적 포기로 대신 끝내지 않는다. 원래 후보가 `giveUp`으로 끝나지 않았는데 수정 후보에 새 `giveUp`을 넣으면 `REPAIR_CHANGED_ENDING`으로 거절한다. 성공/실패 목표를 바꾸거나 정답률·경로·구매 성공을 높이기 위한 최적화도 수정 대상이 아니다. 원본·수정본과 실제 제출 횟수를 보존한다. 최대 수정 횟수에 도달하면 실패로 보고하고 새 조건을 같은 표본인 것처럼 이어 붙이지 않는다. 실행 전 형식 검사에서 수량 등의 누락이 발견되면 모든 해당 인덱스를 함께 반환하며 아직 수락한 prefix는 없다. 이때 before·choiceFrame이 null이면 원래 bundle의 initialChoiceFrame을 출발 상태로 사용해 전체 suffix를 수정한다.
+첫 의미 오류가 나면 실패 위치·직전 상태·적용된 앞부분을 진단으로 반환한다. 실패한 앞부분은 완성 trace나 실제 플레이 기억이 아니다. `maxRepairs:0`이면 추가 후보를 제출하지 않는다. `maxRepairs:1`이면 오류의 `repairContext`가 제공하는 `baseAttempt`, `fromDecisionIndex`, 최신 `before`·`choiceFrame`·지식에 맞춘 suffix를 `repair_whole_trace`로 한 번만 보낼 수 있다. 권장 repair payload는 `{ "decisions": [...] }`이며 서버가 요청·버전·수정 시작 위치를 채운다. 기존 전체 wrapper에 명시한 값도 같은 요청과 정확히 일치해야 한다. 서버는 수락한 정확한 prefix를 보존하고 suffix의 끝도 원래 후보의 종료 의도와 일치시킨다. 문제가 된 필드·단서·조작 참조만 기술적으로 바로잡고, 미관찰 근거·스키마·조작 오류를 자발적 포기로 대신 끝내지 않는다. 원래 후보가 `giveUp`으로 끝나지 않았는데 수정 후보에 새 `giveUp`을 넣으면 `REPAIR_CHANGED_ENDING`으로 거절한다. 성공/실패 목표를 바꾸거나 정답률·경로·구매 성공을 높이기 위한 최적화도 수정 대상이 아니다. 원본·수정본과 실제 제출 횟수를 보존한다. 최대 수정 횟수에 도달하면 실패로 보고하고 새 조건을 같은 표본인 것처럼 이어 붙이지 않는다. 실행 전 형식 검사에서 수량 등의 누락이 발견되면 모든 해당 인덱스를 함께 반환하며 아직 수락한 prefix는 없다. 이때 before·choiceFrame이 null이면 원래 bundle의 initialChoiceFrame을 출발 상태로 사용해 전체 suffix를 수정한다.
 
 100회 전에 배열이 끝나면 `submit`이나 `giveUp`으로 자연스럽게 종료돼야 한다. 이 두 행동 이후 단계는 기존 생성기가 붙이므로 후보에 `awaitReviewAccepted`, `skipRating`, `leave`를 직접 넣지 않는다. `submit`은 분석 요청 **접수 대기 후 나가기**, `giveUp`은 기존 포기 흐름이다. 포기를 오류 복구나 강제 종료 대신 삽입하지 않는다.
 

@@ -5,7 +5,7 @@ const { invokeTool, close } = require('./server.cjs');
 const commands = { personas: 'list_personas', generate: 'generate_trace', validate: 'validate_trace', pair: 'pair_app_session', sessions: 'list_app_sessions', play: 'play_trace', status: 'replay_status', stop: 'stop_replay',
   'create-learner': 'create_learner', 'create-trial': 'create_learning_trial', 'prepare-round': 'prepare_learning_round',
   'generate-round': 'generate_learning_round', 'record-round': 'record_learning_round', 'record-failure': 'record_learning_failure', 'compare-trial': 'compare_learning_trial',
-  'create-whole-learner':'create_whole_trace_learner','prepare-whole':'prepare_whole_trace','submit-whole':'submit_whole_trace','repair-whole':'repair_whole_trace','whole-status':'whole_trace_status' };
+  'create-whole-learner':'create_whole_trace_learner','prepare-whole':'prepare_whole_trace','submit-whole':'submit_whole_trace','repair-whole':'repair_whole_trace','whole-status':'whole_trace_status', 'prepare-persona-validation':'prepare_persona_validation', 'measure-persona-validation':'measure_persona_validation', 'prepare-blind-review':'prepare_blind_review', 'submit-blind-review':'submit_blind_review', 'persona-validation-report':'persona_validation_report' };
 async function main() {
   const [command, ...rest] = process.argv.slice(2);
   if (command === 'serve') { require('./server.cjs').start(); return; }

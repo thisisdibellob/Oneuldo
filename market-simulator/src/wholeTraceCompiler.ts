@@ -73,6 +73,8 @@ export async function compileWholeTraceCandidate(settings: WholeTraceSettings, b
     cognition?: ReturnType<WholeTraceCognitionEngine['preview']>;
     taskMemory?: ReturnType<WholeTraceTaskMemoryEngine['preview']>;
     choiceResolution?: { choiceRef: import('./wholeTraceContracts').WholeTraceChoiceDecision['choiceRef'];
+      resolvedChoiceRef: import('./wholeTraceContracts').WholeTraceChoiceDecision['choiceRef'];
+      normalization?: import('./wholeTraceChoices').WholeTraceChoiceNormalization;
       derivedCueRefs: string[]; declaredBasisCueRefs: string[]; declaredTriggerCueRefs: string[];
       source: import('./wholeTraceContracts').WholeTraceChoiceDecision['choiceRef']['source'] } }[] = [];
   let pending: typeof knowledgeAudit[number] | undefined;
@@ -145,6 +147,8 @@ export async function compileWholeTraceCandidate(settings: WholeTraceSettings, b
           ...(memoryCheck ? { cognition: structuredClone(memoryCheck) } : {}),
           ...(taskCheck ? { taskMemory: structuredClone(taskCheck) } : {}),
           ...(binding ? { choiceResolution: { choiceRef: structuredClone((wire as import('./wholeTraceContracts').WholeTraceChoiceDecision).choiceRef),
+            resolvedChoiceRef: structuredClone(binding.resolvedChoiceRef),
+            ...(binding.normalization ? { normalization: structuredClone(binding.normalization) } : {}),
             derivedCueRefs: [...binding.derivedCueRefs],
             declaredBasisCueRefs: [...((wire as import('./wholeTraceContracts').WholeTraceChoiceDecision).basis.cueRefs ?? [])],
             declaredTriggerCueRefs: [...((wire as import('./wholeTraceContracts').WholeTraceChoiceDecision).actorState.triggerCueRefs ?? [])],

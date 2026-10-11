@@ -31,24 +31,10 @@ function shoppingSequence(trace) {
   return semanticSequence(trace).filter(step => !['walkTo', 'walkToAnchor', 'pause', 'lookAround'].includes(step.type));
 }
 function describe(trace, persona) {
-  const steps = trace.steps, familiar = new Set(persona.character?.familiarProductIds ?? []);
-  const selections = steps.filter(s => s.type === 'dragProduct' && s.gesture.outcome === 'drop');
-  const returns = steps.filter(s => s.type === 'removeProduct' || s.type === 'talkToStaff' && s.choice === 'returnProduct');
-  const goalShelves = new Set(OBJECTIVES.map(o => getMarketProduct(o.productId).categoryId));
+  const steps = trace.steps;
   const reactions = steps.filter(s => s.reactionDelayMs > 0).map(s => s.reactionDelayMs);
-  const listReads = steps.filter(s => s.type === 'readList').length;
-  const result = { steps: steps.length,
-    interestShelfOpens: steps.filter(s => s.type === 'openShelf' && s.attentionTag === 'interest').length,
-    nonGoalShelfOpens: steps.filter(s => s.type === 'openShelf' && !goalShelves.has(s.stationId)).length,
-    comparisonBrowses: steps.filter(s => s.type === 'browse' && COMPARISON_REASONS.some(r => starts(s, r))).length,
-    listRechecks: Math.max(0, listReads - 1), cartChecks: steps.filter(s => s.type === 'viewCart').length,
-    familiarSelections: selections.filter(s => familiar.has(s.productId)).length,
-    familiarShortcuts: selections.filter(s => starts(s, 'choose-a-familiar-visible-variant-before-checking-all-details')).length,
-    selections: selections.length,
-    returnActions: returns.length, returnedQuantity: returns.reduce((n, s) => n + s.quantity, 0),
-    staffReturnRequests: returns.filter(s => s.type === 'talkToStaff').length,
-    postSelectionListRechecks: steps.filter(s => s.type === 'readList' && starts(s, 'recheck-the-list-after-a-selection')).length,
-    preCheckoutCartChecks: steps.filter(s => s.type === 'viewCart' && starts(s, 'check-the-basket-before-looking-for-checkout')).length,
+  const shared = require('../src/personaValidationMetrics.cjs').legacyCounts(trace, persona, OBJECTIVES);
+  const result = { steps: steps.length, ...shared,
     reactionMs: distribution(reactions), reactionValues: reactions,
     ending: steps.some(s => s.type === 'submitForReview') ? 'review-requested' : 'gave-up',
     semanticHash: marketReplayFingerprint(semanticSequence(trace)), shoppingHash: marketReplayFingerprint(shoppingSequence(trace)),

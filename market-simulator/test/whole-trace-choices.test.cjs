@@ -115,6 +115,62 @@ test('global target IDs do not authorize a nonlocal hop or unopened shelf produc
   const product = bundle.choiceCatalog.entries.find(e => e.action.type === 'add');
   assert.throws(() => resolveWholeTraceChoice(d(frame.source, product.choiceId, 1), o, bundle, tracked), error => error.code === 'CHOICE_NOT_AVAILABLE');
 });
+test('declared checkout aliases preserve the same target and actor declarations without mutating the candidate', () => {
+  for (const checkoutId of ['checkout', 'checkout-2']) {
+    const { bundle, guard, tracked } = fixture({ near: checkoutId });
+    const o = guard.observeActor(), frame = wholeTraceChoiceFrame(o, bundle, tracked);
+    assert.ok(frame.availableChoices.some(choice => choice.choiceId === `checkout/${checkoutId}`));
+    assert.ok(bundle.choiceCatalog.referenceAliases.some(alias => alias.aliasChoiceId === `open/${checkoutId}`));
+    const selected = d(frame.source, `open/${checkoutId}`, undefined, { delayMs: 2400, reason: '이 계산대를 이용한다' });
+    const original = structuredClone(selected);
+    const resolved = resolveWholeTraceChoice(selected, o, bundle, tracked);
+    assert.deepEqual(selected, original);
+    assert.deepEqual(resolved.policyAction, { type: 'checkout', checkoutId });
+    assert.equal(resolved.decision.delayMs, selected.delayMs);
+    assert.equal(resolved.decision.reason, selected.reason);
+    assert.deepEqual(resolved.resolvedChoiceRef, { ...selected.choiceRef, choiceId: `checkout/${checkoutId}` });
+    assert.deepEqual(resolved.normalization, { kind: 'checkout-open-v1', authoredChoiceId: `open/${checkoutId}`, canonicalChoiceId: `checkout/${checkoutId}` });
+    const exact = resolveWholeTraceChoice(d(frame.source, `checkout/${checkoutId}`), o, bundle, tracked);
+    assert.equal(exact.normalization, undefined);
+    assert.deepEqual(exact.policyAction, resolved.policyAction);
+  }
+});
+test('checkout aliases still require exact source and a currently available same-checkout control', () => {
+  const { bundle, guard, tracked } = fixture({ near: 'checkout' });
+  const o = guard.observeActor(), frame = wholeTraceChoiceFrame(o, bundle, tracked);
+  for (const changed of [{ location: 'W999' }, { navigationStateId: 'cashiers-wrong' }, { phase: 'checkout' },
+    { view: 'cart' }, { activeStation: 'checkout' }, { pageIndex: 0 }]) {
+    assert.throws(() => resolveWholeTraceChoice(d({ ...frame.source, ...changed }, 'open/checkout'), o, bundle, tracked),
+      error => error.code === 'CHOICE_SOURCE_MISMATCH');
+  }
+  assert.throws(() => resolveWholeTraceChoice(d(frame.source, 'open/checkout', 1), o, bundle, tracked), error => error.code === 'CHOICE_QUANTITY');
+  for (const invalid of ['open/unknown-checkout', 'open/Checkout', 'open/checkout ', 'checkout/open', 'open/fresh']) {
+    assert.throws(() => resolveWholeTraceChoice(d(frame.source, invalid), o, bundle, tracked), error => error.code === 'CHOICE_NOT_AVAILABLE');
+  }
+  const far = fixture({ near: 'fresh' }), farObservation = far.guard.observeActor();
+  const farFrame = wholeTraceChoiceFrame(farObservation, far.bundle, far.tracked);
+  assert.equal(farFrame.availableChoices.some(choice => choice.action.type === 'checkout'), false);
+  assert.throws(() => resolveWholeTraceChoice(d(farFrame.source, 'open/checkout'), farObservation, far.bundle, far.tracked),
+    error => error.code === 'CHOICE_NOT_AVAILABLE');
+  guard.execute(step({ type: 'viewCart' }));
+  const cart = guard.observeActor(), cartFrame = wholeTraceChoiceFrame(cart, bundle, tracked);
+  assert.throws(() => resolveWholeTraceChoice(d(cartFrame.source, 'open/checkout'), cart, bundle, tracked), error => error.code === 'CHOICE_NOT_AVAILABLE');
+});
+test('missing, ambiguous or retargeted alias contracts never authorize normalization', () => {
+  const { bundle, guard, tracked } = fixture({ near: 'checkout' });
+  const o = guard.observeActor(), selected = d(wholeTraceChoiceFrame(o, bundle, tracked).source, 'open/checkout');
+  for (const change of [
+    b => { delete b.choiceCatalog.referenceAliases; },
+    b => { b.choiceCatalog.referenceAliases.push(structuredClone(b.choiceCatalog.referenceAliases.find(a => a.aliasChoiceId === 'open/checkout'))); },
+    b => { b.choiceCatalog.referenceAliases.find(a => a.aliasChoiceId === 'open/checkout').canonicalChoiceId = 'checkout/checkout-2'; },
+    b => { b.choiceCatalog.referenceAliases.find(a => a.aliasChoiceId === 'open/checkout').kind = 'unknown'; },
+    b => { b.worldReference.world.checkouts = b.worldReference.world.checkouts.filter(c => c.id !== 'checkout'); },
+    b => { b.choiceCatalog.navigation.find(s => s.navigationStateId === tracked.navigationStateId).locations.find(l => l.location === 'start').choiceIds = []; },
+  ]) {
+    const altered = structuredClone(bundle); change(altered);
+    assert.throws(() => resolveWholeTraceChoice(selected, o, altered, tracked), error => error.code === 'CHOICE_NOT_AVAILABLE');
+  }
+});
 test('directed camera/HUD edges cannot be reversed through a global choice entry', () => {
   const environment = createMarketEnvironment({ layoutId: 'classic', entranceConstruction: false, seed: 'market-1790906391403-1',
     employeeCount: { min: 1, max: 3 }, customerCount: { min: 1, max: 5 }, pillarCount: { min: 1, max: 3 }, chairCount: 0,

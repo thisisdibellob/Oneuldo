@@ -1,0 +1,229 @@
+{
+  "schema": "oneuldo.persona-fidelity-spec",
+  "version": 1,
+  "note": "효과 크기와 플래그 기준은 설계값이며 임상 기준이 아님.",
+  "controlPersonaId": "neutral-adult-control",
+  "minValidPairs": 8,
+  "minAbsDelta": 0.33,
+  "bootstrapReplicates": 1000,
+  "maxFlaggedTraceRate": 0.1,
+  "metrics": [
+    {
+      "id": "mild-intellectual-disability-adult:postSelectionListRate",
+      "personaId": "mild-intellectual-disability-adult",
+      "traitIndex": 0,
+      "selectedTrait": "여러 상품·수량 조건을 동시에 기억하며 처리하기보다 눈앞의 구체적인 단서와 현재 한 항목에 집중하고, 다음 항목은 목록을 다시 확인한다.",
+      "condition": "담은 뒤 다음 목표 또는 결제 전",
+      "measure": "다음 목표 전에 목록을 다시 읽은 비율",
+      "kind": "postSelectionListRate",
+      "expectedAgainstControl": "up",
+      "applies": "high",
+      "minValidPairs": 8,
+      "minAbsDelta": 0.33
+    },
+    {
+      "id": "mild-intellectual-disability-adult:firstShelfOrientationCount",
+      "personaId": "mild-intellectual-disability-adult",
+      "traitIndex": 1,
+      "selectedTrait": "상품이 익숙해도 처음 보는 배치와 조작은 따로 익히며, 시작할 곳이 불확실하면 알아보는 단서나 현재 단계의 도움을 찾아 살핀다.",
+      "condition": "첫 매대 열기 전",
+      "measure": "첫 매대 전 둘러보기·도움 행동 수",
+      "kind": "firstShelfOrientationCount",
+      "expectedAgainstControl": "up",
+      "applies": "both",
+      "minValidPairs": 8,
+      "minAbsDelta": 0.33
+    },
+    {
+      "id": "mild-intellectual-disability-adult:curryDetourRate",
+      "personaId": "mild-intellectual-disability-adult",
+      "traitIndex": 2,
+      "selectedTrait": "카레 종류와 맛을 살피는 개인적 관심으로 목표에서 잠시 주의가 옮겨갈 수 있고, 그동안 하던 항목의 세부를 놓칠 수 있다.",
+      "condition": "카레 단서를 관찰하고 카레가 비목표인 경우",
+      "measure": "비목표 카레 매대로 들어간 비율 및 구간 길이",
+      "kind": "curryDetourRate",
+      "expectedAgainstControl": "up",
+      "applies": "both",
+      "minValidPairs": 8,
+      "minAbsDelta": 0.33
+    },
+    {
+      "id": "mild-intellectual-disability-adult:interestRecoveryRate",
+      "personaId": "mild-intellectual-disability-adult",
+      "traitIndex": 3,
+      "selectedTrait": "관심을 살핀 뒤 스스로 장보기를 떠올리거나 실제 목록·장바구니 단서로 돌아오며, 구체적인 피드백을 이용해 선택을 수정한다.",
+      "condition": "관심 구간 뒤 미완료 목표가 남은 경우",
+      "measure": "목록·장바구니 확인 후 목표 복귀 비율",
+      "kind": "interestRecoveryRate",
+      "expectedAgainstControl": "up",
+      "applies": "both",
+      "minValidPairs": 8,
+      "minAbsDelta": 0.33
+    },
+    {
+      "id": "careful-checker:postSelectionListRate",
+      "personaId": "careful-checker",
+      "traitIndex": 0,
+      "selectedTrait": "반복해서 배운 목록 확인·상품 살피기·담기·장바구니 확인 순서는 안정적으로 수행하지만, 배치나 표기가 바뀌면 같은 순서를 어떻게 적용할지 다시 확인한다.",
+      "condition": "담은 뒤 다음 목표 또는 결제 전",
+      "measure": "다음 목표 전에 목록을 다시 읽은 비율",
+      "kind": "postSelectionListRate",
+      "expectedAgainstControl": "up",
+      "applies": "both",
+      "minValidPairs": 8,
+      "minAbsDelta": 0.33
+    },
+    {
+      "id": "careful-checker:newShelfDelayMs",
+      "personaId": "careful-checker",
+      "traitIndex": 1,
+      "selectedTrait": "새 설명과 상품명·수량·가격의 조건을 정리하는 데 시간이 필요하고, 한 번에 모든 조건을 계산하기보다 눈앞의 항목을 차례로 대조한다.",
+      "condition": "낯선 매대 첫 진입",
+      "measure": "첫 진입 행동 전 대기시간(ms)",
+      "kind": "newShelfDelayMs",
+      "expectedAgainstControl": "up",
+      "applies": "both",
+      "minValidPairs": 8,
+      "minAbsDelta": 0.33
+    },
+    {
+      "id": "careful-checker:comparisonRate",
+      "personaId": "careful-checker",
+      "traitIndex": 2,
+      "selectedTrait": "꼼꼼하고 절약을 중시하는 개인 성격으로 실제 관찰한 소수의 후보와 선반 페이지를 비교하며, 선택 뒤 목록과 계산 전 장바구니를 자주 살핀다.",
+      "condition": "상품 선택 전 매대 페이지를 둘러볼 수 있는 경우",
+      "measure": "선택 전 비교 탐색 비율",
+      "kind": "comparisonRate",
+      "expectedAgainstControl": "up",
+      "applies": "both",
+      "minValidPairs": 8,
+      "minAbsDelta": 0.33
+    },
+    {
+      "id": "careful-checker:correctionRate",
+      "personaId": "careful-checker",
+      "traitIndex": 3,
+      "selectedTrait": "낯선 단계나 확인되지 않은 실패가 누적되면 잠시 멈추거나 현재 단계의 설명을 찾지만, 명확한 단서와 피드백이 있으면 익숙한 전략을 수정한다.",
+      "condition": "불일치나 피드백을 확인한 경우",
+      "measure": "확인한 불일치 뒤 수정 비율",
+      "kind": "correctionRate",
+      "expectedAgainstControl": "up",
+      "applies": "both",
+      "minValidPairs": 8,
+      "minAbsDelta": 0.33
+    },
+    {
+      "id": "careful-checker:independentSelectionRate",
+      "personaId": "careful-checker",
+      "traitIndex": 4,
+      "selectedTrait": "익숙한 상품과 배운 절차에서는 자신 있게 선택하고, 도움을 받아도 필요한 물건과 최종 구매는 스스로 정한다.",
+      "condition": "상품을 고른 경우",
+      "measure": "도움 직후가 아닌 자기 선택 비율",
+      "kind": "independentSelectionRate",
+      "expectedAgainstControl": "up",
+      "applies": "both",
+      "minValidPairs": 8,
+      "minAbsDelta": 0.33
+    },
+    {
+      "id": "quick-decider:familiarSelectionDelayMs",
+      "personaId": "quick-decider",
+      "traitIndex": 0,
+      "selectedTrait": "익숙한 이름과 맛을 구체적인 단서로 삼아 선택지를 좁히고, 친숙한 활동에서는 자신의 취향을 빠르고 분명하게 표현한다.",
+      "condition": "익숙한 상품을 고른 경우",
+      "measure": "익숙한 선택 전 대기시간(ms)",
+      "kind": "familiarSelectionDelayMs",
+      "expectedAgainstControl": "down",
+      "applies": "both",
+      "minValidPairs": 8,
+      "minAbsDelta": 0.33
+    },
+    {
+      "id": "quick-decider:highLoadMismatchRate",
+      "personaId": "quick-decider",
+      "traitIndex": 1,
+      "selectedTrait": "여러 상품·규격·수량 조건을 동시에 유지하며 선택을 점검하는 데 부담이 있어, 미확인 선택이 쌓이면 세부 조건이나 개수를 놓칠 수 있다.",
+      "condition": "고부하 수량 또는 규격 목표를 고른 경우",
+      "measure": "수량·규격 불일치 비율",
+      "kind": "highLoadMismatchRate",
+      "expectedAgainstControl": "up",
+      "applies": "high",
+      "minValidPairs": 8,
+      "minAbsDelta": 0.33
+    },
+    {
+      "id": "quick-decider:comparisonRate",
+      "personaId": "quick-decider",
+      "traitIndex": 2,
+      "selectedTrait": "빠르게 결정하고 긴 비교를 선호하지 않는 개인 성격으로 익숙한 후보부터 고르지만, 단순하고 구체적인 목표까지 일부러 틀리지는 않는다.",
+      "condition": "상품 선택 전 매대 페이지를 둘러볼 수 있는 경우",
+      "measure": "선택 전 비교 탐색 비율",
+      "kind": "comparisonRate",
+      "expectedAgainstControl": "down",
+      "applies": "both",
+      "minValidPairs": 8,
+      "minAbsDelta": 0.33
+    },
+    {
+      "id": "quick-decider:interestRunLength",
+      "personaId": "quick-decider",
+      "traitIndex": 3,
+      "selectedTrait": "좋아하는 상품에 잠깐 관심이 옮겨갔다가 기억하는 장보기로 돌아올 수 있으며, 불확실하면 실제 목록·장바구니·현재 단계의 도움을 사용한다.",
+      "condition": "좋아하는 상품에 관심이 옮겨간 구간",
+      "measure": "관심 구간의 평균 행동 길이",
+      "kind": "interestRunLength",
+      "expectedAgainstControl": "down",
+      "applies": "both",
+      "minValidPairs": 8,
+      "minAbsDelta": 0.33
+    },
+    {
+      "id": "quick-decider:correctionRate",
+      "personaId": "quick-decider",
+      "traitIndex": 4,
+      "selectedTrait": "확인한 이름·수량 차이와 명확한 피드백이 있으면 선택을 다시 살피고 수정하며, 도움을 받아도 선호와 최종 결정은 스스로 유지한다.",
+      "condition": "불일치나 피드백을 확인한 경우",
+      "measure": "확인한 불일치 뒤 수정 비율",
+      "kind": "correctionRate",
+      "expectedAgainstControl": "up",
+      "applies": "both",
+      "minValidPairs": 8,
+      "minAbsDelta": 0.33
+    },
+    {
+      "id": "careful-checker:preCheckoutCartRate",
+      "personaId": "careful-checker",
+      "traitIndex": 2,
+      "selectedTrait": "꼼꼼하고 절약을 중시하는 개인 성격으로 실제 관찰한 소수의 후보와 선반 페이지를 비교하며, 선택 뒤 목록과 계산 전 장바구니를 자주 살핀다.",
+      "condition": "계산 전 단계에 도달한 경우",
+      "measure": "결제 전 장바구니 확인 비율",
+      "kind": "preCheckoutCartRate",
+      "expectedAgainstControl": "up",
+      "applies": "both",
+      "minValidPairs": 8,
+      "minAbsDelta": 0.33
+    }
+  ],
+  "expectedOrders": [
+    {
+      "kind": "preCheckoutCartRate",
+      "order": [
+        "careful-checker",
+        "mild-intellectual-disability-adult",
+        "quick-decider"
+      ]
+    },
+    {
+      "kind": "comparisonRate",
+      "order": [
+        "careful-checker",
+        "mild-intellectual-disability-adult",
+        "quick-decider"
+      ]
+    }
+  ],
+  "conditions": [
+    "low",
+    "high"
+  ]
+}

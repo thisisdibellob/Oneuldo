@@ -51,6 +51,9 @@ export class WholeTraceSession {
   private originalCandidateVersion?: '3' | '4' | '5' | '6' | '7';
   private lastRepairHash?: string;
   private lastRepairResult?: Record<string, unknown>;
+  // Keep the original binding for identical suffix-only delivery retries, even
+  // after compilation has advanced the accepted prefix or closed the request.
+  private lastRepairBinding?: { baseAttempt: number; fromDecisionIndex: number; candidateVersion: string };
 
   constructor(input: WholeTraceSettings) {
     if (!input || typeof input !== 'object') throw new Error('Whole trace settings are required');
@@ -86,9 +89,17 @@ export class WholeTraceSession {
   async submitRepair(value: unknown): Promise<Record<string, unknown>> {
     if (!value || typeof value !== 'object' || Array.isArray(value) || Object.getPrototypeOf(value) !== Object.prototype)
       throw new Error('Repair must be a JSON object');
-    const repair = structuredClone(value) as Record<string, unknown>;
-    if (Object.keys(repair).some(key => !['repairVersion', 'requestId', 'baseAttempt', 'fromDecisionIndex', 'candidateVersion', 'decisions'].includes(key)))
+    if (Object.keys(value).some(key => !['repairVersion', 'requestId', 'baseAttempt', 'fromDecisionIndex', 'candidateVersion', 'decisions'].includes(key)))
       throw new Error('Repair contains an unknown field');
+    // Transport metadata is owned by this prepared session. Existing clients
+    // may still provide it: explicit values are validated, never overwritten.
+    const repair: Record<string, unknown> = {
+      repairVersion: '1', requestId: this.requestId,
+      baseAttempt: this.lastRepairBinding?.baseAttempt ?? this.attempts,
+      fromDecisionIndex: this.lastRepairBinding?.fromDecisionIndex ?? this.preservedPrefix.length,
+      candidateVersion: this.lastRepairBinding?.candidateVersion ?? this.originalCandidateVersion,
+      ...structuredClone(value),
+    };
     if (repair.repairVersion !== '1') throw new Error('repairVersion must be 1');
     if (repair.requestId !== this.requestId) throw new Error('Repair requestId differs from the prepared input');
     const repairJson = canonicalMarketReplayJson(repair);
@@ -121,6 +132,8 @@ export class WholeTraceSession {
     // preserve its attempt state and leave the next suffix diagnostic path free.
     if (assembledHash === this.lastHash && this.lastResult) return structuredClone(this.lastResult);
     saveNew(suffixPath, repair);
+    this.lastRepairBinding = { baseAttempt: this.attempts, fromDecisionIndex: this.preservedPrefix.length,
+      candidateVersion: this.originalCandidateVersion! };
     const result = await this.submit(assembled);
     this.lastRepairHash = repairHash;
     this.lastRepairResult = structuredClone(result);
