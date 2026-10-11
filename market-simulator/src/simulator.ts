@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { marketReplayTraceId, marketReplayFingerprint, validateMarketReplaySnapshot, type MarketReplaySnapshot,
   type MarketReplayStep, type MarketReplayTrace } from '../../frontend/src/game/marketReplayTrace';
 import type { MarketEnvironmentStationId } from '../../frontend/src/game/marketEnvironment';
-import { getPersona } from './personas';
+import { getPersona, getWholeTracePersona } from './personas';
 import { StochasticPolicy } from './stochasticPolicy';
 import { assertDecision, createLlmPolicy } from './llmPolicy';
 import { Random } from './random';
@@ -19,8 +19,10 @@ type StepIntent = MarketReplayStep extends infer S ? S extends MarketReplayStep 
 
 /** Produces intentions only. No BehaviorLogRequest, episode export, HTTP write, or UI process. */
 export async function generateTrace(options: TraceOptions): Promise<MarketReplayTrace> {
-  const timing = options?.timingProfile ?? 'compact';
+  const preserved = options?.actorPolicyVersion === 'whole-trace-v3';
+  const timing = options?.timingProfile ?? (preserved ? 'original' : 'compact');
   if (!['original', 'compact'].includes(timing)) throw new Error('Unknown timingProfile');
+  if (preserved && timing !== 'original') throw new Error('Whole-trace-v3 preserves actor judgment timing; use original');
   // Generate all decisions first: faster replay must not change memory, choices or RNG.
   const trace = await generateOriginalTrace(options);
   const result = timing === 'original' ? trace : compactTraceTiming(trace);
@@ -34,7 +36,9 @@ async function generateOriginalTrace(options: TraceOptions): Promise<MarketRepla
     || String(options.seed).length > 200 || (typeof options.seed === 'number' && !Number.isFinite(options.seed))) throw new Error('A finite numeric or non-empty string seed is required.');
   const snapshotCheck = validateMarketReplaySnapshot(options.snapshot);
   if (!snapshotCheck.valid) throw new Error(snapshotCheck.errors.join('; '));
-  const persona = getPersona(options.personaId);
+  const wholeTraceCompiler = options.planningMode === 'whole-trace' && options.mode === 'llm'
+    && options.actorPolicyVersion === 'whole-trace-v3' && typeof options.actorDecisionProvider === 'function';
+  const persona = wholeTraceCompiler ? getWholeTracePersona(options.personaId) : getPersona(options.personaId);
   const mode = options.mode ?? 'llm';
   if (!['stochastic', 'llm'].includes(mode)) throw new Error('mode must be stochastic or llm.');
   const maxActions = options.maxActions ?? 1000;
@@ -193,5 +197,6 @@ export function summarizeTrace(trace: MarketReplayTrace): TraceSummary {
     helpRequests: trace.steps.filter(s => s.type === 'viewHelp' || (s.type === 'talkToStaff' && s.choice !== 'open')).length,
     productsDragged: trace.steps.reduce((sum, s) => sum + (s.type === 'dragProduct' && s.gesture.outcome === 'drop' ? s.quantity : 0), 0),
     plannedReactionMs: trace.steps.reduce((sum, s) => sum + s.reactionDelayMs, 0),
-    ending: trace.steps.some(s => s.type === 'submitForReview') ? 'review-requested' : 'gave-up' };
+    ending: trace.generation?.systemCompletion ? 'assisted-review-requested' : trace.generation?.controlledStop?.reason === 'action-limit' ? 'action-limit-incomplete'
+      : trace.generation?.controlledStop ? 'controlled-stop' : trace.steps.some(s => s.type === 'submitForReview') ? 'review-requested' : 'gave-up' };
 }

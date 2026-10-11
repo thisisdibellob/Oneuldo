@@ -6,11 +6,13 @@ const fs = require('node:fs');
 const os = require('node:os');
 const { spawn } = require('node:child_process');
 const { dispatch, invokeTool, definitions, createService } = require('../server.cjs');
-test('MCP exposes only intent generation and app replay tools', async () => {
+const { getPersona } = require('../src/personas.ts');
+test('MCP exposes intent generation, app replay and evidence-based learning trial tools', async () => {
   const initialized = await dispatch({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-03-26' } });
   assert.equal(initialized.result.protocolVersion, '2025-03-26');
   const listed = await dispatch({ jsonrpc: '2.0', id: 2, method: 'tools/list' });
-  assert.deepEqual(listed.result.tools.map(tool => tool.name), ['list_personas', 'generate_trace', 'validate_trace', 'pair_app_session', 'list_app_sessions', 'play_trace', 'replay_status', 'stop_replay']);
+  assert.deepEqual(listed.result.tools.map(tool => tool.name), ['begin_actor_plan','observe_actor_plan','append_actor_plan','finalize_actor_plan', 'prepare_whole_trace', 'submit_whole_trace', 'repair_whole_trace', 'whole_trace_status', 'list_personas', 'prepare_persona_validation', 'measure_persona_validation', 'prepare_blind_review', 'submit_blind_review', 'persona_validation_report', 'generate_trace', 'validate_trace', 'pair_app_session', 'list_app_sessions', 'play_trace', 'replay_status', 'stop_replay',
+    'create_learner', 'create_luna_learner', 'create_whole_trace_learner', 'create_learning_trial', 'prepare_learning_round', 'generate_learning_round', 'record_learning_round', 'record_learning_failure', 'compare_learning_trial']);
   assert.equal(await dispatch({ jsonrpc: '2.0', method: 'notifications/initialized' }), null);
 });
 test('removed log/export tools, speed-up options and missing snapshots are rejected', async () => {
@@ -37,7 +39,8 @@ test('replay commands use selected tab and whole trace with one service owner', 
 test('list_personas is offline and does not initialize a bridge', async () => {
   const result = await invokeTool('list_personas'); assert.equal(result.personas.length, 3);
   assert.ok(result.personas.every(persona => persona.id && !Object.hasOwn(persona, 'prompt')));
-  assert.deepEqual(Object.fromEntries(result.personas.map(persona => [persona.id, persona.version])), { 'mild-intellectual-disability-adult': '5', 'careful-checker': '3', 'quick-decider': '3' });
+  assert.deepEqual(Object.fromEntries(result.personas.map(persona => [persona.id, persona.version])),
+    Object.fromEntries(['mild-intellectual-disability-adult', 'careful-checker', 'quick-decider'].map(id => [id, getPersona(id).version])));
   assert.ok(definitions.find(tool => tool.name === 'pair_app_session'));
 });
 test('MCP generates only an intention file bound to the supplied snapshot and validates it offline', async () => {
@@ -54,7 +57,7 @@ test('MCP generates only an intention file bound to the supplied snapshot and va
     const trace = JSON.parse(fs.readFileSync(outputPath, 'utf8'));
     assert.equal(result.traceId, trace.traceId);
     assert.equal(trace.traceSchemaVersion, '2'); assert.equal(trace.policyVersion, '5');
-    assert.equal(trace.personaVersion, '3'); assert.equal(trace.experienceMode, 'first-play');
+    assert.equal(trace.personaVersion, getPersona('careful-checker').version); assert.equal(trace.experienceMode, 'first-play');
     assert.equal(trace.attentionExperience.source, 'planned-trace');
     assert.deepEqual(JSON.parse(fs.readFileSync(result.snapshotFilePath, 'utf8')), snapshot);
     assert.equal(trace.target.snapshotId, snapshot.snapshotId);

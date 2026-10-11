@@ -47,7 +47,8 @@
       "enum": [
         "3",
         "4",
-        "5"
+        "5",
+        "6"
       ]
     },
     "generation": {
@@ -70,13 +71,257 @@
           "maxLength": 100
         },
         "timingProfile": {
-          "enum": ["compact-v1"]
+          "enum": [
+            "compact-v1",
+            "actor-preserved-v1"
+          ]
         },
-        "actorPolicyVersion": { "enum": ["episodic-choice-v1", "episodic-choice-v2", "episodic-choice-v3", "episodic-choice-v4"] },
+        "actorPolicyVersion": {
+          "enum": [
+            "episodic-choice-v1",
+            "episodic-choice-v2",
+            "episodic-choice-v3",
+            "episodic-choice-v4",
+            "episodic-choice-v5",
+            "episodic-choice-v6",
+            "episodic-choice-v7",
+            "episodic-choice-v8",
+            "episodic-choice-v9",
+            "episodic-choice-v10",
+            "whole-trace-v1",
+            "whole-trace-v2",
+            "whole-trace-v3"
+          ]
+        },
+        "reasoningEffort": {
+          "enum": [
+            "low"
+          ]
+        },
         "sourceTraceId": {
           "type": "string",
           "minLength": 1,
           "maxLength": 100
+        },
+        "experienceFingerprint": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{32}$"
+        },
+        "learnerIdentity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "learnerId",
+            "memberId",
+            "personaId",
+            "personaVersion",
+            "experimentId",
+            "arm",
+            "model",
+            "policyVersion"
+          ],
+          "properties": {
+            "learnerId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "memberId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "personaId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "personaVersion": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "experimentId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "arm": {
+              "enum": [
+                "A",
+                "B",
+                "C"
+              ]
+            },
+            "model": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "policyVersion": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "reasoningEffort": {
+              "enum": [
+                "low"
+              ]
+            }
+          }
+        },
+        "trialBinding": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "trialId",
+            "arm",
+            "roundId",
+            "requestHash"
+          ],
+          "properties": {
+            "trialId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500
+            },
+            "arm": {
+              "enum": [
+                "A",
+                "B",
+                "C"
+              ]
+            },
+            "roundId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500
+            },
+            "requestHash": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500
+            }
+          }
+        },
+        "systemCompletion": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "reason",
+            "afterDecisions",
+            "actionLimit",
+            "firstStepId",
+            "checkoutId",
+            "cartAtStart"
+          ],
+          "properties": {
+            "reason": {
+              "const": "action-limit"
+            },
+            "afterDecisions": {
+              "type": "integer",
+              "const": 100
+            },
+            "actionLimit": {
+              "type": "integer",
+              "const": 100
+            },
+            "firstStepId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "checkoutId": {
+              "enum": [
+                "checkout",
+                "checkout-2"
+              ]
+            },
+            "cartAtStart": {
+              "type": "object"
+            }
+          }
+        },
+        "controlledStop": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "reason",
+                "afterDecisions",
+                "reviewCount"
+              ],
+              "properties": {
+                "reason": {
+                  "const": "persistent-stagnation"
+                },
+                "afterDecisions": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "reviewCount": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "reason",
+                "afterDecisions",
+                "actionLimit"
+              ],
+              "properties": {
+                "reason": {
+                  "const": "action-limit"
+                },
+                "afterDecisions": {
+                  "type": "integer",
+                  "const": 100
+                },
+                "actionLimit": {
+                  "type": "integer",
+                  "const": 100
+                }
+              }
+            }
+          ]
+        },
+        "planningMode": {
+          "enum": [
+            "whole-trace"
+          ]
+        },
+        "observationScope": {
+          "enum": [
+            "whole-world"
+          ]
+        },
+        "actorKnowledgeScope": {
+          "enum": [
+            "observed-and-remembered"
+          ]
+        },
+        "actorStateVersion": {
+          "enum": [
+            "1"
+          ]
+        },
+        "planningSubmissions": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "repairSubmissions": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
         }
       },
       "required": [

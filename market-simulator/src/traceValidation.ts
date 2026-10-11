@@ -1,11 +1,13 @@
 import { createMarketAgentAdapter, type MarketAgentAction } from '../../frontend/src/game/marketSession';
-import { validateMarketReplaySnapshot, validateMarketReplayTrace, type MarketReplaySnapshot,
+import { canonicalMarketReplayJson, isMarketReplaySystemCompletionStep, validateMarketReplaySnapshot, validateMarketReplayTrace, type MarketReplaySnapshot,
   type MarketReplayStep, type MarketReplayTrace } from '../../frontend/src/game/marketReplayTrace';
 import { planWalk } from './navigation';
 import { Random } from './random';
 import { DEFAULT_REPLAY_PRESENTATION, visibleStations, visibleAnchors, resolveReplayAnchor, getReplayShelfPage, replayShelfPageFractions } from '../../frontend/src/game/marketReplayPerception';
 import { getMarketStationApproachPoint } from '../../frontend/src/game/marketEnvironment';
 import { isMarketNavigationSegmentClear } from '../../frontend/src/game/marketNavigation';
+import { getMarketHelpLines, marketCashierResponse, marketReturnResponse } from '../../frontend/src/game/marketHelp';
+import { getMarketProduct } from '../../frontend/src/game/scenarios';
 import type { ActorObservation, Observation } from './types';
 
 /** Scratch game state only. Never exports an episode, log request, or renderer position. */
@@ -18,7 +20,8 @@ export class TraceGuard {
   private lastResult?: ActorObservation['result'];
   private readonly presentation;
   private readonly mission;
-  constructor(snapshot: MarketReplaySnapshot, personaId = 'trace-validator', personaVersion = '1', model = 'trace-validation/1', private readonly attentionMode = false) {
+  private readonly helpLines;
+  constructor(snapshot: MarketReplaySnapshot, personaId = 'trace-validator', personaVersion = '1', model = 'trace-validation/1', private readonly attentionMode = false, private readonly extendedActor = false) {
     const valid = validateMarketReplaySnapshot(snapshot);
     if (!valid.valid) throw new Error(valid.errors.join('; '));
     this.adapter = createMarketAgentAdapter({ ...snapshot.config,
@@ -26,6 +29,7 @@ export class TraceGuard {
     }, snapshot.environment);
     this.presentation = snapshot.presentation ?? DEFAULT_REPLAY_PRESENTATION;
     this.mission = snapshot.mission;
+    this.helpLines = getMarketHelpLines(snapshot.config.alarmPenaltyPoints);
   }
   observe(): Observation { return this.adapter.observe(); }
   /** This is the only observation sent to attention policies. Raw state remains guard-owned. */
@@ -51,6 +55,9 @@ export class TraceGuard {
       shelf: page ? { page: page.page, pageCount: page.pageCount, scrollFraction: this.scrollFraction,
         pageFractions: replayShelfPageFractions(o.products.map(p => p.id), this.presentation) } : null,
       listAvailable: world, cart: o.view === 'cart' || o.phase === 'checkout' ? o.cart : null,
+      ...(this.extendedActor && o.view === 'help' ? { supportText: [...this.helpLines] } : {}),
+      ...(this.extendedActor && o.view === 'cart' ? { removableProductIds: Object.keys(o.cart ?? {}).filter(id =>
+        o.products.some(product => product.id === id && product.categoryId === o.activeStation)) } : {}),
       cashiers,
       sequence: this.sequence, elapsedMs: this.time - Date.parse('2000-01-01T00:00:00.000Z'),
       ...(this.lastResult ? { result: { ...this.lastResult } } : {}),
@@ -69,7 +76,8 @@ export class TraceGuard {
     }
     return result;
   }
-  execute(step: MarketReplayStep): { before: Observation; after: Observation; actions: MarketAgentAction[]; movementMs: number } {
+  execute(step: MarketReplayStep, systemCompletion = false): { before: Observation; after: Observation; actions: MarketAgentAction[]; movementMs: number } {
+    if (systemCompletion && !this.extendedActor) throw new Error('System completion requires an explicitly extended actor policy');
     const before = this.observe();
     const actions: MarketAgentAction[] = [];
     let movementMs = 0;
@@ -98,8 +106,8 @@ export class TraceGuard {
         if (!this.attentionMode || !this.observeActor().listAvailable) throw new Error(`${step.id}: the mission list is not visible`);
         this.time += step.durationMs; break;
       case 'walkTo': {
-        if (this.attentionMode && !this.observeActor().visibleStations.some(s => s.id === step.target.stationId && s.near)) throw new Error(`${step.id}: station approach requires a visible nearby station; explore with anchors first`);
-        if (this.attentionMode) {
+        if (this.attentionMode && !systemCompletion && !this.observeActor().visibleStations.some(s => s.id === step.target.stationId && s.near)) throw new Error(`${step.id}: station approach requires a visible nearby station; explore with anchors first`);
+        if (this.attentionMode && !systemCompletion) {
           const target = getMarketStationApproachPoint(before.environment, step.target.stationId, before.playerPosition, before.cashierAvailability);
           if (!target || Math.hypot(target.x - before.playerPosition.x, target.y - before.playerPosition.y) > 180
             || !isMarketNavigationSegmentClear(before.environment, before.playerPosition, target, before.cashierAvailability)) throw new Error(`${step.id}: station approach is not a local clear segment`);
@@ -168,14 +176,23 @@ export class TraceGuard {
     const actionType = step.type === 'talkToStaff'
       ? step.choice === 'open' ? 'interact' : step.choice === 'requestCashier' ? 'requestCashier' : 'requestReturn'
       : ({ openShelf: 'interact', dragProduct: 'add', removeProduct: 'remove', submitForReview: 'submit' } as Record<string, string>)[step.type] ?? step.type;
+    const after = this.observe();
+    const cashierMessage = step.type === 'talkToStaff' && step.choice === 'requestCashier'
+      ? after.cashierRequestFeedback?.message ?? (after.selectedCheckoutId
+        && !before.cashierAvailability[after.selectedCheckoutId] && after.cashierAvailability[after.selectedCheckoutId]
+        ? marketCashierResponse(after.selectedCheckoutId) : undefined)
+      : undefined;
     this.lastResult = { accepted: true, actionType: actionType as NonNullable<ActorObservation['result']>['actionType'],
       ...('productId' in step ? { productId: step.productId } : {}),
       ...('quantity' in step ? { quantity: step.quantity } : {}),
       ...(step.type === 'openShelf' || step.type === 'talkToStaff' ? { stationId: step.stationId } : {}),
       ...(step.type === 'walkTo' ? { stationId: step.target.stationId } : {}),
       ...(step.type === 'walkToAnchor' ? { anchorId: step.target.anchorId } : {}),
+      ...(this.extendedActor && cashierMessage !== undefined ? { message: cashierMessage } : {}),
+      ...(this.extendedActor && step.type === 'talkToStaff' && step.choice === 'returnProduct'
+        ? { message: marketReturnResponse(getMarketProduct(step.productId!)!.name, step.quantity!) } : {}),
     };
-    return { before, after: this.observe(), actions, movementMs };
+    return { before, after, actions, movementMs };
   }
 }
 
@@ -185,8 +202,17 @@ export function validateTrace(value: unknown, snapshot?: MarketReplaySnapshot) {
   if (!shape.valid || !snapshot) return shape;
   try {
     const trace = value as MarketReplayTrace;
-    const guard = new TraceGuard(snapshot, trace.personaId, trace.personaVersion, trace.generation?.model, trace.traceSchemaVersion === '2');
-    for (const step of trace.steps) guard.execute(step);
+    const guard = new TraceGuard(snapshot, trace.personaId, trace.personaVersion, trace.generation?.model, trace.traceSchemaVersion === '2',
+      ['episodic-choice-v9', 'episodic-choice-v10', 'whole-trace-v3'].includes(trace.generation?.actorPolicyVersion ?? ''));
+    const completion = trace.generation?.systemCompletion;
+    for (const step of trace.steps) {
+      const systemOwned = isMarketReplaySystemCompletionStep(trace, step.id);
+      const applied = guard.execute(step, systemOwned);
+      if (systemOwned && completion) for (const state of [applied.before, applied.after]) {
+        if (state.cart !== null && canonicalMarketReplayJson(state.cart) !== canonicalMarketReplayJson(completion.cartAtStart))
+          throw new Error(`${step.id}: system checkout must preserve the actual cart at the action limit`);
+      }
+    }
     return { valid: true, errors: [] as string[] };
   } catch (error) { return { valid: false, errors: [(error as Error).message] }; }
 }

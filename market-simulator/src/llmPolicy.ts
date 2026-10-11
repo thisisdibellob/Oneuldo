@@ -1,4 +1,6 @@
-import { actorChoices } from './actorChoices';
+import { actorChoices, extendedActorChoices, presentActorChoices } from './actorChoices';
+import { ACTOR_PERSONA_INSTRUCTIONS, ACTOR_OBSERVATION_INSTRUCTIONS } from './actorInstructions';
+import type { ActorActivityState } from './actorActivity';
 import type { ActorLearningMemory } from './actorLearning';
 import type { Decision, TraceOptions, Observation, Persona, TraceEntry, ActorObservation } from './types';
 import { PersonaContext } from './personaContext';
@@ -31,7 +33,18 @@ export function assertDecision(value: unknown): asserts value is Decision {
 }
 
 /** Same HTTP contract as the legacy provider, with actor-only input and externally owned memory. */
-export function createAttentionLlmPolicy(options: NonNullable<TraceOptions['llm']>) {
+export const LEGACY_ACTOR_POLICY_VERSION = 'episodic-choice-v4' as const;
+export function isExtendedActorPolicy(policy?: string): boolean {
+  return ['episodic-choice-v9', 'episodic-choice-v10', 'whole-trace-v3'].includes(policy ?? '');
+}
+export function attentionActorPolicyVersion(options: Pick<TraceOptions, 'actorPolicyVersion' | 'learnerIdentity' | 'attentionExperience'>) {
+  return options.actorPolicyVersion ?? options.learnerIdentity?.policyVersion
+    ?? (options.attentionExperience?.learning?.version === '2' ? options.attentionExperience.learning.policyVersion : LEGACY_ACTOR_POLICY_VERSION);
+}
+export const ACTOR_POLICY_VERSION = 'episodic-choice-v9' as const;
+export const LUNA_ACTOR_POLICY_VERSION = 'episodic-choice-v10' as const;
+
+export function createAttentionLlmPolicy(options: NonNullable<TraceOptions['llm']>, presentationSeed: string | number = 'actor-choice-presentation', extendedPolicy = false) {
   const baseUrl = options.baseUrl ?? process.env.MARKET_LLM_BASE_URL;
   const model = options.model ?? process.env.MARKET_LLM_MODEL;
   if (!baseUrl || !model) throw new Error('LLM mode requires llm.baseUrl/model or MARKET_LLM_MODEL.');
@@ -43,18 +56,19 @@ export function createAttentionLlmPolicy(options: NonNullable<TraceOptions['llm'
   if (!token && url.protocol === 'https:') throw new Error('LLM API key environment variable is not set.');
   if (options.timeoutMs !== undefined && (!Number.isInteger(options.timeoutMs) || options.timeoutMs < 1000 || options.timeoutMs > 120000)) throw new Error('LLM timeoutMs must be 1000..120000.');
   let calls = 0;
-  return async (observation: ActorObservation, history: TraceEntry[], persona: Persona, state: unknown): Promise<Decision> => {
+  return async (observation: ActorObservation, history: TraceEntry[], persona: Persona, state: unknown, activity?: ActorActivityState): Promise<Decision> => {
     const observed=(state as Partial<ReturnType<ActorLearningMemory['getState']>> | null)?.observedThisVisit;
-    const choices = actorChoices(observation, observed ? {anchors:observed.discoveries.anchors,currentAnchor:observed.currentAnchor} : undefined);
+    const memory = observed ? {anchors:observed.discoveries.anchors,currentAnchor:observed.currentAnchor} : undefined;
+    const choices = extendedPolicy ? presentActorChoices(extendedActorChoices(observation, memory), presentationSeed, history.length) : actorChoices(observation, memory);
     if (!choices.length) throw new Error('No supported UI controls in this phase');
     const attempts: unknown[] = [];
     let feedback = '';
     for (let attempt = 0; attempt < 3; attempt++) {
       if (++calls > (options.maxCalls ?? 300)) throw new Error('ATTENTION_GENERATION_LIMIT: model-call-limit (including format repairs)');
       const messages = [
-        { role:'system', content: `Choose ONE next high-level action for a fictional adult shopping in an app. This is one individual, not a representative of intellectual disability. Use the stable personal traits supplied. Do not force mistakes, helplessness, improvement or perfect performance. Use only displayed cues and provided experience; no hidden map or correct-answer feedback exists. Learn from concrete observations and any actually displayed help, but do not assume that seeing instructions means understanding or mastery. Past choices may have been wrong. Previous task items are not the current shopping list. Experience can guide a choice but does not guarantee transfer. lookAround and pause only wait; they do not reveal a new aisle. Movement is necessary to see another area. Reading the list exposes its contents. The lastReadList and instructions in observedThisVisit remain available after movement; absence from the current screen does not erase that recorded information. You may consult them or read again if you choose. Use current visible cues together with your recorded sightings and traveled edges; unseen areas remain unknown. submit requests analysis; it does not reveal a verdict. Choose exactly one ID from availableChoices. The program only translates that ID into the corresponding UI action. Return JSON: {"choiceId":"C1","delayMs":500,"reason":"brief observable action description","currentTask":"short current activity, not an explanation"}. Maintain or revise currentTask yourself; it is a provisional intention and may be mistaken. Do not return an action object, diagnosis, ability score or private reasoning.` },
+        { role:'system', content: extendedPolicy ? `${ACTOR_PERSONA_INSTRUCTIONS}\n${ACTOR_OBSERVATION_INSTRUCTIONS}\nChoose ONE next high-level action for a fictional adult shopping in an app. This is one individual, not a representative of intellectual disability. Use the stable personal traits supplied. practicedStrategies and learningProfile describe initial personal history, not skills learned in this experiment. practiceFocus names areas to observe, not required actions or improvement targets. Keep personality and preferences stable; decide whether a relevant previous experience applies to this situation. Retrieved experiences are historical, may include unsuccessful choices, and do not establish understanding. A displayed correction or help text is available support, not proof that it was learned. Do not force mistakes, helplessness, improvement or perfect performance. Use only displayed cues and provided experience; no hidden map or correct-answer feedback exists. Learn from concrete observations and any actually displayed help, but do not assume that seeing instructions means understanding or mastery. Past choices may have been wrong. Previous task items are not the current shopping list. Experience can guide a choice but does not guarantee transfer. lookAround and pause only wait; they do not reveal a new aisle. Movement is necessary to see another area. Reading the list exposes its contents. The lastReadList and instructions in observedThisVisit remain available after movement; absence from the current screen does not erase that recorded information. You may consult them or read again if you choose. Use current visible cues together with your recorded sightings and traveled edges; unseen areas remain unknown. submit requests analysis; it does not reveal a verdict. Choose exactly one ID from availableChoices. The program only translates that ID into the corresponding UI action. Return JSON: {"choiceId":"an exact availableChoices ID","delayMs":500,"reason":"brief observable action description","currentTask":"short current activity, not an explanation"}. Maintain or revise currentTask yourself; it is a provisional intention and may be mistaken. Do not return an action object, diagnosis, ability score or private reasoning.` : `Choose ONE next high-level action for a fictional adult shopping in an app. This is one individual, not a representative of intellectual disability. Use the stable personal traits supplied. Do not force mistakes, helplessness, improvement or perfect performance. Use only displayed cues and provided experience; no hidden map or correct-answer feedback exists. Learn from concrete observations and any actually displayed help, but do not assume that seeing instructions means understanding or mastery. Past choices may have been wrong. Previous task items are not the current shopping list. Experience can guide a choice but does not guarantee transfer. lookAround and pause only wait; they do not reveal a new aisle. Movement is necessary to see another area. Reading the list exposes its contents. The lastReadList and instructions in observedThisVisit remain available after movement; absence from the current screen does not erase that recorded information. You may consult them or read again if you choose. Use current visible cues together with your recorded sightings and traveled edges; unseen areas remain unknown. submit requests analysis; it does not reveal a verdict. Choose exactly one ID from availableChoices. The program only translates that ID into the corresponding UI action. Return JSON: {"choiceId":"C1","delayMs":500,"reason":"brief observable action description","currentTask":"short current activity, not an explanation"}. Maintain or revise currentTask yourself; it is a provisional intention and may be mistaken. Do not return an action object, diagnosis, ability score or private reasoning.` },
         { role:'user', content:JSON.stringify({observation, personaCharacter:persona.character ?? {description:persona.description},
-          experience:state, availableChoices:choices, ...(feedback ? {formatCorrection:feedback}:{} )}) },
+          experience:state, ...(extendedPolicy && activity ? {activityFeedback:activity}:{}), availableChoices:choices, ...(feedback ? {formatCorrection:feedback}:{} )}) },
       ];
       const wire = options.protocol === 'ollama'
         ? { model,messages,think:false,stream:false,options:{num_ctx:18432,num_predict:500,temperature:0.2} }

@@ -14,13 +14,39 @@ export type Decision = { action: PolicyAction; delayMs: number; reason: string; 
   exchange?: { request: unknown; response: unknown } };
 export type PrimitiveDecision = { action: MarketAgentAction; delayMs: number; reason: string };
 export type TraceEntry = Decision;
+export type PersonaTraitKey = 'deliberation' | 'checking' | 'exploration' | 'persistence' | 'helpSeeking';
+export type PersonaTraitLevel = 'low' | 'medium' | 'high';
+export type PersonaTraitContext = {
+  capability: {
+    reactionMedianMs: number; reactionSigma: number; walkSpeed: number;
+    confusionProbability: number; quantitySlipProbability: number; feedbackLearningRate: number;
+    goalMemoryCapacity: number | null; spatialMemoryCapacity: number | null; switchMemoryDecay: number | null;
+  };
+  preferences: {
+    pricePreference: number; familiarityBias: number; itemPreferenceWeights: Record<string, number>;
+    interestProductWeights: Record<string, number>; interestCategoryWeights: Record<string, number>;
+  };
+  experience: {
+    familiarProductIds: string[]; familiarCategories: string[];
+    learningProfile: { baseline: 'initial-personal-history'; practiceFocus: string[]; transferConditions: string[] } | null;
+    interpretation: string;
+  };
+};
+export type PersonaTraitProfile = {
+  schemaVersion: 'persona-traits-v1'; basePersonaId: string; presetId: string | null;
+  traits: Record<PersonaTraitKey, PersonaTraitLevel>; contextHash: string; context: PersonaTraitContext;
+};
 export type Persona = {
   id: string; version: string; name: string; description: string; prompt: string;
+  /** Validation-only composition. Canonical persona files and ordinary generation remain unchanged. */
+  traitProfile?: PersonaTraitProfile;
   /** Fictional personal history and a stable subset of traits, never population estimates. */
   character?: {
     name: string; age: number; goal: string; selectedTraits: string[]; strengths: string[];
     preferences: string[]; familiarCategories: string[]; familiarProductIds: string[];
     practicedStrategies: string[];
+    /** Initial habits are fixed during a trial; newly observed practice lives in learner memory. */
+    learningProfile?: { baseline: 'initial-personal-history'; practiceFocus: string[]; transferConditions: string[] };
   };
   attention?: AttentionProfile;
   /** Stable shopping habits; probabilities are synthetic design settings, not population estimates. */
@@ -59,7 +85,11 @@ export type ActorObservation = {
   readObjectives?: ActorObjective[];
   /** Text actually shown by the app. No analysis, hidden goals or expected answer. */
   instructions?: { phase: 'entry' | 'checkout'; lines: string[] };
+  /** Exact shared UI help content, present only while that support view is open. */
+  supportText?: string[];
   cart: Record<string, number> | null;
+  /** Enabled return controls in the open shelf basket; a standalone cart has none. */
+  removableProductIds?: string[];
   cashiers: Partial<Record<string, boolean>>;
   lastActionError?: string | null;
   result?: { accepted: boolean; actionType: PolicyAction['type']; productId?: string; quantity?: number;
@@ -91,6 +121,8 @@ export type AttentionExperience = {
 export type TraceOptions = {
   personaId: string; seed: string | number; snapshot: MarketReplaySnapshot;
   mode?: 'stochastic' | 'llm'; maxActions?: number; timeBudgetMs?: number;
+  tracePolicyVersion?: '5' | '6'; actorPolicyVersion?: 'episodic-choice-v9' | 'episodic-choice-v10' | 'whole-trace-v1' | 'whole-trace-v2' | 'whole-trace-v3'; reasoningEffort?: 'low';
+  planningMode?: 'whole-trace'; planningSubmissions?: number; repairSubmissions?: number;
   /** Compact is a test execution schedule, not an estimate of a person's speed. */
   timingProfile?: 'original' | 'compact';
   llm?: { baseUrl?: string; model?: string; apiKeyEnv?: string; maxCalls?: number; timeoutMs?: number;
@@ -98,8 +130,17 @@ export type TraceOptions = {
   /** Optional local model contract. A failed LLM call is never replaced by stochastic actions. */
   decisionProvider?: (observation: Observation, history: TraceEntry[], persona: Persona) => Promise<Decision>;
   attentionExperience?: AttentionExperience;
-  actorDecisionProvider?: (observation: ActorObservation, history: TraceEntry[], persona: Persona) => Promise<Decision>;
+  learnerIdentity?: import('./actorLearning').LearnerIdentity;
+  trialBinding?: { trialId: string; arm: 'A' | 'B' | 'C'; roundId: string; requestHash: string };
+  actorDecisionProvider?: (observation: ActorObservation, history: TraceEntry[], persona: Persona,
+    activity: import('./actorActivity').ActorActivityState, state?: unknown) => Promise<Decision>;
+  onActorDecisionAccepted?: () => void;
+  /** Local diagnostics only. Unfinished plans never become executed learner experience. */
+  onCheckpoint?: (entry: GenerationCheckpoint) => void;
 };
+export type GenerationCheckpoint = { kind: 'decision'; index: number; before: ActorObservation;
+  decision: Omit<Decision, 'exchange'>; after: ActorObservation; activity: import('./actorActivity').ActorActivityState }
+  | { kind: 'controlled-stop' | 'system-completion'; index: number; activity: import('./actorActivity').ActorActivityState };
 export type TraceSummary = { personaId: string; steps: number; walkingIntentions: number; cartChecks: number;
-  helpRequests: number; productsDragged: number; plannedReactionMs: number; ending: 'review-requested' | 'gave-up' };
+  helpRequests: number; productsDragged: number; plannedReactionMs: number; ending: 'review-requested' | 'gave-up' | 'controlled-stop' | 'action-limit-incomplete' | 'assisted-review-requested' };
 export type GeneratedTrace = MarketReplayTrace;
