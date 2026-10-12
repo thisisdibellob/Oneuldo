@@ -1,4 +1,4 @@
-import { validateMarketReplayTrace, type MarketReplayStep, type MarketReplayTrace } from '../game/marketReplayTrace';
+import { isMarketReplaySystemCompletionStep, validateMarketReplayTrace, type MarketReplayStep, type MarketReplayTrace } from '../game/marketReplayTrace';
 import { assertReplayActive, replayAwait, replayDelay, replayStep, replayUntil, type ReplayMotionPort, type ReplayUiPort } from './ports';
 import { createMotionReport, dragProduct, moveDirection, walkToAnchor, walkToStation, walkToVisibleStation } from './motor';
 import { replayPresentationKey, validateReplayPresentation } from '../game/marketReplayPerception';
@@ -50,7 +50,7 @@ export async function playMarketTrace(trace: MarketReplayTrace, getUi: () => Rep
         await replayUntil(() => !motion.read().locked, signal); return;
       }
       case 'walkTo':
-        if (strict) await walkToVisibleStation(motion, step.target.stationId, presentation!, step.movement, signal, report, step.timeoutMs);
+        if (strict && !isMarketReplaySystemCompletionStep(trace, step.id)) await walkToVisibleStation(motion, step.target.stationId, presentation!, step.movement, signal, report, step.timeoutMs);
         else await walkToStation(motion, step.target.stationId, step.movement, signal, report, step.timeoutMs);
         return;
       case 'walkToAnchor': await walkToAnchor(motion, step.target.anchorId, presentation!, step.movement, signal, report, step.timeoutMs); return;

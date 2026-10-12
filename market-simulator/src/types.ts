@@ -67,6 +67,17 @@ export type Persona = {
   };
 };
 
+/** Direct MCP research actors carry only their canonical individual description.
+ * They have no synthetic probability, timing or motor settings and must not be
+ * passed to numeric trace-generation policies.
+ */
+export type ResearchPersona = {
+  id: string; version: string; name: string; scope: string;
+  strengths: string[]; initialSupportNeeds: string[]; preferences: string[];
+  learningInstructions: string[]; researchSourceIds: string[]; engineeringAssumptions: string[];
+};
+export type ActorPersona = Persona | ResearchPersona;
+
 export type ShoppingStyle = {
   comparisonProbability: number; maxComparisonPages: number;
   listCheckAfterSelectionProbability: number; preCheckoutCheckProbability: number;
@@ -146,7 +157,7 @@ export type TraceOptions = {
   attentionExperience?: AttentionExperience;
   learnerIdentity?: import('./actorLearning').LearnerIdentity;
   trialBinding?: { trialId: string; arm: 'A' | 'B' | 'C'; roundId: string; requestHash: string };
-  actorDecisionProvider?: (observation: ActorObservation, history: TraceEntry[], persona: Persona,
+  actorDecisionProvider?: (observation: ActorObservation, history: TraceEntry[], persona: ActorPersona,
     activity: import('./actorActivity').ActorActivityState, state?: unknown) => Promise<Decision>;
   /** The feedback actor boundary never receives archived observations or the full snapshot. */
   feedbackDecisionProvider?: (frame: import('./feedbackActor').FeedbackActorFrame) => Promise<Decision>;

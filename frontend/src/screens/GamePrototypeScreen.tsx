@@ -2820,7 +2820,11 @@ export function GamePrototypeScreen({ accessToken = null, onExit, onOpenAnalysis
         backgroundColor: '#f4fff3', borderColor: '#3b6b3b', borderWidth: 1, borderRadius: 8, padding: 8, zIndex: 10000 }}>
         <Text accessibilityLiveRegion="polite" testID="market-replay-status" style={{ fontSize: 12, color: '#234b23' }}>{replayStatus}</Text>
         {worldMap === 'village' ? <Pressable accessibilityRole="button" accessibilityLabel="실험용 매장 입구로 이동"
-          onPress={event => handlePortalPress(event, 'market')}><Text>실험용 매장 입구로 이동</Text></Pressable> : null}
+          onPress={event => {
+            event?.stopPropagation?.();
+            if (nearbyPortalIdRef.current === 'market') handleEnterMarket();
+            else handlePortalPress(event, 'market');
+          }}><Text>실험용 매장 입구로 이동</Text></Pressable> : null}
       </View> : null}
 
       {fridgeMenuOpen ? (
