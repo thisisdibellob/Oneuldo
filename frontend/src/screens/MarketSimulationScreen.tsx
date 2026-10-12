@@ -677,6 +677,7 @@ export function MarketSimulationScreen({
   const backToStaff = () => { setStaffReturnHelp(false); setStaffResponse(''); };
   if (__DEV__ && replayUiRef && aiAssessment) {
     replayUiRef.current = {
+      recordExecutionContext:context=>tracker.current?.recordReplayExecutionContext(context),
       snapshot: () => {
         const presentation = replayPresentation?.();
         if (briefing && briefingStep === 0 && JSON.stringify(replaySnapshot.current?.presentation) !== JSON.stringify(presentation)) replaySnapshot.current = null;

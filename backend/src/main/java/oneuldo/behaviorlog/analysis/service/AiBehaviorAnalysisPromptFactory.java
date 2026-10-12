@@ -226,7 +226,9 @@ public class AiBehaviorAnalysisPromptFactory {
                 + "summary/uncertainties의 사건 번호와 chunkScopes의 범위 경계는 관찰 근거가 아니다. 목록 밖 ID로 새 관찰을 만들지 않는다. "
                 + "허용 근거가 없는 자식의 자료 한계는 uncertainties에 유지하고 evidenceEventIds로 승격하지 않는다. "
                 + "allowedEvidenceEventIds가 비어 있으면 observations는 []로 두고 불확실성을 보존한다. "
-                + "uncertainties는 필수이며 축약으로 빠진 관찰과 상충을 명시한다. 인과를 지어내지 않는다.";
+                + "uncertainties는 필수이며 축약으로 빠진 관찰과 상충을 명시한다. 인과를 지어내지 않는다. "
+                + "1800토큰 안에 JSON을 반드시 완성한다. summary 120자 이내, 핵심 관찰 1~3개, 각 observation 200자·interpretation 120자 이내, 대안 0~1개 100자 이내, 근거 1~3개로 쓴다. "
+                + "uncertainties는 같은 한계를 합친 1~4개 문장으로 각 90자 이내, requestedSegmentIds는 필요한 0~3개만 쓴다. 자식 원문과 원본 사건은 모두 별도 보존되므로 긴 한계 목록을 그대로 복사하지 않는다. 반증·도움·상충과 축약 범위는 짧게 유지하고 새 사실은 만들지 않는다.";
     }
     /** Replace instructions only; the saved child interpretations remain byte-for-byte JSON-equivalent. */
     public String compactReductionPrompt(String json) {

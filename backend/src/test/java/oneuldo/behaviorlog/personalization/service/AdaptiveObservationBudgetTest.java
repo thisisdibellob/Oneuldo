@@ -31,7 +31,9 @@ class AdaptiveObservationBudgetTest {
         }
         assertThat(restored).isEqualTo(source.path("events"));
         assertThat(restored).hasSize(349);assertThat(source).isEqualTo(before);
-        Files.writeString(run.resolve("observation-part-budget-check.json"),mapper.writerWithDefaultPrettyPrinter().writeValueAsString(report)+"\n");
+        var out=Path.of(System.getenv().getOrDefault("ONEULDO_TEST_RECORD_OUTPUT","build/test-records"));
+        Files.createDirectories(out);
+        Files.writeString(out.resolve("observation-part-budget-check.json"),mapper.writerWithDefaultPrettyPrinter().writeValueAsString(report)+"\n");
     }
     @Test void short_sources_stay_in_one_call_and_unfit_sources_fail_without_silently_dropping_records(){
         var source=mapper.createObjectNode();source.putArray("events");source.putArray("sourceEventDetails");source.put("original","기록을 그대로 유지해요");
@@ -39,8 +41,8 @@ class AdaptiveObservationBudgetTest {
         var before=source.deepCopy();
         assertThatThrownBy(()->AdaptiveQuestObservation.plan(mapper,source,mapper.createArrayNode(),100)).isInstanceOf(AiInputLimitException.class);
         assertThat(source).isEqualTo(before);
-        assertThat(AdaptiveQuestContract.MAXIMUM_AI_CALLS).isEqualTo(6);
-        assertThat(AdaptiveQuestContract.GENERATION_DEADLINE_SECONDS).isEqualTo(420);
+        assertThat(AdaptiveQuestContract.MAXIMUM_AI_CALLS).isEqualTo(21);
+        assertThat(AdaptiveQuestContract.GENERATION_DEADLINE_SECONDS).isEqualTo(1800);
     }
     private JsonNode readable(ObjectNode source){
         var rows=mapper.createArrayNode();for(var e:source.path("sourceEventDetails")){

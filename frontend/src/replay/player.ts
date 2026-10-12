@@ -26,6 +26,8 @@ export async function playMarketTrace(trace: MarketReplayTrace, getUi: () => Rep
   if (!ui().read().briefing || ui().read().briefingStep !== 0) throw new Error('Replay must start on the first page of an untouched mission briefing');
   const report: ReplayProgress['report'] = { ...createMotionReport(), startedAt: new Date().toISOString(), acknowledged: false, completedSteps: [] };
   let index = 0;
+  const controllerFirst=trace.generation?.systemCompletion?trace.steps.findIndex(step=>step.id===trace.generation!.systemCompletion!.firstStepId):-1;
+  let recordedOwner:string|undefined;
   const progress = (status: ReplayProgress['status'], error?: string) => onProgress({ status, stepIndex: index,
     stepId: trace.steps[index]?.id, ...(error ? { error } : {}), report: JSON.parse(JSON.stringify(report)) });
   const shelf = () => { const port = ui().shelf(); if (!port) throw new Error('No open shelf'); return port; };
@@ -156,6 +158,14 @@ export async function playMarketTrace(trace: MarketReplayTrace, getUi: () => Rep
   try {
     for (index = 0; index < trace.steps.length; index++) {
       const step = trace.steps[index];
+      const completion=controllerFirst>=0&&index>=controllerFirst;
+      const controlledStop=!!trace.generation?.controlledStop&&index>=trace.steps.length-3;
+      const owner=completion?'SYSTEM_COMPLETION':controlledStop?'SYSTEM_STOP':'PERSONA_ACTOR';
+      if(owner!==recordedOwner)ui().recordExecutionContext?.({source:'synthetic',traceId:trace.traceId,personaId:trace.personaId,personaVersion:trace.personaVersion,
+        agentModel:trace.generation?.model??'trace-generator',actorPolicyVersion:trace.generation?.actorPolicyVersion,
+        executionOwner:owner,
+        ...(completion?{controllerReason:trace.generation!.systemCompletion!.reason}:controlledStop?{controllerReason:trace.generation!.controlledStop!.reason}:{})});
+      recordedOwner=owner;
       progress('running');
       if (step.reactionDelayMs > 0) await replayDelay(step.reactionDelayMs, signal);
       const startedAt = new Date().toISOString();

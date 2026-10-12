@@ -73,7 +73,7 @@ public final class MovementSourceContext {
                 var payload = source.path("payload");
                 var content = payload.path("marketContent");
                 var context = mapper.createObjectNode();
-                for (String field : List.of("sceneRef", "layoutVersion", "seed", "movementContext", "controlSource", "agentContext"))
+                for (String field : List.of("sceneRef", "layoutVersion", "seed", "movementContext", "controlSource", "agentContext", "replayExecutionContext"))
                     copy(content, field, context, field);
                 copy(source, "accessibility", context, "accessibility");
                 if (!context.isEmpty() && seenContexts.add(context.deepCopy())) {
