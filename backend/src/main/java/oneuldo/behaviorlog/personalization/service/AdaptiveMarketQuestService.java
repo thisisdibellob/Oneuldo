@@ -15,7 +15,7 @@ import tools.jackson.databind.node.ObjectNode;
 @Service
 @RequiredArgsConstructor
 public class AdaptiveMarketQuestService {
-    public static final String VERSION="market-ai-quest-v71-shared-review-originals";
+    public static final String VERSION="market-ai-quest-v72-exact-source-numeric-columns";
     private final MarketDifficultyRecommendationService recommendations;
     private final AiUserProfileService profiles;
     private final BehaviorAnalysisInputSnapshotRepository inputs;
@@ -103,7 +103,7 @@ public class AdaptiveMarketQuestService {
             wire.set("readableActions",readableActions(evidence));
             wire.set("allowedBehaviorEvidenceIds",mapper.valueToTree(evidence.path("sourceEventDetails").valueStream().map(e->e.path("id").asString()).toList()));
             wire.set("allowedMovementEvidenceIds",mapper.valueToTree(AdaptiveQuestEvidence.ids(generationEvidence,true).stream().sorted(Comparator.comparingInt(e->Integer.parseInt(e.substring(1)))).toList()));
-            packed=mapper.writeValueAsString(AdaptiveQuestTransport.encode(mapper,wire));
+            packed=mapper.writeValueAsString(AdaptiveQuestTransport.encodeGeneration(mapper,wire));
             for(int round=1;round<=2;round++) {
                 progress.accept(round==1?"GENERATING":"REPAIRING");
                 String system=(round==1?GENERATION_SYSTEM:REPAIR_SYSTEM)+" Required objective count is exactly "+rec.adjustments().itemCount()+" and difficulty exactly "+rec.recommendedDifficulty()+". Example/schema values are not default decisions. Make explicit choices from source and constraints.";

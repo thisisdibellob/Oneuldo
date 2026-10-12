@@ -12,7 +12,7 @@ import tools.jackson.databind.node.ObjectNode;
 /** 원본 스냅샷은 변경하지 않고 기존 판정 필드만 AI 입력에서 분리한다. */
 @Component
 public class AiBehaviorAnalysisPromptFactory {
-    public static final String VERSION = "behavior-analysis-v61-adaptive-runtime";
+    public static final String VERSION = "behavior-analysis-v62-cognition-review";
     // Final transport changes do not relabel or invalidate unchanged observation requests.
     public static final String OBSERVATION_VERSION = "behavior-analysis-v34-readable-action-source";
     public static final String EVIDENCE_VERSION = EvidenceIndex.VERSION;

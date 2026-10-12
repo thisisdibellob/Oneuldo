@@ -12,6 +12,7 @@ import tools.jackson.databind.node.ObjectNode;
 final class AdaptiveQuestTransport {
     private static final String VERSION_FIELD="adaptiveTransportVersion";
     private static final String VERSION="shared-environment-v5";
+    private static final String GENERATION_VERSION="shared-environment-v6-original-objects";
     private static final String ACTION_ENCODING="readableActionEncoding";
     private static final String ID_REFERENCES="allowedIdReferences";
     private static final List<String> V1_LITERAL_FIELDS = List.of(
@@ -22,6 +23,27 @@ final class AdaptiveQuestTransport {
             .filter(field->!field.equals("allowedBehaviorEvidenceIds")&&!field.equals("allowedMovementEvidenceIds")).toList();
     private static final List<String> LITERAL_FIELDS = V4_LITERAL_FIELDS.stream().filter(field->!field.equals("citedOriginalRecords")).toList();
     private AdaptiveQuestTransport() {}
+
+    /** Generation may share identical raw geometry/source objects before column encoding.
+     * Ordinary observation/review transport and the global source codec remain unchanged.
+     */
+    static ObjectNode encodeGeneration(ObjectMapper mapper,ObjectNode source){
+        var best=encode(mapper,source);int bestTokens=QwenTokenCounter.count(best.toString());
+        var numerical=new AdaptiveNumericColumnText(mapper).encode(best);int numericalTokens=QwenTokenCounter.count(numerical.toString());
+        if(numericalTokens<bestTokens){best=numerical;bestTokens=numericalTokens;}
+        for(int minimum:List.of(24,48,72,128)){
+            var originals=new AdaptiveOriginalObjectSharing(mapper,minimum).encode(source);
+            if(!originals.has(AdaptiveOriginalObjectSharing.DICTIONARY))continue;
+            var candidate=encode(mapper,originals);
+            candidate.put(VERSION_FIELD,GENERATION_VERSION);
+            candidate.put(AdaptiveOriginalObjectSharing.RULE_FIELD,AdaptiveOriginalObjectSharing.RULE);
+            numerical=new AdaptiveNumericColumnText(mapper).encode(candidate);numericalTokens=QwenTokenCounter.count(numerical.toString());
+            int tokens=QwenTokenCounter.count(candidate.toString());
+            if(tokens<bestTokens){best=candidate;bestTokens=tokens;}
+            if(numericalTokens<bestTokens){best=numerical;bestTokens=numericalTokens;}
+        }
+        return best;
+    }
 
     static ObjectNode encode(ObjectMapper mapper, ObjectNode source) {
         if(source.has(VERSION_FIELD)||source.has(ACTION_ENCODING)||source.has(ID_REFERENCES))throw new IllegalArgumentException("ADAPTIVE_TRANSPORT_METADATA_COLLISION");
@@ -55,6 +77,12 @@ final class AdaptiveQuestTransport {
     }
 
     static ObjectNode decode(ObjectMapper mapper, JsonNode source) {
+        if(source.has(AdaptiveNumericColumnText.RULE_FIELD))source=AdaptiveNumericColumnText.decode(mapper,(ObjectNode)source);
+        boolean sharedOriginals=GENERATION_VERSION.equals(source.path(VERSION_FIELD).asString());
+        if(sharedOriginals){
+            if(!AdaptiveOriginalObjectSharing.RULE.equals(source.path(AdaptiveOriginalObjectSharing.RULE_FIELD).asString()))throw new IllegalArgumentException("INVALID_ADAPTIVE_ORIGINAL_OBJECT_RULE");
+            var normalized=(ObjectNode)source.deepCopy();normalized.remove(AdaptiveOriginalObjectSharing.RULE_FIELD);normalized.put(VERSION_FIELD,VERSION);source=normalized;
+        }
         var packed = (ObjectNode) source.deepCopy();
         boolean legacy=!packed.has(VERSION_FIELD);
         String version=packed.path(VERSION_FIELD).asString();
@@ -72,6 +100,7 @@ final class AdaptiveQuestTransport {
         var facts = new FinalSourceEncoding(mapper).decode(packed);
         for (String field : literalFields) if (source.has(field)) facts.set(field, source.get(field).deepCopy());
         if(actionsPacked)facts.set("readableActions",new LosslessEventColumns(mapper).decodeValues(source.path("readableActions")));
+        if(sharedOriginals)facts=AdaptiveOriginalObjectSharing.decode(mapper,facts);
         for(String field:references.propertyNames()){
             if(!List.of("allowedBehaviorEvidenceIds","allowedMovementEvidenceIds").contains(field)||!references.get(field).isBoolean())throw new IllegalArgumentException("INVALID_ALLOWED_ID_REFERENCE");
             boolean movement=references.get(field).asBoolean();var value=facts.path(field);

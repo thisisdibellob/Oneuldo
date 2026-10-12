@@ -513,7 +513,7 @@ public final class TimelineAnalysisPipeline {
         try {
             response = client.complete(system, prompt, AnalysisPlanSemanticReview.OUTPUT_TOKENS, 0.0);
             if ("length".equals(response.finishReason())) throw new ReviewEvidenceException("REVIEW_PLAN_SEMANTIC_FORMAT", "/", List.of());
-            AnalysisPlanSemanticReview.validate(mapper, response.text(), candidate);
+            AnalysisPlanSemanticReview.validate(mapper, response.text(), candidate, source);
             audit.add(attempt(audit.size()+1, system, prompt, AnalysisPlanSemanticReview.OUTPUT_TOKENS, response, null, "PLAN_SOURCE_REVIEW"));
         } catch (RuntimeException failure) {
             var transport = failure instanceof oneuldo.ai.exception.AiTransportException t ? t : null;
