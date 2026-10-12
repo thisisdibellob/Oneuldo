@@ -1,0 +1,28 @@
+import {MarketBehaviorTracker} from '../src/behavior/marketBehaviorTracker';
+import {buildMarketScenarioMission} from '../src/game/scenarios';
+import {enqueueBehaviorEvents} from '../src/behavior/behaviorEventQueue';
+import type {MarketReplayExecutionContext} from '../src/game/marketReplayTrace';
+jest.mock('expo-crypto',()=>({randomUUID:jest.fn(()=> 'synthetic-uuid')}));
+jest.mock('../src/behavior/behaviorEventQueue',()=>({enqueueBehaviorEvents:jest.fn(async()=>{}),flushBehaviorEventQueue:jest.fn(async()=>{}),assertBehaviorEventsAcknowledged:jest.fn(async()=>{})}));
+test('actual replay owner transitions are original events, without counting metadata as a persona action',async()=>{
+ jest.useFakeTimers();jest.setSystemTime(new Date('2026-10-13T00:00:00Z'));
+ const t=new MarketBehaviorTracker('synthetic-token',buildMarketScenarioMission('S02'));
+ const context:MarketReplayExecutionContext={source:'synthetic',traceId:'trace-test',personaId:'test-persona',personaVersion:'v1',agentModel:'test-model',executionOwner:'PERSONA_ACTOR'};
+ t.recordReplayExecutionContext(context);t.recordReplayExecutionContext(context);
+ jest.advanceTimersByTime(100);
+ t.track({eventCode:'SHOP.LIST_VIEWED',microActionId:'ACTOR_LIST_VIEW'});
+ t.recordReplayExecutionContext({...context,executionOwner:'SYSTEM_COMPLETION',controllerReason:'action-limit'});
+ t.track({eventCode:'SHOP.CHECKOUT_SUBMITTED',microActionId:'CONTROLLER_SUBMIT'});
+ await t.abort({});await t.flushNow();
+ const events=jest.mocked(enqueueBehaviorEvents).mock.calls.flatMap(x=>x[1].map(row=>row.event));
+ const transitions=events.filter(x=>x.action.eventCode==='SHOP.REPLAY_CONTEXT_CHANGED');
+ expect(transitions).toHaveLength(2);
+ expect(transitions.every(x=>!x.action.firstAction)).toBe(true);
+ const listed=events.find(x=>x.action.eventCode==='SHOP.LIST_VIEWED')!;
+ expect(listed.action.firstAction).toBe('ACTOR_LIST_VIEW');
+ expect((listed.payload.marketContent as any).replayExecutionContext.executionOwner).toBe('PERSONA_ACTOR');
+ const submitted=events.find(x=>x.action.eventCode==='SHOP.CHECKOUT_SUBMITTED')!;
+ expect((submitted.payload.marketContent as any).replayExecutionContext.executionOwner).toBe('SYSTEM_COMPLETION');
+ expect((submitted.payload.marketContent as any).controlSource).toBe('AGENT');
+ jest.useRealTimers();
+});

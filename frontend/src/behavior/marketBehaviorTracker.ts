@@ -12,6 +12,7 @@ import { MARKET_CATALOG_VERSION, MARKET_SCENARIO_VERSION, MARKET_INITIAL_STOCK, 
 import { enqueueBehaviorEvents, flushBehaviorEventQueue, assertBehaviorEventsAcknowledged } from './behaviorEventQueue';
 import { MovementLogReducer, MOVEMENT_SAMPLING } from './movementLogReducer';
 import type { MarketQuestTiming } from '../game/marketQuestTime';
+import type { MarketReplayExecutionContext } from '../game/marketReplayTrace';
 import {
   MarketMovementDetector,
   type MarketMovementEventDraft,
@@ -75,7 +76,8 @@ export class MarketBehaviorTracker {
   private sequence = 0;
   private readonly startedAt = Date.now();
   private readonly contentSource: BehaviorSimulationContext['contentSource'];
-  private readonly agentContext?: { personaId: string; personaVersion?: string; agentModel: string };
+  private agentContext?: { personaId: string; personaVersion?: string; agentModel: string };
+  private replayExecutionContext?: MarketReplayExecutionContext;
   private uploadTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly movementDetector: MarketMovementDetector;
   private readonly movementLogs = new MovementLogReducer<TrackInput>((event, span) => ({
@@ -159,19 +161,32 @@ export class MarketBehaviorTracker {
     this.movementLogs.push(input, reading).forEach(event => this.record(event));
   }
 
+  recordReplayExecutionContext(context: MarketReplayExecutionContext) {
+    if(this.closed||JSON.stringify(this.replayExecutionContext)===JSON.stringify(context))return;
+    // Pending samples belong to the preceding owner, before this recorded transition.
+    this.movementLogs.flush().forEach(event=>this.record(event));
+    this.replayExecutionContext=JSON.parse(JSON.stringify(context));
+    this.agentContext={personaId:context.personaId,personaVersion:context.personaVersion,agentModel:context.agentModel};
+    this.track({eventCode:'SHOP.REPLAY_CONTEXT_CHANGED',microActionId:'RECORD_REPLAY_EXECUTION_CONTEXT',priority:'high',
+      payload:{marketContent:{replayExecutionContext:this.replayExecutionContext}}});
+  }
+
   private record(input: TrackInput) {
     const occurredAt = input.occurredAt ?? new Date().toISOString();
     const occurredAtMs = Date.parse(occurredAt);
     const timing = this.frozenTiming ?? this.timingSnapshot?.();
     if (input.eventCode !== 'SHOP.IDLE_STARTED'
       && input.eventCode !== 'SHOP.IDLE_ENDED'
-      && input.eventCode !== 'SHOP.MOVEMENT_STOPPED') {
+      && input.eventCode !== 'SHOP.MOVEMENT_STOPPED'
+      && input.eventCode !== 'SHOP.REPLAY_CONTEXT_CHANGED') {
       this.endIdleIfNeeded(occurredAtMs, input.eventCode);
     }
     const isUserAction = !input.eventCode.endsWith('_PRESENTED')
       && input.eventCode !== 'SHOP.SESSION_STARTED'
+      && input.eventCode !== 'SHOP.REPLAY_CONTEXT_CHANGED'
       && input.eventCode !== 'SHOP.MOVEMENT_SEGMENT_SUMMARIZED';
     if (isUserAction && this.firstUserActionAt === null) this.firstUserActionAt = occurredAtMs;
+    const marksFirstAction=input.eventCode!=='SHOP.REPLAY_CONTEXT_CHANGED'&&this.firstUserActionAt===occurredAtMs;
     this.sequence += 1;
     const event: BehaviorLogRequest = {
       metadata: {
@@ -194,9 +209,9 @@ export class MarketBehaviorTracker {
       },
       action: {
         eventCode: input.eventCode,
-        firstAction: this.firstUserActionAt === occurredAtMs ? input.microActionId : undefined,
+        firstAction: marksFirstAction ? input.microActionId : undefined,
         microActionId: input.microActionId,
-        startLatencyMs: this.firstUserActionAt === occurredAtMs
+        startLatencyMs: marksFirstAction
           ? Math.max(0, occurredAtMs - this.startedAt)
           : undefined,
         stepOrder: this.sequence,
@@ -220,6 +235,7 @@ export class MarketBehaviorTracker {
         ...input.payload,
         marketContent: { ...(input.payload?.marketContent as object ?? {}), sceneRef: this.questInstanceId, layoutVersion: this.mission.scene?.layoutVersion, seed: this.mission.scene?.seed,
           ...(this.agentContext ? { controlSource: 'AGENT', agentContext: this.agentContext } : {}),
+          ...(this.replayExecutionContext?{replayExecutionContext:this.replayExecutionContext}:{}),
           movementContext: { coordinateSpace: 'market-world', stations: this.stations, interactionRadius: 105,
             ...MOVEMENT_SAMPLING } },
       },

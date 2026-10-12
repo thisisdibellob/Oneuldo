@@ -1,4 +1,4 @@
-import type { MarketReplaySnapshot } from '../game/marketReplayTrace';
+import type { MarketReplayExecutionContext, MarketReplaySnapshot } from '../game/marketReplayTrace';
 import type { MarketCashierAvailability, MarketEnvironment, MarketEnvironmentStationId } from '../game/marketEnvironment';
 import type { Point } from '../game/prototypeWorld';
 import type { ReplayPresentation } from '../game/marketReplayPerception';
@@ -28,6 +28,7 @@ export interface ReplayUiState {
   cart: Record<string, number>;
 }
 export interface ReplayUiPort {
+  recordExecutionContext?(context: MarketReplayExecutionContext): void;
   snapshot(): MarketReplaySnapshot;
   presentation?(): ReplayPresentation | undefined;
   scrollList?(fraction: number): void;

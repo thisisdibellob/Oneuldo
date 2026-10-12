@@ -31,6 +31,12 @@ export type MarketReplaySystemCompletion = {
   reason: 'action-limit'; afterDecisions: 100; actionLimit: 100; firstStepId: string;
   checkoutId: MarketCheckoutId; cartAtStart: Record<string, number>;
 };
+export type MarketReplayExecutionContext = {
+  source: 'synthetic'; traceId: string; personaId: string; personaVersion: string;
+  agentModel: string; actorPolicyVersion?: string;
+  executionOwner: 'PERSONA_ACTOR' | 'SYSTEM_COMPLETION' | 'SYSTEM_STOP';
+  controllerReason?: string;
+};
 export type MarketReplayStep = StepBase & (
   | { type: 'start' | 'closeView' | 'closeStation' | 'submitForReview' | 'awaitReviewAccepted' | 'giveUp' | 'skipRating' | 'leave' }
   | { type: 'viewCart' | 'viewHelp'; durationMs?: number }

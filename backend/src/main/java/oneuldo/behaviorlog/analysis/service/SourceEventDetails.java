@@ -16,7 +16,8 @@ public final class SourceEventDetails {
             + "이 사본은 상호작용·제한 시간·종료 값을 포함한다. 자동 이동·근접·재방문 원본은 sourceMovementContext와 관측 입력에서 확인하며 여기에는 중복 기재하지 않는다. "
             + "AI 구간 요약은 틀릴 수 있다. 기록이 없다는 주장, 수량 변경, 최종 장바구니를 이 사본과 대조하고 "
             + "상충하면 원본에 맞춰 해석을 수정한다. 출처가 없는 이전 세션 잔여물이나 기기 오류를 만들어 설명하지 않는다. "
-            + "성패·의도·지원·난이도는 실제 목표와 자료 범위를 고려해 AI가 판단한다.";
+            + "성패·의도·지원·난이도는 실제 목표와 자료 범위를 고려해 AI가 판단한다. "
+            + "replayExecutionContext.source=synthetic은 합성 재생이며 executionOwner=SYSTEM_COMPLETION/SYSTEM_STOP인 종료·계산은 배우 선택이나 숙달 근거가 아니다. 게임상 결과와 조작 주체를 구분하고 초기 자동 SESSION_STARTED만으로 사람의 플레이라고 간주하지 않는다.";
     private static final List<String> VALUES = List.of("itemId", "stationId", "requiredQuantity", "selectedQuantity",
             "quantityBefore", "quantityAfter", "cartItemCount", "cartTotalAmount", "remainingBudgetAmount",
             "budgetAmount", "priceAmount", "paymentAmount", "paymentMethod", "substituteItemId",
@@ -56,6 +57,9 @@ public final class SourceEventDetails {
             copy(payload.path("marketContent"), "cart", row, "cart");
             copy(payload.path("marketContent"), "action", row, "recordedAction");
             copy(payload.path("marketContent"), "runtimeState", row, "runtimeState");
+            copy(payload.path("marketContent"), "controlSource", row, "controlSource");
+            copy(payload.path("marketContent"), "agentContext", row, "agentContext");
+            copy(payload.path("marketContent"), "replayExecutionContext", row, "replayExecutionContext");
             copy(payload.path("marketContent"), "outcomeEvents", row, "runtimeOutcomeEvents");
             if ("SHOP.TIME_LIMIT_EXPIRED".equals(code)) {
                 copy(payload.path("marketContent"), "missionSnapshot", row, "missionSnapshot");
