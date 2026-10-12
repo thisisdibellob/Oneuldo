@@ -35,7 +35,7 @@ final class AdaptiveQuestTransport {
                 references.put(field,movement);
             }
         }
-        var packed = new FinalSourceEncoding(mapper).encode(facts);
+        var packed = new FinalSourceEncoding(mapper,true).encode(facts);
         for (String field : LITERAL_FIELDS) if (source.has(field)) packed.set(field, source.get(field).deepCopy());
         if(source.path("readableActions").isArray()&&source.path("readableActions").size()>2){
             var rows=new java.util.ArrayList<JsonNode>();source.path("readableActions").forEach(rows::add);

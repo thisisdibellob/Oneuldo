@@ -15,7 +15,7 @@ import tools.jackson.databind.node.ObjectNode;
 @Service
 @RequiredArgsConstructor
 public class AdaptiveMarketQuestService {
-    public static final String VERSION="market-ai-quest-v69-scoped-embedded-plans";
+    public static final String VERSION="market-ai-quest-v70-literal-event-identities";
     private final MarketDifficultyRecommendationService recommendations;
     private final AiUserProfileService profiles;
     private final BehaviorAnalysisInputSnapshotRepository inputs;

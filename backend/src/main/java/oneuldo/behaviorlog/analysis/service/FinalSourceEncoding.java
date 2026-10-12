@@ -40,8 +40,10 @@ public final class FinalSourceEncoding {
     private static final String EVENT_SET_RULE=" $eventSet:[추가원문행]은 sourceEventDetails와 sourceMovementContext.sessions[].movementEventDetails의 모든 같은-ID 원본 id/sessionId/timeMs/eventCode 사본에 추가원문행을 합쳐 숫자 E 순서로 복원한다. 이동 sessionId=부모값. 원래 인용 행과 정확히 같은 경우만 쓴다.";
     private static final Set<String> V2_RESERVED=Set.of(VERSION_FIELD,RULE_FIELD,SHARED_FIELD,"$ev","$v","$eventSet","$x","$r","$h",COLUMNS,LITERAL,EVENT_VIEW);
     private final ObjectMapper mapper;
+    private final boolean literalSmallEventIds;
 
-    public FinalSourceEncoding(ObjectMapper mapper) { this.mapper = mapper; }
+    public FinalSourceEncoding(ObjectMapper mapper) { this(mapper,false); }
+    public FinalSourceEncoding(ObjectMapper mapper,boolean literalSmallEventIds) { this.mapper = mapper; this.literalSmallEventIds=literalSmallEventIds; }
 
     /** Keep ID/product/quantity source pairs literal for the model; pack only the full source. */
     public ObjectNode encodeReadable(ObjectNode source) {
@@ -64,7 +66,7 @@ public final class FinalSourceEncoding {
         var build=new Build(source);
         var prepared=prepareObject(source,build,true);
         if(v2Reserved(source))prepared=mapper.createObjectNode().set("$x",prepared);
-        var columns=(ObjectNode)new FinalSourceColumns(mapper).encode(prepared);
+        var columns=(ObjectNode)new FinalSourceColumns(mapper,literalSmallEventIds).encode(prepared);
         String rule=CORE_RULE+(build.viewsUsed?VIEW_RULE:"")+(build.eventSetUsed?EVENT_SET_RULE:"");
         var sharing=new Sharing();sharing.count(columns);
         var shared=(ObjectNode)sharing.value(columns);
