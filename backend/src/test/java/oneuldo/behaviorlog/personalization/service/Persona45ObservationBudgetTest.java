@@ -86,7 +86,13 @@ class Persona45ObservationBudgetTest {
                 var row=readable.addArray();for(String field:java.util.List.of("id","eventCode","timeMs","itemId","quantityBefore","quantityAfter"))row.add(e.has(field)?e.get(field):mapper.nullNode());
                 row.add(e.path("recordedAction").path("type").asString(""));row.add(e.path("stationId").asString(""));
             }
-            var planned=AdaptiveQuestObservation.plan(mapper,source,readable,24000);
+            java.util.List<AdaptiveQuestObservation.Part> planned;
+            try { planned=AdaptiveQuestObservation.plan(mapper,source,readable,24000); }
+            catch(oneuldo.ai.exception.AiInputLimitException failure) {
+                item.put("failureRequiredTokens",failure.required()).put("limitTokens",failure.limit());
+                Files.writeString(Path.of("../output/persona45-mcp-20261013/resumable-observation-source-diagnostic.json"),mapper.writerWithDefaultPrettyPrinter().writeValueAsString(report));
+                throw failure;
+            }
             assertThat(planned.size()+5).isLessThanOrEqualTo(AdaptiveQuestContract.MAXIMUM_AI_CALLS);
             var restored=mapper.createArrayNode();var parts=item.putArray("partitionTokens");
             for(var part:planned){

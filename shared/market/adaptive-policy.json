@@ -47,6 +47,6 @@
     1000,
     10000
   ],
-  "generationDeadlineSeconds": 1800,
-  "maximumAiCalls": 21
+  "generationDeadlineSeconds": 3600,
+  "maximumAiCalls": 23
 }

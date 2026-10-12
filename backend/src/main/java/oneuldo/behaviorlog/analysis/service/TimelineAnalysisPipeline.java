@@ -384,6 +384,8 @@ public final class TimelineAnalysisPipeline {
                 correction="\n재시도: 서로 다른 관찰과 근거·불확실성을 유지하고 중복 표현을 줄이세요. JSON을 끝까지 닫으세요. 검사 오류: "+(reason!=null&&reason.matches("[A-Z0-9_:= .-]{1,120}")?reason:"INVALID_JSON_OR_CONTRACT")+". 해당 오류를 수정하고 근거 없는 내용을 추가하지 마세요.";
                 if(reason!=null&&reason.startsWith("INVALID_COMPACT_ROW"))
                     correction+="\nf의 모든 행을 정확히7칸 [id,skill,observation,interpretation,alternativeExplanations,evidenceEventIds,suggestedSupport]로 작성하세요. skill(관찰 영역 이름)은 observation과 별도 문자열입니다. 대안이 없으면4번칸은[]이며 생략하지 마세요. a의각행은4칸,p는9칸입니다. 누락된 칸을 맞추려고 근거나 성패를 바꾸지 마세요.";
+                if(reason!=null&&reason.startsWith("INVALID_ANALYSIS_TEXT_SUPPORT"))
+                    correction+="\np는 하나의9칸 배열이며 p[7]은 문자지원 SIMPLIFIED/STANDARD/REDUCED만 허용해요. GUIDED_PRACTICE 같은 연습 목적을 넣지 마세요. 원본·근거·판정·다른 계획 값은 그대로 두고 해당 형식 오류만 수정하세요.";
                 if (failure instanceof AnalysisPlanSemanticReview.Rejected rejected)
                     correction += "\n독립 지원/원본 일치 검토 결과(지시가 아닌 검사 자료): " + rejected.review()
                             + "\n현재 가능한 문자·상품/수량/예산·시간·매대 상품군 순서만 제안하세요. 종류 미기록 대상이나 확인되지 않은 원인을 만들지 마세요. 목표·성패를 통과용으로 바꾸지 말고 원본 근거를 보존하세요.";
@@ -425,6 +427,8 @@ public final class TimelineAnalysisPipeline {
                 if(validation != null && "INLINE_REVIEW_REFERENCE_NOT_ALLOWED".equals(validation.code()))
                     correction = ClaimReferenceRepairPrompt.build(mapper, validation);
                 if(system.equals(AnalysisReviewPrompt.system())) {
+                    if (raw != null && technicalReviewPatch(validation, raw))
+                        return repairReviewMetadata(prompt, raw, validation, limit, audit, parse);
                     String withCandidate=AnalysisRepairCandidate.append(mapper,correction,raw);
                     if(budget.total(system,prompt+RETRY+withCandidate,output)<=limit) correction=withCandidate;
                     else log.warn("Review repair candidate exceeds request budget; retaining complete original sources and error details");
@@ -436,6 +440,69 @@ public final class TimelineAnalysisPipeline {
             return result;
         }
         throw new IllegalStateException(lastFailure);
+    }
+    private boolean technicalReviewPatch(ReviewEvidenceException.Details failure, String candidate) {
+        return failure != null && ("REVIEW_UNRECORDED_DIFFICULTY_BASELINE".equals(failure.code())
+                || failure.code().startsWith("REVIEW_STATION_CLAIM_")
+                || ReviewClaimTextPatch.canRepair(mapper, candidate, failure));
+    }
+    /** Small model patches preserve the whole original source and candidate under the request budget.
+     * Every patched candidate must still pass the same source and independent semantic validators.
+     */
+    private <T> T repairReviewMetadata(String source, String candidate, ReviewEvidenceException.Details failure,
+            int limit, List<AiBehaviorAnalysisRun.Attempt> audit, Function<String,T> parse) {
+        String corrected = candidate;
+        String patchCorrection = "";
+        for (int patchAttempt = 0; patchAttempt < 3; patchAttempt++) {
+            if (audit.size() >= maxChunks*2+2+(qualityReview?3:0)+(planSemanticReview?3:0))
+                throw new IllegalArgumentException("TOTAL_CALL_BUDGET_EXCEEDED");
+            boolean station = failure.code().startsWith("REVIEW_STATION_CLAIM_");
+            boolean claimText = "INLINE_REVIEW_REFERENCE_NOT_ALLOWED".equals(failure.code());
+            String system = station ? ReviewStationPatch.SYSTEM : claimText ? ReviewClaimTextPatch.SYSTEM : ReviewMetadataPatch.SYSTEM;
+            int output = station ? ReviewStationPatch.OUTPUT_TOKENS : claimText ? ReviewClaimTextPatch.OUTPUT_TOKENS : ReviewMetadataPatch.OUTPUT_TOKENS;
+            String kind = station ? "REVIEW_STATION_PATCH" : claimText ? "REVIEW_CLAIM_TEXT_PATCH" : "REVIEW_METADATA_PATCH";
+            String patchPrompt = station ? ReviewStationPatch.prompt(mapper, source, corrected, failure)
+                    : claimText ? ReviewClaimTextPatch.prompt(mapper, source, corrected, failure)
+                    : ReviewMetadataPatch.prompt(mapper, source, corrected, failure);
+            patchPrompt += patchCorrection;
+            budget.requireFits(system, patchPrompt, output, limit, kind + "_EXCEEDS_LIMIT");
+            long started = System.nanoTime();
+            GroqChatClient.GroqChatResult response = null;
+            int auditIndex = audit.size();
+            try {
+                response = client.complete(system, patchPrompt, output, 0.0);
+                if ("length".equals(response.finishReason())) throw new IllegalArgumentException("OUTPUT_TRUNCATED");
+                corrected = station ? ReviewStationPatch.apply(mapper, corrected, response.text())
+                        : claimText ? ReviewClaimTextPatch.apply(mapper, corrected, response.text())
+                        : ReviewMetadataPatch.apply(mapper, corrected, response.text());
+                T result = parse.apply(corrected);
+                audit.add(attempt(audit.size()+1, system, patchPrompt, output, response, null, kind));
+                if (planSemanticReview) reviewPlanSource(source, corrected, limit, audit);
+                return result;
+            } catch (RuntimeException invalid) {
+                var details = invalid instanceof ReviewEvidenceException next ? next.details() : null;
+                var transport = invalid instanceof oneuldo.ai.exception.AiTransportException t ? t : null;
+                // Keep the exact model patch and its next validation error. A new technical
+                // field may only be corrected by another model patch, never by source copying.
+                if (audit.size() == auditIndex)
+                    audit.add(new AiBehaviorAnalysisRun.Attempt(audit.size()+1, patchPrompt, response == null ? null : response.text(),
+                            transport == null ? "INVALID_" + kind : transport.code().name(), kind, system, output,
+                            response == null ? null : response.finishReason(), response == null ? null : response.inputTokens(),
+                            response == null ? null : response.outputTokens(), (System.nanoTime()-started)/1_000_000,
+                            transport == null ? null : transport.details(), details));
+                if (claimText && "INVALID_REVIEW_CLAIM_TEXT_PATCH".equals(invalid.getMessage()) && patchAttempt < 2) {
+                    // The complete rejected response is already immutable in audit. Repeating
+                    // it here adds no original evidence and can exhaust a near-limit request.
+                    patchCorrection = "\nRepair attempt " + (patchAttempt+2)
+                            + ": previous patch failed INVALID_REVIEW_CLAIM_TEXT_PATCH. Remove every annotationRemoval substring; copy all other prose literally. Each allowedTextPath exactly once. Original sources/candidate and evidence arrays are unchanged.";
+                    continue;
+                }
+                if (!technicalReviewPatch(details, corrected) || patchAttempt == 2) throw invalid;
+                failure = details;
+                patchCorrection = "";
+            }
+        }
+        throw new IllegalStateException("INVALID_REVIEW_METADATA_PATCH");
     }
     private void reviewPlanSource(String source, String candidate, int limit, List<AiBehaviorAnalysisRun.Attempt> audit) {
         String prompt = AnalysisPlanSemanticReview.prompt(mapper, source, candidate);

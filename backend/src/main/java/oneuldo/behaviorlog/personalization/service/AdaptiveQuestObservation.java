@@ -16,8 +16,8 @@ final class AdaptiveQuestObservation {
     static List<Part> plan(ObjectMapper mapper, ObjectNode evidence, JsonNode readableActions, int budget) {
         var rows = new ArrayList<JsonNode>(); evidence.path("events").forEach(rows::add);
         int largest = 0;
-        // Reserve one synthesis, two candidates and two reviews independently of source size.
-        int maximumParts = Math.max(1, AdaptiveQuestContract.MAXIMUM_AI_CALLS - 5);
+        // Reserve one synthesis, two candidates and two reviews and bounded observation repairs independently of source size.
+        int maximumParts = Math.max(1, AdaptiveQuestContract.MAXIMUM_AI_CALLS - 5 - AdaptiveObservationRequests.REPAIR_CALLS);
         for (int count = 1; count <= maximumParts; count++) {
             if (count > 1 && rows.size() < count) break;
             var parts = new ArrayList<Part>(); boolean fits = true; largest = 0;
@@ -28,9 +28,12 @@ final class AdaptiveQuestObservation {
                 source.putObject("movementObservationScope").put("part", part + 1).put("parts", count)
                         .put("originalRawPositionRowCount", rows.size()).put("providedRawPositionRowCount", end - start)
                         .put("scope", "These are original position rows in original order; every row occurs once across the parts. Full original interactions, navigation transitions and geometry are retained for temporal grounding. Unprovided positions in this part are in the other parts and immutable dataset; do not infer a whole route from this part alone.");
-                var wire = AdaptiveQuestEvidence.encode(mapper, source); wire.set("readableActions", readableActions);
+                // Include this exact ID/action table in the same reversible columns/dictionary,
+                // rather than appending a second unencoded copy after the source is packed.
+                source.set("readableActions", readableActions);
+                var wire = AdaptiveQuestEvidence.encode(mapper, source);
                 String prompt = mapper.writeValueAsString(wire);
-                int required = QwenTokenCounter.inputTokens(AdaptiveMarketQuestService.OBSERVATION_SYSTEM, prompt) + OUTPUT_TOKENS + 32;
+                int required = QwenTokenCounter.inputTokens(AdaptiveMarketQuestService.OBSERVATION_SYSTEM, prompt) + OUTPUT_TOKENS + 32 + AdaptiveObservationRequests.REPAIR_RESERVE_TOKENS;
                 largest = Math.max(largest, required);
                 parts.add(new Part(source, prompt, required));
                 // Reject this partition as soon as one request exceeds the budget.
