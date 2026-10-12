@@ -10,6 +10,7 @@ public final class AnalysisReviewPrompt {
     private AnalysisReviewPrompt() {}
     public static String system() {
         return "Arrange observation clauses by the actual action timeline. Do not group all key presses across the session before describing earlier interleaved movements. A concise combined chronological clause can retain several related facts. Task definitions, time expiry and session end are comparison/coverage anchors, not new user actions. Cite them where needed without inventing missing actions. " + "Output compact single-line JSON without indentation or formatting whitespace. Preserve every needed source citation and objective comparison; do not repeat the same fact across several lengthy paragraphs. " + AnalysisSourceContext.FINAL_RULES
+                + AdaptiveObservationGuidance.RULE
                 + "원본에서 독립적으로 재검토하고 이전 초안을 답으로 삼지 않는다. "
                 + "Write each claim with its supporting source IDs. Reconcile partial limitations against full raw coverage and retain unresolved limitations. "
                 + "Output one JSON with reviewFormat, analysis, reviewNotes, taskChecks, stationClaims. Do not emit separate claimChecks; follow the supplied reviewed-claim format. "

@@ -10,10 +10,15 @@ class ActualMcpFinalBudgetTest {
   var mapper=JsonMapper.builder().findAndAddModules().build();var codec=new FinalSourceEncoding(mapper);var report=mapper.createArrayNode();int found=0;
   for(var run:mapper.readTree(Files.readString(file)))for(var attempt:run.path("attempts")){
    if(!"FINAL_EVIDENCE_EXCEEDS_LIMIT".equals(attempt.path("errorCode").asString()))continue;
-   var original=codec.decode(mapper.readTree(attempt.path("inputPrompt").asString()));var packed=codec.encodeReadable(original);var restored=codec.decode(packed);
-   assertThat(restored).isEqualTo(original);
+   var original=codec.decode(mapper.readTree(attempt.path("inputPrompt").asString()));var source=original.deepCopy();
+   source.remove(java.util.List.of("sourceEventDetailsRule","eventSemantics","eventDefinitions","interpretationRule","practiceCapabilities"));
+   source.put("categoryMeaning","produce=과일/채소, fresh=냉장 식품, drink=음료, meal=간편 식품. 원래 categoryId로 위치를 확인한다.");source.put("outputContract",AnalysisSynthesisPrompt.COMPACT_CONTRACT);
+   var packed=codec.encodeReadable(source);var restored=codec.decode(packed);
+   var oldFacts=original.deepCopy();var newFacts=restored.deepCopy();
+   for(var value:java.util.List.of(oldFacts,newFacts))value.remove(java.util.List.of("sourceEventDetailsRule","eventSemantics","eventDefinitions","interpretationRule","practiceCapabilities","categoryMeaning","outputContract"));
+   assertThat(newFacts).isEqualTo(oldFacts);
    assertThat(packed.path("readableSourceFacts").path("eventsById")).isEqualTo(original.path("readableSourceFacts").path("eventsById"));
-   int required=QwenTokenCounter.inputTokens(attempt.path("systemPrompt").asString(),packed.toString())+3200+512;
+   int required=QwenTokenCounter.inputTokens(FinalAnalysisPromptCompactor.systemPrompt(),packed.toString())+3200+512;
    var item=report.addObject().put("analysisId",run.path("id").asString()).put("requiredTokens",required).put("allOriginalFactsPreserved",true);
    item.put("systemTokens",QwenTokenCounter.count(attempt.path("systemPrompt").asString()));var sizes=item.putObject("encodedFieldTokens");for(String field:packed.propertyNames())sizes.put(field,QwenTokenCounter.count(packed.get(field).toString()));
    Files.writeString(Path.of("../output/persona45-mcp-20261013/final-source-count-budget.json"),mapper.writerWithDefaultPrettyPrinter().writeValueAsString(report));

@@ -29,6 +29,8 @@ public final class AnalysisSourceContext {
             CART_OPENED means opening, not reading/comparing/understanding. Proximity is not perception; samples are not wandering counts.
             Explain observed goal relationships separately from cognition/intent. Ground alternatives or use [] and retain uncertainty.
             Historical STAFF_HELP_REQUESTED includes viewHelp: check recordedAction/microActionId; generic help is not staff consultation.
+            ITEM_SEARCH_STARTED is automatic movement/restart, never use of a search tool. GENERAL_HELP_OPENED displays generic guidance, not reading or reliance. SESSION_ENDED stops collection, not a verdict. Collector v2-content may label completion/exit after submission USER_ABORTED; inspect recorded submissions instead.
+            replayExecutionContext marks synthetic actor/controller input. SYSTEM_COMPLETION/STOP is not the actor's checkout choice, mastery or deficit. Initial automatic SESSION_STARTED alone proves no human play.
             Objective names/specs/units/quantities/budget are required task information, not extra hints. Extra support means actual comparison/correction wording; REDUCED labels alone prove no change.
             Missing/null/0 differ. Respect session/catalog versions and partial coverage; never replace old values with current catalog values.
             Timing starts at TIME_LIMIT_STARTED, excluding briefing/generation/analysis; WALL_CLOCK includes later background time.

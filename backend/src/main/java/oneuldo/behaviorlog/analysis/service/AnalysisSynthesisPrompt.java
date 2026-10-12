@@ -6,7 +6,7 @@ import tools.jackson.databind.ObjectMapper;
 /** Synthesizes observations whose source IDs have been checked, without replaying raw scene blobs. */
 public final class AnalysisSynthesisPrompt {
     public static final String FINAL_STAGE="FINAL: compare original events with chunk observations. Originals take priority; no unrecorded actions. IDs alone prove no claim.";
-    public static final String VERSION="synthesis-v15-explicit-finding-columns";
+    public static final String VERSION="synthesis-v16-single-policy-copy";
     public static final String CONTRACT="""
         짧은 JSON 객체: {"s":"요약","f":[["F1","기술","사실","가설",[],["E1"],"지원"]],
         "a":[["S1","SUCCESS|FAILURE|UNDETERMINED","이유",["E1"]]],"u":["한계"],
@@ -31,9 +31,7 @@ public final class AnalysisSynthesisPrompt {
         root.set(SourceEventDetails.FIELD,details);
         var movementContext=MovementSourceContext.build(mapper,input);
         root.set(MovementSourceContext.FIELD,movementContext);
-        root.put("sourceEventDetailsRule",SourceEventDetails.RULE);
-        root.put("eventSemantics",prompts.marketEventSemantics());
-        root.set("eventDefinitions",AnalysisSourceContext.definitions(mapper));
+        root.put("categoryMeaning","produce=과일/채소, fresh=냉장 식품, drink=음료, meal=간편 식품. 원래 categoryId로 위치를 확인한다.");
         root.set("sourceCoverage",AnalysisSourceContext.coverage(mapper,input));
         var scopeNodes=root.putArray("chunkScopes");
         for(int i=0;i<scopes.size();i++) {
@@ -43,12 +41,10 @@ public final class AnalysisSynthesisPrompt {
         }
         // FinalAnalysisPromptCompactor.systemPrompt() already supplies the complete review guidance.
         // Keep the immutable source values here without repeating the same instruction block.
-        root.put("interpretationRule","관찰·가설·미확인 원인을 구별한다. 근거 없는 대안은 []로 두고 uncertainties에 한계를 쓴다. 지원은 다음에 실행 가능한 행동으로 제안한다. 전체 판단 경계는 system 지시를 따른다.");
         root.set("taskContext",prompts.tasks(input));
         root.set("catalogProductCategories",ProductLocationSource.build(mapper,new AnalysisContentScope(mapper).catalog(input)));
         root.set("chunkAnalyses",mapper.valueToTree(digests));
         root.put("movementDetailLimited",limited);
-        root.put("practiceCapabilities", AdaptiveObservationGuidance.RULE);
         var evidence=new HashSet<UUID>();digests.forEach(d->d.observations().forEach(o->evidence.addAll(o.evidenceEventIds())));
         details.forEach(e->evidence.add(UUID.fromString(e.path("id").asString())));
         for(var session:movementContext.path("sessions")) {
@@ -67,9 +63,10 @@ public final class AnalysisSynthesisPrompt {
                 r.put("timeMs",event.elapsedFromSessionStartMs());if(event.action()!=null)r.put("eventCode",event.action().eventCode());
             }
         }
-        root.put("outputContract",CONTRACT);
+        root.put("outputContract",COMPACT_CONTRACT);
         String source = refs.encode(prompts.pack(root));
         var decoded = (tools.jackson.databind.node.ObjectNode) new LosslessTables(mapper).decode(mapper.readTree(source));
         return mapper.writeValueAsString(new FinalSourceEncoding(mapper).encodeReadable(decoded));
     }
+    public static final String COMPACT_CONTRACT="Korean JSON {s:string,f:[[id,skill,observation,interpretation,alternatives:[string],eventIds:[string],support]],a:[[sessionId,SUCCESS|FAILURE|UNDETERMINED,explanation,[IDs]]],u:[string],p:[[findingIds],goal,rationale,difficulty1..3,itemCount1..4,LOW|MEDIUM|HIGH,LOW|MEDIUM|HIGH,SIMPLIFIED|STANDARD|REDUCED,[UPPER_CASE_REASON_CODES]],c:[]}. Each f row has exactly7 columns in the shown order, including empty alternatives[]. skill is a separate area name, not an observation clause. Use1..3 supported findings without filling a quota; assess every supplied session once and cite only its supplied IDs in source order. Write complete concise clauses with needed specifications/amounts/evidence connections, distinguish fact/interpretation/proposed support. Alternatives need recorded supporting facts, otherwise[]; unrecorded causes/comprehension remain uncertain. Reduce repetition without omitting counterevidence or necessary limits. p's first array references returned findings; if none, use[] and explicitly propose observation only. c=[] because no literature cards were supplied.";
 }
