@@ -15,7 +15,7 @@ import tools.jackson.databind.node.ObjectNode;
 /** Reversible final transport only. Every original source value and citation row survives decoding. */
 public final class FinalSourceEncoding {
     public static final String VERSION = "final-source-v2";
-    public static final String ENCODER_REVISION = "shared-source-text-v1";
+    public static final String ENCODER_REVISION = "shared-source-text-v2-source-event-set";
     private static final String VERSION_FIELD = "finalSourceEncodingVersion";
     private static final String RULE_FIELD = "finalSourceEncoding";
     private static final String COLUMNS = "$finalColumns";
@@ -37,7 +37,8 @@ public final class FinalSourceEncoding {
     private static final String VIEW_RULE=" $v:[T,id]=taskContext의 sourceEventId=id인 행의 sessionId/sourceEventId+mission.objectives/budget 사본. "
             + "[P,id]=sourceEventDetails의 id=id인 행의 sourceEventId=id,sessionId,product=selectedProduct 사본. [E,id]=같은 사건행 전체.";
     private static final String SHARE_RULE=" $r:n은 finalSourceShared의 n 원문으로 재귀 복원한다.";
-    private static final Set<String> V2_RESERVED=Set.of(VERSION_FIELD,RULE_FIELD,SHARED_FIELD,"$ev","$v","$x","$r","$h",COLUMNS,LITERAL,EVENT_VIEW);
+    private static final String EVENT_SET_RULE=" $eventSet:[추가원문행]은 sourceEventDetails와 sourceMovementContext.sessions[].movementEventDetails의 모든 같은-ID 원본 id/sessionId/timeMs/eventCode 사본에 추가원문행을 합쳐 숫자 E 순서로 복원한다. 이동 sessionId=부모값. 원래 인용 행과 정확히 같은 경우만 쓴다.";
+    private static final Set<String> V2_RESERVED=Set.of(VERSION_FIELD,RULE_FIELD,SHARED_FIELD,"$ev","$v","$eventSet","$x","$r","$h",COLUMNS,LITERAL,EVENT_VIEW);
     private final ObjectMapper mapper;
 
     public FinalSourceEncoding(ObjectMapper mapper) { this.mapper = mapper; }
@@ -48,6 +49,13 @@ public final class FinalSourceEncoding {
         rest.remove(ReadableSourceFacts.FIELD);
         var result = encode(rest);
         var facts=ReadableSourceFacts.build(mapper,rest);
+        // Keep literal ID/product/quantity pairs. Repeated mechanical count tables
+        // use the same reversible column rules already included in this envelope.
+        if(facts.has("recordedActionPresence")){
+            var presence=facts.get("recordedActionPresence");
+            var columns=new FinalSourceColumns(mapper).encode(presence);
+            if(QwenTokenCounter.count(columns.toString())<QwenTokenCounter.count(presence.toString()))facts.set("recordedActionPresence",columns);
+        }
         result.set(ReadableSourceFacts.FIELD,facts);
         return result;
     }
@@ -57,7 +65,7 @@ public final class FinalSourceEncoding {
         var prepared=prepareObject(source,build,true);
         if(v2Reserved(source))prepared=mapper.createObjectNode().set("$x",prepared);
         var columns=(ObjectNode)new FinalSourceColumns(mapper).encode(prepared);
-        String rule=CORE_RULE+(build.viewsUsed?VIEW_RULE:"");
+        String rule=CORE_RULE+(build.viewsUsed?VIEW_RULE:"")+(build.eventSetUsed?EVENT_SET_RULE:"");
         var sharing=new Sharing();sharing.count(columns);
         var shared=(ObjectNode)sharing.value(columns);
         var original=columns.deepCopy();original.put(VERSION_FIELD,VERSION).put(RULE_FIELD,rule);
@@ -73,6 +81,8 @@ public final class FinalSourceEncoding {
         for(String key:source.propertyNames()) {
             JsonNode value=source.get(key);
             if(root&&key.equals("evidenceReferences")&&value.isArray()) {
+                var additional=eventSetAdditional((ArrayNode)value,build);
+                if(additional!=null){result.set(key,mapper.createObjectNode().set("$eventSet",additional));build.eventSetUsed=true;continue;}
                 var rows=mapper.createArrayNode();
                 for(var row:value){var tuple=build.events.get(row.path("id").asString());rows.add(tuple!=null&&tuple.equals(row)?mapper.createObjectNode().set("$ev",row.get("id")):prepare(row,build));}
                 result.set(key,rows);
@@ -102,7 +112,7 @@ public final class FinalSourceEncoding {
         final Map<String,JsonNode> events;
         final Map<String,JsonNode> tasks=new HashMap<>(),products=new HashMap<>(),rows=new HashMap<>();
         final Set<String> ambiguousTasks=new HashSet<>(),ambiguousRows=new HashSet<>();
-        boolean viewsUsed;
+        boolean viewsUsed,eventSetUsed;
         Build(ObjectNode source) {
             events=eventIndex(source);
             for(var task:source.path("taskContext"))if(task.isObject()&&task.path("sourceEventId").isString()) {
@@ -116,6 +126,14 @@ public final class FinalSourceEncoding {
             rows.forEach((id,event)->{if(event.has("selectedProduct")&&event.has("sessionId")){var product=mapper.createObjectNode();product.put("sourceEventId",id);product.set("sessionId",event.get("sessionId").deepCopy());product.set("product",event.get("selectedProduct").deepCopy());products.put(id,product);}});
         }
         JsonNode view(String type,String id){return switch(type){case "T"->tasks.get(id);case "P"->products.get(id);case "E"->rows.get(id);default->null;};}
+    }
+    private ArrayNode eventSetAdditional(ArrayNode references,Build build){
+        if(build.events.size()<20)return null;
+        var byId=new LinkedHashMap<String,JsonNode>();String previous="";
+        for(var row:references){String id=row.path("id").asString();if(!id.matches("E[1-9][0-9]*")||byId.putIfAbsent(id,row)!=null)return null;
+            if(!previous.isEmpty()&&new java.math.BigInteger(previous.substring(1)).compareTo(new java.math.BigInteger(id.substring(1)))>=0)return null;previous=id;}
+        for(var item:build.events.entrySet())if(!item.getValue().equals(byId.get(item.getKey())))return null;
+        var additional=mapper.createArrayNode();for(var item:byId.entrySet())if(!build.events.containsKey(item.getKey()))additional.add(item.getValue().deepCopy());return additional;
     }
     private void putUnique(Map<String,JsonNode> values,Set<String> ambiguous,String id,JsonNode value){var prior=values.putIfAbsent(id,value);if(prior!=null&&!prior.equals(value))ambiguous.add(id);}
 
@@ -159,6 +177,12 @@ public final class FinalSourceEncoding {
         if(value instanceof ObjectNode object) {
             if(object.size()==1&&object.has("$x")){if(!(object.get("$x") instanceof ObjectNode literal))throw invalidV2();return restoreV2Object(literal,build);}
             if(object.size()==1&&object.has("$ev")){if(build==null)return object.deepCopy();JsonNode id=object.get("$ev");if(!id.isString()||!build.events.containsKey(id.asString()))throw invalidV2();return build.events.get(id.asString()).deepCopy();}
+            if(object.size()==1&&object.has("$eventSet")){
+                if(build==null)return object.deepCopy();if(!object.get("$eventSet").isArray())throw invalidV2();
+                var rows=new HashMap<String,JsonNode>(build.events);for(var row:object.get("$eventSet")){String id=row.path("id").asString();if(!id.matches("E[1-9][0-9]*")||rows.putIfAbsent(id,row)!=null)throw invalidV2();}
+                if(rows.keySet().stream().anyMatch(id->!id.matches("E[1-9][0-9]*")))throw invalidV2();
+                var result=mapper.createArrayNode();rows.entrySet().stream().sorted(java.util.Comparator.comparing(item->new java.math.BigInteger(item.getKey().substring(1)))).forEach(item->result.add(item.getValue().deepCopy()));return result;
+            }
             if(object.size()==1&&object.has("$v")){if(build==null)return object.deepCopy();JsonNode pair=object.get("$v");if(!pair.isArray()||pair.size()!=2||!pair.get(0).isString()||!pair.get(1).isString())throw invalidV2();JsonNode row=build.view(pair.get(0).asString(),pair.get(1).asString());if(row==null)throw invalidV2();return row.deepCopy();}
             return restoreV2Object(object,build);
         }
@@ -185,7 +209,8 @@ public final class FinalSourceEncoding {
         if(VERSION.equals(source.path(VERSION_FIELD).asString())) {
             if(!(source instanceof ObjectNode root))throw invalidV2();
             String rule=root.path(RULE_FIELD).asString();
-            if(!Set.of(CORE_RULE,CORE_RULE+VIEW_RULE,CORE_RULE+SHARE_RULE,CORE_RULE+VIEW_RULE+SHARE_RULE).contains(rule))throw invalidV2();
+            if(!Set.of(CORE_RULE,CORE_RULE+VIEW_RULE,CORE_RULE+SHARE_RULE,CORE_RULE+VIEW_RULE+SHARE_RULE,
+                    CORE_RULE+EVENT_SET_RULE,CORE_RULE+VIEW_RULE+EVENT_SET_RULE,CORE_RULE+EVENT_SET_RULE+SHARE_RULE,CORE_RULE+VIEW_RULE+EVENT_SET_RULE+SHARE_RULE).contains(rule))throw invalidV2();
             boolean shared=root.has(SHARED_FIELD);
             if(shared!=rule.endsWith(SHARE_RULE))throw invalidV2();
             var encoded=root.deepCopy();JsonNode dictionary=encoded.has(SHARED_FIELD)?encoded.get(SHARED_FIELD):mapper.createObjectNode();
