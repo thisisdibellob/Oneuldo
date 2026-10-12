@@ -1,12 +1,12 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { extendedActorChoices as actorChoices, presentActorChoices } from './actorChoices';
 import { assertDecision, LUNA_ACTOR_POLICY_VERSION } from './llmPolicy';
-import type { ActorObservation, Decision, Persona, TraceEntry } from './types';
+import type { ActorObservation, ActorPersona, Decision, Persona, ResearchPersona, TraceEntry } from './types';
 
 export const ACTOR_PLAN_MODEL = 'gpt-6-luna' as const;
 export const ACTOR_PLAN_REASONING = 'low' as const;
 export type PlanFrame = { sessionId: string; revision: number; observation: ActorObservation;
-  persona: {id:string;version:string;name:string;character?:Pick<NonNullable<Persona['character']>,'name'|'age'|'goal'|'selectedTraits'|'strengths'|'preferences'|'familiarCategories'|'familiarProductIds'|'practicedStrategies'>};
+  persona: ResearchPersona | {id:string;version:string;name:string;character?:Pick<NonNullable<Persona['character']>,'name'|'age'|'goal'|'selectedTraits'|'strengths'|'preferences'|'familiarCategories'|'familiarProductIds'|'practicedStrategies'>};
   experience: unknown; activity: unknown; availableChoices: {id:string;label:string;action:Decision['action']}[];
   choiceSemantics: {walkToAnchor:string;readList:string;pauseAndLookAround:string} };
 
@@ -54,7 +54,7 @@ export class ActorPlanSession {
     return {accepted:n,revision:this.revision};
   }
 
-  async decide(observation:ActorObservation, history:TraceEntry[], persona:Persona, activity:unknown, state:unknown):Promise<Decision>{
+  async decide(observation:ActorObservation, history:TraceEntry[], persona:ActorPersona, activity:unknown, state:unknown):Promise<Decision>{
     if(this.stopped) throw new Error('Plan session is closed');
     const observed=(state as any)?.observedThisVisit;
     const choices=presentActorChoices(actorChoices(observation,observed?{anchors:observed.discoveries.anchors,currentAnchor:observed.currentAnchor}:undefined),this.id,history.length);
@@ -76,9 +76,9 @@ export class ActorPlanSession {
     this.queued=[];
     this.revision++;
     this.previousFingerprint=fingerprint;
-    const character=persona.character;
+    const character='scope' in persona ? undefined : persona.character;
     this.frame={sessionId:this.id,revision:this.revision,observation:structuredClone(observation),
-      persona:{id:persona.id,version:persona.version,name:persona.name,...(character?{character:{name:character.name,age:character.age,goal:character.goal,
+      persona:'scope' in persona ? structuredClone(persona) : {id:persona.id,version:persona.version,name:persona.name,...(character?{character:{name:character.name,age:character.age,goal:character.goal,
         selectedTraits:character.selectedTraits,strengths:character.strengths,preferences:character.preferences,
         familiarCategories:character.familiarCategories,familiarProductIds:character.familiarProductIds,practicedStrategies:character.practicedStrategies}}:{})},
       experience:structuredClone(state),activity:structuredClone(activity),

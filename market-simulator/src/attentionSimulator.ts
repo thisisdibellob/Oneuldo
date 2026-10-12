@@ -12,7 +12,7 @@ import { createFeedbackLlmPolicy } from './feedbackLlmPolicy';
 import { buildFeedbackActorFrame, feedbackChoiceMatchesDecision, emptyFeedbackBeliefMemory, validateFeedbackBeliefMemory, carryFeedbackBeliefMemory, isFeedbackActorPolicy, isExperienceFeedbackPolicy, isStructuredFeedbackPolicy, projectFeedbackObservation } from './feedbackActor';
 import { FeedbackMovementPolicy } from './feedbackMovementPolicy';
 import { FeedbackExperience } from './feedbackExperience';
-import type { ActorObservation, AttentionExperience, Decision, Persona, TraceEntry, TraceOptions } from './types';
+import type { ActorObservation, ActorPersona, AttentionExperience, Decision, TraceEntry, TraceOptions } from './types';
 
 type StepIntent = MarketReplayStep extends infer S ? S extends MarketReplayStep ? Omit<S, 'id' | 'reactionDelayMs' | 'reason' | 'timeoutMs'> : never : never;
 
@@ -20,8 +20,13 @@ type StepIntent = MarketReplayStep extends infer S ? S extends MarketReplayStep 
 export const ACTOR_ACTION_LIMIT = 100;
 
 /** Executes bounded actor observations; whole-trace reference context is built separately. */
-export async function generateAttentionTrace(options: TraceOptions, persona: Persona, model: string): Promise<MarketReplayTrace> {
+export async function generateAttentionTrace(options: TraceOptions, persona: ActorPersona, model: string): Promise<MarketReplayTrace> {
   const mode = options.mode ?? 'llm';
+  const numericPersona = 'scope' in persona ? undefined : persona;
+  if (!numericPersona && (mode !== 'llm' || options.actorPolicyVersion !== 'episodic-choice-v10'
+    || model !== 'gpt-6-luna' || options.reasoningEffort !== 'low' || options.tracePolicyVersion !== '6'
+    || !options.actorDecisionProvider || options.planningMode || options.decisionProvider || options.feedbackDecisionProvider))
+    throw new Error(`Research persona ${persona.id} requires direct MCP actor control with the local Luna v10 provider`);
   if (options.actorDecisionProvider && mode !== 'llm') throw new Error('actorDecisionProvider requires llm mode; stochastic traces must be seed-reproducible');
   const wholeTrace = options.planningMode === 'whole-trace';
   const actorPolicyVersion = attentionActorPolicyVersion(options);
@@ -89,7 +94,7 @@ export async function generateAttentionTrace(options: TraceOptions, persona: Per
   if (supplied?.visit === 'revisit' && (!supplied.memory || !supplied.previousLayoutKey)) throw new Error('Revisit requires memory and previousLayoutKey from a previous trace');
   const experience: AttentionExperience = { ...supplied, visit: supplied?.visit ?? 'first-play', layoutKey };
   if (supplied?.learning && (mode !== 'llm' || experience.visit !== 'revisit')) throw new Error('Learning experience requires an AI revisit');
-  const policy = mode === 'stochastic' ? new AttentionPolicy(persona, options.seed, experience) : new ActorLearningMemory(supplied?.learning, extendedActor);
+  const policy = mode === 'stochastic' ? new AttentionPolicy(numericPersona!, options.seed, experience) : new ActorLearningMemory(supplied?.learning, extendedActor);
   const needsProvider = mode === 'llm' && !options.actorDecisionProvider && !options.decisionProvider && !options.feedbackDecisionProvider;
   const feedbackProvider = needsProvider && feedbackActor
     ? createFeedbackLlmPolicy(options.llm ?? {}, options.seed, actorPolicyVersion as import('./feedbackActor').FeedbackActorPolicyVersion, options.feedbackMovement) : null;
@@ -113,7 +118,10 @@ export async function generateAttentionTrace(options: TraceOptions, persona: Per
       + (step.type === 'moveDirection' ? 0 : 'durationMs' in step ? (step.durationMs ?? 0) : step.type === 'dragProduct' ? (step.gesture.durationMs + step.gesture.hesitationMs) * step.quantity : 0);
     if (!feedbackActor && options.timeBudgetMs !== undefined && plannedMs > options.timeBudgetMs) throw new Error('ATTENTION_GENERATION_LIMIT: planned-time-budget; incomplete plan was not exported');
   };
-  append({ type: 'start' }, feedbackActor ? 0 : persona.parameters.reactionMedianMs, '게임 설명 화면을 한 장씩 확인한다');
+  // Research actors use only the existing 1ms scheduling floor for controller UI
+  // steps. Chosen actor delays are preserved and no reaction distribution is added.
+  const controllerDelayMs = numericPersona?.parameters.reactionMedianMs ?? 1;
+  append({ type: 'start' }, feedbackActor ? 0 : controllerDelayMs, '게임 설명 화면을 한 장씩 확인한다');
   for (;;) {
     // Keep the app bridge's heartbeat responsive while constructing long plans.
     if (history.length && history.length % 20 === 0) await new Promise<void>(resolve => setImmediate(resolve));
@@ -142,9 +150,9 @@ export async function generateAttentionTrace(options: TraceOptions, persona: Per
       ...(recentExperience ? { experience: recentExperience.snapshot(projectFeedbackObservation(before, feedbackActor ? actorPolicyVersion : undefined)) } : {}) }) : null;
     const decision = options.feedbackDecisionProvider ? await options.feedbackDecisionProvider(structuredClone(actorFrame!)) : options.actorDecisionProvider ? extendedActor
       ? await options.actorDecisionProvider(before, history, persona, feedback, policy.getState())
-      : await (options.actorDecisionProvider as (o: ActorObservation, h: TraceEntry[], p: Persona) => Promise<Decision>)(before, history, persona)
-      : feedbackProvider ? await feedbackProvider(before, history, persona, undefined, undefined, actorFrame!)
-      : provider ? await provider(before, history, persona, policy.getState(), feedback) : (policy as AttentionPolicy).next(before);
+      : await (options.actorDecisionProvider as (o: ActorObservation, h: TraceEntry[], p: ActorPersona) => Promise<Decision>)(before, history, persona)
+      : feedbackProvider ? await feedbackProvider(before, history, numericPersona!, undefined, undefined, actorFrame!)
+      : provider ? await provider(before, history, numericPersona!, policy.getState(), feedback) : (policy as AttentionPolicy).next(before);
     assertDecision(decision, feedbackActor);
     if (feedbackActor) {
       const checked = validateFeedbackBeliefMemory(decision.feedbackMemory, actorPolicyVersion);
@@ -164,7 +172,7 @@ export async function generateAttentionTrace(options: TraceOptions, persona: Per
     const raw = guard.observe();
     const activeKind = raw.environment.stationDetails.find(s => s.id === raw.activeStation)?.kind;
     if ((decision.action.type === 'viewHelp' || decision.action.type === 'viewCart' && activeKind !== 'shelf') && raw.activeStation) {
-      append({ type: 'closeStation' }, feedbackActor ? 0 : Math.round(persona.parameters.reactionMedianMs * .35), '화면을 닫고 안내 버튼을 확인한다');
+      append({ type: 'closeStation' }, feedbackActor ? 0 : numericPersona ? Math.round(controllerDelayMs * .35) : 1, '화면을 닫고 안내 버튼을 확인한다');
     }
     const intent = projectDecision(decision, guard.observe(), persona, options.snapshot, options.seed, steps.length, motor);
     append(intent, decision.delayMs, decision.reason, {
@@ -186,11 +194,11 @@ export async function generateAttentionTrace(options: TraceOptions, persona: Per
     }
     if (decision.action.type === 'submit') {
       append({ type: 'awaitReviewAccepted' }, 0, '앱의 분석 접수 결과를 기다린다', {}, 180000);
-      append({ type: 'leave' }, feedbackActor ? 0 : persona.parameters.reactionMedianMs, '접수된 뒤 장보기를 나간다'); break;
+      append({ type: 'leave' }, feedbackActor ? 0 : controllerDelayMs, '접수된 뒤 장보기를 나간다'); break;
     }
     if (decision.action.type === 'giveUp') {
-      append({ type: 'skipRating' }, feedbackActor ? 0 : persona.parameters.reactionMedianMs, '이번 게임의 평가를 건너뛴다');
-      append({ type: 'leave' }, feedbackActor ? 0 : persona.parameters.reactionMedianMs, '이번 장보기를 그만하고 나간다'); break;
+      append({ type: 'skipRating' }, feedbackActor ? 0 : controllerDelayMs, '이번 게임의 평가를 건너뛴다');
+      append({ type: 'leave' }, feedbackActor ? 0 : controllerDelayMs, '이번 장보기를 그만하고 나간다'); break;
     }
   }
   if (feedbackActor && options.timeBudgetMs !== undefined && plannedMs > options.timeBudgetMs) {
