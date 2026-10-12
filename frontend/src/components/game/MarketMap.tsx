@@ -28,6 +28,7 @@ import {
 } from './MarketInteriorLayer';
 import { getMarketRenderDepth, getNearestMarketStation, getMarketStationApproachPoint, MARKET_ENVIRONMENT_PLAYER_RADIUS, MarketEnvironment, MarketCashierAvailability, isMarketEnvironmentBlocked } from '../../game/marketEnvironment';
 import { getMarketPersonFrame } from '../../game/marketPersonLayout';
+import { resolveMarketEnvironmentMovement } from '../../game/marketMovement';
 import { getWorldCameraFrame, MARKET_DEFAULT_ZOOM, screenPointToWorld } from '../../game/worldZoom';
 import { marketCategories } from '../../game/scenarios';
 import { fonts } from '../../theme';
@@ -126,14 +127,8 @@ export function MarketMap({
 
   const movePlayer = useCallback((dx: number, dy: number, animate = false) => {
     const current = playerPoint.current;
-    let next = current;
-    const steps = Math.max(1, Math.ceil(Math.max(Math.abs(dx), Math.abs(dy)) / 6));
-    for (let index = 0; index < steps; index += 1) {
-      const xCandidate = clampMarketPoint({ x: next.x + dx / steps, y: next.y }, geometryRef.current.environment.world);
-      if (!isMarketBlocked(xCandidate)) next = xCandidate;
-      const yCandidate = clampMarketPoint({ x: next.x, y: next.y + dy / steps }, geometryRef.current.environment.world);
-      if (!isMarketBlocked(yCandidate)) next = yCandidate;
-    }
+    const next = resolveMarketEnvironmentMovement(geometryRef.current.environment, current,
+      { x: dx, y: dy }, geometryRef.current.cashierCalled).position;
     const movement = getAvatarMovement(current, next, avatarFacing.current, speedMultiplier.current > 1 ? 'sprint' : 'walk');
     avatarFacing.current = movement.facing;
     const motion = animate ? movement.motion : 'idle';

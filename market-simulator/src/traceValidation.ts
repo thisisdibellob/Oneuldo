@@ -3,12 +3,15 @@ import { canonicalMarketReplayJson, isMarketReplaySystemCompletionStep, validate
   type MarketReplayStep, type MarketReplayTrace } from '../../frontend/src/game/marketReplayTrace';
 import { planWalk } from './navigation';
 import { Random } from './random';
-import { DEFAULT_REPLAY_PRESENTATION, visibleStations, visibleAnchors, resolveReplayAnchor, getReplayShelfPage, replayShelfPageFractions } from '../../frontend/src/game/marketReplayPerception';
+import { FeedbackMovementPolicy } from './feedbackMovementPolicy';
+import { DEFAULT_REPLAY_PRESENTATION, visibleStations, visibleAnchors, visibleUnlabelledShelfBodies, resolveReplayAnchor, getReplayShelfPage, replayShelfPageFractions } from '../../frontend/src/game/marketReplayPerception';
+import { directionalInputSlices, MARKET_DIRECTIONAL_MOVE_SPEED } from '../../frontend/src/game/marketDirectionalInput';
 import { getMarketStationApproachPoint } from '../../frontend/src/game/marketEnvironment';
 import { isMarketNavigationSegmentClear } from '../../frontend/src/game/marketNavigation';
 import { getMarketHelpLines, marketCashierResponse, marketReturnResponse } from '../../frontend/src/game/marketHelp';
 import { getMarketProduct } from '../../frontend/src/game/scenarios';
 import type { ActorObservation, Observation } from './types';
+import { feedbackCheckoutScreenLines } from './feedbackScreenText';
 
 /** Scratch game state only. Never exports an episode, log request, or renderer position. */
 export class TraceGuard {
@@ -21,7 +24,7 @@ export class TraceGuard {
   private readonly presentation;
   private readonly mission;
   private readonly helpLines;
-  constructor(snapshot: MarketReplaySnapshot, personaId = 'trace-validator', personaVersion = '1', model = 'trace-validation/1', private readonly attentionMode = false, private readonly extendedActor = false, private readonly feedbackMode = false) {
+  constructor(snapshot: MarketReplaySnapshot, personaId = 'trace-validator', personaVersion = '1', model = 'trace-validation/1', private readonly attentionMode = false, private readonly extendedActor = false, private readonly feedbackMode = false, private readonly directionalMovement = false, private readonly richFeedbackObservation = false) {
     const valid = validateMarketReplaySnapshot(snapshot);
     if (!valid.valid) throw new Error(valid.errors.join('; '));
     this.adapter = createMarketAgentAdapter({ ...snapshot.config,
@@ -51,10 +54,25 @@ export class TraceGuard {
     const result: ActorObservation = {
       schemaVersion: 'attention-observation-v1', phase: o.phase, view: o.view, activeStation: o.activeStation,
       visibleStations: stations, anchors: world ? visibleAnchors(o.environment, o.playerPosition, this.presentation, o.cashierAvailability) : [],
+      ...(this.directionalMovement ? { visibleStructures: world
+        ? visibleUnlabelledShelfBodies(o.environment, o.playerPosition, this.presentation, o.cashierAvailability) : [] } : {}),
       products: shelfOpen ? o.products.filter(p => visible.has(p.id)).map(p => ({ ...p, stock: o.stock[p.id] })) : [],
       shelf: page ? { page: page.page, pageCount: page.pageCount, scrollFraction: this.scrollFraction,
         pageFractions: replayShelfPageFractions(o.products.map(p => p.id), this.presentation) } : null,
       listAvailable: world, cart: o.view === 'cart' || o.phase === 'checkout' ? o.cart : null,
+      // Restore labels already rendered for this exposed cart, not catalog knowledge
+      // about unseen products. The existing cart observation covers the whole panel;
+      // neither legacy nor rich observation models its scroll-clipped rows.
+      ...(this.richFeedbackObservation && o.cart !== null
+        && (o.phase === 'shopping' && o.view === 'cart' || o.phase === 'checkout') ? {
+          cartItems: Object.entries(o.cart).flatMap(([id, quantity]) => {
+            const product = quantity > 0 ? getMarketProduct(id) : undefined;
+            return product ? [{ id, name: product.name, quantity,
+              // The shelf's horizontal basket omits detail; CartContents renders it.
+              ...(o.phase === 'checkout' || !o.activeStation ? { detail: product.detail } : {}),
+            }] : [];
+          }),
+        } : {}),
       ...(this.extendedActor && o.view === 'help' ? { supportText: [...this.helpLines] } : {}),
       ...(this.extendedActor && o.view === 'cart' ? { removableProductIds: Object.keys(o.cart ?? {}).filter(id =>
         o.products.some(product => product.id === id && product.categoryId === o.activeStation)) } : {}),
@@ -65,7 +83,9 @@ export class TraceGuard {
       lastActionError: o.lastActionError,
       ...(this.mission && (this.sequence <= 1 || o.phase === 'checkout') ? {
         instructions: o.phase === 'checkout'
-          ? { phase: 'checkout' as const, lines: [...this.mission.checkoutDialogue] }
+          ? { phase: 'checkout' as const, lines: this.richFeedbackObservation
+            ? feedbackCheckoutScreenLines(this.mission.checkoutDialogue, !!(o.cashierAvailable || o.selectedKioskId))
+            : [...this.mission.checkoutDialogue] }
           : { phase: 'entry' as const, lines: [this.mission.description, ...this.mission.briefing] },
       } : {}),
     };
@@ -81,6 +101,7 @@ export class TraceGuard {
     const before = this.observe();
     const actions: MarketAgentAction[] = [];
     let movementMs = 0;
+    let movementResult: NonNullable<ActorObservation['result']>['movement'];
     this.time += step.reactionDelayMs;
     const apply = (action: MarketAgentAction, delay = 1) => {
       this.time += delay;
@@ -91,6 +112,26 @@ export class TraceGuard {
     };
     switch (step.type) {
       case 'start': break;
+      case 'moveDirection': {
+        if (!this.directionalMovement || before.phase !== 'shopping' || before.view !== 'world' || before.activeStation)
+          throw new Error(`${step.id}: directional input requires an unlocked feedback-choice-v2, feedback-choice-v3 or feedback-choice-v4 world`);
+        let movedDistancePx = 0, constrained = false;
+        for (const slice of directionalInputSlices(step.direction, step.durationMs, step.movement)) {
+          const previous = this.observe().playerPosition;
+          const dx = slice.input.x * MARKET_DIRECTIONAL_MOVE_SPEED * slice.durationMs / 1000;
+          const dy = slice.input.y * MARKET_DIRECTIONAL_MOVE_SPEED * slice.durationMs / 1000;
+          apply({ type: 'moveInput', dx, dy }, slice.durationMs);
+          const current = this.observe().playerPosition;
+          movedDistancePx += Math.hypot(current.x - previous.x, current.y - previous.y);
+          constrained ||= Math.hypot(current.x - previous.x - dx, current.y - previous.y - dy) > 1e-7;
+          movementMs += slice.durationMs;
+        }
+        const current = this.observe().playerPosition;
+        movementResult = { direction: step.direction, durationMs: step.durationMs,
+          actualDelta: { dx: current.x - before.playerPosition.x, dy: current.y - before.playerPosition.y },
+          movedDistancePx, outcome: movedDistancePx < 1e-7 ? 'blocked' : constrained ? 'partially-blocked' : 'moved' };
+        break;
+      }
       case 'walkToAnchor': {
         if (!this.attentionMode || before.phase !== 'shopping' || before.view !== 'world' || before.activeStation) throw new Error(`${step.id}: anchor walking requires an unobstructed attention world view`);
         if (!this.observeActor().anchors.some(anchor => anchor.id === step.target.anchorId)) throw new Error(`${step.id}: anchor is not a visible local movement choice with arrival margin`);
@@ -188,6 +229,7 @@ export class TraceGuard {
       ...(step.type === 'openShelf' || step.type === 'talkToStaff' ? { stationId: step.stationId } : {}),
       ...(step.type === 'walkTo' ? { stationId: step.target.stationId } : {}),
       ...(step.type === 'walkToAnchor' ? { anchorId: step.target.anchorId } : {}),
+      ...(movementResult ? { movement: movementResult } : {}),
       ...(this.extendedActor && cashierMessage !== undefined ? { message: cashierMessage } : {}),
       ...(this.extendedActor && step.type === 'talkToStaff' && step.choice === 'returnProduct'
         ? { message: marketReturnResponse(getMarketProduct(step.productId!)!.name, step.quantity!) } : {}),
@@ -210,17 +252,30 @@ export function validateTrace(value: unknown, snapshot?: MarketReplaySnapshot) {
   try {
     const trace = value as MarketReplayTrace;
     const guard = new TraceGuard(snapshot, trace.personaId, trace.personaVersion, trace.generation?.model, trace.traceSchemaVersion === '2',
-      ['episodic-choice-v9', 'episodic-choice-v10', 'feedback-choice-v1', 'whole-trace-v3'].includes(trace.generation?.actorPolicyVersion ?? ''),
-      trace.generation?.actorPolicyVersion === 'feedback-choice-v1');
+      ['episodic-choice-v9', 'episodic-choice-v10', 'feedback-choice-v1', 'feedback-choice-v2', 'feedback-choice-v3', 'feedback-choice-v4', 'feedback-choice-v5', 'feedback-choice-v6', 'feedback-choice-v7', 'whole-trace-v3'].includes(trace.generation?.actorPolicyVersion ?? ''),
+      ['feedback-choice-v1', 'feedback-choice-v2', 'feedback-choice-v3', 'feedback-choice-v4', 'feedback-choice-v5', 'feedback-choice-v6', 'feedback-choice-v7'].includes(trace.generation?.actorPolicyVersion ?? ''),
+      ['feedback-choice-v2', 'feedback-choice-v3', 'feedback-choice-v4', 'feedback-choice-v5', 'feedback-choice-v6', 'feedback-choice-v7'].includes(trace.generation?.actorPolicyVersion ?? ''),
+      ['feedback-choice-v5', 'feedback-choice-v6', 'feedback-choice-v7'].includes(trace.generation?.actorPolicyVersion ?? ''));
     const completion = trace.generation?.systemCompletion;
+    const movementPolicy = ['feedback-choice-v3', 'feedback-choice-v4', 'feedback-choice-v5', 'feedback-choice-v6', 'feedback-choice-v7'].includes(trace.generation?.actorPolicyVersion ?? '')
+      ? new FeedbackMovementPolicy(trace.seed, { wanderProbability: trace.generation!.movementPolicy!.wanderProbability },
+        trace.generation!.movementPolicy!.version) : null;
+    let movementDecisions = 0;
     for (const step of trace.steps) {
       const systemOwned = isMarketReplaySystemCompletionStep(trace, step.id);
+      if (movementPolicy && !['start', 'awaitReviewAccepted', 'skipRating', 'leave'].includes(step.type)) {
+        const expected = movementPolicy.prepare(guard.observeActor(), movementDecisions++);
+        if (canonicalMarketReplayJson(step.movementPolicy) !== canonicalMarketReplayJson(expected))
+          throw new Error(`${step.id}: movement policy differs from the seeded decision and observed movement feedback`);
+      }
       const applied = guard.execute(step, systemOwned);
       if (systemOwned && completion) for (const state of [applied.before, applied.after]) {
         if (state.cart !== null && canonicalMarketReplayJson(state.cart) !== canonicalMarketReplayJson(completion.cartAtStart))
           throw new Error(`${step.id}: system checkout must preserve the actual cart at the action limit`);
       }
     }
+    if (movementPolicy && movementDecisions !== trace.generation?.feedback?.decisions)
+      throw new Error('Movement policy decision count differs from feedback decisions');
     return { valid: true, errors: [] as string[] };
   } catch (error) { return { valid: false, errors: [(error as Error).message] }; }
 }

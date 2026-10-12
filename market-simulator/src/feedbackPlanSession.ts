@@ -3,14 +3,16 @@ import { performance } from 'node:perf_hooks';
 import { canonicalMarketReplayJson } from '../../frontend/src/game/marketReplayTrace';
 import { assertDecision } from './llmPolicy';
 import { buildFeedbackActorFrame, emptyFeedbackBeliefMemory, FEEDBACK_ACTOR_POLICY_VERSION, feedbackDecisionFromChoice,
-  validateFeedbackBeliefMemory, type FeedbackActorFrame, type FeedbackBeliefMemory } from './feedbackActor';
+  validateFeedbackBeliefMemory, carryFeedbackBeliefMemory, projectFeedbackObservation, isExperienceFeedbackPolicy, isStructuredFeedbackPolicy, type FeedbackChoiceParameters, type FeedbackActorFrame, type FeedbackBeliefMemory, type FeedbackActorPolicyVersion } from './feedbackActor';
 import type { ActorObservation, Decision, Persona, TraceEntry } from './types';
+import { FeedbackMovementPolicy, type FeedbackMovementPolicyOptions } from './feedbackMovementPolicy';
+import { FeedbackExperience } from './feedbackExperience';
 
 export const FEEDBACK_PLAN_MODEL = 'gpt-6-luna' as const;
 export const FEEDBACK_PLAN_REASONING = 'low' as const;
 export type FeedbackPlanFrame = FeedbackActorFrame & { sessionId: string; revision: number };
 export type FeedbackPlanStep = { requestId: string; revision: number; choiceId: string;
-  durationMs: number; reason: string; memory: FeedbackBeliefMemory };
+  durationMs: number; reason: string; memory: FeedbackBeliefMemory; choiceParameters?: FeedbackChoiceParameters };
 type AppliedResult = Omit<NonNullable<ActorObservation['result']>, 'message'>;
 export type FeedbackPlanTiming = { wallMs: number; actorWaitingMs: number; applicationMs: number;
   frameBuildMs: number; plannedElapsedMs: number };
@@ -20,7 +22,7 @@ export type FeedbackPlanStepResult = { requestId: string; revision: number; acce
   & ({ nextFrame: FeedbackPlanFrame; complete: false } | { complete: true });
 type StepRecord = { fingerprint: string; input: FeedbackPlanStep; promise: Promise<FeedbackPlanStepResult>;
   resolve: (result: FeedbackPlanStepResult) => void; reject: (error: Error) => void;
-  dispatchedAt: number; applied: boolean; result: AppliedResult | null };
+  dispatchedAt: number; applied: boolean; result: AppliedResult | null; before: ActorObservation; decision: Decision };
 type Observer = { resolve: (value: FeedbackPlanFrame | FeedbackPlanCompletion) => void;
   reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> };
 
@@ -35,7 +37,8 @@ function actionResult(observation: ActorObservation): AppliedResult | null {
     ...(result.productId === undefined ? {} : { productId: result.productId }),
     ...(result.quantity === undefined ? {} : { quantity: result.quantity }),
     ...(result.stationId === undefined ? {} : { stationId: result.stationId }),
-    ...(result.anchorId === undefined ? {} : { anchorId: result.anchorId }) };
+    ...(result.anchorId === undefined ? {} : { anchorId: result.anchorId }),
+    ...(result.movement === undefined ? {} : { movement: projectFeedbackObservation(observation).result!.movement }) };
 }
 
 /** One actor decision, one applied observation, then one next frame. No world or archive is forwarded. */
@@ -43,10 +46,10 @@ export class FeedbackPlanSession {
   readonly id = randomUUID();
   readonly model = FEEDBACK_PLAN_MODEL;
   readonly reasoning = FEEDBACK_PLAN_REASONING;
-  readonly policyVersion = FEEDBACK_ACTOR_POLICY_VERSION;
   private revision = 0;
   private frame: FeedbackPlanFrame | null = null;
-  private memory = emptyFeedbackBeliefMemory();
+  private memory: FeedbackBeliefMemory;
+  private readonly experience: FeedbackExperience;
   private waiter: { resolve: (decision: Decision) => void; reject: (error: Error) => void } | null = null;
   private readonly observers = new Set<Observer>();
   private readonly requests = new Map<string, StepRecord>();
@@ -65,10 +68,18 @@ export class FeedbackPlanSession {
   private frameBuildMs = 0;
   private firstElapsedMs: number | null = null;
   private plannedElapsedMs = 0;
+  private readonly movementPolicy: FeedbackMovementPolicy | null;
 
-  constructor(private readonly seed: string | number) {
+  constructor(private readonly seed: string | number, readonly policyVersion: FeedbackActorPolicyVersion = FEEDBACK_ACTOR_POLICY_VERSION,
+    movementOptions?: FeedbackMovementPolicyOptions) {
     if (!(typeof seed === 'string' || typeof seed === 'number' && Number.isFinite(seed)))
       throw failure('Feedback plan seed must be a string or finite number', 'FEEDBACK_SEED');
+    this.memory = emptyFeedbackBeliefMemory(policyVersion);
+    this.experience = new FeedbackExperience({ version: policyVersion === 'feedback-choice-v7' ? 'bounded-observed-experience-v2' : 'bounded-observed-experience-v1' });
+    const exploration = policyVersion === 'feedback-choice-v3' || isExperienceFeedbackPolicy(policyVersion);
+    if (movementOptions !== undefined && !exploration) throw failure('feedbackMovement requires feedback-choice-v3 or feedback-choice-v4', 'FEEDBACK_MOVEMENT_POLICY');
+    this.movementPolicy = exploration ? new FeedbackMovementPolicy(seed, movementOptions,
+      isExperienceFeedbackPolicy(policyVersion) ? 'exploration-v2' : 'exploration-v1') : null;
   }
 
   private timing(): FeedbackPlanTiming {
@@ -127,24 +138,26 @@ export class FeedbackPlanSession {
         throw failure('Feedback plan session is not awaiting a decision', 'FEEDBACK_NOT_WAITING');
       if (Object.prototype.hasOwnProperty.call(input, 'delayMs'))
         throw failure('Feedback steps use durationMs for the action itself; legacy delayMs is not accepted', 'FEEDBACK_LEGACY_DELAY');
-      const keys = Object.keys(input).sort();
+      const keys = Object.keys(input).filter(key => !(isStructuredFeedbackPolicy(this.policyVersion) && key === 'choiceParameters')).sort();
       if (canonicalMarketReplayJson(keys) !== canonicalMarketReplayJson(['choiceId', 'durationMs', 'memory', 'reason', 'requestId', 'revision']))
         throw failure('A feedback step requires exactly one choice, durationMs, reason and full replacement memory', 'FEEDBACK_STEP_SHAPE');
       const choice = this.frame.availableChoices.find(candidate => candidate.id === input.choiceId);
       if (!choice) throw failure('Choice is not available in the current feedback revision', 'FEEDBACK_CHOICE');
-      const validMemory = validateFeedbackBeliefMemory(input.memory);
+      const validMemory = validateFeedbackBeliefMemory(input.memory, this.policyVersion);
       if (!validMemory.valid) throw failure(validMemory.errors.join('; '), 'FEEDBACK_MEMORY');
-      const decision = feedbackDecisionFromChoice(choice, input.durationMs, input.reason, input.memory);
+      const decision = feedbackDecisionFromChoice(choice, input.durationMs, input.reason, input.memory, input.choiceParameters);
+      if (this.frame.movementPolicy) decision.movementPolicy = structuredClone(this.frame.movementPolicy);
       assertDecision(decision, true);
       let resolve!: StepRecord['resolve'], reject!: StepRecord['reject'];
       const promise = new Promise<FeedbackPlanStepResult>((yes, no) => { resolve = yes; reject = no; });
       // An RPC disconnect must not create an unhandled rejection or erase the request record.
       void promise.catch(() => {});
       const record: StepRecord = { fingerprint, input: structuredClone(input), promise, resolve, reject,
-        dispatchedAt: performance.now(), applied: false, result: null };
+        dispatchedAt: performance.now(), applied: false, result: null,
+        before: structuredClone(this.frame.observation), decision: structuredClone(decision) };
       this.requests.set(input.requestId, record);
       this.active = record;
-      this.memory = structuredClone(input.memory);
+      this.memory = carryFeedbackBeliefMemory(this.frame.memory, input.memory, this.policyVersion);
       this.accepted++;
       this.stopActorWait();
       const waiter = this.waiter;
@@ -160,7 +173,9 @@ export class FeedbackPlanSession {
     try {
       const buildStarted = performance.now();
       const actorFrame = buildFeedbackActorFrame({ observation, persona, memory: structuredClone(this.memory),
-        seed: this.seed, decisionIndex: this.executed });
+        seed: this.seed, decisionIndex: this.executed, policyVersion: this.policyVersion,
+        ...(this.movementPolicy ? { movementPolicy: this.movementPolicy.prepare(observation, this.executed) } : {}),
+        ...(isExperienceFeedbackPolicy(this.policyVersion) ? { experience: this.experience.snapshot(projectFeedbackObservation(observation, this.policyVersion)) } : {}) });
       this.frameBuildMs += performance.now() - buildStarted;
       return this.decideFrame(actorFrame);
     } catch (error) { this.fail(error); throw error; }
@@ -169,6 +184,7 @@ export class FeedbackPlanSession {
   /** The simulator supplies this frame through its dedicated current-only callback boundary. */
   async decideFrame(actorFrame: FeedbackActorFrame): Promise<Decision> {
     if (this.error) throw this.error;
+    if (actorFrame.policyVersion !== this.policyVersion) throw failure('Feedback frame policy differs from its session', 'FEEDBACK_POLICY_MISMATCH');
     if (this.stopped) throw failure('Feedback plan session is complete', 'FEEDBACK_SESSION_CLOSED');
     if (this.waiter || this.frame) throw failure('Another feedback decision is already waiting', 'FEEDBACK_DECISION_PENDING');
     if (this.active && !this.active.applied) {
@@ -194,6 +210,8 @@ export class FeedbackPlanSession {
     if (!this.active || this.active.applied || this.stopped)
       throw failure('No unapplied feedback decision is pending', 'FEEDBACK_APPLICATION_STATE');
     this.active.applied = true;
+    if (isExperienceFeedbackPolicy(this.policyVersion))
+      this.experience.record(this.active.decision, this.active.before, projectFeedbackObservation(after, this.policyVersion));
     this.active.result = actionResult(after);
     this.lastResult = structuredClone(this.active.result);
     this.executed++;

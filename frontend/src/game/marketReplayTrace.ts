@@ -3,7 +3,8 @@ import { createMarketSession, type MarketSession, type MarketSessionConfig } fro
 import type { MarketEnvironment, MarketCashierAvailability, MarketEnvironmentStationId, MarketCheckoutId } from './marketEnvironment';
 import type { MarketMission } from './scenarios';
 import { MARKET_CATALOG_VERSION, MARKET_SCENARIO_VERSION } from './marketContent';
-import { validateReplayPresentation, type ReplayPresentation } from './marketReplayPerception';
+import { validateReplayPresentation, type ReplayDirection, type ReplayPresentation } from './marketReplayPerception';
+import type { DirectionalMovement } from './marketDirectionalInput';
 
 export type MarketReplaySnapshot = {
   snapshotSchemaVersion: '1'; snapshotId: string; config: MarketSessionConfig; environment: MarketEnvironment;
@@ -11,7 +12,15 @@ export type MarketReplaySnapshot = {
   catalogVersion: string; scenarioVersion: string; completionMode: 'ai-review';
   presentation?: ReplayPresentation;
 };
-type StepBase = { id: string; reactionDelayMs: number; timeoutMs: number; reason: string; attentionTag?: string; cueRefs?: string[] };
+export type MarketReplayMovementPolicy = {
+  version: 'exploration-v1' | 'exploration-v2'; wanderProbability: number; blockedDirectionCooldown: 4; unblockDistancePx: 24;
+};
+export type MarketReplayMovementPolicyDecision = {
+  version: 'exploration-v1' | 'exploration-v2'; mode: 'actor-choice' | 'random-wander' | 'blocked-recovery'; eligible: boolean;
+  wanderProbability: number; roll: number | null; avoidedDirections: ReplayDirection[];
+};
+type StepBase = { id: string; reactionDelayMs: number; timeoutMs: number; reason: string; attentionTag?: string; cueRefs?: string[];
+  movementPolicy?: MarketReplayMovementPolicyDecision };
 export type ReplayMovement = { style: 'careful' | 'steady' | 'brisk'; speedMultiplier: number; running: false; motorSeed: string; accelerationMs: number };
 /** The generator ended an incomplete observation. Its terminal actions are never the persona's decision. */
 export type MarketReplayControlledStop =
@@ -27,6 +36,7 @@ export type MarketReplayStep = StepBase & (
   | { type: 'viewCart' | 'viewHelp'; durationMs?: number }
   | { type: 'walkTo'; target: { stationId: MarketEnvironmentStationId }; movement: ReplayMovement }
   | { type: 'walkToAnchor'; target: { anchorId: string }; movement: ReplayMovement }
+  | { type: 'moveDirection'; direction: ReplayDirection; durationMs: number; movement: DirectionalMovement }
   | { type: 'readList'; durationMs: number }
   | { type: 'pause' | 'lookAround'; durationMs: number }
   | { type: 'openShelf'; stationId: MarketEnvironmentStationId }
@@ -47,9 +57,14 @@ export type MarketReplayTrace = {
   attentionExperience?: { layoutKey: string; memory: Record<string, unknown>; source: 'planned-trace' };
   /** Fresh LLM requests are not seed deterministic. A captured trace is replayable. */
   generation?: { model: string; reproducibility: 'seed-and-snapshot' | 'captured-trace'; requestId?: string;
-    timingProfile?: 'compact-v1' | 'actor-preserved-v1' | 'activity-duration-v1'; sourceTraceId?: string; actorPolicyVersion?: 'episodic-choice-v1' | 'episodic-choice-v2' | 'episodic-choice-v3' | 'episodic-choice-v4' | 'episodic-choice-v5' | 'episodic-choice-v6' | 'episodic-choice-v7' | 'episodic-choice-v8' | 'episodic-choice-v9' | 'episodic-choice-v10' | 'feedback-choice-v1' | 'whole-trace-v1' | 'whole-trace-v2' | 'whole-trace-v3';
+    timingProfile?: 'compact-v1' | 'actor-preserved-v1' | 'activity-duration-v1' | 'activity-duration-v2'; sourceTraceId?: string; actorPolicyVersion?: 'episodic-choice-v1' | 'episodic-choice-v2' | 'episodic-choice-v3' | 'episodic-choice-v4' | 'episodic-choice-v5' | 'episodic-choice-v6' | 'episodic-choice-v7' | 'episodic-choice-v8' | 'episodic-choice-v9' | 'episodic-choice-v10' | 'feedback-choice-v1' | 'feedback-choice-v2' | 'feedback-choice-v3' | 'feedback-choice-v4' | 'feedback-choice-v5' | 'feedback-choice-v6' | 'feedback-choice-v7' | 'whole-trace-v1' | 'whole-trace-v2' | 'whole-trace-v3';
+    movementContract?: 'joystick-direction-v1';
+    movementPolicy?: MarketReplayMovementPolicy;
     reasoningEffort?: 'low';
-    feedback?: { version: '1'; observationScope: 'current-screen'; memory: 'actor-authored'; contextDelivery: 'stateless-http' | 'external-frame'; decisions: number };
+    feedback?: { observationScope: 'current-screen'; contextDelivery: 'stateless-http' | 'external-frame'; decisions: number } & (
+      | { version: '1'; memory: 'actor-authored' }
+      | { version: '2'; memory: 'actor-authored-with-recent-experience'; experienceContract: 'bounded-observed-experience-v1'; intentContract: 'persistent-intent-v1' }
+      | { version: '3'; memory: 'actor-authored-with-recent-experience'; experienceContract: 'bounded-observed-experience-v2'; intentContract: 'persistent-intent-v1'; beliefContract: 'quantity-source-beliefs-v1' });
     planningMode?: 'whole-trace'; observationScope?: 'whole-world'; actorKnowledgeScope?: 'observed-and-remembered'; actorStateVersion?: '1'; planningSubmissions?: number; repairSubmissions?: number;
     controlledStop?: MarketReplayControlledStop;
     systemCompletion?: MarketReplaySystemCompletion;
@@ -149,6 +164,7 @@ function validateSchema(value: unknown, schema: any, path: string, errors: strin
   } else if (type === 'array') {
     if (!Array.isArray(value)) { errors.push(`${path}: expected array`); return; }
     if (value.length < (schema.minItems ?? 0) || value.length > (schema.maxItems ?? Infinity)) errors.push(`${path}: invalid item count`);
+    if (schema.uniqueItems && new Set(value.map(canonicalMarketReplayJson)).size !== value.length) errors.push(`${path}: items must be unique`);
     value.forEach((item, i) => validateSchema(item, schema.items, `${path}[${i}]`, errors));
   } else if (type === 'string') {
     if (typeof value !== 'string') { errors.push(`${path}: expected string`); return; }
@@ -157,6 +173,7 @@ function validateSchema(value: unknown, schema: any, path: string, errors: strin
   } else if (type === 'number' || type === 'integer') {
     if (typeof value !== 'number' || !Number.isFinite(value) || (type === 'integer' && !Number.isInteger(value))) { errors.push(`${path}: expected finite ${type}`); return; }
     if (value < (schema.minimum ?? -Infinity) || value > (schema.maximum ?? Infinity)) errors.push(`${path}: outside allowed bounds`);
+    if (schema.exclusiveMaximum !== undefined && value >= schema.exclusiveMaximum) errors.push(`${path}: outside exclusive upper bound`);
   } else if (type === 'boolean' && typeof value !== 'boolean') errors.push(`${path}: expected boolean`);
 }
 export function validateMarketReplayTrace(value: unknown, snapshot?: MarketReplaySnapshot): MarketReplayValidation {
@@ -167,7 +184,7 @@ export function validateMarketReplayTrace(value: unknown, snapshot?: MarketRepla
   const trace = value as MarketReplayTrace;
   if (trace.traceSchemaVersion === '1') {
     if (trace.policyVersion !== '3' || trace.experienceMode !== undefined || trace.attentionExperience !== undefined
-      || trace.steps.some(step => step.type === 'walkToAnchor' || step.type === 'readList' || step.attentionTag !== undefined || step.cueRefs !== undefined)) {
+      || trace.steps.some(step => step.type === 'walkToAnchor' || step.type === 'moveDirection' || step.type === 'readList' || step.attentionTag !== undefined || step.cueRefs !== undefined)) {
       errors.push('Attention intentions and metadata require trace schema 2 and policy 4.');
     }
   } else if (!['4', '5', '6'].includes(trace.policyVersion)) errors.push('Trace schema 2 requires policy 4, 5 or 6.');
@@ -206,14 +223,59 @@ export function validateMarketReplayTrace(value: unknown, snapshot?: MarketRepla
   } else if (['whole-trace-v1', 'whole-trace-v2', 'whole-trace-v3'].includes(generation?.learnerIdentity?.policyVersion ?? '')) {
     errors.push('A whole-trace learner requires explicit whole-trace planning metadata.');
   }
-  const feedback = generation?.actorPolicyVersion === 'feedback-choice-v1';
+  const experienceFeedback = ['feedback-choice-v4', 'feedback-choice-v5', 'feedback-choice-v6', 'feedback-choice-v7'].includes(generation?.actorPolicyVersion ?? '');
+  const explorationFeedback = generation?.actorPolicyVersion === 'feedback-choice-v3' || experienceFeedback;
+  const explorationVersion = experienceFeedback ? 'exploration-v2' : 'exploration-v1';
+  const directionalFeedback = generation?.actorPolicyVersion === 'feedback-choice-v2' || explorationFeedback;
+  const feedback = generation?.actorPolicyVersion === 'feedback-choice-v1' || directionalFeedback;
   if (feedback) {
     if (trace.generationPolicy !== 'llm' || trace.traceSchemaVersion !== '2' || trace.policyVersion !== '6'
-      || generation?.feedback?.version !== '1' || !['actor-preserved-v1', 'activity-duration-v1'].includes(generation.timingProfile ?? '')
+      || generation?.feedback?.version !== (generation?.actorPolicyVersion === 'feedback-choice-v7' ? '3' : experienceFeedback ? '2' : '1')
+      || !(directionalFeedback ? generation.timingProfile === 'activity-duration-v2' : ['actor-preserved-v1', 'activity-duration-v1'].includes(generation.timingProfile ?? ''))
       || generation.learnerIdentity || generation.systemCompletion || generation.controlledStop
       || trace.experienceMode !== 'first-play') errors.push('Feedback planning requires a fresh schema 2 / policy 6 actor, current-screen belief metadata and supported actor timing without automatic completion.');
-  } else if (generation?.feedback !== undefined) errors.push('Feedback metadata requires feedback-choice-v1.');
-  const activityTiming = generation?.timingProfile === 'activity-duration-v1';
+  } else if (generation?.feedback !== undefined) errors.push('Feedback metadata requires feedback-choice-v1, feedback-choice-v2, feedback-choice-v3 or feedback-choice-v4.');
+  const directionalSteps = trace.steps.some(step => step.type === 'moveDirection');
+  if (directionalFeedback && generation?.movementContract !== 'joystick-direction-v1')
+    errors.push('Feedback-choice-v2, feedback-choice-v3 and feedback-choice-v4 require joystick-direction-v1 movement.');
+  if ((directionalSteps || generation?.movementContract !== undefined) && !directionalFeedback)
+    errors.push('Directional movement requires feedback-choice-v2, feedback-choice-v3 or feedback-choice-v4 and its explicit movement contract.');
+  if (generation?.timingProfile === 'activity-duration-v2' && !directionalFeedback)
+    errors.push('Activity-duration-v2 timing requires feedback-choice-v2, feedback-choice-v3 or feedback-choice-v4.');
+  if (explorationFeedback && generation?.movementPolicy?.version !== explorationVersion)
+    errors.push(`${generation?.actorPolicyVersion} requires ${explorationVersion} movement policy metadata.`);
+  if (!explorationFeedback && (generation?.movementPolicy !== undefined || trace.steps.some(step => step.movementPolicy !== undefined)))
+    errors.push('Exploration movement policy metadata requires feedback-choice-v3 or feedback-choice-v4.');
+  if (explorationFeedback) {
+    if (trace.steps.filter(step => step.movementPolicy !== undefined).length !== generation?.feedback?.decisions)
+      errors.push('Exploration policy provenance count must match the recorded feedback decision count.');
+    for (const step of trace.steps) {
+      const policy = step.movementPolicy;
+      const systemStep = ['start', 'awaitReviewAccepted', 'skipRating', 'leave'].includes(step.type);
+      if (step.type === 'moveDirection' && !policy) errors.push(`${step.id}: directional movement requires exploration policy provenance.`);
+      else if (!systemStep && !policy) errors.push(`${step.id}: actor steps require exploration policy provenance.`);
+      if (!policy) continue;
+      if (systemStep)
+        errors.push(`${step.id}: system steps cannot carry actor movement policy provenance.`);
+      if (policy.version !== explorationVersion)
+        errors.push(`${step.id}: movement policy version must match its actor policy contract.`);
+      if (policy.wanderProbability !== generation?.movementPolicy?.wanderProbability)
+        errors.push(`${step.id}: movement policy probability must match generation metadata.`);
+      if (!policy.eligible && (policy.mode !== 'actor-choice' || policy.roll !== null))
+        errors.push(`${step.id}: inactive movement policy requires actor-choice with no roll.`);
+      if (policy.version === 'exploration-v1' && policy.mode !== 'actor-choice' && step.type !== 'moveDirection')
+        errors.push(`${step.id}: automatic movement policy modes require a directional movement step.`);
+      if (step.type === 'moveDirection' && policy.avoidedDirections.includes(step.direction))
+        errors.push(`${step.id}: selected movement direction is currently avoided.`);
+      if (policy.mode === 'random-wander' && (policy.roll === null || policy.roll >= policy.wanderProbability))
+        errors.push(`${step.id}: random wandering requires a roll below the configured probability.`);
+      if (policy.mode === 'actor-choice' && policy.eligible && (policy.roll === null || policy.roll < policy.wanderProbability))
+        errors.push(`${step.id}: an eligible actor choice requires a roll at or above the configured probability.`);
+      if (policy.mode === 'blocked-recovery' && policy.roll !== null)
+        errors.push(`${step.id}: blocked recovery does not draw a wandering roll.`);
+    }
+  }
+  const activityTiming = generation?.timingProfile === 'activity-duration-v1' || generation?.timingProfile === 'activity-duration-v2';
   if (activityTiming) {
     if (!feedback) errors.push('Activity-duration timing requires feedback-choice-v1.');
     if (trace.steps.some(step => step.reactionDelayMs !== 0)) errors.push('Activity-duration timing requires zero reaction delay on every step.');

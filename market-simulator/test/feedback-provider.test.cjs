@@ -57,7 +57,7 @@ for (const protocol of ['openai', 'ollama']) test(`${protocol}: each intercepted
     assert.deepEqual(current.memory, wrongMemory());
     return response(choose(current, 'giveUp'), protocol);
   };
-  const policy = createFeedbackLlmPolicy({ ...options, protocol }, 'fresh-requests');
+  const policy = createFeedbackLlmPolicy({ ...options, protocol }, 'fresh-requests', 'feedback-choice-v1');
   const g = guard(), history = [{ action: { type: 'pause', durationMs: 1 }, delayMs: 1, reason: sentinel,
     exchange: { request: { entirePriorConversation: sentinel }, response: { rawSnapshot: sentinel } } }];
   const source = () => ({ ...g.observeActor(), expectedAnswer: sentinel, history: [sentinel],
@@ -108,7 +108,7 @@ test('all currently legal quantities survive the wire and applied add feedback r
     assert.deepEqual(current.memory, wrongMemory(), 'the actual add must not correct a contrary belief or its completion flag');
     return response(choose(current, 'viewCart', current.memory));
   };
-  const policy = createFeedbackLlmPolicy(options, 'quantities');
+  const policy = createFeedbackLlmPolicy(options, 'quantities', 'feedback-choice-v1');
   const selected = await policy(g.observeActor(), [], persona);
   assert.deepEqual(selected.action, { type: 'add', productId: product.id, quantity });
   g.execute(step('dragProduct', { productId: selected.action.productId, quantity: selected.action.quantity,
@@ -142,7 +142,7 @@ test('an explicitly chosen missed drag reaches the next request as failed applic
     assert.equal(current.observation.products.find(item => item.id === product.id).stock, product.stock);
     return response(choose(current, 'viewCart', current.memory));
   };
-  const policy = createFeedbackLlmPolicy(options, 'failed-gesture');
+  const policy = createFeedbackLlmPolicy(options, 'failed-gesture', 'feedback-choice-v1');
   const miss = await policy(g.observeActor(), [], persona);
   assert.equal(miss.dragOutcome, 'miss');
   assert.equal(miss.action.quantity, 1);
@@ -162,7 +162,7 @@ test('terminal observations never trigger a model request or expose a hypothetic
   const g = guard();
   g.execute(step('giveUp'));
   const terminal = { ...g.observeActor(), evaluation: { correct: sentinel }, feedback: { expectedAnswer: sentinel } };
-  await assert.rejects(createFeedbackLlmPolicy(options, 'terminal')(terminal, [], persona), /No supported feedback UI controls/);
+  await assert.rejects(createFeedbackLlmPolicy(options, 'terminal', 'feedback-choice-v1')(terminal, [], persona), /No supported feedback UI controls/);
   assert.equal(calls, 0);
 });
 
@@ -208,7 +208,7 @@ test('a schema repair repeats the unchanged frame without importing the rejected
     if (calls < 3) selection.durationMs = 0;
     return response(selection);
   };
-  const policy = createFeedbackLlmPolicy(options, 'repair');
+  const policy = createFeedbackLlmPolicy(options, 'repair', 'feedback-choice-v1');
   const selected = await policy(before, [], persona);
   assert.equal(calls, 3);
   assert.equal(selected.action.type, 'pause');
@@ -240,7 +240,7 @@ test('legacy delay and nonzero ordinary duration are format failures rather than
       return response(selection);
     };
     const g = guard(), before = g.observeActor();
-    await assert.rejects(createFeedbackLlmPolicy(options, `invalid-duration-${legacy}`)(before, [], persona),
+    await assert.rejects(createFeedbackLlmPolicy(options, `invalid-duration-${legacy}`, 'feedback-choice-v1')(before, [], persona),
       /invalid choice\/memory after 3 attempts/);
     assert.equal(calls, 3);
     assert.deepEqual(g.observeActor(), before);
@@ -255,7 +255,7 @@ test('optional cart and help inspection time is preserved on the action with zer
       const current = JSON.parse(JSON.parse(init.body).messages[1].content);
       return response({ ...choose(current, type, wrongMemory()), durationMs });
     };
-    const selected = await createFeedbackLlmPolicy(options, `${type}-${durationMs}`)(guard().observeActor(), [], persona);
+    const selected = await createFeedbackLlmPolicy(options, `${type}-${durationMs}`, 'feedback-choice-v1')(guard().observeActor(), [], persona);
     assert.equal(selected.delayMs, 0);
     assert.deepEqual(selected.action, { type, durationMs });
     assert.deepEqual(selected.feedbackMemory, wrongMemory());

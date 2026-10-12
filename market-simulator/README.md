@@ -1,14 +1,43 @@
 # Oneuldo 장보기 의도 trace와 앱 재생
 
-새 페르소나 생성의 권장 경로는 **`feedback-choice-v1`**이다. `begin_feedback_plan`이 첫 관측을 돌려주고, `step_feedback_plan`은 행동 하나를 적용한 결과와 다음 관측을 함께 반환한다. 전체 지도와 정답 원장은 내부에 두며 배우에게는 현재 화면과 배우가 직접 남긴 짧은 기억만 제공한다. 목록은 읽은 직후에만 노출하고 오기억·누락·잘못된 완료 믿음을 자동 수정하지 않는다. 100회에 도달해도 시스템이 대신 계산하지 않는다. 저장된 전체 trace를 검토한 뒤 실제 웹에서 재생하는 흐름은 유지한다. 연결·기억 형식·실패 처리·문맥 격리와 한계는 [새 생성 절차](../market-persona-skill/references/feedback-plan.md)에 있다.
+## 현재 기본: feedback-choice-v7
 
-HTTP provider는 `generate_trace({actorPolicyVersion:"feedback-choice-v1", ...})`로 선택하며 매 판단에 새 system+현재 frame 메시지만 보낸다. 직접 Codex 배우는 실제 Luna/low의 새 판단 문맥이 필요하다. 서버가 외부 배우의 과거 문맥 삭제를 보장하지는 않는다. 새 정책은 첫 방문 생성에 적용하며 기존 learner 원장은 자동 가져오지 않는다. 입력 timing 옵션은 original이고 compact는 허용하지 않는다. 새 trace의 시간 계약은 아래 activity-duration-v1이다. 아래 기본 v4와 기존 whole-trace/v10 경로는 호환성을 위해 유지한다.
+새 `begin_feedback_plan`의 기본은 `feedback-choice-v7`이며 HTTP 생성은 이를 명시한다. 일반 `generate_trace`의 기존 episodic 기본값은 유지한다. 명시적 v1~v6와 과거 저장 자료는 기존 계약으로 재현한다. 아래 v5/v6의 기본 채택 기록은 과거 상태를 설명하며 새 생성에는 이 v7 절을 우선 적용한다.
+
+v7은 v6의 개인 동기·선택권을 유지하며 다음 표현을 분리한다.
+
+- `experience.checks.cartChangedSinceLastCartView`: 실제 장바구니 확인 이후 관측·적용 결과로 확인한 변화. 닫기·목록 읽기는 기준을 초기화하지 않는다. 변화 없음은 false, 변화 있음은 true, 불확실하거나 24행동 기한이 지난 경우는 null이다.
+- `rememberedItems.quantity`: 배우가 현재 원한다고 믿는 총수량. 선택적 `rememberedCartQuantity`는 마지막으로 담겨 있었다고 기억하는 수량이며 `source`는 list/personal/uncertain 중 배우가 믿는 출처다. 틀린 값·누락·불확실성을 허용하고 코드가 채우거나 정답과 대조하지 않는다.
+- 담기·빼기의 `choiceParameters.quantity`는 추가·제거할 개수다. 기억의 총수량과 구분하며 실제 현재 카탈로그의 상품·수량만 선택한다. 행동 설명이 매개변수를 덮어쓰지 않는다.
+- 확인은 이미 선택한 `ongoingIntent`와 구분하고, 실행 전 응답 기억을 실행 완료 사실로 취급하지 않는다. 다음 실제 결과를 보고 배우가 수정 여부를 결정한다.
+
+상품 기억 12개·메모 8개, 최근 행동 6개·장소 6곳·24행동 기한, 원본 페르소나와 배회 신호 0.2는 유지한다. 반복 금지·자동 수량 조정·목표 복원·강제 구매나 종료는 추가하지 않는다. trace에는 feedback version 3, experienceContract `bounded-observed-experience-v2`, beliefContract `quantity-source-beliefs-v1`을 기록한다. 제품의 최대 100행동은 유지하고 사용자가 요청한 300행동은 별도 동결 실험 사본에서만 실행한다. 실제 모델 성능은 별도로 측정하며 구현 검증만으로 성공률 향상을 주장하지 않는다.
+
+**정책 채택 상태:** feedback 기본·권장 정책은 `feedback-choice-v5`다. 현재 UI 정보 표현의 정확성과 기존 합법 행동 집합 보존 검증을 근거로 채택했으며, 성공률·인간 행동 충실도 개선을 입증한 결정은 아니다. `feedback-choice-v6`는 명시적 실험 옵션으로 유지한다. **모델 비교 결과 상태:** 2026-10-12 동일 S01에서 v5·v6 각 5회, 최대 300행동 비교를 완료했다. 두 조건 모두 관측된 목표 상품 노출·담기·완수는 0회였다. v6 1회는 1행동 뒤 선택 ID 오류로 중단돼 이후가 미관측이다. 성공률 개선은 확인되지 않았으며, 같은 궤적의 100·200·300 누적 구간과 실제 사람의 행동 타당성을 구분한다.
+
+새 페르소나 생성의 권장 경로는 **`feedback-choice-v5`**이다. `begin_feedback_plan`의 기본은 v5이고 첫 관측을 돌려주며, `step_feedback_plan`은 행동 하나를 적용한 결과와 다음 관측을 함께 반환한다. 현재 화면과 배우가 남긴 믿음 기억에 최근 6개 적용 행동·결과와 제한된 매대·통로 관찰 경험을 전달한다. 선택적 `memory.ongoingIntent`로 진행 중인 목적을 현재 활동인 `currentTask`와 분리한다. `exploration-v2`는 실제 막힌 방향을 잠시 제외하고 기본 20%의 seed 기반 배회 신호를 제공하되, 배회·회복 모드에서도 매대 열기·확인·중단 등 현재 가능한 비이동 조작을 모두 유지한다. 이동 여부·방향·100~2000ms 입력 시간은 모델이 선택하며 구매 목적이나 보이는 대상은 필요 없다. 전체 지도·좌표·숨은 목표·정답 원장은 배우에게 주지 않는다. 정확한 목록은 읽은 직후에만 노출하고 오기억·누락·잘못된 완료 믿음을 자동 수정하지 않는다. 최대 행동 한도 100과 자동 계산 없음은 유지한다. 저장된 전체 trace를 검토한 뒤 실제 웹에서 재생하는 흐름은 유지한다. 연결·기억 형식·실패 처리·문맥 격리와 한계는 [새 생성 절차](../market-persona-skill/references/feedback-plan.md)에 있다.
+
+HTTP provider는 `generate_trace({actorPolicyVersion:"feedback-choice-v5", feedbackMovement:{wanderProbability:0.2}, ...})`로 선택하며 매 판단에 새 system+현재 frame 메시지만 보낸다. `begin_feedback_plan`도 `feedbackMovement`를 받으며 `wanderProbability`는 0~1, 생략 시 0.2다. 정책을 생략한 일반 `generate_trace`의 기존 `episodic-choice-v4` 기본값은 유지한다. 직접 Codex 배우는 실제 Luna/low의 새 판단 문맥이 필요하며 최근 경험·`movementPolicy`를 포함한 현재 frame 전체를 전달한다. 서버가 외부 배우의 과거 문맥 삭제를 보장하지는 않는다. 새 정책은 첫 방문 생성에 적용하며 기존 learner 원장은 자동 가져오지 않는다. timing은 original이고 compact는 허용하지 않는다. v4~v6 모두 `activity-duration-v2`와 `movementContract:"joystick-direction-v1"`을 사용한다. 명시적 `feedback-choice-v3`는 `exploration-v1`의 강제 방향 이동과 기존 믿음 기억 계약, 명시적 `feedback-choice-v2`는 자동 배회·회피 없이 8방향을 제공하는 계약, 명시적 `feedback-choice-v1`은 기존 anchor 이동·관측·시간 계약을 보존한다. 명시적 v4의 프레임·합법 행동과 저장된 v1/v2/v3/v4 및 아래 whole-trace/v10 경로도 그대로 유지한다.
+
+`exploration-v2`는 `shopping` / `world` / `activeStation` 없음인 판단에 적용한다. `actor-choice`는 일반 선택, `random-wander`는 배회를 고려하는 신호, `blocked-recovery`는 완전 막힘 뒤 다른 선택을 고려하는 신호다. v4~v6는 세 모드 모두 현재 가능한 비이동 조작을 유지한다. 완전히 막힌 방향은 다음 4회의 world 판단에서 제외하며, 실제 24px 이동 또는 관측된 위치 변경이 있으면 차단 기억을 초기화한다. 제자리 패널 열기·닫기로는 이력이 사라지지 않는다. `wanderProbability:0`은 확률 배회 신호만 끄고 막힘 회피는 유지한다. 20%는 적격 판단별 신호 발생 확률이며 실제 이동 횟수 할당량이나 임상 통계가 아니다. frame의 `movementPolicy:{version,mode,eligible,wanderProbability,roll,avoidedDirections}`, trace의 `generation.movementPolicy`와 각 step의 `movementPolicy`에 설정과 개입 출처를 남긴다. 명시적 v3의 `exploration-v1`은 배회·회복 턴에 방향 이동만 제시하는 기존 제한을 유지한다. 분석에서는 v4~v6의 신호와 실제 선택, v3의 강제 이동을 구분한다. 숨은 지도로 우회로를 찾거나 목표 상품·수량·성공을 보정하지 않으며, AI 실패를 대신하는 fallback도 아니다.
+
+v4~v6의 `bounded-observed-experience-v1`은 최근 6개 적용 행동·관찰 결과와 최근 관찰한 매대·통로를 각각 최대 6곳씩 전달한다. 장소 경험은 마지막 관찰 뒤 24개 행동 이내로 제한하고, 매대별 상품·페이지 요약은 실제 관찰한 최대 12개 상품·12개 페이지만 담는다. 전체 방문 원장이나 정확한 쇼핑 목록의 영구 사본은 만들지 않는다. 배우는 최근 확인 뒤 새 정보가 생겼는지, 현재 보이는 장바구니와 자신의 믿음이 일치하는지를 판단하고 다음 행동이나 기억 수정 여부를 선택한다. 반복 확인·재방문·중단을 횟수 규칙으로 금지하지 않는다. `ongoingIntent`는 생략하면 이전 값 유지, 문자열이면 교체, null이면 해제하며 `rememberedItems`·`currentTask`·`notes`는 응답으로 교체한다. 이 형식은 자동 목표 보정이나 임상적 기억력 측정이 아니다. 새 trace의 `generation.feedback`에는 `version:2`, `memory:"actor-authored-with-recent-experience"`, `experienceContract:"bounded-observed-experience-v1"`, `intentContract:"persistent-intent-v1"`을 기록한다.
+
+v2~v6의 `visibleStructures`는 매대 이름을 읽을 수 없어도 보이는 본체의 방향·거리와 익명 `진열대` 단서를 전달한다. 범주·상품·좌표·상호작용 ID를 제공하지 않으며, 가까운 버튼이나 표지로 이름이 확인된 매대와 중복하지 않는다. 보수적인 sprite/HUD 기하 투영이며 실제 픽셀의 모든 가림을 판정하는 기능은 아니다. 본체 단서는 방향 이동의 전제 조건이 아니며, v3~v6의 회피는 실제 관측된 막힘만 이용한다.
+
+기본 `feedback-choice-v5`는 v4의 합법 행동을 유지하면서 화면 정보와 선택의 표현을 보완한다. `begin_feedback_plan`은 생략 시 v5를 사용하며, HTTP `generate_trace`에서는 `actorPolicyVersion:"feedback-choice-v5"`를 명시한다. 담기·내려놓기를 각각 하나의 선택지와 현재 상품 `catalog`로 묶으며, 같은 모델 응답의 `choiceParameters`로 상품·수량·담기 결과를 고른다. 예를 들어 현재 카탈로그에 해당 상품과 수량이 있을 때 담기 매개변수는 `{"productId":"curry","quantity":2,"dragOutcome":"drop"}`이다. add는 세 필드가 모두 필요하고, remove는 `productId`와 `quantity`만 받는다. 실패 `miss`·취소 `cancel`은 기존과 같이 수량 1에서만 가능하다. 그 밖의 선택에는 `choiceParameters`를 생략한다. 기본 상품·수량을 대신 채우거나 목표를 우선 정렬하지 않으며, 기존 v4의 합법 행동 집합을 유지한다. [전체 응답 예제와 검증 규칙](../market-persona-skill/references/feedback-plan.md#v5-기본과-v6-실험-계약)을 참고한다.
+
+v5/v6에서만 현재 열린 장바구니·계산 화면에 `cartItems:[{id,name,detail?,quantity}]`를 전달한다. detail은 해당 UI가 표시할 때만 포함하고, 구매 버튼은 실제 화면의 `구매 확정` 및 `구매를 확정하면 이번 시도가 기록되고 결과가 나와요.` 효과를 전달한다. 계산 화면의 닫기는 `다시 고르기`로 매장에 복귀한다. 정답과의 자동 비교·부족 수량·제출 전 추가 확인이나 성공 조건 검사는 넣지 않는다. `cartItems`는 기존의 열린 장바구니 패널 전체 관측 계약에 상품명을 보완한 것으로, 스크롤 밖 행·가림을 픽셀 단위로 재현한 것은 아니다. 장바구니가 닫힌 뒤 현재 내용으로 계속 제공하지 않으며 미관찰 상품·재고를 추가하지 않는다.
+
+명시적 `feedback-choice-v6`는 v5와 같은 관측·선택지에 지시문만 조정한 비교 후보다. 원래 개인의 장보기 동기와 강점, 현재 기억·관찰에 근거한 구체적 활동을 기존 `currentTask`·`ongoingIntent`에 표현하도록 하되, 기억 슬롯·보존 기간·목표 복원·반복 금지·즉시 목표 복귀·강제 완수는 추가하지 않는다. v5/v6 모두 페르소나 원본, 믿음 기억의 용량·교체 방식, 최근 경험 한도, `exploration-v2`와 기본 배회 신호 20%, 행동 시간·게임 규칙을 v4와 공유한다. 기존 v1~v4의 관측·선택지·지시문과 저장된 자료는 그대로 유지한다. 제품 경로의 feedback 기본·최대 행동 수는 **100**이고 자동 계산을 추가하지 않는다. **300행동은 별도 승인된 동결 실험 경로에서만** 사용하며 제품 한도가 바뀌었다고 설명하지 않는다. v6의 채택 여부와 모델 효과는 같은 개인·조건의 비교 결과, 관찰 기회와 기술 중단을 검토해 별도로 판단한다.
 
 페르소나 충실도 검증은 공통 성향 5축과 유형 5개의 조합을 평가한다. 기존 MCP 도구 5개를 재사용하고, 같은 맥락에서 성향 하나만 다른 표본 비교·기회 미발생 구분·A/B 성향 추정·원본 불변 검사를 제공한다. 일반 생성 경로에서 자동 실행하지 않는다. 자세한 입력·출력·분모·한계와 기존 v2 호환 절차는 [검증 절차](../market-persona-skill/references/persona-validation.md)를 따른다.
 
 페르소나 생성기는 `walkTo`, `readList`, `browse`, `openShelf`, `dragProduct`, `viewCart` 같은 행동 **의도**를 JSON으로 만든다. 개발용 Expo 웹앱이 전체 trace를 받아 기존 이동·버튼·드래그 입력 경로로 실시간 재생한다. 게임 로그는 앱의 기존 `MarketBehaviorTracker`와 큐가 기록·전송한다. 생성기와 MCP에는 `BehaviorLogRequest` 생성·변환·직접 전송 기능이 없다.
 
-Luna 전체 계획 경로는 전체 세계를 전개 계산용 참고 자료로 전달하되 인물의 관찰 사실 원장과 현재 작업 기억을 분리한다. 실제 Codex Luna가 각 행동의 상태·사용 기억·근거와 종료까지의 배열을 한 번 작성하고 Node가 제출 후 화면 전개와 기억의 출처·일관성을 검사해 앱용 trace를 저장한다. 코드가 계산한 상태를 Luna의 다음 판단에 실시간 주입하거나 행동마다 모델을 호출하지 않는다. 전체 세계가 모델 문맥에 있으므로 사후 감사는 숨은 정보 영향 차단을 입증하지 않는다. 기존 generate_trace는 실제 LLM이 다음 행동을 선택하는 증분 방식이고 확률 정책은 mode:"stochastic" 회귀/비교 시험에서만 실행한다. 생성기의 가상 시간·좌표·이벤트를 앱에 전송하지 않는다. 화면 재생의 시간과 위치는 실제 앱이 결정한다.
+Luna 전체 계획 경로는 전체 세계를 전개 계산용 참고 자료로 전달하되 인물의 관찰 사실 원장과 현재 작업 기억을 분리한다. 실제 Codex Luna가 각 행동의 상태·사용 기억·근거와 종료까지의 배열을 한 번 작성하고 Node가 제출 후 화면 전개와 기억의 출처·일관성을 검사해 앱용 trace를 저장한다. 코드가 계산한 상태를 Luna의 다음 판단에 실시간 주입하거나 행동마다 모델을 호출하지 않는다. 전체 세계가 모델 문맥에 있으므로 사후 감사는 숨은 정보 영향 차단을 입증하지 않는다. 기존 generate_trace는 실제 LLM이 다음 행동을 선택하는 증분 방식이며, 행동 전부를 결정하는 확률 회귀 정책은 mode:"stochastic"에 한정한다. v4의 `exploration-v2` 신호·막힘 회피와 명시적 v3의 `exploration-v1` 선택 제한은 이와 별개이며 구체적인 방향·시간은 모델이 고른다. 생성기의 가상 시간·좌표·이벤트를 앱에 전송하지 않는다. 화면 재생의 시간과 위치는 실제 앱이 결정한다.
+
+이 기억·이동 정책 구현만으로 대규모 AI 표본이나 클리어 검증 실험을 자동 실행하지 않는다. fixture 테스트를 실제 AI 실행으로 보고하지 않으며, 과거 v1/v2/v3 실험의 frame·추론·trace·보고서 원본은 수정하지 않는다. 별도로 승인된 비교에서는 새 정보 없는 재확인·같은 장소 재방문, 배회·회피 개입과 모델 선택, 상품 관측 기회와 실제 담기, 완성·기술 실패·구매 성공을 각각 집계한다.
 
 정책 옵션·learner 신원 없이 호출한 `generate_trace`는 기존 `episodic-choice-v4` 프롬프트·C1부터 시작하는 선택 ID·선택 순서·300회 기술 상한을 유지한다. `actorPolicyVersion:"episodic-choice-v9"` 또는 `create_learner`로 만든 v9 신원의 `learnerFile`을 명시하면 새 provider 정책을 선택한다. 아래 Codex 직접 증분 계획과 전체 계획도 별도 도구로 명시적으로 시작한다.
 
@@ -150,7 +179,7 @@ const validation = validateTrace(trace, snapshot);
 
 ## 시험 재생 시간
 
-새 `feedback-choice-v1`은 `activity-duration-v1`을 기록한다. 모든 행동 전 `reactionDelayMs`는 0이고 배우는 `choiceId,durationMs,reason,memory`를 응답한다. 일반 행동의 durationMs는 0, pause/lookAround/readList/browse는 100~120000ms, viewCart/viewHelp는 화면을 연 뒤 확인할 0~120000ms다. 목록 읽기 2초 같은 고정 활동 시간도 배우가 선택한 값으로 대체한다. 실제 보행·드래그·UI 전환·서버 접수 시간은 유지하며 확인 시간과 중복하지 않는다. 구형 delayMs 요청은 거절하고, 이미 저장된 actor-preserved-v1 trace는 기존 의미로 재생한다. [시간 계약과 예시](../market-persona-skill/references/feedback-plan.md#행동-시간)를 참고한다.
+새 `feedback-choice-v5`와 명시적 v2/v3/v4/v6는 `activity-duration-v2`를 기록한다. 모든 행동 전 `reactionDelayMs`는 0이고 배우는 `choiceId,durationMs,reason,memory`를 응답하며 v5/v6의 담기·내려놓기에는 `choiceParameters`도 포함한다. `moveDirection`의 durationMs는 배회·회피 모드에서도 모델이 고르는 조이스틱 입력 지속 시간 100~2000ms다. 일반 조작은 0, pause/lookAround/readList/browse는 100~120000ms, viewCart/viewHelp는 화면을 연 뒤 확인할 0~120000ms다. `reason`은 짧은 공개 행동 서술이며 목적의 정당화가 아니다. 목록 읽기 2초 같은 고정 활동 시간도 배우가 선택한 값으로 대체한다. 실제 보행·드래그·UI 전환·서버 접수 시간은 유지하며 확인 시간과 중복하지 않는다. 구형 delayMs 요청은 거절한다. 명시적 v2에는 자동 배회·회피를 추가하지 않으며 명시적 v3는 `exploration-v1`을 유지한다. 명시적 feedback v1은 `activity-duration-v1`과 `durationMs:0`의 기존 anchor 이동을 유지하고, 저장된 v1/v2/v3 및 actor-preserved-v1 trace는 원래 의미로 재생한다. [시간 계약과 예시](../market-persona-skill/references/feedback-plan.md#행동-시간)를 참고한다.
 
 `whole-trace-v3`의 `prepare_whole_trace`는 `timingProfile` 기본값과 허용값이 `original`이며 명시적 `compact`는 거절한다. Luna가 판단마다 제출한 `delayMs`와 프로필 보행 기준을 유지하며 임의 시간 지터나 compact 압축을 적용하지 않는다. 완성 trace에는 `generation.timingProfile:"actor-preserved-v1"`·`generation.actorStateVersion:"1"`을 기록한다. 반응 지연은 실제 이동·읽기·드래그·서버 대기와 별개이며 이동은 기존 물리적 보행과 어댑터의 한 번에 32 이하 이동 입력 상한을 계속 따른다. 생성 시간 예산은 판단 시간을 일괄 단축하는 지침이 아니다.
 
@@ -251,7 +280,7 @@ A 모드는 각 프로필의 구조화된 설정으로 주의 상태와 제한�
 
 “이유 없는 반복 금지”는 모든 행동이 구매 목표에 직접 도움이 되어야 한다는 뜻이 아니다. 방향을 다시 찾거나, 목표 밖 관심 상품을 오래 살피거나, 같은 매대를 다시 찾고 스스로 목표로 복귀할 수 있다. 실수·이탈 quota나 좌표 흔들림으로 차이를 강제하지 않는다. `reason`은 짧은 관찰 기술이어도 되며 인물에게 자기 행동의 설명을 강요하지 않는다. `attentionTag`·`cueRefs` 같은 생성 조건은 모델 감사 정보이지 발화·측정된 심리 상태가 아니다. 발화·억양·동의 편향 등 이 게임에 없는 상호작용을 검증했다고 주장하지 않는다.
 
-`mode:"llm"`일 때 `llm.baseUrl`, `llm.model`, API 키 환경변수 **이름** `llm.apiKeyEnv`를 설정한다. 기본 환경변수는 `MARKET_LLM_BASE_URL`, `MARKET_LLM_MODEL`, `MARKET_LLM_API_KEY`다. 기본 연결은 OpenAI 호환 `/chat/completions`이며 `llm.protocol:"ollama"`는 `/api/chat`을 사용한다. AI는 현재 가능한 조작의 choiceId를 선택하고 코드는 그 선택만 변환한다. 형식 오류만 최대 2회 다시 요청하며 재요청도 호출 상한에 포함한다. 기본 호출 상한은 300회, 요청 제한시간은 45초다. 인증키 값은 옵션·파일·로그에 넣지 않는다. 실패를 확률 정책으로 조용히 대체하지 않는다. LLM의 새로운 호출은 동일 seed 재현을 보장하지 않으며 저장된 완성 trace를 재생한다.
+`mode:"llm"`일 때 `llm.baseUrl`, `llm.model`, API 키 환경변수 **이름** `llm.apiKeyEnv`를 설정한다. 기본 환경변수는 `MARKET_LLM_BASE_URL`, `MARKET_LLM_MODEL`, `MARKET_LLM_API_KEY`다. 기본 연결은 OpenAI 호환 `/chat/completions`이며 `llm.protocol:"ollama"`는 `/api/chat`을 사용한다. AI는 제시된 조작의 choiceId를 선택하고 코드는 그 선택을 변환한다. `feedback-choice-v4`에서는 실제 막혔던 방향을 잠시 제외하되 현재 가능한 비이동 조작을 유지한다. 명시적 v3는 기존 배회·회복 턴의 방향 이동 제한을 유지한다. 형식 오류만 최대 2회 다시 요청하며 재요청도 호출 상한에 포함한다. 기본 호출 상한은 300회, 요청 제한시간은 45초다. 이 호출 상한은 feedback의 최대 행동 수 100과 별개다. 인증키 값은 옵션·파일·로그에 넣지 않는다. 실패를 확률 정책으로 조용히 대체하지 않는다. LLM의 새로운 호출은 동일 seed 재현을 보장하지 않으며 저장된 완성 trace를 재생한다.
 
 ## 주의 정책의 회차 경험과 재생
 
@@ -364,7 +393,7 @@ v9는 반복과 새 관측이 없던 구간을 진단 기록으로만 사용한�
 
 기존 v6/v7의 반복 정체 종료와 v8의 `giveUp → skipRating → leave` 상한 종료는 `generation.controlledStop`으로 계속 구분한다. v9의 시스템 계산 메타데이터와 섞거나 지워서 자발적 수행으로 바꾸지 않는다. 기술 오류로 생성이 중단된 자료도 시스템 계산을 완료한 trace로 보고하지 않는다.
 
-LLM 오류, 너무 작은 `maxActions`/`maxCalls`, 예정 시간 상한 등은 여전히 기술적 생성 실패다. 100회 상한은 완성 trace를 보장하거나 구매·분석 성공을 보장하는 장치가 아니다. 확률 정책의 선택과 종료 방식은 바꾸지 않았다. 생성·검증만 요청받으면 저장된 snapshot으로 trace를 만들고 검증까지만 수행하며, 앱 재생·백엔드 전송·분석 요청은 실행하지 않는다.
+LLM 오류, 너무 작은 `maxActions`/`maxCalls`, 예정 시간 상한 등은 여전히 기술적 생성 실패다. 100회 상한은 완성 trace를 보장하거나 구매·분석 성공을 보장하는 장치가 아니다. 이 v9 종료 처리로 기존 `mode:"stochastic"` 회귀 정책의 선택과 종료 방식을 바꾸지는 않았다. 생성·검증만 요청받으면 저장된 snapshot으로 trace를 만들고 검증까지만 수행하며, 앱 재생·백엔드 전송·분석 요청은 실행하지 않는다.
 
 MCP/CLI 생성은 모델 호출 전에 `<trace 경로>.generation/`에 snapshot과 인증정보 없는 설정을 보존한다. 관찰·선택·결과 체크포인트와 최종 상태를 기록하므로 실패한 경우도 조사할 수 있다. 미완성 자료는 완성 trace나 실제 수행 경험으로 승격하지 않는다. 진단 자료에도 실험용 미션 내용이 있으므로 공유할 때 검토한다. 키·인증 헤더·원본 모델 교환/추론은 저장하지 않는다.
 

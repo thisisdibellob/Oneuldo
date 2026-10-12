@@ -1,6 +1,7 @@
 import { MARKET_ENVIRONMENT_PLAYER_RADIUS, getMarketWrongWayGate, getMarketWrongWayRearm, createMarketEnvironment, isMarketEnvironmentBlocked, isNearMarketStation, MarketEnvironment, MarketEnvironmentConfig, MarketEnvironmentStationId, MarketCashierAvailability, MarketCheckoutId, MarketKioskId } from './marketEnvironment';
 import { MarketCategoryId, marketCategories, marketProducts, MarketProduct, getMarketProduct } from './scenarios';
 import { Point } from './prototypeWorld';
+import { resolveMarketEnvironmentMovement } from './marketMovement';
 import { normalizeMarketLearningConfig, type MarketLearningConfig, type MarketLearningState, type MarketStockoutState, type MarketUnavailableReason } from './marketLearning';
 import { createMarketCheckoutReview, correctMarketCheckoutReview, evaluateMarketCheckoutReview, getMarketCartFingerprint,
   getMarketCheckoutReview, isStaffedCheckoutReviewReady, type MarketCheckoutReviewState } from './marketCheckoutReview';
@@ -34,6 +35,8 @@ export type MarketEpisodeEvent = { sequence: number; timestamp: string; type: st
 export type MarketAction = (
   | { type: 'setPosition'; point: Point }
   | { type: 'move'; dx: number; dy: number }
+  /** Bounded physical input: collision may stop or slide the player without rejecting the action. */
+  | { type: 'moveInput'; dx: number; dy: number }
   | { type: 'interact'; station: MarketEnvironmentStationId }
   | { type: 'add' | 'remove' | 'requestReturn'; productId: string; quantity?: number }
   | { type: 'checkout'; checkoutId?: MarketCheckoutId }
@@ -413,6 +416,26 @@ export function applyMarketAction(current: MarketSession, action: MarketAction):
       session.ratings = { difficulty: action.difficulty, interest: action.interest }; session.ratingSkipped = false;
     } else { session.ratings = null; session.ratingSkipped = true; }
     record(session, action.type === 'rate' ? 'ratings_submitted' : 'ratings_skipped', { ratings: session.ratings }, action.at);
+    return session;
+  }
+  if (action.type === 'moveInput') {
+    if (session.phase === 'feedback') return reject(session, action, '다시 시도하거나 그만하기를 선택해 주세요.');
+    if (session.view !== 'world') return reject(session, action, '열린 화면을 닫고 이동해 주세요.');
+    if (session.phase !== 'shopping' || session.activeStation) return reject(session, action, '대화나 진열대 화면을 닫고 이동해 주세요.');
+    const distance = Math.hypot(action.dx, action.dy);
+    if (!Number.isFinite(action.dx) || !Number.isFinite(action.dy) || !Number.isFinite(distance) || distance > 32) {
+      return reject(session, action, '한 번에 최대 32픽셀 이동할 수 있어요.');
+    }
+    const previousPosition = session.playerPosition;
+    const movement = resolveMarketEnvironmentMovement(session.environment, previousPosition,
+      { x: action.dx, y: action.dy }, session.cashierAvailability);
+    session.playerPosition = movement.position;
+    checkEntranceCrossing(session, previousPosition, movement.position, action.at);
+    checkWrongWayEntry(session, previousPosition, movement.position, action.at);
+    record(session, 'player_moved', { point: clone(movement.position), input: 'bounded-joystick-input',
+      requestedDelta: movement.requestedDelta, actualDelta: movement.actualDelta,
+      requestedDistancePx: movement.requestedDistancePx, movedDistancePx: movement.movedDistancePx,
+      outcome: movement.outcome }, action.at);
     return session;
   }
   if (action.type === 'setPosition' || action.type === 'move') {

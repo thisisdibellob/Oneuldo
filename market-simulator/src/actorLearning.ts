@@ -155,6 +155,7 @@ export class ActorLearningMemory {
   record(d: Decision, before: ActorObservation, after: ActorObservation) {
     const a=d.action;
     if (d.currentTask !== undefined) this.currentTask=d.currentTask;
+    if (a.type === 'moveDirection' && (after.result?.movement?.movedDistancePx ?? 0) > 1e-7) this.currentAnchor = null;
     if (after.result?.accepted && a.type==='walkToAnchor') {
       const from=this.currentAnchor, to=a.anchorId;
       this.currentAnchor=to;

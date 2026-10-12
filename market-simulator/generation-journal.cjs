@@ -18,10 +18,12 @@ function pick(value, fields) {
 }
 function safeOptions(options) {
   const result = pick(options, ['personaId', 'seed', 'mode', 'maxActions', 'timeBudgetMs', 'timingProfile',
-    'attentionExperience', 'learnerIdentity', 'trialBinding', 'actorPolicyVersion', 'tracePolicyVersion']);
+    'attentionExperience', 'learnerIdentity', 'trialBinding', 'actorPolicyVersion', 'tracePolicyVersion', 'feedbackMovement']);
   result.mode ??= 'llm';
   result.maxActions ??= 1000;
-  result.timingProfile ??= ['feedback-choice-v1','whole-trace-v3'].includes(options.actorPolicyVersion) ? 'original' : 'compact';
+  result.timingProfile ??= ['feedback-choice-v1','feedback-choice-v2','feedback-choice-v3','feedback-choice-v4', 'feedback-choice-v5', 'feedback-choice-v6', 'feedback-choice-v7','whole-trace-v3'].includes(options.actorPolicyVersion) ? 'original' : 'compact';
+  if (['feedback-choice-v3', 'feedback-choice-v4', 'feedback-choice-v5', 'feedback-choice-v6', 'feedback-choice-v7'].includes(result.actorPolicyVersion) && result.feedbackMovement === undefined)
+    result.feedbackMovement = { wanderProbability: .2 };
   if (result.mode === 'llm') {
     result.llm = pick(options.llm, ['model', 'protocol', 'maxCalls', 'timeoutMs']);
     result.llm.model ??= process.env.MARKET_LLM_MODEL;
@@ -38,7 +40,7 @@ function sanitizeCheckpoint(entry) {
   if (entry.kind === 'decision') {
     result.before = safeJson(entry.before);
     result.after = safeJson(entry.after);
-    result.decision = pick(entry.decision, ['action', 'delayMs', 'reason', 'currentTask', 'attentionTag', 'cueRefs', 'feedbackMemory', 'dragOutcome']);
+    result.decision = pick(entry.decision, ['action', 'delayMs', 'reason', 'currentTask', 'attentionTag', 'cueRefs', 'feedbackMemory', 'dragOutcome', 'movementPolicy']);
   }
   return result;
 }

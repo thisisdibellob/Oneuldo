@@ -2,7 +2,8 @@ import { getMarketNavigationPath, isMarketNavigationSegmentClear } from '../game
 import { getMarketStationApproachPoint, isNearMarketStation, type MarketEnvironmentStationId } from '../game/marketEnvironment';
 import type { Point } from '../game/prototypeWorld';
 import { replayDelay, replayUntil, type ReplayMotionPort, type ReplayShelfPort } from './ports';
-import { replayPresentationKey, resolveReplayAnchor, visibleStations, type ReplayPresentation } from '../game/marketReplayPerception';
+import { replayPresentationKey, resolveReplayAnchor, visibleStations, type ReplayDirection, type ReplayPresentation } from '../game/marketReplayPerception';
+import { createDirectionalInputPlayback, MARKET_DIRECTIONAL_MOVE_SPEED, type DirectionalMovement } from '../game/marketDirectionalInput';
 
 const MOVE_SPEED = 190;
 export const REPLAY_INPUT_RATE_LIMIT = 10; // Full magnitude ramp >= 100ms; measured in input units/second.
@@ -19,6 +20,76 @@ export function approachVector(previous: Point, target: Point, maximumChange: nu
   const dx = target.x - previous.x, dy = target.y - previous.y, length = Math.hypot(dx, dy);
   const scale = length > maximumChange ? maximumChange / length : 1;
   return { x: previous.x + dx * scale, y: previous.y + dy * scale };
+}
+
+/** A bounded joystick input independent of visible targets; collision is an ordinary movement result. */
+export async function moveDirection(port: ReplayMotionPort, direction: ReplayDirection, durationMs: number,
+  presentation: ReplayPresentation, movement: DirectionalMovement, signal: AbortSignal, report: MotionReport,
+  timeoutMs = 10000): Promise<void> {
+  const playback = createDirectionalInputPlayback(direction, durationMs, movement);
+  const profile = replayPresentationKey(presentation);
+  let previous = port.read().position, previousIntegrationMs = 0, previousInput = { x: 0, y: 0 }, previousSliceMs = 0;
+  try {
+    await replayUntil(() => !port.read().locked, signal);
+    previous = port.read().position;
+    await new Promise<void>((resolve, reject) => {
+      let done = false;
+      const finish = (error?: Error) => {
+        if (done) return; done = true;
+        clearTimeout(deadline); clearInterval(availabilityCheck); signal.removeEventListener('abort', abort);
+        error ? reject(error) : resolve();
+      };
+      const abort = () => finish(new Error(String(signal.reason ?? 'Replay stopped')));
+      const deadline = setTimeout(() => finish(new Error('Directional movement timed out')), timeoutMs);
+      const assertWorldAvailable = () => {
+        const state = port.read();
+        if (state.locked) throw new Error('Replay world became unavailable during directional movement');
+        if (state.presentation && replayPresentationKey(state.presentation) !== profile)
+          throw new Error('Replay presentation changed during directional movement');
+        return state;
+      };
+      // A panel may cancel the UI's RAF before it can call the driver again.
+      const availabilityCheck = setInterval(() => {
+        try { assertWorldAvailable(); }
+        catch (error) { finish(error instanceof Error ? error : new Error(String(error))); }
+      }, 32);
+      signal.addEventListener('abort', abort, { once: true });
+      if (signal.aborted) { abort(); return; }
+      try { port.drive((_timestamp, dt) => {
+        if (done) return { x: 0, y: 0 };
+        try {
+          const state = assertWorldAvailable();
+          const displacement = Math.hypot(state.position.x - previous.x, state.position.y - previous.y);
+          if (previousIntegrationMs > 0) {
+            const bound = MARKET_DIRECTIONAL_MOVE_SPEED * previousIntegrationMs / 1000;
+            report.frames++; report.distance += displacement;
+            report.maxDisplacement = Math.max(report.maxDisplacement, displacement);
+            report.maxSpeedRatio = Math.max(report.maxSpeedRatio, displacement / bound);
+            if (displacement > bound + 1e-5) report.displacementViolations++;
+          }
+          previous = { ...state.position };
+          // The previous RAF has already applied the final slice before this acknowledgement.
+          if (playback.done) { finish(); return { x: 0, y: 0 }; }
+          const input = playback.takeFrame(dt * 1000);
+          previousIntegrationMs = 0;
+          for (const slice of input.directionalSlices ?? []) {
+            previousIntegrationMs += slice.durationMs;
+            const change = Math.hypot(slice.input.x - previousInput.x, slice.input.y - previousInput.y);
+            // Samples are interval means: their clock is the distance between interval midpoints.
+            const seconds = (previousSliceMs + slice.durationMs) / 2000;
+            report.maxInputDelta = Math.max(report.maxInputDelta, change);
+            report.maxInputRate = Math.max(report.maxInputRate, change / seconds);
+            if (change > REPLAY_INPUT_RATE_LIMIT * seconds + 1e-6) report.inputViolations++;
+            previousInput = slice.input;
+            previousSliceMs = slice.durationMs;
+          }
+          return input;
+        } catch (error) {
+          finish(error instanceof Error ? error : new Error(String(error))); return { x: 0, y: 0 };
+        }
+      }); } catch (error) { finish(error instanceof Error ? error : new Error(String(error))); }
+    });
+  } finally { port.stop(); }
 }
 function seedPhase(seed: string | number): number {
   let n = 2166136261;

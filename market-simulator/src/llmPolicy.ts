@@ -11,8 +11,9 @@ const actionFields: Record<string, string[]> = {
   submit: [], giveUp: [], closeStation: [], viewCart: [], viewHelp: [], closeView: [],
   walkToAnchor: ['anchorId'], readList: ['durationMs'], browse: ['durationMs', 'scrollFraction'],
   pause: ['durationMs'], lookAround: ['durationMs'],
+  moveDirection: ['direction', 'durationMs'],
 };
-const legacyActionFields = Object.fromEntries(Object.entries(actionFields).filter(([type]) => !['walkToAnchor', 'readList', 'browse', 'pause', 'lookAround'].includes(type)));
+const legacyActionFields = Object.fromEntries(Object.entries(actionFields).filter(([type]) => !['walkToAnchor', 'readList', 'browse', 'pause', 'lookAround', 'moveDirection'].includes(type)));
 export function assertDecision(value: unknown, feedbackTiming = false): asserts value is Decision {
   const d = value as Decision;
   if (!d || typeof d !== 'object' || !d.action || !Object.prototype.hasOwnProperty.call(actionFields, d.action.type)) throw new Error('Decision contains an unsupported agent action.');
@@ -26,6 +27,10 @@ export function assertDecision(value: unknown, feedbackTiming = false): asserts 
   if (['add', 'remove', 'requestReturn'].includes(d.action.type) && typeof action.productId !== 'string') throw new Error('Item action requires productId.');
   if (action.quantity !== undefined && (!Number.isInteger(action.quantity) || Number(action.quantity) < 1 || Number(action.quantity) > 99)) throw new Error('quantity must be an integer 1..99.');
   if (d.action.type === 'walkToAnchor' && (typeof action.anchorId !== 'string' || !/^anchor-[a-f0-9]{8}$/.test(action.anchorId))) throw new Error('walkToAnchor requires a visible anchor ID');
+  if (d.action.type === 'moveDirection' && (!feedbackTiming
+    || !['north', 'northeast', 'east', 'southeast', 'south', 'southwest', 'west', 'northwest'].includes(String(action.direction))
+    || !Number.isInteger(action.durationMs) || Number(action.durationMs) < 100 || Number(action.durationMs) > 2000))
+    throw new Error('moveDirection requires feedback timing, an eight-way direction and durationMs 100..2000');
   const durationLimit = feedbackTiming ? 120000 : 30000;
   if (['readList', 'browse', 'pause', 'lookAround'].includes(d.action.type)
     && (!Number.isInteger(action.durationMs) || Number(action.durationMs) < (feedbackTiming ? 100 : 1) || Number(action.durationMs) > durationLimit)) throw new Error(`durationMs must be ${feedbackTiming ? 100 : 1}..${durationLimit}`);
@@ -41,7 +46,7 @@ export function assertDecision(value: unknown, feedbackTiming = false): asserts 
 /** Same HTTP contract as the legacy provider, with actor-only input and externally owned memory. */
 export const LEGACY_ACTOR_POLICY_VERSION = 'episodic-choice-v4' as const;
 export function isExtendedActorPolicy(policy?: string): boolean {
-  return ['episodic-choice-v9', 'episodic-choice-v10', 'feedback-choice-v1', 'whole-trace-v3'].includes(policy ?? '');
+  return ['episodic-choice-v9', 'episodic-choice-v10', 'feedback-choice-v1', 'feedback-choice-v2', 'feedback-choice-v3', 'feedback-choice-v4', 'feedback-choice-v5', 'feedback-choice-v6', 'feedback-choice-v7', 'whole-trace-v3'].includes(policy ?? '');
 }
 export function attentionActorPolicyVersion(options: Pick<TraceOptions, 'actorPolicyVersion' | 'learnerIdentity' | 'attentionExperience'>) {
   return options.actorPolicyVersion ?? options.learnerIdentity?.policyVersion
@@ -121,7 +126,7 @@ export function createLlmPolicy(options: NonNullable<TraceOptions['llm']>, timeB
     if (previous && history.length > historyLength) {
       const action = history.at(-1)!.action;
       if (action.type !== 'walkTo' && action.type !== 'walkToAnchor' && action.type !== 'readList'
-        && action.type !== 'browse' && action.type !== 'pause' && action.type !== 'lookAround') context.record(action, previous, observation);
+        && action.type !== 'moveDirection' && action.type !== 'browse' && action.type !== 'pause' && action.type !== 'lookAround') context.record(action, previous, observation);
     }
     previous = observation; historyLength = history.length;
     const remainingMs = timeBudgetMs === undefined ? undefined : timeBudgetMs - history.reduce((sum, step) => sum + step.delayMs, 0);

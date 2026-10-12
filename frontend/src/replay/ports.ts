@@ -2,11 +2,12 @@ import type { MarketReplaySnapshot } from '../game/marketReplayTrace';
 import type { MarketCashierAvailability, MarketEnvironment, MarketEnvironmentStationId } from '../game/marketEnvironment';
 import type { Point } from '../game/prototypeWorld';
 import type { ReplayPresentation } from '../game/marketReplayPerception';
+import type { ReplayDirectionalInput } from '../game/marketDirectionalInput';
 
 /** Input-only ports. There deliberately is no position setter or add-product command. */
 export interface ReplayMotionPort {
   read(): { position: Point; environment: MarketEnvironment; cashiers: Partial<MarketCashierAvailability>; locked: boolean; presentation?: ReplayPresentation };
-  drive(frame: (timestamp: number, dt: number) => Point): void;
+  drive(frame: (timestamp: number, dt: number) => ReplayDirectionalInput): void;
   stop(): void;
 }
 export type ReplayBounds = Point & { width: number; height: number };

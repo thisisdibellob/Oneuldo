@@ -1,6 +1,6 @@
 import { validateMarketReplayTrace, type MarketReplayStep, type MarketReplayTrace } from '../game/marketReplayTrace';
 import { assertReplayActive, replayAwait, replayDelay, replayStep, replayUntil, type ReplayMotionPort, type ReplayUiPort } from './ports';
-import { createMotionReport, dragProduct, walkToAnchor, walkToStation, walkToVisibleStation } from './motor';
+import { createMotionReport, dragProduct, moveDirection, walkToAnchor, walkToStation, walkToVisibleStation } from './motor';
 import { replayPresentationKey, validateReplayPresentation } from '../game/marketReplayPerception';
 
 export type ReplayProgress = {
@@ -54,6 +54,8 @@ export async function playMarketTrace(trace: MarketReplayTrace, getUi: () => Rep
         else await walkToStation(motion, step.target.stationId, step.movement, signal, report, step.timeoutMs);
         return;
       case 'walkToAnchor': await walkToAnchor(motion, step.target.anchorId, presentation!, step.movement, signal, report, step.timeoutMs); return;
+      case 'moveDirection':
+        await moveDirection(motion, step.direction, step.durationMs, presentation!, step.movement, signal, report, step.timeoutMs); return;
       case 'readList':
         if (ui().read().briefing || ui().read().phase !== 'shopping' || ui().read().shelf || ui().read().cartOpen || ui().read().helpOpen || ui().read().staffOpen || motion.read().locked) {
           throw new Error('Shopping list is not visible on the world HUD');

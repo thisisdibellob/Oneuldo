@@ -19,10 +19,10 @@ type StepIntent = MarketReplayStep extends infer S ? S extends MarketReplayStep 
 
 /** Produces intentions only. No BehaviorLogRequest, episode export, HTTP write, or UI process. */
 export async function generateTrace(options: TraceOptions): Promise<MarketReplayTrace> {
-  const preserved = ['whole-trace-v3', 'feedback-choice-v1'].includes(options?.actorPolicyVersion ?? '');
+  const preserved = ['whole-trace-v3', 'feedback-choice-v1', 'feedback-choice-v2', 'feedback-choice-v3', 'feedback-choice-v4', 'feedback-choice-v5', 'feedback-choice-v6', 'feedback-choice-v7'].includes(options?.actorPolicyVersion ?? '');
   const timing = options?.timingProfile ?? (preserved ? 'original' : 'compact');
   if (!['original', 'compact'].includes(timing)) throw new Error('Unknown timingProfile');
-  if (preserved && timing !== 'original') throw new Error(`${options.actorPolicyVersion === 'whole-trace-v3' ? 'Whole-trace-v3' : 'feedback-choice-v1'} preserves actor judgment timing; use original`);
+  if (preserved && timing !== 'original') throw new Error(`${options.actorPolicyVersion === 'whole-trace-v3' ? 'Whole-trace-v3' : options.actorPolicyVersion} preserves actor judgment timing; use original`);
   // Generate all decisions first: faster replay must not change memory, choices or RNG.
   const trace = await generateOriginalTrace(options);
   const result = timing === 'original' ? trace : compactTraceTiming(trace);
@@ -39,6 +39,8 @@ async function generateOriginalTrace(options: TraceOptions): Promise<MarketRepla
   const wholeTraceCompiler = options.planningMode === 'whole-trace' && options.mode === 'llm'
     && options.actorPolicyVersion === 'whole-trace-v3' && typeof options.actorDecisionProvider === 'function';
   const persona = wholeTraceCompiler ? getWholeTracePersona(options.personaId) : getPersona(options.personaId);
+  if (options.feedbackMovement !== undefined && (!persona.attention || !['feedback-choice-v3', 'feedback-choice-v4', 'feedback-choice-v5', 'feedback-choice-v6', 'feedback-choice-v7'].includes(options.actorPolicyVersion ?? '')))
+    throw new Error('feedbackMovement requires an attention persona with feedback-choice-v3 or feedback-choice-v4');
   const mode = options.mode ?? 'llm';
   if (!['stochastic', 'llm'].includes(mode)) throw new Error('mode must be stochastic or llm.');
   const maxActions = options.maxActions ?? 1000;
@@ -145,6 +147,10 @@ export function projectDecision(d: Decision, o: Observation, persona: Persona, s
   const rawMotorSeed = `${seed}:motor:${persona.id}:${persona.version}:${stepIndex}`;
   const motorSeed = rawMotorSeed.length <= 200 ? rawMotorSeed : `motor-${marketReplayFingerprint(rawMotorSeed)}`;
   switch (a.type) {
+    case 'moveDirection': return { type: 'moveDirection', direction: a.direction, durationMs: a.durationMs, movement: {
+      speedMultiplier: Math.round(Math.max(.4, Math.min(1, persona.parameters.walkSpeed / 190)) * 1000) / 1000,
+      accelerationMs: Math.round(motor.between(160, 280)),
+    } };
     case 'walkToAnchor': return { type: 'walkToAnchor', target: { anchorId: a.anchorId }, movement: {
       style: persona.parameters.walkSpeed < 110 ? 'careful' : persona.parameters.walkSpeed < 140 ? 'steady' : 'brisk',
       speedMultiplier: Math.round(Math.max(.4, Math.min(1, persona.parameters.walkSpeed / 190)) * 1000) / 1000,
@@ -193,7 +199,7 @@ function requireStaff(o: Observation): MarketEnvironmentStationId {
 }
 export function summarizeTrace(trace: MarketReplayTrace): TraceSummary {
   return { personaId: trace.personaId, steps: trace.steps.length,
-    walkingIntentions: trace.steps.filter(s => s.type === 'walkTo' || s.type === 'walkToAnchor').length,
+    walkingIntentions: trace.steps.filter(s => s.type === 'walkTo' || s.type === 'walkToAnchor' || s.type === 'moveDirection').length,
     cartChecks: trace.steps.filter(s => s.type === 'viewCart').length,
     helpRequests: trace.steps.filter(s => s.type === 'viewHelp' || (s.type === 'talkToStaff' && s.choice !== 'open')).length,
     productsDragged: trace.steps.reduce((sum, s) => sum + (s.type === 'dragProduct' && s.gesture.outcome === 'drop' ? s.quantity : 0), 0),

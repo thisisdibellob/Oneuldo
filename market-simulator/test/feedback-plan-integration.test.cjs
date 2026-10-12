@@ -21,7 +21,7 @@ function setup(t, extra = {}) {
   const service = createService();
   t.after(async () => { await service.close(); fs.rmSync(directory, { recursive: true, force: true }); });
   t.mock.method(globalThis, 'fetch', () => { throw new Error('Offline feedback protocol must not call a provider, bridge or backend'); });
-  const begin = { requestId: 'begin-fixture', personaId: 'mild-intellectual-disability-adult', seed: 'feedback-fixture',
+  const begin = { actorPolicyVersion: 'feedback-choice-v1', requestId: 'begin-fixture', personaId: 'mild-intellectual-disability-adult', seed: 'feedback-fixture',
     snapshot, outputPath: path.join(directory, 'trace.json'), ...extra };
   return { directory, snapshot, service, begin };
 }

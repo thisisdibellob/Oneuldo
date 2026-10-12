@@ -71,6 +71,11 @@ export class ActorActivityMonitor {
     let returnedToPreviousAnchor = false;
     let repeatedDirectedEdgeCount = 0;
     let destination: Pick<ActorActivityOutcome, 'destinationAnchorId' | 'destinationArrivals'> = {};
+    if (action.type === 'moveDirection' && (after.result.movement?.movedDistancePx ?? 0) > 1e-7) {
+      // A free input does not arrive at a named anchor, even if it passes one.
+      this.currentAnchor = null;
+      this.previousDeparture = null;
+    }
     if (action.type === 'walkToAnchor') {
       const to = action.anchorId;
       const count = (this.arrivals.get(to) ?? 0) + 1;
@@ -129,6 +134,7 @@ export class ActorActivityMonitor {
     };
     // Relative direction/distance and passage labels change when moving; they are not new cues.
     for (const s of o.visibleStations) remember(`station:${s.id}`, [s.kind, s.label]);
+    for (const body of o.visibleStructures ?? []) remember('unlabelled-shelf-body', [body.kind, body.label]);
     for (const a of o.anchors) remember(`anchor:${a.id}`, a.id);
     for (const p of o.products) remember(`product:${p.id}`, [p.name, p.detail, p.categoryId, p.price, p.stock]);
     if (o.activeStation) remember(`interaction:${o.activeStation}`, o.activeStation);
@@ -145,6 +151,7 @@ export class ActorActivityMonitor {
   private actionSignature(d: Decision, before: ActorObservation, after: ActorObservation, origin: string | null): string {
     const a = d.action;
     if (a.type === 'walkToAnchor') return canonical([a.type, origin, a.anchorId]);
+    if (a.type === 'moveDirection') return canonical([a.type, a.direction, after.result?.movement?.outcome]);
     if (a.type === 'walkTo' || a.type === 'interact') return canonical([a.type, a.station]);
     if (a.type === 'add' || a.type === 'remove') return canonical([a.type, a.productId, a.quantity ?? 1]);
     if (a.type === 'checkout' || a.type === 'requestCashier') return canonical([a.type, a.checkoutId ?? 'checkout']);

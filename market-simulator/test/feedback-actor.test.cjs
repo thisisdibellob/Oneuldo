@@ -17,7 +17,7 @@ const guard = () => new TraceGuard(createMarketReplaySnapshot(createMarketSessio
   undefined, undefined, undefined, true, true);
 const step = (type, extra = {}) => ({ id: type, type, reactionDelayMs: 1, timeoutMs: 120000, reason: 'fixture', ...extra });
 const frame = (observation, memory = emptyFeedbackBeliefMemory(), individual = persona(), decisionIndex = 0) =>
-  buildFeedbackActorFrame({ observation, memory, persona: individual, seed: 'fixture', decisionIndex });
+  buildFeedbackActorFrame({ observation, memory, persona: individual, seed: 'fixture', decisionIndex, policyVersion: 'feedback-choice-v1' });
 
 test('belief schema preserves wrong quantities, confident mistakes and completion without any purchase', () => {
   const memory = {
@@ -147,7 +147,7 @@ test('a real list read is transient and never becomes an automatically retained 
 test('choices retain every legal current action and have a neutral deterministic presentation', () => {
   const observation = guard().observeActor();
   const result = frame(observation);
-  assert.equal(result.policyVersion, FEEDBACK_ACTOR_POLICY_VERSION);
+  assert.equal(FEEDBACK_ACTOR_POLICY_VERSION, 'feedback-choice-v7');
   assert.equal(result.policyVersion, 'feedback-choice-v1');
   assert.deepEqual(result, frame(observation));
   assert.deepEqual(result.availableChoices.filter(choice => !choice.dragOutcome).map(choice => choice.id).sort(), extendedActorChoices(observation).map(choice => choice.id).sort());

@@ -16,7 +16,7 @@ const request = (frame, overrides = {}) => ({ requestId: 'request-1', revision: 
   choiceId: frame.availableChoices.find(choice => choice.action.type === 'pause').id,
   durationMs: 800, reason: '현재 자리에서 잠시 기다린다', memory: emptyFeedbackBeliefMemory(), ...overrides });
 async function start(seed = 'feedback-session') {
-  const session = new FeedbackPlanSession(seed);
+  const session = new FeedbackPlanSession(seed, 'feedback-choice-v1');
   const decision = session.decide(observation(), [], persona, {}, {});
   const frame = await session.awaitObserve();
   return { session, decision, frame };
@@ -126,7 +126,7 @@ test('legacy delay input and nonzero duration for an ordinary action are rejecte
 test('timed actions keep their own duration and optional inspection permits both zero and positive duration', async () => {
   for (const [type, durationMs] of [['pause', 100], ['pause', 2310], ['pause', 120000], ['lookAround', 4200], ['readList', 5200],
     ['browse', 6700], ['viewCart', 0], ['viewCart', 3800], ['viewHelp', 0], ['viewHelp', 7100]]) {
-    const session = new FeedbackPlanSession(`duration-${type}-${durationMs}`);
+    const session = new FeedbackPlanSession(`duration-${type}-${durationMs}`, 'feedback-choice-v1');
     const current = type === 'browse'
       ? observation({ activeStation: 'fresh', shelf: { page: 0, pageCount: 2, scrollFraction: 0, pageFractions: [0, 1] } })
       : observation();
@@ -221,7 +221,7 @@ test('technical failures before and after application reject retained request pr
 });
 
 test('closing while awaiting a decision rejects the actor and observer without an undefined decision', async () => {
-  const session = new FeedbackPlanSession('closed-before-frame');
+  const session = new FeedbackPlanSession('closed-before-frame', 'feedback-choice-v1');
   const observer = session.awaitObserve();
   session.close();
   await assert.rejects(observer, error => error.code === 'FEEDBACK_SESSION_CLOSED');
@@ -256,9 +256,9 @@ test('duplicate application callbacks cannot inflate execution counts', async ()
 });
 
 test('the dedicated frame entrypoint clones all caller-owned frame fields before awaiting a decision', async () => {
-  const session = new FeedbackPlanSession('frame-boundary');
+  const session = new FeedbackPlanSession('frame-boundary', 'feedback-choice-v1');
   const input = buildFeedbackActorFrame({ observation: observation(), persona, memory: emptyFeedbackBeliefMemory(),
-    seed: 'frame-boundary', decisionIndex: 0 });
+    seed: 'frame-boundary', decisionIndex: 0, policyVersion: 'feedback-choice-v1' });
   const expected = structuredClone(input);
   const decision = session.decideFrame(input);
   input.memory.notes.push('caller mutation');

@@ -118,6 +118,8 @@ import {
 import { CashierSimulationScreen } from './CashierSimulationScreen';
 import { CookingSimulationScreen } from './CookingSimulationScreen';
 import type { ReplayMotionPort, ReplayUiPort } from '../replay/ports';
+import { resolveMarketMovement } from '../game/marketMovement';
+import { MARKET_DIRECTIONAL_MOVE_SPEED, type ReplayDirectionalInput } from '../game/marketDirectionalInput';
 import { pilotScenario } from '../replay/pilotScenario';
 import type { ReplayPresentation } from '../game/marketReplayPerception';
 
@@ -523,7 +525,7 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
   const zoomGestureActiveRef = useRef(false);
   const suppressWorldPressRef = useRef(false);
   const direction = useRef<Point>({ x: 0, y: 0 });
-  const replayFrame = useRef<((timestamp: number, dt: number) => Point) | null>(null);
+  const replayFrame = useRef<((timestamp: number, dt: number) => ReplayDirectionalInput) | null>(null);
   const replayUi = useRef<ReplayUiPort | null>(null);
   const replayMotion = useRef<ReplayMotionPort | null>(null);
   const [replayStatus, setReplayStatus] = useState('재생 연결 준비');
@@ -914,17 +916,11 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
   const movePlayer = useCallback(
     (dx: number, dy: number, animate = false) => {
       const current = playerPoint.current;
-      let next = current;
       const activeMap = worldMapRef.current;
-
-      // Sample large accessibility steps so they cannot cross a thin wall.
-      const steps = Math.max(1, Math.ceil(Math.max(Math.abs(dx), Math.abs(dy)) / 6));
-      for (let index = 0; index < steps; index += 1) {
-        const xCandidate = clampPoint({ x: next.x + dx / steps, y: next.y }, activeMap, marketEnvironmentRef.current);
-        if (!isBlocked(xCandidate, activeMap, marketEnvironmentRef.current, marketCashierCalledRef.current)) next = xCandidate;
-        const yCandidate = clampPoint({ x: next.x, y: next.y + dy / steps }, activeMap, marketEnvironmentRef.current);
-        if (!isBlocked(yCandidate, activeMap, marketEnvironmentRef.current, marketCashierCalledRef.current)) next = yCandidate;
-      }
+      const next = resolveMarketMovement(current, { x: dx, y: dy }, {
+        clamp: point => clampPoint(point, activeMap, marketEnvironmentRef.current),
+        isBlocked: point => isBlocked(point, activeMap, marketEnvironmentRef.current, marketCashierCalledRef.current),
+      }).position;
 
       if (animate) {
         const movement = getAvatarMovement(current, next, playerFacingRef.current, speedMultiplier.current > 1 ? 'sprint' : 'walk');
@@ -1127,8 +1123,10 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
       const last = previousFrame.current ?? timestamp;
       const elapsedSeconds = Math.min(timestamp - last, 32) / 1000;
       previousFrame.current = timestamp;
+      let replayInput: ReplayDirectionalInput | null = null;
       if (__DEV__ && MARKET_REPLAY_ENABLED && replayFrame.current) {
-        direction.current = replayFrame.current(timestamp, elapsedSeconds);
+        replayInput = replayFrame.current(timestamp, elapsedSeconds);
+        direction.current = replayInput;
       }
       const target = tapTarget.current;
 
@@ -1235,15 +1233,23 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
         return;
       }
 
-      const combinedX = direction.current.x + keyboardDirection.current.x;
-      const combinedY = direction.current.y + keyboardDirection.current.y;
-      const combinedLength = Math.hypot(combinedX, combinedY);
-      const movementScale = combinedLength > 1 ? 1 / combinedLength : 1;
-      movePlayer(
-        combinedX * movementScale * MOVE_SPEED * speedMultiplier.current * elapsedSeconds,
-        combinedY * movementScale * MOVE_SPEED * speedMultiplier.current * elapsedSeconds,
-        true,
-      );
+      if (replayInput?.directionalSlices) {
+        // Preserve canonical collision samples regardless of the display's frame rate.
+        for (const slice of replayInput.directionalSlices) {
+          movePlayer(slice.input.x * MARKET_DIRECTIONAL_MOVE_SPEED * slice.durationMs / 1000,
+            slice.input.y * MARKET_DIRECTIONAL_MOVE_SPEED * slice.durationMs / 1000, true);
+        }
+      } else {
+        const combinedX = direction.current.x + keyboardDirection.current.x;
+        const combinedY = direction.current.y + keyboardDirection.current.y;
+        const combinedLength = Math.hypot(combinedX, combinedY);
+        const movementScale = combinedLength > 1 ? 1 / combinedLength : 1;
+        movePlayer(
+          combinedX * movementScale * MOVE_SPEED * speedMultiplier.current * elapsedSeconds,
+          combinedY * movementScale * MOVE_SPEED * speedMultiplier.current * elapsedSeconds,
+          true,
+        );
+      }
       if (joystickEngaged.current || keyboardEngaged.current) {
         animationFrame.current = requestAnimationFrame(runMovement);
       } else {
