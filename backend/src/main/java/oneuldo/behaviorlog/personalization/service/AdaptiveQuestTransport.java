@@ -11,15 +11,16 @@ import tools.jackson.databind.node.ObjectNode;
 /** One reversible dictionary across current evidence and prior plays; readable controls stay literal. */
 final class AdaptiveQuestTransport {
     private static final String VERSION_FIELD="adaptiveTransportVersion";
-    private static final String VERSION="shared-environment-v4";
+    private static final String VERSION="shared-environment-v5";
     private static final String ACTION_ENCODING="readableActionEncoding";
     private static final String ID_REFERENCES="allowedIdReferences";
     private static final List<String> V1_LITERAL_FIELDS = List.of(
             "outputSchema", "readableActions", "policy", "timePolicy",
             "requiredDifficulty", "requiredItemCount", "allowedBehaviorEvidenceIds", "allowedMovementEvidenceIds",
             "candidate", "citedOriginalRecords", "literalChanges", "computedObjectiveCosts");
-    private static final List<String> LITERAL_FIELDS = V1_LITERAL_FIELDS.stream()
+    private static final List<String> V4_LITERAL_FIELDS = V1_LITERAL_FIELDS.stream()
             .filter(field->!field.equals("allowedBehaviorEvidenceIds")&&!field.equals("allowedMovementEvidenceIds")).toList();
+    private static final List<String> LITERAL_FIELDS = V4_LITERAL_FIELDS.stream().filter(field->!field.equals("citedOriginalRecords")).toList();
     private AdaptiveQuestTransport() {}
 
     static ObjectNode encode(ObjectMapper mapper, ObjectNode source) {
@@ -57,13 +58,13 @@ final class AdaptiveQuestTransport {
         var packed = (ObjectNode) source.deepCopy();
         boolean legacy=!packed.has(VERSION_FIELD);
         String version=packed.path(VERSION_FIELD).asString();
-        if(!legacy&&!List.of(VERSION,"shared-environment-v3","shared-environment-v2","shared-environment-v1").contains(version))throw new IllegalArgumentException("UNKNOWN_ADAPTIVE_TRANSPORT_VERSION");
-        var literalFields=List.of(VERSION,"shared-environment-v3","shared-environment-v2").contains(version)?LITERAL_FIELDS:V1_LITERAL_FIELDS;
+        if(!legacy&&!List.of(VERSION,"shared-environment-v4","shared-environment-v3","shared-environment-v2","shared-environment-v1").contains(version))throw new IllegalArgumentException("UNKNOWN_ADAPTIVE_TRANSPORT_VERSION");
+        var literalFields=VERSION.equals(version)?LITERAL_FIELDS:List.of("shared-environment-v4","shared-environment-v3","shared-environment-v2").contains(version)?V4_LITERAL_FIELDS:V1_LITERAL_FIELDS;
         var references=packed.has(ID_REFERENCES)?packed.get(ID_REFERENCES).deepCopy():mapper.createObjectNode();
-        if(!references.isObject()||!references.isEmpty()&&!VERSION.equals(version))throw new IllegalArgumentException("UNKNOWN_ALLOWED_ID_REFERENCE");
+        if(!references.isObject()||!references.isEmpty()&&!List.of(VERSION,"shared-environment-v4").contains(version))throw new IllegalArgumentException("UNKNOWN_ALLOWED_ID_REFERENCE");
         packed.remove(java.util.List.of(ID_REFERENCES,"allowedIdReferenceRules"));
         boolean actionsPacked=packed.has(ACTION_ENCODING);
-        if(actionsPacked&&(!List.of(VERSION,"shared-environment-v3").contains(version)||!packed.path(ACTION_ENCODING).asString().startsWith("lossless-row-columns-v1:")))throw new IllegalArgumentException("UNKNOWN_READABLE_ACTION_ENCODING");
+        if(actionsPacked&&(!List.of(VERSION,"shared-environment-v4","shared-environment-v3").contains(version)||!packed.path(ACTION_ENCODING).asString().startsWith("lossless-row-columns-v1:")))throw new IllegalArgumentException("UNKNOWN_READABLE_ACTION_ENCODING");
         packed.remove(ACTION_ENCODING);
         packed.remove(VERSION_FIELD);
         packed.remove(literalFields);

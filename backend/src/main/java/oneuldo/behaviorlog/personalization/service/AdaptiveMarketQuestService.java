@@ -15,7 +15,7 @@ import tools.jackson.databind.node.ObjectNode;
 @Service
 @RequiredArgsConstructor
 public class AdaptiveMarketQuestService {
-    public static final String VERSION="market-ai-quest-v70-literal-event-identities";
+    public static final String VERSION="market-ai-quest-v71-shared-review-originals";
     private final MarketDifficultyRecommendationService recommendations;
     private final AiUserProfileService profiles;
     private final BehaviorAnalysisInputSnapshotRepository inputs;
@@ -142,22 +142,7 @@ public class AdaptiveMarketQuestService {
                 }
                 attempts.add(new MarketAiQuestGeneration.Attempt(attempts.size()+1,raw,null,Map.of("stage",round==1?"GENERATION":"PATCH_REPAIR","submittedPrompt",prompt,"systemPrompt",system)));
                 progress.accept("REVIEWING");
-                var reviewInput=mapper.createObjectNode();
-                reviewInput.set("citedOriginalRecords",citedOriginalRecords(evidence,candidate));
-                var reviewSource=AdaptiveQuestTransport.decode(mapper,mapper.readTree(packed));
-                // Original behavior/navigation stays intact. The reviewer does not choose new products.
-                reviewSource.remove(List.of("outputSchema","deepObservation","allowedBehaviorEvidenceIds","allowedMovementEvidenceIds"));
-                var selectedIds=new HashSet<String>();draft.objectives().forEach(o->selectedIds.add(o.productId()));
-                var reviewCatalog=mapper.createArrayNode();for(var product:source.path("catalog"))if(selectedIds.contains(product.path("id").asString()))reviewCatalog.add(product);
-                reviewSource.set("catalog",reviewCatalog);
-                reviewSource.put("reviewScope","Every original interaction/navigation record is retained. Only prior AI observation, output template, duplicate allowed-ID lists and unselected prospective catalog entries are omitted. Cited originals are also expanded into literal same-ID rows for checking claims.");
-                reviewInput.set("originalSource",reviewSource);reviewInput.set("candidate",candidate);
-                reviewInput.set("literalChanges",literalChanges(source,candidate));
-                reviewInput.set("progressionComparison",AdaptiveQuestProgression.comparison(mapper,evidence,candidate));
-                var costs=reviewInput.putObject("computedObjectiveCosts");int total=0;
-                for(var objective:draft.objectives())for(var product:MarketQuestCatalog.PRODUCTS)if(product.id().equals(objective.productId())){int cost=product.price()*objective.quantity();costs.put(objective.productId(),cost);total+=cost;}
-                costs.put("total",total);costs.put("budget",draft.budget());
-                String reviewPrompt=mapper.writeValueAsString(AdaptiveQuestTransport.encode(mapper,reviewInput));
+                String reviewPrompt=reviewPrompt(source,evidence,candidate,draft,packed);
                 var review=call(REVIEW_SYSTEM,reviewPrompt,1000,0.0);
                 try {
                     issues=validateReview(mapper.readTree(review.text()),candidate,evidence);
@@ -185,6 +170,24 @@ public class AdaptiveMarketQuestService {
         boolean interrupted=Thread.interrupted();
         try{audit.record(member,profile.sourceDatasetId(),failed,null,attempts,failure,key);}finally{if(interrupted)Thread.currentThread().interrupt();}
         throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE,failure);
+    }
+    String reviewPrompt(ObjectNode source,ObjectNode evidence,JsonNode candidate,MarketAiQuestDraft draft,String packed) {
+                var reviewInput=mapper.createObjectNode();
+                reviewInput.set("citedOriginalRecords",citedOriginalRecords(evidence,candidate));
+                var reviewSource=AdaptiveQuestTransport.decode(mapper,mapper.readTree(packed));
+                // Original behavior/navigation stays intact. The reviewer does not choose new products.
+                reviewSource.remove(List.of("outputSchema","deepObservation","allowedBehaviorEvidenceIds","allowedMovementEvidenceIds"));
+                var selectedIds=new HashSet<String>();draft.objectives().forEach(o->selectedIds.add(o.productId()));
+                var reviewCatalog=mapper.createArrayNode();for(var product:source.path("catalog"))if(selectedIds.contains(product.path("id").asString()))reviewCatalog.add(product);
+                reviewSource.set("catalog",reviewCatalog);
+                reviewSource.put("reviewScope","Every original interaction/navigation record is retained. Only prior AI observation, output template, duplicate allowed-ID lists and unselected prospective catalog entries are omitted. Cited originals are also expanded into literal same-ID rows for checking claims.");
+                reviewInput.set("originalSource",reviewSource);reviewInput.set("candidate",candidate);
+                reviewInput.set("literalChanges",literalChanges(source,candidate));
+                reviewInput.set("progressionComparison",AdaptiveQuestProgression.comparison(mapper,evidence,candidate));
+                var costs=reviewInput.putObject("computedObjectiveCosts");int total=0;
+                for(var objective:draft.objectives())for(var product:MarketQuestCatalog.PRODUCTS)if(product.id().equals(objective.productId())){int cost=product.price()*objective.quantity();costs.put(objective.productId(),cost);total+=cost;}
+                costs.put("total",total);costs.put("budget",draft.budget());
+                return mapper.writeValueAsString(AdaptiveQuestTransport.encode(mapper,reviewInput));
     }
     private GroqChatClient.GroqChatResult call(String system,String prompt,int output,double temperature) {
         AiOperationDeadline.remaining();int required=QwenTokenCounter.inputTokens(system,prompt)+output+32;
