@@ -6,6 +6,11 @@ import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
 import static org.assertj.core.api.Assertions.*;
 class ActualProfileBudgetRegressionTest {
+ private static Path recordOutput(String name) throws java.io.IOException {
+  var directory=Path.of(System.getenv().getOrDefault("ONEULDO_TEST_RECORD_OUTPUT","build/test-records/actual-regression"));
+  Files.createDirectories(directory);return directory.resolve(name);
+ }
+
  @Test void lossless_transport_keeps_all_actual_profile_sources_and_fits() throws Exception {
   var mapper=JsonMapper.builder().findAndAddModules().build();
   var path=Path.of("/Users/bluem/Documents/GitHub/Oneuldo/output/persona-actual-15-v43-v34-20261011/group-01/round-03/profile-failed-v20-after-v54-audit.json");
@@ -18,7 +23,7 @@ class ActualProfileBudgetRegressionTest {
   int before=budget.total(system,attempt.path("inputPrompt").asString(),2400);
   int after=budget.total(system,packed.toString(),2400);
   assertThat(after).isLessThanOrEqualTo(18000);
-  Files.writeString(Path.of("../output/post-actual15-fixes-20261012/legacy-regression-reruns/profile-lossless-transport-budget.json"),mapper.writeValueAsString(Map.of("before",before,"after",after,"limit",18000,"allOriginalFieldsAndValuesPreserved",true,"semanticProfileVersionUnchanged",AiUserProfilePromptFactory.VERSION)));
+  Files.writeString(recordOutput("profile-lossless-transport-budget.json"),mapper.writeValueAsString(Map.of("before",before,"after",after,"limit",18000,"allOriginalFieldsAndValuesPreserved",true,"semanticProfileVersionUnchanged",AiUserProfilePromptFactory.VERSION)));
  }
  @Test void measure_actual_minsu_profile_failure_without_rewriting_source() throws Exception {
   var mapper=JsonMapper.builder().findAndAddModules().build();
@@ -27,7 +32,7 @@ class ActualProfileBudgetRegressionTest {
   String unchanged=Files.readString(path);var a=mapper.readTree(unchanged).path("attempts").get(0);
   int required=new AnalysisTokenBudget().total(a.path("systemPrompt").asString(),a.path("inputPrompt").asString(),a.path("outputMax").asInt());
   assertThat(Files.readString(path)).isEqualTo(unchanged);
-  Files.writeString(Path.of("../output/post-actual15-fixes-20261012/legacy-regression-reruns/actual-profile-failed-input-budget.json"),mapper.writeValueAsString(Map.of("required",required,"transportLimit",17744,"exceedsTransportLimit",required>17744,"rawAuditUnchanged",true,"actualModelCallMadeByThisCheck",false)));
+  Files.writeString(recordOutput("actual-profile-failed-input-budget.json"),mapper.writeValueAsString(Map.of("required",required,"transportLimit",17744,"exceedsTransportLimit",required>17744,"rawAuditUnchanged",true,"actualModelCallMadeByThisCheck",false)));
  }
 
 }
