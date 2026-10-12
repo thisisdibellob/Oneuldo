@@ -64,6 +64,7 @@ public final class AnalysisSynthesisPrompt {
             }
         }
         root.put("outputContract",COMPACT_CONTRACT);
+        AnalysisSourceContext.addMissionPlanProvenance(mapper,root);
         String source = refs.encode(prompts.pack(root));
         var decoded = (tools.jackson.databind.node.ObjectNode) new LosslessTables(mapper).decode(mapper.readTree(source));
         return mapper.writeValueAsString(new FinalSourceEncoding(mapper).encodeReadable(decoded));

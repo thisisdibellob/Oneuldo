@@ -37,6 +37,7 @@ public final class AdaptiveQuestEvidence {
                 .add(event.elapsedFromSessionStartMs()).add(code).add(payload);
         }
         root.put("eventCount",index);
+        AnalysisSourceContext.addMissionPlanProvenance(mapper,root);
         var refs=new AnalysisReferences(mapper,response);
         return (ObjectNode)mapper.readTree(refs.encode(mapper.writeValueAsString(root),false));
     }
