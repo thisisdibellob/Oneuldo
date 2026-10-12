@@ -427,6 +427,22 @@ public final class TimelineAnalysisPipeline {
                 if(validation != null && "INLINE_REVIEW_REFERENCE_NOT_ALLOWED".equals(validation.code()))
                     correction = ClaimReferenceRepairPrompt.build(mapper, validation);
                 if(system.equals(AnalysisReviewPrompt.system())) {
+                    if(validation!=null&&"REVIEW_UNRECORDED_DIFFICULTY_BASELINE".equals(validation.code())&&raw!=null){
+                        String patchPrompt=prompt+"\nCandidate (all values retained): "+raw+"\nReported technical error: "+mapper.writeValueAsString(validation);
+                        budget.requireFits(ReviewMetadataPatch.SYSTEM,patchPrompt,ReviewMetadataPatch.OUTPUT_TOKENS,limit,"REVIEW_METADATA_PATCH_EXCEEDS_LIMIT");
+                        var patchResponse=client.complete(ReviewMetadataPatch.SYSTEM,patchPrompt,ReviewMetadataPatch.OUTPUT_TOKENS,0.0);
+                        try{
+                            if("length".equals(patchResponse.finishReason()))throw new IllegalArgumentException("OUTPUT_TRUNCATED");
+                            String corrected=ReviewMetadataPatch.apply(mapper,raw,patchResponse.text());
+                            T repaired=parse.apply(corrected);
+                            audit.add(attempt(audit.size()+1,ReviewMetadataPatch.SYSTEM,patchPrompt,ReviewMetadataPatch.OUTPUT_TOKENS,patchResponse,null,"REVIEW_METADATA_PATCH"));
+                            if(planSemanticReview)reviewPlanSource(prompt,corrected,limit,audit);
+                            return repaired;
+                        }catch(RuntimeException invalid){
+                            audit.add(attempt(audit.size()+1,ReviewMetadataPatch.SYSTEM,patchPrompt,ReviewMetadataPatch.OUTPUT_TOKENS,patchResponse,"INVALID_REVIEW_METADATA_PATCH","REVIEW_METADATA_PATCH"));
+                            throw invalid;
+                        }
+                    }
                     String withCandidate=AnalysisRepairCandidate.append(mapper,correction,raw);
                     if(budget.total(system,prompt+RETRY+withCandidate,output)<=limit) correction=withCandidate;
                     else log.warn("Review repair candidate exceeds request budget; retaining complete original sources and error details");
