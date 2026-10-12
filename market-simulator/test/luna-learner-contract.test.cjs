@@ -1,0 +1,31 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path');
+const {createHash}=require('node:crypto');require('../runtime.cjs');
+const {createMarketSession}=require('../../frontend/src/game/marketSession.ts');const {createMarketReplaySnapshot,marketReplayTraceId}=require('../../frontend/src/game/marketReplayTrace.ts');
+const {getPersona}=require('../src/personas.ts');const {generateTrace}=require('../src/simulator.ts');const {createLearner,recordLearnerRound,readLearner}=require('../learner-store.cjs');const {createService}=require('../server.cjs');
+const hash=x=>createHash('sha256').update(JSON.stringify(x)).digest('hex');
+test('v10 verified learner roundtrip binds Luna identity and loads only replay-derived memory into the next plan',async t=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'oneuldo-luna-learner-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+ const persona=getPersona('careful-checker'),snapshot=createMarketReplaySnapshot(createMarketSession({seed:'v10-roundtrip'}));
+ const identity={learnerId:'luna-b',memberId:'luna-test-member',personaId:persona.id,personaVersion:persona.version,experimentId:'luna-trial',arm:'B',model:'gpt-6-luna',policyVersion:'episodic-choice-v10',reasoningEffort:'low'};
+ const {learnerFile}=createLearner({directory:dir,identity});let calls=0;
+ const trace=await generateTrace({personaId:persona.id,seed:'first-luna-round',snapshot,mode:'llm',llm:{model:'gpt-6-luna'},learnerIdentity:identity,
+  tracePolicyVersion:'6',actorPolicyVersion:'episodic-choice-v10',reasoningEffort:'low',actorDecisionProvider:async()=>({action:{type:'giveUp'},delayMs:100,reason:'오프라인 실행 계약 fixture'})});
+ assert.equal(trace.generation.model,'gpt-6-luna');assert.equal(trace.generation.reasoningEffort,'low');assert.equal(trace.generation.actorPolicyVersion,'episodic-choice-v10');
+ const replay={replayId:'luna-replay-1',sessionId:'luna-session-1',memberId:identity.memberId,traceId:trace.traceId,traceHash:hash(trace),snapshotId:snapshot.snapshotId,status:'completed',report:{acknowledged:true,completedSteps:trace.steps.map(s=>({id:s.id,type:s.type})),displacementViolations:0,inputViolations:0}};
+ const receipt={sessionId:replay.sessionId,memberId:replay.memberId,eventCount:10,firstSequence:1,lastSequence:10,uniqueSequences:10,uniqueClientEvents:10,endEvents:1,timeReversals:0};
+ const round=recordLearnerRound({learnerFile,trace,snapshot,replay,receipt});assert.equal(round.experience.learning.policyVersion,'episodic-choice-v10');
+ assert.ok(round.experience.learning.episodes.every(e=>e.source==='executed-app-action'&&e.evidence?.replayId==='luna-replay-1'));
+ const service=createService();t.after(()=>service.close());
+ const begun=await service.invokeTool('begin_actor_plan',{personaId:persona.id,seed:'second-luna-round',snapshot,learnerFile,outputPath:path.join(dir,'second-trace.json')});
+ assert.equal(begun.model,'gpt-6-luna');assert.equal(begun.reasoningEffort,'low');assert.equal(begun.actorPolicyVersion,'episodic-choice-v10');
+ const frame=await (async()=>{for(let i=0;i<100;i++){try{return await service.invokeTool('observe_actor_plan',{sessionId:begun.sessionId});}catch(e){if(i===99)throw e;await new Promise(r=>setTimeout(r,10));}}})();
+ assert.ok(frame.experience.previousExecutedExperience.length>0);assert.equal(frame.experience.previousExperienceRetrieval.archivedEpisodeCount,trace.steps.length);
+ const quit=frame.availableChoices.find(c=>c.action.type==='giveUp');await service.invokeTool('append_actor_plan',{sessionId:begun.sessionId,revision:frame.revision,choiceIds:[quit.id],delayMs:[100],reasons:['이번 회차는 여기까지 한다']});
+ let completed=false;for(let i=0;i<100;i++){const state=await service.invokeTool('observe_actor_plan',{sessionId:begun.sessionId});if(state.status==='complete'){completed=true;break;}await new Promise(r=>setTimeout(r,10));}assert.equal(completed,true,'trace finalization must not hang');
+ const output=await service.invokeTool('finalize_actor_plan',{sessionId:begun.sessionId});const next=JSON.parse(fs.readFileSync(output.outputPath,'utf8'));
+ assert.equal(next.generation.learnerIdentity.policyVersion,'episodic-choice-v10');assert.equal(next.generation.learnerIdentity.reasoningEffort,'low');
+ assert.equal(next.experienceMode,'revisit');assert.equal(readLearner(learnerFile).rounds.length,1);
+ const old=createLearner({directory:dir,identity:{learnerId:'old-v9',memberId:'old-member',personaId:persona.id,personaVersion:persona.version,experimentId:'old',arm:'B',model:'fixture',policyVersion:'episodic-choice-v9'}});
+ await assert.rejects(service.invokeTool('begin_actor_plan',{personaId:persona.id,seed:'reject-old',snapshot,learnerFile:old.learnerFile,outputPath:path.join(dir,'old.json')}),/identity changed/);
+});

@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "persona-traits-v1",
+  "interpretation": "쇼핑 상황의 합성 행동 성향 설계값이다. 심리검사 점수, 임상 기준, 장애 또는 실제 사람의 측정값이 아니다. 성격과 인지·수행 특성, 취향, 경험을 분리한다. 낮음은 능력 부족을 뜻하지 않으며 각 행동은 실제 기회와 상황에 따라 선택한다.",
+  "levels": ["low", "medium", "high"],
+  "traits": [
+    {"key":"deliberation","label":"숙고 성향","description":"선택 전 후보와 조건을 살펴보려는 성향","levels":{"low":"관찰한 후보가 기억하는 조건을 충분히 만족하면 다른 후보를 더 찾기보다 선택하는 편이다. 조건 충족 여부가 불분명하거나 관찰한 후보끼리 중요한 차이가 있으면 필요한 정보를 살필 수 있다. 선택이 충분히 분명해지면 비교를 마친다. 미확인 정보를 아는 것으로 꾸미거나 실수를 강제하지 않는다.","medium":"관찰한 후보들의 차이가 선택에 중요하거나 여러 조건이 얽혀 있으면 관련 후보의 상품 정보와 기억하는 조건을 대조할지 판단한다. 익숙하고 조건이 분명한 후보라면 추가 비교 없이 선택할 수 있다. 선택이 충분히 분명해지면 비교를 마친다.","high":"관련 후보를 둘 이상 실제로 관찰했거나 여러 조건을 함께 고려해야 할 때, 바로 담기 전에 후보별로 어떤 조건이 맞고 다른지 살펴본 뒤 선택하려는 편이다. 더 알아야 할 정보가 있으면 현재 허용된 상품·매대 관찰 행동을 선택한다. 하나의 지정 상품만 보이거나 선택이 충분히 분명해지면 비교를 마친다. 머무는 시간을 늘리거나 비교 횟수를 채우는 것으로 숙고를 대신하지 않는다."}},
+    {"key":"checking","label":"확인 성향","description":"목록·수량·장바구니를 다시 확인하려는 성향","levels":{"low":"방금 관찰한 목표와 수량이 분명하고 기억하고 있으면 그대로 다음 단계로 진행하는 편이다. 수량이 헷갈리거나 관찰과 기억이 어긋나면 실제로 목록·장바구니를 열어 필요한 정보를 확인할 수 있다. 충분히 명확해지면 추가 확인을 마친다.","medium":"상품을 담고 다음 목표로 넘어갈 때, 수량이 불확실할 때, 결제를 결정할 때 현재 기억과 관찰이 충분한지 살핀다. 빠진 조건이나 불확실한 수량이 있으면 해당 정보가 보이는 목록·장바구니 등을 실제로 열어 대조할지 판단한다. 충분히 명확해지면 추가 확인을 마친다.","high":"상품을 담고 다음 목표로 넘어가거나 결제를 결정할 때, 방금 선택한 상품·수량과 기억하는 목표 조건을 다시 대조하고 싶어 하는 편이다. 특히 수량이 헷갈리거나 관심 전환 뒤 무엇을 담았는지 불확실하면 목록·장바구니처럼 필요한 정보가 실제로 보이는 화면을 열어 확인하는 쪽을 선호한다. 현재 관찰과 유지한 기억으로 충분히 명확하면 추가 확인을 마친다. 매 단계의 확인을 의무화하거나 완벽한 장바구니를 보장하지 않는다."}},
+    {"key":"exploration","label":"탐색 성향","description":"새로운 상품·단서·대안을 살펴보려는 성향","levels":{"low":"익숙하고 필요한 단서를 중심으로 진행하는 편이다. 배치가 달라지거나 정보가 부족하면 새 단서를 찾을 수 있다.","medium":"필요한 과업과 눈에 들어온 관심 단서 사이에서 상황에 맞게 살펴볼 범위를 정한다.","high":"실제로 눈에 들어온 새로운 상품이나 대안을 살펴보는 편이다. 보이지 않는 관심 단서를 만들거나 정해진 이탈 횟수를 채우지 않는다."}},
+    {"key":"persistence","label":"지속 성향","description":"어려움 뒤 재시도·전략 변경·중단을 선택하는 성향","levels":{"low":"부담이나 반복 실패가 커지면 쉬거나 중단하는 선택을 비교적 쉽게 고려한다. 이유 없는 포기나 실패를 의무로 만들지 않는다.","medium":"실패 원인과 남은 부담을 보고 재시도·다른 전략·중단을 선택한다.","high":"어려움이 생겨도 단서를 확인하고 다른 방법이나 지원을 활용해 이어가려는 편이다. 같은 행동을 무한 반복하거나 완료를 강제하지 않는다."}},
+    {"key":"helpSeeking","label":"도움 활용 성향","description":"불확실할 때 제공된 설명·도움을 활용하려는 성향","levels":{"low":"먼저 직접 확인하는 편이지만 해결이 어렵거나 불확실성이 크면 제공된 도움을 사용할 수 있다.","medium":"현재 정보와 부담을 보고 직접 확인하거나 제공된 도움을 선택한다.","high":"불확실한 단계에서는 제공된 설명이나 도움을 적극적으로 활용하는 편이다. 도움 사용은 자기 결정 능력의 부족이나 복종을 뜻하지 않는다."}}
+  ],
+  "presets": [
+    {"id":"deliberate-checker","label":"숙고·확인형","description":"후보와 조건을 차례로 살피고 선택을 확인하는 기본 묶음","traits":{"deliberation":"high","checking":"high","exploration":"medium","persistence":"high","helpSeeking":"medium"}},
+    {"id":"quick-satisficer","label":"신속 결정형","description":"조건을 만족하는 후보를 빠르게 정하는 기본 묶음","traits":{"deliberation":"low","checking":"low","exploration":"low","persistence":"medium","helpSeeking":"low"}},
+    {"id":"curious-explorer","label":"탐색·호기심형","description":"눈에 들어온 새로운 단서와 대안을 살피는 기본 묶음","traits":{"deliberation":"medium","checking":"medium","exploration":"high","persistence":"medium","helpSeeking":"medium"}},
+    {"id":"familiar-routine","label":"익숙함 선호형","description":"익숙한 단서와 연습한 절차를 중심으로 진행하는 기본 묶음","traits":{"deliberation":"medium","checking":"medium","exploration":"low","persistence":"high","helpSeeking":"medium"}},
+    {"id":"help-seeker","label":"도움 활용형","description":"불확실할 때 설명과 지원을 활용하는 기본 묶음","traits":{"deliberation":"medium","checking":"high","exploration":"medium","persistence":"medium","helpSeeking":"high"}}
+  ],
+  "legacyMappings": {
+    "mild-intellectual-disability-adult":{"presetId":"help-seeker","traits":{"deliberation":"medium","checking":"high","exploration":"high","persistence":"high","helpSeeking":"high"},"annotation":"원본 설정을 보존한 설계 해석이며 실제 행동의 측정 결과가 아니다."},
+    "careful-checker":{"presetId":"deliberate-checker","traits":{"deliberation":"high","checking":"high","exploration":"medium","persistence":"high","helpSeeking":"medium"},"annotation":"원본 설정을 보존한 설계 해석이며 실제 행동의 측정 결과가 아니다."},
+    "quick-decider":{"presetId":"quick-satisficer","traits":{"deliberation":"low","checking":"low","exploration":"low","persistence":"high","helpSeeking":"low"},"annotation":"원본 설정을 보존한 설계 해석이며 실제 행동의 측정 결과가 아니다."},
+    "neutral-adult-control":{"presetId":null,"traits":{"deliberation":"medium","checking":"medium","exploration":"medium","persistence":"medium","helpSeeking":"medium"},"annotation":"기존 대조군을 연결한 설계 해석이며 일반 성인의 평균을 뜻하지 않는다."}
+  }
+}

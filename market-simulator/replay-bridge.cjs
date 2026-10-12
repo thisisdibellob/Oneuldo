@@ -148,6 +148,11 @@ class ReplayBridge {
     if (tab.replayId) throw new Error('TAB_BUSY: this tab already has an active replay.');
     const validation = this.validateTrace(trace, this.snapshot(tabId));
     if (!validation.valid) throw new Error(`Invalid trace: ${validation.errors.join('; ')}`);
+    // Reject before creating a replay or sending input: recording-time validation
+    // cannot undo gameplay logs already written into another experiment account.
+    if (trace.generation?.learnerIdentity && trace.generation.learnerIdentity.memberId !== tab.memberId) {
+      throw new Error('Learner trace cannot play in another test account.');
+    }
     for (const other of this.tabs.values()) if (other.replayId && other.backendOrigin === tab.backendOrigin && other.memberId === tab.memberId) throw new Error('ACCOUNT_BUSY: concurrent tabs must use different test accounts.');
     const replay = { replayId: randomUUID(), traceId: trace.traceId, traceHash: digest(trace), tabId, epoch: tab.epoch, ownerId,
       targetEnv: tab.targetEnv, backendOrigin: tab.backendOrigin, memberId: tab.memberId,

@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { marketReplayTraceId, marketReplayFingerprint, validateMarketReplaySnapshot, type MarketReplaySnapshot,
   type MarketReplayStep, type MarketReplayTrace } from '../../frontend/src/game/marketReplayTrace';
 import type { MarketEnvironmentStationId } from '../../frontend/src/game/marketEnvironment';
-import { getPersona } from './personas';
+import { getPersona, getWholeTracePersona } from './personas';
 import { StochasticPolicy } from './stochasticPolicy';
 import { assertDecision, createLlmPolicy } from './llmPolicy';
 import { Random } from './random';
@@ -19,8 +19,10 @@ type StepIntent = MarketReplayStep extends infer S ? S extends MarketReplayStep 
 
 /** Produces intentions only. No BehaviorLogRequest, episode export, HTTP write, or UI process. */
 export async function generateTrace(options: TraceOptions): Promise<MarketReplayTrace> {
-  const timing = options?.timingProfile ?? 'compact';
+  const preserved = ['whole-trace-v3', 'feedback-choice-v1', 'feedback-choice-v2', 'feedback-choice-v3', 'feedback-choice-v4', 'feedback-choice-v5', 'feedback-choice-v6', 'feedback-choice-v7'].includes(options?.actorPolicyVersion ?? '');
+  const timing = options?.timingProfile ?? (preserved ? 'original' : 'compact');
   if (!['original', 'compact'].includes(timing)) throw new Error('Unknown timingProfile');
+  if (preserved && timing !== 'original') throw new Error(`${options.actorPolicyVersion === 'whole-trace-v3' ? 'Whole-trace-v3' : options.actorPolicyVersion} preserves actor judgment timing; use original`);
   // Generate all decisions first: faster replay must not change memory, choices or RNG.
   const trace = await generateOriginalTrace(options);
   const result = timing === 'original' ? trace : compactTraceTiming(trace);
@@ -34,7 +36,11 @@ async function generateOriginalTrace(options: TraceOptions): Promise<MarketRepla
     || String(options.seed).length > 200 || (typeof options.seed === 'number' && !Number.isFinite(options.seed))) throw new Error('A finite numeric or non-empty string seed is required.');
   const snapshotCheck = validateMarketReplaySnapshot(options.snapshot);
   if (!snapshotCheck.valid) throw new Error(snapshotCheck.errors.join('; '));
-  const persona = getPersona(options.personaId);
+  const wholeTraceCompiler = options.planningMode === 'whole-trace' && options.mode === 'llm'
+    && options.actorPolicyVersion === 'whole-trace-v3' && typeof options.actorDecisionProvider === 'function';
+  const persona = wholeTraceCompiler ? getWholeTracePersona(options.personaId) : getPersona(options.personaId);
+  if (options.feedbackMovement !== undefined && (!persona.attention || !['feedback-choice-v3', 'feedback-choice-v4', 'feedback-choice-v5', 'feedback-choice-v6', 'feedback-choice-v7'].includes(options.actorPolicyVersion ?? '')))
+    throw new Error('feedbackMovement requires an attention persona with feedback-choice-v3 or feedback-choice-v4');
   const mode = options.mode ?? 'llm';
   if (!['stochastic', 'llm'].includes(mode)) throw new Error('mode must be stochastic or llm.');
   const maxActions = options.maxActions ?? 1000;
@@ -60,7 +66,7 @@ async function generateOriginalTrace(options: TraceOptions): Promise<MarketRepla
     const applied = guard.execute(step);
     steps.push(step);
     plannedMs += step.reactionDelayMs + applied.movementMs
-      + ('durationMs' in step ? step.durationMs : step.type === 'dragProduct' ? (step.gesture.durationMs + step.gesture.hesitationMs) * step.quantity : 0);
+      + ('durationMs' in step ? (step.durationMs ?? 0) : step.type === 'dragProduct' ? (step.gesture.durationMs + step.gesture.hesitationMs) * step.quantity : 0);
     return applied;
   };
   append({ type: 'start' }, Math.round(persona.parameters.reactionMedianMs), 'read-mission-one-page-at-a-time');
@@ -141,6 +147,10 @@ export function projectDecision(d: Decision, o: Observation, persona: Persona, s
   const rawMotorSeed = `${seed}:motor:${persona.id}:${persona.version}:${stepIndex}`;
   const motorSeed = rawMotorSeed.length <= 200 ? rawMotorSeed : `motor-${marketReplayFingerprint(rawMotorSeed)}`;
   switch (a.type) {
+    case 'moveDirection': return { type: 'moveDirection', direction: a.direction, durationMs: a.durationMs, movement: {
+      speedMultiplier: Math.round(Math.max(.4, Math.min(1, persona.parameters.walkSpeed / 190)) * 1000) / 1000,
+      accelerationMs: Math.round(motor.between(160, 280)),
+    } };
     case 'walkToAnchor': return { type: 'walkToAnchor', target: { anchorId: a.anchorId }, movement: {
       style: persona.parameters.walkSpeed < 110 ? 'careful' : persona.parameters.walkSpeed < 140 ? 'steady' : 'brisk',
       speedMultiplier: Math.round(Math.max(.4, Math.min(1, persona.parameters.walkSpeed / 190)) * 1000) / 1000,
@@ -163,8 +173,8 @@ export function projectDecision(d: Decision, o: Observation, persona: Persona, s
     case 'checkout': return { type: 'checkout', checkoutId: a.checkoutId ?? 'checkout' };
     case 'add': return { type: 'dragProduct', productId: a.productId, quantity: a.quantity ?? 1, gesture: {
       durationMs: Math.round(Math.max(450, Math.min(2400, persona.parameters.reactionMedianMs * motor.between(.35, .55)))),
-      hesitationMs: d.reason.includes('pause-before-next-step') ? Math.round(motor.between(150, 700)) : 0,
-      outcome: 'drop', motorSeed,
+      hesitationMs: d.feedbackMemory === undefined && d.reason.includes('pause-before-next-step') ? Math.round(motor.between(150, 700)) : 0,
+      outcome: d.dragOutcome ?? 'drop', motorSeed,
     } };
     case 'remove': return { type: 'removeProduct', productId: a.productId, quantity: a.quantity ?? 1 };
     case 'requestReturn': return { type: 'talkToStaff', stationId: requireStaff(o), choice: 'returnProduct', productId: a.productId, quantity: a.quantity ?? 1 };
@@ -178,7 +188,8 @@ export function projectDecision(d: Decision, o: Observation, persona: Persona, s
       return { type: 'talkToStaff', stationId: requireStaff(o), choice: 'requestCashier', checkoutId };
     }
     case 'submit': return { type: 'submitForReview' };
-    case 'viewCart': case 'viewHelp': case 'closeView': case 'closeStation': case 'giveUp': return { type: a.type };
+    case 'viewCart': case 'viewHelp': return { type: a.type, ...('durationMs' in a && a.durationMs !== undefined ? { durationMs: a.durationMs } : {}) };
+    case 'closeView': case 'closeStation': case 'giveUp': return { type: a.type };
     default: throw new Error(`Action ${a.type} is unavailable in the AI-review app flow.`);
   }
 }
@@ -188,10 +199,11 @@ function requireStaff(o: Observation): MarketEnvironmentStationId {
 }
 export function summarizeTrace(trace: MarketReplayTrace): TraceSummary {
   return { personaId: trace.personaId, steps: trace.steps.length,
-    walkingIntentions: trace.steps.filter(s => s.type === 'walkTo' || s.type === 'walkToAnchor').length,
+    walkingIntentions: trace.steps.filter(s => s.type === 'walkTo' || s.type === 'walkToAnchor' || s.type === 'moveDirection').length,
     cartChecks: trace.steps.filter(s => s.type === 'viewCart').length,
     helpRequests: trace.steps.filter(s => s.type === 'viewHelp' || (s.type === 'talkToStaff' && s.choice !== 'open')).length,
     productsDragged: trace.steps.reduce((sum, s) => sum + (s.type === 'dragProduct' && s.gesture.outcome === 'drop' ? s.quantity : 0), 0),
     plannedReactionMs: trace.steps.reduce((sum, s) => sum + s.reactionDelayMs, 0),
-    ending: trace.steps.some(s => s.type === 'submitForReview') ? 'review-requested' : 'gave-up' };
+    ending: trace.generation?.systemCompletion ? 'assisted-review-requested' : trace.generation?.controlledStop?.reason === 'action-limit' ? 'action-limit-incomplete'
+      : trace.generation?.controlledStop ? 'controlled-stop' : trace.steps.some(s => s.type === 'submitForReview') ? 'review-requested' : 'gave-up' };
 }

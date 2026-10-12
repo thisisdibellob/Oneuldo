@@ -211,3 +211,30 @@
 - `reactionMedianMs` 등의 시간은 행동 전 계획된 대기시간을 만든다. 실제 앱의 관측 시간이나 임상적 반응시간을 측정한 값으로 해석하지 않는다. `walkSpeed`는 앱의 기본 보행속도에 대한 조이스틱 입력크기로 변환한다.
 - 로그인 미션은 구매 확정 뒤 AI 검토 접수를 확인하고 종료한다. 구매 정답·실패·재시도 피드백을 생성기가 임의로 만들어 정책에 돌려주지 않는다. `retryProbability`와 `feedbackLearningRate` 값은 기존 정의를 보존하지만, 현재 AI 검토 종료 흐름에서 제출 후 반복 학습을 재현했다고 주장하지 않는다.
 - 생성기는 서버 로그를 만들지 않는다. 페르소나·버전·seed는 trace에 기록하고 테스트 계정·실제 세션은 실행 manifest로 구분한다. 실제 로그는 기존 앱 입력 경로와 tracker에서 생성된다.
+
+
+## 2026-10-11 페르소나 충실도 검증 전용 일반 성인 대조군 v2
+
+`neutral-adult-control`은 지민과 이름·32세 연령·저녁 장보기 목표·우유/사과/순한 카레 구매 경험·카레 요리 관심을 공유한다. 개인 취향·강점·자기결정·실제 확인과 도움 전략을 충분한 자연어 지침으로 유지한다. `selectedTraits`에는 개인 취향과 성격만 있으며 선택된 인지·적응 어려움은 없다. 스키마의 비어 있지 않은 `selectedTraits` 요구를 충족하기 위해 개인 특성을 적었으며 장애 특성을 대조군에 추가한 것이 아니다. JSON prompt와 `neutral-adult-control.md`는 동일하다.
+
+기존 대조군 v1에 남아 있던 관심 전환·상품명 혼동·수량 추적 부담값을 v2에서 0으로 바꾸고 대조군 전용 전체 계획 해석문을 제공한다. 원래 세 인물의 JSON·prompt·버전 및 공통 cognition 규칙·게임 가드는 변경하지 않았다. 같은 이름 때문에 단계별 확인형 지민의 목록 재확인·작은 목표 기억 규칙을 대조군에 적용하지 않도록 개인 지침에 구분을 명시한다. 기존 v1과 v2 표본을 한 run의 같은 프로필로 합치지 않는다.
+
+| 설정 | 값 | 선택 이유 및 실제 적용 범위 |
+| --- | --- | --- |
+| `goalMemoryCapacity` | 5 | 고부하 조건의 다섯 목표를 담는 설계 상한. 사람의 평균 기억 용량이 아님 |
+| `switchMemoryDecay`, `confusionProbability`, `quantitySlipProbability` | 0, 0, 0 | 선택하지 않은 인지·적응 어려움에 연결된 추가 부담을 제거. 전체 계획의 관심·유사 이름·수량 추적 계수도 0이 됨 |
+| 공통 cognition의 `delay` | .04 | 기존 규칙 `.04 + switchMemoryDecay`를 변경하지 않아 남는 모든 인물 공통 시간 계수. 이 대조군은 망각이 절대 없는 가상 인물이 아니며, 아주 긴 계획에서는 공통 시간 규칙이 기억 상태에 영향을 줄 수 있음 |
+| `reactionMedianMs`, `reactionSigma` | 1700ms, .32 | 빠른 선택형 950ms와 단계별 확인형 2700ms 사이의 합성 반응 기준 및 분포 폭. 사람 자료에서 추정하지 않음. Luna는 이를 문맥으로 받고 각 대기시간을 직접 선택 |
+| `walkSpeed` | 95 | 지민과 같은 이동 기준으로 운동 차이가 비교를 설명하지 않게 유지 |
+| `pricePreference`, `familiarityBias`, `itemPreferenceWeights` | .25, 2.2, milk/apple/curry 각 2 | 지민의 개인 가격·익숙한 상품 선호를 유지 |
+| `interestProductWeights`, `interestCategoryWeights` | curry:3, meal:1.6 | 같은 카레 관심과 관련 상품군 선호를 유지 |
+| `captureProbability`, `interestPurchaseProbability`, `resumeProbability` | .22, .20, .65 | 호환용 관심 설정. 대조군도 관심을 살피고 복귀할 수 있게 둔 설계값이며 Luna의 행동 선택 확률로 사용하지 않음 |
+| `minimumInterestActions`, `maximumInterestActions`, `firstPlayOrientationActions` | 1, 4, 0 | 기존 구조화 프로필의 호환 범위. Luna에 횟수나 초회 탐색 의무로 전달하지 않음 |
+| `spatialMemoryCapacity` | 96 | 기존 프로필과 같은 공간 기록 구현 상한. 실제 공간 기억 검사값이 아님 |
+| `recheckProbability`, `hesitationProbability`, `helpProbability`, `explorationProbability` | .20, .08, .15, .05 | 확인·망설임·도움·탐색을 불가능하게 만들지 않는 호환 설계값. Luna의 선택 확률로 사용하지 않음 |
+| `retryProbability`, `feedbackLearningRate` | .90, .85 | 시도와 피드백 활용이 가능한 호환 설계값. 실제 학습률이나 learner 허용을 뜻하지 않음 |
+| `shoppingStyle` | 비교 .25 / 최대 2페이지 / 선택 후 목록 .23 / 계산 전 확인 .35 / 익숙한 선택 .45 / 방향 유지 .65 | 중간 수준의 호환 습관 설정. Luna에는 고정 빈도나 의무 행동으로 전달하지 않음 |
+
+수치는 사전에 정한 설계값이며 임상 기준이 아니다. 전체 계획에는 개인 지침, 목표 기억 상한, 위의 cognition 원본값과 반응·보행 기준만 행동 문맥으로 연결된다. 나머지 호환 수치는 일반 생성에 대조군을 등록하는 근거가 아니며 stochastic trace는 충실도 근거가 될 수 없다. 대조군은 전용 registry에 보관하고 검증 run의 셀로 확인된 `prepare_whole_trace` 안에서만 불러온다. 일반 `getPersona`·`list_personas`·`generate_trace`·배치·학습 identity·learner archive·learning trial은 대조군을 받지 않는다.
+
+이 결과는 설계한 허구 인물이 대조군과 구별되게 행동하는지를 살피는 페르소나 충실도 검증이다. 실제 지적장애인의 행동과 닮았다는 주장이나 임상적 타당성은 범위 밖이다. 대조군은 지민의 개인 층을 맞췄지만 서연·민수와는 취향까지 통제한 비교가 아니므로 해당 차이가 섞인다는 한계를 보고한다.

@@ -1,4 +1,6 @@
-import { actorChoices } from './actorChoices';
+import { actorChoices, extendedActorChoices, presentActorChoices } from './actorChoices';
+import { ACTOR_PERSONA_INSTRUCTIONS, ACTOR_OBSERVATION_INSTRUCTIONS } from './actorInstructions';
+import type { ActorActivityState } from './actorActivity';
 import type { ActorLearningMemory } from './actorLearning';
 import type { Decision, TraceOptions, Observation, Persona, TraceEntry, ActorObservation } from './types';
 import { PersonaContext } from './personaContext';
@@ -9,29 +11,51 @@ const actionFields: Record<string, string[]> = {
   submit: [], giveUp: [], closeStation: [], viewCart: [], viewHelp: [], closeView: [],
   walkToAnchor: ['anchorId'], readList: ['durationMs'], browse: ['durationMs', 'scrollFraction'],
   pause: ['durationMs'], lookAround: ['durationMs'],
+  moveDirection: ['direction', 'durationMs'],
 };
-const legacyActionFields = Object.fromEntries(Object.entries(actionFields).filter(([type]) => !['walkToAnchor', 'readList', 'browse', 'pause', 'lookAround'].includes(type)));
-export function assertDecision(value: unknown): asserts value is Decision {
+const legacyActionFields = Object.fromEntries(Object.entries(actionFields).filter(([type]) => !['walkToAnchor', 'readList', 'browse', 'pause', 'lookAround', 'moveDirection'].includes(type)));
+export function assertDecision(value: unknown, feedbackTiming = false): asserts value is Decision {
   const d = value as Decision;
   if (!d || typeof d !== 'object' || !d.action || !Object.prototype.hasOwnProperty.call(actionFields, d.action.type)) throw new Error('Decision contains an unsupported agent action.');
   const action = d.action as unknown as Record<string, unknown>;
-  for (const key of Object.keys(action)) if (!['type', ...actionFields[d.action.type]].includes(key)) throw new Error(`Unexpected action field: ${key}`);
-  if (!Number.isInteger(d.delayMs) || d.delayMs < 1 || d.delayMs > 120000) throw new Error('Decision delayMs must be 1..120000.');
+  const panelTiming = feedbackTiming && ['viewCart', 'viewHelp'].includes(d.action.type);
+  for (const key of Object.keys(action)) if (!['type', ...actionFields[d.action.type], ...(panelTiming ? ['durationMs'] : [])].includes(key)) throw new Error(`Unexpected action field: ${key}`);
+  if (feedbackTiming ? d.delayMs !== 0 : !Number.isInteger(d.delayMs) || d.delayMs < 1 || d.delayMs > 120000)
+    throw new Error(feedbackTiming ? 'Feedback decision delayMs must be 0; use an explicit timed activity.' : 'Decision delayMs must be 1..120000.');
   if (typeof d.reason !== 'string' || !d.reason.trim() || d.reason.length > 1000) throw new Error('Decision reason must be a short string.');
   if ((d.action.type === 'interact' || d.action.type === 'walkTo') && typeof d.action.station !== 'string') throw new Error('interact requires station.');
   if (['add', 'remove', 'requestReturn'].includes(d.action.type) && typeof action.productId !== 'string') throw new Error('Item action requires productId.');
   if (action.quantity !== undefined && (!Number.isInteger(action.quantity) || Number(action.quantity) < 1 || Number(action.quantity) > 99)) throw new Error('quantity must be an integer 1..99.');
   if (d.action.type === 'walkToAnchor' && (typeof action.anchorId !== 'string' || !/^anchor-[a-f0-9]{8}$/.test(action.anchorId))) throw new Error('walkToAnchor requires a visible anchor ID');
+  if (d.action.type === 'moveDirection' && (!feedbackTiming
+    || !['north', 'northeast', 'east', 'southeast', 'south', 'southwest', 'west', 'northwest'].includes(String(action.direction))
+    || !Number.isInteger(action.durationMs) || Number(action.durationMs) < 100 || Number(action.durationMs) > 2000))
+    throw new Error('moveDirection requires feedback timing, an eight-way direction and durationMs 100..2000');
+  const durationLimit = feedbackTiming ? 120000 : 30000;
   if (['readList', 'browse', 'pause', 'lookAround'].includes(d.action.type)
-    && (!Number.isInteger(action.durationMs) || Number(action.durationMs) < 1 || Number(action.durationMs) > 30000)) throw new Error('durationMs must be 1..30000');
+    && (!Number.isInteger(action.durationMs) || Number(action.durationMs) < (feedbackTiming ? 100 : 1) || Number(action.durationMs) > durationLimit)) throw new Error(`durationMs must be ${feedbackTiming ? 100 : 1}..${durationLimit}`);
+  if (panelTiming && action.durationMs !== undefined
+    && (!Number.isInteger(action.durationMs) || Number(action.durationMs) < 0 || Number(action.durationMs) > durationLimit)) throw new Error('Panel durationMs must be 0..120000');
   if (d.action.type === 'browse' && (typeof action.scrollFraction !== 'number' || !Number.isFinite(action.scrollFraction) || action.scrollFraction < 0 || action.scrollFraction > 1)) throw new Error('browse requires scrollFraction 0..1');
   if (d.currentTask !== undefined && (typeof d.currentTask !== 'string' || d.currentTask.length > 160)) throw new Error('currentTask must be a short task intention, not reasoning.');
+  if (d.dragOutcome !== undefined && (d.action.type !== 'add' || !['drop','miss','cancel'].includes(d.dragOutcome))) throw new Error('dragOutcome requires a supported add gesture');
   if (d.attentionTag !== undefined && (typeof d.attentionTag !== 'string' || d.attentionTag.length > 100)) throw new Error('Invalid attentionTag');
   if (d.cueRefs !== undefined && (!Array.isArray(d.cueRefs) || d.cueRefs.length > 20 || d.cueRefs.some(x => typeof x !== 'string' || !x.length || x.length > 200))) throw new Error('Invalid cueRefs');
 }
 
 /** Same HTTP contract as the legacy provider, with actor-only input and externally owned memory. */
-export function createAttentionLlmPolicy(options: NonNullable<TraceOptions['llm']>) {
+export const LEGACY_ACTOR_POLICY_VERSION = 'episodic-choice-v4' as const;
+export function isExtendedActorPolicy(policy?: string): boolean {
+  return ['episodic-choice-v9', 'episodic-choice-v10', 'feedback-choice-v1', 'feedback-choice-v2', 'feedback-choice-v3', 'feedback-choice-v4', 'feedback-choice-v5', 'feedback-choice-v6', 'feedback-choice-v7', 'whole-trace-v3'].includes(policy ?? '');
+}
+export function attentionActorPolicyVersion(options: Pick<TraceOptions, 'actorPolicyVersion' | 'learnerIdentity' | 'attentionExperience'>) {
+  return options.actorPolicyVersion ?? options.learnerIdentity?.policyVersion
+    ?? (options.attentionExperience?.learning?.version === '2' ? options.attentionExperience.learning.policyVersion : LEGACY_ACTOR_POLICY_VERSION);
+}
+export const ACTOR_POLICY_VERSION = 'episodic-choice-v9' as const;
+export const LUNA_ACTOR_POLICY_VERSION = 'episodic-choice-v10' as const;
+
+export function createAttentionLlmPolicy(options: NonNullable<TraceOptions['llm']>, presentationSeed: string | number = 'actor-choice-presentation', extendedPolicy = false) {
   const baseUrl = options.baseUrl ?? process.env.MARKET_LLM_BASE_URL;
   const model = options.model ?? process.env.MARKET_LLM_MODEL;
   if (!baseUrl || !model) throw new Error('LLM mode requires llm.baseUrl/model or MARKET_LLM_MODEL.');
@@ -43,18 +67,19 @@ export function createAttentionLlmPolicy(options: NonNullable<TraceOptions['llm'
   if (!token && url.protocol === 'https:') throw new Error('LLM API key environment variable is not set.');
   if (options.timeoutMs !== undefined && (!Number.isInteger(options.timeoutMs) || options.timeoutMs < 1000 || options.timeoutMs > 120000)) throw new Error('LLM timeoutMs must be 1000..120000.');
   let calls = 0;
-  return async (observation: ActorObservation, history: TraceEntry[], persona: Persona, state: unknown): Promise<Decision> => {
+  return async (observation: ActorObservation, history: TraceEntry[], persona: Persona, state: unknown, activity?: ActorActivityState): Promise<Decision> => {
     const observed=(state as Partial<ReturnType<ActorLearningMemory['getState']>> | null)?.observedThisVisit;
-    const choices = actorChoices(observation, observed ? {anchors:observed.discoveries.anchors,currentAnchor:observed.currentAnchor} : undefined);
+    const memory = observed ? {anchors:observed.discoveries.anchors,currentAnchor:observed.currentAnchor} : undefined;
+    const choices = extendedPolicy ? presentActorChoices(extendedActorChoices(observation, memory), presentationSeed, history.length) : actorChoices(observation, memory);
     if (!choices.length) throw new Error('No supported UI controls in this phase');
     const attempts: unknown[] = [];
     let feedback = '';
     for (let attempt = 0; attempt < 3; attempt++) {
       if (++calls > (options.maxCalls ?? 300)) throw new Error('ATTENTION_GENERATION_LIMIT: model-call-limit (including format repairs)');
       const messages = [
-        { role:'system', content: `Choose ONE next high-level action for a fictional adult shopping in an app. This is one individual, not a representative of intellectual disability. Use the stable personal traits supplied. Do not force mistakes, helplessness, improvement or perfect performance. Use only displayed cues and provided experience; no hidden map or correct-answer feedback exists. Learn from concrete observations and any actually displayed help, but do not assume that seeing instructions means understanding or mastery. Past choices may have been wrong. Previous task items are not the current shopping list. Experience can guide a choice but does not guarantee transfer. lookAround and pause only wait; they do not reveal a new aisle. Movement is necessary to see another area. Reading the list exposes its contents. The lastReadList and instructions in observedThisVisit remain available after movement; absence from the current screen does not erase that recorded information. You may consult them or read again if you choose. Use current visible cues together with your recorded sightings and traveled edges; unseen areas remain unknown. submit requests analysis; it does not reveal a verdict. Choose exactly one ID from availableChoices. The program only translates that ID into the corresponding UI action. Return JSON: {"choiceId":"C1","delayMs":500,"reason":"brief observable action description","currentTask":"short current activity, not an explanation"}. Maintain or revise currentTask yourself; it is a provisional intention and may be mistaken. Do not return an action object, diagnosis, ability score or private reasoning.` },
+        { role:'system', content: extendedPolicy ? `${ACTOR_PERSONA_INSTRUCTIONS}\n${ACTOR_OBSERVATION_INSTRUCTIONS}\nChoose ONE next high-level action for a fictional adult shopping in an app. This is one individual, not a representative of intellectual disability. Use the stable personal traits supplied. practicedStrategies and learningProfile describe initial personal history, not skills learned in this experiment. practiceFocus names areas to observe, not required actions or improvement targets. Keep personality and preferences stable; decide whether a relevant previous experience applies to this situation. Retrieved experiences are historical, may include unsuccessful choices, and do not establish understanding. A displayed correction or help text is available support, not proof that it was learned. Do not force mistakes, helplessness, improvement or perfect performance. Use only displayed cues and provided experience; no hidden map or correct-answer feedback exists. Learn from concrete observations and any actually displayed help, but do not assume that seeing instructions means understanding or mastery. Past choices may have been wrong. Previous task items are not the current shopping list. Experience can guide a choice but does not guarantee transfer. lookAround and pause only wait; they do not reveal a new aisle. Movement is necessary to see another area. Reading the list exposes its contents. The lastReadList and instructions in observedThisVisit remain available after movement; absence from the current screen does not erase that recorded information. You may consult them or read again if you choose. Use current visible cues together with your recorded sightings and traveled edges; unseen areas remain unknown. submit requests analysis; it does not reveal a verdict. Choose exactly one ID from availableChoices. The program only translates that ID into the corresponding UI action. Return JSON: {"choiceId":"an exact availableChoices ID","delayMs":500,"reason":"brief observable action description","currentTask":"short current activity, not an explanation"}. Maintain or revise currentTask yourself; it is a provisional intention and may be mistaken. Do not return an action object, diagnosis, ability score or private reasoning.` : `Choose ONE next high-level action for a fictional adult shopping in an app. This is one individual, not a representative of intellectual disability. Use the stable personal traits supplied. Do not force mistakes, helplessness, improvement or perfect performance. Use only displayed cues and provided experience; no hidden map or correct-answer feedback exists. Learn from concrete observations and any actually displayed help, but do not assume that seeing instructions means understanding or mastery. Past choices may have been wrong. Previous task items are not the current shopping list. Experience can guide a choice but does not guarantee transfer. lookAround and pause only wait; they do not reveal a new aisle. Movement is necessary to see another area. Reading the list exposes its contents. The lastReadList and instructions in observedThisVisit remain available after movement; absence from the current screen does not erase that recorded information. You may consult them or read again if you choose. Use current visible cues together with your recorded sightings and traveled edges; unseen areas remain unknown. submit requests analysis; it does not reveal a verdict. Choose exactly one ID from availableChoices. The program only translates that ID into the corresponding UI action. Return JSON: {"choiceId":"C1","delayMs":500,"reason":"brief observable action description","currentTask":"short current activity, not an explanation"}. Maintain or revise currentTask yourself; it is a provisional intention and may be mistaken. Do not return an action object, diagnosis, ability score or private reasoning.` },
         { role:'user', content:JSON.stringify({observation, personaCharacter:persona.character ?? {description:persona.description},
-          experience:state, availableChoices:choices, ...(feedback ? {formatCorrection:feedback}:{} )}) },
+          experience:state, ...(extendedPolicy && activity ? {activityFeedback:activity}:{}), availableChoices:choices, ...(feedback ? {formatCorrection:feedback}:{} )}) },
       ];
       const wire = options.protocol === 'ollama'
         ? { model,messages,think:false,stream:false,options:{num_ctx:18432,num_predict:500,temperature:0.2} }
@@ -101,7 +126,7 @@ export function createLlmPolicy(options: NonNullable<TraceOptions['llm']>, timeB
     if (previous && history.length > historyLength) {
       const action = history.at(-1)!.action;
       if (action.type !== 'walkTo' && action.type !== 'walkToAnchor' && action.type !== 'readList'
-        && action.type !== 'browse' && action.type !== 'pause' && action.type !== 'lookAround') context.record(action, previous, observation);
+        && action.type !== 'moveDirection' && action.type !== 'browse' && action.type !== 'pause' && action.type !== 'lookAround') context.record(action, previous, observation);
     }
     previous = observation; historyLength = history.length;
     const remainingMs = timeBudgetMs === undefined ? undefined : timeBudgetMs - history.reduce((sum, step) => sum + step.delayMs, 0);

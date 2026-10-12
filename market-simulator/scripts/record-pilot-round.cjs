@@ -5,11 +5,19 @@ const fs = require('node:fs');
 const path = require('node:path');
 const {execFileSync} = require('node:child_process');
 const {confirmedExperience,measureRound} = require('../pilot-evidence.cjs');
-const [directory,traceName,replayId,database,priorFile,auditFlag] = process.argv.slice(2);
-if (auditFlag && auditFlag !== '--allow-nonmonotonic-movement-timestamps') throw new Error('Unknown audit flag');
-const options = {allowNonMonotonicMovementTimestamps:auditFlag === '--allow-nonmonotonic-movement-timestamps'};
+const {recordLearnerRound}=require('../learner-store.cjs');
+const positional=[];let learnerFile;const options={};
+const args=process.argv.slice(2);
+for(let i=0;i<args.length;i++) {
+  if(args[i]==='--allow-nonmonotonic-movement-timestamps') options.allowNonMonotonicMovementTimestamps=true;
+  else if(args[i]==='--learner-file') {if(learnerFile || !args[i+1] || args[i+1].startsWith('--')) throw new Error('Expected one learner file');learnerFile=path.resolve(args[++i]);}
+  else if(args[i].startsWith('--')) throw new Error('Unknown flag: '+args[i]);
+  else positional.push(args[i]);
+}
+const [directory,traceName,replayId,database,priorFile]=positional;
+if(positional.length>5 || learnerFile&&priorFile) throw new Error('Use one learner archive or one legacy experience, not both');
 if (!directory || !traceName || !/^[a-f0-9-]{36}$/.test(replayId??'') || !/^oneuldo_pilot_[a-z0-9_]+$/.test(database??'')) {
-  throw new Error('Usage: record-pilot-round.cjs OUTPUT_DIR TRACE_FILENAME REPLAY_UUID oneuldo_pilot_NAME [PRIOR_EXPERIENCE_FILE]');
+  throw new Error('Usage: record-pilot-round.cjs OUTPUT_DIR TRACE_FILENAME REPLAY_UUID oneuldo_pilot_NAME [PRIOR_EXPERIENCE_FILE] [--learner-file FILE] [--allow-nonmonotonic-movement-timestamps]');
 }
 const dir=path.resolve(directory), file=path.resolve(dir,traceName);
 if (path.dirname(file)!==dir || !file.endsWith('.json')) throw new Error('Trace must be a JSON file inside the run directory');
@@ -36,14 +44,16 @@ if (receipt.timeReversals) receipt.timeReversalDetails=query(`WITH events AS (
 ) SELECT json_agg(json_build_object('sequence',event_sequence,'eventCode',event_code,'previousEventCode',previous_code,
  'occurredAt',occurred_at,'previousTime',previous_time,'reversalMs',extract(epoch FROM previous_time-occurred_at)*1000))
  FROM events WHERE occurred_at<previous_time`);
-const job=query(`SELECT row_to_json(j) FROM (SELECT id,session_id,status,stage,analysis_id,error_code,created_at,updated_at
+const job=query(`SELECT row_to_json(j) FROM (SELECT id,session_id AS "sessionId",status,stage,analysis_id AS "analysisId",error_code AS "errorCode",created_at AS "createdAt",updated_at AS "updatedAt"
  FROM ai_analysis_jobs WHERE session_id='${replay.sessionId}' AND member_id='${replay.memberId}' ORDER BY created_at DESC LIMIT 1) j`);
 const prior=priorFile?read(path.resolve(priorFile)):undefined;
-const experience=confirmedExperience(trace,snapshot,replay,receipt,prior,options);
+const experience=learnerFile?recordLearnerRound({learnerFile,trace,snapshot,replay,receipt,options}).experience
+  :confirmedExperience(trace,snapshot,replay,receipt,prior,options);
 const measurement=measureRound(trace,snapshot,replay,receipt,options);
 const stem=file.replace(/\.json$/,'');
 for(const [suffix,value] of Object.entries({replay,receipt,measurement,experience,job})) {
+  if(value===undefined) continue;
   fs.writeFileSync(`${stem}.${suffix}.json`,JSON.stringify(value,null,2)+'\n',{flag:'wx',mode:0o600});
 }
 console.log(JSON.stringify({replayId,sessionId:replay.sessionId,measurement,analysisStatus:job?.status??'NOT_FOUND',
-  analysisReady:job?.status==='READY',questLinkageVerified:false,experienceFile:path.basename(stem+'.experience.json')},null,2));
+  analysisReady:job?.status==='READY',questLinkageVerified:false,experienceFile:experience?path.basename(stem+'.experience.json'):null,learnerFile:learnerFile??null},null,2));

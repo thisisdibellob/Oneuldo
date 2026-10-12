@@ -1,6 +1,6 @@
 import { validateMarketReplayTrace, type MarketReplayStep, type MarketReplayTrace } from '../game/marketReplayTrace';
 import { assertReplayActive, replayAwait, replayDelay, replayStep, replayUntil, type ReplayMotionPort, type ReplayUiPort } from './ports';
-import { createMotionReport, dragProduct, walkToAnchor, walkToStation, walkToVisibleStation } from './motor';
+import { createMotionReport, dragProduct, moveDirection, walkToAnchor, walkToStation, walkToVisibleStation } from './motor';
 import { replayPresentationKey, validateReplayPresentation } from '../game/marketReplayPerception';
 
 export type ReplayProgress = {
@@ -45,7 +45,7 @@ export async function playMarketTrace(trace: MarketReplayTrace, getUi: () => Rep
           const before = ui().read().briefingStep;
           ui().advanceBriefing();
           await replayUntil(() => !ui().read().briefing || ui().read().briefingStep !== before, signal);
-          if (ui().read().briefing) await replayDelay(step.reactionDelayMs, signal);
+          if (ui().read().briefing && step.reactionDelayMs > 0) await replayDelay(step.reactionDelayMs, signal);
         }
         await replayUntil(() => !motion.read().locked, signal); return;
       }
@@ -54,6 +54,8 @@ export async function playMarketTrace(trace: MarketReplayTrace, getUi: () => Rep
         else await walkToStation(motion, step.target.stationId, step.movement, signal, report, step.timeoutMs);
         return;
       case 'walkToAnchor': await walkToAnchor(motion, step.target.anchorId, presentation!, step.movement, signal, report, step.timeoutMs); return;
+      case 'moveDirection':
+        await moveDirection(motion, step.direction, step.durationMs, presentation!, step.movement, signal, report, step.timeoutMs); return;
       case 'readList':
         if (ui().read().briefing || ui().read().phase !== 'shopping' || ui().read().shelf || ui().read().cartOpen || ui().read().helpOpen || ui().read().staffOpen || motion.read().locked) {
           throw new Error('Shopping list is not visible on the world HUD');
@@ -89,10 +91,14 @@ export async function playMarketTrace(trace: MarketReplayTrace, getUi: () => Rep
       case 'viewCart':
         if (ui().read().helpOpen || ui().read().cartOpen || ui().read().staffOpen || ui().read().phase !== 'shopping') throw new Error('Cart button is not visible; close the current panel first');
         if (ui().shelf()) shelf().viewCart(true); else ui().viewCart();
-        await replayDelay(260, signal); return;
+        await replayDelay(260, signal);
+        if (step.durationMs) await replayDelay(step.durationMs, signal);
+        return;
       case 'viewHelp':
         if (ui().read().shelf || ui().read().cartOpen || ui().read().staffOpen || ui().read().phase !== 'shopping') throw new Error('Help button is not visible; close the current panel first');
-        ui().viewHelp(); await replayDelay(260, signal); return;
+        ui().viewHelp(); await replayDelay(260, signal);
+        if (step.durationMs) await replayDelay(step.durationMs, signal);
+        return;
       case 'closeView': ui().closeView(); await replayDelay(280, signal); return;
       case 'closeStation':
         ui().closeStation(); await replayUntil(() => !ui().read().shelf && !ui().read().staffOpen && ui().read().phase !== 'checkout', signal);
@@ -151,7 +157,7 @@ export async function playMarketTrace(trace: MarketReplayTrace, getUi: () => Rep
     for (index = 0; index < trace.steps.length; index++) {
       const step = trace.steps[index];
       progress('running');
-      await replayDelay(step.reactionDelayMs, signal);
+      if (step.reactionDelayMs > 0) await replayDelay(step.reactionDelayMs, signal);
       const startedAt = new Date().toISOString();
       await replayStep(stepSignal => execute(step, stepSignal), signal, step.timeoutMs);
       assertReplayActive(signal);

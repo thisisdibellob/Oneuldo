@@ -47,7 +47,8 @@
       "enum": [
         "3",
         "4",
-        "5"
+        "5",
+        "6"
       ]
     },
     "generation": {
@@ -70,13 +71,413 @@
           "maxLength": 100
         },
         "timingProfile": {
-          "enum": ["compact-v1"]
+          "enum": [
+            "compact-v1",
+            "actor-preserved-v1",
+            "activity-duration-v1",
+            "activity-duration-v2"
+          ]
         },
-        "actorPolicyVersion": { "enum": ["episodic-choice-v1", "episodic-choice-v2", "episodic-choice-v3", "episodic-choice-v4"] },
+        "actorPolicyVersion": {
+          "enum": [
+            "episodic-choice-v1",
+            "episodic-choice-v2",
+            "episodic-choice-v3",
+            "episodic-choice-v4",
+            "episodic-choice-v5",
+            "episodic-choice-v6",
+            "episodic-choice-v7",
+            "episodic-choice-v8",
+            "episodic-choice-v9",
+            "episodic-choice-v10",
+            "feedback-choice-v1",
+            "whole-trace-v1",
+            "whole-trace-v2",
+            "whole-trace-v3",
+            "feedback-choice-v2",
+            "feedback-choice-v3",
+            "feedback-choice-v4",
+            "feedback-choice-v5",
+            "feedback-choice-v6",
+            "feedback-choice-v7"
+          ]
+        },
+        "feedback": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "version",
+                "observationScope",
+                "memory",
+                "contextDelivery",
+                "decisions"
+              ],
+              "properties": {
+                "version": {
+                  "enum": [
+                    "1"
+                  ]
+                },
+                "observationScope": {
+                  "enum": [
+                    "current-screen"
+                  ]
+                },
+                "memory": {
+                  "enum": [
+                    "actor-authored"
+                  ]
+                },
+                "contextDelivery": {
+                  "enum": [
+                    "stateless-http",
+                    "external-frame"
+                  ]
+                },
+                "decisions": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 100
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "version",
+                "observationScope",
+                "memory",
+                "contextDelivery",
+                "decisions",
+                "experienceContract",
+                "intentContract"
+              ],
+              "properties": {
+                "version": {
+                  "enum": [
+                    "2"
+                  ]
+                },
+                "observationScope": {
+                  "enum": [
+                    "current-screen"
+                  ]
+                },
+                "memory": {
+                  "enum": [
+                    "actor-authored-with-recent-experience"
+                  ]
+                },
+                "contextDelivery": {
+                  "enum": [
+                    "stateless-http",
+                    "external-frame"
+                  ]
+                },
+                "decisions": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 100
+                },
+                "experienceContract": {
+                  "const": "bounded-observed-experience-v1"
+                },
+                "intentContract": {
+                  "const": "persistent-intent-v1"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "version",
+                "observationScope",
+                "memory",
+                "contextDelivery",
+                "decisions",
+                "experienceContract",
+                "intentContract",
+                "beliefContract"
+              ],
+              "properties": {
+                "version": {
+                  "const": "3"
+                },
+                "observationScope": {
+                  "enum": [
+                    "current-screen"
+                  ]
+                },
+                "memory": {
+                  "enum": [
+                    "actor-authored-with-recent-experience"
+                  ]
+                },
+                "contextDelivery": {
+                  "enum": [
+                    "stateless-http",
+                    "external-frame"
+                  ]
+                },
+                "decisions": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 100
+                },
+                "experienceContract": {
+                  "const": "bounded-observed-experience-v2"
+                },
+                "intentContract": {
+                  "const": "persistent-intent-v1"
+                },
+                "beliefContract": {
+                  "const": "quantity-source-beliefs-v1"
+                }
+              }
+            }
+          ]
+        },
+        "reasoningEffort": {
+          "enum": [
+            "low"
+          ]
+        },
         "sourceTraceId": {
           "type": "string",
           "minLength": 1,
           "maxLength": 100
+        },
+        "experienceFingerprint": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{32}$"
+        },
+        "learnerIdentity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "learnerId",
+            "memberId",
+            "personaId",
+            "personaVersion",
+            "experimentId",
+            "arm",
+            "model",
+            "policyVersion"
+          ],
+          "properties": {
+            "learnerId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "memberId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "personaId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "personaVersion": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "experimentId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "arm": {
+              "enum": [
+                "A",
+                "B",
+                "C"
+              ]
+            },
+            "model": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "policyVersion": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "reasoningEffort": {
+              "enum": [
+                "low"
+              ]
+            }
+          }
+        },
+        "trialBinding": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "trialId",
+            "arm",
+            "roundId",
+            "requestHash"
+          ],
+          "properties": {
+            "trialId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500
+            },
+            "arm": {
+              "enum": [
+                "A",
+                "B",
+                "C"
+              ]
+            },
+            "roundId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500
+            },
+            "requestHash": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500
+            }
+          }
+        },
+        "systemCompletion": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "reason",
+            "afterDecisions",
+            "actionLimit",
+            "firstStepId",
+            "checkoutId",
+            "cartAtStart"
+          ],
+          "properties": {
+            "reason": {
+              "const": "action-limit"
+            },
+            "afterDecisions": {
+              "type": "integer",
+              "const": 100
+            },
+            "actionLimit": {
+              "type": "integer",
+              "const": 100
+            },
+            "firstStepId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "checkoutId": {
+              "enum": [
+                "checkout",
+                "checkout-2"
+              ]
+            },
+            "cartAtStart": {
+              "type": "object"
+            }
+          }
+        },
+        "controlledStop": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "reason",
+                "afterDecisions",
+                "reviewCount"
+              ],
+              "properties": {
+                "reason": {
+                  "const": "persistent-stagnation"
+                },
+                "afterDecisions": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "reviewCount": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "reason",
+                "afterDecisions",
+                "actionLimit"
+              ],
+              "properties": {
+                "reason": {
+                  "const": "action-limit"
+                },
+                "afterDecisions": {
+                  "type": "integer",
+                  "const": 100
+                },
+                "actionLimit": {
+                  "type": "integer",
+                  "const": 100
+                }
+              }
+            }
+          ]
+        },
+        "planningMode": {
+          "enum": [
+            "whole-trace"
+          ]
+        },
+        "observationScope": {
+          "enum": [
+            "whole-world"
+          ]
+        },
+        "actorKnowledgeScope": {
+          "enum": [
+            "observed-and-remembered"
+          ]
+        },
+        "actorStateVersion": {
+          "enum": [
+            "1"
+          ]
+        },
+        "planningSubmissions": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "repairSubmissions": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "movementContract": {
+          "enum": [
+            "joystick-direction-v1"
+          ]
+        },
+        "movementPolicy": {
+          "$ref": "#/$defs/movementPolicy"
         }
       },
       "required": [
@@ -191,8 +592,6 @@
             "type": {
               "enum": [
                 "start",
-                "viewCart",
-                "viewHelp",
                 "closeView",
                 "closeStation",
                 "submitForReview",
@@ -215,6 +614,70 @@
                 "minLength": 1,
                 "maxLength": 100
               }
+            },
+            "movementPolicy": {
+              "$ref": "#/$defs/movementPolicyDecision"
+            }
+          },
+          "required": [
+            "id",
+            "reactionDelayMs",
+            "timeoutMs",
+            "reason",
+            "type"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "reactionDelayMs": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 120000
+            },
+            "timeoutMs": {
+              "type": "integer",
+              "minimum": 1000,
+              "maximum": 300000
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1000
+            },
+            "type": {
+              "enum": [
+                "viewCart",
+                "viewHelp"
+              ]
+            },
+            "attentionTag": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "cueRefs": {
+              "type": "array",
+              "maxItems": 32,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              }
+            },
+            "durationMs": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 120000
+            },
+            "movementPolicy": {
+              "$ref": "#/$defs/movementPolicyDecision"
             }
           },
           "required": [
@@ -320,6 +783,9 @@
                 "minLength": 1,
                 "maxLength": 100
               }
+            },
+            "movementPolicy": {
+              "$ref": "#/$defs/movementPolicyDecision"
             }
           },
           "required": [
@@ -380,6 +846,9 @@
                 "minLength": 1,
                 "maxLength": 100
               }
+            },
+            "movementPolicy": {
+              "$ref": "#/$defs/movementPolicyDecision"
             }
           },
           "required": [
@@ -438,6 +907,9 @@
                 "minLength": 1,
                 "maxLength": 100
               }
+            },
+            "movementPolicy": {
+              "$ref": "#/$defs/movementPolicyDecision"
             }
           },
           "required": [
@@ -501,6 +973,9 @@
                 "minLength": 1,
                 "maxLength": 100
               }
+            },
+            "movementPolicy": {
+              "$ref": "#/$defs/movementPolicyDecision"
             }
           },
           "required": [
@@ -599,6 +1074,9 @@
                 "minLength": 1,
                 "maxLength": 100
               }
+            },
+            "movementPolicy": {
+              "$ref": "#/$defs/movementPolicyDecision"
             }
           },
           "required": [
@@ -664,6 +1142,9 @@
                 "minLength": 1,
                 "maxLength": 100
               }
+            },
+            "movementPolicy": {
+              "$ref": "#/$defs/movementPolicyDecision"
             }
           },
           "required": [
@@ -724,6 +1205,9 @@
                 "minLength": 1,
                 "maxLength": 100
               }
+            },
+            "movementPolicy": {
+              "$ref": "#/$defs/movementPolicyDecision"
             }
           },
           "required": [
@@ -783,6 +1267,9 @@
                 "minLength": 1,
                 "maxLength": 100
               }
+            },
+            "movementPolicy": {
+              "$ref": "#/$defs/movementPolicyDecision"
             }
           },
           "required": [
@@ -849,6 +1336,9 @@
                 "minLength": 1,
                 "maxLength": 100
               }
+            },
+            "movementPolicy": {
+              "$ref": "#/$defs/movementPolicyDecision"
             }
           },
           "required": [
@@ -920,6 +1410,9 @@
                 "minLength": 1,
                 "maxLength": 100
               }
+            },
+            "movementPolicy": {
+              "$ref": "#/$defs/movementPolicyDecision"
             }
           },
           "required": [
@@ -1026,6 +1519,9 @@
                 "minLength": 1,
                 "maxLength": 100
               }
+            },
+            "movementPolicy": {
+              "$ref": "#/$defs/movementPolicyDecision"
             }
           },
           "required": [
@@ -1083,6 +1579,9 @@
                 "minLength": 1,
                 "maxLength": 100
               }
+            },
+            "movementPolicy": {
+              "$ref": "#/$defs/movementPolicyDecision"
             }
           },
           "required": [
@@ -1094,8 +1593,196 @@
             "durationMs"
           ],
           "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "reactionDelayMs": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 120000
+            },
+            "timeoutMs": {
+              "type": "integer",
+              "minimum": 1000,
+              "maximum": 300000
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1000
+            },
+            "type": {
+              "const": "moveDirection"
+            },
+            "movement": {
+              "type": "object",
+              "properties": {
+                "speedMultiplier": {
+                  "type": "number",
+                  "minimum": 0.4,
+                  "maximum": 1
+                },
+                "accelerationMs": {
+                  "type": "integer",
+                  "minimum": 100,
+                  "maximum": 300
+                }
+              },
+              "required": [
+                "speedMultiplier",
+                "accelerationMs"
+              ],
+              "additionalProperties": false
+            },
+            "attentionTag": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "cueRefs": {
+              "type": "array",
+              "maxItems": 32,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              }
+            },
+            "direction": {
+              "enum": [
+                "north",
+                "northeast",
+                "east",
+                "southeast",
+                "south",
+                "southwest",
+                "west",
+                "northwest"
+              ]
+            },
+            "durationMs": {
+              "type": "integer",
+              "minimum": 100,
+              "maximum": 2000
+            },
+            "movementPolicy": {
+              "$ref": "#/$defs/movementPolicyDecision"
+            }
+          },
+          "required": [
+            "id",
+            "reactionDelayMs",
+            "timeoutMs",
+            "reason",
+            "type",
+            "movement",
+            "direction",
+            "durationMs"
+          ],
+          "additionalProperties": false
         }
       ]
+    },
+    "movementPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "wanderProbability",
+        "blockedDirectionCooldown",
+        "unblockDistancePx"
+      ],
+      "properties": {
+        "version": {
+          "enum": [
+            "exploration-v1",
+            "exploration-v2"
+          ]
+        },
+        "wanderProbability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "blockedDirectionCooldown": {
+          "type": "integer",
+          "const": 4
+        },
+        "unblockDistancePx": {
+          "type": "number",
+          "const": 24
+        }
+      }
+    },
+    "movementPolicyDecision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "mode",
+        "eligible",
+        "wanderProbability",
+        "roll",
+        "avoidedDirections"
+      ],
+      "properties": {
+        "version": {
+          "enum": [
+            "exploration-v1",
+            "exploration-v2"
+          ]
+        },
+        "mode": {
+          "enum": [
+            "actor-choice",
+            "random-wander",
+            "blocked-recovery"
+          ]
+        },
+        "eligible": {
+          "type": "boolean"
+        },
+        "wanderProbability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "roll": {
+          "oneOf": [
+            {
+              "type": "number",
+              "minimum": 0,
+              "exclusiveMaximum": 1
+            },
+            {
+              "const": null
+            }
+          ]
+        },
+        "avoidedDirections": {
+          "type": "array",
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "north",
+              "northeast",
+              "east",
+              "southeast",
+              "south",
+              "southwest",
+              "west",
+              "northwest"
+            ]
+          }
+        }
+      }
     }
   }
 }

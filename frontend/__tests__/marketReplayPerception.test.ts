@@ -4,7 +4,8 @@ import { isMarketNavigationSegmentClear } from '../src/game/marketNavigation';
 import { createMarketReplaySnapshot, marketReplayTraceId, validateMarketReplaySnapshot, validateMarketReplayTrace,
   type MarketReplayTrace } from '../src/game/marketReplayTrace';
 import { DEFAULT_REPLAY_PRESENTATION, getReplayShelfPage, replayShelfPageFractions, resolveReplayAnchor,
-  visibleAnchors, visibleStations } from '../src/game/marketReplayPerception';
+  visibleAnchors, visibleStations, visibleUnlabelledShelfBodies } from '../src/game/marketReplayPerception';
+import { MARKET_SHELF_PAIR_HEIGHT, MARKET_SHELF_PAIR_WIDTH } from '../src/game/marketFixtureLayout';
 
 const environment = () => createMarketEnvironment({ seed: 'replay-motor-test', employeeCount: 1, customerCount: 1,
   employeeSlotIds: ['staff-southwest'], customerSlotIds: ['customer-southeast'], cashierCount: 2, pillarCount: 0, kioskPresent: false });
@@ -81,6 +82,62 @@ test('visible station cues expose neither geometry nor off-screen global station
   for (const station of stations) expect(Object.keys(station).sort()).toEqual(['direction', 'distanceBand', 'id', 'kind', 'label', 'near']);
   const zoomed = visibleStations(e, e.spawn, { ...DEFAULT_REPLAY_PRESENTATION, zoom: 2 });
   expect(zoomed.length).toBeLessThanOrEqual(stations.length);
+});
+
+const bodyPresentation = { viewport: { width: 400, height: 400 }, zoom: 1.3 };
+const bodyObserver = { x: 700, y: 700 };
+function isolatedShelfBody(x: number, y: number) {
+  const e = environment();
+  e.stationDetails = e.stationDetails.filter(station => station.id === 'drink');
+  e.shelves.drink = { ...e.shelves.drink, x, y, orientation: 'horizontal',
+    width: MARKET_SHELF_PAIR_WIDTH, height: MARKET_SHELF_PAIR_HEIGHT };
+  e.stationDetails[0].point = { x: x + MARKET_SHELF_PAIR_WIDTH / 2, y: y + MARKET_SHELF_PAIR_HEIGHT + 10 };
+  return e;
+}
+
+test('v2 notices a visible shelf body when its label is below the viewport, without changing v1 cues', () => {
+  const e = isolatedShelfBody(640, 800);
+  const before = visibleStations(e, bodyObserver, bodyPresentation);
+  expect(before).toEqual([]);
+  const bodies = visibleUnlabelledShelfBodies(e, bodyObserver, bodyPresentation);
+  expect(bodies.length).toBeGreaterThan(0);
+  for (const body of bodies) {
+    expect(Object.keys(body).sort()).toEqual(['direction', 'distanceBand', 'kind', 'label']);
+    expect(body.kind).toBe('shelf');
+    expect(body.label).toBe('진열대');
+    expect(['south', 'southeast']).toContain(body.direction);
+  }
+  expect(visibleStations(e, bodyObserver, bodyPresentation)).toEqual(before);
+});
+
+test('a body behind the shopping HUD or entirely off-screen supplies no structure cue', () => {
+  const masked = isolatedShelfBody(800, 650);
+  expect(visibleStations(masked, bodyObserver, bodyPresentation)).toEqual([]);
+  expect(visibleUnlabelledShelfBodies(masked, bodyObserver, bodyPresentation)).toEqual([]);
+  expect(visibleUnlabelledShelfBodies(isolatedShelfBody(640, 100), bodyObserver, bodyPresentation)).toEqual([]);
+  // Accessibility layout can cover more of the world; it must not reveal a
+  // structure through the enlarged, lowered shopping note.
+  expect(visibleUnlabelledShelfBodies(isolatedShelfBody(640, 800), bodyObserver,
+    { ...bodyPresentation, fontScale: 4, safeArea: { top: 200, bottom: 0 } })).toEqual([]);
+});
+
+test('a readable nearby shelf is represented once as a labelled station, not again as anonymous furniture', () => {
+  const e = isolatedShelfBody(640, 650);
+  expect(visibleStations(e, bodyObserver, bodyPresentation).map(station => station.id)).toEqual(['drink']);
+  expect(visibleUnlabelledShelfBodies(e, bodyObserver, bodyPresentation)).toEqual([]);
+});
+
+test('anonymous body cues do not disclose the hidden category through IDs, ordering or duplicate counts', () => {
+  const e = isolatedShelfBody(640, 800);
+  const original = visibleUnlabelledShelfBodies(e, bodyObserver, bodyPresentation);
+  const changed = structuredClone(e);
+  changed.shelves.fresh = { ...changed.shelves.drink };
+  changed.stationDetails = [{ ...changed.stationDetails[0], id: 'fresh', categoryId: 'fresh' }];
+  expect(visibleUnlabelledShelfBodies(changed, bodyObserver, bodyPresentation)).toEqual(original);
+  changed.stationDetails.push({ ...changed.stationDetails[0], id: 'drink', categoryId: 'drink' });
+  changed.stationDetails.reverse();
+  expect(visibleUnlabelledShelfBodies(changed, bodyObserver, bodyPresentation)).toEqual(original);
+  expect(JSON.stringify(original)).not.toMatch(/drink|fresh|product|category|anchor|coordinate/);
 });
 
 test('offered passages keep the full arrival tolerance outside crowded fixture footprints', () => {

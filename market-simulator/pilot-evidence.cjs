@@ -2,13 +2,43 @@
 // Experimental measurements only; no changes to production AI judgments or actor error rates.
 const { createHash } = require('node:crypto');
 require('./runtime.cjs');
-const { marketReplayTraceId, validateMarketReplayTrace } = require('../frontend/src/game/marketReplayTrace.ts');
+const { marketReplayTraceId, validateMarketReplayTrace, canonicalMarketReplayJson } = require('../frontend/src/game/marketReplayTrace.ts');
 const { validateAttentionMemory } = require('./src/attentionPolicy.ts');
-const {validateLearning} = require('./src/actorLearning.ts');
+const {validateLearning,validateLearnerIdentity,assertLearnerIdentity,assertPersonaLearningEligible,LEARNER_IDENTITY_KEYS,learnerIdentityFrom} = require('./src/actorLearning.ts');
 const {TraceGuard} = require('./src/traceValidation.ts');
 const { marketProducts } = require('../frontend/src/game/scenarios.ts');
 const hash = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const need = (value, message) => { if (!value) throw new Error(message); };
+
+function positiveCart(cart, message) {
+  need(cart && typeof cart === 'object' && !Array.isArray(cart)
+    && Object.values(cart).every(q => Number.isSafeInteger(q) && q >= 0), message);
+  return Object.fromEntries(Object.entries(cart).filter(([,quantity]) => quantity > 0));
+}
+function verifySystemCompletion(trace, replay) {
+  const completion = trace.generation?.systemCompletion;
+  if (!completion) return;
+  const expected = canonicalMarketReplayJson(completion.cartAtStart);
+  need(replay.report.submission?.source === 'app-ui-before-submit', 'System completion requires actual app submission evidence');
+  need(canonicalMarketReplayJson(positiveCart(replay.report.submission.cart, 'Invalid actual cart')) === expected,
+    'System completion submitted cart differs from the actor boundary');
+  const observed = replay.report.systemCompletion;
+  if (observed !== undefined) {
+    need(observed && typeof observed === 'object' && !Array.isArray(observed), 'Invalid app system completion boundary');
+    const {observedCartAtStart, startedAt, source, ...metadata} = observed;
+    need(source === 'app-ui-before-system-completion' && Number.isFinite(Date.parse(startedAt))
+      && canonicalMarketReplayJson(metadata) === canonicalMarketReplayJson(completion), 'App system completion boundary differs from trace');
+    need(canonicalMarketReplayJson(positiveCart(observedCartAtStart, 'Invalid observed system completion cart')) === expected,
+      'Observed system completion cart differs from the actor boundary');
+  }
+}
+function actorSteps(trace) {
+  const firstStepId = trace.generation?.systemCompletion?.firstStepId;
+  if (!firstStepId) return trace.steps;
+  const first = trace.steps.findIndex(step => step.id === firstStepId);
+  need(first >= 0, 'System completion actor boundary is missing');
+  return trace.steps.slice(0, first);
+}
 
 function verifyExecution(trace, snapshot, replay, receipt, options = {}) {
   need(validateMarketReplayTrace(trace, snapshot).valid && marketReplayTraceId(trace) === trace.traceId, 'Trace/snapshot mismatch');
@@ -28,15 +58,36 @@ function verifyExecution(trace, snapshot, replay, receipt, options = {}) {
       && details.every(d => d.eventCode === 'SHOP.MOVEMENT_SAMPLED' && d.previousEventCode === 'SHOP.MOVEMENT_SAMPLED'
         && Number.isFinite(d.reversalMs) && d.reversalMs > 0), 'Non-monotonic event time requires an explicit movement-only audit');
   }
+  verifySystemCompletion(trace,replay);
   return true;
 }
 
-/** Reconstruct only content tied to executed controls, never AI analysis or task correctness. */
-function executedLearning(trace, snapshot, replay, prior) {
-  if (prior) { validateLearning(prior); need(prior.memberId === replay.memberId, 'Learning cannot cross test accounts'); }
+function bindLearningIdentity(identity, trace, replay) {
+  validateLearnerIdentity(identity);
+  need(trace.generation?.learnerIdentity, 'Persistent learner traces require their generation learner identity');
+  assertLearnerIdentity(trace.generation.learnerIdentity,identity);
+  need(identity.memberId === replay.memberId, 'Learner identity mismatch: memberId');
+  need(trace.generationPolicy === 'llm', 'Persistent learner experience requires an AI trace');
+  for (const [key,value] of Object.entries({personaId:trace.personaId,personaVersion:trace.personaVersion,
+    model:trace.generation?.model,policyVersion:trace.generation?.actorPolicyVersion}))
+    need(identity[key] === value, `Learner identity mismatch: ${key}`);
+}
+
+/** Reconstruct only content tied to executed controls, never AI analysis or task correctness.
+ * Text comes from the shared app/guard presentation, not a claim of measured comprehension.
+ */
+function executedLearning(trace, snapshot, replay, prior, identity) {
+  if (prior) {
+    validateLearning(prior); need(prior.memberId === replay.memberId, 'Learning cannot cross test accounts');
+    if (identity) {
+      need(prior.version === '2', 'Legacy unbound experience cannot seed a persistent learner');
+      assertLearnerIdentity(learnerIdentityFrom(prior),identity);
+    }
+  }
+  if (identity) bindLearningIdentity(identity,trace,replay);
   const episodes = [...(prior?.episodes ?? [])];
-  const guard = new TraceGuard(snapshot,trace.personaId,trace.personaVersion,'confirmed-experience',true);
-  for(const step of trace.steps) {
+  const guard = new TraceGuard(snapshot,trace.personaId,trace.personaVersion,'confirmed-experience',true,Boolean(identity));
+  for(const [stepIndex,step] of actorSteps(trace).entries()) {
     const before=guard.observeActor(); guard.execute(step); const after=guard.observeActor();
     const e={action:step.type,source:'executed-app-action'};
     if(step.type==='start' && before.instructions) e.instructions=before.instructions.lines;
@@ -52,10 +103,24 @@ function executedLearning(trace, snapshot, replay, prior) {
     }
     if(step.type==='viewCart') e.result=('Displayed basket: '+JSON.stringify(after.cart)).slice(0,500);
     if(step.type==='checkout' && after.instructions) e.instructions=after.instructions.lines;
-    if(step.type==='viewHelp') e.result='Help opened; help text not captured; comprehension unknown.';
-    if(Object.keys(e).length>2) episodes.push(e);
+    if(step.type==='viewHelp') {
+      if(after.supportText?.length) e.supportText=[...after.supportText];
+      e.result=after.supportText?.length ? 'Help text displayed; comprehension unknown.' : 'Help opened; help text not captured; comprehension unknown.';
+    }
+    if(step.type==='talkToStaff' && ['requestCashier','returnProduct'].includes(step.choice) && after.result?.message) {
+      e.target=step.stationId;e.result=after.result.message;
+      if(step.choice==='returnProduct') {
+        const p=marketProducts.find(p=>p.id===step.productId);e.product=p?`${p.name} ${p.detail??''}`.trim():step.productId;e.quantity=step.quantity;
+      }
+    }
+    if (identity) {
+      e.evidence={sessionId:replay.sessionId,replayId:replay.replayId,traceId:trace.traceId,stepId:step.id,stepIndex};
+      // Retain executed actor history; the automatic checkout suffix is never actor learning.
+      episodes.push(e);
+    } else if(Object.keys(e).length>2) episodes.push(e);
   }
-  const artifact={version:'1',source:'confirmed-app-replay',memberId:replay.memberId,sessionId:replay.sessionId,replayId:replay.replayId,episodes:episodes.slice(-24)};
+  const artifact={version:identity?'2':'1',source:'confirmed-app-replay',...(identity??{}),memberId:replay.memberId,
+    sessionId:replay.sessionId,replayId:replay.replayId,episodes:identity?episodes:episodes.slice(-24)};
   validateLearning(artifact);return artifact;
 }
 
@@ -65,6 +130,9 @@ function executedLearning(trace, snapshot, replay, prior) {
  */
 function confirmedExperience(trace, snapshot, replay, receipt, prior, options = {}) {
   verifyExecution(trace, snapshot, replay, receipt, options);
+  assertPersonaLearningEligible(trace);
+  const identity=options.identity ?? (prior?.learning?.version==='2' ? learnerIdentityFrom(prior.learning) : undefined);
+  if (identity) bindLearningIdentity(identity,trace,replay);
   if (prior) {
     need(prior.provenance?.source === 'confirmed-app-replay' && prior.provenance.memberId === replay.memberId, 'Memory cannot cross test arms/accounts');
     validateAttentionMemory(prior.memory);
@@ -76,7 +144,7 @@ function confirmedExperience(trace, snapshot, replay, receipt, prior, options = 
     viewCart:'viewCart', viewHelp:'viewHelp', closeView:'closeView', closeStation:'closeStation',
     checkout:'checkout', requestCashier:'requestCashier', requestReturn:'requestReturn', submitForReview:'submit',
     giveUp:'giveUp', skipRating:'skipRating' };
-  for (const step of trace.steps) {
+  for (const step of actorSteps(trace)) {
     if (mapping[step.type]) controls.add(mapping[step.type]);
     if (step.type === 'dragProduct') {
       const p = marketProducts.find(p => p.id === step.productId);
@@ -88,9 +156,11 @@ function confirmedExperience(trace, snapshot, replay, receipt, prior, options = 
   const memory = { version:'1', stations:[], anchors:[], knownProducts:[...products.values()], controlsPracticed:[...controls] };
   validateAttentionMemory(memory);
   return { visit:'revisit', previousLayoutKey:trace.attentionExperience.layoutKey, memory,
-    ...(trace.generationPolicy==='llm' ? {learning:executedLearning(trace,snapshot,replay,prior?.learning)} : {}),
+    ...(trace.generationPolicy==='llm' ? {learning:executedLearning(trace,snapshot,replay,prior?.learning,identity)} : {}),
     provenance:{ source:'confirmed-app-replay', replayId:replay.replayId, sessionId:replay.sessionId, memberId:replay.memberId,
-      traceHash:hash(trace), databaseReceiptHash:hash(receipt), comprehensionMeasured:false, spatialMemoryRetained:false,
+      traceHash:hash(trace), databaseReceiptHash:hash(receipt), ...(identity ? {identity:{...identity}} : {}), comprehensionMeasured:false, spatialMemoryRetained:false,
+      ...(trace.generation?.systemCompletion ? {learningScope:'actor-prefix',
+        systemCompletionFirstStepId:trace.generation.systemCompletion.firstStepId} : {}),
       ...(receipt.timeReversals ? { temporalWarning:'NON_MONOTONIC_MOVEMENT_TIMESTAMPS', timeReversals:receipt.timeReversals } : {}) } };
 }
 
@@ -104,6 +174,27 @@ function measureRound(trace, snapshot, replay, receipt, options = {}) {
   const measurement = { source:'actual-app-replay-and-database', sessionId:replay.sessionId, elapsedMs,
     eventCount:receipt.eventCount, actionCounts:counts, submitted:!!submission, purchase:null,
     interpretation:'Task measurements, not an ability score or evidence of real human learning.' };
+  if (trace.generation?.controlledStop) {
+    need(!submission, 'A system-controlled stop cannot have submission evidence');
+    return {...measurement, outcome:'system-intervention', learningEligible:false, performanceEligible:false,
+      intervention:structuredClone(trace.generation.controlledStop),
+      ...(trace.generation.controlledStop.reason === 'action-limit' ? {completion:'action-limit-incomplete',
+        actorDecisionCount:trace.generation.controlledStop.afterDecisions,
+        systemEndingStepIds:trace.steps.slice(-3).map(step=>step.id)} : {}),
+      interpretation:trace.generation.controlledStop.reason === 'action-limit'
+        ? 'Observation ended at 100 actor decisions. The final three controls were added by the system, not chosen by the persona. The task is incomplete, not scored as a failure. Whole-session learning and analysis-effect comparisons remain excluded pending actor-prefix support.'
+        : 'Technical termination by the generation watchdog. Action counts are execution diagnostics only; exclude this run from persona performance, learning and quest-effect comparisons.'};
+  }
+  if (trace.generation?.systemCompletion) {
+    const completion = trace.generation.systemCompletion;
+    const actor = actorSteps(trace), actorActionCounts = {};
+    for (const step of actor) actorActionCounts[step.type] = (actorActionCounts[step.type] ?? 0) + 1;
+    Object.assign(measurement,{outcome:'assisted-completion',completion:'assisted-submission',
+      learningEligible:true,learningScope:'actor-prefix',analysisEligible:true,performanceEligible:false,
+      actorDecisionCount:completion.afterDecisions,actorActionCounts,
+      systemCompletion:structuredClone(completion),systemCompletionStepIds:trace.steps.slice(actor.length).map(step=>step.id),
+      interpretation:'The unchanged actor basket was submitted by the system after 100 decisions. Purchase content may be measured, but automatic checkout is not independent persona completion. Only the executed actor prefix may enter learning; analysis readiness requires its separate server result.'});
+  }
   if (receipt.timeReversals) measurement.temporalWarning = {
     code:'NON_MONOTONIC_MOVEMENT_TIMESTAMPS', details:receipt.timeReversalDetails,
     limitation:'Purchase and completed-action evidence retained; do not infer movement timing across reversed samples. Original timestamps were not changed.'
@@ -111,7 +202,7 @@ function measureRound(trace, snapshot, replay, receipt, options = {}) {
   if (!submission) return measurement;
   need(submission.source === 'app-ui-before-submit', 'Submission must be captured from the actual app');
   const cart = submission.cart;
-  need(Object.values(cart).every(q => Number.isSafeInteger(q) && q >= 0), 'Invalid actual cart');
+  positiveCart(cart, 'Invalid actual cart');
   const allowed = new Set();
   const objectives = snapshot.mission.objectives.map(o => {
     const ids = o.acceptedProductIds?.length ? o.acceptedProductIds : [o.productId];
@@ -135,4 +226,4 @@ function requirePersonalizedContinuation(job, generation, expected) {
     'Quest is not an AI result linked to the completed analysis');
   return true;
 }
-module.exports = { verifyExecution, confirmedExperience, measureRound, requirePersonalizedContinuation };
+module.exports = { verifyExecution, confirmedExperience, measureRound, requirePersonalizedContinuation, bindLearningIdentity };
