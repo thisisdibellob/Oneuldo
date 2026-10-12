@@ -23,6 +23,19 @@ class ActualMcpFinalBudgetTest {
    item.put("systemTokens",QwenTokenCounter.count(attempt.path("systemPrompt").asString()));var sizes=item.putObject("encodedFieldTokens");for(String field:packed.propertyNames())sizes.put(field,QwenTokenCounter.count(packed.get(field).toString()));
    Files.writeString(Path.of("../output/persona45-mcp-20261013/final-source-count-budget.json"),mapper.writerWithDefaultPrettyPrinter().writeValueAsString(report));
    assertThat(required).isLessThanOrEqualTo(24000);found++;
+   var snapshotRows=mapper.readTree(Files.readString(Path.of("../output/persona45-mcp-20261013/auditor/input-snapshots.json")));
+   for(var row:snapshotRows)if(row.path("id").asString().equals(run.path("dataset_id").asString())){
+    var input=mapper.treeToValue(row.path("input_data"),oneuldo.behaviorlog.analysis.domain.BehaviorAnalysisInput.class);
+    var response=new oneuldo.behaviorlog.analysis.domain.BehaviorAnalysisInputResponse(input.datasetId(),input.schemaVersion(),input.generatedAt(),input.sessionCount(),input.eventCount(),input);
+    var refs=new AnalysisReferences(mapper,response);String review=AnalysisReviewPrompt.build(mapper,packed.toString(),null,refs);
+    var decodedReview=codec.decode(mapper.readTree(review));var stations=decodedReview.path("stationClaimSources");
+    assertThat(stations).hasSize(refs.recordedStations().size());
+    for(var station:stations){var recorded=refs.recordedStations().get(station.path("eventId").asString());assertThat(station.path("stationId")).isEqualTo(recorded.path("stationId"));assertThat(station.path("kind")).isEqualTo(recorded.path("kind"));}
+    int reviewRequired=QwenTokenCounter.inputTokens(AnalysisReviewPrompt.system(),review)+3200+512;item.put("reviewRequiredTokens",reviewRequired);
+    item.put("reviewSystemTokens",QwenTokenCounter.count(AnalysisReviewPrompt.system()));var reviewSizes=item.putObject("reviewFieldTokens");var wire=mapper.readTree(review);for(String field:wire.propertyNames())reviewSizes.put(field,QwenTokenCounter.count(wire.get(field).toString()));
+    Files.writeString(Path.of("../output/persona45-mcp-20261013/final-source-count-budget.json"),mapper.writerWithDefaultPrettyPrinter().writeValueAsString(report));
+    assertThat(reviewRequired).isLessThanOrEqualTo(24000);
+   }
   }
   Assumptions.assumeTrue(found>0);
   Files.writeString(Path.of("../output/persona45-mcp-20261013/final-source-count-budget.json"),mapper.writerWithDefaultPrettyPrinter().writeValueAsString(report));
