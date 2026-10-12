@@ -16,7 +16,8 @@ final class AdaptiveQuestObservation {
     static List<Part> plan(ObjectMapper mapper, ObjectNode evidence, JsonNode readableActions, int budget) {
         var rows = new ArrayList<JsonNode>(); evidence.path("events").forEach(rows::add);
         int largest = 0;
-        int maximumParts = Math.max(1, AdaptiveQuestContract.MAXIMUM_AI_CALLS - 4);
+        // Reserve one synthesis, two candidates and two reviews independently of source size.
+        int maximumParts = Math.max(1, AdaptiveQuestContract.MAXIMUM_AI_CALLS - 5);
         for (int count = 1; count <= maximumParts; count++) {
             if (count > 1 && rows.size() < count) break;
             var parts = new ArrayList<Part>(); boolean fits = true; largest = 0;
@@ -30,8 +31,11 @@ final class AdaptiveQuestObservation {
                 var wire = AdaptiveQuestEvidence.encode(mapper, source); wire.set("readableActions", readableActions);
                 String prompt = mapper.writeValueAsString(wire);
                 int required = QwenTokenCounter.inputTokens(AdaptiveMarketQuestService.OBSERVATION_SYSTEM, prompt) + OUTPUT_TOKENS + 32;
-                largest = Math.max(largest, required); if (required > budget) fits = false;
+                largest = Math.max(largest, required);
                 parts.add(new Part(source, prompt, required));
+                // Reject this partition as soon as one request exceeds the budget.
+                // A later partition is still built from the entire immutable source.
+                if (required > budget) { fits = false; break; }
             }
             if (fits) return List.copyOf(parts);
         }
