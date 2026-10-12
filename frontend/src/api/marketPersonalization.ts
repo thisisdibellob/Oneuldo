@@ -111,10 +111,12 @@ async function requestMarketAiQuest(accessToken: string, environmentContext?: Ma
     throw new Error(`AI 맞춤 장보기 퀘스트 생성 실패: ${response.status}`);
   }
   let result:MarketAiQuestResponse;
-  if(adaptive){let job=await response.json() as MarketQuestProgress;const started=Date.now();
+  if(adaptive){let job=await response.json() as MarketQuestProgress;
+    const remainingMs=job.deadlineSeconds*1000-Math.max(0,job.elapsedMs??0);
+    const pollingDeadline=Date.now()+Math.max(0,remainingMs)+15000;
     while(true){if(!job?.jobId||!['RUNNING','READY','FAILED'].includes(job.status))throw new Error('추천 생성 응답 형식이 올바르지 않아요.');onProgress?.(job);if(job.status==='READY'&&job.result){result=job.result;break;}
-      if(job.status==='FAILED')throw new Error(job.errorCode==='QUEST_GENERATION_TIMEOUT'?'연습 생성이 5분 안에 완료되지 않았어요. 진행 중인 생성을 중단했어요.':`연습 조건 검토를 완료하지 못했어요 (${job.errorCode??'AI_QUEST_FAILED'}).`);
-      if(Date.now()-started>315000)throw new Error('생성 상태를 확인할 수 없어요. 다시 확인해 주세요.');
+      if(job.status==='FAILED')throw new Error(job.errorCode==='QUEST_GENERATION_TIMEOUT'?`연습 생성이 ${Math.ceil(job.deadlineSeconds/60)}분 안에 완료되지 않았어요. 진행 중인 생성을 중단했어요.`:`연습 조건 검토를 완료하지 못했어요 (${job.errorCode??'AI_QUEST_FAILED'}).`);
+      if(!Number.isFinite(pollingDeadline)||Date.now()>pollingDeadline)throw new Error('생성 상태를 확인할 수 없어요. 다시 확인해 주세요.');
       await new Promise(resolve=>setTimeout(resolve,1500));
       const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),15000);
       try{const status=await fetch(`${API_BASE_URL}/api/market-personalization/quest-jobs/${job.jobId}`,{headers:{Authorization:`Bearer ${accessToken}`},signal:controller.signal});

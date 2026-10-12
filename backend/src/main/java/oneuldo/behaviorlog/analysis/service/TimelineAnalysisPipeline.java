@@ -427,22 +427,8 @@ public final class TimelineAnalysisPipeline {
                 if(validation != null && "INLINE_REVIEW_REFERENCE_NOT_ALLOWED".equals(validation.code()))
                     correction = ClaimReferenceRepairPrompt.build(mapper, validation);
                 if(system.equals(AnalysisReviewPrompt.system())) {
-                    if(validation!=null&&"REVIEW_UNRECORDED_DIFFICULTY_BASELINE".equals(validation.code())&&raw!=null){
-                        String patchPrompt=prompt+"\nCandidate (all values retained): "+raw+"\nReported technical error: "+mapper.writeValueAsString(validation);
-                        budget.requireFits(ReviewMetadataPatch.SYSTEM,patchPrompt,ReviewMetadataPatch.OUTPUT_TOKENS,limit,"REVIEW_METADATA_PATCH_EXCEEDS_LIMIT");
-                        var patchResponse=client.complete(ReviewMetadataPatch.SYSTEM,patchPrompt,ReviewMetadataPatch.OUTPUT_TOKENS,0.0);
-                        try{
-                            if("length".equals(patchResponse.finishReason()))throw new IllegalArgumentException("OUTPUT_TRUNCATED");
-                            String corrected=ReviewMetadataPatch.apply(mapper,raw,patchResponse.text());
-                            T repaired=parse.apply(corrected);
-                            audit.add(attempt(audit.size()+1,ReviewMetadataPatch.SYSTEM,patchPrompt,ReviewMetadataPatch.OUTPUT_TOKENS,patchResponse,null,"REVIEW_METADATA_PATCH"));
-                            if(planSemanticReview)reviewPlanSource(prompt,corrected,limit,audit);
-                            return repaired;
-                        }catch(RuntimeException invalid){
-                            audit.add(attempt(audit.size()+1,ReviewMetadataPatch.SYSTEM,patchPrompt,ReviewMetadataPatch.OUTPUT_TOKENS,patchResponse,"INVALID_REVIEW_METADATA_PATCH","REVIEW_METADATA_PATCH"));
-                            throw invalid;
-                        }
-                    }
+                    if (raw != null && technicalReviewMetadata(validation))
+                        return repairReviewMetadata(prompt, raw, validation, limit, audit, parse);
                     String withCandidate=AnalysisRepairCandidate.append(mapper,correction,raw);
                     if(budget.total(system,prompt+RETRY+withCandidate,output)<=limit) correction=withCandidate;
                     else log.warn("Review repair candidate exceeds request budget; retaining complete original sources and error details");
@@ -454,6 +440,55 @@ public final class TimelineAnalysisPipeline {
             return result;
         }
         throw new IllegalStateException(lastFailure);
+    }
+    private static boolean technicalReviewMetadata(ReviewEvidenceException.Details failure) {
+        return failure != null && ("REVIEW_UNRECORDED_DIFFICULTY_BASELINE".equals(failure.code())
+                || failure.code().startsWith("REVIEW_STATION_CLAIM_"));
+    }
+    /** Small model patches preserve the whole original source and candidate under the request budget.
+     * Every patched candidate must still pass the same source and independent semantic validators.
+     */
+    private <T> T repairReviewMetadata(String source, String candidate, ReviewEvidenceException.Details failure,
+            int limit, List<AiBehaviorAnalysisRun.Attempt> audit, Function<String,T> parse) {
+        String corrected = candidate;
+        for (int patchAttempt = 0; patchAttempt < 3; patchAttempt++) {
+            if (audit.size() >= maxChunks*2+2+(qualityReview?3:0)+(planSemanticReview?3:0))
+                throw new IllegalArgumentException("TOTAL_CALL_BUDGET_EXCEEDED");
+            boolean station = failure.code().startsWith("REVIEW_STATION_CLAIM_");
+            String system = station ? ReviewStationPatch.SYSTEM : ReviewMetadataPatch.SYSTEM;
+            int output = station ? ReviewStationPatch.OUTPUT_TOKENS : ReviewMetadataPatch.OUTPUT_TOKENS;
+            String kind = station ? "REVIEW_STATION_PATCH" : "REVIEW_METADATA_PATCH";
+            String patchPrompt = station ? ReviewStationPatch.prompt(mapper, source, corrected, failure)
+                    : ReviewMetadataPatch.prompt(mapper, source, corrected, failure);
+            budget.requireFits(system, patchPrompt, output, limit, kind + "_EXCEEDS_LIMIT");
+            long started = System.nanoTime();
+            GroqChatClient.GroqChatResult response = null;
+            int auditIndex = audit.size();
+            try {
+                response = client.complete(system, patchPrompt, output, 0.0);
+                if ("length".equals(response.finishReason())) throw new IllegalArgumentException("OUTPUT_TRUNCATED");
+                corrected = station ? ReviewStationPatch.apply(mapper, corrected, response.text())
+                        : ReviewMetadataPatch.apply(mapper, corrected, response.text());
+                T result = parse.apply(corrected);
+                audit.add(attempt(audit.size()+1, system, patchPrompt, output, response, null, kind));
+                if (planSemanticReview) reviewPlanSource(source, corrected, limit, audit);
+                return result;
+            } catch (RuntimeException invalid) {
+                var details = invalid instanceof ReviewEvidenceException next ? next.details() : null;
+                var transport = invalid instanceof oneuldo.ai.exception.AiTransportException t ? t : null;
+                // Keep the exact model patch and its next validation error. A new technical
+                // field may only be corrected by another model patch, never by source copying.
+                if (audit.size() == auditIndex)
+                    audit.add(new AiBehaviorAnalysisRun.Attempt(audit.size()+1, patchPrompt, response == null ? null : response.text(),
+                            transport == null ? "INVALID_REVIEW_METADATA_PATCH" : transport.code().name(), kind, system, output,
+                            response == null ? null : response.finishReason(), response == null ? null : response.inputTokens(),
+                            response == null ? null : response.outputTokens(), (System.nanoTime()-started)/1_000_000,
+                            transport == null ? null : transport.details(), details));
+                if (!technicalReviewMetadata(details) || patchAttempt == 2) throw invalid;
+                failure = details;
+            }
+        }
+        throw new IllegalStateException("INVALID_REVIEW_METADATA_PATCH");
     }
     private void reviewPlanSource(String source, String candidate, int limit, List<AiBehaviorAnalysisRun.Attempt> audit) {
         String prompt = AnalysisPlanSemanticReview.prompt(mapper, source, candidate);
