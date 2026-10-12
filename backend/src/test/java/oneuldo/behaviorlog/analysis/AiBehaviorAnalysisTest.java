@@ -85,7 +85,7 @@ class AiBehaviorAnalysisTest {
         var response = service.analyze(memberId, new BehaviorAnalysisInputRequest(null, null));
         assertThat(response.status()).isEqualTo("READY");
         assertThat(response.analysis().sessionAssessments().getFirst().judgment()).isEqualTo("UNDETERMINED");
-        verify(client).complete(eq(AnalysisReviewPrompt.system()), contains("reviewSourcePolicy"), anyInt(), anyDouble());
+        verify(client).complete(eq(AnalysisReviewPrompt.system()), contains("taskConsistencyContract"), anyInt(), anyDouble());
         verify(repository).save(argThat(run -> run.getAttempts().size()==2
                 && run.getAttempts().get(1).inputPrompt().contains("behaviorTimeline")
                 && run.getAttempts().get(1).inputPrompt().contains("SUCCESS")));
@@ -126,12 +126,68 @@ class AiBehaviorAnalysisTest {
                 && run.getAttempts().get(2).inputPrompt().contains("문장 사이에서는 직전 문장의 마지막 사건을 다시 인용할 수 있습니다")));
     }
 
+    @Test void 서로다른_인용형식과_빈관찰근거_오류는_원문을_보존하고_세번째_검토까지_허용한다() {
+        ReflectionTestUtils.setField(service, "qualityReview", true);
+        var ranged = mapper.readTree(reviewed(valid("UNDETERMINED")));
+        ((tools.jackson.databind.node.ObjectNode) ranged.path("analysis").path("summary").get(0))
+                .put("text", "기록된 수량 변경(E1-E1)을 관찰했습니다.");
+        var missing = mapper.readTree(reviewed(valid("UNDETERMINED")));
+        ((tools.jackson.databind.node.ObjectNode) missing.path("analysis").path("findings").get(0)
+                .path("observation").get(0)).putArray("evidenceEventIds");
+        String corrected = reviewed(valid("UNDETERMINED"));
+        when(client.complete(anyString(), anyString(), anyInt(), anyDouble()))
+                .thenReturn(new GroqChatClient.GroqChatResult(mapper.writeValueAsString(valid("SUCCESS")), "test-model"))
+                .thenReturn(new GroqChatClient.GroqChatResult(ranged.toString(), "test-model"))
+                .thenReturn(new GroqChatClient.GroqChatResult(missing.toString(), "test-model"))
+                .thenReturn(new GroqChatClient.GroqChatResult(corrected, "test-model"));
+        var response = service.analyze(memberId, new BehaviorAnalysisInputRequest(null, null));
+        assertThat(response.status()).isEqualTo("READY");
+        assertThat(response.analysis().sessionAssessments().getFirst().judgment()).isEqualTo("UNDETERMINED");
+        verify(client, times(4)).complete(anyString(), anyString(), anyInt(), anyDouble());
+        verify(repository).save(argThat(run -> run.getAttempts().size() == 4
+                && run.getAttempts().get(1).rawOutput().equals(ranged.toString())
+                && run.getAttempts().get(1).validationFailure().code().equals("INLINE_REVIEW_REFERENCE_NOT_ALLOWED")
+                && run.getAttempts().get(2).rawOutput().equals(missing.toString())
+                && run.getAttempts().get(2).validationFailure().code().equals("INVALID_REVIEW_CLAIM_ARRAY")
+                && run.getAttempts().get(2).inputPrompt().contains("전체 응답의 모든 문장 객체")
+                && run.getAttempts().get(3).inputPrompt().contains("기록 부재 문장도 실제 기록 범위")
+                && run.getAttempts().get(3).rawOutput().equals(corrected)));
+    }
+
+    @Test void 근거없는_대안의_빈_근거_오류는_대안_빈배열과_불확실성_보존으로_재안내한다() {
+        ReflectionTestUtils.setField(service, "qualityReview", true);
+        var invalid = mapper.readTree(reviewed(valid("FAILURE")));
+        ((tools.jackson.databind.node.ObjectNode) invalid.path("analysis").path("findings").get(0)
+                .path("alternativeExplanations").get(0)).putArray("evidenceEventIds");
+        var corrected = mapper.readTree(reviewed(valid("FAILURE")));
+        ((tools.jackson.databind.node.ObjectNode) corrected.path("analysis").path("findings").get(0))
+                .putArray("alternativeExplanations");
+        ((tools.jackson.databind.node.ObjectNode) corrected.path("analysis"))
+                .putArray("uncertainties").add("미선택의 원인과 이동 경로는 제공된 기록으로 확인되지 않습니다.");
+        when(client.complete(anyString(), anyString(), anyInt(), anyDouble()))
+                .thenReturn(new GroqChatClient.GroqChatResult(mapper.writeValueAsString(valid("FAILURE")), "test-model"))
+                .thenReturn(new GroqChatClient.GroqChatResult(invalid.toString(), "test-model"))
+                .thenReturn(new GroqChatClient.GroqChatResult(corrected.toString(), "test-model"));
+        var response = service.analyze(memberId, new BehaviorAnalysisInputRequest(null, null));
+        assertThat(response.status()).isEqualTo("READY");
+        assertThat(response.analysis().sessionAssessments().getFirst().judgment()).isEqualTo("FAILURE");
+        assertThat(response.analysis().findings().getFirst().alternativeExplanations()).isEmpty();
+        assertThat(response.analysis().uncertainties()).containsExactly("미선택의 원인과 이동 경로는 제공된 기록으로 확인되지 않습니다.");
+        verify(repository).save(argThat(run -> run.getAttempts().size() == 3
+                && run.getAttempts().get(1).rawOutput().equals(invalid.toString())
+                && run.getAttempts().get(1).validationFailure().path().equals("/findings/0/alternativeExplanations/0/evidenceEventIds")
+                && run.getAttempts().get(2).inputPrompt().contains("alternativeExplanations를 []로 출력")
+                && run.getAttempts().get(2).inputPrompt().contains("uncertainties 문자열 배열에 보존")
+                && run.getAttempts().get(2).inputPrompt().contains("임의 근거를 추가하지")));
+    }
+
     @Test void 검토는_원본과_관찰을_보존하면서_중간단계의_추측을_반복주입하지않는다() {
         var data=input(true);var refs=new AnalysisReferences(mapper,data);
         var digest=new AiObservationDigest("구간",List.of(new AiObservationDigest.Observation(
                 "수량 1에서 2 변경", "중간 단계의 의도 추측", List.of("중간 단계의 우연한 조작 추측"), List.of(eventId))),List.of("동기는 미확인"));
         String source=AnalysisSynthesisPrompt.build(mapper,prompts,data,List.of(digest),refs,false);
-        var review=mapper.readTree(AnalysisReviewPrompt.build(mapper,source,valid("SUCCESS"),refs));
+        String reviewWire=AnalysisReviewPrompt.build(mapper,source,valid("SUCCESS"),refs);
+        var review=new FinalSourceEncoding(mapper).decode(mapper.readTree(reviewWire));
         var fact=review.path(SourceEventDetails.FIELD).get(0);
         assertThat(fact.path("id").asString()).isEqualTo("E1");
         assertThat(fact.path("quantityBefore").asInt()).isEqualTo(1);
@@ -143,9 +199,9 @@ class AiBehaviorAnalysisTest {
         assertThat(context.toString()).doesNotContain("중간 단계의 의도 추측", "중간 단계의 우연한 조작 추측");
         assertThat(review.has("draftToReview")).isFalse();
         // Independent review input is unchanged when only the previous verdict changes.
-        assertThat(AnalysisReviewPrompt.build(mapper,source,valid("FAILURE"),refs)).isEqualTo(review.toString());
-        assertThat(new LosslessTables(mapper).decode(review).path("taskContext"))
-                .isEqualTo(new LosslessTables(mapper).decode(mapper.readTree(source)).path("taskContext"));
+        assertThat(AnalysisReviewPrompt.build(mapper,source,valid("FAILURE"),refs)).isEqualTo(reviewWire);
+        assertThat(review.path("taskContext"))
+                .isEqualTo(new FinalSourceEncoding(mapper).decode(mapper.readTree(source)).path("taskContext"));
         assertThat(digest.observations().getFirst().alternativeExplanations()).containsExactly("중간 단계의 우연한 조작 추측");
     }
 
@@ -162,7 +218,7 @@ class AiBehaviorAnalysisTest {
         movement.putArray("evidenceEventIds").add("E2");
         var mixed=observations.addObject().put("observation","변경 후 이동");
         mixed.putArray("evidenceEventIds").add("E1").add("E2");
-        var review=mapper.readTree(AnalysisReviewPrompt.build(mapper,source.toString(),valid("SUCCESS"),refs));
+        var review=new FinalSourceEncoding(mapper).decode(mapper.readTree(AnalysisReviewPrompt.build(mapper,source.toString(),valid("SUCCESS"),refs)));
         assertThat(review.path(SourceEventDetails.FIELD)).isEqualTo(source.path(SourceEventDetails.FIELD));
         assertThat(review.path("rawBackedObservationsNotRepeated").asInt()).isEqualTo(1);
         var retained=review.path("chunkAnalyses").get(0).path("observations");
@@ -394,10 +450,11 @@ class AiBehaviorAnalysisTest {
         }
         for(var assessment:tree.path("sessionAssessments")) {
             var a=(tools.jackson.databind.node.ObjectNode)assessment;
+            a.put("sessionId", "S1");
             a.remove("evidenceEventIds");var explanation=claim(a.path("explanation").asString());
             a.putArray("explanation").add(explanation);
         }
-        return mapper.writeValueAsString(Map.of("reviewFormat",ReviewedClaimOutput.FORMAT,"reviewNotes",List.of(),"analysis",tree));
+        return CurrentReviewFixtures.envelope(mapper, tree).toString();
     }
     private tools.jackson.databind.JsonNode claim(String text) {
         return mapper.valueToTree(Map.of("text",text,"evidenceEventIds",List.of("E1")));

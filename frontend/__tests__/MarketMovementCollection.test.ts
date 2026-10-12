@@ -68,7 +68,7 @@ test.each([
   const ending = events.filter(event => event.action.eventCode === 'SHOP.SESSION_ENDED');
   expect(ending).toHaveLength(1);
   expect(ending[0].sessionEnd?.reason).toBe(reason);
-  expect(ending[0].task.taskVersion).toBe('market-micro-behavior-v3-lifecycle');
+  expect(ending[0].task.taskVersion).toBe('market-micro-behavior-v4-timing-help');
   expect(ending[0].taskResult).toBeUndefined();
   expect(ending[0].action.stepOutcome).toBeUndefined();
   expect(events.some(event => event.action.eventCode === 'SHOP.CHECKOUT_SUBMITTED')).toBe(flow === 'after-submit');

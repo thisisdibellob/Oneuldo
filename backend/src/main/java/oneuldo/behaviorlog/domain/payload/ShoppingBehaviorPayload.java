@@ -1,5 +1,6 @@
 package oneuldo.behaviorlog.domain.payload;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.PositiveOrZero;
@@ -63,7 +64,8 @@ public record ShoppingBehaviorPayload(
         String catalogVersion,
         String scenarioId,
         String scenarioVersion,
-        java.util.Map<String, Object> marketContent
+        java.util.Map<String, Object> marketContent,
+        @Valid ShoppingTimingContext timing
 ) implements BehaviorPayload {
 
     /** 기존 서버 내부 생성 코드가 사용하던 payload 생성 계약을 유지한다. */
@@ -96,7 +98,7 @@ public record ShoppingBehaviorPayload(
                 null, null, null, null, null, null, null, null, null, null,
                 null, null, null, null, null, null, null, null, null, null,
                 null, null, null, null, null,
-                null, null, null, null);
+                null, null, null, null, null);
     }
 
     public record ShoppingObjective(

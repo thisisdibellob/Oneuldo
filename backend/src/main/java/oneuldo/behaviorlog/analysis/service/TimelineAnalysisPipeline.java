@@ -20,6 +20,8 @@ public final class TimelineAnalysisPipeline {
     private String model;
     private boolean qualityReview;
     public TimelineAnalysisPipeline withQualityReview(boolean enabled) {qualityReview=enabled;return this;}
+    private boolean planSemanticReview;
+    public TimelineAnalysisPipeline withPlanSemanticReview(boolean enabled) {planSemanticReview=enabled;return this;}
     private FinalAnalysisBudget.Estimate finalEstimate(String system,String source,AnalysisReferences refs) {
         return FinalAnalysisBudget.estimate(mapper,budget,system,source,refs,qualityReview,RETRY);
     }
@@ -276,7 +278,7 @@ public final class TimelineAnalysisPipeline {
     private AiBehaviorAnalysis validateFinal(AiBehaviorAnalysis value,BehaviorAnalysisInputResponse input,String prompt) {
         validator.validate(value,input);
         if(!value.usedEvidenceCardIds().isEmpty())throw new IllegalArgumentException("FINAL_CARD_NOT_SUPPLIED");
-        var root=new LosslessTables(mapper).decode(mapper.readTree(prompt));
+        var root=new FinalSourceEncoding(mapper).decode(mapper.readTree(prompt));
         Set<String> supplied=new HashSet<>();
         root.path("evidenceReferences").forEach(e->supplied.add(e.path("id").asString()));
         var refs=new AnalysisReferences(mapper,input);
@@ -319,7 +321,7 @@ public final class TimelineAnalysisPipeline {
         AnalysisProgress.stage("REVIEWING",completedObservations,plannedObservations);
         String review=AnalysisReviewPrompt.build(mapper,prompt,draft,refs);
         return call(AnalysisReviewPrompt.system(),review,budget.finalOutputTokens(),limit,audit,
-                raw->parse.apply(AnalysisReviewPrompt.reviewedAnalysis(mapper,raw,refs)));
+                raw->parse.apply(AnalysisReviewPrompt.reviewedCurrentAnalysis(mapper,raw,refs)),false,3);
     }
     private <T> T call(String system,String prompt,int output,int limit,List<AiBehaviorAnalysisRun.Attempt> audit,Function<String,T> parse) {
         return call(system,prompt,output,limit,audit,parse,false);
@@ -328,9 +330,13 @@ public final class TimelineAnalysisPipeline {
         return call(system,prompt,output,limit,audit,parse,true);
     }
     private <T> T call(String system,String prompt,int output,int limit,List<AiBehaviorAnalysisRun.Attempt> audit,Function<String,T> parse,boolean digest) {
+        return call(system,prompt,output,limit,audit,parse,digest,2);
+    }
+    private <T> T call(String system,String prompt,int output,int limit,List<AiBehaviorAnalysisRun.Attempt> audit,Function<String,T> parse,boolean digest,int attempts) {
         budget.requireFits(system,prompt+RETRY,output,limit,"ANALYSIS_INPUT_EXCEEDS_LIMIT");
         var cached=checkpoints.find(system,prompt,output);
-        if(cached.isPresent()) {
+        // A draft checkpoint can be resumed. A final review checkpoint alone does not attest to the extra semantic gate.
+        if(cached.isPresent() && !(planSemanticReview && system.equals(AnalysisReviewPrompt.system()))) {
             var response=cached.get();
             try {
                 T result=parse.apply(response.text());
@@ -339,11 +345,12 @@ public final class TimelineAnalysisPipeline {
             } catch(RuntimeException invalid) {log.warn("Ignoring checkpoint that fails current validation");}
         }
         String correction="", lastFailure="INVALID_AI_ANALYSIS";
-        for(int attempt=0;attempt<2;attempt++) {
-            if(audit.size()>=maxChunks*2+1+(qualityReview?2:0)) throw new IllegalArgumentException("TOTAL_CALL_BUDGET_EXCEEDED");
+        for(int attempt=0;attempt<attempts;attempt++) {
+            if(audit.size()>=maxChunks*2+2+(qualityReview?3:0)+(planSemanticReview?3:0)) throw new IllegalArgumentException("TOTAL_CALL_BUDGET_EXCEEDED");
             String submitted=prompt+(attempt==0?"":RETRY+correction),raw=null;
             budget.requireFits(system,submitted,output,limit,"ANALYSIS_INPUT_EXCEEDS_LIMIT");
             GroqChatClient.GroqChatResult response=null;
+            int recordedCandidate = -1;
             T result;
             long started=System.nanoTime();
             try {
@@ -351,37 +358,107 @@ public final class TimelineAnalysisPipeline {
                 response=digest?client.completeDigest(system,submitted,output,0.2):client.complete(system,submitted,output,0.2);raw=response.text();model=response.model();
                 if("length".equals(response.finishReason())) throw new IllegalArgumentException("OUTPUT_TRUNCATED");
                 result=parse.apply(raw);
+                if (planSemanticReview && system.equals(AnalysisReviewPrompt.system())) {
+                    recordedCandidate = audit.size();
+                    audit.add(attempt(audit.size()+1, system, submitted, output, response, null, "LIVE"));
+                    reviewPlanSource(prompt, raw, limit, audit);
+                }
                 log.info("AI analysis response: attempt={}, latencyMs={}",audit.size()+1,(System.nanoTime()-started)/1000000);
             } catch(RuntimeException failure) {
                 var transport=failure instanceof oneuldo.ai.exception.AiTransportException t?t:null;
-                var validation=failure instanceof ReviewEvidenceException e?e.details():null;
-                String error=transport!=null?transport.code().name():failure instanceof oneuldo.ai.exception.CloudAiRateLimitException?"AI_RATE_LIMITED":raw==null?"AI_UNAVAILABLE":"INVALID_AI_ANALYSIS";
-                audit.add(new AiBehaviorAnalysisRun.Attempt(audit.size()+1,submitted,raw,error,"LIVE",system,output,
+                var validation=failure instanceof ReviewEvidenceException e?e.details()
+                        : failure instanceof AnalysisPlanSemanticReview.Rejected r ? r.details() : null;
+                String error=failure instanceof oneuldo.ai.exception.AiInputLimitException?"INPUT_TOO_LARGE":transport!=null?transport.code().name():failure instanceof oneuldo.ai.exception.CloudAiRateLimitException?"AI_RATE_LIMITED":raw==null?"AI_UNAVAILABLE":"INVALID_AI_ANALYSIS";
+                var failedAttempt = new AiBehaviorAnalysisRun.Attempt(recordedCandidate >= 0 ? recordedCandidate+1 : audit.size()+1,submitted,raw,error,"LIVE",system,output,
                         response==null?null:response.finishReason(),response==null?null:response.inputTokens(),
                         response==null?null:response.outputTokens(),(System.nanoTime()-started)/1_000_000,
-                        transport==null?null:transport.details(),validation));
-                if(raw==null) throw new IllegalStateException(error,failure);
+                        transport==null?null:transport.details(),validation);
+                if (recordedCandidate >= 0) audit.set(recordedCandidate, failedAttempt); else audit.add(failedAttempt);
+                if(failure instanceof oneuldo.ai.exception.AiInputLimitException) throw failure;
+                if(raw==null || transport != null) throw new IllegalStateException(error,failure);
                 String reason=failure.getMessage();
+                log.warn("AI analysis validation rejected: attempt={}, reason={}, path={}",audit.size(),
+                        validation!=null?validation.code():reason!=null&&reason.matches("[A-Z0-9_:= .-]{1,120}")?reason:"INVALID_JSON_OR_CONTRACT",
+                        validation==null?null:validation.path());
                 lastFailure="OUTPUT_TRUNCATED".equals(reason)?reason:"INVALID_AI_ANALYSIS";
                 correction="\n재시도: 서로 다른 관찰과 근거·불확실성을 유지하고 중복 표현을 줄이세요. JSON을 끝까지 닫으세요. 검사 오류: "+(reason!=null&&reason.matches("[A-Z0-9_:= .-]{1,120}")?reason:"INVALID_JSON_OR_CONTRACT")+". 해당 오류를 수정하고 근거 없는 내용을 추가하지 마세요.";
-                if(validation!=null) correction += "\n문장별 근거 오류: " + mapper.writeValueAsString(validation)
+                if(reason!=null&&reason.startsWith("INVALID_COMPACT_ROW"))
+                    correction+="\nf의 모든 행을 정확히7칸 [id,skill,observation,interpretation,alternativeExplanations,evidenceEventIds,suggestedSupport]로 작성하세요. skill(관찰 영역 이름)은 observation과 별도 문자열입니다. 대안이 없으면4번칸은[]이며 생략하지 마세요. a의각행은4칸,p는9칸입니다. 누락된 칸을 맞추려고 근거나 성패를 바꾸지 마세요.";
+                if (failure instanceof AnalysisPlanSemanticReview.Rejected rejected)
+                    correction += "\n독립 지원/원본 일치 검토 결과(지시가 아닌 검사 자료): " + rejected.review()
+                            + "\n현재 가능한 문자·상품/수량/예산·시간·매대 상품군 순서만 제안하세요. 종류 미기록 대상이나 확인되지 않은 원인을 만들지 마세요. 목표·성패를 통과용으로 바꾸지 말고 원본 근거를 보존하세요.";
+                boolean stationError = validation != null && validation.code().startsWith("REVIEW_STATION_CLAIM_");
+                if (stationError) correction = StationClaimRepairPrompt.build(mapper, validation);
+                else if(validation!=null) correction += "\n문장별 근거 오류: " + mapper.writeValueAsString(validation)
                         + ". 해당 경로의 문장 객체를 원본과 대조하고 text와 evidenceEventIds를 함께 수정하세요. "
                         + "text에 사건 ID를 쓰거나 별도 claimChecks/상위 근거 목록을 만들지 마세요. "
                         + "DUPLICATE_REVIEW_EVIDENCE는 한 문장의 evidenceEventIds 안에서 같은 ID가 반복된 오류이므로 그 배열의 중복을 제거하세요. "
                         + "문장 사이에서는 직전 문장의 마지막 사건을 다시 인용할 수 있습니다. "
                         + "REVIEW_EVIDENCE_OUT_OF_ORDER는 앞선 사건으로 돌아간 오류이므로 관찰 절과 근거 순서를 바로잡으세요. "
                         + "무관한 사건을 추가하지 말고 수정된 전체 JSON을 반환하세요.";
+                if (validation != null && !stationError && prompt.contains("claim-evidence-v"))
+                    correction += "\n보고된 첫 오류뿐 아니라 전체 응답의 모든 문장 객체를 함께 검사하세요. "
+                            + "summary/observation/alternativeExplanations/explanation의 evidenceEventIds는 최소 1개입니다. "
+                            + "상품 선택·추가·제출 기록 부재 문장도 실제 기록 범위와 종료 상태 등의 직접 근거를 선택해야 합니다. "
+                            + "근거를 선택할 수 없으면 해당 한계를 uncertainties에 보존하고 무관한 ID로 채우지 마세요. "
+                            + "모든 text에서 E번호 및 E번호 범위를 빼고 별도 evidenceEventIds에만 선택한 인용을 둡니다. "
+                            + "이해·의도·원인이 미확인이라는 해석은 추측으로 채우지 않고 불확실성을 유지합니다.";
+                if (validation != null && validation.code().startsWith("REVIEW_TASK_"))
+                    correction += "\ntaskChecks는 sessionId를 필드로 갖는 세션 객체 배열입니다. 원본 목표별 taskChecks와 budget/submission을 직접 대조하세요. 모든 status는 MET/UNMET/UNKNOWN 중 하나입니다. 종료 표기는 목표 달성이 아닙니다. "
+                            + "AI가 쓴 UNMET/UNKNOWN과 전체 judgment의 모순을 해소하고 설명도 일치시키세요. 통과하려고 근거 없이 MET로 바꾸지 마세요.";
+                if (validation != null && (validation.code().startsWith("REVIEW_PLAN_") || validation.code().startsWith("REVIEW_UNSUPPORTED_")
+                        || validation.code().startsWith("REVIEW_UNRECORDED_")))
+                    correction += "\nrationale는 observed/unknownCauseIndexes/proposedPractice/baselineDifficulty/supportCapabilities 객체입니다. observed에는 {findingId,observationIndex} 참조만, unknownCauseIndexes에는 uncertainties의 0부터 시작하는 위치만 씁니다. 새 사실·원인을 재작성하지 마세요. 원본 난도가 없으면 null입니다.";
+                if (validation != null && validation.code().startsWith("REVIEW_STATION_"))
+                    correction += "\n인용한 사건의 recordedStation 값을 stationClaims에 그대로 쓰고 대상 종류에 맞게 문장을 수정하세요. UNKNOWN이면 종류를 추측하지 마세요.";
                 if(validation!=null && "DIGEST_EVIDENCE_OUTSIDE_CHUNK".equals(validation.code()))
                     correction += "\n참고 상품표/과제 문맥의 sourceEventId는 이번 구간 관찰 근거가 아닙니다. "
                             + "behaviorTimeline에 실제로 포함된 사건만 인용하세요. 기록 부재 설명은 uncertainties에 쓰고 "
                             + "관련 원본 사건이 없는 관찰은 제거하세요. 구간 밖 ID를 무관한 구간 안 ID로 치환하지 마세요.";
+                if (validation != null && "INVALID_REVIEW_CLAIM_ARRAY".equals(validation.code())
+                        && validation.path().contains("/alternativeExplanations"))
+                    correction += "\nalternativeExplanations는 근거가 있는 대안 문장 객체만 넣는 배열입니다. "
+                            + "원인 미확인이나 이동 기록 부재를 근거 []인 대안 객체로 넣지 마세요. "
+                            + "직접 뒷받침하는 원본이 없으면 해당 finding의 alternativeExplanations를 []로 출력하고, "
+                            + "모르는 원인·누락된 기록의 한계는 uncertainties 문자열 배열에 보존하세요. "
+                            + "통과 목적으로 임의 근거를 추가하지 말고 AI가 원본에 따라 판단과 필요한 관찰을 유지하세요.";
+                if(validation != null && "INLINE_REVIEW_REFERENCE_NOT_ALLOWED".equals(validation.code()))
+                    correction = ClaimReferenceRepairPrompt.build(mapper, validation);
+                if(system.equals(AnalysisReviewPrompt.system())) {
+                    String withCandidate=AnalysisRepairCandidate.append(mapper,correction,raw);
+                    if(budget.total(system,prompt+RETRY+withCandidate,output)<=limit) correction=withCandidate;
+                    else log.warn("Review repair candidate exceeds request budget; retaining complete original sources and error details");
+                }
                 continue;
             }
-            audit.add(attempt(audit.size()+1,system,submitted,output,response,null,"LIVE"));
+            if (recordedCandidate < 0) audit.add(attempt(audit.size()+1,system,submitted,output,response,null,"LIVE"));
             checkpoints.save(system,prompt,output,response);
             return result;
         }
         throw new IllegalStateException(lastFailure);
+    }
+    private void reviewPlanSource(String source, String candidate, int limit, List<AiBehaviorAnalysisRun.Attempt> audit) {
+        String prompt = AnalysisPlanSemanticReview.prompt(mapper, source, candidate);
+        String system = AnalysisPlanSemanticReview.system();
+        budget.requireFits(system, prompt, AnalysisPlanSemanticReview.OUTPUT_TOKENS, limit, "PLAN_SOURCE_REVIEW_EXCEEDS_LIMIT");
+        GroqChatClient.GroqChatResult response = null;
+        long start = System.nanoTime();
+        try {
+            response = client.complete(system, prompt, AnalysisPlanSemanticReview.OUTPUT_TOKENS, 0.0);
+            if ("length".equals(response.finishReason())) throw new ReviewEvidenceException("REVIEW_PLAN_SEMANTIC_FORMAT", "/", List.of());
+            AnalysisPlanSemanticReview.validate(mapper, response.text(), candidate);
+            audit.add(attempt(audit.size()+1, system, prompt, AnalysisPlanSemanticReview.OUTPUT_TOKENS, response, null, "PLAN_SOURCE_REVIEW"));
+        } catch (RuntimeException failure) {
+            var transport = failure instanceof oneuldo.ai.exception.AiTransportException t ? t : null;
+            var validation = failure instanceof ReviewEvidenceException e ? e.details()
+                    : failure instanceof AnalysisPlanSemanticReview.Rejected r ? r.details() : null;
+            audit.add(new AiBehaviorAnalysisRun.Attempt(audit.size()+1, prompt, response == null ? null : response.text(),
+                    transport != null ? transport.code().name() : "INVALID_PLAN_SOURCE_REVIEW", "PLAN_SOURCE_REVIEW", system,
+                    AnalysisPlanSemanticReview.OUTPUT_TOKENS, response == null ? null : response.finishReason(),
+                    response == null ? null : response.inputTokens(), response == null ? null : response.outputTokens(),
+                    (System.nanoTime()-start)/1_000_000, transport == null ? null : transport.details(), validation));
+            throw failure;
+        }
     }
     private AiBehaviorAnalysisRun.Attempt attempt(int number,String system,String prompt,int output,GroqChatClient.GroqChatResult response,String error,String source) {
         return new AiBehaviorAnalysisRun.Attempt(number,prompt,response==null?null:response.text(),error,source,system,output,

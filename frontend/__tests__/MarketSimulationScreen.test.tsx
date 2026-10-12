@@ -317,7 +317,7 @@ describe('마트 장보기의 최종 결정과 재시도', () => {
     const game = setup(); await game.start();
     expect(within(game.screen.getByTestId('market-shopping-list')).getByText('2개')).toBeTruthy();
     await game.station('fresh');
-    fireEvent.press(game.screen.getAllByRole('button', { name: '흰 우유 담기' })[0]);
+    fireEvent.press(game.screen.getAllByRole('button', { name: /^흰 우유 900mL [0-9,]+원 담기$/ })[0]);
     await game.closeShelf();
     expect(within(game.screen.getByTestId('market-shopping-list')).getByText('2개')).toBeTruthy();
     expect(within(game.screen.getByTestId('market-shopping-list')).queryByText(/1\s*\/\s*2/)).toBeNull();
@@ -716,7 +716,7 @@ describe('직원에게 묻고 의뢰인과 상의하는 장보기', () => {
       await game.station('fresh');
       expect(game.screen.UNSAFE_getByType(MarketShelfScene).props.stock.milk).toBe(0);
       expect(game.screen.getByLabelText('흰 우유 품절')).toBeTruthy();
-      expect(game.screen.queryByRole('button', { name: '흰 우유 담기' })).toBeNull();
+      expect(game.screen.queryByRole('button', { name: /^흰 우유 900mL [0-9,]+원 담기$/ })).toBeNull();
       act(() => { expect(game.screen.UNSAFE_getByType(MarketShelfScene).props.onDropProduct('milk')).toBe(false); });
       await game.closeShelf();
       await game.station(staff);
@@ -781,4 +781,20 @@ describe('직원에게 묻고 의뢰인과 상의하는 장보기', () => {
     } finally { game.screen.unmount(); }
   });
 
+});
+
+it.each(['staffed','kiosk'] as const)('AI runtime exposes the actual %s checkout and optional drink goal',async(kind)=>{
+  jest.useFakeTimers();
+  const {buildMarketScenarioMission}=require('../src/game/scenarios') as typeof import('../src/game/scenarios');
+  const base=buildMarketScenarioMission('S01');
+  const runtimePlan:import('../src/game/marketAdaptivePlan').MarketRuntimePlan={environment:{layoutId:'classic',employeeCount:1,customerCount:1,pillarCount:0,chairCount:0,cashierCount:kind==='staffed'?2:1,kioskLane:kind==='kiosk'?'checkout-2':'none',entranceConstruction:false},learning:{stockoutProductId:null,allowSubstitution:true,budgetChoiceEnabled:true,choiceBudget:3000,checkoutReviewMode:'overcharge'},matchRule:'exact',stockPerProduct:5,stockOverrides:{},alarmPenaltyPoints:10,wrongWayPenaltyPoints:10,cashierRequestPenaltyPoints:0};
+  const game=setup({environment:runtimePlan.environment},kind==='staffed'?2:1,{mission:{...base,scenarioId:'CUSTOM',runtimePlan}});
+  try{
+    expect(game.screen.getAllByText(/내가 고른 음료/).length).toBeGreaterThan(0);
+    await game.start();await game.station('fresh');await game.add('milk');await game.closeShelf();
+    const station=kind==='staffed'?'checkout':game.environment.kiosks[0].id;
+    await game.station(station);await finishTransition();
+    expect(game.screen.getByTestId(kind==='staffed'?'market-staffed-checkout':'market-kiosk-checkout')).toBeTruthy();
+    expect(game.screen.queryByText('이대로 구매할까요?')).toBeNull();
+  }finally{game.screen.unmount();jest.useRealTimers();}
 });

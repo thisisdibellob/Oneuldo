@@ -22,7 +22,8 @@ import tools.jackson.databind.ObjectMapper;
 @RestController
 public class ChatController {
     static final String MODEL = "qwen3.6:27b-q4_K_M";
-    static final int MAX_OUTPUT_TOKENS = 2400;
+    static final int MAX_OUTPUT_TOKENS = 3200;
+    static final List<Integer> CONTEXT_LENGTHS = List.of(8192, 18432, 24576);
     static final int MAX_BYTES = 131072;
     private final ObjectMapper mapper;
     private final InferenceGate gate;
@@ -38,7 +39,7 @@ public class ChatController {
 
     @GetMapping("/api/limits") public Object limits() {
         return Map.of("model", MODEL, "maxOutputTokens", MAX_OUTPUT_TOKENS,
-                "contextLengths", List.of(8192, 18432));
+                "contextLengths", CONTEXT_LENGTHS);
     }
 
     // Read a bounded body explicitly; callers cannot reach Ollama management endpoints or select URLs.
@@ -84,7 +85,7 @@ public class ChatController {
         }
         var options = body.path("options");
         if (body.has("options") && !options.isObject()) throw error(HttpStatus.BAD_REQUEST, "INVALID_OPTIONS");
-        if (options.has("num_ctx") && (!options.path("num_ctx").isIntegralNumber() || !List.of(8192,18432).contains(options.path("num_ctx").asInt()))) throw error(HttpStatus.BAD_REQUEST, "UNSUPPORTED_CONTEXT_LENGTH");
+        if (options.has("num_ctx") && (!options.path("num_ctx").isIntegralNumber() || !CONTEXT_LENGTHS.contains(options.path("num_ctx").asInt()))) throw error(HttpStatus.BAD_REQUEST, "UNSUPPORTED_CONTEXT_LENGTH");
         if (options.has("num_predict") && (!options.path("num_predict").isIntegralNumber()
                 || options.path("num_predict").asLong() < 1 || options.path("num_predict").asLong() > MAX_OUTPUT_TOKENS)) throw error(HttpStatus.BAD_REQUEST, "INVALID_OUTPUT_LIMIT");
         if (options.has("temperature") && (!options.path("temperature").isNumber()

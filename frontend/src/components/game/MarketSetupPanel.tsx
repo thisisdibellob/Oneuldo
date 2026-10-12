@@ -1,34 +1,54 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Platform, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
 import { PressScale } from '../PressScale';
 import { MarketSessionConfig, parseMarketSessionConfig } from '../../game/marketSession';
-import { MARKET_LAYOUT_OPTIONS, type MarketCount } from '../../game/marketEnvironment';
+import { DEFAULT_MARKET_ENVIRONMENT_CONFIG, MARKET_LAYOUT_OPTIONS, type MarketCount } from '../../game/marketEnvironment';
 import { DEFAULT_MARKET_LEARNING_CONFIG } from '../../game/marketLearning';
 import { fonts } from '../../theme';
+
+export type MarketSetupChanges = { shelfOrderTouched: boolean; changedConfigPaths?: string[]; lockedSettings?: Record<string,unknown> };
 
 /** Configuration is applied atomically before an episode, never halfway through an attempt. */
 export function MarketSetupPanel({ config, onApply, onClose }: {
   config: MarketSessionConfig;
-  onApply: (config: MarketSessionConfig) => void;
+  onApply: (config: MarketSessionConfig, changes: MarketSetupChanges) => void;
   onClose: () => void;
 }) {
   const [draft, setDraft] = useState(config),
     [json, setJson] = useState(JSON.stringify(config, null, 2));
   const [advanced, setAdvanced] = useState(false),
     [error, setError] = useState('');
+  const shelfOrderTouched = useRef(false);
+  const touched = useRef(new Set<string>());
+  const collectChanges=(before:unknown,after:unknown,prefix='')=>{
+    if(JSON.stringify(before)===JSON.stringify(after))return;
+    if(prefix==='stockOverrides'||!after||typeof after!=='object'||Array.isArray(after)){if(prefix)touched.current.add(prefix);return;}
+    for(const [key,value] of Object.entries(after as Record<string,unknown>))collectChanges((before as Record<string,unknown>|undefined)?.[key],value,prefix?prefix+'.'+key:key);
+  };
   const update = (next: MarketSessionConfig) => {
+    collectChanges(draft,next);
     setDraft(next);
     setJson(JSON.stringify(next, null, 2));
     setError('');
   };
   // Keep intermediate input (such as an empty budget) editable; validate only on apply/export.
   const learning = { ...DEFAULT_MARKET_LEARNING_CONFIG, ...draft.learning };
-  const learn = (next: Partial<typeof learning>) => update({ ...draft, learning: { ...learning, ...next } });
-  const env = (next: Partial<MarketSessionConfig['environment']>) => update({ ...draft, environment: { ...draft.environment, ...next } });
+  const learn = (next: Partial<typeof learning>) => {Object.keys(next).forEach(key=>touched.current.add('learning.'+key));update({ ...draft, learning: { ...learning, ...next } });};
+  const env = (next: Partial<MarketSessionConfig['environment']>) => {
+    Object.keys(next).forEach(key=>touched.current.add('environment.'+key));
+    if (Object.prototype.hasOwnProperty.call(next, 'shelfOrder')) shelfOrderTouched.current = true;
+    update({ ...draft, environment: { ...draft.environment, ...next } });
+  };
+  const hasChangedJsonShelfOrder = () => {
+    const input = JSON.parse(json);
+    return input.environment && Object.prototype.hasOwnProperty.call(input.environment, 'shelfOrder')
+      && JSON.stringify(input.environment.shelfOrder) !== JSON.stringify(config.environment.shelfOrder);
+  };
   const apply = () => {
     try {
       const next = parseMarketSessionConfig(json);
-      onApply(next);
+      collectChanges(config,next);
+      onApply(next, { shelfOrderTouched: shelfOrderTouched.current || !!hasChangedJsonShelfOrder(), changedConfigPaths:[...touched.current] });
     } catch (e) {
       setError(e instanceof Error ? e.message : '설정 내용을 확인해 주세요.');
     }
@@ -86,6 +106,7 @@ export function MarketSetupPanel({ config, onApply, onClose }: {
       <Text style={s.eyebrow}>장보기 시작 전 설정</Text>
       <Text accessibilityRole="header" style={s.title}>연습 환경 설정</Text>
       <Text style={s.description}>같은 시드와 같은 설정이면 같은 매장이 만들어져요. 설정을 적용하면 아직 시작하지 않은 게임의 배치가 바뀝니다.</Text>
+      <Text style={s.description}>직접 바꾼 게임 조건은 다음 AI 추천에서도 고정돼요. AI는 나머지 조건을 조절해요.</Text>
       <Text style={s.label}>시드 (배치를 다시 만드는 값)</Text>
       <TextInput
         accessibilityLabel="환경 시드"
@@ -98,6 +119,7 @@ export function MarketSetupPanel({ config, onApply, onClose }: {
         text="새 랜덤 배치"
         onPress={() => {
           const seed = 'market-' + Date.now();
+          shelfOrderTouched.current = true;
           update({ ...draft, seed, environment: { ...draft.environment, seed, shelfOrder: 'random' } });
         }}
       />
@@ -146,8 +168,9 @@ export function MarketSetupPanel({ config, onApply, onClose }: {
         />
         <Choice
           text="기본 위치"
-          selected={draft.environment.shelfOrder !== 'random'}
-          onPress={() => env({ shelfOrder: ['produce', 'fresh', 'household', 'meal', 'drink'] })}
+          selected={Array.isArray(draft.environment.shelfOrder)
+            && JSON.stringify(draft.environment.shelfOrder) === JSON.stringify(DEFAULT_MARKET_ENVIRONMENT_CONFIG.shelfOrder)}
+          onPress={() => env({ shelfOrder: DEFAULT_MARKET_ENVIRONMENT_CONFIG.shelfOrder })}
         />
       </View>
       <Text style={s.label}>출입 경보기 감점</Text>
@@ -239,6 +262,7 @@ export function MarketSetupPanel({ config, onApply, onClose }: {
             text="JSON을 간편 설정에 불러오기"
             onPress={() => {
               try {
+                if (hasChangedJsonShelfOrder()) shelfOrderTouched.current = true;
                 update(parseMarketSessionConfig(json));
               } catch (e) {
                 setError(e instanceof Error ? e.message : 'JSON을 확인해 주세요.');

@@ -77,17 +77,34 @@ class GatewayHttpTest {
     @Test void largerOutputStillRequiresAuthenticationAndFitsTheSameContextBudget() throws Exception {
         mvc.perform(get("/api/limits")).andExpect(status().isUnauthorized());
         mvc.perform(get("/api/limits").header("Authorization", "Bearer " + KEY))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.maxOutputTokens").value(2400));
+                .andExpect(status().isOk()).andExpect(jsonPath("$.maxOutputTokens").value(3200))
+                .andExpect(jsonPath("$.contextLengths[2]").value(24576));
         assertThat(count.get()).isZero();
         mvc.perform(post("/api/chat").header("Authorization", "Bearer " + KEY).contentType(MediaType.APPLICATION_JSON)
                 .content(BODY.replace("128", "2400").replace("8192", "18432"))).andExpect(status().isOk());
         assertThat(received.path("options").path("num_predict").asInt()).isEqualTo(2400);
         count.set(0);
         mvc.perform(post("/api/chat").header("Authorization", "Bearer " + KEY).contentType(MediaType.APPLICATION_JSON)
-                .content(BODY.replace("128", "2401"))).andExpect(status().isBadRequest());
+                .content(BODY.replace("128", "3201"))).andExpect(status().isBadRequest());
         mvc.perform(post("/api/chat").header("Authorization", "Bearer " + KEY).contentType(MediaType.APPLICATION_JSON)
                 .content(BODY.replace("128", "2400").replace("8192", "18432")
                         .replace("한국어 테스트", "token ".repeat(16200)))).andExpect(status().isBadRequest());
+        assertThat(count.get()).isZero();
+    }
+    @Test void expandedContextAndOutputRemainBoundedBeforeCallingOllama() throws Exception {
+        String request=BODY.replace("8192","24576").replace("128","3200");
+        mvc.perform(post("/api/chat").header("Authorization","Bearer "+KEY)
+                .contentType(MediaType.APPLICATION_JSON).content(request.replace("한국어 테스트","token ".repeat(20000))))
+                .andExpect(status().isOk());
+        assertThat(received.path("options").path("num_ctx").asInt()).isEqualTo(24576);
+        assertThat(received.path("options").path("num_predict").asInt()).isEqualTo(3200);
+        count.set(0);
+        mvc.perform(post("/api/chat").header("Authorization","Bearer "+KEY)
+                .contentType(MediaType.APPLICATION_JSON).content(request.replace("한국어 테스트","token ".repeat(21500))))
+                .andExpect(status().isBadRequest());
+        mvc.perform(post("/api/chat").header("Authorization","Bearer "+KEY)
+                .contentType(MediaType.APPLICATION_JSON).content(request.replace("24576","32768")))
+                .andExpect(status().isBadRequest());
         assertThat(count.get()).isZero();
     }
     @Test void forwardsOnlyTheFixedObservationSchema() throws Exception {

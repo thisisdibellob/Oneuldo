@@ -3,18 +3,26 @@ import { getMarketContrastProductIds } from './marketAlternatives';
 import type { MarketMission, MarketProduct } from './scenarios';
 import { marketProducts, getObjectiveProductIds } from './scenarios';
 import { MARKET_CATALOG_VERSION, MARKET_SCENARIO_VERSION, getEnabledMarketScenario } from './marketContent';
+import { createMarketEnvironment } from './marketEnvironment';
+import { getMarketMissionEnvironmentConfig } from './marketEnvironmentPlan';
 
 export const MARKET_LAYOUT_VERSION = 'market-list-layout-v1';
 export type MarketScene = {
   schemaVersion: 'market-scene-v1'; questInstanceId: string; seed: number | string;
   layoutVersion: string; catalogVersion: string; scenarioVersion: string;
+  environmentPlanApplication?: {
+    requestedShelfOrder: readonly import('./scenarios').MarketCategoryId[];
+    actualShelfOrder: readonly import('./scenarios').MarketCategoryId[];
+    applied: boolean;
+  };
   mission: Omit<MarketMission, 'scene'>; products: MarketProduct[];
   slots: Array<{ slotId: string; stationId: string; productId: string; storage: string }>;
   startingConditions: { cart: Record<string, number>; player: { x: number; y: number };
+    runtimeConfig?: Record<string,unknown>;
     supportOptions: string[]; geometry: string; exposureMeaning: string };
 };
 
-/** Seed fixes the offered list, not a claim that the user saw every row. No ability-based placement. */
+/** Seed fixes the offered list; an AI plan assigns categories only to existing safe shelf slots. */
 export function createMarketScene(mission: MarketMission, seed: number, questInstanceId = randomUUID()): MarketScene {
   if (!Number.isSafeInteger(seed) || seed < 0 || seed > 0xffffffff) throw new Error('INVALID_SCENE_SEED');
   let state = seed >>> 0;
@@ -44,13 +52,16 @@ export function createMarketScene(mission: MarketMission, seed: number, questIns
     return shuffle([...mandatory, ...shuffle(pool.filter(p => !required.has(p.id))).slice(0, 6 - mandatory.length)]);
   });
   const { scene: ignored, ...original } = mission;
+  const environment = mission.environmentPlan ? createMarketEnvironment({
+    ...getMarketMissionEnvironmentConfig(mission.environmentPlan), seed,
+  }) : undefined;
   return JSON.parse(JSON.stringify({
     schemaVersion: 'market-scene-v1', questInstanceId, seed, layoutVersion: MARKET_LAYOUT_VERSION,
     catalogVersion: MARKET_CATALOG_VERSION, scenarioVersion: MARKET_SCENARIO_VERSION, mission: original, products,
     slots: products.map((p, index) => ({ slotId: p.categoryId + '-' + (index % 6 + 1), stationId: p.categoryId, productId: p.id, storage: p.storage })),
-    startingConditions: { cart: {}, player: { x: 450, y: 860 },
+    startingConditions: { cart: {}, player: environment?.spawn ?? { x: 450, y: 860 },
       supportOptions: ['목록 다시 보기', '글 정보', '거절/중단'],
-      geometry: 'existing-market-900x1000-v1; fixed fixtures; storage-tagged virtual list slots',
+      geometry: environment ? JSON.stringify(environment) : 'existing-market-900x1000-v1; fixed fixtures; storage-tagged virtual list slots',
       exposureMeaning: 'Shelf rows are offered in this order; no viewport or comprehension inference.' },
   }));
 }

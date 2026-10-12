@@ -35,7 +35,8 @@ class FinalAnalysisBudgetTest {
             var estimate = FinalAnalysisBudget.estimate(fixture.mapper,budget,prompts.wholeSourceSystem(),source,refs,true,"");
             var draft = refs.read(new CompactPipelineTest().finalJson);
             String actualReview = AnalysisReviewPrompt.build(fixture.mapper,source,draft,refs);
-            assertThat(estimate.reviewRequest()).isGreaterThanOrEqualTo(budget.total(AnalysisReviewPrompt.system(),actualReview,outputLimit));
+            assertThat(actualReview).doesNotContain("draftToReview");
+            assertThat(estimate.reviewRequest()).isEqualTo(budget.total(AnalysisReviewPrompt.system(),actualReview,outputLimit) + 256);
             assertThat(estimate.required()).isEqualTo(Math.max(estimate.draftRequest(),estimate.reviewRequest()));
             assertThat(estimate.required()).isGreaterThan(previous);
             previous=estimate.required();

@@ -10,8 +10,10 @@ public final class AnalysisReferences {
     private final ObjectMapper mapper;
     private final Map<String, String> aliases = new LinkedHashMap<>();
     private final Map<String, String> originals = new LinkedHashMap<>();
+    private final BehaviorAnalysisInputResponse input;
     public AnalysisReferences(ObjectMapper mapper, BehaviorAnalysisInputResponse input) {
         this.mapper = mapper;
+        this.input = input;
         int sessionNumber = 0, eventNumber = 0;
         for (var session : input.input().sessions()) {
             add(session.sessionId().toString(), "S" + (++sessionNumber));
@@ -34,6 +36,34 @@ public final class AnalysisReferences {
     public Set<String> eventIds() {
         return originals.keySet().stream().filter(id -> id.startsWith("E"))
                 .collect(java.util.stream.Collectors.toUnmodifiableSet());
+    }
+
+    /** Read-only source values for current review contracts; no goal matching or learner scoring. */
+    public JsonNode reviewSource() { return replace(mapper.valueToTree(input.input())); }
+    /** A supplied task definition is background for later comparisons, not a new action at citation time. */
+    public Set<String> taskDefinitionEventIds() {
+        var result = new HashSet<String>();
+        for (var session : input.input().sessions()) for (var event : session.events()) {
+            if (event.action() == null || !"SHOP.SESSION_STARTED".equals(event.action().eventCode())) continue;
+            var payload = mapper.valueToTree(event.payload());
+            if (payload.path("marketContent").path("sceneSnapshot").path("mission").isObject())
+                result.add(aliases.get(event.behaviorLogId().toString()));
+        }
+        return Set.copyOf(result);
+    }
+    /** Terminal snapshots delimit evidence coverage; they are not new user actions. */
+    public Set<String> comparisonAnchorEventIds() {
+        var result=new HashSet<String>(taskDefinitionEventIds());
+        for(var session:input.input().sessions())for(var event:session.events())
+            if(event.action()!=null && Set.of("SHOP.TIME_LIMIT_EXPIRED","SHOP.SESSION_ENDED").contains(event.action().eventCode()))
+                result.add(aliases.get(event.behaviorLogId().toString()));
+        return Set.copyOf(result);
+    }
+    public Map<String, ObjectNode> recordedStations() {
+        var result = new LinkedHashMap<String, ObjectNode>();
+        RecordedStationIdentity.byEvent(mapper, input).forEach((id, value) ->
+                result.put(aliases.get(id), (ObjectNode)replace(value.deepCopy())));
+        return Map.copyOf(result);
     }
 
     /** Dataset order only. Does not evaluate the meaning of a claim or of an event. */
@@ -131,7 +161,7 @@ public final class AnalysisReferences {
             }
         }
     }
-    private void requireRow(JsonNode row,int length) {if(!row.isArray()||row.size()!=length)throw new IllegalArgumentException("INVALID_COMPACT_ROW");}
+    private void requireRow(JsonNode row,int length) {if(!row.isArray()||row.size()!=length)throw new IllegalArgumentException("INVALID_COMPACT_ROW:EXPECTED="+length+" ACTUAL="+(row.isArray()?row.size():0));}
     private ObjectNode expandFinal(ObjectNode source) {
         if(!Set.of("s","f","a","u","p","c").equals(source.propertyNames())||!source.path("f").isArray()||!source.path("a").isArray()) throw new IllegalArgumentException("INVALID_COMPACT_FINAL");
         var root=mapper.createObjectNode();root.set("summary",source.get("s"));root.set("uncertainties",source.get("u"));root.set("usedEvidenceCardIds",source.get("c"));

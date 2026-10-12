@@ -47,17 +47,18 @@ public class RestOllamaChatClient implements GroqChatClient {
     }
 
     private GroqChatResult execute(String systemPrompt, String userPrompt, int output, double temperature, Object format) {
-        if (output < 1 || Math.addExact(QwenTokenCounter.inputTokens(systemPrompt, userPrompt), output)
-                > properties.contextLength() - 256) {
-            throw new IllegalArgumentException("OLLAMA_CONTEXT_LIMIT_EXCEEDED");
-        }
+        if (output < 1) throw new IllegalArgumentException("INVALID_OUTPUT_TOKEN_BUDGET");
+        int required = Math.addExact(QwenTokenCounter.inputTokens(systemPrompt, userPrompt), output);
+        if (required > properties.contextLength() - 256)
+            throw new oneuldo.ai.exception.AiInputLimitException("OLLAMA_CONTEXT_LIMIT_EXCEEDED", required, properties.contextLength() - 256);
         String requestId = java.util.UUID.randomUUID().toString();
         long started = System.nanoTime();
         if (!admission.tryAcquire()) throw failure(Code.AI_QUEUE_FULL, requestId, "QUEUE", 0, started, null);
         boolean acquired = false;
         int attempts = 0;
         try {
-            acquired = execution.tryAcquire(properties.queueTimeout().toMillis(), TimeUnit.MILLISECONDS);
+            var remaining=AiOperationDeadline.remaining();
+            acquired = execution.tryAcquire(remaining==null?properties.queueTimeout().toMillis():Math.min(remaining.toMillis(),properties.queueTimeout().toMillis()), TimeUnit.MILLISECONDS);
             if (!acquired) throw failure(Code.AI_QUEUE_TIMEOUT, requestId, "QUEUE", 0, started, null);
             var body = new Request(properties.model(), List.of(new Message("system", systemPrompt),
                     new Message("user", userPrompt)), false, false, properties.keepAlive(),
@@ -67,7 +68,14 @@ public class RestOllamaChatClient implements GroqChatClient {
                 log.info("AI transport start: requestId={}, attempt={}", requestId, attempts);
                 Response response;
                 try {
-                    response = restClient.post().uri("/api/chat")
+                    var budget=AiOperationDeadline.remaining();
+                    var client=restClient;
+                    if(budget!=null) {
+                        var factory=new org.springframework.http.client.JdkClientHttpRequestFactory(java.net.http.HttpClient.newBuilder()
+                            .connectTimeout(budget.compareTo(properties.connectTimeout())<0?budget:properties.connectTimeout()).build());
+                        factory.setReadTimeout(budget);client=restClient.mutate().requestFactory(factory).build();
+                    }
+                    response = client.post().uri("/api/chat")
                             .headers(headers -> {
                                 headers.set("X-Request-ID", requestId);
                                 if (!properties.apiKey().isBlank()) headers.setBearerAuth(properties.apiKey());

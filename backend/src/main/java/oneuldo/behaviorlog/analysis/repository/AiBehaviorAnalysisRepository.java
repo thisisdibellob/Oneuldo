@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface AiBehaviorAnalysisRepository extends JpaRepository<AiBehaviorAnalysisRun, UUID> {
     Optional<AiBehaviorAnalysisRun> findFirstByMemberIdOrderByCreatedAtDesc(UUID memberId);
+    Optional<AiBehaviorAnalysisRun> findFirstByMemberIdAndStatusNotOrderByCreatedAtDesc(UUID memberId, String status);
     Optional<AiBehaviorAnalysisRun> findByIdAndMemberId(UUID id, UUID memberId);
     Optional<AiBehaviorAnalysisRun> findFirstByMemberIdAndDatasetIdAndRequestKeyAndStatusOrderByCreatedAtDesc(
             UUID memberId, UUID datasetId, String requestKey, String status);

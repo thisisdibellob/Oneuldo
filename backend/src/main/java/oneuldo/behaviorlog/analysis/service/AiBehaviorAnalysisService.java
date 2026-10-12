@@ -63,6 +63,8 @@ public class AiBehaviorAnalysisService {
 
     @org.springframework.beans.factory.annotation.Value("${ai.behavior-analysis.quality-review:false}")
     private boolean qualityReview;
+    @org.springframework.beans.factory.annotation.Value("${ai.behavior-analysis.plan-source-review:true}")
+    private boolean planSourceReview;
 
     private AiBehaviorAnalysisResponse analyzeShared(UUID memberId, BehaviorAnalysisInputResponse input) {
         return datasets.run(memberId+":"+input.id(),()->analyzeInput(memberId,input));
@@ -74,9 +76,10 @@ public class AiBehaviorAnalysisService {
         String prompt = references.encode(prompts.userPrompt(input));
         String requestKey=oneuldo.ai.service.AiRequestFingerprint.of(mapper,memberId,input.id(),configuredModel,
                 system,mapper.readTree(prompt),prompts.observationSystem(),prompts.digestContract(),prompts.reductionContract(),
-                FinalAnalysisPromptCompactor.systemPrompt(),FinalAnalysisPromptCompactor.VERSION,
+                FinalAnalysisPromptCompactor.systemPrompt(),FinalAnalysisPromptCompactor.VERSION,FinalSourceEncoding.VERSION,FinalSourceEncoding.ENCODER_REVISION,AnalysisSynthesisPrompt.VERSION,
                 budget.requestTokens(),budget.chunkOutputTokens(),budget.finalOutputTokens(),maxChunks,0.2,
-                MovementProjection.VERSION,prompts.movementMaxError(),MovementInputEncoder.VERSION,"analysis-reuse-v4-reviewed", qualityReview, AnalysisReviewPrompt.VERSION, AnalysisReviewPrompt.system());
+                MovementProjection.VERSION,prompts.movementMaxError(),MovementInputEncoder.VERSION,"analysis-reuse-v5-plan-source-reviewed", qualityReview, AnalysisReviewPrompt.VERSION, AnalysisReviewPrompt.system(),
+                planSourceReview, AnalysisPlanSemanticReview.VERSION, AnalysisPlanSemanticReview.system());
         var reusable=repository.findFirstByMemberIdAndDatasetIdAndRequestKeyAndStatusOrderByCreatedAtDesc(memberId,input.id(),requestKey,"READY");
         if(reusable.isPresent()) {
             try {
@@ -90,7 +93,8 @@ public class AiBehaviorAnalysisService {
         if (input.eventCount() == 0) {
             status = "NO_HISTORY";
         } else {
-            var pipeline = new TimelineAnalysisPipeline(prompts, validator, client, mapper, maxChunks, budget, pacer).withQualityReview(qualityReview);
+            var pipeline = new TimelineAnalysisPipeline(prompts, validator, client, mapper, maxChunks, budget, pacer)
+                    .withQualityReview(qualityReview).withPlanSemanticReview(qualityReview && planSourceReview);
             if(checkpointStore!=null) pipeline.withCheckpoints(checkpointStore.scope(memberId,input.id()));
             try {
                 analysis = pipeline.analyze(input, budget.requestTokens(), attempts, references, prompt);

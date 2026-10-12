@@ -1,6 +1,7 @@
 import type { MarketCategoryId } from './scenarios';
 
 export type MarketLearningConfig = {
+  stockoutProductId?: string | null;
   stockoutEnabled: boolean;
   allowSubstitution: boolean;
   budgetChoiceEnabled: boolean;
@@ -11,6 +12,7 @@ export type MarketLearningConfig = {
 };
 
 export const DEFAULT_MARKET_LEARNING_CONFIG: MarketLearningConfig = {
+  stockoutProductId: null,
   stockoutEnabled: true,
   allowSubstitution: true,
   budgetChoiceEnabled: true,

@@ -41,7 +41,11 @@ public class AnalysisJobService {
         var snapshot=inputs.createForSession(member,null,session); // ownership checked; fixed input survives restarts
         var existing=query("SELECT * FROM ai_analysis_jobs WHERE member_id=? AND session_id=? AND dataset_id=? AND (status IN ('QUEUED','RUNNING') OR (status='READY' AND prompt_version=?)) ORDER BY created_at DESC LIMIT 1",
                 member,session,snapshot.id(),AiBehaviorAnalysisPromptFactory.VERSION);
-        if(!existing.isEmpty()) return existing.getFirst();
+        if (!existing.isEmpty()) {
+            var cached = existing.getFirst();
+            if (!"READY".equals(cached.status()) || reflectsCurrentProfile(cached, profiles.current(member).orElse(null))) return cached;
+            // Analysis can be cached while a changed profile prompt still needs a new update job.
+        }
         UUID id=UUID.randomUUID();
         db.update("INSERT INTO ai_analysis_jobs(id,member_id,session_id,dataset_id,prompt_version,status,stage) VALUES(?,?,?,?,?,'QUEUED','QUEUED') ON CONFLICT DO NOTHING",id,member,session,snapshot.id(),AiBehaviorAnalysisPromptFactory.VERSION);
         return query("SELECT * FROM ai_analysis_jobs WHERE member_id=? AND session_id=? AND dataset_id=? AND status IN ('QUEUED','RUNNING') ORDER BY created_at DESC LIMIT 1",member,session,snapshot.id()).getFirst();
@@ -49,6 +53,17 @@ public class AnalysisJobService {
     public Job current(UUID member) {
         var rows=query("SELECT * FROM ai_analysis_jobs WHERE member_id=? ORDER BY CASE WHEN status IN ('QUEUED','RUNNING') THEN 0 ELSE 1 END, created_at DESC LIMIT 1",member);
         return rows.isEmpty()?null:rows.getFirst();
+    }
+    static boolean reflectsCurrentProfile(Job job, oneuldo.behaviorlog.profile.domain.AiUserProfileResponse profile) {
+        return profile != null && "READY".equals(profile.status())
+                && oneuldo.behaviorlog.profile.service.AiUserProfilePromptFactory.VERSION.equals(profile.promptVersion())
+                && job.sessionId().equals(profile.sourceSessionId())
+                && job.datasetId().equals(profile.sourceDatasetId())
+                && java.util.Objects.equals(job.analysisId(), profile.sourceAnalysisId());
+    }
+    public Job latestForSession(UUID member, UUID session) {
+        var rows = query("SELECT * FROM ai_analysis_jobs WHERE member_id=? AND session_id=? ORDER BY created_at DESC LIMIT 1", member, session);
+        return rows.isEmpty() ? null : rows.getFirst();
     }
     public Job find(UUID member,UUID id) {
         var rows=query("SELECT * FROM ai_analysis_jobs WHERE member_id=? AND id=?",member,id);

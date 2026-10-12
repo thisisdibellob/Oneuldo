@@ -25,7 +25,8 @@ public class BehaviorMeasurementExtractor {
                         rule.metricCode(), decimal(number), null,
                         target instanceof Number targetNumber ? decimal(targetNumber) : null,
                         rule.unit(), rule.valueSemantics()));
-            } else if (source instanceof Boolean || source instanceof String || source instanceof Enum<?>) {
+            } else if (source instanceof Boolean || source instanceof String || source instanceof Enum<?>
+                    || source instanceof java.time.Instant) {
                 result.add(new MeasurementDraft(
                         rule.metricCode(), null, source.toString(), null,
                         rule.unit(), rule.valueSemantics()));
@@ -49,14 +50,19 @@ public class BehaviorMeasurementExtractor {
             default -> throw new IllegalStateException("지원하지 않는 측정값 경로입니다: " + path);
         };
         if (source == null || parts.length != 2) return null;
-        String accessor = parts[0].equals("action")
-                ? "get" + Character.toUpperCase(parts[1].charAt(0)) + parts[1].substring(1)
-                : parts[1];
-        try {
-            return source.getClass().getMethod(accessor).invoke(source);
-        } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException exception) {
-            throw new IllegalStateException("측정값 규칙의 경로가 유효하지 않습니다: " + path, exception);
+        boolean firstGetter = parts[0].equals("action");
+        for (String field : parts[1].split("\\.")) {
+            if (source == null) return null;
+            String accessor = firstGetter
+                    ? "get" + Character.toUpperCase(field.charAt(0)) + field.substring(1) : field;
+            try {
+                source = source.getClass().getMethod(accessor).invoke(source);
+            } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException exception) {
+                throw new IllegalStateException("측정값 규칙의 경로가 유효하지 않습니다: " + path, exception);
+            }
+            firstGetter = false;
         }
+        return source;
     }
 
     private BigDecimal decimal(Number number) {

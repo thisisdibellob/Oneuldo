@@ -152,6 +152,10 @@ public class BehaviorNormalizationService {
                             + "이지만 실제 값은 " + log.getPayloadType() + "입니다."));
             return new PayloadValidationResult(issues);
         }
+        String timingIssue = oneuldo.behaviorlog.domain.payload.ShoppingTimingContract.invalidReason(
+                log.getEventCode(), log.getPayload());
+        if (timingIssue != null) issues.add(new NormalizationIssue(timingIssue,
+                "payload.timing", "장보기 시간 상태가 시간 정책 또는 종료 이벤트와 일치하지 않습니다."));
         if (definition.requiredPayloadFields().isEmpty()) {
             return new PayloadValidationResult(issues);
         }

@@ -1,0 +1,32 @@
+package oneuldo.behaviorlog.profile.service;
+
+import java.util.Map;
+import tools.jackson.databind.node.ObjectNode;
+
+/** Compacts application-authored instructions only; source/AI records remain intact. */
+public final class ProfilePromptInstructions {
+    private ProfilePromptInstructions() {}
+    public static final Map<String,String> TEXT = Map.of(
+        "currentTaskComparisonScope", "Literal current-play accepted IDs/specifications/quantities, submission and delivered text; no computed verdict. Available or submittable products are not necessarily accepted objectives. Do not expand accepted IDs from prior AI claims. This context grants no extra citation permission.",
+        "timingHistoryScope", "TIME_LIMIT_STARTED starts actual shopping after briefing; read startedAt/elapsedMs/remainingMs. TIME_LIMIT_EXPIRED records expiry cart, not submission or ability. WALL_CLOCK includes later background time. Missing historical timing stays unknown, never filled with new defaults.",
+        "movementHistoryScope", "History sourceMovementContext supplies actual store/five shelf slots/start/support/collector-input context; tasks are in recordedPractice.tasks. Detailed SKU rows, past coordinates/movement/walls/obstacles/dynamic NPC states remain in per-play snapshots, not repeated history. Current analysis reads its original timeline; past AI movement claims are indirect. This limited context proves no optimal route, necessary detour, wandering cause or ability change; preserve missing detail. No extra citation permission or verdict.",
+        "sourcePriority", "Original tasks/submissions/delivered support outrank currentAnalysis and prior AI reports. Correct or withhold conflicting AI claims. Prior observations are indirect, not current actions. Reanalysis, repeated-source revisions or incomplete provenance excludes prior observations; do not restore excluded summaries/cognitive guesses/alternatives/uncertainties/plans/support proposals. Verify delivered support in recordedPractice.",
+        "profileComparisonScope", "sourceSessionProvenance lists original session/dataset/analysis identities, not outcomes/abilities. sourceHistoryComplete confirms link traversal, not full behavioral coverage. Revisions of one session never create another play or repeated learning; compare distinct original sessions only.",
+        "planSourceBoundaries", "Separate observed differences, unknown causes and proposed practice in rationale. Spec mismatch proves no inability; opening help proves no reading/use/dependence; one correction proves no independent mastery/confidence. No recorded baseline difficulty means null, never infer it from the new proposal. Match plan parameters and support prose. Supported future practice is not historical delivered support or achieved progress. Preserve uncertainty without erasing observable goal fulfillment.",
+        "practiceHistoryScope", "At most 12 distinct actual plays, not lifetime history. Missing history proves neither resolution nor first occurrence. Reanalysis is not another play. Judge original goals/purchases/submissions, never invent missing successes/failures. Instruction transitions/help and briefingIndex do not prove reading/dependence. History adds context, not citation permission; cite allowed evidenceEventIds only. sessionId identifies play, datasetId source snapshot. currentSession marks the analysis target, not latest play. Use recorded start/end times. RECORDED_SESSION_START_WITH_PROFILE_LINK_TIEBREAK sorts recorded starts, links only break ties. PROFILE_LINK_ORDER_SOURCE_TIME_MISSING preserves link order without establishing play chronology. playOrder is array order, never learning/success/mastery count.",
+        "planningProcess", "Compare every original current goal/accepted ID/specification/unit/quantity/budget with actual selections/submission. Separate item selection, whole task, delivered support and uncertainty. Compare genuinely different plays under their actual conditions. AI chooses the unresolved observation question and next practice; plan parameters are proposals, not delivered support or progress evidence.",
+        "sourceScope", "previousProfile.observationsIncluded=true supplies indirect past AI observations to verify against originals. false means excluded; never reconstruct them. Do not copy past help/errors into current actions. Same-source reanalysis corrects interpretation without new experience/success. Compare only distinct original plays; retain missing chronology/coverage. Prior plans are proposals, not historical support.");
+    public static ObjectNode compact(ObjectNode source) {
+        var result=source.deepCopy();
+        TEXT.forEach((key,value)->{if(result.has(key))result.put(key,value);});
+        if(result.has("updateRules")) result.putArray("updateRules")
+            .add("Use original sources, not prior AI guesses; retain conflicts, unknown causes and coverage limits. Distinct session IDs identify distinct plays; profile/analysis/dataset revisions do not create experiences, repeated successes, learning or mastery.")
+            .add("Cite only relevant allowed R IDs, 1-30 per finding, never the entire allowed list or old E/R numbers in prose. Split genuinely different observations, retaining counterevidence.")
+            .add("Keep separately grounded findings (normally 2-3) without inventing a quota or erasing other valid observations with one new item. Distinguish observed product/specification/volume/package-unit/quantity/navigation/checkout skills; do not assume transfer to another product or unit.")
+            .add("Do not automatically postpone unresolved package-unit observations behind uncertain causes. AI chooses product/workload/support changes from actual evidence. Prior practicePlan is proposed support, not delivered support.")
+            .add("Write concise complete Korean JSON within the output budget, preserve conflicting evidence and uncertainty. Ground alternatives or use []; unknown motives/comprehension belong in uncertainties, never fill an alternative quota.")
+            .add("Do not generalize everyday ability from one session or invent psychological causes, diagnosis, IQ, disability grade, automatic ability scores or private information.")
+            .add("Propose only difficulty 1-3, distinct itemCount 1-4 and implemented controls. Compare actual timing, layout, input source and support; no automatic advancement from successes. Match support prose and plan parameters.");
+        return result;
+    }
+}

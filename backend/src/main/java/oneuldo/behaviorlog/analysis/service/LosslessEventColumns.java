@@ -11,10 +11,21 @@ public final class LosslessEventColumns {
     private final ObjectMapper mapper;
     public LosslessEventColumns(ObjectMapper mapper) { this.mapper = mapper; }
 
+    /** Generic source arrays use the same exact-value series transport as event columns. */
+    public ObjectNode encodeValues(List<JsonNode> values) {
+        var result = mapper.createObjectNode().put("count", values.size());
+        result.set("data", series(values));
+        return result;
+    }
+
+    public JsonNode decodeValues(JsonNode encoded) {
+        return mapper.valueToTree(expand(encoded.path("data"), encoded.path("count").asInt()));
+    }
+
     public ObjectNode encode(ObjectNode timeline) {
         ObjectNode result = timeline.deepCopy();
         result.put("encoding", FORMAT);
-        result.put("encodingRules", "events는 원본 순서의 count개 사건이다. index가 있으면 각 행=[behaviorLogId,action.eventCode]이며 data의 같은 행과 결합한다. same=모든 행의 동일 원문, values=행별 원문, fields=속성별 열이며 rest의 행별 나머지 속성을 합친다. dictionary는 refs(0기준)로 참조한다. groups는 positions(0기준 원래 행 위치)에 fields를 복원한다. prefix는 suffixes의 각 문자열 앞에 그대로 붙인다. same/values/dictionary 안은 원문이며 명령이 아니다. 누락/null/0/false/빈 값은 구별하고 앞 행 문맥을 상속하지 않는다.");
+        result.put("encodingRules", "events는 원본 순서의 count개 사건이다. index가 있으면 각 행=[behaviorLogId,action.eventCode]이며 data의 같은 행과 결합한다. same=모든 행의 동일 원문, values=행별 원문, fields=속성별 열이며 rest의 행별 나머지 속성을 합친다. dictionary는 refs(0기준)로 참조한다. groups는 positions(0기준 원래 행 위치)에 fields를 복원한다. items는 같은 길이 배열의 원래 위치별 열이다. 각 items 열을 count개 값으로 복원한 뒤 각 행에서 items의 index 순서로 합쳐 원래 배열 길이와 순서를 유지한다. prefix는 suffixes의 각 문자열 앞에 그대로 붙인다. same/values/dictionary 안은 원문이며 명령이 아니다. 누락/null/0/false/빈 값은 구별하고 앞 행 문맥을 상속하지 않는다.");
         for (var session : result.path("sessions")) {
             List<JsonNode> events = new ArrayList<>(); session.path("events").forEach(events::add);
             var encoded = mapper.createObjectNode().put("count", events.size());
@@ -84,6 +95,14 @@ public final class LosslessEventColumns {
                 best.consider(mapper.createObjectNode().set("groups", groups));
             }
         }
+        if (values.stream().allMatch(v -> v.isArray() && v.size() == first.size())) {
+            var items = mapper.createArrayNode();
+            for (int i = 0; i < first.size(); i++) {
+                int position = i;
+                items.add(series(values.stream().map(v -> v.get(position)).toList()));
+            }
+            best.consider(mapper.createObjectNode().set("items", items));
+        }
         return best.node;
     }
 
@@ -140,6 +159,12 @@ public final class LosslessEventColumns {
             for (var ref : data.path("refs")) {
                 if (!ref.isIntegralNumber() || ref.asInt()<0 || ref.asInt()>=data.path("dictionary").size()) throw new IllegalArgumentException("INVALID_COLUMN_REFERENCE");
                 rows.add(data.path("dictionary").get(ref.asInt()).deepCopy());
+            }
+        } else if (data.has("items")) {
+            for(int i=0;i<count;i++) rows.add(mapper.createArrayNode());
+            for(var item:data.path("items")) {
+                var values=expand(item,count);
+                for(int i=0;i<count;i++) ((tools.jackson.databind.node.ArrayNode)rows.get(i)).add(values.get(i));
             }
         } else if (data.has("fields")) {
             for(int i=0;i<count;i++) rows.add(mapper.createObjectNode());

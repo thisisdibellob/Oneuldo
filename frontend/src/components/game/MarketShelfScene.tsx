@@ -367,7 +367,7 @@ export function MarketShelfScene({ slots, stock, onCartVisibilityChange, cart, c
                       <Text style={s.basketItemName}>{product.name}</Text>
                       <Text style={s.basketItemPrice}>개당 {price(product.price)}</Text>
                       <Text style={s.basketItemCount}>담은 수량 {quantity}개</Text>
-                      {canReturnHere ? <PressScale accessibilityLabel={product.name + ' ' + category.label + ' 진열대에 1개 내려놓기'}
+                      {canReturnHere ? <PressScale accessibilityLabel={product.name + ' ' + product.detail + ' ' + price(product.price) + ' ' + category.label + ' 진열대에 1개 내려놓기'}
                         accessibilityRole="button" onPress={() => onChangeQuantity(id, -1)} style={s.basketRemove}>
                         <Ionicons color="#405D50" name="remove" size={15} />
                         <Text style={s.basketRemoveText}>1개 내려놓기</Text>
@@ -526,8 +526,8 @@ function ShelfProduct({ product, quantity, width, artworkSize, surfaceY, tagHeig
       <Text style={s.price}>{price(product.price)}</Text>
     </View>
     {unavailable ? <View accessibilityLabel={product.name + ' 품절'} style={[s.soldOut, { minHeight: buttonHeight }, compactRows && s.addCompact]}><Text style={s.soldOutText}>품절</Text></View>
-      : <PressScale accessibilityLabel={quantity === 0 ? product.name + ' 담기' : product.name + ' 한 개 더 담기'}
-        accessibilityHint="상품을 0.35초 동안 누른 다음 장바구니로 끌어 담을 수도 있어요"
+      : <PressScale accessibilityLabel={product.name + ' ' + product.detail + ' ' + price(product.price) + ' 담기'}
+        accessibilityHint={'현재 담은 수량 ' + quantity + '개. 상품을 0.35초 동안 누른 다음 장바구니로 끌어 담을 수도 있어요'}
         accessibilityRole="button" onPress={onAdd} style={[s.add, { minHeight: buttonHeight }, compactRows && s.addCompact]}>
         <Ionicons color="#456A55" name="add" size={17}/>{!compactRows ? <Text style={s.addText}>담기</Text> : null}
       </PressScale>}

@@ -18,12 +18,11 @@ public final class FinalAnalysisBudget {
         int draftCost = budget.total(system, source + retry, output);
         if (!review) return new Estimate(draftCost, 0);
         // Count the current review instructions/source instead of an arbitrary 1,500-token constant.
-        // The draft does not exist yet. Reserve its output limit plus framing for draftToReview.
-        // This is a planning estimate, not a proof that every possible draft will fit.
+        // The independent review never receives draftToReview; do not reserve a second copy of its output.
+        // Keep the actual review output reservation and a separate framing margin.
         var empty = new AiBehaviorAnalysis("", List.of(), List.of(), List.of(), null, List.of());
         String reviewSource = AnalysisReviewPrompt.build(mapper, source, empty, refs);
-        int reviewCost = budget.total(AnalysisReviewPrompt.system(), reviewSource + retry, output)
-                + output + 256;
+        int reviewCost = budget.total(AnalysisReviewPrompt.system(), reviewSource + retry, output) + 256;
         return new Estimate(draftCost, reviewCost);
     }
 }

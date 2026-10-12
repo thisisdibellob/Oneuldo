@@ -17,6 +17,20 @@ class AdaptivePracticeContractTest {
     final MovementProjectionTest fixture = new MovementProjectionTest();
     final tools.jackson.databind.json.JsonMapper mapper = fixture.mapper;
 
+    @Test void quest_history_uses_raw_submission_without_copying_the_earlier_ai_success_label() {
+        var history = mapper.createArrayNode();
+        var row = history.addObject().put("currentSession", true).put("priorAiJudgment", "SUCCESS");
+        var recorded = row.putObject("recordedPractice");
+        recorded.putObject("submittedCart").put("banana-single", 1);
+        recorded.putArray("checkoutDialogue").add("구매를 제출하거나 계속 장볼 수 있어요.");
+        var wire = mapper.readTree(new MarketAiQuestPromptFactory(mapper).withPracticeHistory("{}", history));
+        var decoded = LosslessHistoryEncoding.decodeHistory(mapper, wire);
+        assertThat(decoded.get(0).has("priorAiJudgment")).isFalse();
+        assertThat(decoded.get(0).path("recordedPractice")).isEqualTo(recorded);
+        assertThat(row.path("priorAiJudgment").asString()).isEqualTo("SUCCESS");
+        assertThat(wire.toString()).doesNotContain("FAILURE", "matched", "score");
+    }
+
     @Test void practice_history_keeps_instruction_transition_values_separate_from_purchase_and_ai_judgments() {
         var data=fixture.fixture();
         var event=(ObjectNode)data.path("input").path("sessions").get(0).path("events").get(0);

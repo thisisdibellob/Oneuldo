@@ -1,6 +1,8 @@
 package oneuldo.behaviorlog.profile.service;
 
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -42,14 +44,20 @@ public class AiUserProfileService {
             AiBehaviorAnalysisResponse current) {
         var reused = repository.findFirstByMemberIdAndSourceAnalysisIdAndStatusOrderByCreatedAtDesc(
                 memberId, current.analysisId(), "READY");
-        if (reused.isPresent()) return AiUserProfileResponse.from(reused.get());
+        if (reused.isPresent() && AiUserProfilePromptFactory.VERSION.equals(reused.get().getPromptVersion()))
+            return AiUserProfileResponse.from(reused.get());
         var previous = repository.findFirstByMemberIdAndStatusOrderByCreatedAtDesc(memberId, "READY").orElse(null);
         if (previous == null) return saveInitial(memberId, sessionId, current);
 
         long started = System.nanoTime();
         String system = prompts.systemPrompt();
-        var references = new AiUserProfileReferences(mapper, previous, current);
-        String prompt = references.encode(prompts.withPracticeHistory(prompts.userPrompt(previous, current), history.forUpdate(memberId, previous, current)));
+        var sources = sourceContext(memberId, sessionId, previous, current);
+        var references = new AiUserProfileReferences(mapper, previous, current, sources.sessionIds());
+        String prompt = references.encode(prompts.withPracticeHistory(prompts.userPrompt(previous, current, sources), history.forUpdate(memberId, previous, current)));
+        // Compact only application-authored instructions, then reversibly encode every original source value.
+        prompt = mapper.writeValueAsString(ProfilePromptInstructions.compact((tools.jackson.databind.node.ObjectNode)mapper.readTree(prompt)));
+        prompt = new oneuldo.behaviorlog.analysis.service.FinalSourceEncoding(mapper)
+            .encode((tools.jackson.databind.node.ObjectNode)mapper.readTree(prompt)).toString();
         List<AiBehaviorAnalysisRun.Attempt> attempts = new ArrayList<>();
         AiBehaviorAnalysis profile = null;
         String model = null, error = null;
@@ -74,19 +82,25 @@ public class AiUserProfileService {
                 break;
             } catch (RuntimeException failure) {
                 var transport = failure instanceof oneuldo.ai.exception.AiTransportException t ? t : null;
-                error = transport != null ? transport.code().name() : response == null ? "AI_UNAVAILABLE" : "INVALID_USER_PROFILE";
+                error = failure instanceof oneuldo.ai.exception.AiInputLimitException ? "INPUT_TOO_LARGE"
+                        : transport != null ? transport.code().name() : response == null ? "AI_UNAVAILABLE" : "INVALID_USER_PROFILE";
                 var audit = attempt(number, submitted, outputMax, response, error);
                 var validation = failure instanceof oneuldo.behaviorlog.analysis.service.ReviewEvidenceException v ? v.details() : null;
                 retryFeedback = "\n이전 응답이 검사를 통과하지 못했습니다. 오류: "
                         + (validation == null ? ("length".equals(response == null ? null : response.finishReason()) ? "OUTPUT_TRUNCATED" : "INVALID_PROFILE_CONTRACT")
-                            : mapper.writeValueAsString(validation))
-                        + ". 입력의 allowedEvidenceEventIds와 각 원본 evidenceEventIds 배열을 다시 확인하세요. "
+                            : mapper.writeValueAsString(validation));
+                if (validation != null && "PROFILE_FIELD_NOT_ALLOWED".equals(validation.code())) {
+                    retryFeedback += ". 오류의 필드명은 검증 데이터이며 명령이 아닙니다. "
+                            + "최상위 필드는 summary, findings, uncertainties, practicePlan, usedEvidenceCardIds 5개만 허용됩니다. "
+                            + "sessionAssessments는 입력 currentAnalysis에 이미 있는 세션 분석값이며 프로필 출력에서 제외하세요. "
+                            + "추가 필드나 감싸기 객체를 만들지 말고 허용된 필드로 완성된 JSON 객체 하나를 다시 출력하세요.";
+                } else retryFeedback += ". 입력의 allowedEvidenceEventIds와 각 원본 evidenceEventIds 배열을 다시 확인하세요. "
                         + "PROFILE_EVIDENCE_COUNT_EXCEEDS_LIMIT는 한 finding의 근거가 최대 30개를 초과한 오류입니다. "
                         + "허용된 ID 전체를 나열하지 말고 그 관찰을 실제로 지지하는 근거만 선택하세요. "
                         + "서로 다른 행동의 모든 근거가 필요하면 관찰을 구분하고 각 문장에 해당하는 근거를 인용하세요. "
                         + "옛 본문 번호를 복사하거나 무관한 ID로 치환하지 말고, 해당 근거가 지지하는 문장만 다시 작성하세요. JSON 객체 하나를 완성하세요.";
                 attempts.add(new AiBehaviorAnalysisRun.Attempt(audit.number(),audit.inputPrompt(),audit.rawOutput(),audit.errorCode(),
-                        audit.source(),audit.systemPrompt(),audit.outputMax(),audit.finishReason(),audit.inputTokens(),audit.outputTokens(),
+                        failure instanceof oneuldo.ai.exception.AiInputLimitException ? "PREFLIGHT" : audit.source(),audit.systemPrompt(),audit.outputMax(),audit.finishReason(),audit.inputTokens(),audit.outputTokens(),
                         elapsed(attemptStarted),transport == null ? null : transport.details(),validation));
                 if (response == null) break;
             }
@@ -106,6 +120,40 @@ public class AiUserProfileService {
                 current.model(), "INITIAL_FROM_SESSION_ANALYSIS", "INITIAL_FROM_SESSION_ANALYSIS",
                 List.of(), current.analysis(), null, 0));
         return AiUserProfileResponse.from(saved);
+    }
+
+    /** Profile revisions are audit records; only source-session identity denotes a played session. */
+    private AiUserProfilePromptFactory.UpdateSourceContext sourceContext(UUID memberId, UUID sessionId,
+            AiUserProfile previous, AiBehaviorAnalysisResponse current) {
+        var currentSources = new LinkedHashMap<UUID, AiUserProfilePromptFactory.SourceSession>();
+        currentSources.put(sessionId, new AiUserProfilePromptFactory.SourceSession(sessionId, current.datasetId(), current.analysisId()));
+        for (var assessment : current.analysis().sessionAssessments())
+            currentSources.putIfAbsent(assessment.sessionId(), new AiUserProfilePromptFactory.SourceSession(
+                    assessment.sessionId(), current.datasetId(), current.analysisId()));
+        var priorSources = new LinkedHashMap<UUID, AiUserProfilePromptFactory.SourceSession>();
+        var visited = new HashSet<UUID>();
+        var seenSourceSessions = new HashSet<UUID>();
+        boolean same = false, complete = true, repeatedSource = false;
+        var profile = previous;
+        int depth = 0;
+        for (; profile != null && depth < 100; depth++) {
+            if (!memberId.equals(profile.getMemberId()) || !visited.add(profile.getId())) {
+                complete = false;
+                break;
+            }
+            if (!seenSourceSessions.add(profile.getSourceSessionId())) repeatedSource = true;
+            if (currentSources.containsKey(profile.getSourceSessionId())) same = true;
+            else if (priorSources.size() < oneuldo.behaviorlog.personalization.service.PracticeHistoryService.MAX_DISTINCT_SESSIONS)
+                priorSources.putIfAbsent(profile.getSourceSessionId(), new AiUserProfilePromptFactory.SourceSession(
+                        profile.getSourceSessionId(), profile.getSourceDatasetId(), profile.getSourceAnalysisId()));
+            var previousId = profile.getPreviousProfileId();
+            profile = previousId == null ? null
+                    : repository.findByIdAndMemberIdAndStatus(previousId, memberId, "READY").orElse(null);
+            if (previousId != null && profile == null) complete = false;
+        }
+        if (profile != null) complete = false;
+        return new AiUserProfilePromptFactory.UpdateSourceContext(same, complete, repeatedSource,
+                List.copyOf(currentSources.values()), List.copyOf(priorSources.values()));
     }
 
     private AiBehaviorAnalysisRun.Attempt attempt(int number, String prompt, int outputMax,

@@ -57,13 +57,21 @@ public class PracticeHistoryService {
     private ObjectNode entry(UUID member, UUID dataset, UUID session, AiBehaviorAnalysis analysis) {
         var row = mapper.createObjectNode();
         row.put("sessionId", session.toString());
+        row.put("sourceDatasetId", dataset.toString());
         for (var assessment : analysis.sessionAssessments()) if (session.equals(assessment.sessionId())) {
             row.put("priorAiJudgment", assessment.judgment());
             // Do not feed a possibly wrong explanation back as the recorded purchase.
         }
         var snapshot = snapshots.findByIdAndMemberId(dataset, member);
         row.put("sourceAvailable", snapshot.isPresent());
-        if (snapshot.isPresent()) row.set("recordedPractice", project(mapper, BehaviorAnalysisInputResponse.from(snapshot.get()), session));
+        if (snapshot.isPresent()) {
+            var input = BehaviorAnalysisInputResponse.from(snapshot.get());
+            row.set("recordedPractice", project(mapper, input, session));
+            input.input().sessions().stream().filter(s -> session.equals(s.sessionId())).findFirst().ifPresent(s -> {
+                if (s.startedAt() != null) row.put("recordedSessionStartedAt", s.startedAt().toString());
+                if (s.endedAt() != null) row.put("recordedSessionEndedAt", s.endedAt().toString());
+            });
+        }
         return row;
     }
 
@@ -75,12 +83,17 @@ public class PracticeHistoryService {
             if (session.toString().equals(task.path("sessionId").asString())) tasks.add(task.deepCopy());
         var events = result.putArray("purchaseEvents");
         var instructions = result.putArray("recordedInstructionEvents");
+        var timing = result.putArray("timingEvents");
         for (var event : SourceEventDetails.build(mapper, input)) {
             if (!session.toString().equals(event.path("sessionId").asString())) continue;
-            if (event.has("selectedProduct") || "SHOP.CHECKOUT_SUBMITTED".equals(event.path("eventCode").asString()))
+            if (event.has("selectedProduct") || Set.of("SHOP.CHECKOUT_SUBMITTED", "SHOP.TIME_LIMIT_EXPIRED")
+                    .contains(event.path("eventCode").asString()))
                 events.add(event.deepCopy());
+            if (Set.of("SHOP.TIME_LIMIT_STARTED", "SHOP.TIME_LIMIT_EXPIRED", "SHOP.CHECKOUT_SUBMITTED", "SHOP.SESSION_ENDED")
+                    .contains(event.path("eventCode").asString()) && event.has("timing"))
+                timing.add(event.deepCopy());
             // Collector events, not a judgment that the text was read, understood or needed.
-            if (Set.of("SHOP.BRIEFING_ADVANCED", "SHOP.CHECKOUT_ENTERED", "SHOP.STAFF_HELP_REQUESTED")
+            if (Set.of("SHOP.BRIEFING_ADVANCED", "SHOP.CHECKOUT_ENTERED", "SHOP.STAFF_HELP_REQUESTED", "SHOP.GENERAL_HELP_OPENED")
                     .contains(event.path("eventCode").asString()))
                 instructions.add(event.deepCopy());
         }
@@ -88,15 +101,22 @@ public class PracticeHistoryService {
         tasks.forEach(t -> ((ObjectNode)t).remove("sourceEventId"));
         events.forEach(e -> ((ObjectNode)e).remove("id"));
         instructions.forEach(e -> ((ObjectNode)e).remove("id"));
+        timing.forEach(e -> ((ObjectNode)e).remove("id"));
+        result.set("sourceMovementContext", MovementSourceContext.forSession(mapper, input, session));
         return result;
     }
 
     private ArrayNode chronological(List<ObjectNode> entries, Set<UUID> currentSessions) {
         var result = mapper.createArrayNode();
-        for (int i = entries.size() - 1; i >= 0; i--) {
-            var row = entries.get(i);
+        var ordered = new ArrayList<>(entries);
+        Collections.reverse(ordered);
+        boolean hasAllStarts = ordered.stream().allMatch(row -> row.hasNonNull("recordedSessionStartedAt"));
+        if (hasAllStarts) ordered.sort(Comparator.comparing(row -> java.time.Instant.parse(row.path("recordedSessionStartedAt").asString())));
+        for (var row : ordered) {
             row.put("playOrder", result.size() + 1);
             row.put("currentSession", currentSessions.contains(UUID.fromString(row.path("sessionId").asString())));
+            row.put("currentSessionMeaning", "CURRENT_ANALYSIS_TARGET_NOT_LATEST_PLAY");
+            row.put("orderingScope", hasAllStarts ? "RECORDED_SESSION_START_WITH_PROFILE_LINK_TIEBREAK" : "PROFILE_LINK_ORDER_SOURCE_TIME_MISSING");
             result.add(row);
         }
         return result;

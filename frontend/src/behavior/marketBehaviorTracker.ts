@@ -11,6 +11,7 @@ import { getObjectiveProductIds, getObjectiveQuantity, getMarketCartTotal, getMa
 import { MARKET_CATALOG_VERSION, MARKET_SCENARIO_VERSION, MARKET_INITIAL_STOCK, MARKET_SUPPORT_OPTIONS } from '../game/marketContent';
 import { enqueueBehaviorEvents, flushBehaviorEventQueue, assertBehaviorEventsAcknowledged } from './behaviorEventQueue';
 import { MovementLogReducer, MOVEMENT_SAMPLING } from './movementLogReducer';
+import type { MarketQuestTiming } from '../game/marketQuestTime';
 import {
   MarketMovementDetector,
   type MarketMovementEventDraft,
@@ -20,7 +21,7 @@ import {
 } from './marketMovementDetector';
 
 const MARKET_TASK_ID = '30000000-0000-0000-0000-000000000003';
-const CONTENT_VERSION = 'market-micro-behavior-v3-lifecycle';
+const CONTENT_VERSION = 'market-micro-behavior-v4-timing-help';
 const DETECTION_RULE_VERSION = 'market-detection-rules-v1';
 const APP_VERSION = '1.0.0';
 const PERSIST_DELAY_MS = 1000;
@@ -58,6 +59,10 @@ export class MarketBehaviorTracker {
   private buffer: BufferedEvent[] = [];
   private closed = false;
   private submissionRequested = false;
+  private timeLimitStarted = false;
+  private timeLimitExpired = false;
+  private frozenTiming: MarketQuestTiming | null = null;
+  private readonly timingSnapshot?: () => MarketQuestTiming;
   private controlMode: MarketTelemetryControlMode = 'joystick';
   private firstUserActionAt: number | null = null;
   private interruptionCount = 0;
@@ -66,6 +71,7 @@ export class MarketBehaviorTracker {
   private idleStartedAt: number | null = null;
   private idleTimer: ReturnType<typeof setTimeout> | null = null;
   private persistTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly pendingPersistence = new Set<Promise<unknown>>();
   private sequence = 0;
   private readonly startedAt = Date.now();
   private readonly contentSource: BehaviorSimulationContext['contentSource'];
@@ -88,11 +94,13 @@ export class MarketBehaviorTracker {
       sessionId?: string;
       initialControlMode?: MarketTelemetryControlMode;
       agentContext?: { personaId: string; personaVersion?: string; agentModel: string };
+      timingSnapshot?: () => MarketQuestTiming;
     },
   ) {
     this.sessionId = options?.sessionId ?? randomUUID();
     this.controlMode = options?.initialControlMode ?? 'joystick';
     this.agentContext = options?.agentContext;
+    this.timingSnapshot = options?.timingSnapshot;
     this.movementDetector = new MarketMovementDetector(stations, 105);
     this.questInstanceId = mission.scene?.questInstanceId ?? simulation?.questInstanceId ?? randomUUID();
     this.contentSource = simulation?.contentSource ?? 'STATIC';
@@ -101,10 +109,12 @@ export class MarketBehaviorTracker {
       microActionId: 'START_MARKET_SESSION',
       payload: {
         budgetAmount: mission.budget,
+        ...(this.timingSnapshot ? { timing: this.timingSnapshot() } : {}),
         marketContent: {
           sceneSnapshot: mission.scene,
           title: mission.title,
           description: mission.description,
+          ...(this.timingSnapshot ? { timeLimitSeconds: mission.timeLimitSeconds } : {}),
           objectiveConstraints: mission.objectives.map((objective) => ({
             productId: objective.productId, quantity: objective.quantity,
             label: objective.label ?? `${this.product(objective.productId)?.name} ${this.product(objective.productId)?.detail}`,
@@ -152,6 +162,7 @@ export class MarketBehaviorTracker {
   private record(input: TrackInput) {
     const occurredAt = input.occurredAt ?? new Date().toISOString();
     const occurredAtMs = Date.parse(occurredAt);
+    const timing = this.frozenTiming ?? this.timingSnapshot?.();
     if (input.eventCode !== 'SHOP.IDLE_STARTED'
       && input.eventCode !== 'SHOP.IDLE_ENDED'
       && input.eventCode !== 'SHOP.MOVEMENT_STOPPED') {
@@ -205,6 +216,7 @@ export class MarketBehaviorTracker {
         scenarioId: this.mission.scenarioId ?? 'CUSTOM',
         scenarioVersion: this.mission.scenarioVersion ?? MARKET_SCENARIO_VERSION,
         thresholdRuleVersion: DETECTION_RULE_VERSION,
+        ...(timing ? { timing } : {}),
         ...input.payload,
         marketContent: { ...(input.payload?.marketContent as object ?? {}), sceneRef: this.questInstanceId, layoutVersion: this.mission.scene?.layoutVersion, seed: this.mission.scene?.seed,
           ...(this.agentContext ? { controlSource: 'AGENT', agentContext: this.agentContext } : {}),
@@ -343,10 +355,20 @@ export class MarketBehaviorTracker {
     });
   }
 
+  startTimeLimit(timing: MarketQuestTiming) {
+    if (this.closed || this.timeLimitStarted || !timing.startedAt) return;
+    this.timeLimitStarted = true;
+    this.track({ eventCode: 'SHOP.TIME_LIMIT_STARTED', microActionId: 'START_SHOPPING_CLOCK',
+      occurredAt: timing.startedAt, payload: { ...this.cartPayload(this.latestCart), timing }, priority: 'critical' });
+  }
+
   checkoutSubmitted(cart: MarketCart, _legacyEvaluation?: MarketEvaluation) {
+    if (this.closed || this.submissionRequested || this.timingSnapshot?.().expired) return false;
     this.submissionRequested = true;
+    this.frozenTiming = this.timingSnapshot?.() ?? null;
     this.track({ eventCode: 'SHOP.CHECKOUT_SUBMITTED', microActionId: 'SUBMIT_CHECKOUT',
       payload: this.cartPayload(cart), priority: 'critical' });
+    return true;
   }
 
   correctionStarted(cart: MarketCart) {
@@ -393,8 +415,18 @@ export class MarketBehaviorTracker {
     await this.closeSession(cart, this.submissionRequested ? 'EXIT_AFTER_SUBMISSION' : 'USER_ABORTED');
   }
 
+  async expireTimeLimit(cart: MarketCart, timing: MarketQuestTiming) {
+    if (this.closed || this.timeLimitExpired) return;
+    this.timeLimitExpired = true;
+    this.frozenTiming = { ...timing };
+    this.track({ eventCode: 'SHOP.TIME_LIMIT_EXPIRED', microActionId: 'EXPIRE_SHOPPING_CLOCK',
+      payload: { ...this.cartPayload(cart), timing }, priority: 'critical' });
+    await this.closeSession(cart, 'TIME_LIMIT_EXPIRED');
+  }
+
   private async closeSession(cart: MarketCart, reason: NonNullable<BehaviorLogRequest['sessionEnd']>['reason']) {
     if (this.closed) return;
+    this.frozenTiming ??= this.timingSnapshot?.() ?? null;
     this.trackMovementEvents(this.movementDetector.finish(this.targetZoneIds()));
     this.closed = true;
     this.track({ eventCode: 'SHOP.SESSION_ENDED', microActionId: 'EXIT_MARKET',
@@ -411,8 +443,14 @@ export class MarketBehaviorTracker {
   }
 
   async flushNow() {
-    await this.persist();
+    await this.persistLocal();
     await flushBehaviorEventQueue(this.accessToken);
+  }
+
+  /** A terminal record must reach the durable local outbox before its tracker is replaced. */
+  async persistLocal() {
+    await this.persist();
+    await Promise.all([...this.pendingPersistence]);
   }
 
   private trackMovementEvents(events: MarketMovementEventDraft[]) {
@@ -445,13 +483,24 @@ export class MarketBehaviorTracker {
     );
   }
 
+  private latestRuntimeState: Record<string,unknown> | undefined;
+  runtimeState(value:Record<string,unknown>) { this.latestRuntimeState=JSON.parse(JSON.stringify(value)); }
   private cartPayload(cart: MarketCart) {
     const total = getMarketCartTotal(cart, this.products);
     return {
       cartItemCount: Object.values(cart).reduce((sum, quantity) => sum + quantity, 0),
+      ...(this.timingSnapshot ? { budgetAmount: this.mission.budget, objectiveCount: this.mission.objectives.length } : {}),
       cartTotalAmount: total,
       remainingBudgetAmount: this.mission.budget - total,
-      marketContent: { cart: { ...cart } },
+      ...(this.frozenTiming ? { timing: this.frozenTiming } : {}),
+      marketContent: { cart: { ...cart }, ...(this.latestRuntimeState?{runtimeState:this.latestRuntimeState}:{}), ...(this.timingSnapshot ? { missionSnapshot: {
+        id: this.mission.id, title: this.mission.title, description: this.mission.description,
+        budget: this.mission.budget, objectives: this.mission.objectives, timeLimitSeconds: this.mission.timeLimitSeconds,
+        ...(this.mission.runtimePlan?{runtimePlan:this.mission.runtimePlan}:{}),
+      }, objectiveProgress: this.mission.objectives.map(objective => ({
+        productId: objective.productId, requiredQuantity: objective.quantity,
+        selectedQuantity: getObjectiveQuantity(cart, objective), acceptedProductIds: getObjectiveProductIds(objective),
+      })) } : {}) },
     };
   }
 
@@ -479,11 +528,15 @@ export class MarketBehaviorTracker {
     }
     if (this.buffer.length === 0) return;
     const events = this.buffer.splice(0, this.buffer.length);
+    const pending = enqueueBehaviorEvents(this.accessToken, events);
+    this.pendingPersistence.add(pending);
     try {
-      await enqueueBehaviorEvents(this.accessToken, events);
+      await pending;
     } catch (error) {
       this.buffer.unshift(...events);
       throw error;
+    } finally {
+      this.pendingPersistence.delete(pending);
     }
   }
 

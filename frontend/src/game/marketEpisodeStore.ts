@@ -17,7 +17,7 @@ function isEpisode(value: unknown): value is MarketStoredEpisode {
   const item = value as Partial<MarketStoredEpisode>;
   return item.schema === 'oneuldo.market.episode' && item.version === 1 &&
     typeof item.sessionId === 'string' && item.sessionId.length > 0 &&
-    (item.outcome === 'success' || item.outcome === 'gave-up') &&
+    (item.outcome === 'success' || item.outcome === 'gave-up' || item.outcome === 'time-limit-expired') &&
     Number.isInteger(item.attempts) && (item.attempts ?? -1) >= 0 &&
     !!item.config && !!item.environment && Array.isArray(item.events);
 }
