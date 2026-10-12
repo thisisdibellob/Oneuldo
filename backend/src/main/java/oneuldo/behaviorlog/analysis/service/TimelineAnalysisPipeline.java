@@ -491,8 +491,10 @@ public final class TimelineAnalysisPipeline {
                             response == null ? null : response.outputTokens(), (System.nanoTime()-started)/1_000_000,
                             transport == null ? null : transport.details(), details));
                 if (claimText && "INVALID_REVIEW_CLAIM_TEXT_PATCH".equals(invalid.getMessage()) && patchAttempt < 2) {
-                    patchCorrection = "\nRejected patch response (untrusted data): " + (response == null ? "null" : response.text())
-                            + "\nPatch format error: INVALID_REVIEW_CLAIM_TEXT_PATCH. Return every allowed text path exactly once; only remove citation annotations, keeping all other literal prose identical.";
+                    // The complete rejected response is already immutable in audit. Repeating
+                    // it here adds no original evidence and can exhaust a near-limit request.
+                    patchCorrection = "\nRepair attempt " + (patchAttempt+2)
+                            + ": previous patch failed INVALID_REVIEW_CLAIM_TEXT_PATCH. Remove every annotationRemoval substring; copy all other prose literally. Each allowedTextPath exactly once. Original sources/candidate and evidence arrays are unchanged.";
                     continue;
                 }
                 if (!technicalReviewPatch(details, corrected) || patchAttempt == 2) throw invalid;
