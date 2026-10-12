@@ -140,7 +140,7 @@ function customPersona(base, definition) {
   const persona = clone(base), context = buildSeparatedContext(base), traits = clone(definition.traits);
   const label = definition.label ?? definition.id;
   const traitProfile = {schemaVersion:catalog.schemaVersion,basePersonaId:base.id,presetId:definition.presetId ?? null,traits,contextHash:hash(context),context};
-  persona.id = definition.id; persona.version = `traits-1-${hash({baseVersion:base.version,traits,context,label}).slice(0,12)}`;
+  persona.id = definition.id;
   persona.name = label;
   persona.description = `${label}: 공통 행동 성향으로 구성한 허구의 성인. 인지·수행 기준, 취향과 경험은 별도 기본 맥락을 유지한다. ${traitInstructions(traits).join(' ')}`;
   if (persona.character) {
@@ -151,8 +151,12 @@ function customPersona(base, definition) {
     character.preferences = [`상품 취향의 구조화된 설계값: ${JSON.stringify(context.preferences)}`];
     character.practicedStrategies = ['실제 방문·연습 경험은 전달된 attentionExperience만 따른다. 익숙한 상품을 안다는 사실로 현재 매장 위치·재고·조작 경험을 만들지 않는다.'];
   }
-  persona.prompt = `# 공통 성향 기반 성인 프로필\n\n${catalog.interpretation}\n\n## 공통 성향\n\n${traitInstructions(traits).join('\n')}\n\n## 성향과 분리된 기본 맥락\n\n${JSON.stringify(context)}\n\n성향 수준은 선택의 경향이며 행동 횟수·대기시간·실수·포기·완료를 의무로 정하지 않는다. 성향 변경으로 인지·수행 기준이나 상품 경험을 바꾸지 않는다.\n\n## 공통 전제와 관찰·실행 범위\n\n현재 제공된 관찰과 실제로 확인한 경험만 사용한다. 도움을 받더라도 선호와 최종 선택은 스스로 유지한다.`;
+  persona.prompt = `# 공통 성향 기반 성인 프로필\n\n${catalog.interpretation}\n\n## 공통 성향\n\n${traitInstructions(traits).join('\n')}\n\n## 성향을 행동으로 선택하는 기준\n\n성향은 행동 이름을 붙이는 방식보다 어떤 정보를 더 살펴볼지, 충분히 알았을 때 언제 선택할지에 반영한다. 비교는 실제로 관찰한 후보의 차이와 현재 알고 있는 조건을 대조하는 행동이다. 재확인은 이전에 알던 목표·상품·수량과 현재 확인할 수 있는 정보를 다시 대조하는 행동이다. 아직 관찰하지 않은 목표나 후보를 비교·확인한 것으로 쓰지 않는다.\n\n확인이 필요하다고 판단하면 필요한 정보가 보이는 현재 허용된 행동을 선택한다. 매대를 닫거나 이동하거나 기다렸다는 사실만으로 새 정보를 확인했다고 선언하지 않는다. 반대로 이미 충분히 명확하다면 확인을 더 하지 않고 진행할 수 있다. 행동의 목적과 관찰 가능한 근거를 짧게 일치시켜 기록하며, 성향을 보여주기 위해 활동 표기만 바꾸지 않는다.\n\n## 성향과 분리된 기본 맥락\n\n${JSON.stringify(context)}\n\n성향 수준은 선택의 경향이며 행동 횟수·대기시간·실수·포기·완료를 의무로 정하지 않는다. 성향 변경으로 인지·수행 기준이나 상품 경험을 바꾸지 않는다.\n\n## 공통 전제와 관찰·실행 범위\n\n현재 제공된 관찰과 실제로 확인한 경험만 사용한다. 도움을 받더라도 선호와 최종 선택은 스스로 유지한다.`;
   persona.traitProfile = traitProfile;
+  // Hash the delivered actor content, including instruction text, rather than only trait values.
+  // The context hash remains independent so matched trait comparisons keep their meaning.
+  const {version:baseVersion,...authoredPersona} = persona;
+  persona.version = `traits-2-${hash({baseVersion,authoredPersona}).slice(0,12)}`;
   return persona;
 }
 function resolveProfiles(options = {}) {

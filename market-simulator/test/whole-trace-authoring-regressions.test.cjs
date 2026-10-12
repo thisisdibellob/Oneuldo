@@ -56,7 +56,8 @@ function purchasePrefix(source, goal) {
       state: { ...held(goal), activity: 'shop', focusedGoalId: goal.id, focusedProductId: 'milk' } })] };
 }
 function fromGuide(declaration, source, choiceId, goal, otherGoal) {
-  const substitutions = { READ_GOAL_ID: goal.id, OTHER_OPEN_GOAL_ID: otherGoal?.id };
+  const substitutions = { READ_GOAL_ID: goal.id, OTHER_OPEN_GOAL_ID: otherGoal?.id,
+    CURRENT_CLEAR_GOAL_NAME: goal.label, OBSERVED_CHOSEN_PRODUCT_ID: 'milk' };
   const actual = JSON.parse(JSON.stringify(declaration, (key, value) =>
     typeof value === 'string' && Object.hasOwn(substitutions, value) ? substitutions[value] : value));
   return { ...decision(source, choiceId), ...actual };
@@ -77,7 +78,43 @@ test('published read/select and complete examples compile after actual observed 
   assert.deepEqual(result.knowledgeAudit[1].taskMemory.state.openGoalIds, [goal.id]);
   assert.deepEqual(result.knowledgeAudit[3].taskMemory.events.map(event => event.kind), ['purchase-observed', 'completed']);
   assert.deepEqual(result.taskMemory.openGoalIds, []);
+  assert.equal(complete.actorState.activity, 'orient', 'Closing after completion no longer teaches a check label');
+  assert.equal(result.personaReview.annotationReview.status, 'clear');
   assert.deepEqual(validateTrace(result.trace, settings.snapshot), { valid: true, errors: [] });
+});
+
+test('published observed-product declaration keeps real focus and an independently chosen mistaken quantity', async () => {
+  const { settings, bundle, source, goal } = fixture();
+  const { shelf, decisions: prefix } = purchasePrefix(source, goal);
+  const selection = fromGuide(bundle.authoringGuide.examples.selectObservedProduct.declaration, shelf, 'add/milk', goal);
+  selection.choiceRef.quantity = 1;
+  const complete = fromGuide(bundle.authoringGuide.examples.completeAfterAdd.declaration, shelf, 'control/closeStation', goal);
+  const decisions = [prefix[0], prefix[1], selection, complete, quit(source)], original = structuredClone(decisions);
+  const result = await compileWholeTraceCandidate(settings, bundle, candidate(bundle, decisions));
+  const purchase = result.knowledgeAudit.find(row => row.action.type === 'add');
+  assert.equal(purchase.actorState.focusedGoalId, goal.id);
+  assert.equal(purchase.actorState.focusedProductId, 'milk');
+  assert.equal(purchase.basis.goalId, goal.id);
+  assert.equal(purchase.action.quantity, 1, 'The guide must not correct the actor quantity to the goal quantity of two');
+  assert.deepEqual(decisions, original);
+  assert.equal(result.personaReview.annotationReview.status, 'clear');
+  assert.equal(result.trace.steps.some(step => step.type === 'submitForReview'), false, 'Voluntary giveUp stays unchanged');
+});
+
+test('published candidate envelope accepts only wire keys; annotation review opts in through new guidance', async () => {
+  const { settings, bundle, source } = fixture();
+  assert.equal(bundle.authoringGuide.authoringVersion, '2');
+  const wire = { ...bundle.authoringGuide.syntax.candidate.envelope, decisions: [quit(source)] };
+  assert.deepEqual(Object.keys(wire), bundle.authoringGuide.syntax.candidate.allowedTopLevelFields);
+  assert.equal(validateWholeTraceCandidate(wire, bundle.requestId).valid, true);
+  assert.match(validateWholeTraceCandidate({ ...wire, inputHash: bundle.inputHash }, bundle.requestId).errors.join('; '), /Unknown candidate field/);
+  const current = await compileWholeTraceCandidate(settings, bundle, wire);
+  assert.equal(current.personaReview.annotationReview.status, 'clear');
+  for (const legacyGuide of [undefined, { ...bundle.authoringGuide, authoringVersion: '1' }]) {
+    const legacy = { ...bundle, authoringGuide: legacyGuide };
+    const result = await compileWholeTraceCandidate(settings, legacy, wire);
+    assert.equal(result.personaReview.annotationReview, undefined, 'Old bundles retain historical review semantics');
+  }
 });
 
 test('published completion example retains the other actually open task', async () => {

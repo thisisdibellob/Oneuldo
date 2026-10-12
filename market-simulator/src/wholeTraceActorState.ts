@@ -142,6 +142,31 @@ export type WholeTraceActorFidelityFinding = {
 export type WholeTraceActorFidelityOptions = {
   /** Trusted game objectives, used AFTER accepted execution only. Never actor knowledge or choice hints. */
   objectives?: readonly MarketTaskObjective[];
+  /** Explicitly versioned opt-in so historical fidelity reviews retain their original meaning. */
+  annotationReview?: 'actor-annotation-v1';
+};
+export type WholeTraceAnnotationFinding = {
+  code: 'CHECK_LABEL_WITHOUT_OBSERVABLE_CHECK' | 'FOCUS_ACTION_MISMATCH' | 'FOCUS_GOAL_SELECTION_MISMATCH';
+  severity: 'warning';
+  decisionIndexes: number[];
+  message: string;
+  improvementTarget: 'activity-annotation' | 'focus-annotation';
+  recommendation: string;
+  evidence: {
+    decisionIndex: number;
+    action: PolicyAction;
+    declaredActivity: WholeTraceActorState['activity'];
+    focusedGoalId?: string | null;
+    focusedProductId?: string | null;
+    basisIntent: WholeTraceBasis['intent'];
+    cueRefs: string[];
+  }[];
+};
+export type WholeTraceAnnotationReview = {
+  reviewVersion: 'actor-annotation-v1';
+  status: 'clear' | 'review';
+  limitation: string;
+  findings: WholeTraceAnnotationFinding[];
 };
 export type WholeTraceActorFidelityTransition = {
   kind: 'purchase-goal' | 'focus-goal' | 'interest-return' | 'uncertainty-cleared';
@@ -160,6 +185,7 @@ export type WholeTraceActorFidelityAudit = {
   validationScope: 'declared-behavior-and-observed-transitions';
   limitation: string;
   findings: WholeTraceActorFidelityFinding[];
+  annotationReview?: WholeTraceAnnotationReview;
   focusCoverage: { recordedDecisions: number; unrecordedDecisionIndexes: number[] };
   transitions: WholeTraceActorFidelityTransition[];
   situations: {
@@ -208,6 +234,41 @@ function nextGoalRecheckTrait(persona: Pick<Persona, 'character'>): string | und
   return persona.character?.selectedTraits.find(trait => /다음\s*항목[\s\S]*목록[\s\S]*(?:다시|재확인)/.test(trait)
     || /(?:next|subsequent)\s+(?:goal|item)[\s\S]*(?:recheck|reread|check\s+again)[\s\S]*list/i.test(trait)
     || /(?:recheck|reread)[\s\S]*list[\s\S]*(?:next|subsequent)\s+(?:goal|item)/i.test(trait));
+}
+
+/**
+ * Reviews annotations against accepted actions, without assigning attention from
+ * hidden objectives or changing actions. Deliberate observation may occur on an
+ * already visible screen; a check label never requires a particular UI command.
+ */
+function reviewAnnotations(entries: readonly WholeTraceActorFidelityEntry[],
+  fidelityFindings: readonly WholeTraceActorFidelityFinding[]): WholeTraceAnnotationReview {
+  const evidence = (entry: WholeTraceActorFidelityEntry): WholeTraceAnnotationFinding['evidence'][number] => ({
+    decisionIndex: entry.decisionIndex, action: structuredClone(entry.action),
+    declaredActivity: entry.actorState.activity,
+    ...(Object.hasOwn(entry.actorState, 'focusedGoalId') ? { focusedGoalId: entry.actorState.focusedGoalId } : {}),
+    ...(Object.hasOwn(entry.actorState, 'focusedProductId') ? { focusedProductId: entry.actorState.focusedProductId } : {}),
+    basisIntent: entry.basis.intent, cueRefs: [...declaredKnownRefs(entry)],
+  });
+  const findings: WholeTraceAnnotationFinding[] = [];
+  for (const entry of entries) {
+    if (entry.actorState.activity === 'check' && ['closeStation', 'closeView'].includes(entry.action.type)) {
+      findings.push({ code: 'CHECK_LABEL_WITHOUT_OBSERVABLE_CHECK', severity: 'warning',
+        decisionIndexes: [entry.decisionIndex], improvementTarget: 'activity-annotation',
+        message: 'The check label accompanies only a closing operation. Closing alone does not establish what information was checked; an implicit review of the already visible display is still possible.',
+        recommendation: 'Describe the actual current activity and the observed information being reviewed. Do not add a check action merely to satisfy this warning or claim that closing a display itself rechecks its contents.',
+        evidence: [evidence(entry)] });
+    }
+  }
+  for (const finding of fidelityFindings) {
+    if (finding.code !== 'FOCUS_ACTION_MISMATCH' && finding.code !== 'FOCUS_GOAL_SELECTION_MISMATCH') continue;
+    findings.push({ code: finding.code, severity: 'warning', decisionIndexes: [...finding.decisionIndexes],
+      improvementTarget: 'focus-annotation', message: finding.message,
+      recommendation: 'Review the declared attention against the actor’s actually known goal and observed product at that moment. Preserve an intentional interest purchase or a mistaken selection; do not fill focus from hidden objectives or change the action to match the annotation.',
+      evidence: entries.filter(entry => finding.decisionIndexes.includes(entry.decisionIndex)).map(evidence) });
+  }
+  return { reviewVersion: 'actor-annotation-v1', status: findings.length ? 'review' : 'clear', findings,
+    limitation: 'Soft post-execution annotation diagnostics only. These findings do not prove a personality failure, infer private attention, require extra checking, reject a mistaken action, or modify the trace. Clear means no supported annotation issue was detected.' };
 }
 
 /**
@@ -365,7 +426,9 @@ export function auditWholeTraceActorFidelity(entries: readonly WholeTraceActorFi
     auditVersion: 'actor-fidelity-v2', status: findings.length ? 'review' : 'clear',
     validationScope: 'declared-behavior-and-observed-transitions',
     limitation: 'Clear means no machine-detected pattern was flagged, not a fidelity or clinical pass. Missing legacy focus is unrecorded, never inferred from archive order. Exposure and load describe opportunities, not required behaviors or proof of understanding. This synthetic review cannot establish private reasoning, absence of implicit whole-world influence, clinical validity, or real-person behavior.',
-    findings, focusCoverage: { recordedDecisions: entries.length - unrecordedDecisionIndexes.length, unrecordedDecisionIndexes },
+    findings,
+    ...(options.annotationReview === 'actor-annotation-v1' ? { annotationReview: reviewAnnotations(entries, findings) } : {}),
+    focusCoverage: { recordedDecisions: entries.length - unrecordedDecisionIndexes.length, unrecordedDecisionIndexes },
     transitions, situations, summary: { decisions: entries.length, distinctReactionDelays: delays.size, activityCounts,
       maximumHeldGoals: Math.max(0, ...entries.map(entry => entry.actorState.heldGoalIds.length)),
       goalSwitches, focusGoalSwitches, productSwitches, interestReturns },

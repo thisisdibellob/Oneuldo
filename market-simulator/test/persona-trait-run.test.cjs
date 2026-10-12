@@ -128,6 +128,9 @@ test('custom whole-trace scope compiles candidate7 and remains outside ordinary 
   assert.equal(measured.completed, 1); assert.equal(measured.fixtureOnly, false);
   const evidence = JSON.parse(fs.readFileSync(measured.measurementsPath)).perTrace[0];
   assert.equal(evidence.outcome.completionRate, 0); assert.equal(evidence.terminationReview.status, 'review');
+  assert.equal(evidence.annotationReview.reviewVersion, 'actor-annotation-v1');
+  const report = JSON.parse(fs.readFileSync(run.report({ runDirectory: prepared.runDirectory }).reportPath));
+  assert.deepEqual(report.annotationReviews[0].review, evidence.annotationReview);
   await assert.rejects(f.service.invokeTool('prepare_whole_trace', slot.prepareWholeTrace), /slot binding mismatch/);
   await assert.rejects(f.service.invokeTool('prepare_whole_trace', { ...slot.prepareWholeTrace, outputPath: path.join(f.directory, 'outside.json') }), /Unknown persona/);
 });

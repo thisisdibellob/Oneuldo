@@ -244,7 +244,8 @@ function measure({ runDirectory, allowFixture = false }) {
     unmatchedTraits: TRAITS.filter(key => !contrasts.some(c => c.traitKey === key)),
     perTrace: samples.map(s => ({ personaId: s.personaId, presetId: s.profile.presetId, traits: s.profile.traits, condition: s.condition,
       seed: s.seed, tracePath: s.tracePath, metrics: s.metrics, outcome: s.outcome, coverage: s.coverage,
-      terminationReview: s.terminationReview, evidenceSources: s.evidenceSources })),
+      terminationReview: s.terminationReview, annotationReview: s.personaReview?.annotationReview ?? null,
+      evidenceSources: s.evidenceSources })),
     missingSlots: missing.map(s => ({ personaId: s.personaId, condition: s.condition, seed: s.seed, tracePath: s.tracePath })) };
   m.fixtureOnly = result.fixtureOnly; write(manifestAt(m.runDirectory), m);
   const measurementsPath = path.join(m.runDirectory, 'measurements.json'); write(measurementsPath, result);
@@ -329,6 +330,8 @@ function report({ runDirectory }) {
       traitExpression: traitResults,
       coverage: measurements.perTrace.map(s => ({ personaId: s.personaId, condition: s.condition, seed: s.seed, ...s.coverage })),
     },
+    annotationReviews: measurements.perTrace.map(s => ({ personaId: s.personaId, condition: s.condition, seed: s.seed,
+      tracePath: s.tracePath, review: s.annotationReview ?? null })),
     groups: measurements.groups, flags: measurements.flags, blindReview: review?.scores ?? null,
     blindReviewer: { model: review?.reviewerModel ?? null, session: review?.reviewerSession ?? null, independenceVerified: false, keyIsolationVerified: false },
     limitations: [
@@ -338,6 +341,7 @@ function report({ runDirectory }) {
       '기회에 도달하지 못한 표본은 조건부 비교에서 제외되므로 도달 기회·중단·전체 목표 달성도 함께 읽어야 한다.',
       '관심·불확실성 의도는 일부 배우 선언을 사용한다. 대기시간은 계획한 값이며 사람의 반응시간이 아니다.',
       '성향 판정은 행동 근거만 사용한다. 작성된 시간은 별도로 보고하며 일부 비교에서 기회가 없으면 partial로 남긴다.',
+      '주석 정합성 검토는 성향·과업 판정과 별도다. 검토가 없는 과거 표본은 null이며 clear로 해석하지 않는다.',
       '효과 크기는 두 집단의 Cliff’s delta이며 신뢰구간만 조건·seed 쌍을 함께 재표집한다. 수준 간 간격과 0.33 기준은 실측으로 보정하지 않은 설계값이다.',
       'A/B는 같은 표본이며 독립 반복이 아니다. 판별자 독립성과 정답 키 미열람은 자기 신고이고, unknown은 정답으로 세지 않는다.',
       '계획 검증은 실제 앱 재생이나 실제 사람의 행동 검증을 수행하지 않는다. 미발생·자료 부족은 통과가 아니다.',
@@ -353,6 +357,10 @@ function report({ runDirectory }) {
     '| --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | --- | --- |',
     ...measurements.findings.map(f => `| ${f.traitKey} | ${f.higherProfileId} (${f.higherLevel}) / ${f.lowerProfileId} (${f.lowerLevel}) | ${f.kind} | ${f.evidenceType} | ${f.condition} | ${f.pairs} | ${f.unexercised} | ${f.missingPairs} | ${f.delta ?? '—'} | ${f.interval?.join(' ~ ') ?? '—'} | ${f.status} |`),
     '', '## 과장 패턴과 진단 경고', '', ...Object.entries(output.flags).map(([id, f]) => `- ${id}: 금지 패턴 ${f.status}, 위반 ${f.violationTraces}/${f.traces}, 검토 신호 ${f.reviewSignals.length}건, 분포 진단 ${f.diagnosticWarnings.length}건. 도움·낮은 정확도·분산 0은 자동 실패가 아니다.`),
+    '', '## 행동·focus 주석 정합성', '', ...output.annotationReviews.flatMap(row => [
+      `- ${row.personaId} (${row.condition}, seed=${row.seed}): ${row.review?.status ?? 'not-recorded'}; 경고 ${row.review?.findings.length ?? '미기록'}건`,
+      ...(row.review?.findings ?? []).map(f => `  - ${f.code}, 결정 ${f.decisionIndexes.join(', ')}: ${f.improvementTarget}. ${f.recommendation}`),
+    ]),
     '', '## 블라인드 성향 추정', '', '개인 이름 대신 다섯 성향의 수준을 추정한다. unknown을 포함한 정확도와 판별 비율을 함께 보고한다.',
     '', '```json', JSON.stringify(output.blindReview, null, 2), '```', '', '## 해석 범위', '', ...output.limitations.map(x => `- ${x}`),
     '', '분자·분모·관찰 기회·step ID·프로필별 설명적 집계는 measurements.json 및 report.json에 저장되어 있다.', ''];

@@ -5,6 +5,12 @@ description: Generate Oneuldo persona action traces with a whole-trace Luna plan
 
 # Oneuldo 페르소나 의도 생성과 앱 재생
 
+새 일반 페르소나 생성의 기본 경로는 **`feedback-choice-v1`**이다. 먼저 [행동 결과 기반 생성 절차](references/feedback-plan.md)를 읽는다. 현재 화면과 배우가 남긴 짧은 믿음 기억으로 행동 하나를 고르고, 공유 게임 로직의 적용 결과를 받은 뒤 다음 행동을 정한다. 전체 지도·영구 목록·정확한 목표 원장은 배우에게 주지 않는다. 생성 → 완성 trace 검토/대기 → 명시적 웹 재생 순서를 유지한다. 기존 whole-trace/v10은 재현·비교 또는 명시적 요청에 사용한다. 아래 전체 계획 절차와 기존 연결 4단계는 이들 과거 정책을 선택했을 때 적용한다.
+
+새 경로는 `begin_feedback_plan` → `step_feedback_plan` 반복 → `finalize_feedback_plan`이다. 첫 관측과 다음 관측이 각각 begin/step 응답에 포함된다. HTTP 연결이 있으면 `generate_trace`에 `actorPolicyVersion:"feedback-choice-v1"`을 지정하여 동일한 흐름을 실행한다. 매 판단에 새 모델 문맥으로 현재 frame만 전달해야 하며, 이전 관측이 쌓인 배우 채팅을 그대로 쓰지 않는다. 서버는 외부 배우 문맥의 격리를 강제하거나 입증하지 않는다. 이번 v1은 첫 방문용이며 기존 learner 기억을 자동 이식하지 않는다.
+
+새 feedback 경로는 `choiceId,durationMs,reason,memory`를 받으며 모든 행동 전 대기는 0이다. 머뭇거림·주위 탐색·목록 읽기·상품 탐색의 활동 시간만 배우가 지정하고, 장바구니·도움말 확인 시간은 화면을 연 뒤 적용한다. 이동·조작 자체와 UI 전환·서버 응답 시간은 유지한다. 새 trace는 `activity-duration-v1`로 기록하며 구형 저장 trace의 시간은 바꾸지 않는다. 세부 시간 범위는 [행동 결과 기반 생성 절차](references/feedback-plan.md#행동-시간)를 따른다.
+
 Node 생성기는 행동 의도 trace를 만든다. 앱이 trace 전체를 받아 기존 이동·버튼·드래그 입력으로 실시간 플레이하고 기존 tracker·queue가 로그를 기록·전송한다. 생성기에서 게임 로그를 만들거나 백엔드에 직접 올리지 않는다. 화면 실행 없이 생성한 trace는 실제 플레이 완료 결과가 아니다.
 
 - **확률 회귀 모드 — `stochastic`:** 세 프로필 모두 attention 설정으로 제한된 관찰·기억·주의 전환을 계획하고, shoppingStyle로 상품 비교·목록 확인·익숙한 선택·이동 방향 유지 성향을 적용한다. LLM이 매 행동을 결정한 것으로 설명하지 않는다.
@@ -46,6 +52,8 @@ Luna 계획을 실행하는 Codex 세션은 실제로 `gpt-6-luna`/`low`로 설�
 전체 계획의 기술 수정은 `maxRepairs:1`일 때 `repair_whole_trace`로 실패한 뒤쪽 결정만 다시 제출한다. 권장 입력은 `{requestId,repair:{decisions:[...]}}`이며 `repairFilePath`에도 같은 decisions 객체를 쓴다. 서버가 요청 ID·버전·수정 시작 위치를 채우므로 모델이 wrapper를 다시 작성하지 않는다. 기존 wrapper를 명시한 경우에는 각 값의 일치를 계속 검사한다. 이 변경은 추가 모델 호출이나 행동별 통신을 만들지 않는다. 서버는 이미 수락한 정확한 앞부분을 유지하고 같은 candidate 형식과 원래 종료 의도를 요구한다. `maxRepairs:0`이면 수정할 수 없다. 오류의 `repairContext`에는 최신 관측·현재 선택지·알려진 단서가 있으므로 이를 기준으로 스키마·선택 참조만 고친다. 미관찰 근거 오류를 자발적 포기로 바꾸거나 구매 결과를 최적화하지 않는다. 세부 요청 형식은 [전체 계획 절차](references/whole-trace.md)를 따른다.
 
 계산대 이용은 `checkout/<계산대 ID>`(예: `checkout/checkout`), 열린 계산대에서 직원이 있을 때 제출은 `control/submit`을 쓴다. 새 `choiceCatalog.referenceAliases`에 명시된 `checkout-open-v1` 별칭만 `open/<ID>`를 같은 계산대의 `checkout/<ID>`로 연결한다. 현재 source가 정확히 일치하고 해당 정식 버튼이 사용 가능해야 하며, 별칭 없는 저장 bundle의 엄격한 해석은 유지한다. 원본 후보와 감사의 작성/실행 참조·정규화 내역을 보존한다. 이 로컬 참조 해석은 행동·경로·수량·종료를 대신 선택하거나 추가 AI 왕복을 만들지 않는다. 상세 범위는 [계산대 참조 별칭](references/whole-trace.md#계산대-참조-별칭)을 따른다.
+
+새 `authoringGuide` v2는 candidate 최상위 필드를 `candidateVersion`, `requestId`, `decisions` 세 개로 명시한다. `inputHash`는 별도 출처 기록으로 보존한다. 실제 관찰한 상품과 수행 중인 목표에 대한 focus 예시를 따르되, 실제 오선택·관심 전환·정당한 null focus를 교정하지 않는다. 닫기·대기·긴 지연만으로 확인이나 숙고를 표현하지 않고, 비교·재확인이 필요한 상황에서 실제 정보를 보는 선택으로 성향을 드러낸다. 확인 횟수나 성공을 강제하지 않는다. v2 결과의 `personaReview.annotationReview`는 활동·focus 주석의 근거와 개선 권고를 별도로 제공한다. 이 상태는 기존 역할 검토 상태와 독립적이며, 과거 가이드 결과에서 항목이 없으면 검사 통과로 해석하지 않는다.
 
 ### 기존 Codex 증분 계획
 

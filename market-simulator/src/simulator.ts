@@ -19,10 +19,10 @@ type StepIntent = MarketReplayStep extends infer S ? S extends MarketReplayStep 
 
 /** Produces intentions only. No BehaviorLogRequest, episode export, HTTP write, or UI process. */
 export async function generateTrace(options: TraceOptions): Promise<MarketReplayTrace> {
-  const preserved = options?.actorPolicyVersion === 'whole-trace-v3';
+  const preserved = ['whole-trace-v3', 'feedback-choice-v1'].includes(options?.actorPolicyVersion ?? '');
   const timing = options?.timingProfile ?? (preserved ? 'original' : 'compact');
   if (!['original', 'compact'].includes(timing)) throw new Error('Unknown timingProfile');
-  if (preserved && timing !== 'original') throw new Error('Whole-trace-v3 preserves actor judgment timing; use original');
+  if (preserved && timing !== 'original') throw new Error(`${options.actorPolicyVersion === 'whole-trace-v3' ? 'Whole-trace-v3' : 'feedback-choice-v1'} preserves actor judgment timing; use original`);
   // Generate all decisions first: faster replay must not change memory, choices or RNG.
   const trace = await generateOriginalTrace(options);
   const result = timing === 'original' ? trace : compactTraceTiming(trace);
@@ -64,7 +64,7 @@ async function generateOriginalTrace(options: TraceOptions): Promise<MarketRepla
     const applied = guard.execute(step);
     steps.push(step);
     plannedMs += step.reactionDelayMs + applied.movementMs
-      + ('durationMs' in step ? step.durationMs : step.type === 'dragProduct' ? (step.gesture.durationMs + step.gesture.hesitationMs) * step.quantity : 0);
+      + ('durationMs' in step ? (step.durationMs ?? 0) : step.type === 'dragProduct' ? (step.gesture.durationMs + step.gesture.hesitationMs) * step.quantity : 0);
     return applied;
   };
   append({ type: 'start' }, Math.round(persona.parameters.reactionMedianMs), 'read-mission-one-page-at-a-time');
@@ -167,8 +167,8 @@ export function projectDecision(d: Decision, o: Observation, persona: Persona, s
     case 'checkout': return { type: 'checkout', checkoutId: a.checkoutId ?? 'checkout' };
     case 'add': return { type: 'dragProduct', productId: a.productId, quantity: a.quantity ?? 1, gesture: {
       durationMs: Math.round(Math.max(450, Math.min(2400, persona.parameters.reactionMedianMs * motor.between(.35, .55)))),
-      hesitationMs: d.reason.includes('pause-before-next-step') ? Math.round(motor.between(150, 700)) : 0,
-      outcome: 'drop', motorSeed,
+      hesitationMs: d.feedbackMemory === undefined && d.reason.includes('pause-before-next-step') ? Math.round(motor.between(150, 700)) : 0,
+      outcome: d.dragOutcome ?? 'drop', motorSeed,
     } };
     case 'remove': return { type: 'removeProduct', productId: a.productId, quantity: a.quantity ?? 1 };
     case 'requestReturn': return { type: 'talkToStaff', stationId: requireStaff(o), choice: 'returnProduct', productId: a.productId, quantity: a.quantity ?? 1 };
@@ -182,7 +182,8 @@ export function projectDecision(d: Decision, o: Observation, persona: Persona, s
       return { type: 'talkToStaff', stationId: requireStaff(o), choice: 'requestCashier', checkoutId };
     }
     case 'submit': return { type: 'submitForReview' };
-    case 'viewCart': case 'viewHelp': case 'closeView': case 'closeStation': case 'giveUp': return { type: a.type };
+    case 'viewCart': case 'viewHelp': return { type: a.type, ...('durationMs' in a && a.durationMs !== undefined ? { durationMs: a.durationMs } : {}) };
+    case 'closeView': case 'closeStation': case 'giveUp': return { type: a.type };
     default: throw new Error(`Action ${a.type} is unavailable in the AI-review app flow.`);
   }
 }

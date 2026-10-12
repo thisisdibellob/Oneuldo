@@ -8,6 +8,7 @@ require('./runtime.cjs').register();
 const { ReplayBridge, loadReplayConfig } = require('./replay-bridge.cjs');
 const { beginGeneration, withDiagnostics } = require('./generation-journal.cjs');
 const { ActorPlanSession, ACTOR_PLAN_MODEL } = require('./src/actorPlanSession.ts');
+const { FeedbackPlanSession } = require('./src/feedbackPlanSession.ts');
 const string = { type: 'string', minLength: 1 };
 const seed = { anyOf: [string, { type: 'number' }] };
 const object = { type: 'object' };
@@ -19,6 +20,10 @@ const wholeTraceRepair = schema({
   fromDecisionIndex:{type:'integer',minimum:0},candidateVersion:{enum:['3','4','5','6','7']},
 },['decisions']);
 const definitions = [
+  { name: 'begin_feedback_plan', description: 'Default feedback-driven persona planning: start a fresh offline actor with one action per observation. Returns the first current-screen frame, never a whole map or audit memory. Use an independent model context for each frame. No web action is executed. Retry with the same requestId and arguments to recover the same session.', inputSchema: schema({requestId:string,personaId:string,seed,tabId:string,snapshot:object,snapshotFilePath:string,outputPath:string,maxActions:{type:'integer',minimum:1,maximum:100},timeBudgetMs:{type:'integer',minimum:1000,maximum:3600000}}, ['requestId','personaId','seed']) },
+  { name: 'step_feedback_plan', description: 'Choose exactly one current choice and replace the actor belief memory. Apply it offline and return its visible outcome and next frame or completion in one response. Same requestId and payload retries never execute twice. durationMs is 0 for ordinary actions; pause/lookAround/readList/browse require 100..120000 ms during the activity, and viewCart/viewHelp allow 0..120000 ms after opening. No pre-action wait. Incorrect beliefs, cart contents and early stopping are preserved.', inputSchema: schema({sessionId:string,requestId:string,revision:{type:'integer',minimum:1},choiceId:string,durationMs:{type:'integer',minimum:0,maximum:120000},reason:string,memory:object}, ['sessionId','requestId','revision','choiceId','durationMs','reason','memory']) },
+  { name: 'observe_feedback_plan', description: 'Recover the current actor frame after a connection timeout. Does not reapply an action. A pending step must be retried with its original requestId.', inputSchema: schema({sessionId:string}, ['sessionId']), annotations:{readOnlyHint:true} },
+  { name: 'finalize_feedback_plan', description: 'Return the complete saved feedback-choice-v1 trace and counts. Generation is offline; validate and explicitly replay the saved trace separately.', inputSchema: schema({sessionId:string}, ['sessionId']), annotations:{readOnlyHint:true} },
   { name: 'begin_actor_plan', description: 'Begin a private Luna low-reasoning actor trace session. Returns a session ID; use observe_actor_plan then append_actor_plan. Each plan is 1..3 choice IDs and is discarded when the actor observation changes. Supports a prepared v10 learning round and sends no app input.', inputSchema: schema({ personaId:string, seed, tabId:string, snapshot:object, snapshotFilePath:string, outputPath:string, learnerFile:string, trialFile:string, arm:{enum:['A','B','C']}, jobFilePath:string, generationFilePath:string, timingProfile:{enum:['original','compact']}, attentionExperience:object, maxActions:{type:'integer',minimum:1,maximum:2000} }) },
   { name: 'observe_actor_plan', description: 'Read the current actor-only observation, stable identity, observed experience and available choice IDs for an active plan session.', inputSchema: schema({sessionId:string}, ['sessionId']), annotations:{readOnlyHint:true} },
   { name: 'append_actor_plan', description: 'Append 1..3 choice IDs for the exact current revision, each with its own delay and brief reason. Stale or unavailable choices are rejected; meaningful observation changes cancel the remainder.', inputSchema: schema({sessionId:string,revision:{type:'integer',minimum:1},choiceIds:{type:'array',minItems:1,maxItems:3,items:string},delayMs:{type:'array',minItems:1,maxItems:3,items:{type:'integer',minimum:1,maximum:120000}},reasons:{type:'array',minItems:1,maxItems:3,items:string},currentTasks:{type:'array',minItems:1,maxItems:3,items:{anyOf:[string,{type:'null'}]}}}, ['sessionId','revision','choiceIds','delayMs','reasons']) },
@@ -33,7 +38,7 @@ const definitions = [
   { name: 'prepare_blind_review', description: 'Create redacted panels and a separate answer key; panel B requires an already scored panel A.', inputSchema: schema({runDirectory:string,panel:{enum:['A','B']},allowFixture:{type:'boolean'}},['runDirectory']) },
   { name: 'submit_blind_review', description: 'Score independently supplied blind answers without model calls. Traits mode accepts answers[opaqueId].traits with all five low/medium/high/unknown levels and optional confidence. Legacy mode keeps persona-label answers. Report abstention coverage and unverified reviewer independence.', inputSchema: schema({runDirectory:string,panel:{enum:['A','B']},answers:object,reviewerModel:string,reviewerSession:string},['runDirectory','panel','answers','reviewerModel','reviewerSession']) },
   { name: 'persona_validation_report', description: 'Save JSON and Korean Markdown. Common-trait reports separate technical validity, task outcomes, behavioral trait expression and opportunity coverage; authored timing is supplementary. Historical manifests keep legacy reporting.', inputSchema: schema({runDirectory:string},['runDirectory']) },
-  { name: 'generate_trace', description: 'AI is the default; stochastic is explicit regression-only. Generate an intent-level trace for a registered tab mission or explicit snapshot. Default AI attention retains episodic-choice-v4 and fails on technical limits. Explicit actorPolicyVersion episodic-choice-v9 or a v9 learnerFile observes at most 100 model decisions; natural termination wins, otherwise the system walks to checkout and submits the unchanged current basket, including an empty basket, then waits for acceptance and exits. The controller suffix is marked separately from actor choices. Repetition alone does not stop generation. Smaller maxActions/maxCalls/time budgets remain technical errors. learnerFile loads verified personal experience and locks the actor identity. Saves JSON; never uploads gameplay logs.', inputSchema: schema({ personaId: string, seed, tabId: string, snapshot: object, snapshotFilePath: string, outputPath: string, learnerFile: string, actorPolicyVersion: { enum: ['episodic-choice-v9'] }, mode: { enum: ['stochastic', 'llm'] }, timingProfile: { enum: ['original', 'compact'] }, maxActions: { type: 'integer', minimum: 1, maximum: 2000 }, timeBudgetMs: { type: 'integer', minimum: 1000, maximum: 3600000 }, attentionExperience: schema({ visit: { enum: ['first-play', 'revisit'] }, previousLayoutKey: string, memory: object, learning: object }, ['visit']), llm }, ['personaId', 'seed']) },
+  { name: 'generate_trace', description: 'AI is the default; stochastic is explicit regression-only. Generate an intent-level trace for a registered tab mission or explicit snapshot. Default AI attention retains episodic-choice-v4 and fails on technical limits. Explicit feedback-choice-v1 uses stateless per-action model requests with current-screen observations and actor-authored beliefs, original timing, no automatic checkout, and no legacy learner import. Explicit actorPolicyVersion episodic-choice-v9 or a v9 learnerFile observes at most 100 model decisions; natural termination wins, otherwise the system walks to checkout and submits the unchanged current basket, including an empty basket, then waits for acceptance and exits. The controller suffix is marked separately from actor choices. Repetition alone does not stop generation. Smaller maxActions/maxCalls/time budgets remain technical errors. learnerFile loads verified personal experience and locks the actor identity. Saves JSON; never uploads gameplay logs.', inputSchema: schema({ personaId: string, seed, tabId: string, snapshot: object, snapshotFilePath: string, outputPath: string, learnerFile: string, actorPolicyVersion: { enum: ['episodic-choice-v9','feedback-choice-v1'] }, mode: { enum: ['stochastic', 'llm'] }, timingProfile: { enum: ['original', 'compact'] }, maxActions: { type: 'integer', minimum: 1, maximum: 2000 }, timeBudgetMs: { type: 'integer', minimum: 1000, maximum: 3600000 }, attentionExperience: schema({ visit: { enum: ['first-play', 'revisit'] }, previousLayoutKey: string, memory: object, learning: object }, ['visit']), llm }, ['personaId', 'seed']) },
   { name: 'validate_trace', description: 'Validate a trace and its target mission snapshot with the shared schema and game guards.', inputSchema: schema({ trace: object, traceFilePath: string, tabId: string, snapshot: object, snapshotFilePath: string }), annotations: { readOnlyHint: true } },
   { name: 'pair_app_session', description: 'Issue a five-minute, one-use pairing URL for one allowlisted local/staging test account. Open it in the development web app and log in with that account.', inputSchema: schema({ appOrigin: string, backendOrigin: string, memberId: string }, ['appOrigin', 'backendOrigin', 'memberId']) },
   { name: 'list_app_sessions', description: 'List authenticated development app tabs, mission readiness and per-tab replay status.', inputSchema: schema({}), annotations: { readOnlyHint: true } },
@@ -90,6 +95,7 @@ function saveTrace(trace, snapshot, outputPath) {
 function createService(options = {}) {
   let bridge = options.bridge ?? null, starting = null;
   const planSessions = new Map();
+  const feedbackSessions = new Map(), feedbackBegins = new Map();
   const wholeTraceSessions = new Map();
   const ownerId = crypto.randomUUID();
   const validate = options.validateTrace ?? ((trace, snapshot) => require('./src/traceValidation.ts').validateTrace(trace, snapshot));
@@ -102,7 +108,8 @@ function createService(options = {}) {
       journal = beginGeneration(destination, snapshot, settings, { personaVersion: persona.version,
         actorPolicyVersion: require('./src/llmPolicy.ts').attentionActorPolicyVersion(settings) });
       const trace = await generate({ ...settings, snapshot, onCheckpoint: entry => journal.checkpoint(entry),
-        onActorDecisionAccepted: () => settings.onActorDecisionAccepted?.() });
+        onActorDecisionAccepted: () => settings.onActorDecisionAccepted?.(),
+        onActorDecisionApplied: after => settings.onActorDecisionApplied?.(after) });
       const validation = validate(trace, snapshot);
       if (!validation.valid) throw new Error(`Generated trace invalid: ${validation.errors.join('; ')}`);
       stage = 'persistence';
@@ -132,6 +139,45 @@ function createService(options = {}) {
     if (name === 'list_personas') {
       const personas = require('./src/personas.ts').listPersonas();
       return { personas: personas.map(({ prompt, ...profile }) => profile) };
+    }
+    if (name === 'begin_feedback_plan') {
+      const key = require('../frontend/src/game/marketReplayTrace.ts').canonicalMarketReplayJson(args);
+      const previous = feedbackBegins.get(args.requestId);
+      if (previous) {
+        if (previous.key !== key) throw new Error('Feedback begin requestId was reused with different arguments');
+        return previous.promise;
+      }
+      const promise = (async () => {
+        const snapshot = await getSnapshot(args);
+        const session = new FeedbackPlanSession(args.seed);
+        const outputPath = path.resolve(args.outputPath ?? path.join(__dirname, 'output', `feedback-${session.id}.json`));
+        const settings = { personaId:args.personaId,seed:args.seed,mode:'llm',llm:{model:ACTOR_PLAN_MODEL,maxCalls:300},
+          tracePolicyVersion:'6',actorPolicyVersion:'feedback-choice-v1',reasoningEffort:'low',timingProfile:'original',maxActions:args.maxActions??100,
+          ...(args.timeBudgetMs === undefined ? {} : {timeBudgetMs:args.timeBudgetMs}),
+          feedbackDecisionProvider:frame=>session.decideFrame(frame),
+          onActorDecisionApplied:after=>session.recordApplied(after) };
+        const record = {session,outputPath,done:null,error:null};
+        feedbackSessions.set(session.id, record);
+        record.done = generateAndSave(settings,snapshot,outputPath).then(result=>{session.complete();return result;})
+          .catch(error=>{record.error=error;session.fail(error);throw error;});
+        record.done.catch(()=>{});
+        const frame = await session.awaitObserve();
+        if (record.error) throw record.error;
+        return {sessionId:session.id,model:ACTOR_PLAN_MODEL,reasoningEffort:'low',actorPolicyVersion:'feedback-choice-v1',policyVersion:'6',frame};
+      })();
+      feedbackBegins.set(args.requestId, {key,promise});
+      return promise;
+    }
+    if (['step_feedback_plan','observe_feedback_plan','finalize_feedback_plan'].includes(name)) {
+      const record=feedbackSessions.get(args.sessionId); if(!record) throw new Error('Unknown feedback plan session');
+      if(name==='step_feedback_plan') {
+        const {sessionId:_sessionId,...input}=args;
+        return record.session.step(input);
+      }
+      if(record.error) throw record.error;
+      if(name==='observe_feedback_plan') return record.session.awaitObserve();
+      if(!record.session.status.complete) throw new Error('Feedback trace is still running; apply the current frame first');
+      return {...await record.done,model:ACTOR_PLAN_MODEL,reasoningEffort:'low',actorPolicyVersion:'feedback-choice-v1',...record.session.status};
     }
     if (['prepare_persona_validation','measure_persona_validation','prepare_blind_review','submit_blind_review','persona_validation_report'].includes(name)) {
       const runner=require('./src/personaValidationRun.cjs');
@@ -415,7 +461,11 @@ function createService(options = {}) {
     } else return { jsonrpc: '2.0', id: message.id, error: { code: -32601, message: 'Method not found' } };
     return { jsonrpc: '2.0', id: message.id, result };
   }
-  return { invokeTool, dispatch, close: async () => { if (bridge) await bridge.close(); }, getBridge };
+  return { invokeTool, dispatch, close: async () => {
+    for (const record of feedbackSessions.values()) if (!record.session.status.complete) record.session.close();
+    await Promise.allSettled([...feedbackSessions.values()].map(record=>record.done));
+    if (bridge) await bridge.close();
+  }, getBridge };
 }
 const service = createService();
 function start() {

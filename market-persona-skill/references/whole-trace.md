@@ -11,8 +11,8 @@ node market-simulator/cli.cjs interactive
 ```
 
 1. `list_personas`로 현재 버전을 확인한다. 오프라인에서는 시작 전 `snapshotFilePath`를 준비한다. 앱 재생까지 요청받았다면 스킬의 pairing 절차로 시작 전 탭을 준비한다.
-2. `prepare_whole_trace`에 `personaId`, 새 `seed`, `tabId` 또는 `snapshot` 또는 `snapshotFilePath` 중 정확히 하나를 전달한다. 결과의 `requestId`와 `bundle`을 보관하고 `bundle.inputHash`를 후보의 출처 기록에 남긴다. 출력 경로와 검증된 개인 기억 파일은 `outputPath`·`learnerFile`로 지정할 수 있다. 기본 `maxRepairs:0`을 유지하며 요청이 기술 수정 재제출을 허용하면 `1`을 지정한다.
-3. 한 인물·한 조건·한 seed·한 request/bundle만 받는 새 actor 문맥에서 후보 배열 전체를 작성한다. 저부하·고부하를 같은 작성 문맥에 함께 주지 않으며 다른 요청의 목표 ID나 선택지를 복사하지 않는다. 해당 `bundle.authoringGuide`(`authoringVersion:"1"`)의 식별 정보·문법·예제를 먼저 확인한 뒤 세계 참고 자료·행동 계약·상세 페르소나·초기 지식·작업 기억·과제 상태를 읽는다. 각 행동 직전의 `actorState`, 필수 `basis.goalId`·`memoryUses`와 필요한 배열 `actorState.taskUpdate`·`memoryUpdate`를 선언하며 현재 예상 화면·위치·계산대 상태를 갱신한다. 코드가 계산하는 기억·과제 snapshot을 임의로 덮어쓰지 않는다. 실제 게임을 실행하지 않고 중간 결과를 예상하는 계획이므로 예측이나 로컬 검증을 앱에서 확인한 경험으로 설명하지 않는다.
+2. `prepare_whole_trace`에 `personaId`, 새 `seed`, `tabId` 또는 `snapshot` 또는 `snapshotFilePath` 중 정확히 하나를 전달한다. 결과의 `requestId`와 `bundle`을 보관하고 `bundle.inputHash`를 후보 외부의 출처 기록에 남긴다. candidate 최상위 필드는 `candidateVersion`, `requestId`, `decisions` 세 개이며 `inputHash`를 추가하지 않는다. 출력 경로와 검증된 개인 기억 파일은 `outputPath`·`learnerFile`로 지정할 수 있다. 기본 `maxRepairs:0`을 유지하며 요청이 기술 수정 재제출을 허용하면 `1`을 지정한다.
+3. 한 인물·한 조건·한 seed·한 request/bundle만 받는 새 actor 문맥에서 후보 배열 전체를 작성한다. 저부하·고부하를 같은 작성 문맥에 함께 주지 않으며 다른 요청의 목표 ID나 선택지를 복사하지 않는다. 해당 `bundle.authoringGuide`(새 기본 `authoringVersion:"2"`)의 식별 정보·문법·예제를 먼저 확인한 뒤 세계 참고 자료·행동 계약·상세 페르소나·초기 지식·작업 기억·과제 상태를 읽는다. 각 행동 직전의 `actorState`, 필수 `basis.goalId`·`memoryUses`와 필요한 배열 `actorState.taskUpdate`·`memoryUpdate`를 선언하며 현재 예상 화면·위치·계산대 상태를 갱신한다. 코드가 계산하는 기억·과제 snapshot을 임의로 덮어쓰지 않는다. 실제 게임을 실행하지 않고 중간 결과를 예상하는 계획이므로 예측이나 로컬 검증을 앱에서 확인한 경험으로 설명하지 않는다.
 4. 기본 candidate 7의 각 결정은 `choiceRef`로 현재 위치·계산대 상태·화면에 묶인 선택지를 지정한다. 반환된 `initialChoiceFrame`에서 첫 선택을 시작한다. 전체 배열을 작성한 뒤 `submit_whole_trace({requestId,candidate})` 또는 `submit_whole_trace({requestId,candidateFilePath})`를 한 번 호출한다. 전달 방식은 하나만 쓴다.
 5. 오류 결과에 `canRepair:true`이고 처음 준비할 때 `maxRepairs:1`을 지정했다면 아래의 suffix-only `repair_whole_trace` 절차를 최대 한 번 사용한다. 성공하면 반환된 최종 trace 파일을 사용한다. 생성·검증만 요청받은 경우 여기서 끝낸다. 앱 재생까지 요청받았으면 `validate_trace` → `play_trace` → `replay_status`로 실제 실행을 확인한다. 미션 snapshot이 달라졌으면 새 요청을 준비한다.
 
@@ -38,7 +38,7 @@ interactive에서는 표준입력 한 줄에 같은 도구를 전달한다.
 
 진행이나 저장 결과를 다시 확인할 때 `whole_trace_status({requestId})`를 사용한다. 동기 제출이 완료된 뒤 행동마다 이 도구를 호출할 필요는 없다. `begin_actor_plan`/`observe_actor_plan`/`append_actor_plan`을 이 경로에 섞지 않는다.
 
-호스트 MCP/interactive 프로세스는 여러 요청을 관리할 수 있다. 새 문맥 규칙은 후보를 작성하는 actor에 적용하며 서버가 세션 분리나 다른 bundle의 미열람을 강제·입증하지는 않는다. `requestId`·`inputHash`는 출처 연결용이고 후보에 스키마 밖의 필드를 추가하지 않는다. 작성 안내의 개선은 기술 오류를 줄이기 위한 것으로 행동 선택·페르소나 지침·통과 기준을 바꾸거나 충실도 개선을 입증하지 않는다.
+호스트 MCP/interactive 프로세스는 여러 요청을 관리할 수 있다. 새 문맥 규칙은 후보를 작성하는 actor에 적용하며 서버가 세션 분리나 다른 bundle의 미열람을 강제·입증하지는 않는다. `requestId`·`inputHash`는 출처 연결용이고 후보에 스키마 밖의 필드를 추가하지 않는다. 가이드 v2는 조건부 성향 표현과 실제 활동·focus 선언을 안내하지만 행동 선택을 대신하거나 구매 결과·통과 기준을 교정하지 않는다. 지침 변경 자체는 충실도 개선의 증거가 아니며, 저장된 v1 가이드와 기존 검토 의미를 유지한다.
 
 ## 작성 시점과 문법 확인
 
@@ -55,6 +55,8 @@ interactive에서는 표준입력 한 줄에 같은 도구를 전달한다.
 | 목표 완료·포기 | 이전 add 결과를 관찰한 뒤 complete를 선언하거나 목표를 abandon하면, 같은 결정의 heldGoalIds에서 그 목표를 뺀다. 완료·포기한 목표를 basis.goalId·focusedGoalId·memoryUses로 계속 참조하지 않는다. 다른 열린 목표는 유지하며 새 행동의 basis와 focus에 맞게 기록한다. |
 
 완료한 목표 하나를 해제한다는 이유로 다른 pending 목표까지 비우지 않는다. 새 행동이 목표에 연결되지 않으면 허용된 intent와 `basis.goalId:null`, `memoryUses:[]`, null goal focus를 쓰고, 다른 열린 목표를 수행한다면 그 목표의 실제 상태를 선언한다. 기술 예제는 상태·형식의 예시이며 구매·확인·실수·관심·포기의 횟수나 행동 순서를 강제하지 않는다.
+
+가이드 v2의 `selectObservedProduct` 예시는 실제 관찰한 상품을 열린 목표와 연결해 선택하는 경우의 focus·기억 선언이다. 실제로 다른 상품을 골랐다면 그 선택을 보존하고, 관심이나 목표 없는 탐색의 null goal focus도 유지한다. `interestWithPendingGoal`은 관심 상품에 주의가 옮겨가도 진행 중인 목표를 잃어버리지 않는 예시다. `completeAfterAdd`의 닫기는 `orient`/`explore`로 표현하며 모든 닫기에 같은 활동을 강제하는 규칙은 아니다. 닫기 자체를 확인으로 세거나 지연만으로 숙고를 나타내지 않는다. 같은 페이지에서 본 정보를 비교했는지는 별도의 행동 근거가 제한될 수 있으므로 선언과 독립 관찰을 구분한다.
 
 ### 계산대 참조 별칭
 
@@ -233,6 +235,8 @@ Node는 고정된 snapshot에서 후보를 처음부터 실행한다. 행동 직
 `summary`는 `decisions`, `distinctReactionDelays`, `activityCounts`, `maximumHeldGoals`, 실제 선택 목표 기준 `goalSwitches`, `focusGoalSwitches`, `productSwitches`, `interestReturns`를 담는다. `focusCoverage`는 `recordedDecisions`와 `unrecordedDecisionIndexes`를 구분한다. `transitions`의 purchase-goal, focus-goal, interest-return, uncertainty-cleared 항목은 `decisionIndexes`·`cueRefs`와 적용 가능한 `checkDecisionIndexes`, `listRechecked` 등을 보존한다. purchase-goal 항목에는 `selectionFocus:"consistent"|"unrecorded"|"different-goal"|"no-goal"`을 기록한다. `situations.unfamiliar`는 시작 orientation·국소 cue·새 매대를, `memoryLoad`는 실제로 읽은 목표가 용량을 넘었는지·선언된 uncertainty·check 인덱스를, `interestExposure`는 `categorySignDecisionIndexes`, `productDecisionIndexes`, `interestDecisionIndexes`를 각각 기록해 실제 category sign과 상품 노출을 구분한다. 이는 행동 해석에 필요한 coverage와 상황 정보다. 목표 수가 설계 용량을 넘었다는 기록은 임상적 기억 부담 측정이 아니며, 낯섦·관심 노출도 표현이 명확하거나 이해됐다는 보증이 아니다. 경고가 없다는 `clear` 역시 표현의 완전성·임상적 타당성을 보증하지 않는다.
 
 candidate 7의 `personaReview.taskExpression`은 `task-expression-v1`로 이동 중 목표 기억, 관심 동안의 pending 목표, 불확실성과 이후 회복, 실제 관심 상품 focus를 별도로 기록한다. coverage가 `unexercised`이면 기억 부담·회복을 관찰하지 못한 표본이며 개선 증거로 삼지 않는다. 열린 목표가 유지됐다는 사실만으로 어려움이 발현됐다고 판정하지 않는다. 불확실성 뒤 회상·guess·실제 확인이 있었는지 단계의 관찰 시점에 맞춰 살핀다. `INTEREST_PRODUCTS_WITHOUT_FOCUS`와 `UNIFORM_ORIENT_WALK_DELAYS`는 추가 soft warning이다. 관심 매대를 열고 닫은 것, 실제 상품 focus, 종류·맛·규격 비교 행동은 구분하고 reason만으로 비교를 인정하지 않는다. 경로 재방문은 왕복 이동일 수 있어 방황으로 단정하지 않는다. 확인·실수·관심·헤맴 횟수를 강제로 넣어 coverage나 경고를 바꾸지 않는다.
+
+가이드 v2로 준비한 요청에는 별도 `personaReview.annotationReview`(`reviewVersion:"actor-annotation-v1"`)를 기록한다. 자체 `status`, `findings`, 관찰 한계를 가지며 기존 `actor-fidelity-v2`의 최상위 상태·경고 의미를 바꾸지 않는다. `CHECK_LABEL_WITHOUT_OBSERVABLE_CHECK`는 `closeStation`/`closeView`만 수행하면서 `activity:"check"`로 적은 경우를 검토한다. 같은 페이지의 `pause`·`lookAround`·`browse`는 실제 정보를 살펴볼 수 있으므로 이 경고로 단정하지 않는다. 기존 두 focus mismatch도 근거와 함께 옮겨 담고, 각 항목에 `improvementTarget`, `recommendation`, 결정 인덱스·행동·선언·단서의 `evidence`를 제공한다. 이 검토는 기술 실패로 처리하거나 행동·구매를 고치지 않는다. 최상위 `clear`와 주석 검토 `clear`를 구분하며, 과거 가이드에서 항목이 없으면 미실시로 보고한다.
 
 새 개인은 `create_whole_trace_learner`로 만든다. `create_learner`의 기존 provider 정책과 파일을 공유하거나 기존 trial의 정책 값을 수동 변경하지 않는다. 생성된 계획 기억을 실제 경험으로 승격하지 않는다. 실제 앱 replay와 DB receipt를 검증한 개인 경험 파일만 다음 요청의 `learnerFile`로 사용한다.
 

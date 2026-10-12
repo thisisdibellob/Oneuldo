@@ -8,6 +8,8 @@ import { ActorLearningMemory, validateLearning, validateLearnerIdentity, assertL
 import { Random } from './random';
 import { ActorActivityMonitor } from './actorActivity';
 import { appendCheckoutCompletion } from './checkoutCompletion';
+import { createFeedbackLlmPolicy } from './feedbackLlmPolicy';
+import { buildFeedbackActorFrame, feedbackChoiceMatchesDecision, emptyFeedbackBeliefMemory, validateFeedbackBeliefMemory, FEEDBACK_ACTOR_POLICY_VERSION } from './feedbackActor';
 import type { ActorObservation, AttentionExperience, Decision, Persona, TraceEntry, TraceOptions } from './types';
 
 type StepIntent = MarketReplayStep extends infer S ? S extends MarketReplayStep ? Omit<S, 'id' | 'reactionDelayMs' | 'reason' | 'timeoutMs'> : never : never;
@@ -21,6 +23,16 @@ export async function generateAttentionTrace(options: TraceOptions, persona: Per
   if (options.actorDecisionProvider && mode !== 'llm') throw new Error('actorDecisionProvider requires llm mode; stochastic traces must be seed-reproducible');
   const wholeTrace = options.planningMode === 'whole-trace';
   const actorPolicyVersion = attentionActorPolicyVersion(options);
+  const feedbackActor = actorPolicyVersion === FEEDBACK_ACTOR_POLICY_VERSION;
+  if (feedbackActor && (options.actorDecisionProvider || options.decisionProvider)) {
+    throw new Error('feedback-choice-v1 requires feedbackDecisionProvider with a current-only frame; raw actorDecisionProvider is not allowed');
+  }
+  if (options.feedbackDecisionProvider && (!feedbackActor || mode !== 'llm')) throw new Error('feedbackDecisionProvider requires feedback-choice-v1 LLM mode');
+  if (feedbackActor && (mode !== 'llm' || options.planningMode || options.learnerIdentity
+    || options.attentionExperience && (options.attentionExperience.visit !== 'first-play'
+      || options.attentionExperience.memory || options.attentionExperience.learning))) {
+    throw new Error('feedback-choice-v1 requires a fresh first-play actor; legacy exact experience cannot be imported as belief memory');
+  }
   const extendedActor = mode === 'llm' && isExtendedActorPolicy(actorPolicyVersion);
   const hasWholeOptions = options.planningMode !== undefined || options.planningSubmissions !== undefined
     || options.repairSubmissions !== undefined || ['whole-trace-v1', 'whole-trace-v2', 'whole-trace-v3'].includes(options.actorPolicyVersion ?? '');
@@ -69,24 +81,29 @@ export async function generateAttentionTrace(options: TraceOptions, persona: Per
   const experience: AttentionExperience = { ...supplied, visit: supplied?.visit ?? 'first-play', layoutKey };
   if (supplied?.learning && (mode !== 'llm' || experience.visit !== 'revisit')) throw new Error('Learning experience requires an AI revisit');
   const policy = mode === 'stochastic' ? new AttentionPolicy(persona, options.seed, experience) : new ActorLearningMemory(supplied?.learning, extendedActor);
-  const provider = mode === 'llm' && !options.actorDecisionProvider && !options.decisionProvider ? createAttentionLlmPolicy(options.llm ?? {}, options.seed, extendedActor) : null;
+  const provider = mode === 'llm' && !options.actorDecisionProvider && !options.decisionProvider && !options.feedbackDecisionProvider
+    ? feedbackActor ? createFeedbackLlmPolicy(options.llm ?? {}, options.seed)
+      : createAttentionLlmPolicy(options.llm ?? {}, options.seed, extendedActor) : null;
   const activity = new ActorActivityMonitor();
   let systemCompletion: NonNullable<MarketReplayTrace['generation']>['systemCompletion'];
   if (options.decisionProvider && !options.actorDecisionProvider) throw new Error('Attention personas require actorDecisionProvider; raw game observations are not exposed');
-  const guard = new TraceGuard(options.snapshot, persona.id, persona.version, model, true, extendedActor);
+  const guard = new TraceGuard(options.snapshot, persona.id, persona.version, model, true, extendedActor, feedbackActor);
   const motor = new Random(`${options.seed}:presentation:${persona.id}:${persona.version}`);
   const history: TraceEntry[] = [], steps: MarketReplayStep[] = [];
   let plannedMs = 0;
+  let feedbackMemory = emptyFeedbackBeliefMemory();
   const append = (intent: StepIntent, delayMs: number, reason: string,
     metadata: Pick<Decision, 'attentionTag' | 'cueRefs'> = {}, timeoutMs = 120000, systemOwned = false) => {
+    // The execution deadline also needs room for panel transitions and timer scheduling.
+    if (feedbackActor && 'durationMs' in intent) timeoutMs = Math.max(timeoutMs, (intent.durationMs ?? 0) + 5000);
     const step = { ...intent, id: `step-${String(steps.length + 1).padStart(4, '0')}`, reactionDelayMs: Math.round(delayMs), timeoutMs, reason, ...metadata } as MarketReplayStep;
     const applied = guard.execute(step, systemOwned);
     steps.push(step);
     plannedMs += step.reactionDelayMs + applied.movementMs
-      + ('durationMs' in step ? step.durationMs : step.type === 'dragProduct' ? (step.gesture.durationMs + step.gesture.hesitationMs) * step.quantity : 0);
-    if (options.timeBudgetMs !== undefined && plannedMs > options.timeBudgetMs) throw new Error('ATTENTION_GENERATION_LIMIT: planned-time-budget; incomplete plan was not exported');
+      + ('durationMs' in step ? (step.durationMs ?? 0) : step.type === 'dragProduct' ? (step.gesture.durationMs + step.gesture.hesitationMs) * step.quantity : 0);
+    if (!feedbackActor && options.timeBudgetMs !== undefined && plannedMs > options.timeBudgetMs) throw new Error('ATTENTION_GENERATION_LIMIT: planned-time-budget; incomplete plan was not exported');
   };
-  append({ type: 'start' }, persona.parameters.reactionMedianMs, '게임 설명 화면을 한 장씩 확인한다');
+  append({ type: 'start' }, feedbackActor ? 0 : persona.parameters.reactionMedianMs, '게임 설명 화면을 한 장씩 확인한다');
   for (;;) {
     // Keep the app bridge's heartbeat responsive while constructing long plans.
     if (history.length && history.length % 20 === 0) await new Promise<void>(resolve => setImmediate(resolve));
@@ -97,6 +114,9 @@ export async function generateAttentionTrace(options: TraceOptions, persona: Per
     policy.observe(before);
     activity.observe(before);
     const feedback = activity.getState();
+    if (feedbackActor && history.length >= ACTOR_ACTION_LIMIT) {
+      throw new Error('ATTENTION_GENERATION_LIMIT: action-limit; no system checkout or completed persona outcome was fabricated');
+    }
     if (extendedActor && history.length >= ACTOR_ACTION_LIMIT) {
       // Natural submit/giveUp below already ended the loop, including decision 100.
       // Repetition is diagnostic only. This fixed observation horizon is not failure.
@@ -106,11 +126,21 @@ export async function generateAttentionTrace(options: TraceOptions, persona: Per
       break;
     }
     if (limit) throw new Error(`ATTENTION_GENERATION_LIMIT: ${limit}; incomplete plan was not exported as a persona outcome`);
-    const decision = options.actorDecisionProvider ? extendedActor
+    const actorFrame = options.feedbackDecisionProvider
+      ? buildFeedbackActorFrame({observation:before,persona,memory:feedbackMemory,seed:options.seed,decisionIndex:history.length}) : null;
+    const decision = options.feedbackDecisionProvider ? await options.feedbackDecisionProvider(structuredClone(actorFrame!)) : options.actorDecisionProvider ? extendedActor
       ? await options.actorDecisionProvider(before, history, persona, feedback, policy.getState())
       : await (options.actorDecisionProvider as (o: ActorObservation, h: TraceEntry[], p: Persona) => Promise<Decision>)(before, history, persona)
       : provider ? await provider(before, history, persona, policy.getState(), feedback) : (policy as AttentionPolicy).next(before);
-    assertDecision(decision);
+    assertDecision(decision, feedbackActor);
+    if (feedbackActor) {
+      const checked = validateFeedbackBeliefMemory(decision.feedbackMemory);
+      if (!checked.valid) throw new Error(`Invalid feedback belief memory: ${checked.errors.join('; ')}`);
+      if (actorFrame && !actorFrame.availableChoices.some(choice =>
+        feedbackChoiceMatchesDecision(choice, decision))) throw new Error('Feedback decision is not a current visible choice');
+      feedbackMemory = structuredClone(decision.feedbackMemory!);
+    }
+    if (decision.dragOutcome !== undefined && !feedbackActor) throw new Error('Explicit actor drag outcomes require feedback-choice-v1');
     assertActorDecision(decision, before);
     assertCueReferences(decision, before, policy);
     if (options.timeBudgetMs !== undefined && plannedMs + decision.delayMs >= options.timeBudgetMs) throw new Error('ATTENTION_GENERATION_LIMIT: planned-time-budget; incomplete plan was not exported');
@@ -118,7 +148,7 @@ export async function generateAttentionTrace(options: TraceOptions, persona: Per
     const raw = guard.observe();
     const activeKind = raw.environment.stationDetails.find(s => s.id === raw.activeStation)?.kind;
     if ((decision.action.type === 'viewHelp' || decision.action.type === 'viewCart' && activeKind !== 'shelf') && raw.activeStation) {
-      append({ type: 'closeStation' }, Math.round(persona.parameters.reactionMedianMs * .35), '화면을 닫고 안내 버튼을 확인한다');
+      append({ type: 'closeStation' }, feedbackActor ? 0 : Math.round(persona.parameters.reactionMedianMs * .35), '화면을 닫고 안내 버튼을 확인한다');
     }
     const intent = projectDecision(decision, guard.observe(), persona, options.snapshot, options.seed, steps.length, motor);
     append(intent, decision.delayMs, decision.reason, {
@@ -130,26 +160,36 @@ export async function generateAttentionTrace(options: TraceOptions, persona: Per
     policy.record(decision, before, after);
     activity.record(decision, before, after);
     options.onActorDecisionAccepted?.();
+    options.onActorDecisionApplied?.(after);
     const { exchange: _exchange, ...recordedDecision } = decision;
     options.onCheckpoint?.({ kind: 'decision', index: history.length, before, decision: recordedDecision, after, activity: activity.getState() });
+    if (feedbackActor && options.timeBudgetMs !== undefined && plannedMs > options.timeBudgetMs) {
+      throw new Error('ATTENTION_GENERATION_LIMIT: planned-time-budget; applied attempt was recorded but incomplete plan was not exported');
+    }
     if (decision.action.type === 'submit') {
       append({ type: 'awaitReviewAccepted' }, 0, '앱의 분석 접수 결과를 기다린다', {}, 180000);
-      append({ type: 'leave' }, persona.parameters.reactionMedianMs, '접수된 뒤 장보기를 나간다'); break;
+      append({ type: 'leave' }, feedbackActor ? 0 : persona.parameters.reactionMedianMs, '접수된 뒤 장보기를 나간다'); break;
     }
     if (decision.action.type === 'giveUp') {
-      append({ type: 'skipRating' }, persona.parameters.reactionMedianMs, '이번 게임의 평가를 건너뛴다');
-      append({ type: 'leave' }, persona.parameters.reactionMedianMs, '이번 장보기를 그만하고 나간다'); break;
+      append({ type: 'skipRating' }, feedbackActor ? 0 : persona.parameters.reactionMedianMs, '이번 게임의 평가를 건너뛴다');
+      append({ type: 'leave' }, feedbackActor ? 0 : persona.parameters.reactionMedianMs, '이번 장보기를 그만하고 나간다'); break;
     }
+  }
+  if (feedbackActor && options.timeBudgetMs !== undefined && plannedMs > options.timeBudgetMs) {
+    throw new Error('ATTENTION_GENERATION_LIMIT: planned-time-budget; terminal UI steps exceed the budget and no completed trace was exported');
   }
   const body: Omit<MarketReplayTrace, 'traceId'> = {
     traceSchemaVersion: '2', personaId: persona.id, personaVersion: persona.version, seed: options.seed,
-    generationPolicy: mode, policyVersion: options.tracePolicyVersion ?? '5', experienceMode: experience.visit,
+    generationPolicy: mode, policyVersion: options.tracePolicyVersion ?? (feedbackActor ? '6' : '5'), experienceMode: experience.visit,
     attentionExperience: { layoutKey, memory: policy.getMemory(), source: 'planned-trace' },
     generation: { model, reproducibility: mode === 'stochastic' ? 'seed-and-snapshot' : 'captured-trace', ...(mode === 'llm' ? {
       requestId: randomUUID(), actorPolicyVersion: actorPolicyVersion as NonNullable<MarketReplayTrace['generation']>['actorPolicyVersion'],
       ...(options.reasoningEffort ? { reasoningEffort: options.reasoningEffort } : {}),
       ...(wholeTrace ? { planningMode: 'whole-trace' as const, observationScope: 'whole-world' as const, actorKnowledgeScope: 'observed-and-remembered' as const, actorStateVersion: '1' as const, timingProfile: 'actor-preserved-v1' as const,
         planningSubmissions, repairSubmissions } : {}),
+      ...(feedbackActor ? { timingProfile: 'activity-duration-v1' as const,
+        feedback: { version: '1' as const, observationScope: 'current-screen' as const, memory: 'actor-authored' as const,
+          contextDelivery: options.feedbackDecisionProvider ? 'external-frame' as const : 'stateless-http' as const, decisions: history.length } } : {}),
       ...(systemCompletion ? { systemCompletion } : {}),
       ...(extendedActor ? { experienceFingerprint: marketReplayFingerprint(supplied ?? { visit: 'first-play' }) } : {}),
       ...(identity ? { learnerIdentity: structuredClone(identity) } : {}),

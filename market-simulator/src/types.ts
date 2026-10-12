@@ -4,13 +4,17 @@ import type { MarketReplaySnapshot, MarketReplayTrace } from '../../frontend/src
 
 export type Observation = ReturnType<ReturnType<typeof createMarketAgentAdapter>['observe']>;
 /** Policy intent; primitive movement exists only inside offline guard validation. */
-export type PolicyAction = Exclude<MarketAgentAction, { type: 'move' }> | { type: 'walkTo'; station: MarketEnvironmentStationId }
+export type PolicyAction = Exclude<MarketAgentAction, { type: 'move' | 'viewCart' | 'viewHelp' }> | { type: 'walkTo'; station: MarketEnvironmentStationId }
+  | { type: 'viewCart' | 'viewHelp'; durationMs?: number }
   | { type: 'walkToAnchor'; anchorId: string }
   | { type: 'readList'; durationMs: number }
   | { type: 'pause'; durationMs: number }
   | { type: 'lookAround'; durationMs: number }
   | { type: 'browse'; durationMs: number; scrollFraction: number };
 export type Decision = { action: PolicyAction; delayMs: number; reason: string; currentTask?: string; attentionTag?: string; cueRefs?: string[];
+  feedbackMemory?: import('./feedbackActor').FeedbackBeliefMemory;
+  /** Explicit observed motor attempt; only feedback planning exposes these choices. */
+  dragOutcome?: 'drop' | 'miss' | 'cancel';
   exchange?: { request: unknown; response: unknown } };
 export type PrimitiveDecision = { action: MarketAgentAction; delayMs: number; reason: string };
 export type TraceEntry = Decision;
@@ -121,7 +125,7 @@ export type AttentionExperience = {
 export type TraceOptions = {
   personaId: string; seed: string | number; snapshot: MarketReplaySnapshot;
   mode?: 'stochastic' | 'llm'; maxActions?: number; timeBudgetMs?: number;
-  tracePolicyVersion?: '5' | '6'; actorPolicyVersion?: 'episodic-choice-v9' | 'episodic-choice-v10' | 'whole-trace-v1' | 'whole-trace-v2' | 'whole-trace-v3'; reasoningEffort?: 'low';
+  tracePolicyVersion?: '5' | '6'; actorPolicyVersion?: 'episodic-choice-v9' | 'episodic-choice-v10' | 'feedback-choice-v1' | 'whole-trace-v1' | 'whole-trace-v2' | 'whole-trace-v3'; reasoningEffort?: 'low';
   planningMode?: 'whole-trace'; planningSubmissions?: number; repairSubmissions?: number;
   /** Compact is a test execution schedule, not an estimate of a person's speed. */
   timingProfile?: 'original' | 'compact';
@@ -134,7 +138,11 @@ export type TraceOptions = {
   trialBinding?: { trialId: string; arm: 'A' | 'B' | 'C'; roundId: string; requestHash: string };
   actorDecisionProvider?: (observation: ActorObservation, history: TraceEntry[], persona: Persona,
     activity: import('./actorActivity').ActorActivityState, state?: unknown) => Promise<Decision>;
+  /** The feedback actor boundary never receives archived observations or the full snapshot. */
+  feedbackDecisionProvider?: (frame: import('./feedbackActor').FeedbackActorFrame) => Promise<Decision>;
   onActorDecisionAccepted?: () => void;
+  /** Applied offline UI outcome, including a handled UI rejection; never a correctness verdict. */
+  onActorDecisionApplied?: (after: ActorObservation) => void;
   /** Local diagnostics only. Unfinished plans never become executed learner experience. */
   onCheckpoint?: (entry: GenerationCheckpoint) => void;
 };

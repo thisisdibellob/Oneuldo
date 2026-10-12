@@ -23,7 +23,8 @@ export type MarketReplaySystemCompletion = {
   checkoutId: MarketCheckoutId; cartAtStart: Record<string, number>;
 };
 export type MarketReplayStep = StepBase & (
-  | { type: 'start' | 'viewCart' | 'viewHelp' | 'closeView' | 'closeStation' | 'submitForReview' | 'awaitReviewAccepted' | 'giveUp' | 'skipRating' | 'leave' }
+  | { type: 'start' | 'closeView' | 'closeStation' | 'submitForReview' | 'awaitReviewAccepted' | 'giveUp' | 'skipRating' | 'leave' }
+  | { type: 'viewCart' | 'viewHelp'; durationMs?: number }
   | { type: 'walkTo'; target: { stationId: MarketEnvironmentStationId }; movement: ReplayMovement }
   | { type: 'walkToAnchor'; target: { anchorId: string }; movement: ReplayMovement }
   | { type: 'readList'; durationMs: number }
@@ -46,8 +47,9 @@ export type MarketReplayTrace = {
   attentionExperience?: { layoutKey: string; memory: Record<string, unknown>; source: 'planned-trace' };
   /** Fresh LLM requests are not seed deterministic. A captured trace is replayable. */
   generation?: { model: string; reproducibility: 'seed-and-snapshot' | 'captured-trace'; requestId?: string;
-    timingProfile?: 'compact-v1' | 'actor-preserved-v1'; sourceTraceId?: string; actorPolicyVersion?: 'episodic-choice-v1' | 'episodic-choice-v2' | 'episodic-choice-v3' | 'episodic-choice-v4' | 'episodic-choice-v5' | 'episodic-choice-v6' | 'episodic-choice-v7' | 'episodic-choice-v8' | 'episodic-choice-v9' | 'episodic-choice-v10' | 'whole-trace-v1' | 'whole-trace-v2' | 'whole-trace-v3';
+    timingProfile?: 'compact-v1' | 'actor-preserved-v1' | 'activity-duration-v1'; sourceTraceId?: string; actorPolicyVersion?: 'episodic-choice-v1' | 'episodic-choice-v2' | 'episodic-choice-v3' | 'episodic-choice-v4' | 'episodic-choice-v5' | 'episodic-choice-v6' | 'episodic-choice-v7' | 'episodic-choice-v8' | 'episodic-choice-v9' | 'episodic-choice-v10' | 'feedback-choice-v1' | 'whole-trace-v1' | 'whole-trace-v2' | 'whole-trace-v3';
     reasoningEffort?: 'low';
+    feedback?: { version: '1'; observationScope: 'current-screen'; memory: 'actor-authored'; contextDelivery: 'stateless-http' | 'external-frame'; decisions: number };
     planningMode?: 'whole-trace'; observationScope?: 'whole-world'; actorKnowledgeScope?: 'observed-and-remembered'; actorStateVersion?: '1'; planningSubmissions?: number; repairSubmissions?: number;
     controlledStop?: MarketReplayControlledStop;
     systemCompletion?: MarketReplaySystemCompletion;
@@ -204,11 +206,27 @@ export function validateMarketReplayTrace(value: unknown, snapshot?: MarketRepla
   } else if (['whole-trace-v1', 'whole-trace-v2', 'whole-trace-v3'].includes(generation?.learnerIdentity?.policyVersion ?? '')) {
     errors.push('A whole-trace learner requires explicit whole-trace planning metadata.');
   }
+  const feedback = generation?.actorPolicyVersion === 'feedback-choice-v1';
+  if (feedback) {
+    if (trace.generationPolicy !== 'llm' || trace.traceSchemaVersion !== '2' || trace.policyVersion !== '6'
+      || generation?.feedback?.version !== '1' || !['actor-preserved-v1', 'activity-duration-v1'].includes(generation.timingProfile ?? '')
+      || generation.learnerIdentity || generation.systemCompletion || generation.controlledStop
+      || trace.experienceMode !== 'first-play') errors.push('Feedback planning requires a fresh schema 2 / policy 6 actor, current-screen belief metadata and supported actor timing without automatic completion.');
+  } else if (generation?.feedback !== undefined) errors.push('Feedback metadata requires feedback-choice-v1.');
+  const activityTiming = generation?.timingProfile === 'activity-duration-v1';
+  if (activityTiming) {
+    if (!feedback) errors.push('Activity-duration timing requires feedback-choice-v1.');
+    if (trace.steps.some(step => step.reactionDelayMs !== 0)) errors.push('Activity-duration timing requires zero reaction delay on every step.');
+    if (trace.steps.some(step => step.type === 'dragProduct' && step.gesture.hesitationMs !== 0))
+      errors.push('Activity-duration timing requires zero drag hesitation; use an explicit pause action.');
+  }
+  if (!activityTiming && trace.steps.some(step => (step.type === 'viewCart' || step.type === 'viewHelp') && step.durationMs !== undefined))
+    errors.push('Cart and help durations require activity-duration-v1 timing.');
   if (generation?.actorPolicyVersion !== 'whole-trace-v3') {
     if (generation?.actorStateVersion !== undefined)
       errors.push('Actor state metadata requires the whole-trace-v3 policy.');
-    if (generation?.timingProfile === 'actor-preserved-v1')
-      errors.push('Actor-preserved timing requires the whole-trace-v3 policy.');
+    if (generation?.timingProfile === 'actor-preserved-v1' && !feedback)
+      errors.push('Actor-preserved timing requires whole-trace-v3 or feedback-choice-v1.');
   }
   if (trace.attentionExperience && JSON.stringify(trace.attentionExperience).length > 250000) errors.push('Attention experience is too large.');
   if (trace.traceId !== marketReplayTraceId(trace)) errors.push('Trace identity does not match its contents.');

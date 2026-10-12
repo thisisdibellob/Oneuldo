@@ -188,6 +188,7 @@ export async function compileWholeTraceCandidate(settings: WholeTraceSettings, b
     } : entry);
     const personaReview = auditWholeTraceActorFidelity(roleEntries, persona, {
       objectives: createMarketSession(settings.snapshot.config, settings.snapshot.environment).objectives,
+      ...(bundle.authoringGuide?.authoringVersion === '2' ? { annotationReview: 'actor-annotation-v1' as const } : {}),
     });
     const taskExpression = persistent ? reviewWholeTraceTaskExpression(roleEntries) : undefined;
     return { trace, acceptedActions: accepted, knowledgeAudit,

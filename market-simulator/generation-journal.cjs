@@ -18,10 +18,10 @@ function pick(value, fields) {
 }
 function safeOptions(options) {
   const result = pick(options, ['personaId', 'seed', 'mode', 'maxActions', 'timeBudgetMs', 'timingProfile',
-    'attentionExperience', 'learnerIdentity', 'trialBinding']);
+    'attentionExperience', 'learnerIdentity', 'trialBinding', 'actorPolicyVersion', 'tracePolicyVersion']);
   result.mode ??= 'llm';
   result.maxActions ??= 1000;
-  result.timingProfile ??= 'compact';
+  result.timingProfile ??= ['feedback-choice-v1','whole-trace-v3'].includes(options.actorPolicyVersion) ? 'original' : 'compact';
   if (result.mode === 'llm') {
     result.llm = pick(options.llm, ['model', 'protocol', 'maxCalls', 'timeoutMs']);
     result.llm.model ??= process.env.MARKET_LLM_MODEL;
@@ -38,7 +38,7 @@ function sanitizeCheckpoint(entry) {
   if (entry.kind === 'decision') {
     result.before = safeJson(entry.before);
     result.after = safeJson(entry.after);
-    result.decision = pick(entry.decision, ['action', 'delayMs', 'reason', 'currentTask', 'attentionTag', 'cueRefs']);
+    result.decision = pick(entry.decision, ['action', 'delayMs', 'reason', 'currentTask', 'attentionTag', 'cueRefs', 'feedbackMemory', 'dragOutcome']);
   }
   return result;
 }

@@ -3,6 +3,7 @@
 const fs = require('node:fs');
 const { invokeTool, close } = require('./server.cjs');
 const commands = { personas: 'list_personas', generate: 'generate_trace', validate: 'validate_trace', pair: 'pair_app_session', sessions: 'list_app_sessions', play: 'play_trace', status: 'replay_status', stop: 'stop_replay',
+  'begin-feedback':'begin_feedback_plan', 'step-feedback':'step_feedback_plan', 'observe-feedback':'observe_feedback_plan', 'finalize-feedback':'finalize_feedback_plan',
   'create-learner': 'create_learner', 'create-trial': 'create_learning_trial', 'prepare-round': 'prepare_learning_round',
   'generate-round': 'generate_learning_round', 'record-round': 'record_learning_round', 'record-failure': 'record_learning_failure', 'compare-trial': 'compare_learning_trial',
   'create-whole-learner':'create_whole_trace_learner','prepare-whole':'prepare_whole_trace','submit-whole':'submit_whole_trace','repair-whole':'repair_whole_trace','whole-status':'whole_trace_status', 'prepare-persona-validation':'prepare_persona_validation', 'measure-persona-validation':'measure_persona_validation', 'prepare-blind-review':'prepare_blind_review', 'submit-blind-review':'submit_blind_review', 'persona-validation-report':'persona_validation_report' };
@@ -22,6 +23,7 @@ async function main() {
     await close(); return;
   }
   if (['pair', 'sessions', 'play', 'status', 'stop'].includes(command)) throw new Error('Replay commands need a persistent connection. Use MCP tools or cli.cjs interactive.');
+  if (['begin-feedback','step-feedback','observe-feedback','finalize-feedback'].includes(command)) throw new Error('Feedback sessions need one persistent MCP or cli.cjs interactive process; separate CLI commands cannot restore a session.');
   if(['prepare-whole','submit-whole','repair-whole','whole-status'].includes(command)) throw new Error('Whole-trace requests need the same persistent MCP or cli.cjs interactive process; separate CLI commands cannot restore a prepared request.');
   if (!commands[command]) throw new Error(`Unknown command: ${command}`);
   if (rest.length > 1 && !(rest.length === 2 && rest[0] === '--options-file')) throw new Error('Pass one JSON argument or --options-file path.');

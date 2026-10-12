@@ -1,5 +1,9 @@
 # Oneuldo 장보기 의도 trace와 앱 재생
 
+새 페르소나 생성의 권장 경로는 **`feedback-choice-v1`**이다. `begin_feedback_plan`이 첫 관측을 돌려주고, `step_feedback_plan`은 행동 하나를 적용한 결과와 다음 관측을 함께 반환한다. 전체 지도와 정답 원장은 내부에 두며 배우에게는 현재 화면과 배우가 직접 남긴 짧은 기억만 제공한다. 목록은 읽은 직후에만 노출하고 오기억·누락·잘못된 완료 믿음을 자동 수정하지 않는다. 100회에 도달해도 시스템이 대신 계산하지 않는다. 저장된 전체 trace를 검토한 뒤 실제 웹에서 재생하는 흐름은 유지한다. 연결·기억 형식·실패 처리·문맥 격리와 한계는 [새 생성 절차](../market-persona-skill/references/feedback-plan.md)에 있다.
+
+HTTP provider는 `generate_trace({actorPolicyVersion:"feedback-choice-v1", ...})`로 선택하며 매 판단에 새 system+현재 frame 메시지만 보낸다. 직접 Codex 배우는 실제 Luna/low의 새 판단 문맥이 필요하다. 서버가 외부 배우의 과거 문맥 삭제를 보장하지는 않는다. 새 정책은 첫 방문 생성에 적용하며 기존 learner 원장은 자동 가져오지 않는다. 입력 timing 옵션은 original이고 compact는 허용하지 않는다. 새 trace의 시간 계약은 아래 activity-duration-v1이다. 아래 기본 v4와 기존 whole-trace/v10 경로는 호환성을 위해 유지한다.
+
 페르소나 충실도 검증은 공통 성향 5축과 유형 5개의 조합을 평가한다. 기존 MCP 도구 5개를 재사용하고, 같은 맥락에서 성향 하나만 다른 표본 비교·기회 미발생 구분·A/B 성향 추정·원본 불변 검사를 제공한다. 일반 생성 경로에서 자동 실행하지 않는다. 자세한 입력·출력·분모·한계와 기존 v2 호환 절차는 [검증 절차](../market-persona-skill/references/persona-validation.md)를 따른다.
 
 페르소나 생성기는 `walkTo`, `readList`, `browse`, `openShelf`, `dragProduct`, `viewCart` 같은 행동 **의도**를 JSON으로 만든다. 개발용 Expo 웹앱이 전체 trace를 받아 기존 이동·버튼·드래그 입력 경로로 실시간 재생한다. 게임 로그는 앱의 기존 `MarketBehaviorTracker`와 큐가 기록·전송한다. 생성기와 MCP에는 `BehaviorLogRequest` 생성·변환·직접 전송 기능이 없다.
@@ -24,6 +28,10 @@ Luna 전체 계획 경로는 전체 세계를 전개 계산용 참고 자료로 
 
 유형 ID는 `deliberate-checker`(숙고·확인형), `quick-satisficer`(신속 결정형), `curious-explorer`(탐색·호기심형), `familiar-routine`(익숙함 선호형), `help-seeker`(도움 활용형)다. [카탈로그](validation/persona-traits.json)에 수준별 지침과 기존 인물의 설계 매핑을 저장한다. 이 유형·수준은 심리검사 점수가 아니다. 성향을 바꿔도 기본 인물의 숫자 인지·반응·보행 기준, 상품 취향과 친숙함은 유지한다. 새 배우 지시문은 기존의 상충하는 성격 서술을 공통 성향 지침으로 대체하며 원본 인물 파일은 바꾸지 않는다.
 
+숙고는 실제 관찰한 관련 후보·복수 조건을 살필지, 확인은 다음 목표 전환·불확실한 수량·결제 시 어떤 정보를 대조할지에 반영한다. 낮은 수준도 필요하면 확인할 수 있고 모든 수준은 충분히 명확해지면 멈춘다. 고정된 행동·실수·도움 횟수를 요구하지 않는다. 닫기·이동·대기나 `check` 표기만으로 실제 확인을 대신하지 않는다. 같은 페이지의 후보를 살필 수 있지만 별도 UI 행동 없는 설명은 배우 선언이며 독립적으로 측정한 비교 행동이 아니다.
+
+새 사용자 정의 프로필 버전 `traits-2-<hash>`는 실제 프롬프트를 포함한 작성 내용을 반영한다. 수행 기준·취향·경험이 같으면 비교용 `contextHash`는 유지된다. 카탈로그·작성 지침 변경 후에는 새 runId와 bundle을 사용한다. 과거 저장 자료는 다시 쓰지 않으며, hash가 달라진 과거 run을 현재 코드로 그대로 재측정할 수 있다는 뜻은 아니다.
+
 다음 `prepare_persona_validation` 예시는 같은 기본 맥락에서 확인 성향만 다른 두 인물을 준비한다. 8개 seed × 2조건 × 2인물 = 32칸을 만들며 모델 생성은 자동 실행하지 않는다.
 
 ```json
@@ -42,9 +50,15 @@ Luna 전체 계획 경로는 전체 세계를 전개 계산용 참고 자료로 
 
 반환된 각 `slot.prepareWholeTrace`를 그대로 사용한다. **슬롯마다 새 `gpt-6-luna / low` 문맥**에서 bundle 하나의 전체 계획을 작성·제출하며, 다른 인물·조건·검증 점수를 함께 주지 않는다. 사용자 정의 인물은 검증 manifest에 바인딩된 전체 계획 scope에서만 사용할 수 있고 일반 인물 목록·확률/증분 생성·learner 등록으로 확대되지 않는다. first-play만 사용하며 앱 재생은 별도 요청과 절차다.
 
+새 `authoringGuide` v2는 읽고 선택한 열린 목표와 실제 관찰한 상품의 focus 예시를 제공한다. `null` 예시를 모든 결정에 복사하거나 실제 선택 오류를 정답에 맞춰 수정하지 않는다. 닫기 예시는 그 자체로 확인이 아니다. candidate의 최상위 키는 `candidateVersion`, `requestId`, `decisions` 세 개뿐이다. 입력 식별용 `inputHash`·`snapshotId`·`personaId`·`seed`는 candidate에 추가하지 않는다.
+
 저장 후 `measure_persona_validation({runDirectory})`를 호출한다. 비교 쌍은 `contextHash`가 같고 나머지 네 성향이 같을 때만 만들어지며 동일 조건·seed에서 실제 평가 기회가 있었던 표본을 사용한다. 높은 설정 수준 대비 낮은 수준을 비교하므로 `high-low`뿐 아니라 `high-medium`, `medium-low`도 포함한다. 여러 유형이 함께 다른 집단의 집계는 설명적이다. 위 예제에서 효과 비교 대상은 확인 성향뿐이다. 같은 seed는 비교 식별자이며 native 모델 난수·동일 출력을 보장하지 않는다. 유효 쌍 8개 기준은 생성 슬롯 8개와 다르다. Cliff’s delta는 두 집단 전체 분포를 비교하고 부트스트랩은 seed 쌍을 함께 재표집한다. 인접 수준에도 같은 |delta| ≥ 0.33 기준을 적용하며, 이는 아직 실험적으로 보정하지 않은 설계값이다.
 
 보고서는 네 축을 나눈다: 기술적으로 저장된 trace·누락 슬롯, **전체 목표**의 시도·충족·미시도·종료 결과, 성향 표현, 실제 평가 기회와 근거 충분성. 어려움의 관찰 근거 없이 미완료 목표를 남기고 포기하면 검토 신호를 남기며 자동 성격 실패로 처리하지 않는다. 시도한 목표의 불일치율을 전체 목표 달성률과 혼동하지 않는다. 도움 사용·낮은 정확도·오류/관심 횟수의 분산 0은 검토·정보 신호이며 자동 실패가 아니다. 금지 패턴 실패는 명시된 위반에만 적용한다. 관찰된 행동·작성된 시간·배우 선언도 구분한다. 누락 슬롯에는 미시도와 기술 실패가 함께 포함되므로 별도 요청 기록 없이 생성 실패율을 추정하지 않는다.
+
+작성 가이드 v2 자료의 제출 결과와 `.persona-review.json`에는 선택적 `annotationReview`(`reviewVersion:"actor-annotation-v1"`)가 있다. 닫기와 `check` 표기·focus 불일치에 대해 자체 `status`, `findings`, 결정별 근거, `improvementTarget`, `recommendation`을 제공한다. 상위 review가 `clear`여도 별도 주석 검토는 `review`일 수 있으므로 각각 읽는다. 과거 가이드에 항목이 없다는 사실을 통과로 해석하지 않는다. 검토 신호는 주석 보완용이며 행동 변경·추가 확인·성향 실패를 요구하지 않는다.
+
+측정의 `measurements.perTrace[i].annotationReview`와 JSON 보고서 `annotationReviews[{personaId,condition,seed,tracePath,review}]`에 이 결과를 전달하고, 항목이 없으면 검토 값을 `null`로 둔다. 한국어 보고서 **행동·focus 주석 정합성**에는 발견 근거와 권장 조치가 표시된다.
 
 성향 주 판정은 `behavioralEvidence`만 사용하고 `authoredTiming`은 별도로 보고한다. 작성 시간 차이가 행동 근거의 부족을 보충하지 않는다. 관찰된/예상 비교 수(`exercisedComparisons / expectedComparisons`)를 표시하며, 일부 행동 비교가 미발생이면 나머지가 모두 pass여도 `partial`이다. 모두 미발생이면 `unexercised`, 표본 부족이 하나라도 있으면 `insufficient`로 남긴다.
 
@@ -69,13 +83,13 @@ Luna 전체 계획 경로는 전체 세계를 전개 계산용 참고 자료로 
 
 새 공통 성향 run은 manifest `version:3`이다. `profiles`와 `personaIds`를 모두 생략하면 기존 세 인물을 설계 성향에 매핑한다. 기존 네 ID를 모두 전달하는 과거 `personaIds` 형식은 모드를 생략하면 legacy로 유지한다. 같은 네 ID에 공통 성향을 적용하려면 `validationMode:"traits"`를 명시한다. `validationMode:"legacy"`와 저장된 v2 run은 [기존 네 인물 고정 검증](../market-persona-skill/references/persona-validation.md#legacy-v2--기존-네-인물-고정-검증-절차와-구현-기록)을 유지하며 v2/v3 자료를 섞지 않는다.
 
-공통 성향 구현 테스트와 `allowFixture:true` 자료는 파이프라인 확인용이다. 이 구현으로 새 Luna 파일럿이나 64건 실험을 실행한 것은 아니며, 계획 검증은 실제 앱 수행·DB 수신·사람 행동의 타당성을 증명하지 않는다.
+공통 성향 구현 테스트와 `allowFixture:true` 자료는 파이프라인 확인용이다. 이번 지침 보완으로 새 LLM 실험의 행동 개선 효과를 입증한 것은 아니며, 계획 검증은 실제 앱 수행·DB 수신·사람 행동의 타당성을 증명하지 않는다.
 
 ## Luna 전체 계획 생성
 
 실제 Codex 세션을 `gpt-6-luna` / `low`로 설정하고 지속형 MCP 또는 `node market-simulator/cli.cjs interactive`에서 실행한다. MCP는 모델을 전환하거나 Luna 세션을 자동 생성하지 않는다. 다른 모델의 감독 세션은 사용자가 이양을 허용한 기존 Luna 세션에 전체 계획 작성을 맡긴다. 서버의 모델 라벨은 실제 세션 설정·내부 API 호출 횟수의 증거가 아니다. 전체 계획 생성에는 학교 Qwen 서버·API 키·SSH 터널이 필요하지 않으며 앱 재생·분석은 기존 서비스 연결을 사용한다.
 
-한 인물·한 조건·한 seed·한 request/bundle마다 새 actor 작성 문맥을 사용하고 저부하·고부하 bundle을 같은 문맥에 함께 주지 않는다. `requestId`·`bundle.inputHash`를 후보 출처로 기록하고 `bundle.authoringGuide`(`authoringVersion:"1"`)의 식별 정보·문법·상태 전이 예제를 확인한다. 호스트 MCP는 여러 요청을 관리할 수 있지만 서버가 actor 문맥 분리를 강제하거나 입증하지는 않는다. `taskUpdate`는 한 건도 배열이며 `basis.intent`와 `actorState.activity`의 허용값은 서로 다르다. 직전 행동 결과와 같은 결정의 taskUpdate를 반영한 행동 직전 상태를 작성한다. 세부 규칙은 [작성 시점과 문법 확인](../market-persona-skill/references/whole-trace.md#작성-시점과-문법-확인)을 따른다.
+한 인물·한 조건·한 seed·한 request/bundle마다 새 actor 작성 문맥을 사용하고 저부하·고부하 bundle을 같은 문맥에 함께 주지 않는다. `requestId`·`bundle.inputHash`를 후보 출처로 기록하고 새 `bundle.authoringGuide`(`authoringVersion:"2"`)의 식별 정보·문법·상태 전이 예제를 확인한다. 저장된 가이드 v1은 그대로 보존한다. 호스트 MCP는 여러 요청을 관리할 수 있지만 서버가 actor 문맥 분리를 강제하거나 입증하지는 않는다. `taskUpdate`는 한 건도 배열이며 `basis.intent`와 `actorState.activity`의 허용값은 서로 다르다. 직전 행동 결과와 같은 결정의 taskUpdate를 반영한 행동 직전 상태를 작성한다. 세부 규칙은 [작성 시점과 문법 확인](../market-persona-skill/references/whole-trace.md#작성-시점과-문법-확인)을 따른다.
 
 1. `prepare_whole_trace({personaId,seed,tabId})` 또는 시작 전 `snapshot`/`snapshotFilePath`로 불변 입력 패키지를 준비한다. 출력은 `{requestId,bundle}`이다. `outputPath`, `learnerFile`, `maxRepairs`도 지정할 수 있다.
 2. Luna는 전체 맵·상품·재고·목표를 다음 화면과 행동 결과를 예상하는 세계 참고 자료로 사용한다. 인물의 선택에는 그 시점에 보이는 단서·발견 기억·같은 프로필 JSON의 상세 개인 지침을 사용해 **전체 행동 배열과 단계별 상태·근거를 직접** 작성한다. 아직 읽지 않은 목록·열지 않은 상품 페이지·화면 밖의 미발견 위치는 인물이 알고 있는 사실이 아니다. 코드가 행동마다 정답이나 확률 선택을 대신 넣지 않는다.
@@ -136,9 +150,11 @@ const validation = validateTrace(trace, snapshot);
 
 ## 시험 재생 시간
 
+새 `feedback-choice-v1`은 `activity-duration-v1`을 기록한다. 모든 행동 전 `reactionDelayMs`는 0이고 배우는 `choiceId,durationMs,reason,memory`를 응답한다. 일반 행동의 durationMs는 0, pause/lookAround/readList/browse는 100~120000ms, viewCart/viewHelp는 화면을 연 뒤 확인할 0~120000ms다. 목록 읽기 2초 같은 고정 활동 시간도 배우가 선택한 값으로 대체한다. 실제 보행·드래그·UI 전환·서버 접수 시간은 유지하며 확인 시간과 중복하지 않는다. 구형 delayMs 요청은 거절하고, 이미 저장된 actor-preserved-v1 trace는 기존 의미로 재생한다. [시간 계약과 예시](../market-persona-skill/references/feedback-plan.md#행동-시간)를 참고한다.
+
 `whole-trace-v3`의 `prepare_whole_trace`는 `timingProfile` 기본값과 허용값이 `original`이며 명시적 `compact`는 거절한다. Luna가 판단마다 제출한 `delayMs`와 프로필 보행 기준을 유지하며 임의 시간 지터나 compact 압축을 적용하지 않는다. 완성 trace에는 `generation.timingProfile:"actor-preserved-v1"`·`generation.actorStateVersion:"1"`을 기록한다. 반응 지연은 실제 이동·읽기·드래그·서버 대기와 별개이며 이동은 기존 물리적 보행과 어댑터의 한 번에 32 이하 이동 입력 상한을 계속 따른다. 생성 시간 예산은 판단 시간을 일괄 단축하는 지침이 아니다.
 
-새 `generate_trace`/CLI `generate`의 기본 `timingProfile`은 `compact`다. 행동 계획을 먼저 생성한 뒤 실행 시간만 조정한다. 연속 이동 전 대기는 0ms, 이동 시작 대기는 최대 350ms, 다른 행동 전 대기는 최대 1,500ms이며 이동 속도는 기본 걷기의 최소 75%다. 관찰·읽기·드래그 동작 시간, 경로, 상품 선택, 수량, 도움 요청, 실패/포기 행동은 유지한다. 시간을 맞추기 위해 과제를 조기 종료하거나 로그 시각을 바꾸지 않는다.
+명시적 feedback/whole-trace 정책이 없는 기존 `generate_trace`/CLI `generate`의 기본 `timingProfile`은 `compact`다. 행동 계획을 먼저 생성한 뒤 실행 시간만 조정한다. 연속 이동 전 대기는 0ms, 이동 시작 대기는 최대 350ms, 다른 행동 전 대기는 최대 1,500ms이며 이동 속도는 기본 걷기의 최소 75%다. 관찰·읽기·드래그 동작 시간, 경로, 상품 선택, 수량, 도움 요청, 실패/포기 행동은 유지한다. 시간을 맞추기 위해 과제를 조기 종료하거나 로그 시각을 바꾸지 않는다.
 
 기존 조건 재현에는 `"timingProfile":"original"`을 명시한다. 이미 저장된 trace는 자동으로 바뀌지 않는다. 빠른 trace에는 `generation.timingProfile=compact-v1`과 원래 계획의 `sourceTraceId`를 기록하고 새 trace ID를 부여한다. 이는 시험 속도 설정이며 실제 사람의 수행 시간이나 능력 향상 지표가 아니다. 서로 다른 timing profile의 소요 시간을 학습 효과로 비교하지 않는다.
 
@@ -175,6 +191,10 @@ MARKET_REPLAY_CONFIG=/absolute/path/to/target.local.json node market-simulator/s
 | `list_personas` | 현재 페르소나·버전·파라미터 조회 |
 | `pair_app_session` | allowlist의 appOrigin/backendOrigin/memberId 조합에 일회성 URL 발급 |
 | `list_app_sessions` | 연결된 탭, 계정, 미션 snapshot ID, 재생 준비 상태 조회 |
+| `begin_feedback_plan` | 첫 방문 세션을 만들고 현재 화면·개인·기억의 첫 frame 반환 |
+| `step_feedback_plan` | 단일 선택 적용 후 결과와 다음 frame 반환, 같은 requestId의 중복 실행 방지 |
+| `observe_feedback_plan` | 통신 중단 뒤 현재 frame 복구 |
+| `finalize_feedback_plan` | 완성 파일과 접수·실행 수 및 시간 반환 |
 | `generate_trace` | personaId/seed와 tabId 또는 snapshot 또는 snapshotFilePath로 trace 생성·파일 저장 |
 | `prepare_whole_trace` | 전체 상태·행동 계약·페르소나·확인된 관련 기억을 불변 bundle로 준비 |
 | `submit_whole_trace` | Luna의 전체 후보 배열을 기존 게임 로직으로 컴파일·검증·저장 |

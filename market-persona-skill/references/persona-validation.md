@@ -39,6 +39,10 @@
 
 새 인물은 기본 인물의 숫자 인지·반응·보행 기준, 상품 취향 가중치와 친숙한 상품·카테고리 경험을 유지한다. 기존 프롬프트의 빠른 결정·적은 확인 같은 성격 서술은 새 배우 입력에서 공통 성향 지침으로 대체한다. 원본 프로필은 그대로 둔다. `contextHash`는 성향과 분리한 `capability / preferences / experience`를 식별한다. 같은 기본 인물의 성향만 바꾸면 이 hash와 인지 기준은 변하지 않는다.
 
+숙고·확인 지침은 실제 상황에서 선택할 정보를 구체화한다. 높은 숙고는 관련 후보를 둘 이상 관찰했거나 여러 조건을 고려해야 할 때 후보와 조건을 살핀 뒤 선택하려는 경향이다. 높은 확인은 다음 목표로 넘어갈 때, 수량이 불확실할 때, 결제를 결정할 때 필요한 정보가 보이는 목록·장바구니 등을 다시 대조하려는 경향이다. 낮은 수준도 불확실하면 확인·비교할 수 있고, 모든 수준은 충분히 명확해지면 멈출 수 있다. 정해진 확인·비교 횟수나 느린 반응, 실수, 도움, 포기, 완료를 요구하지 않는다. 매대 닫기·이동·대기나 `check` 표기만으로 정보를 확인한 것으로 쓰지 않는다.
+
+새 사용자 정의 인물의 버전은 `traits-2-<hash>`이며 실제 생성된 프롬프트·성격 서술·구조화된 맥락을 포함한 내용을 hash에 반영한다. 문구가 바뀌면 버전도 바뀌지만, 수행 기준·취향·경험이 같다면 `contextHash`는 유지된다. 카탈로그나 작성 지침을 바꾼 뒤에는 새 runId와 새 bundle로 시작한다. 과거 trace·bundle·manifest·보고서는 다시 쓰지 않는다. 현재 정의와 hash가 달라진 과거 run을 현재 코드로 그대로 재측정할 수 있다는 뜻도 아니다.
+
 ## 2. run 준비와 전체 계획 작성
 
 먼저 확인 성향만 다른 두 인물로 비교를 준비할 수 있다. 다음은 요청 형식 예시이며 실제 생성 결과가 아니다.
@@ -76,9 +80,11 @@
 
 각 빈 슬롯에서 `prepare_whole_trace(slot.prepareWholeTrace)`를 호출한다. **한 인물·한 조건·한 seed·한 request/bundle마다 새 `gpt-6-luna / low` 배우 문맥**을 사용한다. 다른 인물·조건의 bundle이나 검증 점수를 배우에게 함께 주지 않는다. candidate 7 전체 배열을 작성한 뒤 같은 persistent MCP/interactive 프로세스의 `submit_whole_trace`에 제출한다. 원본 requestId·bundle.inputHash를 기록하고 [전체 계획 절차](whole-trace.md)의 관찰·작성·기술 수정 제한을 따른다. `attentionExperience`는 `{ "visit": "first-play" }`이며 learner/trial을 사용하지 않는다.
 
+새 bundle의 `authoringGuide.authoringVersion:"2"`는 상황별 실제 focus 예시를 제공한다. 열린 목표를 처리한다면 그 목표를, 관찰한 상품을 살피거나 고른다면 그 상품을 기록한다. 아직 읽지 않은 목표나 관찰하지 않은 상품으로 focus를 채우지 않고, 실제 관심 구매나 잘못된 선택을 정답에 맞춰 고치지 않는다. `null`은 현재 해당 집중 대상이 없다는 뜻이며 모든 행동의 기본값으로 복사하지 않는다. 매대를 닫는 예시도 자동으로 `check`가 되지 않는다. candidate 최상위 키는 `candidateVersion`, `requestId`, `decisions` 세 개뿐이며 입력 확인용 `inputHash`·`snapshotId`·`personaId`·`seed`를 추가하지 않는다. 저장된 과거 가이드와 후보는 새 형식으로 덮어쓰지 않는다.
+
 사용자 정의 프로필과 대조군은 바인딩된 검증 슬롯의 전체 계획 전용 scope에서만 조회한다. 일반 `list_personas`·`getPersona`·`generate_trace`·learner 등록으로 인물 목록을 확대하지 않는다. 슬롯의 인물·seed·snapshot·출력 경로와 버전이 일치해야 하며, 비동기 요청 간 프로필도 분리한다. 실패나 수정 요청은 별도 생성 기록에 보존하고 성공 표본만 골라 숨기지 않는다. 보고서의 `missingSlots`에는 미시도와 기술 실패가 함께 포함되므로 이것만으로 실패율을 계산할 수 없다.
 
-같은 조건·seed는 비교를 묶는 실험 식별자다. 새 Luna 호출의 native 난수를 고정하거나 동일 출력을 보장하지 않는다. 부트스트랩 계산의 seed 재현성과 모델 생성의 재현성을 구분한다. 이번 공통 성향 구현은 테스트·fixture로 계약을 확인했으며, 새 Luna 성향 파일럿이나 64건 실험을 실행했다는 뜻이 아니다.
+같은 조건·seed는 비교를 묶는 실험 식별자다. 새 Luna 호출의 native 난수를 고정하거나 동일 출력을 보장하지 않는다. 부트스트랩 계산의 seed 재현성과 모델 생성의 재현성을 구분한다. 테스트·fixture는 계약을 확인하며 모델 파일럿을 대신하지 않는다. 실제 생성 표본 수·성공·실패와 행동 결과는 별도 실행 기록으로 확인한다.
 
 ## 3. 공통 지표와 네 평가 축
 
@@ -96,6 +102,8 @@
 
 `interestRecoveryRate`는 미완료 목표가 남은 관심 구간 이후의 복귀를 설명적으로 기록한다. 자기 결정·수정·목표 달성 같은 능력을 다른 인물보다 낮게 보여야 성격에 충실하다고 판정하지 않는다. 실제 행동 근거, 작성 시간(`authored-timing`), 배우 선언(`actor-declaration`)을 구분하고 조건·step 근거를 함께 남긴다.
 
+같은 페이지에 이미 보이는 후보를 살피는 것도 가능한 선택이다. 다만 별도 UI 행동 없이 작성한 주의·비교 설명은 배우 선언이며 독립적으로 관측된 비교 행동이 아니다. `comparisonRate`가 이를 모두 측정하는 것으로 해석하지 않고, 점수를 채우기 위해 불필요한 페이지 이동을 요구하지 않는다.
+
 보고서는 다음 네 축을 분리한다.
 
 | 축 | 보고 내용 |
@@ -108,6 +116,10 @@
 남은 목표가 있는데 기록된 오류나 표시 불일치 없이 포기하면 `terminationReview`에 검토 신호를 남긴다. 선언된 불확실성은 따로 보여준다. 이것은 상황을 더 살펴보라는 신호이며 포기 자체를 기술 실패·성격 실패로 확정하지 않는다. 기록만으로 모든 중단 이유를 알 수 없다는 한계도 남긴다.
 
 오류나 관심 횟수의 분산 0, 도움 사용, 익숙한 선택에서의 낮은 정확도만으로 자동 실패하지 않는다. 도움·정확도 관련 신호는 `reviewSignals`, 집합 분포 진단은 `diagnosticWarnings`에 검토·정보로 남긴다. 금지 패턴의 실패 판정에는 명확한 피드백 뒤 같은 오선택 반복과 역할·장애를 직접 언급하는 등 코드에 명시된 위반만 사용하며, 해당 trace 수는 `violationTraces`로 별도 보고한다. 오류 없이 완료한 표본에 실수를 강제하지 않으며, 금지 패턴 검사 통과를 전체 충실도 통과로 읽지 않는다.
+
+새 작성 가이드 v2로 생성한 자료에는 제출 결과와 `.persona-review.json`의 선택적 `annotationReview`가 추가된다. `reviewVersion:"actor-annotation-v1"`이며 자체 `status:"clear"|"review"`와 `findings`를 읽는다. 닫기만 수행한 `check` 표기나 focus 불일치에 대해 결정 번호·실제 행동·선언 근거와 함께 `improvementTarget`(`activity-annotation` 또는 `focus-annotation`), `recommendation`을 제공한다. 이는 주석 작성의 개선 지점을 찾는 사후 검토이며 행동을 변경하거나 성향 실패를 확정하지 않는다. 이미 보이는 화면을 암묵적으로 살폈을 가능성은 남고, 경고를 없애려고 확인 행동을 추가하지 않는다. 상위 persona review의 `status:"clear"`만 보고 이 별도 검토도 clear라고 판단하지 않는다. 과거 가이드 자료에는 이 항목이 없을 수 있으며 부재를 통과로 해석하지 않는다.
+
+측정 결과에서는 `measurements.perTrace[i].annotationReview`로 전달하며 자료에 없으면 `null`이다. JSON 보고서의 `annotationReviews`는 `{personaId, condition, seed, tracePath, review}` 목록이며 `review`는 해당 주석 검토 또는 `null`이다. 한국어 보고서의 **행동·focus 주석 정합성**에서 결정별 신호와 권장 조치를 확인한다. 성향 표현 지표와 별도로 읽어 생성 지침 문제인지 상태 주석 문제인지 구분한다.
 
 ## 4. 성향 비교와 충분성 판정
 
@@ -162,7 +174,7 @@ A는 행동·대상·순서·작성된 행동 전 대기시간을 제공하고, 
 
 `persona_validation_report({"runDirectory":"/absolute/output/checking-contrast-01"})`는 `report.json`과 `report.ko.md`를 만든다. 저장된 최신 측정과 블라인드 표본이 일치해야 하며, 미채점은 그대로 표시한다. 이 보고서는 전체 계획의 설계 성향 표현을 평가하며 앱 재생·DB 수신·실제 사람의 행동을 검증하지 않는다.
 
-`allowFixture:true`는 측정·블라인드 준비의 테스트 전용 옵션이다. 확률 fixture와 Luna 전체 계획을 섞지 않으며, `fixtureOnly:true` 자료를 독립 모델 표본이나 실제 파일럿 결과로 해석하지 않는다. 공통 성향 구현은 프로필 검증·비동기 scope 격리·지표 분모·익명화·채점·호환 경로의 테스트를 포함하지만 모델 파일럿 실행을 대신하지 않는다.
+`allowFixture:true`는 측정·블라인드 준비의 테스트 전용 옵션이다. 확률 fixture와 Luna 전체 계획을 섞지 않으며, `fixtureOnly:true` 자료를 독립 모델 표본이나 실제 파일럿 결과로 해석하지 않는다. 공통 성향 구현은 프로필 검증·비동기 scope 격리·지표 분모·익명화·채점·호환 경로의 테스트를 포함하지만 모델 파일럿 실행을 대신하지 않는다. 이번 성향·작성 지침 보완 역시 새 LLM 실험으로 행동 개선 효과를 입증했다는 의미가 아니다.
 
 주요 구현은 [공통 프로필](../../market-simulator/src/personaTraitProfiles.cjs), [v3 run](../../market-simulator/src/personaTraitValidationRun.cjs), [모드 분기](../../market-simulator/src/personaValidationRun.cjs), [지표](../../market-simulator/src/personaValidationMetrics.cjs), [블라인드](../../market-simulator/src/personaValidationBlind.cjs)에 있다. 기존 v2 run은 [legacy 구현](../../market-simulator/src/personaValidationLegacyRun.cjs)에 보존한다.
 

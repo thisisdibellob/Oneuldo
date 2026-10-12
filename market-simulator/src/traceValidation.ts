@@ -21,7 +21,7 @@ export class TraceGuard {
   private readonly presentation;
   private readonly mission;
   private readonly helpLines;
-  constructor(snapshot: MarketReplaySnapshot, personaId = 'trace-validator', personaVersion = '1', model = 'trace-validation/1', private readonly attentionMode = false, private readonly extendedActor = false) {
+  constructor(snapshot: MarketReplaySnapshot, personaId = 'trace-validator', personaVersion = '1', model = 'trace-validation/1', private readonly attentionMode = false, private readonly extendedActor = false, private readonly feedbackMode = false) {
     const valid = validateMarketReplaySnapshot(snapshot);
     if (!valid.valid) throw new Error(valid.errors.join('; '));
     this.adapter = createMarketAgentAdapter({ ...snapshot.config,
@@ -153,10 +153,10 @@ export class TraceGuard {
       case 'pause': case 'lookAround': this.time += step.durationMs; break;
       case 'viewHelp':
         if (before.phase !== 'shopping' || before.view !== 'world' || before.activeStation) throw new Error(`${step.id}: help requires the visible world HUD button`);
-        apply({ type: 'viewHelp' }); break;
+        apply({ type: 'viewHelp' }); this.time += step.durationMs ?? 0; break;
       case 'viewCart':
         if (before.phase !== 'shopping' || before.view !== 'world' || before.activeStation && !before.products.length) throw new Error(`${step.id}: cart requires the world HUD or shelf cart button`);
-        apply({ type: 'viewCart' }); break;
+        apply({ type: 'viewCart' }); this.time += step.durationMs ?? 0; break;
       case 'closeView':
         if (before.view === 'world') throw new Error(`${step.id}: there is no visible view to close`);
         apply({ type: 'closeView' }); break;
@@ -192,6 +192,13 @@ export class TraceGuard {
       ...(this.extendedActor && step.type === 'talkToStaff' && step.choice === 'returnProduct'
         ? { message: marketReturnResponse(getMarketProduct(step.productId!)!.name, step.quantity!) } : {}),
     };
+    // A valid gesture can fail to add an item. This is observable basket feedback,
+    // not an engine exception, hidden goal comparison, or fabricated UI error.
+    if (this.feedbackMode && step.type === 'dragProduct' && step.gesture.outcome !== 'drop') {
+      this.lastResult.accepted = false;
+      this.lastResult.quantity = 0;
+      this.lastResult.message = '상품이 장바구니에 담기지 않았어요.';
+    }
     return { before, after, actions, movementMs };
   }
 }
@@ -203,7 +210,8 @@ export function validateTrace(value: unknown, snapshot?: MarketReplaySnapshot) {
   try {
     const trace = value as MarketReplayTrace;
     const guard = new TraceGuard(snapshot, trace.personaId, trace.personaVersion, trace.generation?.model, trace.traceSchemaVersion === '2',
-      ['episodic-choice-v9', 'episodic-choice-v10', 'whole-trace-v3'].includes(trace.generation?.actorPolicyVersion ?? ''));
+      ['episodic-choice-v9', 'episodic-choice-v10', 'feedback-choice-v1', 'whole-trace-v3'].includes(trace.generation?.actorPolicyVersion ?? ''),
+      trace.generation?.actorPolicyVersion === 'feedback-choice-v1');
     const completion = trace.generation?.systemCompletion;
     for (const step of trace.steps) {
       const systemOwned = isMarketReplaySystemCompletionStep(trace, step.id);

@@ -13,21 +13,27 @@ const actionFields: Record<string, string[]> = {
   pause: ['durationMs'], lookAround: ['durationMs'],
 };
 const legacyActionFields = Object.fromEntries(Object.entries(actionFields).filter(([type]) => !['walkToAnchor', 'readList', 'browse', 'pause', 'lookAround'].includes(type)));
-export function assertDecision(value: unknown): asserts value is Decision {
+export function assertDecision(value: unknown, feedbackTiming = false): asserts value is Decision {
   const d = value as Decision;
   if (!d || typeof d !== 'object' || !d.action || !Object.prototype.hasOwnProperty.call(actionFields, d.action.type)) throw new Error('Decision contains an unsupported agent action.');
   const action = d.action as unknown as Record<string, unknown>;
-  for (const key of Object.keys(action)) if (!['type', ...actionFields[d.action.type]].includes(key)) throw new Error(`Unexpected action field: ${key}`);
-  if (!Number.isInteger(d.delayMs) || d.delayMs < 1 || d.delayMs > 120000) throw new Error('Decision delayMs must be 1..120000.');
+  const panelTiming = feedbackTiming && ['viewCart', 'viewHelp'].includes(d.action.type);
+  for (const key of Object.keys(action)) if (!['type', ...actionFields[d.action.type], ...(panelTiming ? ['durationMs'] : [])].includes(key)) throw new Error(`Unexpected action field: ${key}`);
+  if (feedbackTiming ? d.delayMs !== 0 : !Number.isInteger(d.delayMs) || d.delayMs < 1 || d.delayMs > 120000)
+    throw new Error(feedbackTiming ? 'Feedback decision delayMs must be 0; use an explicit timed activity.' : 'Decision delayMs must be 1..120000.');
   if (typeof d.reason !== 'string' || !d.reason.trim() || d.reason.length > 1000) throw new Error('Decision reason must be a short string.');
   if ((d.action.type === 'interact' || d.action.type === 'walkTo') && typeof d.action.station !== 'string') throw new Error('interact requires station.');
   if (['add', 'remove', 'requestReturn'].includes(d.action.type) && typeof action.productId !== 'string') throw new Error('Item action requires productId.');
   if (action.quantity !== undefined && (!Number.isInteger(action.quantity) || Number(action.quantity) < 1 || Number(action.quantity) > 99)) throw new Error('quantity must be an integer 1..99.');
   if (d.action.type === 'walkToAnchor' && (typeof action.anchorId !== 'string' || !/^anchor-[a-f0-9]{8}$/.test(action.anchorId))) throw new Error('walkToAnchor requires a visible anchor ID');
+  const durationLimit = feedbackTiming ? 120000 : 30000;
   if (['readList', 'browse', 'pause', 'lookAround'].includes(d.action.type)
-    && (!Number.isInteger(action.durationMs) || Number(action.durationMs) < 1 || Number(action.durationMs) > 30000)) throw new Error('durationMs must be 1..30000');
+    && (!Number.isInteger(action.durationMs) || Number(action.durationMs) < (feedbackTiming ? 100 : 1) || Number(action.durationMs) > durationLimit)) throw new Error(`durationMs must be ${feedbackTiming ? 100 : 1}..${durationLimit}`);
+  if (panelTiming && action.durationMs !== undefined
+    && (!Number.isInteger(action.durationMs) || Number(action.durationMs) < 0 || Number(action.durationMs) > durationLimit)) throw new Error('Panel durationMs must be 0..120000');
   if (d.action.type === 'browse' && (typeof action.scrollFraction !== 'number' || !Number.isFinite(action.scrollFraction) || action.scrollFraction < 0 || action.scrollFraction > 1)) throw new Error('browse requires scrollFraction 0..1');
   if (d.currentTask !== undefined && (typeof d.currentTask !== 'string' || d.currentTask.length > 160)) throw new Error('currentTask must be a short task intention, not reasoning.');
+  if (d.dragOutcome !== undefined && (d.action.type !== 'add' || !['drop','miss','cancel'].includes(d.dragOutcome))) throw new Error('dragOutcome requires a supported add gesture');
   if (d.attentionTag !== undefined && (typeof d.attentionTag !== 'string' || d.attentionTag.length > 100)) throw new Error('Invalid attentionTag');
   if (d.cueRefs !== undefined && (!Array.isArray(d.cueRefs) || d.cueRefs.length > 20 || d.cueRefs.some(x => typeof x !== 'string' || !x.length || x.length > 200))) throw new Error('Invalid cueRefs');
 }
@@ -35,7 +41,7 @@ export function assertDecision(value: unknown): asserts value is Decision {
 /** Same HTTP contract as the legacy provider, with actor-only input and externally owned memory. */
 export const LEGACY_ACTOR_POLICY_VERSION = 'episodic-choice-v4' as const;
 export function isExtendedActorPolicy(policy?: string): boolean {
-  return ['episodic-choice-v9', 'episodic-choice-v10', 'whole-trace-v3'].includes(policy ?? '');
+  return ['episodic-choice-v9', 'episodic-choice-v10', 'feedback-choice-v1', 'whole-trace-v3'].includes(policy ?? '');
 }
 export function attentionActorPolicyVersion(options: Pick<TraceOptions, 'actorPolicyVersion' | 'learnerIdentity' | 'attentionExperience'>) {
   return options.actorPolicyVersion ?? options.learnerIdentity?.policyVersion
