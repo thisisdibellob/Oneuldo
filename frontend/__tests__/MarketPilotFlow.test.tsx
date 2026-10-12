@@ -3,6 +3,7 @@ import { Platform } from 'react-native';
 import { getMarketAiQuest } from '../src/api/marketPersonalization';
 import { createMarketEnvironment } from '../src/game/marketEnvironment';
 import { getMarketEnvironmentContext } from '../src/game/marketEnvironmentPlan';
+import { getMarketRuntimeContext } from '../src/game/marketAdaptivePlan';
 import { buildMarketScenarioMission } from '../src/game/scenarios';
 import { HARD_BASELINE_SCENARIO_ID, pilotScenario } from '../src/replay/pilotScenario';
 import { HARD_SHARED_ENVIRONMENT_ID, pilotEnvironment, pilotSessionConfig } from '../src/replay/pilotEnvironment';
@@ -89,7 +90,10 @@ test('hard baseline is STATIC at difficulty 2; AI round applies its plan and the
     pilotWindow.location.search = query();
     await enter(view);
     const practice = props();
-    expect(jest.mocked(getMarketAiQuest).mock.calls[0][1]).toEqual(getMarketEnvironmentContext(before.environment!, false));
+    expect(jest.mocked(getMarketAiQuest).mock.calls[0][1]).toEqual({
+      ...getMarketEnvironmentContext(before.environment!, false),
+      runtimeContext: getMarketRuntimeContext(before.environment!, {}),
+    });
     expect(practice.environment?.config.shelfOrder).toEqual(generation.quest.environmentPlan.shelfOrder);
     expect(practice.environment?.employees).toEqual(before.environment?.employees);
     expect(practice.environment?.customers).toEqual(before.environment?.customers);

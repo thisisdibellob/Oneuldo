@@ -11,6 +11,7 @@ import oneuldo.behaviorlog.analysis.domain.AiBehaviorAnalysis;
 import oneuldo.behaviorlog.analysis.domain.AiBehaviorAnalysisResponse;
 import oneuldo.behaviorlog.analysis.service.AnalysisTokenBudget;
 import oneuldo.behaviorlog.analysis.service.LosslessHistoryEncoding;
+import oneuldo.behaviorlog.analysis.service.FinalSourceEncoding;
 import oneuldo.behaviorlog.personalization.service.MarketAiDifficultyValidator;
 import oneuldo.behaviorlog.personalization.service.PracticeHistoryService;
 import oneuldo.behaviorlog.profile.domain.AiUserProfile;
@@ -51,7 +52,7 @@ class AiUserProfileSourceSessionRegressionTest {
         when(profiles.findByIdAndMemberIdAndStatus(actualPrior.getId(), member, "READY"))
                 .thenReturn(Optional.of(actualPrior));
         var saved = update(contaminated);
-        var prompt = mapper.readTree(saved.getInputPrompt());
+        var prompt = new FinalSourceEncoding(mapper).decode(mapper.readTree(saved.getInputPrompt()));
 
         assertThat(prompt.path("sameSessionReanalysis").asBoolean()).isTrue();
         assertThat(prompt.path("profileUpdateKind").asString()).isEqualTo("REINTERPRET_EXISTING_PLAY");
@@ -80,7 +81,7 @@ class AiUserProfileSourceSessionRegressionTest {
         when(profiles.findByIdAndMemberIdAndStatus(original.getId(), member, "READY"))
                 .thenReturn(Optional.of(original));
         var saved = update(laterDistinct, true);
-        var prompt = mapper.readTree(saved.getInputPrompt());
+        var prompt = new FinalSourceEncoding(mapper).decode(mapper.readTree(saved.getInputPrompt()));
 
         assertThat(prompt.path("sameSessionReanalysis").asBoolean()).isTrue();
         assertFreshSourceInput(prompt);
@@ -105,7 +106,7 @@ class AiUserProfileSourceSessionRegressionTest {
         var earlier = stored(1, null, currentSession, oldDataset,
                 "이전 성공을 재현했고 두 번째 성공으로 안정적 유지와 숙달을 보였다", currentEvent);
         var saved = update(earlier);
-        var prompt = mapper.readTree(saved.getInputPrompt());
+        var prompt = new FinalSourceEncoding(mapper).decode(mapper.readTree(saved.getInputPrompt()));
 
         assertThat(saved.getSourceDatasetId()).isNotEqualTo(earlier.getSourceDatasetId());
         assertThat(saved.getSourceAnalysisId()).isNotEqualTo(earlier.getSourceAnalysisId());
@@ -117,7 +118,7 @@ class AiUserProfileSourceSessionRegressionTest {
     @Test void missing_profile_link_does_not_assert_a_new_play_or_reuse_unverifiable_claims() {
         var latest = stored(3, UUID.randomUUID(), priorSession, priorDataset,
                 "이전 성공을 재현했고 두 번째 성공으로 안정적 유지와 숙달을 보였다", priorEvent);
-        var prompt = mapper.readTree(update(latest).getInputPrompt());
+        var prompt = new FinalSourceEncoding(mapper).decode(mapper.readTree(update(latest).getInputPrompt()));
 
         assertThat(prompt.path("sameSessionReanalysis").asBoolean()).isFalse();
         assertThat(prompt.path("sourceHistoryComplete").asBoolean()).isFalse();
@@ -143,7 +144,7 @@ class AiUserProfileSourceSessionRegressionTest {
                 "이전 성공을 재현했고 두 번째 성공으로 안정적 유지와 숙달을 보였다", priorEvent);
         when(profiles.findByIdAndMemberIdAndStatus(original.getId(), member, "READY"))
                 .thenReturn(Optional.of(original));
-        var prompt = mapper.readTree(update(repeated).getInputPrompt());
+        var prompt = new FinalSourceEncoding(mapper).decode(mapper.readTree(update(repeated).getInputPrompt()));
 
         assertThat(prompt.path("sameSessionReanalysis").asBoolean()).isFalse();
         assertThat(prompt.path("profileUpdateKind").asString()).isEqualTo("ADD_DISTINCT_SOURCE_SESSION");

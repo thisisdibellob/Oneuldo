@@ -79,35 +79,32 @@ class MarketQuestTextFieldFeedbackTest {
         }
     }
 
-    @Test void preserved_missing_description_then_rationle_typo_retries_three_times_until_ai_supplies_correct_keys() throws Exception {
-        var failures = firstTwoFailures();
-        var corrected = validSource(); String correctedRaw = mapper.writeValueAsString(corrected);
-        var harness = new Harness();
-        when(harness.client.complete(anyString(), anyString(), eq(1200), eq(0.2))).thenReturn(
-                output(failures.get(0)), output(failures.get(1)), output(correctedRaw));
-        var response = harness.service.generate(harness.member);
-        var prompts = ArgumentCaptor.forClass(String.class);
-        verify(harness.client, times(3)).complete(anyString(), prompts.capture(), eq(1200), eq(0.2));
-        verify(harness.client).complete(anyString(), anyString(), eq(MarketAiQuestService.REVIEW_MAX_TOKENS), eq(0.0));
-        assertThat(prompts.getAllValues().get(1)).contains("INVALID_TEXT_LENGTH", "/description", "requiredKey", "submittedMissing", "Apply requiredKey/expectedType/length/numeric bounds");
-        assertThat(prompts.getAllValues().get(2)).contains("/environmentPlan/rationale", "rationale", "submittedMissing", "requiredKey");
-        assertThat(prompts.getAllValues().get(1)).contains("Rejected candidate data", mapper.writeValueAsString(mapper.readTree(failures.get(0))));
-        assertThat(prompts.getAllValues().get(2)).contains("Rejected candidate data", mapper.writeValueAsString(mapper.readTree(failures.get(1))));
-        assertThat(response.quest().description()).isEqualTo(corrected.path("description").asString());
-        assertThat(response.quest().environmentPlan().rationale()).isEqualTo(corrected.path("environmentPlan").path("rationale").asString());
-        assertThat(response.promptVersion()).isEqualTo(MarketAiQuestPromptFactory.PROMPT_VERSION);
-        @SuppressWarnings("unchecked") var attempts = (ArgumentCaptor<List<MarketAiQuestGeneration.Attempt>>)(ArgumentCaptor<?>)ArgumentCaptor.forClass(List.class);
-        verify(harness.audit).record(eq(harness.member), any(), eq(response), any(), attempts.capture(), isNull(), anyString());
-        assertThat(attempts.getValue()).hasSize(3);
+    @Test void two_invalid_text_candidates_stop_at_the_bound_with_original_diagnostics() throws Exception {
+        var failures=firstTwoFailures();var harness=new Harness();
+        when(harness.client.complete(anyString(),anyString(),eq(1200),eq(0.2)))
+            .thenReturn(output(failures.get(0)),output(failures.get(1)));
+        assertThatThrownBy(()->harness.service.generate(harness.member)).isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+        verify(harness.client,times(2)).complete(anyString(),anyString(),eq(1200),eq(0.2));
+        verify(harness.client,never()).complete(anyString(),anyString(),eq(MarketAiQuestService.REVIEW_MAX_TOKENS),eq(0.0));
+        @SuppressWarnings("unchecked") var attempts=(ArgumentCaptor<List<MarketAiQuestGeneration.Attempt>>)(ArgumentCaptor<?>)ArgumentCaptor.forClass(List.class);
+        verify(harness.audit).record(eq(harness.member),any(),argThat(r->r.quest()==null),isNull(),attempts.capture(),eq("AI_QUEST_FAILED"),anyString());
+        assertThat(attempts.getValue()).hasSize(2);
         assertThat(attempts.getValue().get(0).rawOutput()).isEqualTo(failures.get(0));
         assertThat(attempts.getValue().get(1).rawOutput()).isEqualTo(failures.get(1));
-        assertThat(attempts.getValue().get(2).rawOutput()).isEqualTo(correctedRaw);
-        assertThat(attempts.getValue().get(0).validationDetails()).containsEntry("path", "/description");
-        assertThat(attempts.getValue().get(1).validationDetails()).containsEntry("path", "/environmentPlan/rationale");
-        assertThat(mapper.readTree(failures.get(0)).has("description")).isFalse();
-        assertThat(mapper.readTree(failures.get(1)).path("environmentPlan").has("rationale")).isFalse();
-        assertThat(mapper.readTree(failures.get(1)).path("environmentPlan").has("rationle")).isTrue();
-        evidence(failures, correctedRaw, prompts.getAllValues(), attempts.getValue());
+        assertThat(attempts.getValue().get(0).validationDetails()).containsEntry("path","/description");
+        assertThat(attempts.getValue().get(1).validationDetails()).containsEntry("path","/environmentPlan/rationale");
+    }
+
+    @Test void each_text_error_is_repaired_within_the_bound_without_server_supplied_text() throws Exception {
+        for(var failed:firstTwoFailures()) {
+            var harness=new Harness();var correct=validSource();
+            when(harness.client.complete(anyString(),anyString(),eq(1200),eq(0.2)))
+                .thenReturn(output(failed),output(mapper.writeValueAsString(correct)));
+            var result=harness.service.generate(harness.member);
+            assertThat(result.quest().description()).isEqualTo(correct.path("description").asString());
+            assertThat(result.quest().environmentPlan().rationale()).isEqualTo(correct.path("environmentPlan").path("rationale").asString());
+            verify(harness.client,times(2)).complete(anyString(),anyString(),eq(1200),eq(0.2));
+        }
     }
 
     @Test void previous_v22_cached_quest_is_not_returned_as_v23_validated_content() {

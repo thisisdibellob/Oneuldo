@@ -131,7 +131,7 @@ test('legacy observation defaults remain byte-identical to explicit opt-out and 
 
 test('restored checkout copy matches the actual aiAssessment screen source', () => {
   const source = fs.readFileSync(path.join(__dirname, '../../frontend/src/screens/MarketSimulationScreen.tsx'), 'utf8');
-  const block = source.slice(source.indexOf('{aiAssessment && review === null'), source.indexOf('{!aiAssessment && !briefing && session.phase'));
+  const block = source.slice(source.indexOf('{aiAssessment && !adaptiveAssessment && review === null'), source.indexOf('{!aiAssessment && !briefing && session.phase'));
   for (const text of Object.values(FEEDBACK_CHECKOUT_SCREEN_TEXT)) assert.ok(block.includes(text), text);
   assert.match(block, /<CartContents cart=\{session\.cart\}/);
   assert.match(block, /text="구매 확정"/);

@@ -42,7 +42,7 @@ class Actual15PostFixRegressionTest {
         }
         Files.writeString(root.resolve("post-fix-long-budgets.json"),mapper.writeValueAsString(results));
         for(var row:results)assertThat((int)row.get("required")+768).as("case %s including repair reserve",row.get("fixture")).isLessThanOrEqualTo(18000);
-        for(var row:results)assertThat((int)row.get("draftRequired")).as("case %s actual final draft",row.get("fixture")).isLessThanOrEqualTo(18000);
+        for(var row:results)assertThat((int)row.get("draftRequired")).as("case %s actual final draft in current 24K preset",row.get("fixture")).isLessThanOrEqualTo(24000);
     }
     @Test void actual_profile_overflow_fits_after_only_instruction_compaction() throws Exception {
         org.junit.jupiter.api.Assumptions.assumeTrue(Files.exists(root.resolve("profile-source-failed.json")));

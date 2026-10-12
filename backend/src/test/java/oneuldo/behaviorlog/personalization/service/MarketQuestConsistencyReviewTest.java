@@ -122,16 +122,16 @@ class MarketQuestConsistencyReviewTest {
         assertThat(validator.validateConsistencyReview(mapper, approval, input)).containsEntry("code", "AI_QUEST_CONSISTENCY_REVIEWED");
     }
 
-    @Test void five_candidates_are_bounded_to_two_independent_reviews_each_without_an_automatic_quest() {
+    @Test void two_candidates_are_bounded_to_two_independent_reviews_each_without_an_automatic_quest() {
         var chosen = draft("총 10개로 수량 복잡도를 높여요.");
         var harness = new Harness(historyPrompt(chosen));
         when(harness.client.complete(anyString(), anyString(), eq(1200), eq(0.2))).thenReturn(output(chosen));
         when(harness.client.complete(anyString(), anyString(), eq(MarketAiQuestService.REVIEW_MAX_TOKENS), eq(0.0))).thenAnswer(call -> rejectedReview(call.getArgument(1)));
         assertThatThrownBy(() -> harness.service.generate(harness.member)).isInstanceOf(ResponseStatusException.class);
-        verify(harness.client, times(5)).complete(anyString(), anyString(), eq(1200), eq(0.2));
-        verify(harness.client, times(10)).complete(anyString(), anyString(), eq(MarketAiQuestService.REVIEW_MAX_TOKENS), eq(0.0));
+        verify(harness.client, times(2)).complete(anyString(), anyString(), eq(1200), eq(0.2));
+        verify(harness.client, times(4)).complete(anyString(), anyString(), eq(MarketAiQuestService.REVIEW_MAX_TOKENS), eq(0.0));
         verify(harness.audit).record(eq(harness.member), any(), argThat(r -> r.quest() == null && r.source().equals("FAILED")), isNull(),
-                argThat(attempts -> attempts.size() == 5 && attempts.stream().allMatch(a -> a.validationDetails().get("code").equals("AI_QUEST_CONSISTENCY_MISMATCH"))),
+                argThat(attempts -> attempts.size() == 2 && attempts.stream().allMatch(a -> a.validationDetails().get("code").equals("AI_QUEST_CONSISTENCY_MISMATCH"))),
                 eq("AI_QUEST_FAILED"), anyString());
     }
 
