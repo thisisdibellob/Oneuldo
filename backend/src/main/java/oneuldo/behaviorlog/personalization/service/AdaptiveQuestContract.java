@@ -86,6 +86,25 @@ public class AdaptiveQuestContract {
     }
     private void citations(JsonNode values,Set<String> allowed,String path,boolean required){if(!values.isArray()||values.size()>12||(required&&values.isEmpty()))throw problem(path,"CITATION_COUNT:"+(required?"1":"0")+"..12");for(var v:values)if(!v.isString()||!allowed.contains(v.asString()))throw problem(path,"UNKNOWN_EVENT_CITATION");}
     private void shape(JsonNode n,String p,List<String> keys){if(!n.isObject()||n.size()!=keys.size())throw problem(p,"EXACT_KEYS_REQUIRED:"+keys);for(String k:keys)if(!n.has(k))throw problem(p+"/"+k,"REQUIRED");}
+    /** Collect independent existing constraints so a single repair can fix coexisting errors. */
+    public List<Map<String,Object>> independentSettingIssues(JsonNode raw){
+        var issues=new ArrayList<Map<String,Object>>();if(!raw.isObject())return issues;
+        for(var field:Map.of("title",40,"description",120,"successMessage",80,"adaptationSummary",MarketAiQuestValidator.ADAPTATION_SUMMARY_MAX_LENGTH).entrySet())
+            collect(issues,()->text(raw.path(field.getKey()),field.getValue(),"/"+field.getKey()));
+        if(raw.path("environmentPlan").isObject())collect(issues,()->text(raw.path("environmentPlan").path("rationale"),160,"/environmentPlan/rationale"));
+        for(String field:List.of("briefing","checkoutDialogue"))if(raw.path(field).isArray())for(int i=0;i<raw.path(field).size();i++){int index=i;collect(issues,()->text(raw.path(field).get(index),80,"/"+field+"/"+index));}
+        var runtime=raw.path("runtimePlan");var environment=runtime.path("environment");var learning=runtime.path("learning");
+        if(environment.isObject())for(String field:List.of("employeeCount","customerCount","pillarCount","chairCount","cashierCount"))collect(issues,()->range(environment,field,policy().path(field),"/runtimePlan/environment"));
+        if(learning.isObject())collect(issues,()->range(learning,"choiceBudget",policy().path("choiceBudget"),"/runtimePlan/learning"));
+        if(runtime.isObject()){
+            collect(issues,()->range(runtime,"stockPerProduct",policy().path("stockPerProduct"),"/runtimePlan"));
+            for(String field:List.of("alarmPenaltyPoints","wrongWayPenaltyPoints","cashierRequestPenaltyPoints"))collect(issues,()->range(runtime,field,policy().path("penaltyPoints"),"/runtimePlan"));
+            if(runtime.path("stockOverrides").isObject())for(String id:runtime.path("stockOverrides").propertyNames())collect(issues,()->integer(runtime.path("stockOverrides").path(id),0,20,"/runtimePlan/stockOverrides/"+id));
+        }
+        if(raw.path("objectives").isArray())for(int i=0;i<raw.path("objectives").size();i++){int index=i;collect(issues,()->integer(raw.path("objectives").get(index).path("quantity"),1,3,"/objectives/"+index+"/quantity"));}
+        return List.copyOf(issues);
+    }
+    private void collect(List<Map<String,Object>> issues,Runnable check){try{check.run();}catch(MarketQuestValidationException error){issues.add(error.details());}}
     private void range(JsonNode n,String k,JsonNode bounds,String p){integer(n.path(k),bounds.path(0).asInt(),bounds.path(1).asInt(),p+"/"+k);}
     private void integer(JsonNode n,int min,int max,String p){if(!n.isIntegralNumber()||!n.canConvertToInt()||n.asInt()<min||n.asInt()>max)throw problem(p,"INTEGER_RANGE:"+min+".."+max);}
     private void choice(JsonNode n,String k,List<String> values,String p){if(!n.path(k).isString()||!values.contains(n.path(k).asString()))throw problem(p+"/"+k,"ALLOWED:"+values);}
