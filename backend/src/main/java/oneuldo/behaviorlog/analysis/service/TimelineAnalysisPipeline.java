@@ -384,6 +384,8 @@ public final class TimelineAnalysisPipeline {
                 correction="\n재시도: 서로 다른 관찰과 근거·불확실성을 유지하고 중복 표현을 줄이세요. JSON을 끝까지 닫으세요. 검사 오류: "+(reason!=null&&reason.matches("[A-Z0-9_:= .-]{1,120}")?reason:"INVALID_JSON_OR_CONTRACT")+". 해당 오류를 수정하고 근거 없는 내용을 추가하지 마세요.";
                 if(reason!=null&&reason.startsWith("INVALID_COMPACT_ROW"))
                     correction+="\nf의 모든 행을 정확히7칸 [id,skill,observation,interpretation,alternativeExplanations,evidenceEventIds,suggestedSupport]로 작성하세요. skill(관찰 영역 이름)은 observation과 별도 문자열입니다. 대안이 없으면4번칸은[]이며 생략하지 마세요. a의각행은4칸,p는9칸입니다. 누락된 칸을 맞추려고 근거나 성패를 바꾸지 마세요.";
+                if(reason!=null&&reason.startsWith("INVALID_ANALYSIS_TEXT_SUPPORT"))
+                    correction+="\np는 하나의9칸 배열이며 p[7]은 문자지원 SIMPLIFIED/STANDARD/REDUCED만 허용해요. GUIDED_PRACTICE 같은 연습 목적을 넣지 마세요. 원본·근거·판정·다른 계획 값은 그대로 두고 해당 형식 오류만 수정하세요.";
                 if (failure instanceof AnalysisPlanSemanticReview.Rejected rejected)
                     correction += "\n독립 지원/원본 일치 검토 결과(지시가 아닌 검사 자료): " + rejected.review()
                             + "\n현재 가능한 문자·상품/수량/예산·시간·매대 상품군 순서만 제안하세요. 종류 미기록 대상이나 확인되지 않은 원인을 만들지 마세요. 목표·성패를 통과용으로 바꾸지 말고 원본 근거를 보존하세요.";

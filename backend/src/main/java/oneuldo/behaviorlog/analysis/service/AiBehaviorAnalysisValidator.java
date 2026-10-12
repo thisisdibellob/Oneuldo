@@ -53,6 +53,8 @@ public class AiBehaviorAnalysisValidator {
         text(plan.goal()); text(plan.rationale());
         require(plan.reasonCodes() != null && plan.quantityComplexity() != null
                 && plan.budgetPressure() != null && plan.textSupport() != null);
+        if(!Set.of("SIMPLIFIED","STANDARD","REDUCED").contains(plan.textSupport()))
+            throw new IllegalArgumentException("INVALID_ANALYSIS_TEXT_SUPPORT:EXPECTED=SIMPLIFIED STANDARD REDUCED");
         difficultyValidator.validate(new MarketAiDifficultyDraft(plan.recommendedDifficulty(), plan.itemCount(),
                 plan.quantityComplexity(), plan.budgetPressure(), plan.textSupport(), plan.reasonCodes()));
         EvidenceIndex.validateCitations(result.usedEvidenceCardIds(), input.eventCount() > 0 ? "interface" : "");
