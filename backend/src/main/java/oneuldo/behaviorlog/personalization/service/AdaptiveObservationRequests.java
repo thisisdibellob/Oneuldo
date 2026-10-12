@@ -44,7 +44,10 @@ final class AdaptiveObservationRequests {
                 String code=invalid instanceof InvalidObservation problem?problem.getMessage():"INVALID_OBSERVATION_JSON";
                 record(response,submittedSystem,prompt,stage,context,code,"LIVE");
                 if(repairs++>=REPAIR_CALLS) throw invalid;
-                submittedSystem=system+" Previous response failed "+code+". Return the complete required JSON with all six fields and only literal E IDs present in this same source. Do not invent or infer missing IDs. Keep observations concise to finish within the output limit. Original source is unchanged.";
+                var offending=invalid instanceof InvalidObservation problem?problem.offendingIds:List.of();
+                submittedSystem=system+" Repair attempt "+repairs+"/"+REPAIR_CALLS+". Previous response failed "+code
+                        +". These proposed citation IDs are not provided source facts: "+mapper.writeValueAsString(offending)
+                        +". Cite only decoded events first cells, sourceEventDetails.id, movementEventDetails.id, sceneSources.sourceEventId or collectorContexts.sourceEventId. Coverage/reference lists do not provide event facts. Return the six JSON fields with recorded facts and unknown causes. Source unchanged.";
             }
         }
     }
@@ -60,8 +63,12 @@ final class AdaptiveObservationRequests {
             if(!item.path(field).isArray()) throw new InvalidObservation("INVALID_OBSERVATION_SCHEMA");
             for(var value:item.path(field)) if(!value.isString()) throw new InvalidObservation("INVALID_OBSERVATION_SCHEMA");
         }
-        for(var cite:item.path("evidenceIds"))
-            if(!cite.isString() || !allowed.contains(cite.asString())) throw new InvalidObservation("INVALID_OBSERVATION_CITATION");
+        var offending=new ArrayList<String>();
+        for(var cite:item.path("evidenceIds")) {
+            if(!cite.isString() || !cite.asString().matches("E[1-9][0-9]*")) throw new InvalidObservation("INVALID_OBSERVATION_CITATION_FORMAT");
+            if(!allowed.contains(cite.asString())) offending.add(cite.asString());
+        }
+        if(!offending.isEmpty()) throw new InvalidObservation("INVALID_OBSERVATION_CITATION",offending);
         return item;
     }
 
@@ -77,6 +84,8 @@ final class AdaptiveObservationRequests {
     }
 
     private static final class InvalidObservation extends IllegalArgumentException {
-        InvalidObservation(String code) { super(code); }
+        final List<String> offendingIds;
+        InvalidObservation(String code) { this(code,List.of()); }
+        InvalidObservation(String code,List<String> offendingIds) { super(code); this.offendingIds=List.copyOf(offendingIds); }
     }
 }

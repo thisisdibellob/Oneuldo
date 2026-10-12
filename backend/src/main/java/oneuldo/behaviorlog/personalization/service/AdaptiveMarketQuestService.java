@@ -15,7 +15,7 @@ import tools.jackson.databind.node.ObjectNode;
 @Service
 @RequiredArgsConstructor
 public class AdaptiveMarketQuestService {
-    public static final String VERSION="market-ai-quest-v67-resumable-observation";
+    public static final String VERSION="market-ai-quest-v68-specific-citation-repair";
     private final MarketDifficultyRecommendationService recommendations;
     private final AiUserProfileService profiles;
     private final BehaviorAnalysisInputSnapshotRepository inputs;

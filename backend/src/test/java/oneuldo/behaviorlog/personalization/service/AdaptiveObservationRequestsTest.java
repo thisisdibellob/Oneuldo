@@ -21,7 +21,7 @@ class AdaptiveObservationRequestsTest {
         var requests=new AdaptiveObservationRequests(mapper,(system,prompt,output)->{
             assertThat(prompt).isEqualTo(original);
             if(calls.getAndIncrement()==0) return new GroqChatResult(report("E999"),"model");
-            assertThat(system).contains("INVALID_OBSERVATION_CITATION");
+            assertThat(system).contains("INVALID_OBSERVATION_CITATION", "E999", "Repair attempt 1/2");
             return new GroqChatResult(report("E1"),"model");
         },AnalysisCheckpoints.NONE,audit);
         assertThat(requests.request("Read actual sources",original,1200,Set.of("E1"),"DEEP_OBSERVATION",Map.of("part",1)).path("evidenceIds").get(0).asString()).isEqualTo("E1");
@@ -57,4 +57,29 @@ class AdaptiveObservationRequestsTest {
         assertThat(audit).hasSize(calls.get());
         assertThat(audit).allMatch(a->a.rawOutput().equals(report("E1"))&&a.failureReason().equals("OBSERVATION_OUTPUT_TRUNCATED"));
     }
+    @Test void actual_rejected_mcp_citations_are_diagnosed_against_exact_decoded_source() throws Exception {
+        var path=java.nio.file.Path.of("../output/persona45-mcp-20261013/quick-decider-1/recommendation-1/preserved-observation-failure-366b4e77-21db-4590-937f-9103cb2fb22c-2.json");
+        org.junit.jupiter.api.Assumptions.assumeTrue(java.nio.file.Files.exists(path));
+        var attempt=mapper.readTree(java.nio.file.Files.readString(path));
+        var source=new oneuldo.behaviorlog.analysis.service.FinalSourceEncoding(mapper).decode(mapper.readTree(attempt.path("validationDetails").path("submittedPrompt").asString()));
+        if(source.has("eventColumnEncoding"))source.set("events",new oneuldo.behaviorlog.analysis.service.LosslessEventColumns(mapper).decodeValues(source.path("events")));
+        var allowed=AdaptiveQuestEvidence.ids(source,false);var report=mapper.readTree(attempt.path("rawOutput").asString());
+        var missing=new ArrayList<String>();for(var id:report.path("evidenceIds"))if(!allowed.contains(id.asString()))missing.add(id.asString());
+        java.nio.file.Files.writeString(java.nio.file.Path.of("../output/persona45-mcp-20261013/actual-observation-citation-diagnostic.json"),mapper.writerWithDefaultPrettyPrinter().writeValueAsString(Map.of("missingIds",missing,"allowedIdCount",allowed.size(),"sourceScope",source.path("movementObservationScope"))));
+        assertThat(missing).isNotEmpty();var audit=new ArrayList<MarketAiQuestGeneration.Attempt>();var calls=new AtomicInteger();
+        String original=attempt.path("validationDetails").path("submittedPrompt").asString();
+        var request=new AdaptiveObservationRequests(mapper,(system,prompt,output)->{
+            assertThat(prompt).isEqualTo(original);
+            if(calls.getAndIncrement()==0)return new GroqChatResult(attempt.path("rawOutput").asString(),"actual-preserved-model");
+            for(String id:missing)assertThat(system).contains(id);
+            assertThat(system).contains("Coverage/reference lists");
+            return new GroqChatResult(report("E1"),"fixture-technical-repair-only");
+        },AnalysisCheckpoints.NONE,audit);
+        request.request(AdaptiveMarketQuestService.OBSERVATION_SYSTEM,original,1200,allowed,"DEEP_OBSERVATION",Map.of());
+        assertThat(audit.getFirst().rawOutput()).isEqualTo(attempt.path("rawOutput").asString());
+        int required=oneuldo.behaviorlog.analysis.service.QwenTokenCounter.inputTokens((String)audit.getLast().validationDetails().get("systemPrompt"),original)+1200+32;
+        assertThat(required).isLessThanOrEqualTo(24000);
+        java.nio.file.Files.writeString(java.nio.file.Path.of("../output/persona45-mcp-20261013/actual-observation-citation-repair-budget.json"),mapper.writeValueAsString(Map.of("requiredTokens",required,"limit",24000,"missingIds",missing,"fixtureOnlyNotANewPlay",true)));
+    }
+
 }
