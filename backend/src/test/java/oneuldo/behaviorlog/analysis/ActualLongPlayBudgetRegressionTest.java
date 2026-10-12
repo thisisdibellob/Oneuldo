@@ -8,6 +8,11 @@ import org.springframework.test.util.ReflectionTestUtils;
 import tools.jackson.databind.node.ObjectNode;
 import static org.assertj.core.api.Assertions.*;
 class ActualLongPlayBudgetRegressionTest {
+ private static Path recordOutput(String name) throws java.io.IOException {
+  var directory=Path.of(System.getenv().getOrDefault("ONEULDO_TEST_RECORD_OUTPUT","build/test-records/actual-regression"));
+  Files.createDirectories(directory);return directory.resolve(name);
+ }
+
  @Test void actual_post_source_fits_with_format_repair_reserve() throws Exception {
   var fixture=new MovementProjectionTest();var mapper=fixture.mapper;
   var path=Path.of("/Users/bluem/Documents/GitHub/Oneuldo/output/persona-actual-15-v43-v34-20261011/generation-repair/final-source-post-failed-v54.json");
@@ -19,7 +24,7 @@ class ActualLongPlayBudgetRegressionTest {
   org.springframework.test.util.ReflectionTestUtils.setField(budget,"finalOutputTokens",2400);
   var estimate=FinalAnalysisBudget.estimate(mapper,budget,FinalAnalysisPromptCompactor.systemPrompt(),source,refs,true,"\n구조와 실제 사건 참조를 수정하세요. JSON 하나만 출력하세요.");
   assertThat(estimate.required()).isLessThanOrEqualTo(18000);
-  Files.writeString(Path.of("../output/post-actual15-fixes-20261012/legacy-regression-reruns/actual-post-v55-budget.json"),mapper.writeValueAsString(Map.of("required",estimate.required(),"limit",18000,"allRawValuesPreserved",true)));
+  Files.writeString(recordOutput("actual-post-v55-budget.json"),mapper.writeValueAsString(Map.of("required",estimate.required(),"limit",18000,"allRawValuesPreserved",true)));
  }
  @Test void long_actual_source_retains_every_fact_and_fits_the_review_request() throws Exception {
   var fixture=new MovementProjectionTest();var mapper=fixture.mapper;
@@ -40,7 +45,7 @@ class ActualLongPlayBudgetRegressionTest {
   String reviewed=AnalysisReviewPrompt.build(mapper,source,new AiBehaviorAnalysis("",List.of(),List.of(),List.of(),null,List.of()),refs);
   int repaired=budget.total(AnalysisReviewPrompt.system(),reviewed+"\n구조와 실제 사건 참조를 수정하세요. JSON 하나만 출력하세요."+retry,2400);
   assertThat(repaired).isLessThanOrEqualTo(18000);
-  Files.writeString(Path.of("../output/post-actual15-fixes-20261012/legacy-regression-reruns/actual-long-play-v53-budget.json"),mapper.writeValueAsString(Map.of("required",estimate.required(),"limit",18000,"rawSourceFieldsUnchanged",true,"formatRepairRequired",repaired)));
+  Files.writeString(recordOutput("actual-long-play-v53-budget.json"),mapper.writeValueAsString(Map.of("required",estimate.required(),"limit",18000,"rawSourceFieldsUnchanged",true,"formatRepairRequired",repaired)));
  }
  @Test void actual_minsu_second_round_keeps_raw_sources_and_fits_real_transport_reserve() throws Exception {
   var fixture=new MovementProjectionTest();var mapper=fixture.mapper;
@@ -60,7 +65,7 @@ class ActualLongPlayBudgetRegressionTest {
   var estimate=FinalAnalysisBudget.estimate(mapper,budget,FinalAnalysisPromptCompactor.systemPrompt(),source,refs,true,"\n구조와 실제 사건 참조를 수정하세요. JSON 하나만 출력하세요.");
   assertThat(estimate.required()).isLessThanOrEqualTo(18000-256);
   assertThat(Files.readString(path)).isEqualTo(source);
-  Files.writeString(Path.of("../output/post-actual15-fixes-20261012/legacy-regression-reruns/actual-g3r2-final-review-v58-budget.json"),mapper.writeValueAsString(Map.of("required",estimate.required(),"transportLimit",17744,"allRawValuesPreserved",true)));
+  Files.writeString(recordOutput("actual-g3r2-final-review-v58-budget.json"),mapper.writeValueAsString(Map.of("required",estimate.required(),"transportLimit",17744,"allRawValuesPreserved",true)));
  }
 
 }

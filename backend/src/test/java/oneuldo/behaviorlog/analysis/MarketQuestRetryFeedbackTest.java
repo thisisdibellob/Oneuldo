@@ -98,8 +98,16 @@ class MarketQuestRetryFeedbackTest {
             when(result.text()).thenReturn(mapper.writeValueAsString(next));
             when(result.model()).thenReturn("test"); return result;
         });
-        var result = new MarketAiQuestService(prompts, new MarketAiQuestValidator(), recommendations,
-            mock(MarketAiQuestAuditService.class), profiles, client, mapper, mock(PracticeHistoryService.class)).generate(member);
+        var service = new MarketAiQuestService(prompts, new MarketAiQuestValidator(), recommendations,
+            mock(MarketAiQuestAuditService.class), profiles, client, mapper, mock(PracticeHistoryService.class));
+        if(repairKind >= 2) {
+            assertThatThrownBy(() -> service.generate(member)).isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+            assertThat(seen).hasSize(2);
+            assertThat(seen.get(1)).contains("QUANTITY_OUT_OF_RANGE", "/objectives/1/quantity");
+            verify(client, never()).complete(anyString(),anyString(),eq(MarketAiQuestService.REVIEW_MAX_TOKENS),eq(0.0));
+            return;
+        }
+        var result = service.generate(member);
         assertThat(seen).hasSize(repairKind == 3 ? 5 : chainedBudgetError ? 3 : 2);
         if (chainedBudgetError) assertThat(seen.get(2)).contains("BUDGET_OUT_OF_RANGE",
             "objectiveTotal", "13000", "minimumBudget", "maximumBudget", "17000", "objectives.quantity는 1~3");
