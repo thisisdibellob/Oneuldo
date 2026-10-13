@@ -121,6 +121,7 @@ public class AiBehaviorAnalysisService {
         return code!=null && (List.of("AI_RATE_LIMITED", "AI_UNAVAILABLE", "INVALID_AI_ANALYSIS",
                 "INVALID_REVIEW_STATION_PATCH", "INVALID_REVIEW_CLAIM_TEXT_PATCH", "INVALID_REVIEW_METADATA_PATCH",
                 "INVALID_REVIEW_SEMANTIC_TEXT_PATCH",
+                "INVALID_REVIEW_ALTERNATIVE_PATCH",
                 "INVALID_REVIEW_TECHNICAL_PATCH", "CHUNK_CALL_BUDGET_EXCEEDED", "TOTAL_CALL_BUDGET_EXCEEDED",
                 "TOKENIZER_MODEL_MISMATCH", "INVALID_TOKEN_BUDGET").contains(code)
                 || oneuldo.ai.exception.AiTransportException.isCode(code)) ? code : "CHUNK_ANALYSIS_FAILED";

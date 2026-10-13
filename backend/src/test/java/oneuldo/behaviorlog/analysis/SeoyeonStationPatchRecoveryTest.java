@@ -86,6 +86,7 @@ class SeoyeonStationPatchRecoveryTest {
         assertThatThrownBy(()->call(client,audit,false)).hasMessage("REVIEW_STATION_CLAIM_INVALID");
         assertThat(audit).hasSize(4);
         assertThat(audit.get(1).validationFailure().code()).isEqualTo("REVIEW_STATION_CLAIM_INVALID");
+        assertThat(audit.get(1).errorCode()).isEqualTo("PATCH_RECHECK_REJECTED");
         var semantic=client(bad);
         when(semantic.complete(eq(ReviewStationPatch.SYSTEM),anyString(),eq(ReviewStationPatch.OUTPUT_TOKENS),eq(0.0)))
                 .thenReturn(new GroqChatClient.GroqChatResult(wholePatch,"mock"));

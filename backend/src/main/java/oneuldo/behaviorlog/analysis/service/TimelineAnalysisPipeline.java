@@ -447,7 +447,8 @@ public final class TimelineAnalysisPipeline {
     private boolean technicalReviewPatch(ReviewEvidenceException.Details failure, String candidate) {
         return failure != null && ("REVIEW_UNRECORDED_DIFFICULTY_BASELINE".equals(failure.code())
                 || failure.code().startsWith("REVIEW_STATION_CLAIM_")
-                || ReviewClaimTextPatch.canRepair(mapper, candidate, failure));
+                || ReviewClaimTextPatch.canRepair(mapper, candidate, failure)
+                || ReviewAlternativeExplanationPatch.canRepair(mapper, candidate, failure));
     }
     /** A semantic repair changes only the model-selected prose path and must pass both existing gates again. */
     private <T> T repairReviewSemanticText(String source,String candidate,AnalysisPlanSemanticReview.Rejected issue,
@@ -504,6 +505,8 @@ public final class TimelineAnalysisPipeline {
      */
     private <T> T repairReviewMetadata(String source, String candidate, ReviewEvidenceException.Details failure,
             int limit, List<AiBehaviorAnalysisRun.Attempt> audit, Function<String,T> parse) {
+        if (ReviewAlternativeExplanationPatch.canRepair(mapper, candidate, failure))
+            return repairReviewAlternatives(source, candidate, failure, limit, audit, parse);
         String corrected = candidate;
         String patchCorrection = "";
         for (int patchAttempt = 0; patchAttempt < 3; patchAttempt++) {
@@ -522,27 +525,33 @@ public final class TimelineAnalysisPipeline {
             long started = System.nanoTime();
             GroqChatClient.GroqChatResult response = null;
             int auditIndex = audit.size();
+            boolean applied = false;
             try {
                 response = client.complete(system, patchPrompt, output, 0.0);
                 if ("length".equals(response.finishReason())) throw new IllegalArgumentException("OUTPUT_TRUNCATED");
                 corrected = station ? ReviewStationPatch.apply(mapper, corrected, response.text())
                         : claimText ? ReviewClaimTextPatch.apply(mapper, corrected, response.text())
                         : ReviewMetadataPatch.apply(mapper, corrected, response.text());
+                applied = true;
                 T result = parse.apply(corrected);
                 audit.add(attempt(audit.size()+1, system, patchPrompt, output, response, null, kind));
                 if (planSemanticReview) reviewPlanSource(source, corrected, limit, audit);
                 return result;
             } catch (RuntimeException invalid) {
-                var details = invalid instanceof ReviewEvidenceException next ? next.details() : null;
+                var details = invalid instanceof ReviewEvidenceException next ? next.details()
+                        : invalid instanceof AnalysisPlanSemanticReview.Rejected rejected ? rejected.details() : null;
                 var transport = invalid instanceof oneuldo.ai.exception.AiTransportException t ? t : null;
                 // Keep the exact model patch and its next validation error. A new technical
                 // field may only be corrected by another model patch, never by source copying.
                 if (audit.size() == auditIndex)
                     audit.add(new AiBehaviorAnalysisRun.Attempt(audit.size()+1, patchPrompt, response == null ? null : response.text(),
-                            transport == null ? "INVALID_" + kind : transport.code().name(), kind, system, output,
+                            transport == null ? applied ? "PATCH_RECHECK_REJECTED" : "INVALID_" + kind : transport.code().name(), kind, system, output,
                             response == null ? null : response.finishReason(), response == null ? null : response.inputTokens(),
                             response == null ? null : response.outputTokens(), (System.nanoTime()-started)/1_000_000,
                             transport == null ? null : transport.details(), details));
+                if (invalid instanceof AnalysisPlanSemanticReview.Rejected rejected
+                        && ReviewSemanticTextPatch.canRepair(mapper,corrected,rejected))
+                    return repairReviewSemanticText(source,corrected,rejected,limit,audit,parse);
                 if (claimText && "INVALID_REVIEW_CLAIM_TEXT_PATCH".equals(invalid.getMessage()) && patchAttempt < 2) {
                     // The complete rejected response is already immutable in audit. Repeating
                     // it here adds no original evidence and can exhaust a near-limit request.
@@ -555,12 +564,65 @@ public final class TimelineAnalysisPipeline {
                             + ": previous patch failed INVALID_REVIEW_STATION_PATCH. Null is not a station-row deletion. Follow stationPatchMode; WHOLE_ARRAY means one /stationClaims array, preserving valid rows and all event/evidence IDs. Original sources/candidate unchanged.";
                     continue;
                 }
+                if (ReviewAlternativeExplanationPatch.canRepair(mapper, corrected, details))
+                    return repairReviewAlternatives(source, corrected, details, limit, audit, parse);
                 if (!technicalReviewPatch(details, corrected) || patchAttempt == 2) throw invalid;
                 failure = details;
                 patchCorrection = "";
             }
         }
         throw new IllegalStateException("INVALID_REVIEW_METADATA_PATCH");
+    }
+    /** Bounded one-finding model patches, separate from metadata's three attempts and under the same total call budget. */
+    private <T> T repairReviewAlternatives(String source, String candidate, ReviewEvidenceException.Details failure,
+            int limit, List<AiBehaviorAnalysisRun.Attempt> audit, Function<String,T> parse) {
+        String corrected = candidate, correction = "";
+        for (int patchAttempt = 0; patchAttempt < 3; patchAttempt++) {
+            if (audit.size() >= maxChunks*2+2+(qualityReview?3:0)+(planSemanticReview?3:0))
+                throw new IllegalArgumentException("TOTAL_CALL_BUDGET_EXCEEDED");
+            String system = ReviewAlternativeExplanationPatch.SYSTEM;
+            int output = ReviewAlternativeExplanationPatch.outputTokens(mapper, corrected, failure);
+            String prompt = ReviewAlternativeExplanationPatch.prompt(mapper, source, corrected, failure) + correction;
+            budget.requireFits(system, prompt, output + ReviewAlternativeExplanationPatch.SAFETY_TOKENS,
+                    limit, "REVIEW_ALTERNATIVE_PATCH_EXCEEDS_LIMIT");
+            GroqChatClient.GroqChatResult response = null;
+            long started = System.nanoTime();
+            int auditIndex = audit.size();
+            boolean applied = false;
+            try {
+                response = client.complete(system, prompt, output, 0.0);
+                if ("length".equals(response.finishReason())) throw new IllegalArgumentException("OUTPUT_TRUNCATED");
+                corrected = ReviewAlternativeExplanationPatch.apply(mapper, corrected, failure, response.text());
+                applied = true;
+                T result = parse.apply(corrected);
+                audit.add(attempt(audit.size()+1, system, prompt, output, response, null, "REVIEW_ALTERNATIVE_PATCH"));
+                if (planSemanticReview) reviewPlanSource(source, corrected, limit, audit);
+                return result;
+            } catch (RuntimeException invalid) {
+                var details = invalid instanceof ReviewEvidenceException next ? next.details()
+                        : invalid instanceof AnalysisPlanSemanticReview.Rejected rejected ? rejected.details() : null;
+                var transport = invalid instanceof oneuldo.ai.exception.AiTransportException t ? t : null;
+                if (audit.size() == auditIndex)
+                    audit.add(new AiBehaviorAnalysisRun.Attempt(audit.size()+1, prompt, response == null ? null : response.text(),
+                            transport != null ? transport.code().name() : applied ? "REVIEW_CANDIDATE_REJECTED" : "INVALID_REVIEW_ALTERNATIVE_PATCH",
+                            "REVIEW_ALTERNATIVE_PATCH", system, output,
+                            response == null ? null : response.finishReason(), response == null ? null : response.inputTokens(),
+                            response == null ? null : response.outputTokens(), (System.nanoTime()-started)/1_000_000,
+                            transport == null ? null : transport.details(), details));
+                if (invalid instanceof AnalysisPlanSemanticReview.Rejected rejected
+                        && ReviewSemanticTextPatch.canRepair(mapper,corrected,rejected))
+                    return repairReviewSemanticText(source,corrected,rejected,limit,audit,parse);
+                if (!applied && "INVALID_REVIEW_ALTERNATIVE_PATCH".equals(invalid.getMessage()) && patchAttempt < 2) {
+                    correction = "\nRepair attempt " + (patchAttempt+2)
+                            + ": previous response failed INVALID_REVIEW_ALTERNATIVE_PATCH. Return only the allowed finding array with all nonempty-evidence rows unchanged. Optional uncertainties must retain their exact original prefix. No new evidence or other paths.";
+                    continue;
+                }
+                if (!ReviewAlternativeExplanationPatch.canRepair(mapper, corrected, details) || patchAttempt == 2) throw invalid;
+                failure = details;
+                correction = "";
+            }
+        }
+        throw new IllegalStateException("INVALID_REVIEW_ALTERNATIVE_PATCH");
     }
     private void reviewPlanSource(String source, String candidate, int limit, List<AiBehaviorAnalysisRun.Attempt> audit) {
         String prompt = AnalysisPlanSemanticReview.prompt(mapper, source, candidate);
