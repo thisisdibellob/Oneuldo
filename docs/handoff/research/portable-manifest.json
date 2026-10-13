@@ -1,0 +1,113 @@
+{
+  "prepared_on": "2026-10-13",
+  "scope": "프로젝트 자체 조사요약·출처목록·비식별 시험보고서만. 원문/코퍼스/개인정보/인증정보 제외.",
+  "files": [
+    {
+      "original_relative_to_old_output": "jinuk-research-2026-09-04/02_AI_근거자료_활용과_검증.md",
+      "portable_file": "baseline-2026-09-04/02_AI_근거자료_활용과_검증.md",
+      "original_sha256": "d7f0cb437550099a6a4f1e547074901ff8569f7131c06e15c40ab9f364cdcba8",
+      "portable_sha256": "93ebbdbacd9522e8d8341f491b74dac7ffdac8ac69f2bac62ec8b8d141b6ea64",
+      "changes": [
+        "상단에 인수인계 복사본과 과거 조사임을 명시",
+        "UTF-8/LF로 정규화"
+      ]
+    },
+    {
+      "original_relative_to_old_output": "jinuk-research-2026-09-04/03_출처_찾아보기.md",
+      "portable_file": "baseline-2026-09-04/03_출처_찾아보기.md",
+      "original_sha256": "d0141f24541975f8c19b4a10a643d049bda13e775573f50bdf8eac19b3ea8a23",
+      "portable_sha256": "aa98f28d0c606d12ece82f0cf00bfe5e08f49d47b54561fd227d76049ffc8153",
+      "changes": [
+        "상단에 인수인계 복사본과 과거 조사임을 명시",
+        "UTF-8/LF로 정규화",
+        "문서 끝의 빈 줄 정리"
+      ]
+    },
+    {
+      "original_relative_to_old_output": "jinuk-research-2026-09-04/06_확장자료_핵심과_시나리오_적용.md",
+      "portable_file": "baseline-2026-09-04/06_확장자료_핵심과_시나리오_적용.md",
+      "original_sha256": "236c2d224f141f568fab942a167922a8dcf3808f72b48bbbf66d9eed88965452",
+      "portable_sha256": "7214deb3a74d089d10d0d861a1d996367b2e1ac1fb875d471fd84f912fad2963",
+      "changes": [
+        "상단에 인수인계 복사본과 과거 조사임을 명시",
+        "UTF-8/LF로 정규화",
+        "문서 끝의 빈 줄 정리"
+      ]
+    },
+    {
+      "original_relative_to_old_output": "jinuk-expert-ai-evidence-2026-09-16/02_신규자료_검토.md",
+      "portable_file": "expert-ai-2026-09-16/02_신규자료_검토.md",
+      "original_sha256": "b3c20d1db36547d73f4f4aafd44c93dd03144008d9e586181fe61e810389aecc",
+      "portable_sha256": "2f4e76eff9a4d5ba5ce85a4f14b3f660542d65e3ae59158dd20605851304bb2b",
+      "changes": [
+        "상단에 인수인계 복사본과 과거 조사임을 명시",
+        "UTF-8/LF로 정규화"
+      ]
+    },
+    {
+      "original_relative_to_old_output": "jinuk-expert-ai-evidence-2026-09-16/03_전문가AI_적용가이드.md",
+      "portable_file": "expert-ai-2026-09-16/03_전문가AI_적용가이드.md",
+      "original_sha256": "5612a73308303f9444e0ad8a75a7a4fefe994685275293e3515c6726d90589ad",
+      "portable_sha256": "09c15381860f11c31074353982dc904c031d22a901fed7fc0ea56721a9b8c3e8",
+      "changes": [
+        "상단에 인수인계 복사본과 과거 조사임을 명시",
+        "UTF-8/LF로 정규화"
+      ]
+    },
+    {
+      "original_relative_to_old_output": "id-deep-research-2026-09-19/지적장애의_개인차와_생활지원_심층조사.md",
+      "portable_file": "individual-differences-2026-09-19/지적장애의_개인차와_생활지원_심층조사.md",
+      "original_sha256": "08b41cc89bd84916e96f2c5d3ed8e242f2b484ad7b40e035636c5dd154770715",
+      "portable_sha256": "2cc2f6eb68bf2c2513c2e37fa07ee1dc7ec8d759f8e94fb56a1a57f95fa799e5",
+      "changes": [
+        "상단에 인수인계 복사본과 과거 조사임을 명시",
+        "UTF-8/LF로 정규화"
+      ]
+    },
+    {
+      "original_relative_to_old_output": "id-deep-research-2026-09-19/기존자료와_신규자료_출처대조표.md",
+      "portable_file": "individual-differences-2026-09-19/기존자료와_신규자료_출처대조표.md",
+      "original_sha256": "de9feb4c1c8a3e92b10960bb708256948bfd49462a9d8728339e17ad81d4fd20",
+      "portable_sha256": "0c95f1c368950f8c8bd81cee209638b91beaebbabe6bcf281c5fc61f55b93683",
+      "changes": [
+        "상단에 인수인계 복사본과 과거 조사임을 명시",
+        "UTF-8/LF로 정규화"
+      ]
+    },
+    {
+      "original_relative_to_old_output": "supported-work-game-2026-09-29/01_공공지원_일자리_조사.md",
+      "portable_file": "supported-work-2026-09-29/01_공공지원_일자리_조사.md",
+      "original_sha256": "96fcc460d96f0d50c3001110688a6dcf3b95800ad9964831ab10d322b24a95be",
+      "portable_sha256": "d7023a39126e7fa4e8e91ced49bf47a2758d2b218dba416898a1b48ca3ad74d9",
+      "changes": [
+        "상단에 인수인계 복사본과 과거 조사임을 명시",
+        "UTF-8/LF로 정규화"
+      ]
+    },
+    {
+      "original_relative_to_old_output": "supported-work-game-2026-09-29/02_도서관_근무_게임_기획안.md",
+      "portable_file": "supported-work-2026-09-29/02_도서관_근무_게임_기획안.md",
+      "original_sha256": "7eff551bf9b9fc66252860b2c6ae6c85a0af8f6042b85874bcbd32f2b4325d2b",
+      "portable_sha256": "acc66bdfad6c6d4fa590b6386dfaad658870d253243991f00dc1fb4ac70a0613",
+      "changes": [
+        "상단에 인수인계 복사본과 과거 조사임을 명시",
+        "UTF-8/LF로 정규화"
+      ]
+    },
+    {
+      "original_relative_to_old_output": "reports/2026-09-18-school-ai/학교_AI_서버_연결_및_분석_진단_보고서.md",
+      "portable_file": "school-ai-2026-09-18/학교_AI_서버_연결_및_분석_진단_보고서.md",
+      "original_sha256": "d5f8ba5d41f14135b62c14f21644a473ef4910ec0c32b54d98c4f9b04e304408",
+      "portable_sha256": "dbcc5d5733c6d34ba72eddd5660cf28ee6ad3b4581fbaefa741944b0384880e2",
+      "changes": [
+        "상단에 인수인계 복사본과 과거 조사임을 명시",
+        "UTF-8/LF로 정규화",
+        "수신자·수행자 이름, 서버 IP, 시험 식별자와 로컬 로그 경로 삭제"
+      ]
+    }
+  ],
+  "hash_format": {
+    "original_sha256": "원본 파일의 실제 바이트",
+    "portable_sha256": "UTF-8, BOM 없음, 줄바꿈 LF로 정규화한 바이트. CRLF checkout에서는 LF로 정규화한 후 확인한다."
+  }
+}
