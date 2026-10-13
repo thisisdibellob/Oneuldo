@@ -47,6 +47,7 @@ public final class SourceEventDetails {
             if ("SHOP.STAFF_HELP_REQUESTED".equals(code) || "SHOP.GENERAL_HELP_OPENED".equals(code))
                 copy(source.path("action"), "microActionId", row, "microActionId");
             copy(source, "sessionEnd", row, "sessionEnd");
+            copy(source, "userExperience", row, "userExperience");
             if ("SHOP.SESSION_STARTED".equals(code) || "SHOP.SESSION_ENDED".equals(code))
                 copy(source.path("task"), "taskVersion", row, "collectorTaskVersion");
             var payload = source.path("payload");

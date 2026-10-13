@@ -37,11 +37,12 @@ public final class AdaptiveQuestEvidence {
                 .add(event.elapsedFromSessionStartMs()).add(code).add(payload);
         }
         root.put("eventCount",index);
+        AnalysisSourceContext.addMissionPlanProvenance(mapper,root);
         var refs=new AnalysisReferences(mapper,response);
         return (ObjectNode)mapper.readTree(refs.encode(mapper.writeValueAsString(root),false));
     }
     public static ObjectNode encode(ObjectMapper mapper,ObjectNode source) {
-        var codec=new FinalSourceEncoding(mapper);var plain=codec.encode(source);
+        var codec=new FinalSourceEncoding(mapper,true);var plain=codec.encode(source);
         var alternative=source.deepCopy();var values=new ArrayList<JsonNode>();source.path("events").forEach(values::add);
         alternative.set("events",new LosslessEventColumns(mapper).encodeValues(values));
         alternative.put("eventColumnEncoding","events.count/data expands original event rows in order: same=common literal, values=per-row, fields=field columns plus rest, dictionary/refs=zero-based original values, groups/positions=original row positions, items=array-position columns, prefix/suffixes=exact string concatenation. Every number, row and order is unchanged.");

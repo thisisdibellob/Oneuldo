@@ -72,6 +72,7 @@ public final class AnalysisReviewPrompt {
         root.put("rawBackedObservationsNotRepeated",rawBackedObservations);
         root.put("outputContract", "Exactly {reviewFormat:'claim-evidence-v4',analysis,reviewNotes:[string],taskChecks,stationClaims}. analysis={sessionAssessments,summary,findings,uncertainties:[string],practicePlan,usedEvidenceCardIds:[]}. sessionAssessment={sessionId,judgment,explanation}; finding={id,skill,observation,interpretation,alternativeExplanations,suggestedSupport}. summary/observation/interpretation/alternatives/explanation are arrays of {text,evidenceEventIds}: supplied IDs max30, uncertain interpretation may[]; no finding-level evidence or claimChecks. practicePlan={targetFindingIds,goal,rationale:planBasisContract,recommendedDifficulty:1..3,itemCount:1..4,quantityComplexity:LOW|MEDIUM|HIGH,budgetPressure:LOW|MEDIUM|HIGH,textSupport:SIMPLIFIED|STANDARD|REDUCED,reasonCodes:[uppercase codes]}. Use taskCheckShape and exact station rows.");
         root.set("taskComparisonSource", taskComparisonSource(mapper, decoded));
+        AnalysisSourceContext.addMissionPlanProvenance(mapper,root);
         var encoded = new FinalSourceEncoding(mapper).encodeReadable(root);
         var stationRows = encoded.putArray("stationClaimSources");
         refs.recordedStations().entrySet().stream()

@@ -10,8 +10,10 @@ import tools.jackson.databind.node.ObjectNode;
 public final class FinalSourceColumns {
     private static final Set<String> MARKERS = Set.of("$a", "$m", "$l");
     private final ObjectMapper mapper;
+    private final boolean literalSmallEventIds;
     private final Map<String,Integer> tokenCounts = new HashMap<>();
-    public FinalSourceColumns(ObjectMapper mapper) { this.mapper=mapper; }
+    public FinalSourceColumns(ObjectMapper mapper) { this(mapper,false); }
+    public FinalSourceColumns(ObjectMapper mapper,boolean literalSmallEventIds) { this.mapper=mapper; this.literalSmallEventIds=literalSmallEventIds; }
 
     public JsonNode encode(JsonNode source) {
         tokenCounts.clear();
@@ -81,6 +83,13 @@ public final class FinalSourceColumns {
                 if(rows.stream().allMatch(row->row.get(target).asString().equals(prefix+row.get(source).toString())))
                     result.set(target,best(result.get(target),object("q",array(mapper.valueToTree(prefix),mapper.valueToTree(source)))));
             }
+        // Small event groups need an explicit factual ID column. The model otherwise
+        // confused a group's 0-based positions (e.g. 87) with event E87, although
+        // its sequence column and q rule actually identify E814/E1783. Keep literal
+        // IDs beside eventCode while every other original field uses the same codec.
+        if(literalSmallEventIds && rows.size()<=8 && keys.contains("id") && keys.contains("eventCode")
+                && rows.stream().allMatch(row->row.get("id").isString()))
+            result.set("id",mapper.valueToTree(rows.stream().map(row->row.get("id")).toList()));
         return result;
     }
     public JsonNode decode(JsonNode encoded) {

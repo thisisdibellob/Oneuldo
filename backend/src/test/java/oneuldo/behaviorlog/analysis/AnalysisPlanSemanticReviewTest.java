@@ -38,7 +38,12 @@ class AnalysisPlanSemanticReviewTest {
         var good = new AnalysisReviewConsistencyTest().envelope("corrected-selection"); var bad = good.deepCopy();
         ((ObjectNode)bad.path("analysis").path("practicePlan").path("rationale")).put("proposedPractice", "매대 위치를 시각적으로 강조합니다.");
         var client = mock(GroqChatClient.class);
-        when(client.complete(anyString(), anyString(), eq(2400), anyDouble())).thenReturn(new GroqChatClient.GroqChatResult(bad.toString(), "mock"), new GroqChatClient.GroqChatResult(good.toString(), "mock"));
+        when(client.complete(eq(AnalysisReviewPrompt.system()), anyString(), eq(2400), anyDouble())).thenReturn(new GroqChatClient.GroqChatResult(bad.toString(), "mock"));
+        var patch=fixture.mapper.createObjectNode();patch.putArray("patches").addObject()
+                .put("path","/analysis/practicePlan/rationale/proposedPractice")
+                .put("value","매대 위치를 기존 문자 안내로 확인하는 연습을 제안합니다.");
+        when(client.complete(eq(ReviewSemanticTextPatch.SYSTEM),anyString(),eq(ReviewSemanticTextPatch.OUTPUT_TOKENS),eq(0.0)))
+                .thenReturn(new GroqChatClient.GroqChatResult(patch.toString(),"mock"));
         when(client.complete(anyString(), anyString(), eq(AnalysisPlanSemanticReview.OUTPUT_TOKENS), eq(0.0)))
                 .thenReturn(new GroqChatClient.GroqChatResult(rejection(), "mock"), new GroqChatClient.GroqChatResult(valid, "mock"));
         var validator = new AiBehaviorAnalysisValidator(new MarketAiDifficultyValidator()); var audit = new ArrayList<AiBehaviorAnalysisRun.Attempt>();
@@ -51,7 +56,12 @@ class AnalysisPlanSemanticReviewTest {
         assertThat(audit.get(0).rawOutput()).isEqualTo(bad.toString());
         assertThat(audit.get(0).validationFailure().code()).isEqualTo("REVIEW_PLAN_SEMANTIC_MISMATCH");
         assertThat(audit.get(1).source()).isEqualTo("PLAN_SOURCE_REVIEW");
-        assertThat(audit.get(2).inputPrompt()).contains("UNSUPPORTED_CAPABILITY", "독립 지원/원본 일치 검토 결과");
+        assertThat(audit.get(2).inputPrompt()).startsWith(prompt).contains("UNSUPPORTED_CAPABILITY",bad.toString());
+        assertThat(audit.get(2).source()).isEqualTo("REVIEW_SEMANTIC_TEXT_PATCH");
+        verify(client,times(1)).complete(eq(AnalysisReviewPrompt.system()),anyString(),eq(2400),anyDouble());
+        var restored=fixture.mapper.readTree(ReviewSemanticTextPatch.apply(fixture.mapper,bad.toString(),rejection(),patch.toString()));
+        ((ObjectNode)restored.at("/analysis/practicePlan/rationale")).set("proposedPractice",bad.at("/analysis/practicePlan/rationale/proposedPractice"));
+        assertThat(restored).isEqualTo(bad);
         assertThat(audit.get(3).errorCode()).isNull();
     }
     private String rejection() {

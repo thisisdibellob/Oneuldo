@@ -99,13 +99,9 @@ public class AiBehaviorAnalysisService {
             try {
                 analysis = pipeline.analyze(input, budget.requestTokens(), attempts, references, prompt);
                 model = pipeline.model(); status = "READY";
-            } catch (IllegalArgumentException tooLarge) {
-                status = "INPUT_TOO_LARGE"; error = tooLarge.getMessage();
             } catch (RuntimeException failure) {
-                status = "FAILED";
-                error = (failure.getMessage()!=null && List.of("AI_RATE_LIMITED", "AI_UNAVAILABLE", "INVALID_AI_ANALYSIS").contains(failure.getMessage()))
-                        || oneuldo.ai.exception.AiTransportException.isCode(failure.getMessage())
-                        ? failure.getMessage() : "CHUNK_ANALYSIS_FAILED";
+                status = failureStatus(failure);
+                error = failureCode(failure);
             }
             model = pipeline.model();
         }
@@ -114,6 +110,21 @@ public class AiBehaviorAnalysisService {
                 model, system, prompt, attempts, analysis, error,
                 (System.nanoTime() - start) / 1_000_000L, input.eventCount(),requestKey));
         return AiBehaviorAnalysisResponse.from(saved);
+    }
+
+    static String failureStatus(RuntimeException failure) {
+        return failure instanceof oneuldo.ai.exception.AiInputLimitException ? "INPUT_TOO_LARGE" : "FAILED";
+    }
+    static String failureCode(RuntimeException failure) {
+        if (failure instanceof oneuldo.ai.exception.AiInputLimitException) return failure.getMessage();
+        String code=failure.getMessage();
+        return code!=null && (List.of("AI_RATE_LIMITED", "AI_UNAVAILABLE", "INVALID_AI_ANALYSIS",
+                "INVALID_REVIEW_STATION_PATCH", "INVALID_REVIEW_CLAIM_TEXT_PATCH", "INVALID_REVIEW_METADATA_PATCH",
+                "INVALID_REVIEW_SEMANTIC_TEXT_PATCH",
+                "INVALID_REVIEW_ALTERNATIVE_PATCH",
+                "INVALID_REVIEW_TECHNICAL_PATCH", "CHUNK_CALL_BUDGET_EXCEEDED", "TOTAL_CALL_BUDGET_EXCEEDED",
+                "TOKENIZER_MODEL_MISMATCH", "INVALID_TOKEN_BUDGET").contains(code)
+                || oneuldo.ai.exception.AiTransportException.isCode(code)) ? code : "CHUNK_ANALYSIS_FAILED";
     }
 
     public AiBehaviorAnalysisResponse latest(UUID memberId) {
