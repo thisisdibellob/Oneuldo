@@ -62,7 +62,7 @@ class ReviewClaimTextPatchTest {
         var client = client(bad);
         String valid = patch(Map.of("/analysis/summary/0/text", "제공된 미션과 종료 기록입니다."));
         String malformed = valid + " {}";
-        when(client.complete(eq(ReviewClaimTextPatch.SYSTEM), anyString(), eq(ReviewClaimTextPatch.OUTPUT_TOKENS), eq(0.0)))
+        when(client.complete(eq(ReviewClaimTextPatch.SYSTEM), anyString(), eq(ReviewClaimTextPatch.outputTokens(fixture.mapper, bad.toString())), eq(0.0)))
                 .thenReturn(new GroqChatClient.GroqChatResult(malformed, "mock"), new GroqChatClient.GroqChatResult(valid, "mock"));
         var audit = new ArrayList<AiBehaviorAnalysisRun.Attempt>();
         var result = call(client, audit, false);
@@ -80,7 +80,7 @@ class ReviewClaimTextPatchTest {
     @Test void a_text_patch_still_must_pass_the_existing_source_and_independent_semantic_gates() {
         var bad = candidate();
         var client = client(bad);
-        when(client.complete(eq(ReviewClaimTextPatch.SYSTEM), anyString(), eq(ReviewClaimTextPatch.OUTPUT_TOKENS), eq(0.0)))
+        when(client.complete(eq(ReviewClaimTextPatch.SYSTEM), anyString(), eq(ReviewClaimTextPatch.outputTokens(fixture.mapper, bad.toString())), eq(0.0)))
                 .thenReturn(new GroqChatClient.GroqChatResult(patch(Map.of("/analysis/summary/0/text", "제공된 미션과 종료 기록입니다.")), "mock"));
         String rejection = """
                 {"verdict":"REPAIR","checkedDimensions":["UNCERTAIN_CAUSES"],"issues":[{

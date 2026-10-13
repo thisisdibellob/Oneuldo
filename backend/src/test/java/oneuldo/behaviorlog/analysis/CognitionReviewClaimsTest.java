@@ -99,7 +99,9 @@ class CognitionReviewClaimsTest {
         var bad=candidate(CLAIM); var good=candidate("목표 위치를 인지했는지는 확인할 수 없습니다.");
         var client=mock(GroqChatClient.class);
         when(client.complete(eq(AnalysisReviewPrompt.system()),anyString(),eq(2400),anyDouble()))
-                .thenReturn(new GroqChatClient.GroqChatResult(bad.toString(),"mock"),new GroqChatClient.GroqChatResult(good.toString(),"mock"));
+                .thenReturn(new GroqChatClient.GroqChatResult(bad.toString(),"mock"));
+        when(client.complete(eq(ReviewSemanticTextPatch.SYSTEM),anyString(),eq(ReviewSemanticTextPatch.OUTPUT_TOKENS),eq(0.0)))
+                .thenReturn(new GroqChatClient.GroqChatResult("{\"patches\":[{\"path\":\"/analysis"+PATH+"\",\"value\":\"목표 위치를 인지했는지는 확인할 수 없습니다.\"}]}","mock"));
         when(client.complete(eq(AnalysisPlanSemanticReview.system()),anyString(),eq(AnalysisPlanSemanticReview.OUTPUT_TOKENS),eq(0.0)))
                 .thenReturn(new GroqChatClient.GroqChatResult(rejection(PATH,CLAIM),"mock"),
                         new GroqChatClient.GroqChatResult(approval(PATH,"UNCERTAIN_OR_PROPOSED",null),"mock"));
@@ -114,6 +116,8 @@ class CognitionReviewClaimsTest {
         assertThat(audit.getFirst().rawOutput()).isEqualTo(bad.toString());
         assertThat(audit.get(1).validationFailure().code()).isEqualTo("REVIEW_PLAN_SEMANTIC_MISMATCH");
         assertThat(audit.get(2).inputPrompt()).startsWith(source).contains("UNCONFIRMED_COGNITION");
+        assertThat(audit.get(2).source()).isEqualTo("REVIEW_SEMANTIC_TEXT_PATCH");
+        verify(client,times(1)).complete(eq(AnalysisReviewPrompt.system()),anyString(),eq(2400),anyDouble());
         ((ObjectNode)good.at("/analysis/findings/0/interpretation/0")).set("text",bad.at("/analysis/findings/0/interpretation/0/text"));
         assertThat(good).isEqualTo(bad);
     }

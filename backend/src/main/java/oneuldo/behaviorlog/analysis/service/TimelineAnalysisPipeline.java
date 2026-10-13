@@ -69,7 +69,7 @@ public final class TimelineAnalysisPipeline {
                 if(observationCost(slice(input,from,end),input,refs)<=limit) {best=end;low=end+1;}
                 else high=end-1;
             }
-            if(best==from)throw new IllegalArgumentException("SINGLE_EVENT_EXCEEDS_LIMIT: required="+observationCost(slice(input,from,from+1),input,refs)+", limit="+limit);
+            if(best==from)throw new oneuldo.ai.exception.AiInputLimitException("SINGLE_EVENT_EXCEEDS_LIMIT",observationCost(slice(input,from,from+1),input,refs),limit);
             chunks.add(slice(input,from,best));from=best;
             AnalysisProgress.stage("PREPARING",from,input.eventCount());
         }
@@ -88,7 +88,7 @@ public final class TimelineAnalysisPipeline {
         if(out.size()>=maxChunks) throw new IllegalArgumentException("CHUNK_CALL_BUDGET_EXCEEDED");
         int required=observationCost(part,full,refs);
         if(required<=limit) {out.add(part);return;}
-        if(part.eventCount()<=1) throw new IllegalArgumentException("SINGLE_EVENT_EXCEEDS_LIMIT: required="+required+", limit="+limit);
+        if(part.eventCount()<=1) throw new oneuldo.ai.exception.AiInputLimitException("SINGLE_EVENT_EXCEEDS_LIMIT",required,limit);
         int half=part.eventCount()/2;
         var events=part.input().sessions().stream().flatMap(s->s.events().stream()).toList();
         // Prefer an interaction boundary near the midpoint, protecting adjacent movement samples.
@@ -164,7 +164,7 @@ public final class TimelineAnalysisPipeline {
             }
             if(groups.size()<=1) {
                 audit.add(new AiBehaviorAnalysisRun.Attempt(audit.size()+1,finalPrompt,null,"FINAL_EVIDENCE_EXCEEDS_LIMIT","PREFLIGHT",finalSystem,budget.finalOutputTokens(),null,null,null,0L));
-                throw new IllegalArgumentException("FINAL_EVIDENCE_EXCEEDS_LIMIT");
+                throw new oneuldo.ai.exception.AiInputLimitException("FINAL_EVIDENCE_EXCEEDS_LIMIT",estimate.required(),limit);
             }
             AnalysisProgress.stage("REDUCING",completedObservations,plannedObservations);
             List<Group> reduced=new ArrayList<>();
@@ -427,6 +427,9 @@ public final class TimelineAnalysisPipeline {
                 if(validation != null && "INLINE_REVIEW_REFERENCE_NOT_ALLOWED".equals(validation.code()))
                     correction = ClaimReferenceRepairPrompt.build(mapper, validation);
                 if(system.equals(AnalysisReviewPrompt.system())) {
+                    if(raw != null && failure instanceof AnalysisPlanSemanticReview.Rejected rejected
+                            && ReviewSemanticTextPatch.canRepair(mapper,raw,rejected))
+                        return repairReviewSemanticText(prompt,raw,rejected,limit,audit,parse);
                     if (raw != null && technicalReviewPatch(validation, raw))
                         return repairReviewMetadata(prompt, raw, validation, limit, audit, parse);
                     String withCandidate=AnalysisRepairCandidate.append(mapper,correction,raw);
@@ -446,6 +449,56 @@ public final class TimelineAnalysisPipeline {
                 || failure.code().startsWith("REVIEW_STATION_CLAIM_")
                 || ReviewClaimTextPatch.canRepair(mapper, candidate, failure));
     }
+    /** A semantic repair changes only the model-selected prose path and must pass both existing gates again. */
+    private <T> T repairReviewSemanticText(String source,String candidate,AnalysisPlanSemanticReview.Rejected issue,
+            int limit,List<AiBehaviorAnalysisRun.Attempt> audit,Function<String,T> parse) {
+        String corrected=candidate,correction="";
+        for(int patchAttempt=0;patchAttempt<3;patchAttempt++) {
+            if(audit.size()>=maxChunks*2+2+(qualityReview?3:0)+(planSemanticReview?3:0)) throw new IllegalArgumentException("TOTAL_CALL_BUDGET_EXCEEDED");
+            String system=ReviewSemanticTextPatch.SYSTEM;
+            String prompt=ReviewSemanticTextPatch.prompt(mapper,source,corrected,issue.review())+correction;
+            budget.requireFits(system,prompt,ReviewSemanticTextPatch.OUTPUT_TOKENS+ReviewSemanticTextPatch.SAFETY_TOKENS,limit,"REVIEW_SEMANTIC_TEXT_PATCH_EXCEEDS_LIMIT");
+            GroqChatClient.GroqChatResult response=null;
+            long started=System.nanoTime();int index=audit.size();
+            String before=corrected;
+            try {
+                var cached=checkpoints.find(system,prompt,ReviewSemanticTextPatch.OUTPUT_TOKENS);
+                response=cached.orElseGet(()->client.complete(system,prompt,ReviewSemanticTextPatch.OUTPUT_TOKENS,0.0));
+                if("length".equals(response.finishReason())) throw new IllegalArgumentException("OUTPUT_TRUNCATED");
+                String proposed=ReviewSemanticTextPatch.apply(mapper,before,issue.review(),response.text());
+                T result=parse.apply(proposed);
+                corrected=proposed;
+                audit.add(attempt(audit.size()+1,system,prompt,ReviewSemanticTextPatch.OUTPUT_TOKENS,response,null,
+                        cached.isPresent()?"REVIEW_SEMANTIC_TEXT_PATCH_CHECKPOINT":"REVIEW_SEMANTIC_TEXT_PATCH"));
+                if(audit.size()>=maxChunks*2+2+(qualityReview?3:0)+(planSemanticReview?3:0)) throw new IllegalArgumentException("TOTAL_CALL_BUDGET_EXCEEDED");
+                reviewPlanSource(source,corrected,limit,audit);
+                // Cache the actual patch response only after source and independent semantic approval.
+                // The reconstructed candidate is never labeled as an original provider response.
+                checkpoints.save(system,prompt,ReviewSemanticTextPatch.OUTPUT_TOKENS,response);
+                return result;
+            } catch(RuntimeException failure) {
+                var details=failure instanceof ReviewEvidenceException e?e.details()
+                        :failure instanceof AnalysisPlanSemanticReview.Rejected r?r.details():null;
+                var transport=failure instanceof oneuldo.ai.exception.AiTransportException t?t:null;
+                if(audit.size()==index) audit.add(new AiBehaviorAnalysisRun.Attempt(audit.size()+1,prompt,response==null?null:response.text(),
+                        transport==null?"INVALID_REVIEW_SEMANTIC_TEXT_PATCH":transport.code().name(),"REVIEW_SEMANTIC_TEXT_PATCH",system,ReviewSemanticTextPatch.OUTPUT_TOKENS,
+                        response==null?null:response.finishReason(),response==null?null:response.inputTokens(),response==null?null:response.outputTokens(),
+                        (System.nanoTime()-started)/1_000_000,transport==null?null:transport.details(),details));
+                if(patchAttempt==2) throw failure;
+                if(failure instanceof AnalysisPlanSemanticReview.Rejected next && ReviewSemanticTextPatch.canRepair(mapper,corrected,next)) {
+                    issue=next;correction="";continue;
+                }
+                if("INVALID_REVIEW_SEMANTIC_TEXT_PATCH".equals(failure.getMessage()) || "OUTPUT_TRUNCATED".equals(failure.getMessage())
+                        || details!=null && "INLINE_REVIEW_REFERENCE_NOT_ALLOWED".equals(details.code())) {
+                    corrected=before;
+                    correction="\nRepair attempt "+(patchAttempt+2)+": previous patch failed its string contract. Return one allowedTextPath string, concise Korean, no inline E IDs; all other candidate fields stay unchanged.";
+                    continue;
+                }
+                throw failure;
+            }
+        }
+        throw new IllegalStateException("INVALID_REVIEW_SEMANTIC_TEXT_PATCH");
+    }
     /** Small model patches preserve the whole original source and candidate under the request budget.
      * Every patched candidate must still pass the same source and independent semantic validators.
      */
@@ -459,7 +512,7 @@ public final class TimelineAnalysisPipeline {
             boolean station = failure.code().startsWith("REVIEW_STATION_CLAIM_");
             boolean claimText = "INLINE_REVIEW_REFERENCE_NOT_ALLOWED".equals(failure.code());
             String system = station ? ReviewStationPatch.SYSTEM : claimText ? ReviewClaimTextPatch.SYSTEM : ReviewMetadataPatch.SYSTEM;
-            int output = station ? ReviewStationPatch.OUTPUT_TOKENS : claimText ? ReviewClaimTextPatch.OUTPUT_TOKENS : ReviewMetadataPatch.OUTPUT_TOKENS;
+            int output = station ? ReviewStationPatch.OUTPUT_TOKENS : claimText ? ReviewClaimTextPatch.outputTokens(mapper, corrected) : ReviewMetadataPatch.OUTPUT_TOKENS;
             String kind = station ? "REVIEW_STATION_PATCH" : claimText ? "REVIEW_CLAIM_TEXT_PATCH" : "REVIEW_METADATA_PATCH";
             String patchPrompt = station ? ReviewStationPatch.prompt(mapper, source, corrected, failure)
                     : claimText ? ReviewClaimTextPatch.prompt(mapper, source, corrected, failure)
@@ -495,6 +548,11 @@ public final class TimelineAnalysisPipeline {
                     // it here adds no original evidence and can exhaust a near-limit request.
                     patchCorrection = "\nRepair attempt " + (patchAttempt+2)
                             + ": previous patch failed INVALID_REVIEW_CLAIM_TEXT_PATCH. Remove every annotationRemoval substring; copy all other prose literally. Each allowedTextPath exactly once. Original sources/candidate and evidence arrays are unchanged.";
+                    continue;
+                }
+                if (station && "INVALID_REVIEW_STATION_PATCH".equals(invalid.getMessage()) && patchAttempt < 2) {
+                    patchCorrection = "\nRepair attempt " + (patchAttempt+2)
+                            + ": previous patch failed INVALID_REVIEW_STATION_PATCH. Null is not a station-row deletion. Follow stationPatchMode; WHOLE_ARRAY means one /stationClaims array, preserving valid rows and all event/evidence IDs. Original sources/candidate unchanged.";
                     continue;
                 }
                 if (!technicalReviewPatch(details, corrected) || patchAttempt == 2) throw invalid;
