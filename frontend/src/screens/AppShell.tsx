@@ -35,6 +35,7 @@ export function AppShell({
   const [tab, setTab] = useState(0);
   const [practice, setPractice] = useState(false);
   const [gamePlaying, setGamePlaying] = useState(false);
+  const [gameActivity, setGameActivity] = useState<'day' | 'bus' | 'market' | 'errand' | undefined>();
   const [reduceMotion, setReduceMotion] = useState(false);
   const screenProgress = useRef(new Animated.Value(0)).current;
   const firstAppearance = useRef(true);
@@ -95,8 +96,9 @@ export function AppShell({
     }
   };
 
-  const openGame = () => {
+  const openGame = (activity?: 'day' | 'bus' | 'market' | 'errand') => {
     beginTransition();
+    setGameActivity(activity);
     setGamePlaying(true);
   };
 
@@ -137,7 +139,7 @@ export function AppShell({
     return (
       <SafeAreaView edges={[]} style={styles.gameSafe}>
         <Animated.View style={[styles.body, animatedStyle]}>
-          <GamePrototypeScreen onExit={closeGame} />
+          <GamePrototypeScreen onExit={closeGame} initialActivity={gameActivity} />
         </Animated.View>
       </SafeAreaView>
     );
@@ -151,8 +153,8 @@ export function AppShell({
       onQuest={openQuest}
       practices={quests}
     />,
-    <QuestScreen key="quest" onPractice={openPractice} />,
-    <GameScreen key="game" onEnter={openGame} />,
+    <QuestScreen key="quest" onPractice={openPractice} onGameQuest={openGame} />,
+    <GameScreen key="game" onEnter={() => openGame()} />,
     <AiScreen key="ai" />,
     <ProfileScreen key="profile" />,
   ];

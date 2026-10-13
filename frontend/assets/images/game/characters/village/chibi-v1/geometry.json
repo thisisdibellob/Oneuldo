@@ -1,0 +1,46 @@
+[
+  {
+    "id": "minsu",
+    "sheet": [
+      1974,
+      797
+    ],
+    "frontSourceBounds": [
+      30,
+      88,
+      390,
+      731
+    ],
+    "canvas": [
+      128,
+      192
+    ],
+    "pivot": [
+      64,
+      186
+    ],
+    "renderedHeight": 170
+  },
+  {
+    "id": "jiyoung",
+    "sheet": [
+      1983,
+      793
+    ],
+    "frontSourceBounds": [
+      35,
+      108,
+      399,
+      733
+    ],
+    "canvas": [
+      128,
+      192
+    ],
+    "pivot": [
+      64,
+      186
+    ],
+    "renderedHeight": 170
+  }
+]

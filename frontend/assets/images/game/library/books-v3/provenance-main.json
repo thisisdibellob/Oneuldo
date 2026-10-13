@@ -1,0 +1,363 @@
+{
+  "tool": "built-in image_gen.imagegen",
+  "created": "2026-10-01",
+  "records": [
+    {
+      "id": "computer-first",
+      "title": "처음 만나는 컴퓨터",
+      "prompt": "Use case: stylized-concept. Asset type: production transparent PNG inventory sprite for a cozy Korean library life-simulation game. Generate ONE distinct closed upright portrait book, straight front cover facing viewer, only a very thin LEFT spine and cream bottom page edge visible; absolutely no tilt or perspective rotation. Book proportions width to height about 0.84. Match a warm hand-drawn children's picture-book game style: strong consistent clean rounded dark warm-brown outlines, soft matte fills, restrained cel shading, gently rounded corners, delicate small leaf-like corner flourishes. Large simple central subject readable at 100 pixels tall. No glossy 3D, no realism, no busy textures. Isolated entire book centered with transparent padding on all sides. Actual transparent alpha background, NO ground plane, no backdrop, no haze or external drop shadow. No title text, no letters, no labels, no numbers, no watermarks. Cover in muted dusty slate-blue. Central illustration: a friendly simple desktop computer monitor, compact keyboard and small mouse, warm cream casing, small blue screen with a simple star-shaped cursor symbol. Clear everyday computer learning motif, no logos.",
+      "generatedPath": "C:\\Users\\PC\\.codex\\generated_images\\01a0f3be-61f6-73c2-aae2-8c8a791742d6\\exec-bb49ffc0-d61a-4844-a73e-07657a414d9d.png",
+      "source": {
+        "path": "source/computer-first.png",
+        "sha256": "435579b1af3c736967ce9c3528fbb8c65be6f10f4203cc5a9d72360d731fbf6d",
+        "bytes": 1311663,
+        "width": 1149,
+        "height": 1368,
+        "alpha": {
+          "transparent": 710575,
+          "partial": 861198,
+          "opaque": 59,
+          "bounds": {
+            "left": 155,
+            "top": 48,
+            "width": 865,
+            "height": 1296
+          }
+        }
+      },
+      "runtime": {
+        "path": "computer-first.png",
+        "sha256": "0cfed57fcf23d9e482bf8d659fdd098f02a280a4f21c9277aea7da5a29f6abb6",
+        "bytes": 102378,
+        "width": 206,
+        "height": 256,
+        "alpha": {
+          "transparent": 2965,
+          "partial": 48963,
+          "opaque": 808,
+          "bounds": {
+            "left": 2,
+            "top": 2,
+            "width": 202,
+            "height": 252
+          }
+        }
+      },
+      "tool": "built-in image_gen.imagegen",
+      "transparent_background": true,
+      "crop": {
+        "left": 153,
+        "top": 167,
+        "width": 843,
+        "height": 1054
+      },
+      "processing": "Find visible book bounds using alpha>16 and add 8 source pixels of padding; crop rectangle only, preserving all original alpha inside it. Resize uniformly with Lanczos3 to 252px height, add 2px transparent padding. No painting, recoloring, compositing or per-pixel alpha thresholding."
+    },
+    {
+      "id": "library-guide",
+      "title": "도서관 사용 설명서",
+      "prompt": "Use case: stylized-concept. Asset type: production transparent PNG inventory sprite for a cozy Korean library life-simulation game. Generate ONE distinct closed upright portrait book, straight front cover facing viewer, only a very thin LEFT spine and cream bottom page edge visible; absolutely no tilt or perspective rotation. Book proportions width to height about 0.84. Match a warm hand-drawn children's picture-book game style: strong consistent clean rounded dark warm-brown outlines, soft matte fills, restrained cel shading, gently rounded corners, delicate small leaf-like corner flourishes. Large simple central subject readable at 100 pixels tall. No glossy 3D, no realism, no busy textures. Isolated entire book centered with transparent padding on all sides. Actual transparent alpha background, NO ground plane, no backdrop, no haze or external drop shadow. No title text, no letters, no labels, no numbers, no watermarks. Cover in muted warm ochre. Central illustration: an open cream book in front of a small friendly library building with a roof, two windows and a simple doorway. A book symbol above the doorway, absolutely no lettering. Clear library guide motif.",
+      "generatedPath": "C:\\Users\\PC\\.codex\\generated_images\\01a0f3be-61f6-73c2-aae2-8c8a791742d6\\exec-b7bbc86e-10e0-4daf-b977-ab021c16a5d3.png",
+      "source": {
+        "path": "source/library-guide.png",
+        "sha256": "5860f3f692afbbf59d7eb4d48f7c5f03c4737655e2d47863ca7adcfeb4a7eed8",
+        "bytes": 1685519,
+        "width": 1145,
+        "height": 1374,
+        "alpha": {
+          "transparent": 553274,
+          "partial": 1019510,
+          "opaque": 446,
+          "bounds": {
+            "left": 43,
+            "top": 37,
+            "width": 1068,
+            "height": 1313
+          }
+        }
+      },
+      "runtime": {
+        "path": "library-guide.png",
+        "sha256": "357c99e6a638f77cbcae8b61bf50c22e3d1f7d8d7939a9ad068a59e92bbdde36",
+        "bytes": 117604,
+        "width": 198,
+        "height": 256,
+        "alpha": {
+          "transparent": 2792,
+          "partial": 47124,
+          "opaque": 772,
+          "bounds": {
+            "left": 2,
+            "top": 2,
+            "width": 194,
+            "height": 252
+          }
+        }
+      },
+      "tool": "built-in image_gen.imagegen",
+      "transparent_background": true,
+      "crop": {
+        "left": 125,
+        "top": 115,
+        "width": 901,
+        "height": 1168
+      },
+      "processing": "Find visible book bounds using alpha>16 and add 8 source pixels of padding; crop rectangle only, preserving all original alpha inside it. Resize uniformly with Lanczos3 to 252px height, add 2px transparent padding. No painting, recoloring, compositing or per-pixel alpha thresholding."
+    },
+    {
+      "id": "feeling-colors",
+      "title": "내 마음의 색깔",
+      "prompt": "Use case: stylized-concept. Asset type: production transparent PNG inventory sprite for a cozy Korean library life-simulation game. Generate ONE distinct closed upright portrait book, straight front cover facing viewer, only a very thin LEFT spine and cream bottom page edge visible; absolutely no tilt or perspective rotation. Book proportions width to height about 0.84. Match a warm hand-drawn children's picture-book game style: strong consistent clean rounded dark warm-brown outlines, soft matte fills, restrained cel shading, gently rounded corners, delicate small leaf-like corner flourishes. Large simple central subject readable at 100 pixels tall. No glossy 3D, no realism, no busy textures. Isolated entire book centered with transparent padding on all sides. Actual transparent alpha background, NO ground plane, no backdrop, no haze or external drop shadow. No title text, no letters, no labels, no numbers, no watermarks. Cover in muted dusty lavender. Central illustration: one large heart assembled from soft coral, pale yellow, sage and blue rounded color patches, with three small surrounding emotion color dots. Calm and welcoming visual about feelings and colors, no faces needed.",
+      "generatedPath": "C:\\Users\\PC\\.codex\\generated_images\\01a0f3be-61f6-73c2-aae2-8c8a791742d6\\exec-eafb870c-3be9-4778-893f-e4978431d222.png",
+      "source": {
+        "path": "source/feeling-colors.png",
+        "sha256": "ff842f410155de554dbd15dfb637296e39d5e149efe0c878efe8e29062b6f1f0",
+        "bytes": 1266085,
+        "width": 1149,
+        "height": 1368,
+        "alpha": {
+          "transparent": 675358,
+          "partial": 895979,
+          "opaque": 495,
+          "bounds": {
+            "left": 82,
+            "top": 51,
+            "width": 936,
+            "height": 1259
+          }
+        }
+      },
+      "runtime": {
+        "path": "feeling-colors.png",
+        "sha256": "747ca2b4dd9e91360ac208e90ecc4bad204c917dd669ae43dc7b9acfd324f353",
+        "bytes": 100176,
+        "width": 211,
+        "height": 256,
+        "alpha": {
+          "transparent": 3015,
+          "partial": 50169,
+          "opaque": 832,
+          "bounds": {
+            "left": 2,
+            "top": 2,
+            "width": 207,
+            "height": 252
+          }
+        }
+      },
+      "tool": "built-in image_gen.imagegen",
+      "transparent_background": true,
+      "crop": {
+        "left": 141,
+        "top": 156,
+        "width": 873,
+        "height": 1062
+      },
+      "processing": "Find visible book bounds using alpha>16 and add 8 source pixels of padding; crop rectangle only, preserving all original alpha inside it. Resize uniformly with Lanczos3 to 252px height, add 2px transparent padding. No painting, recoloring, compositing or per-pixel alpha thresholding."
+    },
+    {
+      "id": "question-tree",
+      "title": "생각이 자라는 질문",
+      "prompt": "Use case: stylized-concept. Asset type: production transparent PNG inventory sprite for a cozy Korean library life-simulation game. Generate ONE distinct closed upright portrait book, straight front cover facing viewer, only a very thin LEFT spine and cream bottom page edge visible; absolutely no tilt or perspective rotation. Book proportions width to height about 0.84. Match a warm hand-drawn children's picture-book game style: strong consistent clean rounded dark warm-brown outlines, soft matte fills, restrained cel shading, gently rounded corners, delicate small leaf-like corner flourishes. Large simple central subject readable at 100 pixels tall. No glossy 3D, no realism, no busy textures. Isolated entire book centered with transparent padding on all sides. Actual transparent alpha background, NO ground plane, no backdrop, no haze or external drop shadow. No title text, no letters, no labels, no numbers, no watermarks. Cover in muted warm parchment gold. Central illustration: a small thoughtful branching tree growing from an open book, with a few sage leaves and small rounded glowing idea buds in muted orange and pale yellow. A clear tree-of-thinking motif. No question marks or lettering.",
+      "generatedPath": "C:\\Users\\PC\\.codex\\generated_images\\01a0f3be-61f6-73c2-aae2-8c8a791742d6\\exec-614ffebb-ff4f-4763-a93c-c2bae5f56448.png",
+      "source": {
+        "path": "source/question-tree.png",
+        "sha256": "62842f301012e156a1c04a599b05167de524ddda73a18e1da2c297908aa9e9fb",
+        "bytes": 1641621,
+        "width": 1145,
+        "height": 1374,
+        "alpha": {
+          "transparent": 621568,
+          "partial": 950469,
+          "opaque": 1193,
+          "bounds": {
+            "left": 25,
+            "top": 74,
+            "width": 1044,
+            "height": 1235
+          }
+        }
+      },
+      "runtime": {
+        "path": "question-tree.png",
+        "sha256": "85dd306382e7e5b896a6f1dfa6813eadf9009b22f91c9761f26787d8a7f34f55",
+        "bytes": 118651,
+        "width": 198,
+        "height": 256,
+        "alpha": {
+          "transparent": 2957,
+          "partial": 47304,
+          "opaque": 427,
+          "bounds": {
+            "left": 2,
+            "top": 2,
+            "width": 194,
+            "height": 252
+          }
+        }
+      },
+      "tool": "built-in image_gen.imagegen",
+      "transparent_background": true,
+      "crop": {
+        "left": 138,
+        "top": 134,
+        "width": 872,
+        "height": 1130
+      },
+      "processing": "Find visible book bounds using alpha>16 and add 8 source pixels of padding; crop rectangle only, preserving all original alpha inside it. Resize uniformly with Lanczos3 to 252px height, add 2px transparent padding. No painting, recoloring, compositing or per-pixel alpha thresholding."
+    },
+    {
+      "id": "world-religions",
+      "title": "세계의 종교 이야기",
+      "prompt": "Use case: stylized-concept. Asset type: production transparent PNG inventory sprite for a cozy Korean library life-simulation game. Generate ONE distinct closed upright portrait book, straight front cover facing viewer, only a very thin LEFT spine and cream bottom page edge visible; absolutely no tilt or perspective rotation. Book proportions width to height about 0.84. Match a warm hand-drawn children's picture-book game style: strong consistent clean rounded dark warm-brown outlines, soft matte fills, restrained cel shading, gently rounded corners, delicate small leaf-like corner flourishes. Large simple central subject readable at 100 pixels tall. No glossy 3D, no realism, no busy textures. Isolated entire book centered with transparent padding on all sides. Actual transparent alpha background, NO ground plane, no backdrop, no haze or external drop shadow. No title text, no letters, no labels, no numbers, no watermarks. Cover in muted dusty teal. Central illustration: a small blue and sage globe with a few equally sized tiny silhouettes of different places of worship arranged around it, a domed building, a temple roof and a simple steepled building. Respectful religiously neutral educational motif, balanced equal prominence, no sacred text, no people.",
+      "generatedPath": "C:\\Users\\PC\\.codex\\generated_images\\01a0f3be-61f6-73c2-aae2-8c8a791742d6\\exec-93df2355-af4a-4c07-ba3b-984ebf43de20.png",
+      "source": {
+        "path": "source/world-religions.png",
+        "sha256": "8808963abaadd3638db2fba03a19000f9f892d29b40e938b539e70eadab0e7c4",
+        "bytes": 1397803,
+        "width": 1145,
+        "height": 1374,
+        "alpha": {
+          "transparent": 737147,
+          "partial": 835240,
+          "opaque": 843,
+          "bounds": {
+            "left": 157,
+            "top": 52,
+            "width": 879,
+            "height": 1296
+          }
+        }
+      },
+      "runtime": {
+        "path": "world-religions.png",
+        "sha256": "19837b1378f6e1d839b4c644841ccfb2f1c140bad71a3401f36080b52362adc5",
+        "bytes": 114142,
+        "width": 211,
+        "height": 256,
+        "alpha": {
+          "transparent": 3109,
+          "partial": 50092,
+          "opaque": 815,
+          "bounds": {
+            "left": 2,
+            "top": 2,
+            "width": 207,
+            "height": 252
+          }
+        }
+      },
+      "tool": "built-in image_gen.imagegen",
+      "transparent_background": true,
+      "crop": {
+        "left": 154,
+        "top": 184,
+        "width": 842,
+        "height": 1026
+      },
+      "processing": "Find visible book bounds using alpha>16 and add 8 source pixels of padding; crop rectangle only, preserving all original alpha inside it. Resize uniformly with Lanczos3 to 252px height, add 2px transparent padding. No painting, recoloring, compositing or per-pixel alpha thresholding."
+    },
+    {
+      "id": "temple-bell",
+      "title": "산사의 풍경 소리",
+      "prompt": "Use case: stylized-concept. Asset type: production transparent PNG inventory sprite for a cozy Korean library life-simulation game. Generate ONE distinct closed upright portrait book, straight front cover facing viewer, only a very thin LEFT spine and cream bottom page edge visible; absolutely no tilt or perspective rotation. Book proportions width to height about 0.84. Match a warm hand-drawn children's picture-book game style: strong consistent clean rounded dark warm-brown outlines, soft matte fills, restrained cel shading, gently rounded corners, delicate small leaf-like corner flourishes. Large simple central subject readable at 100 pixels tall. No glossy 3D, no realism, no busy textures. Isolated entire book centered with transparent padding on all sides. Actual transparent alpha background, NO ground plane, no backdrop, no haze or external drop shadow. No title text, no letters, no labels, no numbers, no watermarks. Cover in muted clay terracotta. Central illustration: a bronze Korean temple wind bell suspended from the curved corner of a dark brown traditional tiled eave, with a small fish-shaped wind catcher beneath and two soft sage pine sprigs. Quiet temple sound motif, no text or people.",
+      "generatedPath": "C:\\Users\\PC\\.codex\\generated_images\\01a0f3be-61f6-73c2-aae2-8c8a791742d6\\exec-f2cb18d0-4fb8-4ad0-82fe-1d461558cc43.png",
+      "source": {
+        "path": "source/temple-bell.png",
+        "sha256": "4832b5f6c74802efa44e2a54e18edbad943b6089013097fd19be1d7580ae114c",
+        "bytes": 1568161,
+        "width": 1145,
+        "height": 1374,
+        "alpha": {
+          "transparent": 685917,
+          "partial": 886005,
+          "opaque": 1308,
+          "bounds": {
+            "left": 25,
+            "top": 72,
+            "width": 1096,
+            "height": 1278
+          }
+        }
+      },
+      "runtime": {
+        "path": "temple-bell.png",
+        "sha256": "411d51da756f6d6b1dd23dc3f0e5ce7f779b0c4dd01842d63360e06feab8ad02",
+        "bytes": 104320,
+        "width": 188,
+        "height": 256,
+        "alpha": {
+          "transparent": 2685,
+          "partial": 44712,
+          "opaque": 731,
+          "bounds": {
+            "left": 2,
+            "top": 2,
+            "width": 184,
+            "height": 252
+          }
+        }
+      },
+      "tool": "built-in image_gen.imagegen",
+      "transparent_background": true,
+      "crop": {
+        "left": 165,
+        "top": 129,
+        "width": 816,
+        "height": 1116
+      },
+      "processing": "Find visible book bounds using alpha>16 and add 8 source pixels of padding; crop rectangle only, preserving all original alpha inside it. Resize uniformly with Lanczos3 to 252px height, add 2px transparent padding. No painting, recoloring, compositing or per-pixel alpha thresholding."
+    },
+    {
+      "id": "neighborhood-jobs",
+      "title": "우리 동네 일하는 사람들",
+      "prompt": "Use case: stylized-concept. Asset type: production transparent PNG inventory sprite for a cozy Korean library life-simulation game. Generate ONE distinct closed upright portrait book, straight front cover facing viewer, only a very thin LEFT spine and cream bottom page edge visible; absolutely no tilt or perspective rotation. Book proportions width to height about 0.84. Match a warm hand-drawn children's picture-book game style: strong consistent clean rounded dark warm-brown outlines, soft matte fills, restrained cel shading, gently rounded corners, delicate small leaf-like corner flourishes. Large simple central subject readable at 100 pixels tall. No glossy 3D, no realism, no busy textures. Isolated entire book centered with transparent padding on all sides. Actual transparent alpha background, NO ground plane, no backdrop, no haze or external drop shadow. No title text, no letters, no labels, no numbers, no watermarks. Cover in muted sage green. Central illustration: a tidy small grouping of everyday job tools, a postal worker's cream-and-brown satchel with an envelope, a small gardener's hand trowel and a baker's whisk. Warm approachable neighborhood work motif. No logos or text.",
+      "generatedPath": "C:\\Users\\PC\\.codex\\generated_images\\01a0f3be-61f6-73c2-aae2-8c8a791742d6\\exec-34b63e11-016f-4d7e-bb60-659285e2e3ce.png",
+      "source": {
+        "path": "source/neighborhood-jobs.png",
+        "sha256": "b3330deaca17c0dde2764fa40b7016c4407bdc8eee8a2ad43168ae464ccab541",
+        "bytes": 1697153,
+        "width": 1161,
+        "height": 1355,
+        "alpha": {
+          "transparent": 560982,
+          "partial": 1012062,
+          "opaque": 111,
+          "bounds": {
+            "left": 23,
+            "top": 71,
+            "width": 1010,
+            "height": 1250
+          }
+        }
+      },
+      "runtime": {
+        "path": "neighborhood-jobs.png",
+        "sha256": "3d2561a4ede5f56be8fa941f53c7fa4dac6edcaea73c0ca5f91bcdaafe289e65",
+        "bytes": 112927,
+        "width": 206,
+        "height": 256,
+        "alpha": {
+          "transparent": 2981,
+          "partial": 48914,
+          "opaque": 841,
+          "bounds": {
+            "left": 2,
+            "top": 2,
+            "width": 202,
+            "height": 252
+          }
+        }
+      },
+      "tool": "built-in image_gen.imagegen",
+      "transparent_background": true,
+      "crop": {
+        "left": 125,
+        "top": 108,
+        "width": 914,
+        "height": 1142
+      },
+      "processing": "Find visible book bounds using alpha>16 and add 8 source pixels of padding; crop rectangle only, preserving all original alpha inside it. Resize uniformly with Lanczos3 to 252px height, add 2px transparent padding. No painting, recoloring, compositing or per-pixel alpha thresholding."
+    }
+  ]
+}

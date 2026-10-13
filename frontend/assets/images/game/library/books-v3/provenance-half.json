@@ -1,0 +1,876 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-09-30T20:02:16.926Z",
+  "generator": "built-in image_gen.imagegen",
+  "intent": "7 distinct illustrated book inventory sprites",
+  "records": [
+    {
+      "id": "money-story",
+      "motif": "A friendly pink piggy bank with three golden coins, one coin above its slot and two beside it. Warm muted jade green book cover. Absolutely no letters or numbers.",
+      "prompt": "Use case: illustration-story. Asset type: transparent 2D mobile game inventory sprite, one closed upright portrait picture book. Create a brand-new single book isolated on a genuinely transparent background with actual alpha. Style: cozy hand-drawn storybook object art, medium-weight warm dark brown outlines, softly rounded corners, matte cel shading with very subtle paper texture. Composition: the broad flat front cover faces the viewer straight on, with only a thin visible rounded spine on the LEFT and a narrow cream page edge along the BOTTOM; no angled or isometric camera. Full book visible with clear transparent margin, centered, no cast shadow outside the book. Book proportions approximately width 0.82 times height. Cover design: A friendly pink piggy bank with three golden coins, one coin above its slot and two beside it. Warm muted jade green book cover. Absolutely no letters or numbers. Keep motifs bold and simple enough to recognize at 80 pixels high. Small leaf sprigs in cover corners echo a gentle storybook ornament style, no clutter. The spine has two small gold bands and one tiny botanical ornament. Constraints: one book only, no environment, no desk, no extra loose objects outside the book silhouette, no title text, no author text, no logo, no watermark, no artificial checkerboard, no white or colored background.",
+      "tool": "image_gen.imagegen",
+      "originalReturnedPath": "C:\\Users\\PC\\.codex\\generated_images\\01a0f3e1-27c3-7c90-9e5e-aa370d863739\\exec-98e72f40-8354-4ebc-8d92-984c2920ec3b.png",
+      "sourcePath": "C:/Users/PC/Documents/Oneuldo/frontend/assets/images/game/library/books-v3/source/money-story.png",
+      "runtimePath": "C:/Users/PC/Documents/Oneuldo/frontend/assets/images/game/library/books-v3/money-story.png",
+      "original": {
+        "width": 1136,
+        "height": 1385,
+        "hasAlpha": true,
+        "format": "png",
+        "bytes": 1793529,
+        "sha256": "6368196b704019876f5cb1aa72f14daa8b99000afd96946f6542b09eb2366f25",
+        "alpha": {
+          "transparentPixels": 625489,
+          "opaquePixels": 52,
+          "partialPixels": 947819,
+          "min": 0,
+          "max": 255,
+          "transparentFraction": 0.397549829663904
+        },
+        "alphaBounds": {
+          "left": 0,
+          "top": 7,
+          "width": 1090,
+          "height": 1378
+        },
+        "visibleAlphaBounds": {
+          "threshold": 16,
+          "left": 145,
+          "top": 131,
+          "width": 849,
+          "height": 1125
+        }
+      },
+      "source": {
+        "width": 1136,
+        "height": 1385,
+        "hasAlpha": true,
+        "format": "png",
+        "bytes": 1793529,
+        "sha256": "6368196b704019876f5cb1aa72f14daa8b99000afd96946f6542b09eb2366f25",
+        "alpha": {
+          "transparentPixels": 625489,
+          "opaquePixels": 52,
+          "partialPixels": 947819,
+          "min": 0,
+          "max": 255,
+          "transparentFraction": 0.397549829663904
+        },
+        "alphaBounds": {
+          "left": 0,
+          "top": 7,
+          "width": 1090,
+          "height": 1378
+        },
+        "visibleAlphaBounds": {
+          "threshold": 16,
+          "left": 145,
+          "top": 131,
+          "width": 849,
+          "height": 1125
+        }
+      },
+      "runtime": {
+        "width": 195,
+        "height": 256,
+        "hasAlpha": true,
+        "format": "png",
+        "bytes": 114160,
+        "sha256": "d3464ecb14f3201b85a507022b993b472fa6adff238c857258390d139ed65223",
+        "alpha": {
+          "transparentPixels": 3133,
+          "opaquePixels": 704,
+          "partialPixels": 46083,
+          "min": 0,
+          "max": 255,
+          "transparentFraction": 0.06276041666666667
+        },
+        "alphaBounds": {
+          "left": 2,
+          "top": 2,
+          "width": 191,
+          "height": 252
+        },
+        "visibleAlphaBounds": {
+          "threshold": 16,
+          "left": 3,
+          "top": 3,
+          "width": 189,
+          "height": 250
+        }
+      },
+      "processing": {
+        "operations": [
+          "copy original unchanged",
+          "derive crop from alpha > 16 visible bounds plus 8 source pixels of margin; crop rectangle only, never threshold or repaint alpha",
+          "resize proportionally to height 252 with Lanczos3",
+          "add 2 transparent pixels on all edges for final height 256",
+          "PNG compression level 9"
+        ],
+        "crop": {
+          "left": 137,
+          "top": 123,
+          "width": 865,
+          "height": 1141
+        },
+        "visibleAlphaThreshold": 16,
+        "sourceMarginPixels": 8,
+        "alphaPreserved": true
+      },
+      "visualQA": {
+        "sourceInspected": true,
+        "runtimeInspected": true,
+        "notes": "Original and full-height runtime contact inspected. Complete upright book, thin left spine and bottom pages, correct motif, no unintended title text, transparent outer border, no clipping. Korean 가/나/다 and English Hello visually checked where requested."
+      },
+      "validation": {
+        "originalCopyHashMatches": true,
+        "runtimeHeight256": true,
+        "outermostBorderFullyTransparent": true
+      }
+    },
+    {
+      "id": "color-sketchbook",
+      "motif": "A little white drawing sheet showing a simple sun and flower, with five colored pencils fanning beside it. Muted ochre yellow book cover. Absolutely no letters or numbers.",
+      "prompt": "Use case: illustration-story. Asset type: transparent 2D mobile game inventory sprite, one closed upright portrait picture book. Create a brand-new single book isolated on a genuinely transparent background with actual alpha. Style: cozy hand-drawn storybook object art, medium-weight warm dark brown outlines, softly rounded corners, matte cel shading with very subtle paper texture. Composition: the broad flat front cover faces the viewer straight on, with only a thin visible rounded spine on the LEFT and a narrow cream page edge along the BOTTOM; no angled or isometric camera. Full book visible with clear transparent margin, centered, no cast shadow outside the book. Book proportions approximately width 0.82 times height. Cover design: A little white drawing sheet showing a simple sun and flower, with five colored pencils fanning beside it. Muted ochre yellow book cover. Absolutely no letters or numbers. Keep motifs bold and simple enough to recognize at 80 pixels high. Small leaf sprigs in cover corners echo a gentle storybook ornament style, no clutter. The spine has two small gold bands and one tiny botanical ornament. Constraints: one book only, no environment, no desk, no extra loose objects outside the book silhouette, no title text, no author text, no logo, no watermark, no artificial checkerboard, no white or colored background.",
+      "tool": "image_gen.imagegen",
+      "originalReturnedPath": "C:\\Users\\PC\\.codex\\generated_images\\01a0f3e1-27c3-7c90-9e5e-aa370d863739\\exec-115e575b-c58a-4b72-9ee2-1d65d019efd6.png",
+      "sourcePath": "C:/Users/PC/Documents/Oneuldo/frontend/assets/images/game/library/books-v3/source/color-sketchbook.png",
+      "runtimePath": "C:/Users/PC/Documents/Oneuldo/frontend/assets/images/game/library/books-v3/color-sketchbook.png",
+      "original": {
+        "width": 1136,
+        "height": 1385,
+        "hasAlpha": true,
+        "format": "png",
+        "bytes": 2102367,
+        "sha256": "10d6a1add7cf0cda3f892c9e83144d12164a9d355f5de24bbc8ac9d5f9acdc35",
+        "alpha": {
+          "transparentPixels": 480516,
+          "opaquePixels": 646,
+          "partialPixels": 1092198,
+          "min": 0,
+          "max": 255,
+          "transparentFraction": 0.3054075354655006
+        },
+        "alphaBounds": {
+          "left": 0,
+          "top": 36,
+          "width": 1118,
+          "height": 1315
+        },
+        "visibleAlphaBounds": {
+          "threshold": 16,
+          "left": 115,
+          "top": 101,
+          "width": 932,
+          "height": 1198
+        }
+      },
+      "source": {
+        "width": 1136,
+        "height": 1385,
+        "hasAlpha": true,
+        "format": "png",
+        "bytes": 2102367,
+        "sha256": "10d6a1add7cf0cda3f892c9e83144d12164a9d355f5de24bbc8ac9d5f9acdc35",
+        "alpha": {
+          "transparentPixels": 480516,
+          "opaquePixels": 646,
+          "partialPixels": 1092198,
+          "min": 0,
+          "max": 255,
+          "transparentFraction": 0.3054075354655006
+        },
+        "alphaBounds": {
+          "left": 0,
+          "top": 36,
+          "width": 1118,
+          "height": 1315
+        },
+        "visibleAlphaBounds": {
+          "threshold": 16,
+          "left": 115,
+          "top": 101,
+          "width": 932,
+          "height": 1198
+        }
+      },
+      "runtime": {
+        "width": 201,
+        "height": 256,
+        "hasAlpha": true,
+        "format": "png",
+        "bytes": 117889,
+        "sha256": "259f2e7a541f9c9e436f3ee5b736c1e2d6f17811deadc1dcc0e3ff7839c02621",
+        "alpha": {
+          "transparentPixels": 3760,
+          "opaquePixels": 714,
+          "partialPixels": 46982,
+          "min": 0,
+          "max": 255,
+          "transparentFraction": 0.07307213930348258
+        },
+        "alphaBounds": {
+          "left": 2,
+          "top": 2,
+          "width": 197,
+          "height": 252
+        },
+        "visibleAlphaBounds": {
+          "threshold": 16,
+          "left": 3,
+          "top": 3,
+          "width": 195,
+          "height": 250
+        }
+      },
+      "processing": {
+        "operations": [
+          "copy original unchanged",
+          "derive crop from alpha > 16 visible bounds plus 8 source pixels of margin; crop rectangle only, never threshold or repaint alpha",
+          "resize proportionally to height 252 with Lanczos3",
+          "add 2 transparent pixels on all edges for final height 256",
+          "PNG compression level 9"
+        ],
+        "crop": {
+          "left": 107,
+          "top": 93,
+          "width": 948,
+          "height": 1214
+        },
+        "visibleAlphaThreshold": 16,
+        "sourceMarginPixels": 8,
+        "alphaPreserved": true
+      },
+      "visualQA": {
+        "sourceInspected": true,
+        "runtimeInspected": true,
+        "notes": "Original and full-height runtime contact inspected. Complete upright book, thin left spine and bottom pages, correct motif, no unintended title text, transparent outer border, no clipping. Korean 가/나/다 and English Hello visually checked where requested."
+      },
+      "validation": {
+        "originalCopyHashMatches": true,
+        "runtimeHeight256": true,
+        "outermostBorderFullyTransparent": true
+      }
+    },
+    {
+      "id": "music-friends",
+      "motif": "A small acoustic guitar, tambourine and tiny hand drum in a compact harmonious arrangement. Muted warm mauve book cover. A few music notes may be drawn as decoration, but absolutely no letters or words.",
+      "prompt": "Use case: illustration-story. Asset type: transparent 2D mobile game inventory sprite, one closed upright portrait picture book. Create a brand-new single book isolated on a genuinely transparent background with actual alpha. Style: cozy hand-drawn storybook object art, medium-weight warm dark brown outlines, softly rounded corners, matte cel shading with very subtle paper texture. Composition: the broad flat front cover faces the viewer straight on, with only a thin visible rounded spine on the LEFT and a narrow cream page edge along the BOTTOM; no angled or isometric camera. Full book visible with clear transparent margin, centered, no cast shadow outside the book. Book proportions approximately width 0.82 times height. Cover design: A small acoustic guitar, tambourine and tiny hand drum in a compact harmonious arrangement. Muted warm mauve book cover. A few music notes may be drawn as decoration, but absolutely no letters or words. Keep motifs bold and simple enough to recognize at 80 pixels high. Small leaf sprigs in cover corners echo a gentle storybook ornament style, no clutter. The spine has two small gold bands and one tiny botanical ornament. Constraints: one book only, no environment, no desk, no extra loose objects outside the book silhouette, no title text, no author text, no logo, no watermark, no artificial checkerboard, no white or colored background.",
+      "tool": "image_gen.imagegen",
+      "originalReturnedPath": "C:\\Users\\PC\\.codex\\generated_images\\01a0f3e1-27c3-7c90-9e5e-aa370d863739\\exec-2728729f-add3-480d-9ffe-9217749d0f10.png",
+      "sourcePath": "C:/Users/PC/Documents/Oneuldo/frontend/assets/images/game/library/books-v3/source/music-friends.png",
+      "runtimePath": "C:/Users/PC/Documents/Oneuldo/frontend/assets/images/game/library/books-v3/music-friends.png",
+      "original": {
+        "width": 1138,
+        "height": 1382,
+        "hasAlpha": true,
+        "format": "png",
+        "bytes": 2121508,
+        "sha256": "6432b9e204ffbd54f9553e0983d799e67c78541b2882a92e62a6ff36fb70b234",
+        "alpha": {
+          "transparentPixels": 391512,
+          "opaquePixels": 960,
+          "partialPixels": 1180244,
+          "min": 0,
+          "max": 255,
+          "transparentFraction": 0.2489400502061402
+        },
+        "alphaBounds": {
+          "left": 85,
+          "top": 75,
+          "width": 974,
+          "height": 1251
+        },
+        "visibleAlphaBounds": {
+          "threshold": 16,
+          "left": 90,
+          "top": 77,
+          "width": 961,
+          "height": 1232
+        }
+      },
+      "source": {
+        "width": 1138,
+        "height": 1382,
+        "hasAlpha": true,
+        "format": "png",
+        "bytes": 2121508,
+        "sha256": "6432b9e204ffbd54f9553e0983d799e67c78541b2882a92e62a6ff36fb70b234",
+        "alpha": {
+          "transparentPixels": 391512,
+          "opaquePixels": 960,
+          "partialPixels": 1180244,
+          "min": 0,
+          "max": 255,
+          "transparentFraction": 0.2489400502061402
+        },
+        "alphaBounds": {
+          "left": 85,
+          "top": 75,
+          "width": 974,
+          "height": 1251
+        },
+        "visibleAlphaBounds": {
+          "threshold": 16,
+          "left": 90,
+          "top": 77,
+          "width": 961,
+          "height": 1232
+        }
+      },
+      "runtime": {
+        "width": 201,
+        "height": 256,
+        "hasAlpha": true,
+        "format": "png",
+        "bytes": 117000,
+        "sha256": "e4c8a91c675938543dcdfc6c6bda667debd954f57dcb2997aa39dbdb22990bdf",
+        "alpha": {
+          "transparentPixels": 2945,
+          "opaquePixels": 572,
+          "partialPixels": 47939,
+          "min": 0,
+          "max": 255,
+          "transparentFraction": 0.05723336442786069
+        },
+        "alphaBounds": {
+          "left": 2,
+          "top": 2,
+          "width": 197,
+          "height": 252
+        },
+        "visibleAlphaBounds": {
+          "threshold": 16,
+          "left": 3,
+          "top": 3,
+          "width": 195,
+          "height": 250
+        }
+      },
+      "processing": {
+        "operations": [
+          "copy original unchanged",
+          "derive crop from alpha > 16 visible bounds plus 8 source pixels of margin; crop rectangle only, never threshold or repaint alpha",
+          "resize proportionally to height 252 with Lanczos3",
+          "add 2 transparent pixels on all edges for final height 256",
+          "PNG compression level 9"
+        ],
+        "crop": {
+          "left": 82,
+          "top": 69,
+          "width": 977,
+          "height": 1248
+        },
+        "visibleAlphaThreshold": 16,
+        "sourceMarginPixels": 8,
+        "alphaPreserved": true
+      },
+      "visualQA": {
+        "sourceInspected": true,
+        "runtimeInspected": true,
+        "notes": "Original and full-height runtime contact inspected. Complete upright book, thin left spine and bottom pages, correct motif, no unintended title text, transparent outer border, no clipping. Korean 가/나/다 and English Hello visually checked where requested."
+      },
+      "validation": {
+        "originalCopyHashMatches": true,
+        "runtimeHeight256": true,
+        "outermostBorderFullyTransparent": true
+      }
+    },
+    {
+      "id": "korean-words",
+      "motif": "Three friendly cream speech bubbles, each containing exactly one clearly drawn Korean syllable: '가', '나', '다'. Muted coral pink book cover. These three syllables are the only text. No title or other lettering.",
+      "prompt": "Use case: illustration-story. Asset type: transparent 2D mobile game inventory sprite, one closed upright portrait picture book. Create a brand-new single book isolated on a genuinely transparent background with actual alpha. Style: cozy hand-drawn storybook object art, medium-weight warm dark brown outlines, softly rounded corners, matte cel shading with very subtle paper texture. Composition: the broad flat front cover faces the viewer straight on, with only a thin visible rounded spine on the LEFT and a narrow cream page edge along the BOTTOM; no angled or isometric camera. Full book visible with clear transparent margin, centered, no cast shadow outside the book. Book proportions approximately width 0.82 times height. Cover design: Three friendly cream speech bubbles, each containing exactly one clearly drawn Korean syllable: '가', '나', '다'. Muted coral pink book cover. These three syllables are the only text. No title or other lettering. Keep motifs bold and simple enough to recognize at 80 pixels high. Small leaf sprigs in cover corners echo a gentle storybook ornament style, no clutter. The spine has two small gold bands and one tiny botanical ornament. Constraints: one book only, no environment, no desk, no extra loose objects outside the book silhouette, no title text, no author text, no logo, no watermark, no artificial checkerboard, no white or colored background.",
+      "tool": "image_gen.imagegen",
+      "originalReturnedPath": "C:\\Users\\PC\\.codex\\generated_images\\01a0f3e1-27c3-7c90-9e5e-aa370d863739\\exec-9d790bd3-9f44-46a1-b691-9490318fc930.png",
+      "sourcePath": "C:/Users/PC/Documents/Oneuldo/frontend/assets/images/game/library/books-v3/source/korean-words.png",
+      "runtimePath": "C:/Users/PC/Documents/Oneuldo/frontend/assets/images/game/library/books-v3/korean-words.png",
+      "original": {
+        "width": 1136,
+        "height": 1385,
+        "hasAlpha": true,
+        "format": "png",
+        "bytes": 1977936,
+        "sha256": "a3e712a577649bd1d76a75d5c7cf31ecde81ca93d51f4aaa40daac37fdca654f",
+        "alpha": {
+          "transparentPixels": 455564,
+          "opaquePixels": 136,
+          "partialPixels": 1117660,
+          "min": 0,
+          "max": 255,
+          "transparentFraction": 0.2895484822291148
+        },
+        "alphaBounds": {
+          "left": 86,
+          "top": 100,
+          "width": 970,
+          "height": 1261
+        },
+        "visibleAlphaBounds": {
+          "threshold": 16,
+          "left": 93,
+          "top": 104,
+          "width": 953,
+          "height": 1185
+        }
+      },
+      "source": {
+        "width": 1136,
+        "height": 1385,
+        "hasAlpha": true,
+        "format": "png",
+        "bytes": 1977936,
+        "sha256": "a3e712a577649bd1d76a75d5c7cf31ecde81ca93d51f4aaa40daac37fdca654f",
+        "alpha": {
+          "transparentPixels": 455564,
+          "opaquePixels": 136,
+          "partialPixels": 1117660,
+          "min": 0,
+          "max": 255,
+          "transparentFraction": 0.2895484822291148
+        },
+        "alphaBounds": {
+          "left": 86,
+          "top": 100,
+          "width": 970,
+          "height": 1261
+        },
+        "visibleAlphaBounds": {
+          "threshold": 16,
+          "left": 93,
+          "top": 104,
+          "width": 953,
+          "height": 1185
+        }
+      },
+      "runtime": {
+        "width": 207,
+        "height": 256,
+        "hasAlpha": true,
+        "format": "png",
+        "bytes": 111214,
+        "sha256": "bd82c7e70fc7248697ab72c8bd3de259163181f608a710d10322de088e43a4e6",
+        "alpha": {
+          "transparentPixels": 2999,
+          "opaquePixels": 760,
+          "partialPixels": 49233,
+          "min": 0,
+          "max": 255,
+          "transparentFraction": 0.05659344806763285
+        },
+        "alphaBounds": {
+          "left": 2,
+          "top": 2,
+          "width": 203,
+          "height": 252
+        },
+        "visibleAlphaBounds": {
+          "threshold": 16,
+          "left": 3,
+          "top": 3,
+          "width": 201,
+          "height": 250
+        }
+      },
+      "processing": {
+        "operations": [
+          "copy original unchanged",
+          "derive crop from alpha > 16 visible bounds plus 8 source pixels of margin; crop rectangle only, never threshold or repaint alpha",
+          "resize proportionally to height 252 with Lanczos3",
+          "add 2 transparent pixels on all edges for final height 256",
+          "PNG compression level 9"
+        ],
+        "crop": {
+          "left": 85,
+          "top": 96,
+          "width": 969,
+          "height": 1201
+        },
+        "visibleAlphaThreshold": 16,
+        "sourceMarginPixels": 8,
+        "alphaPreserved": true
+      },
+      "visualQA": {
+        "sourceInspected": true,
+        "runtimeInspected": true,
+        "notes": "Original and full-height runtime contact inspected. Complete upright book, thin left spine and bottom pages, correct motif, no unintended title text, transparent outer border, no clipping. Korean 가/나/다 and English Hello visually checked where requested."
+      },
+      "validation": {
+        "originalCopyHashMatches": true,
+        "runtimeHeight256": true,
+        "outermostBorderFullyTransparent": true
+      }
+    },
+    {
+      "id": "english-hello",
+      "motif": "A friendly cream speech bubble containing exactly 'Hello' in simple readable hand lettering, above two small waving hands. Muted periwinkle blue book cover. 'Hello' is the only text. No title or other lettering.",
+      "prompt": "Use case: illustration-story. Asset type: transparent 2D mobile game inventory sprite, one closed upright portrait picture book. Create a brand-new single book isolated on a genuinely transparent background with actual alpha. Style: cozy hand-drawn storybook object art, medium-weight warm dark brown outlines, softly rounded corners, matte cel shading with very subtle paper texture. Composition: the broad flat front cover faces the viewer straight on, with only a thin visible rounded spine on the LEFT and a narrow cream page edge along the BOTTOM; no angled or isometric camera. Full book visible with clear transparent margin, centered, no cast shadow outside the book. Book proportions approximately width 0.82 times height. Cover design: A friendly cream speech bubble containing exactly 'Hello' in simple readable hand lettering, above two small waving hands. Muted periwinkle blue book cover. 'Hello' is the only text. No title or other lettering. Keep motifs bold and simple enough to recognize at 80 pixels high. Small leaf sprigs in cover corners echo a gentle storybook ornament style, no clutter. The spine has two small gold bands and one tiny botanical ornament. Constraints: one book only, no environment, no desk, no extra loose objects outside the book silhouette, no title text, no author text, no logo, no watermark, no artificial checkerboard, no white or colored background.",
+      "tool": "image_gen.imagegen",
+      "originalReturnedPath": "C:\\Users\\PC\\.codex\\generated_images\\01a0f3e1-27c3-7c90-9e5e-aa370d863739\\exec-982fa8f0-f122-4dc3-b19c-a9fc4779bb7c.png",
+      "sourcePath": "C:/Users/PC/Documents/Oneuldo/frontend/assets/images/game/library/books-v3/source/english-hello.png",
+      "runtimePath": "C:/Users/PC/Documents/Oneuldo/frontend/assets/images/game/library/books-v3/english-hello.png",
+      "original": {
+        "width": 1136,
+        "height": 1385,
+        "hasAlpha": true,
+        "format": "png",
+        "bytes": 1747886,
+        "sha256": "4488e074d9e633f65148df1f544cd67d59a7e9fc030aea1441a7e6d07508816a",
+        "alpha": {
+          "transparentPixels": 610830,
+          "opaquePixels": 8,
+          "partialPixels": 962522,
+          "min": 0,
+          "max": 255,
+          "transparentFraction": 0.38823282656226166
+        },
+        "alphaBounds": {
+          "left": 103,
+          "top": 52,
+          "width": 927,
+          "height": 1247
+        },
+        "visibleAlphaBounds": {
+          "threshold": 16,
+          "left": 130,
+          "top": 161,
+          "width": 892,
+          "height": 1090
+        }
+      },
+      "source": {
+        "width": 1136,
+        "height": 1385,
+        "hasAlpha": true,
+        "format": "png",
+        "bytes": 1747886,
+        "sha256": "4488e074d9e633f65148df1f544cd67d59a7e9fc030aea1441a7e6d07508816a",
+        "alpha": {
+          "transparentPixels": 610830,
+          "opaquePixels": 8,
+          "partialPixels": 962522,
+          "min": 0,
+          "max": 255,
+          "transparentFraction": 0.38823282656226166
+        },
+        "alphaBounds": {
+          "left": 103,
+          "top": 52,
+          "width": 927,
+          "height": 1247
+        },
+        "visibleAlphaBounds": {
+          "threshold": 16,
+          "left": 130,
+          "top": 161,
+          "width": 892,
+          "height": 1090
+        }
+      },
+      "runtime": {
+        "width": 211,
+        "height": 256,
+        "hasAlpha": true,
+        "format": "png",
+        "bytes": 118423,
+        "sha256": "bdb588ecf92cc56fe26ffd478e96dcd214a54cf5891a0ea55fa3134f132796bc",
+        "alpha": {
+          "transparentPixels": 3483,
+          "opaquePixels": 788,
+          "partialPixels": 49745,
+          "min": 0,
+          "max": 255,
+          "transparentFraction": 0.06448089454976304
+        },
+        "alphaBounds": {
+          "left": 2,
+          "top": 2,
+          "width": 207,
+          "height": 252
+        },
+        "visibleAlphaBounds": {
+          "threshold": 16,
+          "left": 3,
+          "top": 3,
+          "width": 204,
+          "height": 250
+        }
+      },
+      "processing": {
+        "operations": [
+          "copy original unchanged",
+          "derive crop from alpha > 16 visible bounds plus 8 source pixels of margin; crop rectangle only, never threshold or repaint alpha",
+          "resize proportionally to height 252 with Lanczos3",
+          "add 2 transparent pixels on all edges for final height 256",
+          "PNG compression level 9"
+        ],
+        "crop": {
+          "left": 122,
+          "top": 153,
+          "width": 908,
+          "height": 1106
+        },
+        "visibleAlphaThreshold": 16,
+        "sourceMarginPixels": 8,
+        "alphaPreserved": true
+      },
+      "visualQA": {
+        "sourceInspected": true,
+        "runtimeInspected": true,
+        "notes": "Original and full-height runtime contact inspected. Complete upright book, thin left spine and bottom pages, correct motif, no unintended title text, transparent outer border, no clipping. Korean 가/나/다 and English Hello visually checked where requested."
+      },
+      "validation": {
+        "originalCopyHashMatches": true,
+        "runtimeHeight256": true,
+        "outermostBorderFullyTransparent": true
+      }
+    },
+    {
+      "id": "korea-history",
+      "motif": "A Korean traditional royal palace pavilion with curved dark teal tiled roof, restrained red wooden pillars, and cream stone stairs. Simplified Korean dancheong trim. Muted parchment beige book cover. Absolutely no letters, flags, numbers or text.",
+      "prompt": "Use case: illustration-story. Asset type: transparent 2D mobile game inventory sprite, one closed upright portrait picture book. Create a brand-new single book isolated on a genuinely transparent background with actual alpha. Style: cozy hand-drawn storybook object art, medium-weight warm dark brown outlines, softly rounded corners, matte cel shading with very subtle paper texture. Composition: the broad flat front cover faces the viewer straight on, with only a thin visible rounded spine on the LEFT and a narrow cream page edge along the BOTTOM; no angled or isometric camera. Full book visible with clear transparent margin, centered, no cast shadow outside the book. Book proportions approximately width 0.82 times height. Cover design: A Korean traditional royal palace pavilion with curved dark teal tiled roof, restrained red wooden pillars, and cream stone stairs. Simplified Korean dancheong trim. Muted parchment beige book cover. Absolutely no letters, flags, numbers or text. Keep motifs bold and simple enough to recognize at 80 pixels high. Small leaf sprigs in cover corners echo a gentle storybook ornament style, no clutter. The spine has two small gold bands and one tiny botanical ornament. Constraints: one book only, no environment, no desk, no extra loose objects outside the book silhouette, no title text, no author text, no logo, no watermark, no artificial checkerboard, no white or colored background.",
+      "tool": "image_gen.imagegen",
+      "originalReturnedPath": "C:\\Users\\PC\\.codex\\generated_images\\01a0f3e1-27c3-7c90-9e5e-aa370d863739\\exec-ac411928-389b-45bb-99f6-f18826c0955c.png",
+      "sourcePath": "C:/Users/PC/Documents/Oneuldo/frontend/assets/images/game/library/books-v3/source/korea-history.png",
+      "runtimePath": "C:/Users/PC/Documents/Oneuldo/frontend/assets/images/game/library/books-v3/korea-history.png",
+      "original": {
+        "width": 1136,
+        "height": 1385,
+        "hasAlpha": true,
+        "format": "png",
+        "bytes": 2285874,
+        "sha256": "1a41d413fe749c22d98d5285c0f4668bc8ae55ea7ffb97610efbba98880b3f46",
+        "alpha": {
+          "transparentPixels": 405381,
+          "opaquePixels": 857,
+          "partialPixels": 1167122,
+          "min": 0,
+          "max": 255,
+          "transparentFraction": 0.25765304825341945
+        },
+        "alphaBounds": {
+          "left": 0,
+          "top": 78,
+          "width": 1088,
+          "height": 1231
+        },
+        "visibleAlphaBounds": {
+          "threshold": 16,
+          "left": 84,
+          "top": 87,
+          "width": 971,
+          "height": 1217
+        }
+      },
+      "source": {
+        "width": 1136,
+        "height": 1385,
+        "hasAlpha": true,
+        "format": "png",
+        "bytes": 2285874,
+        "sha256": "1a41d413fe749c22d98d5285c0f4668bc8ae55ea7ffb97610efbba98880b3f46",
+        "alpha": {
+          "transparentPixels": 405381,
+          "opaquePixels": 857,
+          "partialPixels": 1167122,
+          "min": 0,
+          "max": 255,
+          "transparentFraction": 0.25765304825341945
+        },
+        "alphaBounds": {
+          "left": 0,
+          "top": 78,
+          "width": 1088,
+          "height": 1231
+        },
+        "visibleAlphaBounds": {
+          "threshold": 16,
+          "left": 84,
+          "top": 87,
+          "width": 971,
+          "height": 1217
+        }
+      },
+      "runtime": {
+        "width": 206,
+        "height": 256,
+        "hasAlpha": true,
+        "format": "png",
+        "bytes": 132415,
+        "sha256": "24c1a9c7dd7c3f8ac708cc51291bd2d3a6f8d7b5f4d99756dba526a2f6664338",
+        "alpha": {
+          "transparentPixels": 3379,
+          "opaquePixels": 682,
+          "partialPixels": 48675,
+          "min": 0,
+          "max": 255,
+          "transparentFraction": 0.06407387742718447
+        },
+        "alphaBounds": {
+          "left": 2,
+          "top": 2,
+          "width": 202,
+          "height": 252
+        },
+        "visibleAlphaBounds": {
+          "threshold": 16,
+          "left": 3,
+          "top": 3,
+          "width": 200,
+          "height": 250
+        }
+      },
+      "processing": {
+        "operations": [
+          "copy original unchanged",
+          "derive crop from alpha > 16 visible bounds plus 8 source pixels of margin; crop rectangle only, never threshold or repaint alpha",
+          "resize proportionally to height 252 with Lanczos3",
+          "add 2 transparent pixels on all edges for final height 256",
+          "PNG compression level 9"
+        ],
+        "crop": {
+          "left": 76,
+          "top": 79,
+          "width": 987,
+          "height": 1233
+        },
+        "visibleAlphaThreshold": 16,
+        "sourceMarginPixels": 8,
+        "alphaPreserved": true
+      },
+      "visualQA": {
+        "sourceInspected": true,
+        "runtimeInspected": true,
+        "notes": "Original and full-height runtime contact inspected. Complete upright book, thin left spine and bottom pages, correct motif, no unintended title text, transparent outer border, no clipping. Korean 가/나/다 and English Hello visually checked where requested."
+      },
+      "validation": {
+        "originalCopyHashMatches": true,
+        "runtimeHeight256": true,
+        "outermostBorderFullyTransparent": true
+      }
+    },
+    {
+      "id": "world-map",
+      "motif": "A small illustrated round blue and green globe in a brown wooden stand, with a folded pale map tucked behind it. Muted sea teal book cover. Simplified recognizable continental land masses. Absolutely no letters, labels or numbers.",
+      "prompt": "Use case: illustration-story. Asset type: transparent 2D mobile game inventory sprite, one closed upright portrait picture book. Create a brand-new single book isolated on a genuinely transparent background with actual alpha. Style: cozy hand-drawn storybook object art, medium-weight warm dark brown outlines, softly rounded corners, matte cel shading with very subtle paper texture. Composition: the broad flat front cover faces the viewer straight on, with only a thin visible rounded spine on the LEFT and a narrow cream page edge along the BOTTOM; no angled or isometric camera. Full book visible with clear transparent margin, centered, no cast shadow outside the book. Book proportions approximately width 0.82 times height. Cover design: A small illustrated round blue and green globe in a brown wooden stand, with a folded pale map tucked behind it. Muted sea teal book cover. Simplified recognizable continental land masses. Absolutely no letters, labels or numbers. Keep motifs bold and simple enough to recognize at 80 pixels high. Small leaf sprigs in cover corners echo a gentle storybook ornament style, no clutter. The spine has two small gold bands and one tiny botanical ornament. Constraints: one book only, no environment, no desk, no extra loose objects outside the book silhouette, no title text, no author text, no logo, no watermark, no artificial checkerboard, no white or colored background.",
+      "tool": "image_gen.imagegen",
+      "originalReturnedPath": "C:\\Users\\PC\\.codex\\generated_images\\01a0f3e1-27c3-7c90-9e5e-aa370d863739\\exec-1fd145e7-9237-477a-9700-646b59c0f3b9.png",
+      "sourcePath": "C:/Users/PC/Documents/Oneuldo/frontend/assets/images/game/library/books-v3/source/world-map.png",
+      "runtimePath": "C:/Users/PC/Documents/Oneuldo/frontend/assets/images/game/library/books-v3/world-map.png",
+      "original": {
+        "width": 1137,
+        "height": 1383,
+        "hasAlpha": true,
+        "format": "png",
+        "bytes": 1716940,
+        "sha256": "46502825824b670e6dd62115f427db0b020237a25ebd8f16e8f8c38aa038e10e",
+        "alpha": {
+          "transparentPixels": 665970,
+          "opaquePixels": 306,
+          "partialPixels": 906195,
+          "min": 0,
+          "max": 255,
+          "transparentFraction": 0.4235181443727738
+        },
+        "alphaBounds": {
+          "left": 0,
+          "top": 19,
+          "width": 997,
+          "height": 1364
+        },
+        "visibleAlphaBounds": {
+          "threshold": 16,
+          "left": 152,
+          "top": 156,
+          "width": 836,
+          "height": 1085
+        }
+      },
+      "source": {
+        "width": 1137,
+        "height": 1383,
+        "hasAlpha": true,
+        "format": "png",
+        "bytes": 1716940,
+        "sha256": "46502825824b670e6dd62115f427db0b020237a25ebd8f16e8f8c38aa038e10e",
+        "alpha": {
+          "transparentPixels": 665970,
+          "opaquePixels": 306,
+          "partialPixels": 906195,
+          "min": 0,
+          "max": 255,
+          "transparentFraction": 0.4235181443727738
+        },
+        "alphaBounds": {
+          "left": 0,
+          "top": 19,
+          "width": 997,
+          "height": 1364
+        },
+        "visibleAlphaBounds": {
+          "threshold": 16,
+          "left": 152,
+          "top": 156,
+          "width": 836,
+          "height": 1085
+        }
+      },
+      "runtime": {
+        "width": 199,
+        "height": 256,
+        "hasAlpha": true,
+        "format": "png",
+        "bytes": 125595,
+        "sha256": "6481890cecf43b673b58e34c5443442e3f4112e0bda69b3b28893a6beeea3fb5",
+        "alpha": {
+          "transparentPixels": 2966,
+          "opaquePixels": 786,
+          "partialPixels": 47192,
+          "min": 0,
+          "max": 255,
+          "transparentFraction": 0.05822079145728643
+        },
+        "alphaBounds": {
+          "left": 2,
+          "top": 2,
+          "width": 195,
+          "height": 252
+        },
+        "visibleAlphaBounds": {
+          "threshold": 16,
+          "left": 3,
+          "top": 3,
+          "width": 193,
+          "height": 250
+        }
+      },
+      "processing": {
+        "operations": [
+          "copy original unchanged",
+          "derive crop from alpha > 16 visible bounds plus 8 source pixels of margin; crop rectangle only, never threshold or repaint alpha",
+          "resize proportionally to height 252 with Lanczos3",
+          "add 2 transparent pixels on all edges for final height 256",
+          "PNG compression level 9"
+        ],
+        "crop": {
+          "left": 144,
+          "top": 148,
+          "width": 852,
+          "height": 1101
+        },
+        "visibleAlphaThreshold": 16,
+        "sourceMarginPixels": 8,
+        "alphaPreserved": true
+      },
+      "visualQA": {
+        "sourceInspected": true,
+        "runtimeInspected": true,
+        "notes": "Original and full-height runtime contact inspected. Complete upright book, thin left spine and bottom pages, correct motif, no unintended title text, transparent outer border, no clipping. Korean 가/나/다 and English Hello visually checked where requested."
+      },
+      "validation": {
+        "originalCopyHashMatches": true,
+        "runtimeHeight256": true,
+        "outermostBorderFullyTransparent": true
+      }
+    }
+  ]
+}

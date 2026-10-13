@@ -1,15 +1,21 @@
 import { useSyncExternalStore } from 'react';
 import { Platform } from 'react-native';
+import type { RunMode } from './movementControls';
+import { isMarketInteriorTheme, type MarketInteriorThemeId } from './marketInteriorThemes';
 
 export type GamePreferences = {
   musicVolume: number;
   effectsVolume: number;
   wallpaperColor: string;
+  runMode: RunMode;
+  marketInteriorTheme: MarketInteriorThemeId;
 };
 export const DEFAULT_GAME_PREFERENCES: Readonly<GamePreferences> = Object.freeze({
   musicVolume: 1,
   effectsVolume: 1,
   wallpaperColor: '#F2F0E5',
+  runMode: 'distance',
+  marketInteriorTheme: 'classic',
 });
 export const GAME_PREFERENCES_STORAGE_KEY = 'oneuldo.game-preferences.v1';
 export type GamePreferencesStorage = Pick<Storage, 'getItem' | 'setItem'>;
@@ -21,7 +27,9 @@ function normalize(patch: unknown, previous: Readonly<GamePreferences>): Readonl
   const wallpaperColor = typeof data.wallpaperColor === 'string' && /^#[0-9a-f]{6}$/i.test(data.wallpaperColor)
     ? data.wallpaperColor.toUpperCase() : previous.wallpaperColor;
   return Object.freeze({ musicVolume: volume(data.musicVolume, previous.musicVolume),
-    effectsVolume: volume(data.effectsVolume, previous.effectsVolume), wallpaperColor });
+    effectsVolume: volume(data.effectsVolume, previous.effectsVolume), wallpaperColor,
+    runMode: data.runMode === 'distance' || data.runMode === 'toggle' ? data.runMode : previous.runMode,
+    marketInteriorTheme: isMarketInteriorTheme(data.marketInteriorTheme) ? data.marketInteriorTheme : previous.marketInteriorTheme });
 }
 function browserStorage(): GamePreferencesStorage | null {
   if (Platform.OS !== 'web') return null;
@@ -51,7 +59,7 @@ export function createGamePreferencesStore(storageProvider: () => GamePreference
   const update = (patch: Partial<GamePreferences>) => {
     initialize();
     const next = normalize(patch, current);
-    if (next.musicVolume === current.musicVolume && next.effectsVolume === current.effectsVolume && next.wallpaperColor === current.wallpaperColor) return current;
+    if (next.musicVolume === current.musicVolume && next.effectsVolume === current.effectsVolume && next.wallpaperColor === current.wallpaperColor && next.runMode === current.runMode && next.marketInteriorTheme === current.marketInteriorTheme) return current;
     current = next;
     try { storageProvider()?.setItem(GAME_PREFERENCES_STORAGE_KEY, JSON.stringify({ version: 1, preferences: current })); }
     catch { /* Retain the new in-memory values even if saving is denied or full. */ }

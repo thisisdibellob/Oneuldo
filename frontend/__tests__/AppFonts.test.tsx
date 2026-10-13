@@ -41,6 +41,10 @@ jest.mock('../src/screens/MarketSimulationScreen', () => {
   const { Text } = jest.requireActual('react-native');
   return { MarketSimulationScreen: () => <Text>마트 본문</Text> };
 });
+jest.mock('../src/screens/GamePrototypeScreen', () => {
+  const { Text } = jest.requireActual('react-native');
+  return { GamePrototypeScreen: () => <Text>마을 본문</Text> };
+});
 jest.mock('expo-status-bar', () => ({ StatusBar: () => null }));
 jest.mock('react-native-safe-area-context', () => {
   const { View } = jest.requireActual('react-native');

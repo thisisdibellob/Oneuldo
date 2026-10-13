@@ -2,9 +2,11 @@ import { DIALOGUE_CHARACTER_DELAY, DIALOGUE_CLEAR_VOLUME, isSilentGamePreview } 
 import { useDialogueAudio } from '../components/game/useDialogueAudio';
 import { useGamePreferences } from '../game/gamePreferences';
 import { getMarketNavigationPath } from '../game/marketNavigation';
+import { getVillageNavigationPath, isVillageNavigationBlocked, isVillageNavigationSegmentClear, VILLAGE_PLAYER_RADIUS, VILLAGE_BUS_STOP_INTERACTION_DISTANCE } from '../game/villageNavigation';
 import { getMarketRecoveryPoint } from '../game/marketRecovery';
+import { getVillageRenderDepth } from '../game/villageStreets';
 import { Ionicons } from '@expo/vector-icons';
-import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
+import { setAudioModeAsync, useAudioPlayer } from 'expo-audio';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -25,8 +27,15 @@ import {
 import { icons } from '../assets';
 import { DirectionalAvatar } from '../components/game/DirectionalAvatar';
 import { GameHud } from '../components/game/GameHud';
+import { GameBackgroundMusic } from '../components/game/GameBackgroundMusic';
+import { BusRoutePanel, BusTimetable } from '../components/game/BusJourneyPanels';
+import { BusArrivalPreview } from '../components/game/BusArrivalPreview';
+import type { PhoneTravelDestination } from '../components/game/GamePhonePanel';
+import { GameControls } from '../components/game/GameControls';
+import { RUN_SPEED_MULTIPLIER, type GameMovementInput } from '../game/movementControls';
 import { GameContactCall } from '../components/game/GameContactCall';
 import { MarketPanelTransition } from '../components/game/MarketPanelTransition';
+import { LibraryButton, LibraryPanel } from '../components/game/LibraryWorkPanel';
 import { MinsuDialoguePortrait } from '../components/game/MinsuDialoguePortrait';
 import {
   MarketShelfTarget,
@@ -87,7 +96,8 @@ import {
   type VillageNpcId,
   type WorldMapId,
 } from '../game/prototypeWorld';
-import { marketCategories } from '../game/scenarios';
+import { getMarketProduct, marketCategories } from '../game/scenarios';
+import { createBusSession, getBusDestination, getDriverReply, reduceBusSession, type BusRouteId, type BusSession } from '../game/busSession';
 import {
   clampWorldZoom,
   getWorldCameraFrame,
@@ -104,23 +114,36 @@ import {
 } from './MarketSimulationScreen';
 import { CashierSimulationScreen } from './CashierSimulationScreen';
 import { CookingSimulationScreen } from './CookingSimulationScreen';
+import { LibrarySimulationScreen } from './LibrarySimulationScreen';
+import { BusSimulationScreen } from './BusSimulationScreen';
+import { DayJourneyPanel } from '../components/game/DayJourneyPanel';
+import { DAY_JOURNEY_GUIDANCE, clearDayBusDraft, dayJourneyStep, dispatchDayJourney, getDayJourney, getDayLibraryDraft, getDayBusDraft, keepDayLibraryDraft, keepDayBusDraft, useDayJourney } from '../game/dayJourney';
+import type { LibrarySession } from '../game/librarySession';
+import { getLibraryResult } from '../game/librarySession';
+import { ShoppingErrandPanel } from '../components/game/ShoppingErrandPanel';
+import { getShoppingErrandMarketConfig, type ShoppingErrandAction } from '../game/shoppingErrand';
+import { dispatchShoppingErrand, getShoppingErrand, offerShoppingErrand, useShoppingErrand } from '../game/shoppingErrandStore';
+import type { MarketSessionConfig } from '../game/marketSession';
+import type { MarketStoredEpisode } from '../game/marketEpisodeStore';
+import { recordCompletedBusActivity, recordCompletedLibraryActivity, recordCompletedShoppingActivity, recordCompletedDeliveryActivity } from '../game/activityAlbum';
 
 // Add ?muteAudio=1 to developer preview URLs for silent interaction checks.
 
-const PLAYER_RADIUS = 22;
+const PLAYER_RADIUS = VILLAGE_PLAYER_RADIUS;
 const PLAYER_ART_SCALE = 0.5;
 const PLAYER_ART_HEIGHT = MODULAR_CHARACTER_CANVAS.height * PLAYER_ART_SCALE;
 const PLAYER_ART_WIDTH = MODULAR_CHARACTER_CANVAS.width * PLAYER_ART_SCALE;
 const PLAYER_ART_PIVOT_Y = MODULAR_CHARACTER_CANVAS.pivotY * PLAYER_ART_SCALE;
 const MOVE_SPEED = 190;
-const RUN_SPEED_MULTIPLIER = 1.55;
-const BACKGROUND_MUSIC_VOLUME = 0.5;
-const BACKGROUND_MUSIC_DUCKED_VOLUME = 0.25;
 const ACCESSIBILITY_STEP = 58;
-const JOYSTICK_RADIUS = 34;
-const JOYSTICK_SIZE = 110;
-const JOYSTICK_ZONE_HEIGHT = 270;
 const DIALOGUE_READ_DELAY = 360;
+type GamePreviewLocation = 'village-stop' | 'library';
+function getPreviewLocation(): GamePreviewLocation | undefined {
+  if (!__DEV__ || Platform.OS !== 'web' || typeof window === 'undefined') return undefined;
+  const query = new URLSearchParams(window.location.search);
+  if (query.get('busPreview') === '1') return 'village-stop';
+  return query.get('libraryPreview') === '1' ? 'library' : undefined;
+}
 
 function touchDistance(touches: readonly { pageX: number; pageY: number }[]): number {
   if (touches.length < 2) return 0;
@@ -138,7 +161,7 @@ const WEB_MOVEMENT_KEYS: Record<string, Point> = {
 };
 
 type DailyConversationChoice = 'fun' | 'tired';
-type NpcInteractionChoice = 'npc-cashier' | 'npc-quest' | 'npc-talk';
+type NpcInteractionChoice = 'npc-cashier' | 'npc-quest' | 'npc-talk' | 'npc-errand';
 type DialogueChoice = DailyConversationChoice | NpcInteractionChoice;
 type DialogueStep =
   | { kind: 'line'; text: string }
@@ -195,7 +218,12 @@ type QuizStep = 'question' | 'result' | null;
 type ControlMode = 'joystick' | 'touch';
 type NearbyMarketStation = MarketEnvironmentStationId | null;
 type NearbyHomeStation = HomeStationId | null;
-type PendingPortal = VillagePortalId | null;
+type VillageGamePortalId = VillagePortalId;
+type PendingPortal = VillageGamePortalId | null;
+
+function getVillagePortalPoint(portal: VillageGamePortalId): Point {
+  return portal === 'market' ? MARKET_ENTRANCE_POINT : HOUSE_ENTRANCE_POINT;
+}
 type DialogueMode = 'minsu-quest' | 'npc-greeting' | 'small-talk' | null;
 type InfoPanel = { body: string; title: string } | null;
 type TapInteractionOptions = {
@@ -207,7 +235,6 @@ type TapInteractionOptions = {
 };
 
 const NPC_QUEST_IDS: Partial<Record<VillageNpcId, DailyQuestId>> = {
-  driver: 'bus-route',
   jiyoung: 'market-shopping',
   minsu: 'minsu-safety',
 };
@@ -217,6 +244,7 @@ function getWorldBounds(worldMap: WorldMapId, environment?: MarketEnvironment) {
 
 function isBlocked(point: Point, worldMap: WorldMapId, environment: MarketEnvironment, cashierCalled: Partial<MarketCashierAvailability> = {}) {
   if (worldMap === 'market') return isMarketEnvironmentBlocked(environment, point, cashierCalled);
+  if (worldMap === 'village') return isVillageNavigationBlocked(point);
   const obstacles = WORLD_OBSTACLES[worldMap];
   return obstacles.some(
     (obstacle) =>
@@ -465,9 +493,21 @@ function MarketWorldLayer({
 
 type GamePrototypeScreenProps = {
   onExit: () => void;
+  initialActivity?: 'day' | 'bus' | 'market' | 'errand';
+  /** Development placement only; normal play always starts in the shared village. */
+  previewLocation?: GamePreviewLocation;
 };
 
-export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
+export function GamePrototypeScreen({ onExit, initialActivity, previewLocation = getPreviewLocation() }: GamePrototypeScreenProps) {
+  const journey = useDayJourney();
+  const errand = useShoppingErrand();
+  const [errandPanelOpen, setErrandPanelOpen] = useState(initialActivity === 'errand' && !!getShoppingErrand());
+  const [errandMarketConfig, setErrandMarketConfig] = useState<Partial<MarketSessionConfig> | undefined>();
+  const openErrandPanel = useCallback(() => setErrandPanelOpen(true), []);
+  const [dayPanelOpen, setDayPanelOpen] = useState(initialActivity === 'day' && ['available', 'completed'].includes(getDayJourney().stage));
+  const openDayPanel = useCallback(() => setDayPanelOpen(true), []);
+  const resumeDayLocation = initialActivity === 'day' || initialActivity === 'errand';
+  const initialPlayerPoint = useRef<Point>(initialActivity === 'market' ? { ...MARKET_RETURN_POINT } : initialActivity === 'bus' || (resumeDayLocation && getDayJourney().stage === 'home') || (__DEV__ && previewLocation === 'village-stop') ? { ...BUS_STOP_POINT } : { ...INITIAL_PLAYER_POINT }).current;
   const DEVELOPMENT_AUDIO_MUTED = isSilentGamePreview();
   const { preferences } = useGamePreferences();
   const effectsVolumeRef = useRef(preferences.effectsVolume);
@@ -478,22 +518,22 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
     downloadFirst: true,
     keepAudioSessionActive: true,
   });
-  const backgroundMusicStatus = useAudioPlayerStatus(backgroundMusic);
   const viewportNode = useRef<View | null>(null);
   const camera = useRef(new Animated.ValueXY()).current;
   const playerCameraOffset = useRef(new Animated.ValueXY()).current;
-  const marketPlayerPosition = useRef(new Animated.ValueXY(INITIAL_PLAYER_POINT)).current;
-  const marketPlayerDepth = useRef(new Animated.Value(getMarketRenderDepth(INITIAL_PLAYER_POINT.y))).current;
-  const cameraCenter = useRef<Point>({ ...INITIAL_PLAYER_POINT });
+  const marketPlayerPosition = useRef(new Animated.ValueXY(initialPlayerPoint)).current;
+  const marketPlayerDepth = useRef(new Animated.Value(getMarketRenderDepth(initialPlayerPoint.y))).current;
+  const villagePlayerPosition = useRef(new Animated.ValueXY(initialPlayerPoint)).current;
+  const villagePlayerDepth = useRef(new Animated.Value(getVillageRenderDepth(initialPlayerPoint.y))).current;
+  const cameraCenter = useRef<Point>({ ...initialPlayerPoint });
   const worldZoom = useRef(new Animated.Value(WORLD_ZOOM_MIN)).current;
-  const joystickKnob = useRef(new Animated.ValueXY()).current;
   const dialoguePanelProgress = useRef(new Animated.Value(0)).current;
   const dailyChoiceProgress = useRef(new Animated.Value(0)).current;
   const quizPanelProgress = useRef(new Animated.Value(0)).current;
   const speakerTagFloat = useRef(new Animated.Value(0)).current;
   const dialogueArrowFloat = useRef(new Animated.Value(0)).current;
   const resultCelebration = useRef(new Animated.Value(0)).current;
-  const playerPoint = useRef<Point>({ ...INITIAL_PLAYER_POINT });
+  const playerPoint = useRef<Point>({ ...initialPlayerPoint });
   const marketMovementListener = useRef<((previous: Point, next: Point) => void) | null>(null);
   const worldMapRef = useRef<WorldMapId>('village');
   const viewport = useRef({ width: 0, height: 0 });
@@ -510,6 +550,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
   const keyboardDirection = useRef<Point>({ x: 0, y: 0 });
   const keyboardEngaged = useRef(false);
   const pressedMovementKeys = useRef(new Set<string>());
+  const keyboardSprintHeld = useRef(false);
   const speedMultiplier = useRef(1);
   const tapTarget = useRef<Point | null>(null);
   const tapWaypoints = useRef<Point[]>([]);
@@ -530,7 +571,6 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
   const homeStationNearbyRef = useRef<NearbyHomeStation>(null);
   const busStopNearbyRef = useRef(false);
   const controlsLockedRef = useRef(false);
-  const joystickZoneSize = useRef({ width: 220, height: JOYSTICK_ZONE_HEIGHT });
   const dialogueReadyAt = useRef(Number.POSITIVE_INFINITY);
   const startNpcGreetingRef = useRef<(npcId: VillageNpcId) => void>(() => undefined);
   const playerFacingRef = useRef<AvatarFacing>('front');
@@ -553,6 +593,27 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
   const [fridgeMenuOpen, setFridgeMenuOpen] = useState(false);
   const [cookingOpen, setCookingOpen] = useState(false);
   const [cashierOpen, setCashierOpen] = useState(false);
+  const [libraryOpen, setLibraryOpen] = useState((__DEV__ && previewLocation === 'library') || (resumeDayLocation && getDayJourney().stage === 'working'));
+  const [busOpen, setBusOpen] = useState(resumeDayLocation && (getDayJourney().stage === 'returning' || !!getDayBusDraft()));
+  const [busEntryPoint, setBusEntryPoint] = useState<'village-stop' | 'library-exterior'>(resumeDayLocation && getDayJourney().stage === 'returning' ? 'library-exterior' : 'village-stop');
+  const [busDestinationOpen, setBusDestinationOpen] = useState(false);
+  const [busDestinationPresent, setBusDestinationPresent] = useState(false);
+  const [villageBusOpen, setVillageBusOpen] = useState(false);
+  const [villageBusPresent, setVillageBusPresent] = useState(false);
+  const [villageBusSession, setVillageBusSession] = useState<BusSession | null>(null);
+  const [villageStopPreview] = useState(() => createBusSession({ id: 'village-stop-sign', startedAt: 0, phase: 'waiting' }));
+  const [busInitialSession, setBusInitialSession] = useState<BusSession | undefined>(() => resumeDayLocation ? getDayBusDraft() : undefined);
+  const [nextVillageBus, setNextVillageBus] = useState<BusRouteId>('201');
+  const [villageDriverReply, setVillageDriverReply] = useState<string | null>(null);
+  const [villageBusReady, setVillageBusReady] = useState(false);
+  const [villageRouteOpen, setVillageRouteOpen] = useState(false);
+  const [busSceneVisit, setBusSceneVisit] = useState(0);
+  useEffect(() => {
+    if (!villageBusOpen || !villageBusSession || villageBusSession.offeredRoute) return;
+    const timer = setTimeout(() => setVillageBusSession(current => current
+      ? reduceBusSession(current, { type: 'ARRIVE_VEHICLE', route: nextVillageBus }) : current), 2200);
+    return () => clearTimeout(timer);
+  }, [villageBusOpen, villageBusSession?.offeredRoute, nextVillageBus]);
   const [worldMap, setWorldMap] = useState<WorldMapId>('village');
   const [audioModeReady, setAudioModeReady] = useState(false);
   const [reduceMotionEnabled, setReduceMotionEnabled] = useState(false);
@@ -562,13 +623,13 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
   const [phoneCallPresent, setPhoneCallPresent] = useState(false);
   const closePhoneCall = useCallback(() => setPhoneContact(null), []);
   const [runEnabled, setRunEnabled] = useState(false);
+  const movementSettingsRef = useRef({ runMode: preferences.runMode, runEnabled });
+  movementSettingsRef.current = { runMode: preferences.runMode, runEnabled };
   const [playerAvatarPose, setPlayerAvatarPose] = useState<{
     facing: AvatarFacing;
     motion: AvatarMotion;
   }>({ facing: 'front', motion: 'idle' });
   const [tapTargetMarker, setTapTargetMarker] = useState<Point | null>(null);
-  const [joystickActive, setJoystickActive] = useState(false);
-  const [joystickCenter, setJoystickCenter] = useState({ x: 76, y: 190 });
   const [questOfferId, setQuestOfferId] = useState<DailyQuestId | null>(null);
   const [infoPanel, setInfoPanel] = useState<InfoPanel>(null);
   const [dialogueMode, setDialogueMode] = useState<DialogueMode>(null);
@@ -632,6 +693,8 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
   const npcActionChoiceOpen =
     currentDialogueStep?.kind === 'choice' && currentDialogueStep.purpose === 'npc-action';
   controlsLockedRef.current =
+    errandPanelOpen ||
+    dayPanelOpen ||
     dialoguePanelMounted ||
     quizPanelMounted ||
     dialogueIndex !== null ||
@@ -644,6 +707,12 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
     fridgeMenuOpen ||
     cookingOpen ||
     cashierOpen ||
+    libraryOpen ||
+    busOpen ||
+    busDestinationOpen ||
+    busDestinationPresent ||
+    villageBusOpen ||
+    villageBusPresent ||
     marketScenarioLocked;
 
   useEffect(() => {
@@ -671,9 +740,12 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
       if (worldMapRef.current === 'market') {
         marketPlayerPosition.setValue(point);
         marketPlayerDepth.setValue(getMarketRenderDepth(point.y));
+      } else if (worldMapRef.current === 'village') {
+        villagePlayerPosition.setValue(point);
+        villagePlayerDepth.setValue(getVillageRenderDepth(point.y));
       }
     },
-    [camera, playerCameraOffset, marketPlayerPosition, marketPlayerDepth],
+    [camera, playerCameraOffset, marketPlayerPosition, marketPlayerDepth, villagePlayerPosition, villagePlayerDepth],
   );
 
   const updateNpcProximity = useCallback((point: Point) => {
@@ -747,14 +819,14 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
         nearbyNpcIdRef.current === npc.id
           ? VILLAGE_NPC_EXIT_DISTANCE
           : VILLAGE_NPC_INTERACTION_DISTANCE;
-      if (distance <= limit && distance < closestNpcDistance) {
+      if (distance <= limit && distance < closestNpcDistance && isVillageNavigationSegmentClear(point, npc.point)) {
         closestNpc = npc.id;
         closestNpcDistance = distance;
       }
     });
     setNpc(closestNpc);
 
-    const portalDistances: Array<[VillagePortalId, number]> = [
+    const portalDistances: Array<[VillageGamePortalId, number]> = [
       [
         'market',
         Math.hypot(point.x - MARKET_ENTRANCE_POINT.x, point.y - MARKET_ENTRANCE_POINT.y),
@@ -771,7 +843,8 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
         nearbyPortalIdRef.current === portal
           ? VILLAGE_PORTAL_INTERACTION_DISTANCE * 1.18
           : VILLAGE_PORTAL_INTERACTION_DISTANCE;
-      if (distance <= limit && distance < closestPortalDistance) {
+      const entrance = getVillagePortalPoint(portal);
+      if (distance <= limit && distance < closestPortalDistance && isVillageNavigationSegmentClear(point, entrance)) {
         closestPortal = portal;
         closestPortalDistance = distance;
       }
@@ -779,7 +852,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
     setPortal(closestPortal);
     setBusStop(
       Math.hypot(point.x - BUS_STOP_POINT.x, point.y - BUS_STOP_POINT.y) <=
-        VILLAGE_PORTAL_INTERACTION_DISTANCE,
+        VILLAGE_BUS_STOP_INTERACTION_DISTANCE,
     );
   }, []);
 
@@ -832,6 +905,9 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
     keyboardDirection.current = { x: 0, y: 0 };
     keyboardEngaged.current = false;
     pressedMovementKeys.current.clear();
+    keyboardSprintHeld.current = false;
+    speedMultiplier.current = movementSettingsRef.current.runMode === 'toggle'
+      && movementSettingsRef.current.runEnabled ? RUN_SPEED_MULTIPLIER : 1;
     joystickEngaged.current = false;
     tapTarget.current = null;
     tapWaypoints.current = [];
@@ -842,20 +918,18 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
     pendingBusStopInteraction.current = false;
     previousFrame.current = null;
     syncPlayerAvatarPose(0, 0, false);
-    setJoystickActive(false);
     setTapTargetMarker(null);
     if (animationFrame.current !== null) {
       cancelAnimationFrame(animationFrame.current);
       animationFrame.current = null;
     }
-    Animated.spring(joystickKnob, {
-      damping: 16,
-      mass: 0.7,
-      stiffness: 240,
-      toValue: { x: 0, y: 0 },
-      useNativeDriver: true,
-    }).start();
-  }, [joystickKnob, syncPlayerAvatarPose]);
+  }, [syncPlayerAvatarPose]);
+
+  useEffect(() => {
+    stopMovement();
+    speedMultiplier.current = 1;
+    setRunEnabled(false);
+  }, [preferences.runMode, stopMovement]);
 
   const handleExit = useCallback(() => {
     stopMovement();
@@ -863,7 +937,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
       setMarketInteractionRequest((request) => ({ id: (request?.id ?? 0) + 1, station: 'give-up' }));
       return;
     }
-    if (backgroundMusicStatus.isLoaded) {
+    if (backgroundMusic.isLoaded) {
       try {
         backgroundMusic.pause();
       } catch {
@@ -871,7 +945,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
       }
     }
     onExit();
-  }, [backgroundMusic, backgroundMusicStatus.isLoaded, onExit, stopMovement]);
+  }, [backgroundMusic, onExit, stopMovement]);
 
   const prepareMapTransition = useCallback(() => {
     stopMovement();
@@ -888,6 +962,14 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
     prepareMapTransition();
     marketVisitNumber.current += 1;
     const environment = createMarketEnvironment({ seed: `market-${Date.now()}-${marketVisitNumber.current}` });
+    const request = getShoppingErrand();
+    if (request?.phase === 'accepted') {
+      const sessionId = `${request.id}-visit-${Date.now()}-${marketVisitNumber.current}`;
+      const at = Date.now();
+      const startedAt = new Date(at).toISOString();
+      dispatchShoppingErrand({ type: 'market-started', sessionId, at });
+      setErrandMarketConfig(getShoppingErrandMarketConfig(getShoppingErrand()!, { sessionId, startedAt, seed: environment.seed }));
+    } else setErrandMarketConfig(undefined);
     marketEnvironmentRef.current = environment;
     setMarketEnvironment(environment);
     marketCashierCalledRef.current = {};
@@ -935,7 +1017,168 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
     playerPoint.current = { ...HOME_PLAYER_POINT };
     updateCamera(playerPoint.current);
     updateNpcProximity(playerPoint.current);
+    if (getDayJourney().stage === 'home') {
+      dispatchDayJourney({ type: 'arrive-home', at: Date.now() });
+      setDayPanelOpen(true);
+    }
   }, [prepareMapTransition, updateCamera, updateNpcProximity]);
+
+  const handleEnterBus = useCallback(() => {
+    if (worldMapRef.current !== 'village' || !busStopNearbyRef.current) return;
+    prepareMapTransition();
+    setHudMenuOpen(false);
+    setPhoneContact(null);
+    controlsLockedRef.current = true;
+    setBusDestinationOpen(true);
+  }, [prepareMapTransition]);
+
+  const handleChooseLibraryDestination = useCallback(() => {
+    prepareMapTransition();
+    setBusDestinationOpen(false);
+    setBusDestinationPresent(false);
+    setBusEntryPoint('village-stop');
+    controlsLockedRef.current = true;
+    const prepared = createBusSession({ destination: 'library', stop: 'village', direction: 'outbound',
+      phase: 'waiting', cardPacked: true, routeOpened: true });
+    setVillageBusSession(reduceBusSession(prepared, { type: 'ARRIVE_VEHICLE', route: '201' }));
+    setVillageDriverReply(null);
+    setVillageBusReady(false);
+    setVillageRouteOpen(false);
+    setVillageBusOpen(true);
+  }, [prepareMapTransition]);
+
+  const handleBoardVillageBus = useCallback(() => {
+    if (!villageBusSession?.offeredRoute || !villageBusReady) return;
+    const boarded = reduceBusSession(villageBusSession, { type: 'BOARD' });
+    if (boarded.phase !== 'boarding') return;
+    prepareMapTransition();
+    setBusInitialSession(boarded);
+    setVillageBusOpen(false);
+    setVillageBusPresent(false);
+    controlsLockedRef.current = true;
+    setBusOpen(true);
+  }, [prepareMapTransition, villageBusReady, villageBusSession]);
+
+  const handleWaitForVillageBus = useCallback(() => {
+    if (!villageBusSession?.offeredRoute || !villageBusReady) return;
+    setNextVillageBus(villageBusSession.offeredRoute === '201' ? '305' : '201');
+    setVillageBusReady(false);
+    setVillageDriverReply(null);
+    setVillageBusSession(reduceBusSession(villageBusSession, { type: 'VEHICLE_LEAVE' }));
+  }, [villageBusReady, villageBusSession]);
+
+  const handleAskVillageDriver = useCallback(() => {
+    if (!villageBusSession?.offeredRoute) return;
+    setVillageDriverReply(getDriverReply(villageBusSession));
+    setVillageBusSession(reduceBusSession(villageBusSession, { type: 'ASK_HELP', source: 'driver' }));
+  }, [villageBusSession]);
+
+  const handleStartLibrary = useCallback(() => {
+    prepareMapTransition();
+    setBusOpen(false);
+    controlsLockedRef.current = true;
+    setLibraryOpen(true);
+  }, [prepareMapTransition]);
+
+  const handleReturnFromActivity = useCallback(() => {
+    prepareMapTransition();
+    clearDayBusDraft();
+    setBusOpen(false);
+    setLibraryOpen(false);
+    setBusDestinationOpen(false);
+    setBusDestinationPresent(false);
+    setVillageBusOpen(false);
+    setVillageBusPresent(false);
+    setBusInitialSession(undefined);
+    worldMapRef.current = 'village';
+    setWorldMap('village');
+    playerPoint.current = { ...BUS_STOP_POINT };
+    updateCamera(playerPoint.current);
+    updateNpcProximity(playerPoint.current);
+  }, [prepareMapTransition, updateCamera, updateNpcProximity]);
+
+  const handleLeaveLibrary = useCallback(() => {
+    prepareMapTransition();
+    setLibraryOpen(false);
+    setBusEntryPoint('library-exterior');
+    setBusInitialSession(undefined);
+    controlsLockedRef.current = true;
+    setBusOpen(true);
+    if (getShoppingErrand()?.phase === 'offered') setErrandPanelOpen(true);
+  }, [prepareMapTransition]);
+
+  const handleTravel = useCallback((destination: PhoneTravelDestination) => {
+    prepareMapTransition();
+    clearDayBusDraft();
+    setHudMenuOpen(false);
+    setPhoneContact(null);
+    setPhoneCallPresent(false);
+    setLibraryOpen(false);
+    setCashierOpen(false);
+    setBusDestinationOpen(false);
+    setBusDestinationPresent(false);
+    setVillageBusOpen(false);
+    setVillageBusPresent(false);
+    setVillageBusSession(null);
+    setVillageBusReady(false);
+    setVillageRouteOpen(false);
+    setBusInitialSession(undefined);
+    setMarketScenarioLocked(false);
+    setMarketInteractionRequest(null);
+    setDialogueIndex(null);
+    setDialogueMode(null);
+    setDialoguePanelMounted(false);
+    setQuizStep(null);
+    setQuizPanelMounted(false);
+    worldMapRef.current = 'village';
+    setWorldMap('village');
+    playerPoint.current = { ...BUS_STOP_POINT };
+    updateCamera(playerPoint.current);
+    updateNpcProximity(playerPoint.current);
+    // A fresh exterior visit cancels the old bus clock and never records a completed trip.
+    setBusSceneVisit(visit => visit + 1);
+    setBusEntryPoint(destination === 'library' ? 'library-exterior' : 'village-stop');
+    setBusOpen(destination === 'library');
+    controlsLockedRef.current = destination === 'library';
+  }, [prepareMapTransition, updateCamera, updateNpcProximity]);
+
+  const handleBusComplete = useCallback(() => {
+    if (questStatusesRef.current['bus-route'] === 'active') completeDailyQuest('bus-route');
+  }, [completeDailyQuest]);
+  const handleJourneyComplete = useCallback((session: BusSession) => {
+    dispatchDayJourney({ type: 'bus-completed', session });
+    recordCompletedBusActivity(session);
+  }, []);
+  const handleShiftComplete = useCallback((session: LibrarySession) => {
+    dispatchDayJourney({ type: 'work-completed', session });
+    recordCompletedLibraryActivity(session);
+    const result = getLibraryResult(session);
+    if (session.phase === 'finished' && result && result.correctlyShelved + result.handedOff === result.total && result.visitorsResolved === result.visitorsTotal)
+      offerShoppingErrand(session.sessionId);
+  }, []);
+  const handleMarketEpisodeComplete = useCallback((episode: MarketStoredEpisode) => {
+    dispatchShoppingErrand({ type: 'market-finished', episode });
+    if (episode.paid && episode.outcome === 'success' && episode.events.some(event => event.type === 'purchase_submitted')) {
+      const items = Object.entries(episode.finalCart);
+      const finishedAt = Date.parse(episode.events.findLast(event => event.type === 'session_finished')?.timestamp ?? '');
+      recordCompletedShoppingActivity({ sessionId: episode.sessionId, completedAt: Number.isFinite(finishedAt) ? finishedAt : Date.now(),
+        itemCount: items.reduce((count, [, quantity]) => count + quantity, 0),
+        totalAmount: items.reduce((sum, [id, quantity]) => sum + (getMarketProduct(id)?.price ?? 0) * quantity, 0),
+        checkoutKind: episode.selectedKioskId ? 'kiosk' : 'staff' });
+    }
+  }, []);
+  const handleErrandAction = useCallback((action: ShoppingErrandAction) => {
+    const before = getShoppingErrand();
+    if (action.type === 'deliver' && (worldMapRef.current !== 'village' || nearbyNpcIdRef.current !== 'minsu')) return;
+    const next = dispatchShoppingErrand(action);
+    if (next?.phase === 'delivered' && before?.phase !== 'delivered') {
+      const contents = Object.entries(next.purchase!.cart);
+      recordCompletedDeliveryActivity({ sessionId: next.id, completedAt: Date.now(), recipient: '민수',
+        itemCount: contents.reduce((count, [, quantity]) => count + quantity, 0),
+        items: contents.map(([id, quantity]) => `${getMarketProduct(id)!.name} ${quantity}개`) });
+    }
+    if (action.type === 'accept' || action.type === 'defer') setErrandPanelOpen(false);
+  }, []);
 
   const handleLeaveHome = useCallback(() => {
     prepareMapTransition();
@@ -1014,7 +1257,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
         const homeStationInteractionReached =
           pendingHomeStation !== null && homeStationNearbyRef.current === pendingHomeStation;
         const busStopInteractionReached =
-          pendingBusStopInteraction.current && busStopNearbyRef.current;
+          pendingBusStopInteraction.current && busStopNearbyRef.current && !tapWaypoints.current.length && distance <= 3;
 
         if (distance <= 3 && tapWaypoints.current.length && !marketStationInteractionReached) {
           movePlayer(dx, dy, true);
@@ -1062,18 +1305,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
             openFridgeMenu();
           }
           if (shouldCheckBusStop) {
-            if (questStatusesRef.current['bus-route'] === 'active') {
-              completeDailyQuest('bus-route');
-              setInfoPanel({
-                body: '목적지로 가는 버스 번호와 정류장 위치를 확인했어요.',
-                title: '버스를 찾았어요',
-              });
-            } else {
-              setInfoPanel({
-                body: '기사님에게 의뢰를 받은 뒤 목적지 버스를 확인할 수 있어요.',
-                title: '동쪽 버스정류장',
-              });
-            }
+            handleEnterBus();
           }
           return;
         }
@@ -1115,8 +1347,8 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
       }
     },
     [
-      completeDailyQuest,
       handleEnterHome,
+      handleEnterBus,
       handleEnterMarket,
       handleLeaveHome,
       handleLeaveMarket,
@@ -1149,6 +1381,9 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
       keyboardDirection.current =
         length > 0 ? { x: x / length, y: y / length } : { x: 0, y: 0 };
       keyboardEngaged.current = length > 0;
+      if (keyboardEngaged.current || !joystickEngaged.current) speedMultiplier.current = (keyboardEngaged.current && keyboardSprintHeld.current) || (
+        movementSettingsRef.current.runMode === 'toggle' && movementSettingsRef.current.runEnabled
+      ) ? RUN_SPEED_MULTIPLIER : 1;
     };
 
     const isEditableTarget = (target: EventTarget | null) => {
@@ -1163,8 +1398,9 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
     };
 
     const handleKeyDown = (event: KeyboardEvent) => {
+      const isShift = event.code === 'ShiftLeft' || event.code === 'ShiftRight';
       if (
-        !WEB_MOVEMENT_KEYS[event.code] ||
+        (!WEB_MOVEMENT_KEYS[event.code] && !isShift) ||
         event.altKey ||
         event.ctrlKey ||
         event.metaKey
@@ -1175,15 +1411,25 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
       event.preventDefault();
       if (controlsLockedRef.current) return;
 
+      if (isShift) {
+        keyboardSprintHeld.current = true;
+        syncKeyboardDirection();
+        return;
+      }
       if (pressedMovementKeys.current.size === 0) stopMovement();
+      // Read the modifier after stopMovement, including Shift held before the first WASD key.
+      keyboardSprintHeld.current = event.shiftKey;
       pressedMovementKeys.current.add(event.code);
       syncKeyboardDirection();
       beginMovement();
     };
 
     const handleKeyUp = (event: KeyboardEvent) => {
-      if (!WEB_MOVEMENT_KEYS[event.code]) return;
+      const isShift = event.code === 'ShiftLeft' || event.code === 'ShiftRight';
+      if (!WEB_MOVEMENT_KEYS[event.code] && !isShift) return;
       event.preventDefault();
+      // shiftKey remains true when the other physical Shift key is still held.
+      keyboardSprintHeld.current = event.shiftKey;
       pressedMovementKeys.current.delete(event.code);
       syncKeyboardDirection();
       if (keyboardEngaged.current && !controlsLockedRef.current) beginMovement();
@@ -1198,6 +1444,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
       window.removeEventListener('keyup', handleKeyUp);
       window.removeEventListener('blur', handleWindowBlur);
       pressedMovementKeys.current.clear();
+      keyboardSprintHeld.current = false;
       keyboardDirection.current = { x: 0, y: 0 };
       keyboardEngaged.current = false;
     };
@@ -1239,37 +1486,17 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
     return () => window.removeEventListener('wheel', handleWheel);
   }, [reduceMotionEnabled, worldZoom]);
 
-  const joystickResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => !controlsLockedRef.current,
-      onMoveShouldSetPanResponder: () => !controlsLockedRef.current,
-      onPanResponderGrant: (event) => {
-        const half = JOYSTICK_SIZE / 2;
-        const { height, width } = joystickZoneSize.current;
-        setJoystickCenter({
-          x: Math.max(half, Math.min(event.nativeEvent.locationX, width - half)),
-          y: Math.max(half, Math.min(event.nativeEvent.locationY, height - half)),
-        });
-        setJoystickActive(true);
-        joystickEngaged.current = true;
-        joystickKnob.stopAnimation();
-        joystickKnob.setValue({ x: 0, y: 0 });
-        direction.current = { x: 0, y: 0 };
-        beginMovement();
-      },
-      onPanResponderMove: (_event, gesture) => {
-        const distance = Math.hypot(gesture.dx, gesture.dy);
-        const scale = distance > JOYSTICK_RADIUS ? JOYSTICK_RADIUS / distance : 1;
-        const x = gesture.dx * scale;
-        const y = gesture.dy * scale;
-        joystickKnob.setValue({ x, y });
-        direction.current = { x: x / JOYSTICK_RADIUS, y: y / JOYSTICK_RADIUS };
-      },
-      onPanResponderRelease: stopMovement,
-      onPanResponderTerminate: stopMovement,
-      onPanResponderTerminationRequest: () => true,
-    }),
-  ).current;
+  const handleJoystickStart = useCallback(() => {
+    stopMovement();
+    joystickEngaged.current = true;
+    beginMovement();
+  }, [beginMovement, stopMovement]);
+  const handleJoystickMove = useCallback((input: GameMovementInput) => {
+    if (controlsLockedRef.current) return;
+    direction.current = { x: input.x, y: input.y };
+    speedMultiplier.current = input.running ? RUN_SPEED_MULTIPLIER : 1;
+    beginMovement();
+  }, [beginMovement]);
 
   const finishPinchZoom = useCallback(() => {
     zoomGestureActiveRef.current = false;
@@ -1425,17 +1652,6 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
       useNativeDriver: true,
     }).start();
   }, [reduceMotionEnabled, worldMap, worldZoom]);
-
-  useEffect(() => {
-    const volume = DEVELOPMENT_AUDIO_MUTED ? 0 : preferences.musicVolume;
-    backgroundMusic.volume = volume * (dialoguePanelMounted || quizPanelMounted
-      ? BACKGROUND_MUSIC_DUCKED_VOLUME : BACKGROUND_MUSIC_VOLUME);
-    if (volume === 0) { backgroundMusic.pause(); return; }
-    if (!audioModeReady || !backgroundMusicStatus.isLoaded) return;
-    backgroundMusic.loop = true;
-    backgroundMusic.play();
-  }, [audioModeReady, backgroundMusic, backgroundMusicStatus.isLoaded, DEVELOPMENT_AUDIO_MUTED,
-    dialoguePanelMounted, preferences.musicVolume, quizPanelMounted]);
 
   useEffect(() => {
     clearSoundTimers.current.forEach(clearTimeout);
@@ -1654,10 +1870,6 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
     updateNpcProximity(playerPoint.current);
   };
 
-  const handleJoystickZoneLayout = (event: LayoutChangeEvent) => {
-    joystickZoneSize.current = event.nativeEvent.layout;
-  };
-
   const handleAccessibilityMove = (actionName: string) => {
     if (controlsLockedRef.current) return;
     if (actionName === 'moveUp') {
@@ -1738,6 +1950,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
     if (npcId === 'jiyoung') {
       options.push({ id: 'npc-cashier', label: '계산 알바 연습' });
     }
+    if (npcId === 'minsu') options.unshift({ id: 'npc-errand', label: getShoppingErrand()?.phase === 'ready' ? '부탁한 물건 전달하기' : '퇴근길 장보기 부탁' });
     startDialogue(
       npcId,
       [
@@ -1767,11 +1980,14 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
   ) => {
     if (controlsLockedRef.current) return;
     stopMovement();
-    const target = findReachableTarget(playerPoint.current, desired, worldMapRef.current, marketEnvironmentRef.current, marketCashierCalledRef.current);
+    const activeMap = worldMapRef.current;
+    const target = activeMap === 'village' ? desired
+      : findReachableTarget(playerPoint.current, desired, activeMap, marketEnvironmentRef.current, marketCashierCalledRef.current);
     if (Math.hypot(target.x - playerPoint.current.x, target.y - playerPoint.current.y) < 2) return;
-    const path = worldMapRef.current === 'market'
-      ? getMarketNavigationPath(marketEnvironmentRef.current, playerPoint.current, target, marketCashierCalledRef.current)
-      : [target];
+    const path = activeMap === 'village' ? getVillageNavigationPath(playerPoint.current, target)
+      : activeMap === 'market'
+        ? getMarketNavigationPath(marketEnvironmentRef.current, playerPoint.current, target, marketCashierCalledRef.current)
+        : [target];
     if (!path?.length) return;
     tapTarget.current = path[0];
     tapWaypoints.current = path.slice(1);
@@ -1780,7 +1996,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
     pendingMarketStationInteraction.current = interaction.marketStation ?? null;
     pendingHomeStationInteraction.current = interaction.homeStation ?? null;
     pendingBusStopInteraction.current = interaction.busStop ?? false;
-    setTapTargetMarker(target);
+    setTapTargetMarker(path[path.length - 1]);
     beginMovement();
   };
 
@@ -1874,23 +2090,13 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
       return;
     }
 
-    const current = playerPoint.current;
-    const dx = current.x - npc.point.x;
-    const dy = current.y - npc.point.y;
-    const distance = Math.max(Math.hypot(dx, dy), 1);
-    const approachDistance = VILLAGE_NPC_INTERACTION_DISTANCE - 18;
-    startTapMovement(
-      {
-        x: npc.point.x + (dx / distance) * approachDistance,
-        y: npc.point.y + (dy / distance) * approachDistance,
-      },
-      { npcId: npc.id },
-    );
+    // Route to the actual contact point; the clear, nearby approach ends the walk.
+    startTapMovement(npc.point, { npcId: npc.id });
   };
 
   const handlePortalPress = (
     event: GestureResponderEvent,
-    portalId: VillagePortalId,
+    portalId: VillageGamePortalId,
   ) => {
     event?.stopPropagation?.();
     if (
@@ -1905,20 +2111,8 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
       return;
     }
 
-    const portalPoint =
-      portalId === 'market' ? MARKET_ENTRANCE_POINT : HOUSE_ENTRANCE_POINT;
-    const current = playerPoint.current;
-    const dx = current.x - portalPoint.x;
-    const dy = current.y - portalPoint.y;
-    const distance = Math.max(Math.hypot(dx, dy), 1);
-    const approachDistance = VILLAGE_PORTAL_INTERACTION_DISTANCE - 18;
-    startTapMovement(
-      {
-        x: portalPoint.x + (dx / distance) * approachDistance,
-        y: portalPoint.y + (dy / distance) * approachDistance,
-      },
-      { portalId },
-    );
+    const portalPoint = getVillagePortalPoint(portalId);
+    startTapMovement(portalPoint, { portalId });
   };
 
   const handleHomeStationPress = (
@@ -1986,21 +2180,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
     setControlMode(mode);
   };
 
-  const handleBusStopInteraction = () => {
-    if (!busStopNearbyRef.current) return;
-    if (questStatusesRef.current['bus-route'] === 'active') {
-      completeDailyQuest('bus-route');
-      setInfoPanel({
-        body: '목적지로 가는 버스 번호와 정류장 위치를 확인했어요.',
-        title: '버스를 찾았어요',
-      });
-      return;
-    }
-    setInfoPanel({
-      body: '기사님에게 의뢰를 받은 뒤 목적지 버스를 확인할 수 있어요.',
-      title: '동쪽 버스정류장',
-    });
-  };
+  const handleBusStopInteraction = handleEnterBus;
 
   const handleBusStopPress = (event: GestureResponderEvent) => {
     event?.stopPropagation?.();
@@ -2010,22 +2190,11 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
       zoomGestureActiveRef.current ||
       suppressWorldPressRef.current
     ) return;
-    if (busStopNearbyRef.current) {
+    if (Math.hypot(playerPoint.current.x - BUS_STOP_POINT.x, playerPoint.current.y - BUS_STOP_POINT.y) <= 3) {
       handleBusStopInteraction();
       return;
     }
-    const current = playerPoint.current;
-    const dx = current.x - BUS_STOP_POINT.x;
-    const dy = current.y - BUS_STOP_POINT.y;
-    const distance = Math.max(Math.hypot(dx, dy), 1);
-    const approachDistance = VILLAGE_PORTAL_INTERACTION_DISTANCE - 18;
-    startTapMovement(
-      {
-        x: BUS_STOP_POINT.x + (dx / distance) * approachDistance,
-        y: BUS_STOP_POINT.y + (dy / distance) * approachDistance,
-      },
-      { busStop: true },
-    );
+    startTapMovement(BUS_STOP_POINT, { busStop: true });
   };
 
   const handleInteraction = () => {
@@ -2072,10 +2241,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
       return;
     }
 
-    if (
-      busStopNearbyRef.current &&
-      questStatusesRef.current['bus-route'] === 'active'
-    ) {
+    if (busStopNearbyRef.current) {
       handleBusStopInteraction();
       return;
     }
@@ -2116,7 +2282,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
     setInfoPanel({
       body:
         questId === 'bus-route'
-          ? '정류장 표지판 가까이에서 행동 버튼을 눌러 목적지 버스를 확인해요.'
+          ? '정류장 표지판 가까이에서 이동 연습을 시작하고, 버스로 하늘도서관에 가서 출근을 알려요.'
           : '하늘마트에 들어가 장보기 목록의 물건을 모두 찾아요.',
       title: questId === 'bus-route' ? '정류장으로 이동해요' : '마트에서 장을 봐요',
     });
@@ -2130,7 +2296,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
         questId === 'minsu-safety'
           ? '민수에게 다시 말을 걸어 함께 연습해요.'
           : questId === 'bus-route'
-            ? '동쪽 정류장에서 목적지 버스를 확인해요.'
+            ? '동쪽 정류장에서 버스 이동 연습을 시작해 하늘도서관에 출근해요.'
             : '하늘마트 안에서 장보기 목록을 완성해요.',
       title: VILLAGE_NPC_BY_ID[npcId].name + '의 의뢰를 받았어요',
     });
@@ -2142,6 +2308,13 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
     }
 
     if (currentDialogueStep.purpose === 'npc-action') {
+      if (choice === 'npc-errand' && dialogueNpcId === 'minsu' && nearbyNpcIdRef.current === 'minsu') {
+        stopMovement();
+        setDialogueIndex(null); setDialogueMode(null); setSelectedDailyChoice(null);
+        if (!getShoppingErrand()) offerShoppingErrand('village-request');
+        setErrandPanelOpen(true);
+        return;
+      }
       if (choice === 'npc-cashier' && dialogueNpcId === 'jiyoung') {
         stopMovement();
         setDialogueIndex(null);
@@ -2200,8 +2373,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
       ? marketCategories.find(({ id }) => id === marketStationNearby)
       : null;
   const nearbyNpcName = nearbyNpcId ? VILLAGE_NPC_BY_ID[nearbyNpcId].name : null;
-  const activeBusStopInteraction =
-    busStopNearby && dailyQuestStatuses['bus-route'] === 'active';
+  const activeBusStopInteraction = busStopNearby;
   const interactionAvailable =
     worldMap === 'market'
       ? marketStationNearby !== null && !marketScenarioLocked
@@ -2226,7 +2398,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
             ? '집에서 마을로 나가기'
             : '가까이 가면 상호작용할 수 있어요'
         : activeBusStopInteraction
-          ? '동쪽 버스정류장 확인하기'
+          ? '버스 목적지 고르기'
           : nearbyNpcName
             ? `${nearbyNpcName}와 대화 또는 의뢰 선택하기`
           : nearbyPortalId === 'market'
@@ -2234,7 +2406,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
             : nearbyPortalId === 'home'
               ? '집으로 들어가기'
               : busStopNearby
-                ? '동쪽 버스정류장 확인하기'
+                ? '버스 목적지 고르기'
                 : '상호작용할 대상이 없습니다';
   const interactionIcon =
     worldMap === 'market'
@@ -2274,13 +2446,13 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
             ? '나가기'
             : '행동'
         : activeBusStopInteraction
-          ? '확인'
+          ? '출발'
           : nearbyNpcId
             ? '대화'
           : nearbyPortalId
             ? '입장'
             : busStopNearby
-              ? '확인'
+              ? '출발'
               : '행동';
 
   const offeredQuest = questOfferId
@@ -2290,21 +2462,33 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
     ? VILLAGE_NPCS.find((npc) => NPC_QUEST_IDS[npc.id] === questOfferId) ?? null
     : null;
 
-  const joystickControlsVisible =
-    controlMode === 'joystick' &&
-    !hudMenuOpen &&
-    !dialoguePanelMounted &&
-    !quizPanelMounted &&
-    !fridgeMenuOpen &&
-    !cookingOpen &&
-    !cashierOpen &&
-    !marketScenarioLocked;
+  const gameControlsVisible = !controlsLockedRef.current;
+  const backgroundAudio = <GameBackgroundMusic player={backgroundMusic} audioModeReady={audioModeReady}
+    muted={DEVELOPMENT_AUDIO_MUTED} musicVolume={preferences.musicVolume}
+    ducked={dialoguePanelMounted || quizPanelMounted} />;
+  const dayPanel = dayPanelOpen ? <DayJourneyPanel journey={journey} onOpenErrand={errand ? () => { setDayPanelOpen(false); setErrandPanelOpen(true); } : undefined} canStart={!busOpen && !libraryOpen && worldMap === 'village'} onClose={() => setDayPanelOpen(false)} onStart={() => {
+    dispatchDayJourney({ type: 'start', at: Date.now() }); setDayPanelOpen(false);
+  }} /> : null;
+  const errandPanel = errandPanelOpen && errand ? <ShoppingErrandPanel errand={errand} onAction={handleErrandAction} onClose={() => setErrandPanelOpen(false)} canDeliver={!busOpen && !libraryOpen && worldMap === 'village' && nearbyNpcId === 'minsu'} /> : null;
 
   if (cashierOpen) {
-    return <CashierSimulationScreen onExit={() => setCashierOpen(false)} />;
+    return <>{backgroundAudio}<CashierSimulationScreen onExit={() => setCashierOpen(false)} /></>;
+  }
+  if (libraryOpen) {
+    return <>{backgroundAudio}<LibrarySimulationScreen onExit={handleLeaveLibrary}
+      initialSession={getDayLibraryDraft()} onSessionChange={keepDayLibraryDraft} onShiftComplete={handleShiftComplete}
+      resumeOnReturn={journey.stage === 'working' || journey.stage === 'returning'}
+      onOpenJourney={openDayPanel} journeyOpen={dayPanelOpen || errandPanelOpen}
+      controlMode={controlMode} onControlModeChange={selectControlMode} onTravel={handleTravel} />{dayPanel}{errandPanel}</>;
+  }
+  if (busOpen) {
+    return <>{backgroundAudio}<BusSimulationScreen key={`bus-visit-${busSceneVisit}`} entryPoint={busEntryPoint} initialSession={busInitialSession} onExit={handleReturnFromActivity} onStartLibrary={handleStartLibrary}
+      onSessionChange={keepDayBusDraft} onJourneyComplete={handleJourneyComplete} onOpenJourney={openDayPanel} journeyOpen={dayPanelOpen || errandPanelOpen}
+      onComplete={handleBusComplete} controlMode={controlMode} onControlModeChange={selectControlMode} onTravel={handleTravel} />{dayPanel}{errandPanel}</>;
   }
 
   return (
+    <>{backgroundAudio}
     <View
       onLayout={handleViewportLayout}
       ref={viewportNode}
@@ -2362,16 +2546,24 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
                 onNpcPress={handleNpcPress}
                 onPortalPress={handlePortalPress}
                 tapTargetMarker={controlMode === 'touch' ? tapTargetMarker : null}
-              />
+              >
+                <Animated.View accessibilityLabel="내 캐릭터" pointerEvents="none"
+                  testID="village-world-player"
+                  style={[styles.player, { left: 0, top: 0, zIndex: villagePlayerDepth,
+                    transform: villagePlayerPosition.getTranslateTransform() }]}>
+                  <DirectionalAvatar facing={playerAvatarPose.facing} manifest={freshPlayerAvatar}
+                    motion={playerAvatarPose.motion} walkCycle={playerWalkCycle} reduceMotion={reduceMotionEnabled} scale={PLAYER_ART_SCALE} />
+                </Animated.View>
+              </ExpandedVillageLayer>
               <PressScale
                 accessibilityHint={
                   controlMode === 'touch'
                     ? busStopNearby
-                      ? '목적지 버스를 확인합니다'
+                      ? '정류장에서 버스로 갈 목적지를 고릅니다'
                       : '정류장 앞으로 이동합니다'
                     : undefined
                 }
-                accessibilityLabel="동쪽 버스정류장으로 이동해 확인하기"
+                accessibilityLabel="동쪽 버스정류장으로 이동해 목적지 고르기"
                 accessibilityRole={controlMode === 'touch' ? 'button' : undefined}
                 disabled={controlMode !== 'touch' || controlsLockedRef.current}
                 onPress={handleBusStopPress}
@@ -2381,7 +2573,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
                 {busStopNearby ? (
                   <View style={styles.busStopActionBadge}>
                     <Ionicons color={colors.white} name="bus" size={17} />
-                    <Text style={styles.busStopActionText}>버스 확인</Text>
+                    <Text style={styles.busStopActionText}>목적지 선택</Text>
                   </View>
                 ) : null}
               </PressScale>
@@ -2414,7 +2606,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
           </Animated.View> : null}
         </Animated.View>
 
-        {worldMap !== 'market' ? <Animated.View accessibilityLabel="내 캐릭터" pointerEvents="none"
+        {worldMap === 'home' ? <Animated.View accessibilityLabel="내 캐릭터" pointerEvents="none"
           style={[styles.player, { transform: playerCameraOffset.getTranslateTransform() }]}>
           <DirectionalAvatar
             facing={playerAvatarPose.facing}
@@ -2428,96 +2620,37 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
       </Animated.View>
 
 
-      {joystickControlsVisible ? (
-      <View
-        accessibilityActions={[
-          { label: '위로 이동', name: 'moveUp' },
-          { label: '아래로 이동', name: 'moveDown' },
-          { label: '왼쪽으로 이동', name: 'moveLeft' },
-          { label: '오른쪽으로 이동', name: 'moveRight' },
-        ]}
-        accessibilityLabel="이동 조이스틱"
-        accessibilityRole="adjustable"
-        accessibilityState={{ disabled: dialoguePanelMounted || quizPanelMounted }}
-        onLayout={handleJoystickZoneLayout}
-        onAccessibilityAction={(event) => handleAccessibilityMove(event.nativeEvent.actionName)}
-        style={[styles.joystickZone, worldMap === 'market' && styles.marketJoystickZone]}
-        {...joystickResponder.panHandlers}
-      >
-        <Animated.View
-          pointerEvents="none"
-          style={[
-            styles.joystick,
-            {
-              left: joystickCenter.x - JOYSTICK_SIZE / 2,
-              opacity: joystickActive ? 1 : 0.42,
-              top: joystickCenter.y - JOYSTICK_SIZE / 2,
-            },
-          ]}
-        >
-          <View style={styles.joystickGuideHorizontal} />
-          <View style={styles.joystickGuideVertical} />
-          <Animated.View
-            style={[styles.joystickKnob, { transform: joystickKnob.getTranslateTransform() }]}
-          />
-        </Animated.View>
-      </View>
-      ) : null}
-
-      {joystickControlsVisible ? (
-      <View style={[styles.actionCluster, worldMap === 'market' && styles.marketActionCluster]}>
-        <PressScale
-          accessibilityLabel={interactionLabel}
-          accessibilityRole="button"
-          accessibilityState={{ disabled: !interactionAvailable || quizPanelMounted }}
-          disabled={!interactionAvailable || quizPanelMounted}
-          onPress={(event) => {
-            event?.stopPropagation?.();
-            handleInteraction();
-          }}
-          scaleTo={0.92}
-          style={[
-            styles.actionButton,
-            styles.interactionButton,
-            !interactionAvailable && styles.actionButtonDisabled,
-          ]}
-        >
-          <Ionicons color={colors.white} name={interactionIcon} size={23} />
-          <Text style={styles.interactionActionText}>{interactionActionText}</Text>
-        </PressScale>
-        <PressScale
-          accessibilityHint="한 번 누르면 달리기를 켜고 다시 누르면 끕니다"
-          accessibilityLabel={runEnabled ? '달리기 끄기' : '달리기 켜기'}
-          accessibilityRole="button"
-          accessibilityState={{ selected: runEnabled }}
-          disabled={dialoguePanelMounted || quizPanelMounted}
-          onPress={(event) => {
-            event?.stopPropagation?.();
-            setRunEnabled((enabled) => {
-              const next = !enabled;
-              speedMultiplier.current = next ? RUN_SPEED_MULTIPLIER : 1;
-              return next;
-            });
-          }}
-          scaleTo={0.9}
-          style={[styles.actionButton, styles.runButton, runEnabled && styles.runButtonActive]}
-        >
-          <Ionicons color={runEnabled ? colors.white : '#39493F'} name="walk" size={23} />
-        </PressScale>
-      </View>
-      ) : null}
-
+      <GameControls
+        controlMode={controlMode}
+        locked={!gameControlsVisible}
+        action={{ label: interactionActionText, accessibilityLabel: interactionLabel,
+          icon: interactionIcon, available: interactionAvailable, onPress: handleInteraction }}
+        onMoveStart={handleJoystickStart}
+        onMove={handleJoystickMove}
+        onMoveEnd={stopMovement}
+        onAccessibilityMove={handleAccessibilityMove}
+        runEnabled={runEnabled}
+        onRunEnabledChange={enabled => {
+          setRunEnabled(enabled);
+          speedMultiplier.current = enabled ? RUN_SPEED_MULTIPLIER : 1;
+        }}
+        reduceMotion={reduceMotionEnabled}
+      />
       {!cookingOpen && !phoneContact && !phoneCallPresent && (worldMap !== 'market' || !marketScenarioLocked) ? (
         <GameHud
           controlMode={controlMode}
           dailyQuests={dailyQuests}
+          onOpenJourney={openDayPanel}
+          onOpenErrand={errand ? openErrandPanel : undefined}
           onControlModeChange={selectControlMode}
           onEmergencyExit={handleEmergencyExit}
           onExit={handleExit}
           onMenuVisibilityChange={handleHudMenuVisibilityChange}
+          onTravel={handleTravel}
+          busRouteContext={{ currentStop: 'village', direction: 'outbound', destination: 'library' }}
           onCallContact={contact => {
             stopMovement();
-            if (contact === 'jiyoung' && worldMap === 'market') {
+            if (contact === (errandMarketConfig ? 'minsu' : 'jiyoung') && worldMap === 'market') {
               setMarketInteractionRequest(current => ({ id: (current?.id ?? 0) + 1, station: 'contact-requester' }));
             } else setPhoneContact(contact);
           }}
@@ -2526,7 +2659,12 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
 
       {worldMap === 'market' ? (
         <MarketSimulationScreen
-          externalMenuOpen={hudMenuOpen || phoneContact !== null || phoneCallPresent}
+          externalMenuOpen={hudMenuOpen || phoneContact !== null || phoneCallPresent || errandPanelOpen || dayPanelOpen}
+          initialConfig={errandMarketConfig}
+          requesterName={errandMarketConfig ? '민수' : undefined}
+          spendingLimit={errandMarketConfig ? errand?.approvedBudget : undefined}
+          onBudgetRequest={errandMarketConfig ? (amount: number) => { dispatchShoppingErrand({ type: 'approve-budget', amount }); } : undefined}
+          onEpisodeComplete={handleMarketEpisodeComplete}
           controlMode={controlMode}
           onControlModeChange={selectControlMode}
           environment={marketEnvironment}
@@ -2538,7 +2676,7 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
           interactionRequest={marketInteractionRequest}
           onExit={handleLeaveMarket}
           onLockChange={setMarketScenarioLocked}
-          onMissionComplete={() => completeDailyQuest('market-shopping')}
+          onMissionComplete={() => { if (!errandMarketConfig) completeDailyQuest('market-shopping'); }}
         />
       ) : null}
 
@@ -3054,16 +3192,74 @@ export function GamePrototypeScreen({ onExit }: GamePrototypeScreenProps) {
       ) : null}
       </Pressable>
       <MarketPanelTransition visible={phoneContact !== null} transitionKey={`phone-call-${phoneContact}`} onPresenceChange={setPhoneCallPresent}>
-        {phoneContact ? <GameContactCall key={phoneContact} contact={phoneContact} inMarket={worldMap === 'market'} onClose={closePhoneCall} /> : null}
+        {phoneContact ? <GameContactCall key={phoneContact} contact={phoneContact} inMarket={worldMap === 'market'} onOpenErrand={errand ? () => { closePhoneCall(); setErrandPanelOpen(true); } : undefined} onClose={closePhoneCall} /> : null}
+      </MarketPanelTransition>
+      {journey.stage !== 'available' && journey.stage !== 'completed' && worldMap !== 'market' && !controlsLockedRef.current ? <View pointerEvents="box-none" style={styles.dayJourneyAnchor}>
+        <PressScale accessibilityRole="button" accessibilityLabel="도서관 다녀오기 일정 열기" onPress={openDayPanel} style={styles.dayJourneyCard}>
+          <Ionicons name={journey.stage === 'home' ? 'home' : 'book'} color="#6B8467" size={23} />
+          <View style={{ flex: 1 }}><Text style={styles.dayJourneyTitle}>도서관 다녀오기 · {dayJourneyStep(journey.stage)}/4</Text><Text style={styles.dayJourneyHint}>{DAY_JOURNEY_GUIDANCE[journey.stage]}</Text></View>
+          <Ionicons name="chevron-forward" color="#7C8C74" size={18} />
+        </PressScale>
+      </View> : null}
+      {dayPanel}
+      {errandPanel}
+      <MarketPanelTransition visible={busDestinationOpen} transitionKey="village-bus-destination" onPresenceChange={setBusDestinationPresent}>
+        {busDestinationOpen ? <BusRoutePanel title="어디로 갈까요?" onClose={() => setBusDestinationOpen(false)}
+          testID="village-bus-destination" footer={<>
+            <LibraryButton onPress={handleChooseLibraryDestination}>하늘도서관으로 가기</LibraryButton>
+            <LibraryButton secondary onPress={() => setBusDestinationOpen(false)}>마을에 머물기</LibraryButton>
+          </>}>
+          <BusTimetable session={villageBusSession ?? villageStopPreview} />
+        </BusRoutePanel> : null}
+      </MarketPanelTransition>
+      <MarketPanelTransition visible={villageBusOpen} transitionKey="village-bus-boarding" onPresenceChange={setVillageBusPresent}>
+        {villageBusOpen && villageBusSession ? <LibraryPanel title="마을앞 정류장"
+          onClose={() => setVillageBusOpen(false)} testID="village-bus-boarding" footer={<>
+            <LibraryButton disabled={!villageBusSession.offeredRoute || !villageBusReady} onPress={handleBoardVillageBus}>
+              {villageBusSession.offeredRoute ? villageBusReady ? `${villageBusSession.offeredRoute}번 버스 타기` : `${villageBusSession.offeredRoute}번 도착 중` : '다음 버스를 기다리고 있어요'}
+            </LibraryButton>
+            <View style={styles.busStopChoices}>
+              <View style={{ flex: 1 }}><LibraryButton secondary label="기사님께 물어보기" disabled={!villageBusSession.offeredRoute || !villageBusReady} onPress={handleAskVillageDriver}>기사님께 묻기</LibraryButton></View>
+              <View style={{ flex: 1 }}><LibraryButton secondary label="다음 버스 기다리기" disabled={!villageBusSession.offeredRoute || !villageBusReady} onPress={handleWaitForVillageBus}>다음 버스</LibraryButton></View>
+            </View>
+          </>}>
+          <BusArrivalPreview bus={villageBusSession.offeredRoute ? { number: villageBusSession.offeredRoute, destination: getBusDestination(villageBusSession.offeredRoute, villageBusSession.direction) } : null}
+            direction={villageBusSession.direction} reduceMotion={reduceMotionEnabled} onReadyChange={setVillageBusReady} compact />
+          {villageBusSession.offeredRoute ? <>
+            <View style={styles.busStopRouteRow}><View style={styles.busStopRouteBadge}><Text style={styles.busStopRouteNumber}>{villageBusSession.offeredRoute}</Text></View>
+              <Text style={styles.busStopRouteTitle}>{getBusDestination(villageBusSession.offeredRoute, villageBusSession.direction)}</Text></View>
+            {villageDriverReply ? <Text style={styles.busStopGuidance}>{villageDriverReply}</Text> : null}
+          </> : <Text style={styles.busStopGuidance}>인도에서 다음 버스를 기다려요.</Text>}
+          <PressScale accessibilityRole="button" accessibilityLabel={villageRouteOpen ? '정류장 노선도 접기' : '정류장 노선도 보기'} accessibilityState={{ expanded: villageRouteOpen }}
+            onPress={() => setVillageRouteOpen(open => !open)} style={styles.busRouteButton}>
+            <Ionicons name="git-branch-outline" size={21} color="#526D59" /><Text style={styles.busRouteButtonText}>도착 안내판 · 노선도</Text><Ionicons name={villageRouteOpen ? 'chevron-up' : 'chevron-down'} size={18} color="#526D59" />
+          </PressScale>
+          {villageRouteOpen && <BusTimetable session={villageBusSession} upcomingRoute={nextVillageBus} />}
+        </LibraryPanel> : null}
       </MarketPanelTransition>
       {cookingOpen ? (
         <CookingSimulationScreen onClose={() => setCookingOpen(false)} />
       ) : null}
     </View>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
+  dayJourneyAnchor: { position: 'absolute', top: 104, left: 18, right: 18, alignItems: 'center', zIndex: 35 },
+  dayJourneyCard: { width: '100%', maxWidth: 410, flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#FAF7EE', borderRadius: 20, padding: 15, boxShadow: '0 4px 15px #584D3210' },
+  dayJourneyTitle: { color: '#4F654D', fontFamily: fonts.bold, fontSize: 17, lineHeight: 23 },
+  dayJourneyHint: { color: '#78816F', fontFamily: fonts.medium, fontSize: 14, lineHeight: 21, marginTop: 3 },
+  busRouteButton: { alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8, backgroundColor: '#E9EBDD', borderRadius: 13, minHeight: 45, marginTop: 16, marginBottom: 10 },
+  busRouteButtonText: { color: '#526D59', fontFamily: fonts.semibold, fontSize: 16 },
+  busDestinationTitle: { color: '#4D6651', fontFamily: fonts.semibold, fontSize: 20, lineHeight: 28, marginBottom: 12 },
+  busStopRouteRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  busStopRouteBadge: { backgroundColor: '#627D64', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 7 },
+  busStopRouteNumber: { color: '#FFFBEA', fontFamily: fonts.bold, fontSize: 25 },
+  busStopRouteTitle: { flex: 1, color: '#454F44', fontFamily: fonts.semibold, fontSize: 18, lineHeight: 27 },
+  busStopRoutePath: { color: '#64755D', fontFamily: fonts.medium, fontSize: 15, lineHeight: 24, marginTop: 13 },
+  busStopGuidance: { color: '#675F55', fontFamily: fonts.medium, fontSize: 16, lineHeight: 26, marginTop: 14 },
+  busStopChoices: { flexDirection: 'row', gap: 10 },
   root: {
     backgroundColor: '#CAD3C3',
     cursor: 'auto',
@@ -3372,103 +3568,14 @@ const styles = StyleSheet.create({
     width: PLAYER_ART_WIDTH,
     zIndex: 12,
   },
-  joystickZone: {
-    bottom: 104,
-    height: JOYSTICK_ZONE_HEIGHT,
-    left: 0,
-    position: 'absolute',
-    width: '58%',
-    zIndex: 20,
-  },
-  marketJoystickZone: { bottom: 128 },
-  joystick: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.52)',
-    borderColor: 'rgba(49,61,52,0.22)',
-    borderRadius: 55,
-    borderWidth: 2,
-    height: JOYSTICK_SIZE,
-    justifyContent: 'center',
-    position: 'absolute',
-    width: JOYSTICK_SIZE,
-  },
-  joystickGuideHorizontal: {
-    backgroundColor: 'rgba(62,78,67,0.12)',
-    height: 2,
-    position: 'absolute',
-    width: 70,
-  },
-  joystickGuideVertical: {
-    backgroundColor: 'rgba(62,78,67,0.12)',
-    height: 70,
-    position: 'absolute',
-    width: 2,
-  },
-  joystickKnob: {
-    backgroundColor: 'rgba(60,76,65,0.82)',
-    borderColor: 'rgba(255,255,255,0.7)',
-    borderRadius: 24,
-    borderWidth: 2,
-    height: 48,
-    width: 48,
-  },
-  actionCluster: {
-    bottom: 142,
-    height: 112,
-    position: 'absolute',
-    right: 18,
-    width: 132,
-    zIndex: 22,
-  },
-  marketActionCluster: { bottom: 166 },
-  actionButton: {
-    alignItems: 'center',
-    borderColor: 'rgba(255,255,255,0.7)',
-    borderWidth: 2,
-    justifyContent: 'center',
-    position: 'absolute',
-  },
-  interactionButton: {
-    backgroundColor: '#2E8061',
-    borderColor: '#F8EDCF',
-    borderRadius: 32,
-    borderWidth: 3,
-    bottom: 0,
-    height: 64,
-    right: 0,
-    shadowColor: '#20352B',
-    shadowOffset: { height: 4, width: 0 },
-    shadowOpacity: 0.28,
-    shadowRadius: 6,
-    width: PLAYER_ART_WIDTH,
-  },
-  interactionActionText: {
-    color: colors.white,
-    fontFamily: fonts.bold,
-    fontSize: 9,
-    letterSpacing: -0.1,
-    marginTop: 1,
-  },
-  runButton: {
-    backgroundColor: 'rgba(255,250,236,0.88)',
-    borderColor: 'rgba(75,64,46,0.28)',
-    borderRadius: 26,
-    borderWidth: 2,
-    height: 52,
-    left: 0,
-    top: 0,
-    width: 52,
-  },
-  runButtonActive: { backgroundColor: '#4C6E5A' },
-  actionButtonDisabled: { opacity: 0.34 },
   busStopHotspot: {
     alignItems: 'center',
-    height: 92,
+    height: 100,
     justifyContent: 'center',
-    left: BUS_STOP_POINT.x - 68,
+    left: BUS_STOP_POINT.x - 82,
     position: 'absolute',
-    top: BUS_STOP_POINT.y - 46,
-    width: 136,
+    top: BUS_STOP_POINT.y - 76,
+    width: 164,
     zIndex: 9,
   },
   busStopActionBadge: {

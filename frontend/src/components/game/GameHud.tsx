@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, Animated, BackHandler, Easing, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { AccessibilityInfo, Animated, BackHandler, Easing, Image, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import type { ImageSourcePropType } from 'react-native';
 
 import { icons } from '../../assets';
@@ -12,7 +12,11 @@ import type {
 import { PressScale } from '../PressScale';
 import { colors, fonts } from '../../theme';
 import { GamePhonePanel } from './GamePhonePanel';
-import type { PhoneAction, PhoneContact } from './GamePhonePanel';
+import type { PhoneAction, PhoneContact, PhoneTravelDestination } from './GamePhonePanel';
+import type { BusRouteContext } from './BusRouteMap';
+import { getGamePhoneLayout, PHONE_CASE_BORDER, PHONE_SCREEN_INSET } from '../../game/phoneLayout';
+import { useDayJourney, dayJourneyStep } from '../../game/dayJourney';
+import { getShoppingErrandStatus, useShoppingErrand } from '../../game/shoppingErrandStore';
 
 export type { DailyQuestItem } from '../../game/dailyQuests';
 
@@ -75,20 +79,36 @@ export function GameHud({
   dailyQuests,
   onControlModeChange,
   onEmergencyExit,
+  emergencyNotice = '안전한 위치로 이동했어요',
   onExit,
   onMenuVisibilityChange,
   onContactRequester,
   onCallContact,
+  onOpenInventory,
+  onOpenNotebook,
+  onTravel,
+  busRouteContext,
+  onRouteViewed,
+  onOpenJourney,
+  onOpenErrand,
 }: {
   controlMode: ControlMode;
   dailyQuests: readonly DailyQuestItem[];
   onControlModeChange: (mode: ControlMode) => void;
   onEmergencyExit: () => void;
+  emergencyNotice?: string | null;
   onExit: () => void;
   onMenuVisibilityChange: (open: boolean) => void;
   onContactRequester?: () => void;
   requesterLabel?: string;
   onCallContact?: (contact: PhoneContact) => void;
+  onOpenInventory?: () => void;
+  onOpenNotebook?: () => void;
+  onTravel?: (destination: PhoneTravelDestination) => void;
+  busRouteContext?: BusRouteContext;
+  onRouteViewed?: () => void;
+  onOpenJourney?: () => void;
+  onOpenErrand?: () => void;
 }) {
   const [menu, setMenu] = useState<MenuKey | null>(null);
   const [phoneAction, setPhoneAction] = useState<PhoneAction>(null);
@@ -96,6 +116,8 @@ export function GameHud({
   const [notice, setNotice] = useState<string | null>(null);
   const [reduceMotionEnabled, setReduceMotionEnabled] = useState(false);
   const panelProgress = useRef(new Animated.Value(0)).current;
+  const viewport = useWindowDimensions();
+  const phoneLayout = getGamePhoneLayout(viewport.width, viewport.height);
 
   useEffect(() => {
     let mounted = true;
@@ -187,7 +209,7 @@ export function GameHud({
 
   const handleEmergencyExit = () => {
     onEmergencyExit();
-    setNotice('안전한 위치로 이동했어요');
+    setNotice(emergencyNotice);
     closeMenu();
   };
 
@@ -227,6 +249,8 @@ export function GameHud({
             key={item.key}
             onPress={(event) => {
               event?.stopPropagation?.();
+              if (item.key === 'bag' && onOpenInventory) { onOpenInventory(); return; }
+              if (item.key === 'diary' && onOpenNotebook) { onOpenNotebook(); return; }
               toggleMenu(item.key);
             }}
             scaleTo={0.9}
@@ -261,17 +285,24 @@ export function GameHud({
               styles.blobPanel,
               menu === 'bag' && styles.inventoryPanel,
               menu === 'diary' && styles.questPanel,
-              menu === 'phone' && styles.phonePanel,
+              menu === 'phone' && [styles.phonePanel, { width: phoneLayout.width, height: phoneLayout.height, borderRadius: phoneLayout.caseRadius }],
               inventoryPanelMotion,
             ]}
           >
             {menu === 'bag' ? <BagPanel /> : null}
-            {menu === 'diary' ? <DiaryPanel quests={dailyQuests} /> : null}
+            {menu === 'diary' ? <DiaryPanel quests={dailyQuests} onOpenJourney={onOpenJourney ? () => closeMenu(onOpenJourney) : undefined} onOpenErrand={onOpenErrand ? () => closeMenu(onOpenErrand) : undefined} /> : null}
             {menu === 'phone' ? (
+              <View testID="phone-screen-clip" style={{ flex: 1, minHeight: 0, overflow: 'hidden', borderRadius: phoneLayout.screenRadius }}>
+                <View style={{ position: 'absolute', width: phoneLayout.contentWidth, height: phoneLayout.contentHeight,
+                  left: phoneLayout.contentLeft, top: phoneLayout.contentTop, transform: [{ scale: phoneLayout.contentScale }] }}>
               <GamePhonePanel
                 action={phoneAction}
                 calculator={calculator}
                 onAction={setPhoneAction}
+                busRouteContext={busRouteContext}
+                onRouteViewed={onRouteViewed}
+                onOpenErrand={onOpenErrand ? () => closeMenu(onOpenErrand) : undefined}
+                onTravel={onTravel ? destination => closeMenu(() => onTravel(destination)) : undefined}
                 onCalculatorKey={(key) => setCalculator((current) => pressCalculatorKey(current, key))}
                 onClose={() => closeMenu()}
                 onCallContact={(contact) => closeMenu(() => {
@@ -288,6 +319,8 @@ export function GameHud({
                   onExit();
                 }}
               />
+                </View>
+              </View>
             ) : null}
           </Animated.View>
         </View>
@@ -398,7 +431,9 @@ function getQuestDetail(quest: DailyQuestItem) {
   return `${quest.region} · ${quest.description}`;
 }
 
-function DiaryPanel({ quests }: { quests: readonly DailyQuestItem[] }) {
+function DiaryPanel({ quests, onOpenJourney, onOpenErrand }: { quests: readonly DailyQuestItem[]; onOpenJourney?: () => void; onOpenErrand?: () => void }) {
+  const journey = useDayJourney();
+  const errand = useShoppingErrand();
   const completedCount = quests.filter(({ status }) => status === 'completed').length;
   const questCount = quests.length;
 
@@ -417,8 +452,12 @@ function DiaryPanel({ quests }: { quests: readonly DailyQuestItem[] }) {
       </View>
 
       <View style={styles.questSheet}>
+        {onOpenJourney ? <PressScale accessibilityRole="button" accessibilityLabel="도서관 다녀오기 일정 열기" onPress={onOpenJourney} style={{ position: 'absolute', top: 10, left: 14, right: 14, height: 49, backgroundColor: '#E3E8D8', borderRadius: 15, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <Ionicons name="book" size={24} color="#627D64" /><Text style={{ flex: 1, color: '#4E6352', fontFamily: fonts.bold, fontSize: 17 }}>도서관 다녀오기</Text><Text style={{ color: '#78826F', fontFamily: fonts.semibold, fontSize: 14 }}>{journey.stage === 'available' ? '새 부탁' : `${dayJourneyStep(journey.stage)}/4`}</Text><Ionicons name="chevron-forward" size={18} color="#7B8C73" />
+        </PressScale> : null}
         <View pointerEvents="none" style={styles.questDashedOutline} />
-        <View style={styles.questList}>
+        <ScrollView style={[styles.questList, { top: onOpenJourney ? 65 : 8, height: onOpenJourney ? 198 : 264 }]} contentContainerStyle={{ gap: 2 }} showsVerticalScrollIndicator={!!onOpenJourney}>
+          {errand && onOpenErrand ? <PressScale accessibilityRole="button" accessibilityLabel="퇴근길 장보기 부탁 확인" onPress={onOpenErrand} style={{ minHeight: 72, padding: 12, borderRadius: 15, backgroundColor: '#E8E7D5', marginBottom: 7, flexDirection: 'row', alignItems: 'center', gap: 10 }}><Ionicons name="basket-outline" size={25} color="#6C8064" /><View style={{ flex: 1 }}><Text style={{ color: '#4E6352', fontFamily: fonts.bold, fontSize: 17 }}>퇴근길 장보기</Text><Text style={{ color: '#78826F', fontFamily: fonts.medium, fontSize: 14, lineHeight: 21 }}>{getShoppingErrandStatus(errand)}</Text></View><Ionicons name="chevron-forward" size={18} color="#7B8C73" /></PressScale> : null}
           {quests.slice(0, 4).map((quest) => {
             const source = questIconById[quest.id];
             const isUndiscovered = quest.status === 'available';
@@ -468,7 +507,7 @@ function DiaryPanel({ quests }: { quests: readonly DailyQuestItem[] }) {
               </View>
             );
           })}
-        </View>
+        </ScrollView>
         <Text style={styles.questFooter}>퀘스트는 매일 아침 7시에 초기화돼요.</Text>
       </View>
       <PanelTail fill="#EFECE8" placement="diary" />
@@ -553,17 +592,13 @@ const styles = StyleSheet.create({
   phonePanel: {
     backgroundColor: '#576A5B',
     borderColor: '#8B9A84',
-    borderRadius: 39,
-    borderWidth: 2,
-    height: 540,
-    maxHeight: '96%',
-    maxWidth: 330,
+    borderWidth: PHONE_CASE_BORDER,
+    maxWidth: 360,
     minHeight: 0,
-    padding: 8,
-    paddingBottom: 8,
-    paddingHorizontal: 8,
-    paddingTop: 8,
-    width: '90%',
+    padding: PHONE_SCREEN_INSET - PHONE_CASE_BORDER,
+    paddingBottom: PHONE_SCREEN_INSET - PHONE_CASE_BORDER,
+    paddingHorizontal: PHONE_SCREEN_INSET - PHONE_CASE_BORDER,
+    paddingTop: PHONE_SCREEN_INSET - PHONE_CASE_BORDER,
   },
   inventoryPanel: {
     backgroundColor: '#4B4B4B',

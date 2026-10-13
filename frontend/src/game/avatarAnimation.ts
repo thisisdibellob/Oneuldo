@@ -20,7 +20,41 @@ export type AvatarFrameSet = Readonly<{
   walk: readonly ImageSourcePropType[];
   sprint?: readonly ImageSourcePropType[];
 }>;
-export type AvatarAnimationManifest = Readonly<Record<AvatarFacing, AvatarFrameSet>>;
+export type AvatarAtlasSheet = Readonly<{
+  id: string;
+  source: ImageSourcePropType;
+  highResolutionSource?: ImageSourcePropType;
+  columns: number;
+  rows: number;
+  frameCount: number;
+  frameWidth: number;
+  frameHeight: number;
+}>;
+export type AvatarAtlasManifest = Readonly<Record<AvatarFacing, Readonly<{
+  idle: AvatarAtlasSheet;
+  walk: AvatarAtlasSheet;
+  sprint?: AvatarAtlasSheet;
+}>>>;
+export type AvatarAnimationManifest = Readonly<Record<AvatarFacing, AvatarFrameSet>> & Readonly<{
+  /** Packed animations keep a single native Image source stable through the entire cycle. */
+  atlases?: AvatarAtlasManifest;
+}>;
+
+export function resolveAvatarAtlas(manifest: AvatarAnimationManifest, facing: AvatarFacing, motion: AvatarMotion): AvatarAtlasSheet | undefined {
+  const direction = manifest.atlases?.[facing];
+  if (!direction) return undefined;
+  return motion === 'sprint' ? direction.sprint ?? direction.walk : direction[motion];
+}
+
+/** Request only the density needed for the sprite's actual on-screen pixel size. */
+export function selectAvatarAtlasSource(sheet: AvatarAtlasSheet, scale: number, pixelRatio: number): ImageSourcePropType {
+  return scale * pixelRatio > 1 && sheet.highResolutionSource ? sheet.highResolutionSource : sheet.source;
+}
+
+export function getAvatarAtlasOffset(sheet: AvatarAtlasSheet, frameIndex: number, scale: number) {
+  const index = ((Math.trunc(frameIndex) % sheet.frameCount) + sheet.frameCount) % sheet.frameCount;
+  return { x: -(index % sheet.columns) * sheet.frameWidth * scale, y: -Math.floor(index / sheet.columns) * sheet.frameHeight * scale };
+}
 
 // World distance covered by one complete left/right gait cycle. Keeping this
 // independent of elapsed time makes slow joystick motion and running stay in step.

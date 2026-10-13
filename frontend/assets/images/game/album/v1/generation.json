@@ -1,0 +1,19 @@
+{
+  "tool": "built-in image_gen",
+  "createdAt": "2026-10-03",
+  "purpose": "완료 활동 기록 카드 전용 일러스트. 실시간 게임 오브젝트나 아이템 이미지를 대체하지 않음.",
+  "prompts": [
+    {
+      "id": "library",
+      "prompt": "Use case: illustration-story. Asset type: square memory album card illustration in the Korean cozy life game Oneuldo. Input image is style and subject design reference only, not an edit target. A single square illustrated memory postcard for finishing a library shift: a small orderly wooden library book cart with six softly colored books and one open library book on a warm cream reading desk, a partial arched library window behind. The scene is a simple cozy cropped vignette, no people. Match the reference's warm cocoa brown substantial clean outlines and tidy 2D game illustration. Large calm flat areas, restrained cel shadows, warm cream, sage green, maple and muted peach. Clear small-thumbnail readability, mature charming picture-book game style, handmade illustration feel without rough texture. Center the important object within generous 12% padding so rounded card cropping never cuts it. Background completely filled pale cream with a sparse environment, not transparent. No text, letters, digits, logos, watermark, UI, border frame, collage or panels. No paper grain/noisy shading, no photorealistic material, no dramatic lighting or shiny 3D. Output one square image only."
+    },
+    {
+      "id": "bus",
+      "prompt": "Use case: illustration-story. Asset type: square memory album card illustration in the Korean cozy life game Oneuldo. Input image is style and subject design reference only, not an edit target. A single square illustrated memory postcard for a successful bus ride: the exact cream and muted sage Korean city bus design from the reference seen in front-side three-quarter view at a small neighborhood bus stop, a very simple receding lane and rounded tree behind. Rounded friendly but credible bus geometry. No driver or people. Match the reference's warm cocoa brown substantial clean outlines and tidy 2D game illustration. Large calm flat areas, restrained cel shadows, warm cream, sage green, maple and muted peach. Clear small-thumbnail readability, mature charming picture-book game style, handmade illustration feel without rough texture. Center the important object within generous 12% padding so rounded card cropping never cuts it. Background completely filled pale cream with a sparse environment, not transparent. No text, letters, digits, logos, watermark, UI, border frame, collage or panels. No paper grain/noisy shading, no photorealistic material, no dramatic lighting or shiny 3D. Output one square image only."
+    },
+    {
+      "id": "shopping",
+      "prompt": "Use case: illustration-story. Asset type: square memory album card illustration in the Korean cozy life game Oneuldo. Input image is style and subject design reference only, not an edit target. A single square illustrated memory postcard for shopping and helping a friend: an open soft sage reusable grocery bag on a cream counter holding one small white-and-pale-blue milk carton and two red apples, blank folded receipt beside it. A subtle sliver of the reference warm wooden and sage market shelf at the back. No people. Match the reference's warm cocoa brown substantial clean outlines and tidy 2D game illustration. Large calm flat areas, restrained cel shadows, warm cream, sage green, maple and muted peach. Clear small-thumbnail readability, mature charming picture-book game style, handmade illustration feel without rough texture. Center the important object within generous 12% padding so rounded card cropping never cuts it. Background completely filled pale cream with a sparse environment, not transparent. No text, letters, digits, logos, watermark, UI, border frame, collage or panels. No paper grain/noisy shading, no photorealistic material, no dramatic lighting or shiny 3D. Output one square image only."
+    }
+  ]
+}

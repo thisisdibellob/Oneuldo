@@ -1,0 +1,18 @@
+{
+  "crop": {
+    "left": 117,
+    "top": 128,
+    "width": 789,
+    "height": 1367
+  },
+  "canvas": [
+    128,
+    192
+  ],
+  "pivot": [
+    64,
+    186
+  ],
+  "renderedHeight": 170,
+  "alphaPreserved": true
+}

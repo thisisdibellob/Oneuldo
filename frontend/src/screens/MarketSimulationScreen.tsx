@@ -22,7 +22,7 @@ import {
 } from '../game/marketSession';
 import { getMarketProductImage } from '../game/marketProductImages';
 import { getMarketCheckoutReview } from '../game/marketCheckoutReview';
-import { getMarketProduct, marketCategories, MarketCart } from '../game/scenarios';
+import { getMarketCartTotal, getMarketProduct, marketCategories, MarketCart } from '../game/scenarios';
 import { fonts } from '../theme';
 import { listMarketEpisodes, saveMarketEpisode, MarketStoredEpisode } from '../game/marketEpisodeStore';
 
@@ -56,6 +56,9 @@ export type MarketSimulationScreenProps = {
   onEnvironmentChange?: (environment: MarketEnvironment) => void;
   onCashierCalled?: (availability: MarketCashierAvailability) => void;
   onEpisodeComplete?: (episode: ReturnType<typeof exportMarketEpisode>) => void;
+  requesterName?: string;
+  spendingLimit?: number;
+  onBudgetRequest?: (amount: number) => void;
   onExit: () => void;
   onLockChange?: (locked: boolean) => void;
   onMissionComplete?: () => void;
@@ -77,6 +80,9 @@ export function MarketSimulationScreen({
   onEnvironmentChange,
   onCashierCalled,
   onEpisodeComplete,
+  requesterName = '지영',
+  spendingLimit,
+  onBudgetRequest,
   onExit,
   onLockChange,
   onMissionComplete
@@ -126,17 +132,22 @@ export function MarketSimulationScreen({
   const position = playerPositionRef ?? localPosition;
   const shelf = marketCategories.find(category => category.id === session.activeStation);
   const requesterOpen = session.view === 'requester';
+  const [budgetReviewTotal, setBudgetReviewTotal] = useState<number | null>(null);
   const panelVisible = requesterOpen || briefing || settings || historyOpen || session.phase !== 'shopping' || cartOpen || helpOpen || staffMessage;
   const locked = panelVisible || panelPresent || !!shelf;
   const dispatch = useCallback((action: MarketAction, sync = false) => {
     let current = live.current;
+    if ((action.type === 'submit' || action.type === 'submitKiosk') && spendingLimit !== undefined) {
+      const total = action.type === 'submitKiosk' ? getMarketCartTotal(action.scannedCart) : getMarketCheckoutReview(current)?.total ?? getMarketCartTotal(current.cart);
+      if (total > spendingLimit) { setBudgetReviewTotal(total); return current; }
+    }
     const at = new Date().toISOString();
     if (sync) current = applyMarketAction(current, { type: 'setPosition', point: { ...position.current }, at });
     const next = applyMarketAction(current, { ...action, at });
     live.current = next;
     setSession(next);
     return next;
-  }, [position]);
+  }, [position, spendingLimit]);
   const contactRequester = useCallback(() => {
     const next = dispatch({ type: 'viewRequester' }, true);
     if (next.lastActionError) return;
@@ -276,7 +287,7 @@ export function MarketSimulationScreen({
           setStaffReturnHelp(false);
         }
       }
-      else if (session.phase === 'checkout') dispatch({ type: 'closeStation' });
+      else if (session.phase === 'checkout') { setBudgetReviewTotal(null); dispatch({ type: 'closeStation' }); }
       else if (session.phase !== 'finished') giveUp();
       else return false;
       return true;
@@ -329,6 +340,7 @@ export function MarketSimulationScreen({
     }
   };
   const closeStation = () => {
+    setBudgetReviewTotal(null);
     dispatch({ type: 'closeStation' });
     setStaffMessage(false);
     setStaffReturnHelp(false);
@@ -484,7 +496,7 @@ export function MarketSimulationScreen({
             ? '목록을 보고 필요한 물건을 골라 보세요. 물건의 이름과 종류를 천천히 살펴봐요.'
             : `다 골랐다면 출구 옆 계산대로 가요. 계산하지 않은 물건을 담고 입구·출구·측면 출입문의 빨간 경보기를 지나 매장 밖으로 나가면 ${session.config.alarmPenaltyPoints}점이 줄어요. 원하면 다시 해보거나 언제든 그만둘 수 있어요.`}
         </Text>
-        <View style={s.choices}>
+        {spendingLimit === undefined ? <View style={s.choices}>
           <Button
             text="연습 모드"
             selected={session.config.difficulty === 'family'}
@@ -497,10 +509,10 @@ export function MarketSimulationScreen({
             quiet
             onPress={() => selectDifficulty('exact')}
           />
-        </View>
+        </View> : <Text style={s.body}>{requesterName}의 부탁 · 예산 {price(spendingLimit)}</Text>}
         <Text style={s.small}>
           {session.config.difficulty === 'family'
-            ? (session.learning.stockout ? '같은 종류의 상품을 골라도 돼요. 다만 이름을 정확히 부탁한 상품은 바꾸기 전에 지영에게 물어봐요.' : '종류가 같으면 괜찮아요. 예: 우유는 맛과 지방 함량에 관계없이 골라요.')
+            ? (session.learning.stockout ? `같은 종류의 상품을 골라도 돼요. 다만 이름을 정확히 부탁한 상품은 바꾸기 전에 ${requesterName}에게 물어봐요.` : '종류가 같으면 괜찮아요. 예: 우유는 맛과 지방 함량에 관계없이 골라요.')
             : '목록에 적힌 상품을 정확히 골라요. 예: 저지방 우유는 저지방 우유만 골라요.'}
         </Text>
         <View style={s.requirements}>
@@ -514,16 +526,16 @@ export function MarketSimulationScreen({
         {session.learning.choiceTask ? <Text style={s.small}>음료는 가격표를 보고 원하는 것으로 골라요. 필요하면 휴대폰의 계산기를 이용해요.</Text> : null}
         {constructionActive ? <Text style={s.small}>바깥 입구는 공사 중이에요. 안쪽 입구를 이용해 주세요.</Text> : null}
         <Text style={s.small}>출구로 들어가면 {session.config.wrongWayPenaltyPoints}점이 줄어요. 들어갈 때는 입구를 이용해요.</Text>
-        {session.learning.stockout ? <Text style={s.small}>물건이 없으면 직원에게 물어보고, 부탁을 바꾸려면 휴대폰의 전화에서 지영을 선택해요.</Text> : null}
+        {session.learning.stockout ? <Text style={s.small}>물건이 없으면 직원에게 물어보고, 부탁을 바꾸려면 휴대폰에서 {requesterName}에게 전화해요.</Text> : null}
         <Button
           text={briefingStep === 0 ? '다음' : '장보기 시작'}
           onPress={() => briefingStep === 0 ? setBriefingStep(1) : start()}
         />
-        <Button
+        {spendingLimit === undefined ? <Button
           text="연습 환경 설정"
           quiet
           onPress={() => setSettings(true)}
-        />
+        /> : null}
         <Button
           text="이전 게임 기록"
           quiet
@@ -582,7 +594,7 @@ export function MarketSimulationScreen({
       ? modal('이렇게 이용해요', <>
         <Text style={s.body}>1. 사야 할 물품과 개수를 읽어요.{'\n\n'}2. 진열대 가까이 가서 물건을 살펴봐요.{'\n\n'}3. 장바구니를 눌러 담은 물건을 확인해요.{'\n\n'}4. 내려놓을 물건은 그 물건의 진열대로 돌아가 장바구니를 펼쳐 내려놓아요. 어렵다면 종업원에게 제자리에 놓아 달라고 부탁해요.{'\n\n'}5. 유인 계산대에서 구매를 확정하거나, 무인 계산대에 물건을 끌어 스캔한 뒤 화면 확인 → 결제로 마무리해요. 유인 계산대가 모두 비어 있으면 매장 직원에게 부탁해요. 계산원이 있는 상태에서 없다고 요청하면 {session.config.cashierRequestPenaltyPoints}점이 줄어요.{'\n\n'}6. 계산하지 않은 물건을 담고 입구·출구·측면 출입문의 빨간 경보기를 지나 매장 밖으로 나가면 {session.config.alarmPenaltyPoints}점이 줄어요. 입구와 출구는 공용 복도로 이어져요. 복도 끝 공동 출입문에서 마을로 나갈 수 있어요.</Text>
         <Text style={s.body}>출구로 들어가면 {session.config.wrongWayPenaltyPoints}점이 줄어요. {constructionActive ? '바깥 입구는 공사 중이에요. 안쪽 입구를 이용해 주세요.' : '들어갈 때는 입구를 이용해요.'}</Text>
-        <Text style={s.body}>상품 위치는 직원에게 물어볼 수 있어요. 품절을 확인하면 재고를 물어보고 휴대폰의 전화에서 지영을 선택해요. 계산기는 휴대폰 메뉴에 있어요.</Text>
+        <Text style={s.body}>상품 위치는 직원에게 물어볼 수 있어요. 품절을 확인하면 재고를 물어보고 휴대폰에서 {requesterName}에게 전화해요. 계산기는 휴대폰 메뉴에 있어요.</Text>
         <Button text="알겠어요" onPress={() => {
           dispatch({ type: 'closeView' });
           setHelpOpen(false);
@@ -619,13 +631,14 @@ export function MarketSimulationScreen({
       </MarketStaffDialogue>
       : null}
     {requesterOpen ? <MarketRequesterCall session={session} onAction={dispatch} onClose={() => dispatch({ type: 'closeView' })}
+      requesterName={requesterName} spendingLimit={spendingLimit} onBudgetRequest={onBudgetRequest}
       bottomInset={embedded ? Math.max(132, (insets?.bottom ?? 0) + 112) : Math.max(24, insets?.bottom ?? 0)} /> : null}
-    {!briefing && session.phase === 'checkout' && session.selectedKioskId ? <MarketKioskCheckout
+    {!briefing && budgetReviewTotal === null && session.phase === 'checkout' && session.selectedKioskId ? <MarketKioskCheckout
       key={session.selectedKioskId + '-' + session.attempts}
       cart={session.cart} kioskLabel="무인 계산대"
       onConfirm={scannedCart => dispatch({ type: 'submitKiosk', scannedCart })}
       onCancel={closeStation} /> : null}
-    {!briefing && session.phase === 'checkout' && !session.selectedKioskId && checkoutReview
+    {!briefing && budgetReviewTotal === null && session.phase === 'checkout' && !session.selectedKioskId && checkoutReview
       ? <MarketStaffedCheckout key={`${session.selectedCheckoutId}-${session.attempts}`}
         review={checkoutReview} cart={session.cart} counterNumber={session.selectedCheckoutId === 'checkout-2' ? 2 : 1}
         dialogueBottomInset={Math.max(24, insets?.bottom ?? 0)}
@@ -648,6 +661,14 @@ export function MarketSimulationScreen({
         {quit}
       </>, `${session.selectedCheckoutId === 'checkout-2' ? 2 : 1}번 계산대 · 최종 결정`)
       : null}
+    {budgetReviewTotal !== null && session.phase === 'checkout' ? modal('예산을 다시 확인해요', <>
+      <Text style={s.body}>계산 금액은 {price(budgetReviewTotal)}이에요. {requesterName}와 정한 예산 {price(spendingLimit ?? 0)}보다 많아요.</Text>
+      <Text style={s.small}>아직 결제하지 않았어요. 물건을 다시 고르거나 예산을 물어봐요.</Text>
+      <Button text="다시 고르기" onPress={() => { setBudgetReviewTotal(null); closeStation(); }} />
+      {onBudgetRequest ? <Button text={`${requesterName}에게 예산 확인하기`} onPress={() => {
+        setBudgetReviewTotal(null); closeStation(); contactRequester();
+      }} /> : null}
+    </>, '결제 전 확인') : null}
     {session.phase === 'feedback'
       ? modal('이번 구매는 맞지 않았어요', <>
         {session.feedback?.details?.length
@@ -674,8 +695,8 @@ export function MarketSimulationScreen({
             {session.outcome === 'success' ? '성공' : '실패 (포기)'}
           </Text>
           <Text style={s.body}>구매 시도 {session.attempts}회</Text>
-          {session.learning.stockout?.status === 'replacement-approved' ? <Text style={s.small}>지영에게 확인하고 대체 상품을 골랐어요.</Text> : null}
-          {session.learning.stockout?.status === 'waived' ? <Text style={s.small}>구매하지 못한 이유를 지영에게 전달했어요.</Text> : null}
+          {session.learning.stockout?.status === 'replacement-approved' ? <Text style={s.small}>{requesterName}에게 확인하고 대체 상품을 골랐어요.</Text> : null}
+          {session.learning.stockout?.status === 'waived' ? <Text style={s.small}>구매하지 못한 이유를 {requesterName}에게 전달했어요.</Text> : null}
           <Text testID="market-final-score" style={s.body}>최종 점수 {session.score}점 · 총 감점 {session.penaltyPoints}점</Text>
           <Text style={s.small}>경보기 {session.penaltyPoints - cashierPenaltyTotal - wrongWayPenaltyTotal}점 ({session.alarmCount}회) · 출구 역진입 {wrongWayPenaltyTotal}점 ({session.wrongWayEntryCount}회) · 계산원 확인 {cashierPenaltyTotal}점</Text>
         </View>

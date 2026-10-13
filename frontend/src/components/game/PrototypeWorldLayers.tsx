@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import type { ComponentProps } from 'react';
+import type { ComponentProps, ReactNode } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
@@ -23,21 +23,22 @@ import {
   VILLAGE_BUILDINGS,
   VILLAGE_DECORATIONS,
   VILLAGE_NPCS,
-  VILLAGE_ROADS,
   VillageBuildingDefinition,
   VillageDecorationDefinition,
   VillageNpcDefinition,
   VillageNpcId,
-  VillageRoadDefinition,
 } from '../../game/prototypeWorld';
 import {
   villageBuildingArt,
   villageDecorationArt,
   villageLandmarkArt,
-  villageSurfaceArt,
 } from '../../game/gameAssets';
+import { VILLAGE_NPC_ART_SCALE, villageNpcArt } from '../../game/villageNpcArt';
+import { getVillageRenderDepth } from '../../game/villageStreets';
 import { colors, fonts } from '../../theme';
 import { PressScale } from '../PressScale';
+import { MODULAR_CHARACTER_CANVAS, ModularCharacter } from './ModularCharacter';
+import { VillageStreets } from './VillageStreets';
 
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
@@ -46,6 +47,7 @@ export type VillagePortalId = 'home' | 'market';
 export type HomeStationId = 'fridge' | 'exit';
 
 export type ExpandedVillageLayerProps = {
+  children?: ReactNode;
   controlsLocked?: boolean;
   controlMode: PrototypeControlMode;
   nearbyNpcId: VillageNpcId | null;
@@ -199,6 +201,7 @@ function VillageBuilding({ building }: { building: VillageBuildingDefinition }) 
           left: building.x,
           top: building.y,
           width: building.width,
+          zIndex: getVillageRenderDepth(building.y + building.height),
         },
       ]}
       testID={`village-building-${building.id}`}
@@ -228,17 +231,19 @@ function VillageDecoration({ decoration }: { decoration: VillageDecorationDefini
       pointerEvents="none"
       style={[
         styles.decoration,
-        decoration.layer === 'front' ? styles.decorationFront : styles.decorationBack,
         {
           height: decoration.height,
           left: decoration.x,
           top: decoration.y,
           width: decoration.width,
+          zIndex: getVillageRenderDepth(decoration.y + decoration.height),
         },
       ]}
       testID={`village-decoration-${decoration.id}`}
     >
+      <View style={{ position: 'absolute', bottom: -2, height: Math.min(12, decoration.height * 0.14), width: decoration.width * 0.64, left: decoration.width * 0.18, borderRadius: 999, backgroundColor: 'rgba(78,83,62,0.12)' }} />
       <Image
+        fadeDuration={0}
         resizeMode="contain"
         source={villageDecorationArt[decoration.kind]}
         style={[
@@ -255,165 +260,39 @@ function VillageDecoration({ decoration }: { decoration: VillageDecorationDefini
   );
 }
 
-function VillageCrosswalk({ x }: { x: number }) {
-  return (
-    <View pointerEvents="none" style={[styles.crosswalk, { left: x }]}>
-      {Array.from({ length: 7 }, (_, index) => (
-        <View key={index} style={styles.crosswalkStripe} />
-      ))}
-    </View>
-  );
-}
-
-function VillageRoadMarkings() {
-  return (
-    <View pointerEvents="none" style={styles.layer}>
-      {Array.from({ length: 18 }, (_, index) => (
-        <View
-          key={`main-${index}`}
-          style={[styles.roadDashHorizontal, { left: 20 + index * 122, top: 768 }]}
-        />
-      ))}
-      {Array.from({ length: 12 }, (_, index) => (
-        <View
-          key={`south-${index}`}
-          style={[styles.roadDashHorizontal, { left: 390 + index * 122, top: 1481 }]}
-        />
-      ))}
-      {Array.from({ length: 11 }, (_, index) => (
-        <View
-          key={`west-${index}`}
-          style={[styles.roadDashVertical, { left: 448, top: 20 + index * 122 }]}
-        />
-      ))}
-      {Array.from({ length: 14 }, (_, index) => (
-        <View
-          key={`east-${index}`}
-          style={[styles.roadDashVertical, { left: 1798, top: 20 + index * 122 }]}
-        />
-      ))}
-    </View>
-  );
-}
-
-const ROAD_TEXTURE_TILE_SIZE = 320;
-
-function VillageRoadSurface({ road }: { road: VillageRoadDefinition }) {
-  // Use world-space phase offsets so overlapping road segments show the same
-  // part of the seamless tile at intersections rather than restarting locally.
-  const startX = -(road.x % ROAD_TEXTURE_TILE_SIZE);
-  const startY = -(road.y % ROAD_TEXTURE_TILE_SIZE);
-  const columns = Math.ceil((road.width - startX) / ROAD_TEXTURE_TILE_SIZE);
-  const rows = Math.ceil((road.height - startY) / ROAD_TEXTURE_TILE_SIZE);
-
-  return (
-    <View
-      pointerEvents="none"
-      style={[
-        styles.road,
-        {
-          height: road.height,
-          left: road.x,
-          top: road.y,
-          width: road.width,
-        },
-      ]}
-      testID={`village-road-${road.id}`}
-    >
-      {Array.from({ length: rows }, (_, rowIndex) =>
-        Array.from({ length: columns }, (_, columnIndex) => (
-          <Image
-            fadeDuration={0}
-            key={`${rowIndex}-${columnIndex}`}
-            resizeMode="stretch"
-            source={villageSurfaceArt.road}
-            style={[
-              styles.roadTextureTile,
-              {
-                left: startX + columnIndex * ROAD_TEXTURE_TILE_SIZE,
-                top: startY + rowIndex * ROAD_TEXTURE_TILE_SIZE,
-              },
-            ]}
-          />
-        )),
-      )}
-    </View>
-  );
-}
-
 function VillageParcels() {
-  return (
-    <>
-      <View pointerEvents="none" style={[styles.parcel, styles.parcelPark]} />
-      <View pointerEvents="none" style={[styles.parcel, styles.parcelSchool]} />
-      <View pointerEvents="none" style={[styles.parcel, styles.parcelMarket]} />
-      <View pointerEvents="none" style={[styles.parcel, styles.parcelCivic]} />
-      <View pointerEvents="none" style={[styles.parcel, styles.parcelNorthResidential]} />
-      <View pointerEvents="none" style={[styles.parcel, styles.parcelLibrary]} />
-      <View pointerEvents="none" style={[styles.parcel, styles.parcelWestShops]} />
-      <View pointerEvents="none" style={[styles.parcel, styles.parcelEastShops]} />
-      <View pointerEvents="none" style={[styles.parcel, styles.parcelSouthResidential]} />
-      <View pointerEvents="none" style={styles.marketPlaza} />
-      <View pointerEvents="none" style={styles.shoppingWalkway} />
-    </>
-  );
+  return <View pointerEvents="none" style={styles.layer}>
+    <View style={[styles.landscapePatch, {left:20,top:24,width:260,height:579,borderRadius:64,backgroundColor:'#C8D3AD'}]} />
+    <View style={[styles.landscapePatch, {left:42,top:185,width:230,height:340,borderRadius:108,borderWidth:33,borderColor:'#E6D7B8',backgroundColor:'#BACDA2'}]} />
+    <View style={[styles.landscapePatch, {left:148,top:483,width:62,height:176,borderRadius:24,backgroundColor:'#E6D7B8'}]} />
+    <View style={[styles.landscapePatch, {left:585,top:477,width:445,height:145,borderRadius:26,backgroundColor:'#E9E2D2'}]} />
+    <View style={[styles.landscapePatch, {left:1482,top:283,width:149,height:319,borderRadius:48,backgroundColor:'#CDD7B7'}]} />
+    <View style={[styles.landscapePatch, {left:1072,top:535,width:372,height:88,borderRadius:22,backgroundColor:'#EEE6D7'}]} />
+    <View style={[styles.landscapePatch, {left:1215,top:543,width:100,height:118,borderRadius:18,backgroundColor:'#EEE6D7'}]} />
+    <View style={[styles.landscapePatch, {left:580,top:1143,width:1068,height:53,borderRadius:24,backgroundColor:'#EEE6D7'}]} />
+    <View style={[styles.landscapePatch, {left:1220,top:877,width:64,height:313,borderRadius:24,backgroundColor:'#EEE6D7'}]} />
+    <View style={[styles.landscapePatch, {left:1185,top:1180,width:55,height:309,borderRadius:24,backgroundColor:'#EEE6D7'}]} />
+    <View style={[styles.landscapePatch, {left:625,top:1199,width:182,height:230,borderRadius:44,backgroundColor:'#D0D8BC'}]} />
+    <View style={[styles.landscapePatch, {left:22,top:1360,width:259,height:205,borderRadius:44,backgroundColor:'#CAD5B3'}]} />
+    <View style={[styles.landscapePatch, {left:1975,top:1443,width:208,height:112,borderRadius:32,backgroundColor:'#CCD6B6'}]} />
+  </View>;
 }
 
-function VillageBusStop({
-  label,
-  point,
-}: {
-  label: string;
-  point: Point;
-}) {
-  return (
-    <View
-      pointerEvents="none"
-      style={[styles.busStop, { left: point.x - 64, top: point.y - 70 }]}
-    >
-      <Image
-        resizeMode="contain"
-        source={villageLandmarkArt.busStop}
-        style={styles.landmarkArt}
-      />
-      <Text numberOfLines={1} style={styles.landmarkLabel}>
-        {label}
-      </Text>
-    </View>
-  );
-}
-
-function VillagePark({
-  height,
-  label,
-  width,
-  x,
-  y,
-}: {
-  height: number;
-  label: string;
-  width: number;
-  x: number;
-  y: number;
-}) {
-  return (
-    <View pointerEvents="none" style={[styles.park, { height, left: x, top: y, width }]}>
-      <Image resizeMode="contain" source={villageLandmarkArt.park} style={styles.landmarkArt} />
-      <Text style={styles.parkLabel}>{label}</Text>
-    </View>
-  );
+function VillageBusStop({label, point}: {label:string;point:Point}) {
+  return <View pointerEvents="none" testID={label === '마트 앞' ? 'village-market-bus-stop' : 'village-east-bus-stop'}
+    style={{position:'absolute',left:point.x-80,top:point.y-100,width:160,height:116,zIndex:getVillageRenderDepth(point.y-16)}}>
+    <View style={{position:'absolute',left:-6,top:85,width:172,height:30,borderRadius:12,backgroundColor:'#E0D7BF',borderColor:'#C8BEA5',borderWidth:1}} />
+    <Image fadeDuration={0} resizeMode="contain" source={villageLandmarkArt.busStop} style={{position:'absolute',left:0,top:0,width:160,height:86}}/>
+    <Text style={[styles.landmarkLabel,{left:40,bottom:21,fontSize:9,paddingHorizontal:7}]}>{label}</Text>
+  </View>;
 }
 
 function VillageLandmarks() {
-  return (
-    <>
-      <VillagePark height={430} label="마을 공원" width={315} x={20} y={150} />
-      <VillageBusStop label="마트 앞 버스정류장" point={MARKET_BUS_STOP_POINT} />
-      <VillageBusStop label="동쪽 버스정류장" point={BUS_STOP_POINT} />
-    </>
-  );
+  return <>
+    <VillageBusStop label="마트 앞" point={MARKET_BUS_STOP_POINT}/>
+    <VillageBusStop label="동쪽 정류장" point={BUS_STOP_POINT}/>
+  </>;
 }
-
 function VillageNpc({
   controlMode,
   controlsLocked,
@@ -429,6 +308,7 @@ function VillageNpc({
 }) {
   const rolePrefix = npc.id === 'minsu' ? '안내원 ' : '';
   const touchLabel = `${rolePrefix}${npc.name}로 이동해 대화하기`;
+  const artwork = villageNpcArt[npc.id];
 
   return (
     <PressScale
@@ -451,7 +331,12 @@ function VillageNpc({
       scaleTo={0.94}
       style={[
         styles.npc,
-        { left: npc.point.x - 35, top: npc.point.y - 45 },
+        {
+          left: npc.point.x - 35,
+          top: npc.point.y - (artwork ? MODULAR_CHARACTER_CANVAS.pivotY * VILLAGE_NPC_ART_SCALE : 45),
+          zIndex: getVillageRenderDepth(npc.point.y) + 1,
+        },
+        artwork ? styles.npcIllustrated : undefined,
         !nearby && styles.npcDistant,
       ]}
       testID={`village-npc-${npc.id}`}
@@ -464,11 +349,21 @@ function VillageNpc({
           visible={nearby}
         />
       </View>
-      <View style={styles.npcShadow} />
-      <View style={[styles.npcBody, { backgroundColor: npc.accentColor }]}>
-        <View style={styles.npcHead} />
-        <View style={styles.npcCollar} />
-      </View>
+      {artwork ? (
+        <ModularCharacter
+          layers={[{ id: npc.id, slot: 'bodySkin', source: artwork, fadeDuration: 0 }]}
+          scale={VILLAGE_NPC_ART_SCALE}
+          testID={`village-npc-art-${npc.id}`}
+        />
+      ) : (
+        <>
+          <View style={styles.npcShadow} />
+          <View style={[styles.npcBody, { backgroundColor: npc.accentColor }]}>
+            <View style={styles.npcHead} />
+            <View style={styles.npcCollar} />
+          </View>
+        </>
+      )}
       <Text style={styles.npcName}>{npc.name}</Text>
       <Text style={styles.npcRole}>{npc.roleLabel}</Text>
     </PressScale>
@@ -476,6 +371,7 @@ function VillageNpc({
 }
 
 export function ExpandedVillageLayer({
+  children,
   controlMode,
   controlsLocked = false,
   nearbyNpcId,
@@ -486,23 +382,8 @@ export function ExpandedVillageLayer({
 }: ExpandedVillageLayerProps) {
   return (
     <View pointerEvents="box-none" style={styles.layer} testID="expanded-village-layer">
-      <View pointerEvents="none" style={styles.villageGround} />
+      <VillageStreets />
       <VillageParcels />
-      <View pointerEvents="none" style={[styles.sidewalk, styles.sidewalkMainNorth]} />
-      <View pointerEvents="none" style={[styles.sidewalk, styles.sidewalkMainSouth]} />
-      <View pointerEvents="none" style={[styles.sidewalk, styles.sidewalkWestLeft]} />
-      <View pointerEvents="none" style={[styles.sidewalk, styles.sidewalkWestRight]} />
-      <View pointerEvents="none" style={[styles.sidewalk, styles.sidewalkEastLeft]} />
-      <View pointerEvents="none" style={[styles.sidewalk, styles.sidewalkEastRight]} />
-      <View pointerEvents="none" style={[styles.sidewalk, styles.sidewalkSouthTop]} />
-      <View pointerEvents="none" style={[styles.sidewalk, styles.sidewalkSouthBottom]} />
-      {VILLAGE_ROADS.map((road) => (
-        <VillageRoadSurface key={road.id} road={road} />
-      ))}
-      <VillageRoadMarkings />
-      <VillageCrosswalk x={414} />
-      <VillageCrosswalk x={1184} />
-      <VillageCrosswalk x={1764} />
 
       {VILLAGE_DECORATIONS.filter(({ layer }) => layer === 'back').map((decoration) => (
         <VillageDecoration decoration={decoration} key={decoration.id} />
@@ -517,6 +398,7 @@ export function ExpandedVillageLayer({
       {VILLAGE_DECORATIONS.filter(({ layer }) => layer === 'front').map((decoration) => (
         <VillageDecoration decoration={decoration} key={decoration.id} />
       ))}
+      {children}
 
       {tapTargetMarker && controlMode === 'touch' ? (
         <View
@@ -760,155 +642,7 @@ export function HomeWorldLayer({
 
 const styles = StyleSheet.create({
   layer: { ...StyleSheet.absoluteFill },
-  villageGround: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: '#E9E5D8',
-    borderColor: '#C7C1AF',
-    borderWidth: 12,
-  },
-  parcel: {
-    borderColor: 'rgba(119,104,82,0.16)',
-    borderRadius: 18,
-    borderWidth: 2,
-    position: 'absolute',
-  },
-  parcelPark: {
-    backgroundColor: '#D4E2BE',
-    height: 500,
-    left: 18,
-    top: 105,
-    width: 320,
-  },
-  parcelSchool: {
-    backgroundColor: '#E8E3D3',
-    height: 505,
-    left: 545,
-    top: 120,
-    width: 520,
-  },
-  parcelMarket: {
-    backgroundColor: '#EEE8D9',
-    height: 415,
-    left: 1070,
-    top: 220,
-    width: 390,
-  },
-  parcelCivic: {
-    backgroundColor: '#DCE5CE',
-    height: 555,
-    left: 1380,
-    top: 55,
-    width: 335,
-  },
-  parcelNorthResidential: {
-    backgroundColor: '#DCE5CE',
-    height: 625,
-    left: 1910,
-    top: 20,
-    width: 270,
-  },
-  parcelLibrary: {
-    backgroundColor: '#D8E2C7',
-    height: 435,
-    left: 12,
-    top: 925,
-    width: 345,
-  },
-  parcelWestShops: {
-    backgroundColor: '#EEE8D9',
-    height: 460,
-    left: 555,
-    top: 905,
-    width: 650,
-  },
-  parcelEastShops: {
-    backgroundColor: '#EEE8D9',
-    height: 460,
-    left: 1195,
-    top: 905,
-    width: 520,
-  },
-  parcelSouthResidential: {
-    backgroundColor: '#DCE5CE',
-    height: 520,
-    left: 1910,
-    top: 890,
-    width: 270,
-  },
-  marketPlaza: {
-    backgroundColor: '#E6DCC9',
-    borderColor: 'rgba(142,120,89,0.17)',
-    borderRadius: 20,
-    borderWidth: 2,
-    height: 150,
-    left: 1158,
-    position: 'absolute',
-    top: 525,
-    width: 124,
-  },
-  shoppingWalkway: {
-    backgroundColor: '#E5DAC6',
-    borderColor: 'rgba(142,120,89,0.15)',
-    borderRadius: 18,
-    borderWidth: 2,
-    height: 500,
-    left: 1158,
-    position: 'absolute',
-    top: 865,
-    width: 124,
-  },
-  sidewalk: {
-    backgroundColor: '#F2EEE4',
-    borderColor: 'rgba(131,119,102,0.2)',
-    borderWidth: 1,
-    position: 'absolute',
-  },
-  sidewalkMainNorth: { height: 40, left: 0, top: 635, width: 2200 },
-  sidewalkMainSouth: { height: 40, left: 0, top: 865, width: 2200 },
-  sidewalkWestLeft: { height: 1405, left: 325, top: 0, width: 40 },
-  sidewalkWestRight: { height: 1405, left: 540, top: 0, width: 40 },
-  sidewalkEastLeft: { height: 1700, left: 1675, top: 0, width: 40 },
-  sidewalkEastRight: { height: 1700, left: 1890, top: 0, width: 40 },
-  sidewalkSouthTop: { height: 40, left: 365, top: 1365, width: 1525 },
-  sidewalkSouthBottom: { height: 40, left: 365, top: 1565, width: 1525 },
-  road: {
-    backgroundColor: '#C8BDB2',
-    overflow: 'hidden',
-    position: 'absolute',
-  },
-  roadTextureTile: {
-    height: ROAD_TEXTURE_TILE_SIZE,
-    opacity: 0.38,
-    position: 'absolute',
-    width: ROAD_TEXTURE_TILE_SIZE,
-  },
-  roadDashHorizontal: {
-    backgroundColor: 'rgba(255,252,235,0.72)',
-    borderRadius: 3,
-    height: 5,
-    position: 'absolute',
-    width: 58,
-  },
-  roadDashVertical: {
-    backgroundColor: 'rgba(255,252,235,0.72)',
-    borderRadius: 3,
-    height: 58,
-    position: 'absolute',
-    width: 5,
-  },
-  crosswalk: {
-    height: 146,
-    justifyContent: 'space-between',
-    position: 'absolute',
-    top: 697,
-    width: 74,
-  },
-  crosswalkStripe: {
-    backgroundColor: 'rgba(255,253,244,0.88)',
-    borderRadius: 2,
-    height: 13,
-    width: '100%',
-  },
+  landscapePatch: { position: 'absolute' },
   decoration: { position: 'absolute' },
   decorationBack: { zIndex: 1 },
   decorationFront: { zIndex: 5 },
@@ -1126,6 +860,7 @@ const styles = StyleSheet.create({
     zIndex: 12,
   },
   npcDistant: { opacity: 0.82 },
+  npcIllustrated: { height: MODULAR_CHARACTER_CANVAS.height * VILLAGE_NPC_ART_SCALE + 30 },
   npcCloudAnchor: { alignItems: 'center', left: -65, position: 'absolute', top: -45, width: 200 },
   npcShadow: {
     backgroundColor: 'rgba(26,35,28,0.2)',

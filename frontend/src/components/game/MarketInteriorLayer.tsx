@@ -23,6 +23,9 @@ import {
 } from '../../game/prototypeWorld';
 import { marketCategories, type MarketCategory, type MarketCategoryId } from '../../game/scenarios';
 import { fonts } from '../../theme';
+import { useGamePreferences } from '../../game/gamePreferences';
+import { COZY_MARKET_PALETTE as cozy } from '../../game/marketInteriorThemes';
+import { cozyMarketArt } from '../../game/marketInteriorThemeArt';
 
 /** Visual layers only: movement and hit targets stay with the shared world. */
 export function MarketInteriorBackdrop({ environment }: { environment?: MarketEnvironment } = {}) {
@@ -54,8 +57,10 @@ export function MarketCategoryFixture({
 }
 
 function MarketCategoryMarker({ category, active }: { category: MarketCategory; active: boolean }) {
-  return (<View testID={`market-aisle-marker-${category.id}`} style={[styles.categorySign, active && styles.categorySignActive]}>
-        <Text numberOfLines={1} style={styles.categoryName}>{category.label}</Text>
+  const illustrated = useGamePreferences().preferences.marketInteriorTheme === 'cozy';
+  return (<View testID={`market-aisle-marker-${category.id}`} style={[styles.categorySign,
+    illustrated && { backgroundColor: cozy.cream, borderColor: '#C2AD8F', borderLeftColor: cozy.peach, borderRadius: 6 }, active && styles.categorySignActive]}>
+        <Text numberOfLines={1} style={[styles.categoryName, illustrated && { color: cozy.ink }]}>{category.label}</Text>
         {active ? <Ionicons color="#587565" name="chevron-forward" size={11} /> : null}
       </View>
   );
@@ -108,6 +113,7 @@ export function MarketShelfTarget({ placement, categoryId, active, highlighted =
 export function MarketCheckoutFixture({ active, cashierPresent = true, counter, index = 0 }: {
   active: boolean; cashierPresent?: boolean; counter?: MarketCheckoutPlacement; index?: number;
 }) {
+  const illustrated = useGamePreferences().preferences.marketInteriorTheme === 'cozy';
   const rect = counter?.rect ?? MARKET_CHECKOUT_RECT;
   const cashierPoint = counter?.cashierPoint ?? MARKET_CASHIER_POINT;
   const appearance = counter?.cashierAppearance ?? (index === 0 ? 0 : 2);
@@ -132,16 +138,16 @@ export function MarketCheckoutFixture({ active, cashierPresent = true, counter, 
         accessibilityIgnoresInvertColors
         accessible={false}
         resizeMode="contain"
-        source={marketGameArt.checkout}
+        source={illustrated ? cozyMarketArt.checkout : marketGameArt.checkout}
         style={[styles.counterArt, { left: (rect.width - 72 * MARKET_CHECKOUT_SIZE_MULTIPLIER) / 2 }]}
         testID="market-checkout-art"
       />
-      <View style={[styles.counterNumberPole, { left: rect.width / 2 - 1.5 }]} />
+      <View style={[styles.counterNumberPole, illustrated && { backgroundColor: cozy.wood, borderRightColor: '#9E7B54' }, { left: rect.width / 2 - 1.5 }]} />
       <View testID={`market-checkout-marker-${index + 1}`} accessibilityLabel={`${index + 1}번 계산대`}
-        style={[styles.counterSign, { left: (rect.width - 48) / 2 }, active && styles.counterSignActive]}>
+        style={[styles.counterSign, illustrated && { backgroundColor: cozy.cream, borderColor: '#C2AD8F', borderTopColor: cozy.sage, borderRadius: 7 }, { left: (rect.width - 48) / 2 }, active && styles.counterSignActive]}>
         <View style={styles.counterSignHeader}>
           <Ionicons color="#587565" name="card-outline" size={11} />
-          <Text numberOfLines={1} style={styles.counterName}>{index + 1}</Text>
+          <Text numberOfLines={1} style={[styles.counterName, illustrated && { color: cozy.ink }]}>{index + 1}</Text>
         </View>
       </View>
       <View testID={`market-checkout-status-${index + 1}`} style={[styles.counterStatus, { left: (rect.width - 64) / 2 }]}>
@@ -184,6 +190,7 @@ export function MarketKioskFixture({ kiosk, active = false }: { kiosk: MarketKio
 
 /** Decorative objects have no action targets. The working kiosks belong to checkout lanes. */
 export function MarketEnvironmentObjects({ environment }: { environment: MarketEnvironment }) {
+  const illustrated = useGamePreferences().preferences.marketInteriorTheme === 'cozy';
   return <>
     {environment.objects.filter(object => object.kind !== 'kiosk').map((object) => {
       const { rect } = object;
@@ -195,7 +202,9 @@ export function MarketEnvironmentObjects({ environment }: { environment: MarketE
         testID={`market-object-${object.id}`}>
         <View style={styles.objectShadow} />
         {object.kind === 'pillar' ? <>
-          <View style={styles.pillarBody} /><View style={styles.pillarTop} /><View style={styles.pillarBase} />
+          <View style={[styles.pillarBody, illustrated && { backgroundColor: cozy.wall, borderColor: '#BEA789' }]} />
+          <View style={[styles.pillarTop, illustrated && { backgroundColor: cozy.cream, borderColor: '#BEA789' }]} />
+          <View style={[styles.pillarBase, illustrated && { backgroundColor: cozy.sage, borderColor: cozy.sageDark }]} />
         </> : object.kind === 'elevator' || object.kind === 'atm' ? <Image accessible={false} resizeMode="contain"
           source={object.kind === 'atm' ? marketGameArt.atm : marketGameArt.elevator}
           style={object.kind === 'atm' ? styles.atmArt : styles.elevatorArt} />
@@ -210,7 +219,8 @@ export function MarketEnvironmentObjects({ environment }: { environment: MarketE
             {[{ left: -2, bottom: 29, rotate: '-34deg' }, { left: 12, bottom: 38, rotate: '24deg' },
               { left: 2, bottom: 46, rotate: '-12deg' }].map((leaf, index) => <View key={index}
                 style={[styles.plantLeaf, { left: leaf.left, bottom: leaf.bottom, transform: [{ rotate: leaf.rotate }] }]} />)}
-            <View style={styles.planterPot} /><View style={styles.planterRim} />
+            <View style={[styles.planterPot, illustrated && { backgroundColor: cozy.peach, borderColor: '#AD7F67' }]} />
+            <View style={[styles.planterRim, illustrated && { backgroundColor: '#E8B99D', borderColor: '#AD7F67' }]} />
           </> : object.kind === 'chair' ? <>
           <View style={[styles.chairLeg, { left: 5 }]} /><View style={[styles.chairLeg, { right: 5 }]} />
           <View style={styles.chairBack} /><View style={styles.chairSeat} />

@@ -3,11 +3,14 @@ import { Platform } from 'react-native';
 import { useAudioPlayer } from 'expo-audio';
 import { resetGamePreferencesForTests, updateGamePreferences } from '../src/game/gamePreferences';
 import { DIALOGUE_CLEAR_VOLUME } from '../src/game/dialogueFeedback';
+import { GamePrototypeScreen } from '../src/screens/GamePrototypeScreen';
 
 jest.mock('expo-font', () => ({ isLoaded: () => true, loadAsync: () => Promise.resolve() }));
 jest.mock('expo-haptics', () => ({ ImpactFeedbackStyle: { Light: 'light' }, impactAsync: () => Promise.resolve() }));
 jest.mock('expo-audio', () => {
+  const listeners = new Map<object, Set<(status: { isLoaded: boolean; currentTime?: number }) => void>>();
   const makePlayer = () => ({
+    isLoaded: true,
     loop: false,
     pause: jest.fn(),
     play: jest.fn(),
@@ -18,8 +21,55 @@ jest.mock('expo-audio', () => {
   return {
     setAudioModeAsync: jest.fn(() => Promise.resolve()),
     useAudioPlayer: jest.fn(() => { const React = jest.requireActual('react'); return React.useRef(makePlayer()).current; }),
-    useAudioPlayerStatus: () => ({ isLoaded: true }),
+    useAudioPlayerStatus: (player: object) => {
+      const React = jest.requireActual('react');
+      const [status, setStatus] = React.useState({ isLoaded: true });
+      React.useEffect(() => {
+        let callbacks = listeners.get(player);
+        if (!callbacks) { callbacks = new Set(); listeners.set(player, callbacks); }
+        callbacks.add(setStatus);
+        return () => callbacks.delete(setStatus);
+      }, [player]);
+      return status;
+    },
+    __emitStatus: (player: object, status: { isLoaded: boolean; currentTime?: number }) => {
+      listeners.get(player)?.forEach(callback => callback(status));
+    },
   };
+});
+
+const emitAudioStatus = (player: object, status: { isLoaded: boolean; currentTime?: number }) => {
+  require('expo-audio').__emitStatus(player, status);
+};
+
+it.each([1, 0.5, 0])('waits for the real downloaded player and applies initial music preference %s before playback', async (musicVolume) => {
+  resetGamePreferencesForTests({ musicVolume });
+  // Expo web's status snapshot says true while its empty player is still unloaded.
+  const pendingBackground = {
+    isLoaded: false, loop: false, volume: 1,
+    pause: jest.fn(), play: jest.fn(),
+  };
+  jest.mocked(useAudioPlayer).mockImplementationOnce(() => {
+    const React = jest.requireActual('react');
+    return React.useRef(pendingBackground).current;
+  });
+  const onExit = jest.fn();
+  const view = render(<GamePrototypeScreen onExit={onExit} />);
+  await act(async () => { await Promise.resolve(); });
+  expect(pendingBackground.play).not.toHaveBeenCalled();
+
+  // downloadFirst replaces the HTMLAudioElement, resetting its volume to 1.
+  pendingBackground.volume = 1;
+  pendingBackground.isLoaded = true;
+  pendingBackground.play.mockImplementation(() => {
+    expect(pendingBackground.volume).toBe(0.375 * musicVolume);
+    expect(pendingBackground.loop).toBe(true);
+  });
+  // onloadeddata sends another status object with isLoaded still true.
+  act(() => emitAudioStatus(pendingBackground, { isLoaded: true }));
+  expect(pendingBackground.volume).toBe(0.375 * musicVolume);
+  expect(pendingBackground.play).toHaveBeenCalledTimes(musicVolume === 0 ? 0 : 1);
+  view.unmount();
 });
 jest.mock('expo-glass-effect', () => {
   const { View } = jest.requireActual('react-native');
@@ -36,6 +86,24 @@ jest.mock('react-native-safe-area-context', () => {
 
 beforeEach(() => { jest.clearAllMocks(); resetGamePreferencesForTests(); });
 
+it.each([undefined, 'library'] as const)('keeps 20 periodic music position updates out of the %s world render', async (previewLocation) => {
+  const view = render(<GamePrototypeScreen onExit={jest.fn()} previewLocation={previewLocation} />);
+  await act(async () => { await Promise.resolve(); });
+  const background = jest.mocked(useAudioPlayer).mock.results[0].value;
+  expect(background.play).toHaveBeenCalled();
+  // This hook runs in GamePrototypeScreen on every parent render, including
+  // while its library/bus scene is mounted. It must not run for BGM progress.
+  const worldAudioHookCalls = jest.mocked(useAudioPlayer).mock.calls.length;
+  const plays = background.play.mock.calls.length;
+  for (let tick = 1; tick <= 20; tick += 1) {
+    act(() => emitAudioStatus(background, { isLoaded: true, currentTime: tick * 0.5 }));
+  }
+  expect(jest.mocked(useAudioPlayer)).toHaveBeenCalledTimes(worldAudioHookCalls);
+  expect(background.play).toHaveBeenCalledTimes(plays);
+  expect(background.volume).toBe(0.375);
+  view.unmount();
+});
+
 it('does not load or play BGM or dialogue audio when opened with muteAudio=1', async () => {
   const previousPlatform = Object.getOwnPropertyDescriptor(Platform, 'OS');
   const previousWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
@@ -51,7 +119,6 @@ it('does not load or play BGM or dialogue audio when opened with muteAudio=1', a
 
   try {
     // Read the real preview query when rendering the screen.
-    const { GamePrototypeScreen } = require('../src/screens/GamePrototypeScreen');
     const view = render(<GamePrototypeScreen onExit={jest.fn()} />);
     await act(async () => { await Promise.resolve(); });
 
@@ -69,19 +136,18 @@ it('does not load or play BGM or dialogue audio when opened with muteAudio=1', a
     else Reflect.deleteProperty(globalThis, 'window');
   }
 });
-it('changes BGM volume immediately, preserves dialogue ducking, and resumes only when unmuted', async () => {
-  const { GamePrototypeScreen } = require('../src/screens/GamePrototypeScreen');
+it('applies 75% BGM gain, preserves immediate slider changes and dialogue ducking, and resumes only when unmuted', async () => {
   const view = render(<GamePrototypeScreen onExit={jest.fn()} />);
   await act(async () => { await Promise.resolve(); });
   const background = jest.mocked(useAudioPlayer).mock.results[0].value;
   expect(background.loop).toBe(true);
-  expect(background.volume).toBe(0.5);
+  expect(background.volume).toBe(0.375);
   expect(background.play).toHaveBeenCalled();
   act(() => updateGamePreferences({ musicVolume: 0.5 }));
-  expect(background.volume).toBe(0.25);
+  expect(background.volume).toBe(0.1875);
   fireEvent(view.getByLabelText('이동 조이스틱'), 'accessibilityAction', { nativeEvent: { actionName: 'moveRight' } });
   fireEvent.press(view.getByRole('button', { name: '민수와 대화 또는 의뢰 선택하기' }));
-  expect(background.volume).toBe(0.125);
+  expect(background.volume).toBe(0.09375);
   background.play.mockClear();
   background.pause.mockClear();
   act(() => updateGamePreferences({ musicVolume: 0 }));
@@ -91,7 +157,7 @@ it('changes BGM volume immediately, preserves dialogue ducking, and resumes only
   act(() => updateGamePreferences({ effectsVolume: 0.25 }));
   expect(background.play).not.toHaveBeenCalled();
   act(() => updateGamePreferences({ musicVolume: 0.75 }));
-  expect(background.volume).toBe(0.1875);
+  expect(background.volume).toBe(0.140625);
   expect(background.play).toHaveBeenCalledTimes(1);
   view.unmount();
 });
@@ -100,7 +166,6 @@ it('scales the quiz chime and cancels its pending seek and later notes without r
   jest.useFakeTimers();
   try {
     updateGamePreferences({ effectsVolume: 0.5 });
-    const { GamePrototypeScreen } = require('../src/screens/GamePrototypeScreen');
     const view = render(<GamePrototypeScreen onExit={jest.fn()} />);
     const wait = async (ms = 400) => { await act(async () => { jest.advanceTimersByTime(ms); await Promise.resolve(); }); };
     await wait(0);

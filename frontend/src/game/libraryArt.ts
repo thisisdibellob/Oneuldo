@@ -1,0 +1,83 @@
+import type { ImageSourcePropType } from 'react-native';
+
+/** Original transparent library assets generated for the library work game. */
+export const libraryArt = {
+  computerDesk: require('../../assets/images/game/library/v2/computer-desk.png'),
+  desk: require('../../assets/images/game/library/desk.png'),
+  doubleDesk: require('../../assets/images/game/library/v4/counter.png'),
+  lounge: require('../../assets/images/game/library/v4/lounge.png'),
+  archedWindow: require('../../assets/images/game/library/v5/window.png'),
+  bookDisplay: require('../../assets/images/game/library/v5/display.png'),
+  plantCluster: require('../../assets/images/game/library/v5/plants.png'),
+  wallShelfLeft: require('../../assets/images/game/library/v6/wall-left.png'),
+  wallShelfRight: require('../../assets/images/game/library/v6/wall-right.png'),
+  islandShelfArts: require('../../assets/images/game/library/v6/island-arts.png'),
+  islandShelfStory: require('../../assets/images/game/library/v6/island-story.png'),
+  cart: require('../../assets/images/game/library/cart.png'),
+  table: require('../../assets/images/game/library/table.png'),
+  plant: require('../../assets/images/game/library/plant.png'),
+  returnBox: require('../../assets/images/game/library/return-box.png'),
+  librarian: require('../../assets/images/game/library/librarian.png'),
+} as const;
+
+/** Covers follow stable book IDs, independent of catalogue order or category. */
+export const libraryBookArtById = {
+  'moon-mail': require('../../assets/images/game/library/book-01.png'),
+  'cloud-cat': require('../../assets/images/game/library/book-02.png'),
+  'little-train': require('../../assets/images/game/library/book-03.png'),
+  'our-neighbor': require('../../assets/images/game/library/book-04.png'),
+  'forest-leaves': require('../../assets/images/game/library/book-05.png'),
+  'sea-friends': require('../../assets/images/game/library/book-06.png'),
+  'night-stars': require('../../assets/images/game/library/book-07.png'),
+  'garden-bugs': require('../../assets/images/game/library/book-08.png'),
+  'easy-cooking': require('../../assets/images/game/library/book-09.png'),
+  'balcony-garden': require('../../assets/images/game/library/book-10.png'),
+  'tidy-room': require('../../assets/images/game/library/book-11.png'),
+  'healthy-day': require('../../assets/images/game/library/book-12.png'),
+  'computer-first': require('../../assets/images/game/library/books-v3/computer-first.png'),
+  'library-guide': require('../../assets/images/game/library/books-v3/library-guide.png'),
+  'feeling-colors': require('../../assets/images/game/library/books-v3/feeling-colors.png'),
+  'question-tree': require('../../assets/images/game/library/books-v3/question-tree.png'),
+  'world-religions': require('../../assets/images/game/library/books-v3/world-religions.png'),
+  'temple-bell': require('../../assets/images/game/library/books-v3/temple-bell.png'),
+  'neighborhood-jobs': require('../../assets/images/game/library/books-v3/neighborhood-jobs.png'),
+  'money-story': require('../../assets/images/game/library/books-v3/money-story.png'),
+  'color-sketchbook': require('../../assets/images/game/library/books-v3/color-sketchbook.png'),
+  'music-friends': require('../../assets/images/game/library/books-v3/music-friends.png'),
+  'korean-words': require('../../assets/images/game/library/books-v3/korean-words.png'),
+  'english-hello': require('../../assets/images/game/library/books-v3/english-hello.png'),
+  'korea-history': require('../../assets/images/game/library/books-v3/korea-history.png'),
+  'world-map': require('../../assets/images/game/library/books-v3/world-map.png'),
+  'knowledge-shelf': require('../../assets/images/game/library/v4/knowledge-shelf.png'),
+  'safe-internet': require('../../assets/images/game/library/v4/safe-internet.png'),
+  'reading-habit': require('../../assets/images/game/library/v4/reading-habit.png'),
+  'kind-heart': require('../../assets/images/game/library/v4/kind-heart.png'),
+  'my-choice': require('../../assets/images/game/library/v4/my-choice.png'),
+  'thinking-together': require('../../assets/images/game/library/v4/thinking-together.png'),
+  'lotus-story': require('../../assets/images/game/library/v4/lotus-story.png'),
+  'church-bell': require('../../assets/images/game/library/v4/church-bell.png'),
+  'religions-and-peace': require('../../assets/images/game/library/v4/religions-and-peace.png'),
+  'our-community': require('../../assets/images/game/library/v4/our-community.png'),
+  'recycling-city': require('../../assets/images/game/library/v4/recycling-city.png'),
+  'world-neighbors': require('../../assets/images/game/library/v4/world-neighbors.png'),
+  'moon-observation': require('../../assets/images/game/library/v4/moon-observation.png'),
+  'forest-animals': require('../../assets/images/game/library/v4/forest-animals.png'),
+  'warm-tea': require('../../assets/images/game/library/v4/warm-tea.png'),
+  'herb-garden': require('../../assets/images/game/library/v4/herb-garden.png'),
+  'dance-step': require('../../assets/images/game/library/v4/dance-step.png'),
+  'photo-walk': require('../../assets/images/game/library/v4/photo-walk.png'),
+  'sports-day': require('../../assets/images/game/library/v4/sports-day.png'),
+  'conversation-words': require('../../assets/images/game/library/v4/conversation-words.png'),
+  'writing-diary': require('../../assets/images/game/library/v4/writing-diary.png'),
+  'travel-english': require('../../assets/images/game/library/v4/travel-english.png'),
+  'owl-night': require('../../assets/images/game/library/v4/owl-night.png'),
+  'red-door': require('../../assets/images/game/library/v4/red-door.png'),
+  'old-pottery': require('../../assets/images/game/library/v4/old-pottery.png'),
+  'mountain-journey': require('../../assets/images/game/library/v4/mountain-journey.png'),
+} satisfies Record<string, ImageSourcePropType>;
+
+export function getLibraryBookArt(bookId: string): ImageSourcePropType {
+  const source = libraryBookArtById[bookId as keyof typeof libraryBookArtById];
+  if (!source) throw new Error(`Missing library book cover: ${bookId}`);
+  return source;
+}

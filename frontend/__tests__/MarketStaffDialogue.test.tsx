@@ -17,7 +17,7 @@ beforeEach(() => { jest.useFakeTimers(); jest.clearAllMocks(); jest.spyOn(Access
 afterEach(() => { jest.useRealTimers(); jest.restoreAllMocks(); });
 const choices = <MarketStaffDialogueChoice text="계산을 부탁드려요" onPress={jest.fn()} />;
 const flush = async () => { await act(async () => { await Promise.resolve(); }); };
-const nextLetter = async () => { await act(async () => { jest.advanceTimersByTime(34); await Promise.resolve(); }); };
+const nextLetter = async () => { await act(async () => { jest.advanceTimersByTime(17); await Promise.resolve(); }); };
 
 it('types the greeting at village speed and exposes choices only after completing it', async () => {
   const screen = render(<MarketStaffDialogue name="종업원 1" message="안녕">{choices}</MarketStaffDialogue>);

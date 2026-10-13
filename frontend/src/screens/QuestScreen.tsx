@@ -6,6 +6,8 @@ import { icons } from '../assets';
 import { PressScale } from '../components/PressScale';
 import { StickyBrandHeader } from '../components/ui';
 import { colors, fonts } from '../theme';
+import { DAY_JOURNEY_GUIDANCE, dayJourneyStep, useDayJourney } from '../game/dayJourney';
+import { getShoppingErrandStatus, useShoppingErrand } from '../game/shoppingErrandStore';
 
 type CalendarCell = {
   day: string;
@@ -35,7 +37,9 @@ const quests = [
   { category: '안전', color: '#E04173', icon: icons.sos, title: '도움을 요청하는 법', description: '곤란한 상황에서 믿을 수 있는\n사람들에게 도움을 요청해요.' },
 ];
 
-export function QuestScreen({ onPractice }: { onPractice: () => void }) {
+export function QuestScreen({ onPractice, onGameQuest }: { onPractice: () => void; onGameQuest?: (activity: 'day' | 'bus' | 'market' | 'errand') => void }) {
+  const journey = useDayJourney();
+  const errand = useShoppingErrand();
   const [selected, setSelected] = useState('전체');
   const visible = selected === '전체'
     ? quests
@@ -44,6 +48,12 @@ export function QuestScreen({ onPractice }: { onPractice: () => void }) {
   return (
     <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} stickyHeaderIndices={[0]}>
       <StickyBrandHeader horizontalPadding={18} />
+      {onGameQuest ? <PressScale accessibilityRole="button" accessibilityLabel="도서관 다녀오기 퀘스트 열기" onPress={() => onGameQuest('day')} style={styles.dayCard}>
+        <View style={styles.dayCardIcon}><Ionicons name="book" size={32} color="#66826C" /></View>
+        <View style={{ flex: 1 }}><Text style={styles.dayEyebrow}>{journey.stage === 'available' ? '새로운 부탁' : journey.stage === 'completed' ? '완료한 이야기' : '진행 중인 이야기'}</Text><Text style={styles.dayTitle}>도서관 다녀오기</Text><Text style={styles.dayCopy}>{DAY_JOURNEY_GUIDANCE[journey.stage]}</Text><Text style={styles.dayAction}>{journey.stage === 'available' ? '부탁 확인하기' : journey.stage === 'completed' ? '기록 보기' : `이어서 하기 · ${dayJourneyStep(journey.stage)}/4`}</Text></View>
+        <Ionicons name="chevron-forward" color="#819178" size={23} />
+      </PressScale> : null}
+      {errand && onGameQuest ? <PressScale accessibilityRole="button" accessibilityLabel="퇴근길 장보기 퀘스트 열기" onPress={() => onGameQuest('errand')} style={[styles.dayCard, { backgroundColor: '#F1EAD8', marginTop: 12 }]}><View style={styles.dayCardIcon}><Ionicons name="basket-outline" size={32} color="#78815C" /></View><View style={{ flex: 1 }}><Text style={styles.dayEyebrow}>민수의 부탁</Text><Text style={styles.dayTitle}>퇴근길 장보기</Text><Text style={styles.dayCopy}>{getShoppingErrandStatus(errand)}</Text><Text style={styles.dayAction}>{errand.phase === 'delivered' ? '전달한 물건 보기' : '부탁 확인하기'}</Text></View><Ionicons name="chevron-forward" color="#819178" size={23} /></PressScale> : null}
       <View style={styles.monthHeader}>
         <Text style={styles.month}>8월</Text>
         <View style={styles.streak}>
@@ -95,7 +105,11 @@ export function QuestScreen({ onPractice }: { onPractice: () => void }) {
       </ScrollView>
 
       <View style={styles.questList}>
-        {visible.map((quest) => <QuestCard key={quest.title} {...quest} onPress={onPractice} />)}
+        {visible.map((quest) => <QuestCard key={quest.title} {...quest} inGame={!!onGameQuest && ['혼자 버스 타기', '마트에서 장보기'].includes(quest.title)} onPress={() => {
+          if (onGameQuest && quest.title === '혼자 버스 타기') onGameQuest('bus');
+          else if (onGameQuest && quest.title === '마트에서 장보기') onGameQuest('market');
+          else onPractice();
+        }} />)}
       </View>
       <View style={styles.bottomSpace} />
     </ScrollView>
@@ -112,7 +126,7 @@ function Stat({ background, color, icon, label, value }: { background: string; c
   );
 }
 
-function QuestCard({ category, color, icon, title, description, onPress }: { category: string; color: string; icon: ImageSourcePropType; title: string; description: string; onPress: () => void }) {
+function QuestCard({ category, color, icon, title, description, onPress, inGame = false }: { category: string; color: string; icon: ImageSourcePropType; title: string; description: string; onPress: () => void; inGame?: boolean }) {
   return (
     <PressScale onPress={onPress} style={styles.questCard}>
       <Image resizeMode="contain" source={icon} style={styles.questIcon} />
@@ -122,14 +136,19 @@ function QuestCard({ category, color, icon, title, description, onPress }: { cat
         <Text style={styles.questDescription}>{description}</Text>
       </View>
       <View style={styles.questProgress}>
-        <View style={[styles.xpPill, { backgroundColor: color }]}><Text style={styles.xpText}>+20 XP</Text></View>
-        <Text style={[styles.stepText, { color }]}>2/4</Text>
+        {inGame ? <Ionicons name="chevron-forward" color={color} size={24} /> : <><View style={[styles.xpPill, { backgroundColor: color }]}><Text style={styles.xpText}>+20 XP</Text></View><Text style={[styles.stepText, { color }]}>2/4</Text></>}
       </View>
     </PressScale>
   );
 }
 
 const styles = StyleSheet.create({
+  dayCard: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 20, marginTop: 20, backgroundColor: '#EFF0E4', borderRadius: 24 },
+  dayCardIcon: { width: 58, height: 68, backgroundColor: '#E1E7D3', borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  dayEyebrow: { color: '#879075', fontFamily: fonts.semibold, fontSize: 13 },
+  dayTitle: { color: '#445E4C', fontFamily: fonts.laundryBold, fontSize: 22, lineHeight: 30, marginTop: 4 },
+  dayCopy: { color: '#717D68', fontFamily: fonts.medium, fontSize: 15, lineHeight: 23, marginTop: 7 },
+  dayAction: { color: '#4E7656', fontFamily: fonts.bold, fontSize: 15, marginTop: 12 },
   content: { alignSelf: 'center', maxWidth: 720, paddingHorizontal: 18, width: '100%' },
   monthHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginTop: 20 },
   month: { color: colors.ink, fontFamily: fonts.laundryBold, fontSize: 20 },

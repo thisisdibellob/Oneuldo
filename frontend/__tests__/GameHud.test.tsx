@@ -59,7 +59,7 @@ it('안드로이드 뒤로 가기는 종료 확인에서 휴대폰으로, 그다
     fireEvent.press(screen.getByRole('button', { name: '게임 나가기' }));
     back();
     expect(screen.queryByText('게임에서 나갈까요?')).toBeNull();
-    expect(screen.getByText('내 휴대폰')).toBeTruthy();
+    expect(screen.getAllByTestId('phone-home-app')).toHaveLength(9);
     expect(callbacks.onMenuVisibilityChange).toHaveBeenLastCalledWith(true);
     expect(callbacks.onExit).not.toHaveBeenCalled();
     back();
@@ -81,8 +81,14 @@ it('툴바 설정도 휴대폰의 한 페이지에서 조작·배경·소리를 
     fireEvent.press(screen.getByRole('button', { name: '설정 열기' }));
     expect(screen.getByTestId('phone-settings')).toBeTruthy();
     expect(screen.getByText('조작 방식')).toBeTruthy();
+    expect(screen.getByRole('radio', { name: '패드 거리로 걷기·달리기' }).props.accessibilityState.checked).toBe(true);
+    fireEvent.press(screen.getByRole('radio', { name: '달리기 버튼 켜기·끄기' }));
+    expect(getGamePreferences().runMode).toBe('toggle');
     expect(screen.getByText('배경화면 색상')).toBeTruthy();
     expect(screen.getByText('소리')).toBeTruthy();
+    expect(screen.getByRole('radio', { name: '기본 마트' }).props.accessibilityState.checked).toBe(true);
+    fireEvent.press(screen.getByRole('radio', { name: '동네 마트' }));
+    expect(getGamePreferences().marketInteriorTheme).toBe('cozy');
     fireEvent.press(screen.getByRole('radio', { name: '터치 이동' }));
     expect(callbacks.onControlModeChange).toHaveBeenCalledWith('touch');
     expect(callbacks.onMenuVisibilityChange).toHaveBeenLastCalledWith(true);
@@ -100,6 +106,7 @@ it('툴바 설정도 휴대폰의 한 페이지에서 조작·배경·소리를 
     fireEvent.press(screen.getByRole('button', { name: '설정' }));
     expect(screen.getByRole('adjustable', { name: '배경음악 음량' }).props.accessibilityValue.now).toBe(75);
     expect(screen.getByRole('adjustable', { name: '효과음 음량' }).props.accessibilityValue.now).toBe(0);
+    expect(screen.getByRole('radio', { name: '동네 마트' }).props.accessibilityState.checked).toBe(true);
     expect(callbacks.onExit).not.toHaveBeenCalled();
   } finally { screen.unmount(); }
 });
@@ -157,26 +164,56 @@ it.each([{ id: 'jiyoung', name: '지영' }, { id: 'minsu', name: '민수' }] as 
   } finally { screen.unmount(); }
 });
 
-it('휴대폰 홈은 비활성 금융 버튼을 포함한 6개 앱이며 앱을 바꿔도 외곽 크기는 같다', async () => {
-  const screen = render(<GameHud {...props()} />);
+it('휴대폰 홈은 사진과 버스 노선을 포함한 9개 앱이며 앱을 바꿔도 외곽 크기는 같다', async () => {
+  const screen = render(<GameHud {...props()} onTravel={jest.fn()} />);
   try {
     expect(screen.getByLabelText('현재 소지금 30,000원')).toBeTruthy();
     fireEvent.press(screen.getByRole('button', { name: '휴대폰 열기' }));
-    expect(screen.getAllByTestId('phone-home-app')).toHaveLength(6);
+    expect(screen.getAllByTestId('phone-home-app')).toHaveLength(9);
+    expect(screen.queryByText('내 휴대폰')).toBeNull();
     expect(screen.queryByText('오늘도, 내 속도로')).toBeNull();
     const finance = screen.getByRole('button', { name: '금융' });
     expect(finance.props.accessibilityState.disabled).toBe(true);
     fireEvent.press(finance);
-    expect(screen.getAllByTestId('phone-home-app')).toHaveLength(6);
+    expect(screen.getAllByTestId('phone-home-app')).toHaveLength(9);
     const initial = StyleSheet.flatten(screen.getByTestId('phone-case').props.style);
     expect(initial.height).toBeGreaterThan(0);
-    for (const app of ['계산기', '전화', '설정', '비상 탈출', '게임 나가기']) {
+    expect(initial.width / initial.height).toBeCloseTo(390 / 750);
+    const screenClip = StyleSheet.flatten(screen.getByTestId('phone-screen-clip').props.style);
+    expect(screenClip.borderRadius + initial.padding + initial.borderWidth).toBeCloseTo(initial.borderRadius);
+    expect(screenClip.overflow).toBe('hidden');
+    expect(StyleSheet.flatten(screen.getByTestId('phone-screen').props.style).borderRadius).toBeUndefined();
+    for (const app of ['사진', '계산기', '전화', '설정', '버스 노선', '바로 이동', '비상 탈출', '게임 나가기']) {
       fireEvent.press(screen.getByRole('button', { name: app }));
       const next = StyleSheet.flatten(screen.getByTestId('phone-case').props.style);
       expect([next.height, next.width, next.maxHeight, next.maxWidth]).toEqual([initial.height, initial.width, initial.maxHeight, initial.maxWidth]);
+      expect(StyleSheet.flatten(screen.getByTestId('phone-screen-clip').props.style).borderRadius).toBe(screenClip.borderRadius);
       expect(screen.getByTestId('phone-content-scroll')).toBeTruthy();
       fireEvent.press(screen.getAllByRole('button', { name: '휴대폰 홈으로' })[0]);
     }
+  } finally { screen.unmount(); }
+});
+
+it('현재 정류장의 노선을 열고 휴대폰이 닫힌 다음 선택한 마을로 바로 이동한다', async () => {
+  const callbacks = props();
+  const travel = jest.fn();
+  const routeViewed = jest.fn();
+  const screen = render(<GameHud {...callbacks} onTravel={travel} onRouteViewed={routeViewed}
+    busRouteContext={{ currentStop: 'library', direction: 'inbound', destination: 'village' }} />);
+  try {
+    fireEvent.press(screen.getByRole('button', { name: '휴대폰 열기' }));
+    fireEvent.press(screen.getByRole('button', { name: '버스 노선' }));
+    expect(routeViewed).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('느티광장 방면')).toBeTruthy();
+    expect(screen.getByTestId('route-map-stop-library').findByProps({ children: '현재' })).toBeTruthy();
+    fireEvent.press(screen.getAllByRole('button', { name: '휴대폰 홈으로' })[0]);
+    fireEvent.press(screen.getByRole('button', { name: '바로 이동' }));
+    fireEvent.press(screen.getByRole('button', { name: '하늘도서관 마을로 바로 이동' }));
+    expect(travel).not.toHaveBeenCalled();
+    await finishMenuAnimation();
+    expect(travel).toHaveBeenCalledWith('library');
+    expect(screen.queryByTestId('phone-screen')).toBeNull();
+    expect(callbacks.onMenuVisibilityChange.mock.invocationCallOrder.at(-1)).toBeLessThan(travel.mock.invocationCallOrder[0]);
   } finally { screen.unmount(); }
 });
 

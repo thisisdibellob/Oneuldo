@@ -1,0 +1,10 @@
+{
+  "mode": "built-in image_gen",
+  "date": "2026-09-26",
+  "base": "source/minsu-key-v5.png",
+  "changes": [
+    "복원한 민수의 얼굴·앞머리·눈매·갈색 선·깨끗한 채색 유지",
+    "셔츠의 어깨·소매·몸통 여유를 줄여 기본핏으로 변경"
+  ],
+  "prompt": "Use case: precise-object-edit.\nThis is the APPROVED Minsu turnaround. Change ONLY THE FIT OF THE CHECKED SHIRT. Keep the face, eyes, smile, skin, entire hair shape and fine fringe, warm light-brown contours, clean matte coloring, jeans and shoes exactly unchanged.\nThe shirt currently looks like a puffy oversized hoodie. Make it a natural REGULAR-FIT thin cotton checked shirt:\n- Modestly narrower shoulders, the shoulder seam at the shoulder instead of dropped.\n- Reduce the puffiness of upper sleeves and forearms by about 15%, straight natural slim sleeves with modest normal ease.\n- Reduce excess outward width at waist and hem by about 10%, straighter side seams following the body rather than a wide trapezoid or balloon.\n- A small amount of natural fabric ease remains. Do not make it skin-tight or tailored hourglass. Do NOT slim the actual torso, shorten arms, lengthen legs or change chibi proportions.\n- Keep the original open black/white large-check shirt and the SAME amount of visible white inner tee. Preserve plaid size/color, collar, sleeves/cuffs and hem length. No new buttons, no accessories.\n- Hands still hang naturally at sides; only tiny alignment changes at cuff edges if necessary.\nApply the same fit consistently to all FIVE directions. Preserve the current exact alignment, figure height, framing, neutral pose and green #00FF00 background. Keep color fill smooth/clean, do not add grain or noisy repainting.\n민수는 오버핏 후드가 아니라 기본핏 체크 셔츠를 입은 캐릭터입니다. 셔츠의 부푼 어깨와 소매, 옆선 여유만 조금 줄여주세요. 얼굴·눈·앞머리·바지·그림체·갈색 선과 색상은 그대로 둡니다."
+}
