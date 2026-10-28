@@ -19,7 +19,7 @@ type StepIntent = MarketReplayStep extends infer S ? S extends MarketReplayStep 
 
 /** Produces intentions only. No BehaviorLogRequest, episode export, HTTP write, or UI process. */
 export async function generateTrace(options: TraceOptions): Promise<MarketReplayTrace> {
-  const preserved = ['whole-trace-v3', 'feedback-choice-v1', 'feedback-choice-v2', 'feedback-choice-v3', 'feedback-choice-v4', 'feedback-choice-v5', 'feedback-choice-v6', 'feedback-choice-v7'].includes(options?.actorPolicyVersion ?? '');
+  const preserved = ['whole-trace-v3', 'feedback-choice-v1', 'feedback-choice-v2', 'feedback-choice-v3', 'feedback-choice-v4', 'feedback-choice-v5', 'feedback-choice-v6', 'feedback-choice-v7', 'feedback-choice-v8', 'feedback-choice-v9', 'feedback-choice-v10', 'feedback-choice-v11', 'feedback-choice-v12', 'feedback-choice-v13'].includes(options?.actorPolicyVersion ?? '');
   const timing = options?.timingProfile ?? (preserved ? 'original' : 'compact');
   if (!['original', 'compact'].includes(timing)) throw new Error('Unknown timingProfile');
   if (preserved && timing !== 'original') throw new Error(`${options.actorPolicyVersion === 'whole-trace-v3' ? 'Whole-trace-v3' : options.actorPolicyVersion} preserves actor judgment timing; use original`);
@@ -39,7 +39,7 @@ async function generateOriginalTrace(options: TraceOptions): Promise<MarketRepla
   const wholeTraceCompiler = options.planningMode === 'whole-trace' && options.mode === 'llm'
     && options.actorPolicyVersion === 'whole-trace-v3' && typeof options.actorDecisionProvider === 'function';
   const persona = wholeTraceCompiler ? getWholeTracePersona(options.personaId) : getPersona(options.personaId);
-  if (options.feedbackMovement !== undefined && (!persona.attention || !['feedback-choice-v3', 'feedback-choice-v4', 'feedback-choice-v5', 'feedback-choice-v6', 'feedback-choice-v7'].includes(options.actorPolicyVersion ?? '')))
+  if (options.feedbackMovement !== undefined && (!persona.attention || !['feedback-choice-v3', 'feedback-choice-v4', 'feedback-choice-v5', 'feedback-choice-v6', 'feedback-choice-v7', 'feedback-choice-v8', 'feedback-choice-v9', 'feedback-choice-v10', 'feedback-choice-v11', 'feedback-choice-v12', 'feedback-choice-v13'].includes(options.actorPolicyVersion ?? '')))
     throw new Error('feedbackMovement requires an attention persona with feedback-choice-v3 or feedback-choice-v4');
   const mode = options.mode ?? 'llm';
   if (!['stochastic', 'llm'].includes(mode)) throw new Error('mode must be stochastic or llm.');

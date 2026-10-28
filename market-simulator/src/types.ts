@@ -79,7 +79,9 @@ export type ActorStation = { id: MarketEnvironmentStationId; kind: string; label
   direction: ActorDirection; distanceBand: ActorDistanceBand; near: boolean };
 export type ActorAnchor = { id: string; label: string; direction: ActorDirection; distanceBand: ActorDistanceBand };
 export type ActorObjective = { id: string; label: string; quantity: number; match: 'exact' | 'family' };
-export type ActorProduct = { id: string; categoryId: string; name: string; detail?: string; price: number; stock: number };
+export type ActorProduct = { id: string; categoryId: string; name: string; detail?: string; price: number; stock: number;
+  /** v8: the open shelf's own add control shows whether this product is already in the basket, never how many. */
+  inCart?: boolean };
 /** Actor projection, deliberately not assignable to the raw game observation. No coordinates, global map or automatic goal copy. */
 export type ActorObservation = {
   schemaVersion: 'attention-observation-v1';
@@ -134,7 +136,7 @@ export type AttentionExperience = {
 export type TraceOptions = {
   personaId: string; seed: string | number; snapshot: MarketReplaySnapshot;
   mode?: 'stochastic' | 'llm'; maxActions?: number; timeBudgetMs?: number;
-  tracePolicyVersion?: '5' | '6'; actorPolicyVersion?: 'episodic-choice-v9' | 'episodic-choice-v10' | 'feedback-choice-v1' | 'feedback-choice-v2' | 'feedback-choice-v3' | 'feedback-choice-v4' | 'feedback-choice-v5' | 'feedback-choice-v6' | 'feedback-choice-v7' | 'whole-trace-v1' | 'whole-trace-v2' | 'whole-trace-v3'; reasoningEffort?: 'low';
+  tracePolicyVersion?: '5' | '6'; actorPolicyVersion?: 'episodic-choice-v9' | 'episodic-choice-v10' | 'feedback-choice-v1' | 'feedback-choice-v2' | 'feedback-choice-v3' | 'feedback-choice-v4' | 'feedback-choice-v5' | 'feedback-choice-v6' | 'feedback-choice-v7' | 'feedback-choice-v8' | 'feedback-choice-v9' | 'feedback-choice-v10' | 'feedback-choice-v11' | 'feedback-choice-v12' | 'feedback-choice-v13' | 'whole-trace-v1' | 'whole-trace-v2' | 'whole-trace-v3'; reasoningEffort?: 'low';
   feedbackMovement?: import('./feedbackMovementPolicy').FeedbackMovementPolicyOptions;
   planningMode?: 'whole-trace'; planningSubmissions?: number; repairSubmissions?: number;
   /** Compact is a test execution schedule, not an estimate of a person's speed. */

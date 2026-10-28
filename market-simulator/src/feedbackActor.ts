@@ -6,15 +6,47 @@ import type { MarketReplayMovementPolicyDecision } from '../../frontend/src/game
 import type { FeedbackExperienceSnapshot } from './feedbackExperience';
 
 export const FEEDBACK_ACTOR_POLICY_VERSION = 'feedback-choice-v7' as const;
-export type FeedbackActorPolicyVersion = 'feedback-choice-v1' | 'feedback-choice-v2' | 'feedback-choice-v3' | 'feedback-choice-v4' | 'feedback-choice-v5' | 'feedback-choice-v6' | 'feedback-choice-v7';
+export type FeedbackActorPolicyVersion = 'feedback-choice-v1' | 'feedback-choice-v2' | 'feedback-choice-v3' | 'feedback-choice-v4' | 'feedback-choice-v5' | 'feedback-choice-v6' | 'feedback-choice-v7' | 'feedback-choice-v8' | 'feedback-choice-v9' | 'feedback-choice-v10' | 'feedback-choice-v11' | 'feedback-choice-v12' | 'feedback-choice-v13';
 export function isFeedbackActorPolicy(value?: string): value is FeedbackActorPolicyVersion {
   return value === 'feedback-choice-v1' || value === 'feedback-choice-v2' || value === 'feedback-choice-v3' || isExperienceFeedbackPolicy(value);
 }
-export function isExperienceFeedbackPolicy(value?: string): value is 'feedback-choice-v4' | 'feedback-choice-v5' | 'feedback-choice-v6' | 'feedback-choice-v7' {
+export function isExperienceFeedbackPolicy(value?: string): value is 'feedback-choice-v4' | 'feedback-choice-v5' | 'feedback-choice-v6' | 'feedback-choice-v7' | 'feedback-choice-v8' | 'feedback-choice-v9' | 'feedback-choice-v10' | 'feedback-choice-v11' | 'feedback-choice-v12' | 'feedback-choice-v13' {
   return value === 'feedback-choice-v4' || isStructuredFeedbackPolicy(value);
 }
-export function isStructuredFeedbackPolicy(value?: string): value is 'feedback-choice-v5' | 'feedback-choice-v6' | 'feedback-choice-v7' {
-  return value === 'feedback-choice-v5' || value === 'feedback-choice-v6' || value === 'feedback-choice-v7';
+export function isStructuredFeedbackPolicy(value?: string): value is 'feedback-choice-v5' | 'feedback-choice-v6' | 'feedback-choice-v7' | 'feedback-choice-v8' | 'feedback-choice-v9' | 'feedback-choice-v10' | 'feedback-choice-v11' | 'feedback-choice-v12' | 'feedback-choice-v13' {
+  return value === 'feedback-choice-v5' || value === 'feedback-choice-v6' || isQuantityBeliefFeedbackPolicy(value);
+}
+/** Policies whose remembered items separate a wanted total from a remembered in-cart amount. */
+export function isQuantityBeliefFeedbackPolicy(value?: string): value is 'feedback-choice-v7' | 'feedback-choice-v8' | 'feedback-choice-v9' | 'feedback-choice-v10' | 'feedback-choice-v11' | 'feedback-choice-v12' | 'feedback-choice-v13' {
+  return value === 'feedback-choice-v7' || isResultReflectionFeedbackPolicy(value);
+}
+/** v8+: the controller reports the applied previous action; the actor reflects it, then writes what follows the new choice. */
+export function isResultReflectionFeedbackPolicy(value?: string): value is 'feedback-choice-v8' | 'feedback-choice-v9' | 'feedback-choice-v10' | 'feedback-choice-v11' | 'feedback-choice-v12' | 'feedback-choice-v13' {
+  return value === 'feedback-choice-v8' || isRevisitNoteFeedbackPolicy(value);
+}
+/** v9: shelves opened repeatedly within the retained experience are restated in words. */
+export function isRevisitNoteFeedbackPolicy(value?: string): value is 'feedback-choice-v9' | 'feedback-choice-v10' | 'feedback-choice-v11' | 'feedback-choice-v12' | 'feedback-choice-v13' {
+  return value === 'feedback-choice-v9' || isShelfChoiceMarkerFeedbackPolicy(value);
+}
+/** v10: the control that reopens a recently opened shelf says so on the choice itself. */
+export function isShelfChoiceMarkerFeedbackPolicy(value?: string): value is 'feedback-choice-v10' | 'feedback-choice-v11' | 'feedback-choice-v12' | 'feedback-choice-v13' {
+  return value === 'feedback-choice-v10' || isMovementNoteFeedbackPolicy(value);
+}
+/** v11: the directions this person recently walked, and did not walk, are restated in words. */
+export function isMovementNoteFeedbackPolicy(value?: string): value is 'feedback-choice-v11' | 'feedback-choice-v12' | 'feedback-choice-v13' {
+  return value === 'feedback-choice-v11' || isPassageMarkerFeedbackPolicy(value);
+}
+/** v12: walk-to-passage choices say whether this person recently walked there, passages carry no ids, and choice ids are short per-frame labels. */
+export function isPassageMarkerFeedbackPolicy(value?: string): value is 'feedback-choice-v12' | 'feedback-choice-v13' {
+  return value === 'feedback-choice-v12' || isProgressNoteFeedbackPolicy(value);
+}
+/** v13: the list control says how recently it was read, and the frame restates this person's own item beliefs and how the visit ends. */
+export function isProgressNoteFeedbackPolicy(value?: string): value is 'feedback-choice-v13' {
+  return value === 'feedback-choice-v13';
+}
+/** v9+: stopping the visit is not an actor choice; the controller checks out the unchanged basket at the action limit. */
+export function isNoGiveUpFeedbackPolicy(value?: string): value is 'feedback-choice-v9' | 'feedback-choice-v10' | 'feedback-choice-v11' | 'feedback-choice-v12' | 'feedback-choice-v13' {
+  return value === 'feedback-choice-v9' || value === 'feedback-choice-v10' || value === 'feedback-choice-v11' || value === 'feedback-choice-v12' || value === 'feedback-choice-v13';
 }
 
 export type FeedbackChoiceParameters = { productId?: string; quantity?: number; dragOutcome?: 'drop' | 'miss' | 'cancel' };
@@ -31,14 +63,17 @@ export type FeedbackBeliefMemory = {
     /** v7: last remembered in-cart amount. quantity separately means believed desired total. */
     rememberedCartQuantity?: number | null;
   }[];
-  currentTask: string | null;
+  /** v1-v7 only. v8 drops it: a description of the chosen action read back as a pending task repeated that action. */
+  currentTask?: string | null;
+  /** v8: what the actor expects to do after the action chosen now, never that action itself. */
+  nextStep?: string | null;
   notes: string[];
   /** v4: omitted updates retain this actor-selected intent; explicit null clears it. */
   ongoingIntent?: string | null;
 };
 
 export function emptyFeedbackBeliefMemory(policyVersion?: FeedbackActorPolicyVersion): FeedbackBeliefMemory {
-  return { rememberedItems: [], currentTask: null, notes: [],
+  return { rememberedItems: [], ...(isResultReflectionFeedbackPolicy(policyVersion) ? { nextStep: null } : { currentTask: null }), notes: [],
     ...(isExperienceFeedbackPolicy(policyVersion) ? { ongoingIntent: null } : {}) };
 }
 
@@ -57,17 +92,18 @@ function onlyKeys(value: Record<string, unknown>, keys: string[]): boolean {
 export function validateFeedbackBeliefMemory(value: unknown, policyVersion: FeedbackActorPolicyVersion = FEEDBACK_ACTOR_POLICY_VERSION): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
   if (!plain(value)) return { valid: false, errors: ['memory must be a JSON object'] };
-  if (!onlyKeys(value, ['rememberedItems', 'currentTask', 'notes', ...(isExperienceFeedbackPolicy(policyVersion) ? ['ongoingIntent'] : [])])) errors.push('memory has unknown fields');
+  const taskField = isResultReflectionFeedbackPolicy(policyVersion) ? 'nextStep' : 'currentTask';
+  if (!onlyKeys(value, ['rememberedItems', taskField, 'notes', ...(isExperienceFeedbackPolicy(policyVersion) ? ['ongoingIntent'] : [])])) errors.push('memory has unknown fields');
   if (Object.prototype.hasOwnProperty.call(value, 'ongoingIntent') && value.ongoingIntent !== null && !shortText(value.ongoingIntent))
     errors.push('memory.ongoingIntent must be null or 1..300 characters');
-  if (value.currentTask !== null && !shortText(value.currentTask)) errors.push('memory.currentTask must be null or 1..300 characters');
+  if (value[taskField] !== null && !shortText(value[taskField])) errors.push(`memory.${taskField} must be null or 1..300 characters`);
   if (!Array.isArray(value.rememberedItems) || value.rememberedItems.length > 12) {
     errors.push('memory.rememberedItems must be an array of at most 12 items');
   } else value.rememberedItems.forEach((item, index) => {
     const at = `memory.rememberedItems[${index}]`;
     if (!plain(item)) { errors.push(`${at} must be a JSON object`); return; }
     if (!onlyKeys(item, ['name', 'quantity', 'certainty', 'status',
-      ...(policyVersion === 'feedback-choice-v7' ? ['source', 'rememberedCartQuantity'] : [])])) errors.push(`${at} has unknown fields`);
+      ...(isQuantityBeliefFeedbackPolicy(policyVersion) ? ['source', 'rememberedCartQuantity'] : [])])) errors.push(`${at} has unknown fields`);
     if (item.name !== null && !shortText(item.name)) errors.push(`${at}.name must be null or 1..300 characters`);
     if (item.quantity !== null && (!Number.isInteger(item.quantity) || Number(item.quantity) < 0 || Number(item.quantity) > 99))
       errors.push(`${at}.quantity must be null or an integer in 0..99`);
@@ -107,7 +143,8 @@ export function projectFeedbackObservation(observation: ActorObservation, policy
     ...(observation.visibleStructures === undefined ? {} : { visibleStructures: observation.visibleStructures.map(body =>
       pick(body, ['kind', 'label', 'direction', 'distanceBand'])) }),
     anchors: observation.anchors.map(anchor => pick(anchor, ['id', 'label', 'direction', 'distanceBand'])),
-    products: observation.products.map(product => pick(product, ['id', 'categoryId', 'name', 'detail', 'price', 'stock'])),
+    products: observation.products.map(product => pick(product, ['id', 'categoryId', 'name', 'detail', 'price', 'stock',
+      ...(isResultReflectionFeedbackPolicy(policyVersion) ? ['inCart' as const] : [])])),
     shelf: observation.shelf === null ? null : {
       ...pick(observation.shelf, ['page', 'pageCount', 'scrollFraction']),
       ...(observation.shelf.pageFractions === undefined ? {} : { pageFractions: [...observation.shelf.pageFractions] }),
@@ -154,6 +191,10 @@ export type FeedbackActorChoice = Omit<ExtendedActorChoice, 'observedContext' | 
   /** Actor selects this duration; any action.durationMs in the template is a placeholder. */
   timing?: { minimumMs: number; maximumMs: number; phase: 'during-action' | 'after-panel-open' };
   observedContext?: Pick<NonNullable<ExtendedActorChoice['observedContext']>, 'label' | 'direction' | 'distanceBand'>;
+  /** v10: this shelf was already opened within the retained experience. A description, never a prohibition. */
+  recentVisit?: { timesOpened: number } | { timesArrived: number };
+  /** v13: when the list was last read and how often within the retained experience. Never its contents. */
+  recentRead?: { actionsAgo: number; timesRead: number };
 };
 
 function activityTiming(type: PolicyAction['type']): FeedbackActorChoice['timing'] {
@@ -249,7 +290,7 @@ function parameterizeProductChoices(choices: FeedbackActorChoice[], observation:
     const catalog = [...byProduct.values()].sort((a, b) => visibleOrder.indexOf(a.productId) - visibleOrder.indexOf(b.productId));
     for (const item of catalog) if (item.dragOutcomes)
       item.dragOutcomes = (['drop', 'miss', 'cancel'] as const).filter(outcome => item.dragOutcomes!.includes(outcome));
-    result.push({ id: `choice-${type}-product`, label: policyVersion === 'feedback-choice-v7'
+    result.push({ id: `choice-${type}-product`, label: isQuantityBeliefFeedbackPolicy(policyVersion)
       ? (type === 'add' ? '선택한 상품을 해당 수량만큼 추가로 담기' : '선택한 상품을 해당 수량만큼 빼기')
       : type === 'add' ? '상품과 수량을 골라 담기' : '상품과 수량을 골라 내려놓기',
       action: { type }, catalog,
@@ -259,7 +300,7 @@ function parameterizeProductChoices(choices: FeedbackActorChoice[], observation:
           quantity: { type: 'integer', minimum: Math.min(...catalog.map(item => item.quantity.minimum)),
             maximum: Math.max(...catalog.map(item => item.quantity.maximum)) },
           ...(type === 'add' ? { dragOutcome: { type: 'string' as const, enum: ['drop', 'miss', 'cancel'] as ('drop' | 'miss' | 'cancel')[] } } : {}) } },
-      effect: policyVersion === 'feedback-choice-v7' ? (type === 'add'
+      effect: isQuantityBeliefFeedbackPolicy(policyVersion) ? (type === 'add'
         ? 'Choose one catalog product, an integer quantity within its own range, and a dragOutcome. quantity is how many MORE units to add, not the desired final cart total. drop adds that quantity; miss releases outside the basket and cancel returns the product without adding. miss/cancel permit quantity 1 only. No product or quantity is recommended. Describe the selected product and actual increment in reason; the next observation, not the choice alone, tells what happened.'
         : 'Choose the exact productId from this currently removable cart catalog and an integer quantity within its own range. quantity is how many units to TAKE OUT of that selected product, not how many should remain. The action will not remove a different product named in reason. No product or quantity is recommended; the next observation tells what happened.')
         : type === 'add'
@@ -275,8 +316,10 @@ function parameterizeProductChoices(choices: FeedbackActorChoice[], observation:
 }
 
 function currentChoices(observation: ActorObservation, seed: string | number, decisionIndex: number,
-  policyVersion: FeedbackActorPolicyVersion, movementPolicy?: MarketReplayMovementPolicyDecision): FeedbackActorChoice[] {
-  const choices: (ExtendedActorChoice & {dragOutcome?: 'miss' | 'cancel'})[] = extendedActorChoices(observation);
+  policyVersion: FeedbackActorPolicyVersion, movementPolicy?: MarketReplayMovementPolicyDecision,
+  experience?: FeedbackExperienceSnapshot): FeedbackActorChoice[] {
+  const choices: (ExtendedActorChoice & {dragOutcome?: 'miss' | 'cancel'})[] = extendedActorChoices(observation)
+    .filter(choice => !(isNoGiveUpFeedbackPolicy(policyVersion) && choice.action.type === 'giveUp'));
   if (policyVersion !== 'feedback-choice-v1' && observation.phase === 'shopping' && observation.view === 'world' && !observation.activeStation) {
     const directions = { north: '위로', northeast: '오른쪽 위로', east: '오른쪽으로', southeast: '오른쪽 아래로',
       south: '아래로', southwest: '왼쪽 아래로', west: '왼쪽으로', northwest: '왼쪽 위로' } as const;
@@ -314,7 +357,29 @@ function currentChoices(observation: ActorObservation, seed: string | number, de
       observedContext: pick(choice.observedContext, ['label', 'direction', 'distanceBand']),
     }),
   }));
-  return isStructuredFeedbackPolicy(policyVersion) ? parameterizeProductChoices(projected, observation, policyVersion) : projected;
+  // The choice id and order depend only on the action, so marking a choice never reorders or removes it.
+  const marked = isShelfChoiceMarkerFeedbackPolicy(policyVersion) ? projected.map(choice => {
+    const opened = choice.action.type === 'interact'
+      ? experience?.exploration.recentShelves.find(shelf => shelf.id === (choice.action as { station: string }).station)?.timesOpened ?? 0 : 0;
+    return opened < 1 ? choice : { ...choice, label: `${choice.label} · 최근에 ${opened}번 열어 본 진열대`,
+      recentVisit: { timesOpened: opened },
+      effect: 'Opens this shelf again. This person already opened it within the retained recent experience, and it displays the same shelf as before; products seen there are in experience.exploration.recentShelves. The marker describes observed experience and does not forbid or discourage any particular purpose.' };
+  }) : projected;
+  const visited = isPassageMarkerFeedbackPolicy(policyVersion) ? marked.map(choice => {
+    const arrived = choice.action.type === 'walkToAnchor'
+      ? experience?.exploration.passageArrivals?.find(passage => passage.id === (choice.action as { anchorId: string }).anchorId)?.arrivals ?? 0 : 0;
+    return arrived < 1 ? choice : { ...choice, label: `${choice.label} · 최근에 ${arrived}번 간 통로`, recentVisit: { timesArrived: arrived } };
+  }) : marked;
+  const read = experience?.checks.listReadActionsAgo ?? null;
+  const listed = isProgressNoteFeedbackPolicy(policyVersion) && read !== null ? visited.map(choice => choice.action.type !== 'readList' ? choice : {
+    ...choice, label: `${choice.label} · ${read === 0 ? '방금' : `${read}번의 행동 전에`} 읽음, 최근 ${experience!.limits.retentionActions}번의 행동 안에 ${experience!.checks.listReadsInRetention ?? 1}번 읽음`,
+    recentRead: { actionsAgo: read, timesRead: experience!.checks.listReadsInRetention ?? 1 },
+    effect: 'Reads the current shopping list again. Nothing this person does in the store changes what the list says, so it shows the same items as the last reading; its contents still appear only in the next observation. The marker describes observed experience and does not forbid reading again when this person is unsure.',
+  }) : visited;
+  const grouped = isStructuredFeedbackPolicy(policyVersion) ? parameterizeProductChoices(listed, observation, policyVersion) : listed;
+  // Hash-like ids were copied wrongly or rebuilt from other ids in the frame. Short labels are valid for this frame only.
+  return isPassageMarkerFeedbackPolicy(policyVersion)
+    ? grouped.map((choice, index) => ({ ...choice, id: `c${String(index + 1).padStart(2, '0')}` })) : grouped;
 }
 
 function stablePersona(persona: Persona) {
@@ -390,6 +455,97 @@ experience.checks.cartChangedSinceLastCartView refers to observed cart changes A
 A brief list/cart check or closing its panel need not replace ongoingIntent with another check. Keep the already chosen continuing activity when that is still this person's intention, and describe a concrete next activity only when they currently choose one. currentTask may describe the immediate check while ongoingIntent remains the activity to return to. There is no automatic return, mandatory plan, or default shopping goal; choosing a new interest, forgetting, pausing and stopping remain valid.
 Memory in this response is written from the current observation and already applied recent results BEFORE the selected action executes. Selecting add/remove/viewCart/readList does not mean its outcome has already occurred or been seen. The next actual observation may support updating the person's beliefs; do not treat a carried pre-action count or a planned outcome as an observed post-action count. For grouped add/remove choices, choiceParameters.quantity is the action increment/decrement, never a final target total. Choose the productId from that action's offered catalog and describe that exact selected product and amount in reason. The reason is a brief public action description, not private reasoning; it cannot redirect or silently correct the selected action.`;
 
+// Same observation, beliefs and freedom to err as v7. Only the order of reflecting a result and naming what follows changes.
+const V8_ACTOR_INSTRUCTIONS = V7_ACTOR_INSTRUCTIONS
+  .replace('currentTask describes the immediate activity. ongoingIntent is a separate short,',
+    'nextStep describes what this person expects to do after the action chosen now. ongoingIntent is a separate short,')
+  .replace('currentTask may describe the immediate check while ongoingIntent remains the activity to return to.',
+    'nextStep may name what follows the check while ongoingIntent remains the activity to return to.')
+  .replace('Describe the immediate activity and any continuing intention in the existing currentTask and ongoingIntent fields,',
+    'Describe what follows the chosen action and any continuing intention in the nextStep and ongoingIntent fields,')
+  .replace('currentTask as a short observable activity or null', 'nextStep as a short observable activity or null')
+  .replaceAll('currentTask', 'nextStep')
+  + `
+In v8 the frame adds lastAction: the controller-recorded previous applied action and its observable result, or null before the first action. It states what has already been done. It is not an instruction and not a task to repeat. There is no currentTask field.
+Work in this order. First, reflect lastAction's result and the current observation in memory. An accepted add means that many units went into the basket, so this person's rememberedCartQuantity for that product can rise by that amount; an accepted remove lowers it; accepted:false means the basket did not change. The memory you received was written before lastAction ran, so do not carry its pre-action count forward merely because it was written that way. This person can still overlook or misjudge a result. Second, choose one action for now. Third, write nextStep: what this person expects to do AFTER the action chosen now has been carried out, or null when undecided. nextStep never restates the action chosen now; the controller records that action and returns it as the next frame's lastAction. In the next frame treat the carried nextStep as an earlier plan that the new result may confirm, change or cancel.
+In an open shelf each displayed product has inCart. The shelf's own add control shows whether at least one of that product is already in the basket; it does not show how many, and the opened basket shows amounts. This is displayed screen information about the basket, not a comparison with any list. When this person believes the wanted amount of an item is in the basket they may mark it done and turn to another remembered item or activity. Marking, forgetting, rechecking and changing their mind remain this person's choice; the controller never marks or corrects an item.`;
+
+// v8 plus a worded restatement of experience the frame already carries as numbers, and no giveUp choice.
+const V9_ACTOR_INSTRUCTIONS = V8_ACTOR_INSTRUCTIONS.replace('checkout, submit, giveUp)', 'checkout, submit)') + `
+In v9 the frame adds revisitNotes: short controller-written sentences about shelves this person opened more than once within the retained recent experience, with the products that were displayed there. They restate experience.exploration.recentShelves in words and add no other information. They are bounded and expire like that experience, an unseen shelf page may hold something else, and they never compare a shelf with the shopping list or with your remembered items. When what this person is looking for was not among the products they saw at a shelf, opening that shelf again shows the same products; they can look at another visible shelf or walk somewhere they have not been. Reopening a shelf out of interest or uncertainty remains this person's choice, and an empty list means no such revisit is retained.
+In v9 there is no choice that ends the visit without checkout. Pausing, looking around, wandering, asking staff and leaving items out remain this person's choice. The visit ends when this person confirms the purchase at a checkout; if 100 actions pass first, the controller takes the basket exactly as it is to a checkout, and that ending is recorded as the controller's, not this person's.`;
+
+const V10_ACTOR_INSTRUCTIONS = V9_ACTOR_INSTRUCTIONS + `
+In v10 a choice that opens a shelf this person already opened within the retained recent experience carries recentVisit.timesOpened and says so in its label. It is the same control as before with the same effect; only the description is added. A choice without the marker opens a shelf not opened within that retained experience. Use the marker together with what this person is currently looking for: reopening is still available for interest, uncertainty or an uninspected page, and no choice is recommended or removed.`;
+
+const V11_ACTOR_INSTRUCTIONS = V10_ACTOR_INSTRUCTIONS + `
+In v11 the frame adds movementNotes: short controller-written sentences about where this person walked within the retained recent experience, restating experience.exploration.recentMovement in words. They count this person's own applied walking by screen direction, name the directions not walked in that window, and, when every retained walk was a directional input, say whether the walking ended close to where it began. They contain no map, position, destination or shelf location, and a direction not walked is only a direction not tried recently: it may be open, blocked or lead nowhere new. When this person keeps looking for something they have not found where they have been, a direction not yet walked is somewhere they have not looked. Walking back and forth, staying, and changing their mind remain this person's choice. An empty list means too little recent walking to describe.`;
+
+const V12_ACTOR_INSTRUCTIONS = V11_ACTOR_INSTRUCTIONS + `
+In v12 every choice id is a short label such as c07 that is valid for this frame only; return it exactly as written and never build an id from other text. Passages carry no ids anywhere in the frame: a walk-to-passage choice is described by its direction and distance, and one that this person walked to within the retained recent experience carries recentVisit.timesArrived and says so in its label. A passage choice without that marker leads somewhere this person has not walked to within that window; it may still be a place they saw or passed. The marker is observed experience, not a prohibition or a recommendation, and walking back to a visited passage remains this person's choice.`;
+
+const V13_ACTOR_INSTRUCTIONS = V12_ACTOR_INSTRUCTIONS + `
+In v13 the read-list choice carries recentRead and says in its label how many actions ago the list was read and how often within the retained recent experience. Reading again shows the same list; when this person still remembers what it said, they can go on with what they were doing instead. Reading again remains their choice when they are unsure.
+The frame also adds progressNotes: short controller-written sentences. The first restates the memory you received, naming which remembered items this person has marked done, still pending or abandoned, and whether every item they believe came from the list is marked done. It repeats your own beliefs, which may be mistaken; nothing is checked against the list or the basket and no item is marked for you. The next states how this visit ends: the purchase has not been confirmed yet, and shopping is finished only by confirming the purchase at a checkout counter. The last says when a checkout counter was last on screen during this visit and where it was displayed then; that direction was true from where this person stood at that time. When this person believes they have what they came for, going to a checkout counter and confirming the purchase is the next part of shopping. Looking at more shelves, buying something else, or leaving items out before that remain this person's choice.`;
+
+const MOVEMENT_NOTE_MINIMUM_WALKS = 4;
+const DIRECTION_WORDS = { north: '위쪽', northeast: '오른쪽 위', east: '오른쪽', southeast: '오른쪽 아래',
+  south: '아래쪽', southwest: '왼쪽 아래', west: '왼쪽', northwest: '왼쪽 위' } as const;
+
+/** Words for the actor's own retained walking only; never a route, a position or a recommended direction. */
+function recentMovementNotes(experience: FeedbackExperienceSnapshot): string[] {
+  const movement = experience.exploration.recentMovement;
+  if (!movement || movement.walks < MOVEMENT_NOTE_MINIMUM_WALKS) return [];
+  const directions = Object.keys(DIRECTION_WORDS) as (keyof typeof DIRECTION_WORDS)[];
+  const walked = directions.filter(direction => movement.byDirection[direction])
+    .sort((a, b) => movement.byDirection[b]! - movement.byDirection[a]!);
+  const notWalked = directions.filter(direction => !movement.byDirection[direction]);
+  const blocked = directions.filter(direction => movement.blockedByDirection[direction]);
+  const notes = [`최근 ${experience.limits.retentionActions}번의 행동 안에 ${movement.walks}번 걸었습니다: `
+    + walked.map(direction => `${DIRECTION_WORDS[direction]} ${movement.byDirection[direction]}번`).join(', ') + '.'
+    + (notWalked.length ? ` 그동안 걷지 않은 방향: ${notWalked.map(direction => DIRECTION_WORDS[direction]).join(', ')}.` : '')
+    + (blocked.length ? ` 막혔던 방향: ${blocked.map(direction => `${DIRECTION_WORDS[direction]} ${movement.blockedByDirection[direction]}번`).join(', ')}.` : '')];
+  // Only measured directional input can say this; a passage walk has no displacement in the actor's experience.
+  if (movement.directional && movement.directional.travelledPx > 0 && movement.directional.netPx * 4 <= movement.directional.travelledPx)
+    notes.push('그 걸음들은 오간 끝에 처음 자리 가까이에서 끝났습니다.');
+  return notes;
+}
+
+const DISTANCE_WORDS: Record<string, string> = { near: '가까이', medium: '조금 떨어진 곳', far: '멀리' };
+
+/** The actor's own beliefs and the visit's ending, in words. No list, basket or goal comparison and no completed step. */
+function progressNotes(memory: FeedbackBeliefMemory, experience: FeedbackExperienceSnapshot, observation: ActorObservation): string[] {
+  const notes: string[] = [];
+  const named = memory.rememberedItems.filter(item => item.name !== null);
+  const names = (status: string) => named.filter(item => item.status === status).map(item => item.name).join(', ');
+  if (named.length) {
+    const fromList = named.filter(item => item.source === 'list');
+    notes.push(`지금 기억에 남긴 물건 ${named.length}가지:`
+      + (names('done') ? ` 끝난 것으로 표시한 물건은 ${names('done')}.` : '')
+      + (names('pending') ? ` 아직 남은 것으로 표시한 물건은 ${names('pending')}.` : '')
+      + (names('abandoned') ? ` 그만둔 것으로 표시한 물건은 ${names('abandoned')}.` : '')
+      + (fromList.length && fromList.every(item => item.status === 'done') ? ' 목록에서 왔다고 기억한 물건은 모두 끝난 것으로 표시되어 있습니다.' : ''));
+  }
+  notes.push(observation.phase === 'checkout'
+    ? '지금 계산대 화면입니다. 아직 구매를 확정하지 않았습니다. 구매를 확정하면 이번 장보기가 끝납니다.'
+    : '아직 구매를 확정하지 않았습니다. 이번 장보기는 고른 물건을 가지고 계산대에서 구매를 확정해야 끝납니다.');
+  const seen = experience.exploration.lastCheckoutSeen;
+  if (observation.phase !== 'checkout') notes.push(!seen ? '이번 방문에서 아직 계산대를 화면에서 본 적이 없습니다.'
+    : seen.actionsAgo === 0 ? `지금 화면의 ${DIRECTION_WORDS[seen.direction]} ${DISTANCE_WORDS[seen.distanceBand] ?? ''}에 계산대가 보입니다.`.replace('  ', ' ')
+      : `계산대를 마지막으로 화면에서 본 것은 ${seen.actionsAgo}번의 행동 전이고, 그때 서 있던 자리에서 ${DIRECTION_WORDS[seen.direction]} ${DISTANCE_WORDS[seen.distanceBand] ?? ''}에 있었습니다.`.replace('  ', ' '));
+  return notes;
+}
+
+/** Words only for shelves opened at least twice; never a goal comparison or a count beyond the retained window. */
+function shelfRevisitNotes(experience: FeedbackExperienceSnapshot): string[] {
+  return experience.exploration.recentShelves.filter(shelf => shelf.timesOpened >= 2).map(shelf => {
+    const name = shelf.label === null ? '이름을 보지 못한 진열대' : `'${shelf.label}' 진열대`;
+    const products = shelf.observedProducts.map(product => product.name);
+    return `${name}를 최근 ${experience.limits.retentionActions}번의 행동 안에 ${shelf.timesOpened}번 열었습니다. `
+      + (products.length ? `거기서 본 상품: ${products.join(', ')}.` : '거기서 본 상품은 기록에 없습니다.');
+  });
+}
+
 export type FeedbackActorFrame = {
   policyVersion: FeedbackActorPolicyVersion;
   instructions: string;
@@ -399,6 +555,14 @@ export type FeedbackActorFrame = {
   availableChoices: FeedbackActorChoice[];
   movementPolicy?: MarketReplayMovementPolicyDecision;
   experience?: FeedbackExperienceSnapshot;
+  /** v8: the previous applied action and its observable result, recorded by the controller. Never a goal or instruction. */
+  lastAction?: FeedbackExperienceSnapshot['recentActions'][number] | null;
+  /** v9: worded restatement of repeatedly opened shelves from the bounded experience. */
+  revisitNotes?: string[];
+  /** v11: worded restatement of the actor's own retained walking by direction. */
+  movementNotes?: string[];
+  /** v13: worded restatement of the actor's own item beliefs, the visit's ending rule and the last checkout sighting. */
+  progressNotes?: string[];
 };
 
 export function buildFeedbackActorFrame(args: {
@@ -420,10 +584,16 @@ export function buildFeedbackActorFrame(args: {
     throw new Error('Feedback frame movement policy version mismatch');
   if (isExperienceFeedbackPolicy(policyVersion) !== (args.experience !== undefined))
     throw new Error('Only feedback-choice-v4 requires bounded recent experience');
-  if (policyVersion === 'feedback-choice-v7' && args.experience?.version !== 'bounded-observed-experience-v2')
-    throw new Error('feedback-choice-v7 requires bounded-observed-experience-v2');
+  if (isQuantityBeliefFeedbackPolicy(policyVersion) && args.experience?.version !== 'bounded-observed-experience-v2')
+    throw new Error(`${policyVersion} requires bounded-observed-experience-v2`);
   const movementPolicy = args.movementPolicy === undefined ? undefined : structuredClone(args.movementPolicy);
-  const instructions = policyVersion === 'feedback-choice-v7' ? V7_ACTOR_INSTRUCTIONS
+  const instructions = policyVersion === 'feedback-choice-v13' ? V13_ACTOR_INSTRUCTIONS
+    : policyVersion === 'feedback-choice-v12' ? V12_ACTOR_INSTRUCTIONS
+    : policyVersion === 'feedback-choice-v11' ? V11_ACTOR_INSTRUCTIONS
+    : policyVersion === 'feedback-choice-v10' ? V10_ACTOR_INSTRUCTIONS
+    : policyVersion === 'feedback-choice-v9' ? V9_ACTOR_INSTRUCTIONS
+    : policyVersion === 'feedback-choice-v8' ? V8_ACTOR_INSTRUCTIONS
+    : policyVersion === 'feedback-choice-v7' ? V7_ACTOR_INSTRUCTIONS
     : policyVersion === 'feedback-choice-v6' ? V6_ACTOR_INSTRUCTIONS
       : policyVersion === 'feedback-choice-v5' ? V5_ACTOR_INSTRUCTIONS
       : policyVersion === 'feedback-choice-v4' ? V4_ACTOR_INSTRUCTIONS : FEEDBACK_ACTOR_INSTRUCTIONS;
@@ -434,8 +604,33 @@ export function buildFeedbackActorFrame(args: {
         + (movementPolicy ? '\n' + (isExperienceFeedbackPolicy(policyVersion) ? V4_MOVEMENT_POLICY_INSTRUCTIONS : MOVEMENT_POLICY_INSTRUCTIONS) : '')
       : FEEDBACK_ACTOR_INSTRUCTIONS,
     observation, memory: structuredClone(args.memory), persona: stablePersona(args.persona),
-    availableChoices: currentChoices(observation, args.seed, args.decisionIndex, policyVersion, movementPolicy),
+    availableChoices: currentChoices(observation, args.seed, args.decisionIndex, policyVersion, movementPolicy, args.experience),
     ...(movementPolicy ? { movementPolicy } : {}),
     ...(args.experience ? { experience: structuredClone(args.experience) } : {}),
+    ...(isResultReflectionFeedbackPolicy(policyVersion)
+      ? { lastAction: structuredClone(args.experience!.recentActions.at(-1) ?? null) } : {}),
+    ...(isRevisitNoteFeedbackPolicy(policyVersion) ? { revisitNotes: shelfRevisitNotes(args.experience!) } : {}),
+    ...(isMovementNoteFeedbackPolicy(policyVersion) ? { movementNotes: recentMovementNotes(args.experience!) } : {}),
+    ...(isProgressNoteFeedbackPolicy(policyVersion) ? { progressNotes: progressNotes(args.memory, args.experience!, observation) } : {}),
   };
+}
+
+/** The complete frame resolves a chosen control; this is the form an actor may read.
+ * v12 removes passage ids everywhere so no id-like text can be mistaken for a choice id. Earlier policies are returned unchanged. */
+export function presentFeedbackActorFrame<T extends FeedbackActorFrame>(frame: T): T {
+  const presented = structuredClone(frame);
+  if (!isPassageMarkerFeedbackPolicy(frame.policyVersion)) return presented;
+  const strip = (value: unknown): void => {
+    if (Array.isArray(value)) { value.forEach(strip); return; }
+    if (!plain(value)) return;
+    delete value.anchorId;
+    Object.values(value).forEach(strip);
+  };
+  strip(presented);
+  for (const anchor of presented.observation.anchors) delete (anchor as { id?: string }).id;
+  if (presented.experience) {
+    for (const passage of presented.experience.exploration.recentPassages) delete (passage as { id?: string }).id;
+    delete presented.experience.exploration.passageArrivals;
+  }
+  return presented;
 }

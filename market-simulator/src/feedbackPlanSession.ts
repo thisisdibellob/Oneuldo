@@ -3,7 +3,7 @@ import { performance } from 'node:perf_hooks';
 import { canonicalMarketReplayJson } from '../../frontend/src/game/marketReplayTrace';
 import { assertDecision } from './llmPolicy';
 import { buildFeedbackActorFrame, emptyFeedbackBeliefMemory, FEEDBACK_ACTOR_POLICY_VERSION, feedbackDecisionFromChoice,
-  validateFeedbackBeliefMemory, carryFeedbackBeliefMemory, projectFeedbackObservation, isExperienceFeedbackPolicy, isStructuredFeedbackPolicy, type FeedbackChoiceParameters, type FeedbackActorFrame, type FeedbackBeliefMemory, type FeedbackActorPolicyVersion } from './feedbackActor';
+  validateFeedbackBeliefMemory, carryFeedbackBeliefMemory, projectFeedbackObservation, isExperienceFeedbackPolicy, isStructuredFeedbackPolicy, isQuantityBeliefFeedbackPolicy, isMovementNoteFeedbackPolicy, isPassageMarkerFeedbackPolicy, isProgressNoteFeedbackPolicy, presentFeedbackActorFrame, type FeedbackChoiceParameters, type FeedbackActorFrame, type FeedbackBeliefMemory, type FeedbackActorPolicyVersion } from './feedbackActor';
 import type { ActorObservation, Decision, Persona, TraceEntry } from './types';
 import { FeedbackMovementPolicy, type FeedbackMovementPolicyOptions } from './feedbackMovementPolicy';
 import { FeedbackExperience } from './feedbackExperience';
@@ -75,7 +75,9 @@ export class FeedbackPlanSession {
     if (!(typeof seed === 'string' || typeof seed === 'number' && Number.isFinite(seed)))
       throw failure('Feedback plan seed must be a string or finite number', 'FEEDBACK_SEED');
     this.memory = emptyFeedbackBeliefMemory(policyVersion);
-    this.experience = new FeedbackExperience({ version: policyVersion === 'feedback-choice-v7' ? 'bounded-observed-experience-v2' : 'bounded-observed-experience-v1' });
+    this.experience = new FeedbackExperience({ version: isQuantityBeliefFeedbackPolicy(policyVersion) ? 'bounded-observed-experience-v2' : 'bounded-observed-experience-v1',
+      movementHistory: isMovementNoteFeedbackPolicy(policyVersion), passageHistory: isPassageMarkerFeedbackPolicy(policyVersion),
+      progressHistory: isProgressNoteFeedbackPolicy(policyVersion) });
     const exploration = policyVersion === 'feedback-choice-v3' || isExperienceFeedbackPolicy(policyVersion);
     if (movementOptions !== undefined && !exploration) throw failure('feedbackMovement requires feedback-choice-v3 or feedback-choice-v4', 'FEEDBACK_MOVEMENT_POLICY');
     this.movementPolicy = exploration ? new FeedbackMovementPolicy(seed, movementOptions,
@@ -99,7 +101,8 @@ export class FeedbackPlanSession {
 
   observe(): FeedbackPlanFrame | FeedbackPlanCompletion {
     if (this.error) throw this.error;
-    if (this.frame) return structuredClone(this.frame);
+    // The session keeps the complete frame to resolve a choice; the actor receives only its presented form.
+    if (this.frame) return presentFeedbackActorFrame(this.frame);
     if (this.stopped) return { status: 'complete', result: structuredClone(this.lastResult) };
     throw failure('No feedback actor observation is waiting', 'FEEDBACK_NOT_READY');
   }
@@ -266,7 +269,7 @@ export class FeedbackPlanSession {
     this.active = null;
     const result = { requestId: record.input.requestId, revision: record.input.revision,
       acceptedActions: 1 as const, executedActions: 1 as const, result: structuredClone(record.result), timing: this.timing(),
-      ...(nextFrame ? { nextFrame: structuredClone(nextFrame), complete: false as const } : { complete: true as const }) };
+      ...(nextFrame ? { nextFrame: presentFeedbackActorFrame(nextFrame), complete: false as const } : { complete: true as const }) };
     // The response has no references to mutable session state; retries receive this exact result.
     record.resolve(result);
   }

@@ -9,7 +9,7 @@ import { Random } from './random';
 import { ActorActivityMonitor } from './actorActivity';
 import { appendCheckoutCompletion } from './checkoutCompletion';
 import { createFeedbackLlmPolicy } from './feedbackLlmPolicy';
-import { buildFeedbackActorFrame, feedbackChoiceMatchesDecision, emptyFeedbackBeliefMemory, validateFeedbackBeliefMemory, carryFeedbackBeliefMemory, isFeedbackActorPolicy, isExperienceFeedbackPolicy, isStructuredFeedbackPolicy, projectFeedbackObservation } from './feedbackActor';
+import { buildFeedbackActorFrame, feedbackChoiceMatchesDecision, emptyFeedbackBeliefMemory, validateFeedbackBeliefMemory, carryFeedbackBeliefMemory, isFeedbackActorPolicy, isExperienceFeedbackPolicy, isStructuredFeedbackPolicy, isQuantityBeliefFeedbackPolicy, isResultReflectionFeedbackPolicy, isNoGiveUpFeedbackPolicy, isMovementNoteFeedbackPolicy, isPassageMarkerFeedbackPolicy, isProgressNoteFeedbackPolicy, projectFeedbackObservation } from './feedbackActor';
 import { FeedbackMovementPolicy } from './feedbackMovementPolicy';
 import { FeedbackExperience } from './feedbackExperience';
 import type { ActorObservation, AttentionExperience, Decision, Persona, TraceEntry, TraceOptions } from './types';
@@ -27,12 +27,16 @@ export async function generateAttentionTrace(options: TraceOptions, persona: Per
   const actorPolicyVersion = attentionActorPolicyVersion(options);
   const feedbackActor = isFeedbackActorPolicy(actorPolicyVersion);
   const directionalMovement = feedbackActor && actorPolicyVersion !== 'feedback-choice-v1';
+  // v9 offers no giveUp, so its action limit ends in the controller-owned checkout instead of a technical failure.
+  const systemCheckout = isNoGiveUpFeedbackPolicy(actorPolicyVersion);
   const exploration = actorPolicyVersion === 'feedback-choice-v3' || isExperienceFeedbackPolicy(actorPolicyVersion);
   if (options.feedbackMovement !== undefined && !exploration)
     throw new Error('feedbackMovement requires feedback-choice-v3 or feedback-choice-v4');
   const movementPolicy = exploration ? new FeedbackMovementPolicy(options.seed, options.feedbackMovement,
     isExperienceFeedbackPolicy(actorPolicyVersion) ? 'exploration-v2' : 'exploration-v1') : null;
-  const recentExperience = isExperienceFeedbackPolicy(actorPolicyVersion) ? new FeedbackExperience({ version: actorPolicyVersion === 'feedback-choice-v7' ? 'bounded-observed-experience-v2' : 'bounded-observed-experience-v1' }) : null;
+  const recentExperience = isExperienceFeedbackPolicy(actorPolicyVersion) ? new FeedbackExperience({ version: isQuantityBeliefFeedbackPolicy(actorPolicyVersion) ? 'bounded-observed-experience-v2' : 'bounded-observed-experience-v1',
+    movementHistory: isMovementNoteFeedbackPolicy(actorPolicyVersion), passageHistory: isPassageMarkerFeedbackPolicy(actorPolicyVersion),
+    progressHistory: isProgressNoteFeedbackPolicy(actorPolicyVersion) }) : null;
   if (feedbackActor && (options.actorDecisionProvider || options.decisionProvider)) {
     throw new Error('feedback-choice-v1 requires feedbackDecisionProvider with a current-only frame; raw actorDecisionProvider is not allowed');
   }
@@ -97,7 +101,7 @@ export async function generateAttentionTrace(options: TraceOptions, persona: Per
   const activity = new ActorActivityMonitor();
   let systemCompletion: NonNullable<MarketReplayTrace['generation']>['systemCompletion'];
   if (options.decisionProvider && !options.actorDecisionProvider) throw new Error('Attention personas require actorDecisionProvider; raw game observations are not exposed');
-  const guard = new TraceGuard(options.snapshot, persona.id, persona.version, model, true, extendedActor, feedbackActor, directionalMovement, isStructuredFeedbackPolicy(actorPolicyVersion));
+  const guard = new TraceGuard(options.snapshot, persona.id, persona.version, model, true, extendedActor, feedbackActor, directionalMovement, isStructuredFeedbackPolicy(actorPolicyVersion), isResultReflectionFeedbackPolicy(actorPolicyVersion));
   const motor = new Random(`${options.seed}:presentation:${persona.id}:${persona.version}`);
   const history: TraceEntry[] = [], steps: MarketReplayStep[] = [];
   let plannedMs = 0;
@@ -124,7 +128,7 @@ export async function generateAttentionTrace(options: TraceOptions, persona: Per
     policy.observe(before);
     activity.observe(before);
     const feedback = activity.getState();
-    if (feedbackActor && history.length >= ACTOR_ACTION_LIMIT) {
+    if (feedbackActor && !systemCheckout && history.length >= ACTOR_ACTION_LIMIT) {
       throw new Error('ATTENTION_GENERATION_LIMIT: action-limit; no system checkout or completed persona outcome was fabricated');
     }
     if (extendedActor && history.length >= ACTOR_ACTION_LIMIT) {
@@ -132,7 +136,7 @@ export async function generateAttentionTrace(options: TraceOptions, persona: Per
       // Repetition is diagnostic only. This fixed observation horizon is not failure.
       options.onCheckpoint?.({ kind: 'system-completion', index: history.length, activity: feedback });
       systemCompletion = appendCheckoutCompletion(guard, `step-${String(steps.length + 1).padStart(4, '0')}`, options.seed,
-        (intent, reason, timeoutMs) => append(intent, 300, reason, {}, timeoutMs, true));
+        (intent, reason, timeoutMs) => append(intent, feedbackActor ? 0 : 300, reason, {}, timeoutMs, true));
       break;
     }
     if (limit) throw new Error(`ATTENTION_GENERATION_LIMIT: ${limit}; incomplete plan was not exported as a persona outcome`);
@@ -208,7 +212,44 @@ export async function generateAttentionTrace(options: TraceOptions, persona: Per
       ...(feedbackActor ? { timingProfile: directionalMovement ? 'activity-duration-v2' as const : 'activity-duration-v1' as const,
         ...(directionalMovement ? { movementContract: 'joystick-direction-v1' as const } : {}),
         ...(movementPolicy ? { movementPolicy: movementPolicy.configuration } : {}),
-        feedback: { ...(actorPolicyVersion === 'feedback-choice-v7'
+        feedback: { ...(actorPolicyVersion === 'feedback-choice-v13'
+          ? { version: '9' as const, memory: 'actor-authored-with-recent-experience' as const,
+            experienceContract: 'bounded-observed-experience-v2' as const, intentContract: 'persistent-intent-v1' as const,
+            beliefContract: 'quantity-source-beliefs-v1' as const, reflectionContract: 'result-reflection-next-step-v1' as const,
+            observationContract: 'shelf-in-cart-cue-v1' as const, revisitContract: 'shelf-revisit-notes-v1' as const,
+            choiceContract: 'recent-shelf-choice-marker-v1' as const, movementNoteContract: 'recent-movement-notes-v1' as const,
+            passageContract: 'anonymous-passage-visit-marker-v1' as const, choiceIdContract: 'per-frame-short-ids-v1' as const,
+            listMarkerContract: 'recent-list-read-marker-v1' as const, progressNoteContract: 'belief-progress-checkout-notes-v1' as const }
+          : actorPolicyVersion === 'feedback-choice-v12'
+          ? { version: '8' as const, memory: 'actor-authored-with-recent-experience' as const,
+            experienceContract: 'bounded-observed-experience-v2' as const, intentContract: 'persistent-intent-v1' as const,
+            beliefContract: 'quantity-source-beliefs-v1' as const, reflectionContract: 'result-reflection-next-step-v1' as const,
+            observationContract: 'shelf-in-cart-cue-v1' as const, revisitContract: 'shelf-revisit-notes-v1' as const,
+            choiceContract: 'recent-shelf-choice-marker-v1' as const, movementNoteContract: 'recent-movement-notes-v1' as const,
+            passageContract: 'anonymous-passage-visit-marker-v1' as const, choiceIdContract: 'per-frame-short-ids-v1' as const }
+          : actorPolicyVersion === 'feedback-choice-v11'
+          ? { version: '7' as const, memory: 'actor-authored-with-recent-experience' as const,
+            experienceContract: 'bounded-observed-experience-v2' as const, intentContract: 'persistent-intent-v1' as const,
+            beliefContract: 'quantity-source-beliefs-v1' as const, reflectionContract: 'result-reflection-next-step-v1' as const,
+            observationContract: 'shelf-in-cart-cue-v1' as const, revisitContract: 'shelf-revisit-notes-v1' as const,
+            choiceContract: 'recent-shelf-choice-marker-v1' as const, movementNoteContract: 'recent-movement-notes-v1' as const }
+          : actorPolicyVersion === 'feedback-choice-v10'
+          ? { version: '6' as const, memory: 'actor-authored-with-recent-experience' as const,
+            experienceContract: 'bounded-observed-experience-v2' as const, intentContract: 'persistent-intent-v1' as const,
+            beliefContract: 'quantity-source-beliefs-v1' as const, reflectionContract: 'result-reflection-next-step-v1' as const,
+            observationContract: 'shelf-in-cart-cue-v1' as const, revisitContract: 'shelf-revisit-notes-v1' as const,
+            choiceContract: 'recent-shelf-choice-marker-v1' as const }
+          : actorPolicyVersion === 'feedback-choice-v9'
+          ? { version: '5' as const, memory: 'actor-authored-with-recent-experience' as const,
+            experienceContract: 'bounded-observed-experience-v2' as const, intentContract: 'persistent-intent-v1' as const,
+            beliefContract: 'quantity-source-beliefs-v1' as const, reflectionContract: 'result-reflection-next-step-v1' as const,
+            observationContract: 'shelf-in-cart-cue-v1' as const, revisitContract: 'shelf-revisit-notes-v1' as const }
+          : isResultReflectionFeedbackPolicy(actorPolicyVersion)
+          ? { version: '4' as const, memory: 'actor-authored-with-recent-experience' as const,
+            experienceContract: 'bounded-observed-experience-v2' as const, intentContract: 'persistent-intent-v1' as const,
+            beliefContract: 'quantity-source-beliefs-v1' as const, reflectionContract: 'result-reflection-next-step-v1' as const,
+            observationContract: 'shelf-in-cart-cue-v1' as const }
+          : actorPolicyVersion === 'feedback-choice-v7'
           ? { version: '3' as const, memory: 'actor-authored-with-recent-experience' as const,
             experienceContract: 'bounded-observed-experience-v2' as const, intentContract: 'persistent-intent-v1' as const,
             beliefContract: 'quantity-source-beliefs-v1' as const }

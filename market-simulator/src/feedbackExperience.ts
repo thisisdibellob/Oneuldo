@@ -19,6 +19,8 @@ type Shelf = { id: string; label: string | null; seenAt: number; openedAt: numbe
   pages: { page: number; seenAt: number }[]; products: { id: string; name: string; seenAt: number }[] };
 type Passage = { id: string; label: string; seenAt: number; arrivals: number[] };
 type VisibleCart = { items: Record<string, number>; seenAt: number };
+/** dx/dy are known only for directional input; walking to a visible passage records its displayed direction alone. */
+type Move = { direction: ActorDirection; outcome: 'moved' | 'partially-blocked' | 'blocked' | null; dx: number | null; dy: number | null; at: number };
 
 export type FeedbackExperienceSnapshot = {
   version: FeedbackExperienceVersion;
@@ -31,12 +33,23 @@ export type FeedbackExperienceSnapshot = {
     cartChangedSinceListRead: boolean | null;
     /** v2 only: any known cart change since an accepted visible cart check, not since a list read.
      * null means no retained check or an unknown mutation outcome; false never resolves an unknown outcome. */
-    cartChangedSinceLastCartView?: boolean | null };
+    cartChangedSinceLastCartView?: boolean | null;
+    /** Opt-in (v13): accepted list reads within the retained window, beyond the six recent actions. */
+    listReadsInRetention?: number };
   exploration: {
     recentShelves: { id: string; label: string | null; lastSeenActionsAgo: number; timesOpened: number;
       observedPages: number[]; observedProducts: { id: string; name: string }[] }[];
     recentPassages: { id: string; label: string; lastSeenActionsAgo: number; arrivals: number }[];
     lastMovement: { direction: ActorDirection; outcome: 'moved' | 'partially-blocked' | 'blocked'; actionsAgo: number } | null;
+    /** Opt-in (v11): walking within the retained window, from applied results only. No position, map or unseen place. */
+    recentMovement?: { walks: number; byDirection: Partial<Record<ActorDirection, number>>; blockedByDirection: Partial<Record<ActorDirection, number>>;
+      /** Present only when every retained walk was a directional input with a measured displacement. */
+      directional: { travelledPx: number; netPx: number } | null };
+    /** Opt-in (v12): accepted walks to a visible passage within the retained window, not capped by the six-place summary. */
+    passageArrivals?: { id: string; arrivals: number }[];
+    /** Opt-in (v13): the last time a checkout counter was on screen during this visit. Kept for the whole visit as one
+     * landmark sighting; the direction is where it was displayed then, not where it is from the current position. */
+    lastCheckoutSeen?: { actionsAgo: number; direction: ActorDirection; distanceBand: string } | null;
   };
   /** Historical cart contents are never presented as the currently visible cart. */
   visibleCart: { items: Record<string, number>; changedSincePreviousVisibleObservation: boolean | null } | null;
@@ -102,9 +115,19 @@ export class FeedbackExperience {
   private lastCart: VisibleCart | null = null;
   private lastCartComparison: boolean | null = null;
   private lastMovement: { direction: ActorDirection; outcome: 'moved' | 'partially-blocked' | 'blocked'; at: number } | null = null;
+  private readonly movementHistory: boolean;
+  private moves: Move[] = [];
+  private readonly passageHistory: boolean;
+  private arrivals: { id: string; at: number }[] = [];
+  private readonly progressHistory: boolean;
+  private listReads: number[] = [];
+  private checkoutSeen: { at: number; direction: ActorDirection; distanceBand: string } | null = null;
 
-  constructor(options: { version?: FeedbackExperienceVersion } = {}) {
+  constructor(options: { version?: FeedbackExperienceVersion; movementHistory?: boolean; passageHistory?: boolean; progressHistory?: boolean } = {}) {
     this.version = options.version ?? FEEDBACK_EXPERIENCE_VERSION;
+    this.movementHistory = options.movementHistory === true;
+    this.passageHistory = options.passageHistory === true;
+    this.progressHistory = options.progressHistory === true;
   }
 
   private age(at: number | null): number | null { return at !== null && within(this.count, at) ? this.count - at : null; }
@@ -186,6 +209,27 @@ export class FeedbackExperience {
       this.passages.find(p => p.id === result.anchorId)?.arrivals.push(this.count);
     if (result?.accepted && result.movement) this.lastMovement = { direction: result.movement.direction,
       outcome: result.movement.outcome, at: this.count };
+    if (this.progressHistory) {
+      if (decision.action.type === 'readList' && result?.accepted) this.listReads.push(this.count);
+      this.listReads = this.listReads.filter(at => within(this.count, at));
+      this.checkoutSeen = this.sightedCheckout(after, this.count) ?? this.sightedCheckout(before, this.count - 1) ?? this.checkoutSeen;
+    }
+    if (this.passageHistory) {
+      if (result?.accepted && decision.action.type === 'walkToAnchor' && result.anchorId === decision.action.anchorId)
+        this.arrivals.push({ id: decision.action.anchorId, at: this.count });
+      this.arrivals = this.arrivals.filter(arrival => within(this.count, arrival.at));
+    }
+    if (this.movementHistory && result?.accepted) {
+      const delta = after.result?.movement?.actualDelta;
+      if (result.movement) this.moves.push({ direction: result.movement.direction, outcome: result.movement.outcome,
+        dx: delta && Number.isFinite(delta.dx) ? delta.dx : null, dy: delta && Number.isFinite(delta.dy) ? delta.dy : null, at: this.count });
+      else if (decision.action.type === 'walkToAnchor') {
+        const anchorId = decision.action.anchorId;
+        const anchor = before.anchors.find(a => a.id === anchorId);
+        if (anchor) this.moves.push({ direction: anchor.direction, outcome: null, dx: null, dy: null, at: this.count });
+      }
+      this.moves = this.moves.filter(move => within(this.count, move.at));
+    }
     if (afterCart !== null) {
       this.lastCartComparison = this.lastCart && within(this.count, this.lastCart.seenAt) ? !sameCart(this.lastCart.items, afterCart) : null;
       this.lastCart = { items: afterCart, seenAt: this.count };
@@ -194,6 +238,26 @@ export class FeedbackExperience {
     this.shelves = trimmed.shelves; this.passages = trimmed.passages;
     if (this.lastCart && !within(this.count, this.lastCart.seenAt)) this.lastCart = null;
     if (this.lastMovement && !within(this.count, this.lastMovement.at)) this.lastMovement = null;
+  }
+
+  private sightedCheckout(o: ActorObservation, at: number): { at: number; direction: ActorDirection; distanceBand: string } | null {
+    const order = ['near', 'medium', 'far'];
+    const seen = o.visibleStations.filter(station => station.kind === 'checkout')
+      .sort((a, b) => order.indexOf(a.distanceBand) - order.indexOf(b.distanceBand))[0];
+    return seen && (!this.checkoutSeen || at >= this.checkoutSeen.at) ? { at, direction: seen.direction, distanceBand: seen.distanceBand } : null;
+  }
+
+  private recentMovement(): NonNullable<FeedbackExperienceSnapshot['exploration']['recentMovement']> {
+    const moves = this.moves.filter(move => within(this.count, move.at));
+    const byDirection: Partial<Record<ActorDirection, number>> = {}, blockedByDirection: Partial<Record<ActorDirection, number>> = {};
+    for (const move of moves) {
+      byDirection[move.direction] = (byDirection[move.direction] ?? 0) + 1;
+      if (move.outcome === 'blocked') blockedByDirection[move.direction] = (blockedByDirection[move.direction] ?? 0) + 1;
+    }
+    const measured = moves.length > 0 && moves.every(move => move.dx !== null && move.dy !== null);
+    return { walks: moves.length, byDirection, blockedByDirection, directional: measured ? {
+      travelledPx: Math.round(moves.reduce((sum, move) => sum + Math.hypot(move.dx!, move.dy!), 0)),
+      netPx: Math.round(Math.hypot(moves.reduce((sum, move) => sum + move.dx!, 0), moves.reduce((sum, move) => sum + move.dy!, 0))) } : null };
   }
 
   snapshot(currentObservation: ActorObservation): FeedbackExperienceSnapshot {
@@ -213,7 +277,8 @@ export class FeedbackExperience {
         listReadsInRecentActions: this.actions.filter(a => a.action.type === 'readList').length,
         cartViewsInRecentActions: this.actions.filter(a => a.action.type === 'viewCart').length,
         cartChangedSinceListRead: this.age(this.lastListRead) === null ? null : this.cartChangedAfterRead,
-        ...(this.version === FEEDBACK_EXPERIENCE_V2_VERSION ? { cartChangedSinceLastCartView: changedSinceCartView } : {}) },
+        ...(this.version === FEEDBACK_EXPERIENCE_V2_VERSION ? { cartChangedSinceLastCartView: changedSinceCartView } : {}),
+        ...(this.progressHistory ? { listReadsInRetention: this.listReads.filter(at => within(this.count, at)).length } : {}) },
       exploration: {
         recentShelves: trimmed.shelves.map(s => ({ id: s.id, label: s.label, lastSeenActionsAgo: this.count - s.seenAt,
           timesOpened: s.openedAt.length, observedPages: s.pages.map(p => p.page),
@@ -221,7 +286,14 @@ export class FeedbackExperience {
         recentPassages: trimmed.passages.map(p => ({ id: p.id, label: p.label, lastSeenActionsAgo: this.count - p.seenAt,
           arrivals: p.arrivals.length })),
         lastMovement: this.lastMovement ? { direction: this.lastMovement.direction, outcome: this.lastMovement.outcome,
-          actionsAgo: this.count - this.lastMovement.at } : null },
+          actionsAgo: this.count - this.lastMovement.at } : null,
+        ...(this.movementHistory ? { recentMovement: this.recentMovement() } : {}),
+        ...(this.progressHistory ? { lastCheckoutSeen: (() => {
+          const seen = this.sightedCheckout(currentObservation, this.count) ?? this.checkoutSeen;
+          return seen ? { actionsAgo: this.count - seen.at, direction: seen.direction, distanceBand: seen.distanceBand } : null;
+        })() } : {}),
+        ...(this.passageHistory ? { passageArrivals: [...new Set(this.arrivals.filter(a => within(this.count, a.at)).map(a => a.id))]
+          .map(id => ({ id, arrivals: this.arrivals.filter(a => a.id === id && within(this.count, a.at)).length })) } : {}) },
       visibleCart: currentCart === null ? null : { items: currentCart, changedSincePreviousVisibleObservation: comparison },
     });
   }

@@ -46,7 +46,7 @@ export function assertDecision(value: unknown, feedbackTiming = false): asserts 
 /** Same HTTP contract as the legacy provider, with actor-only input and externally owned memory. */
 export const LEGACY_ACTOR_POLICY_VERSION = 'episodic-choice-v4' as const;
 export function isExtendedActorPolicy(policy?: string): boolean {
-  return ['episodic-choice-v9', 'episodic-choice-v10', 'feedback-choice-v1', 'feedback-choice-v2', 'feedback-choice-v3', 'feedback-choice-v4', 'feedback-choice-v5', 'feedback-choice-v6', 'feedback-choice-v7', 'whole-trace-v3'].includes(policy ?? '');
+  return ['episodic-choice-v9', 'episodic-choice-v10', 'feedback-choice-v1', 'feedback-choice-v2', 'feedback-choice-v3', 'feedback-choice-v4', 'feedback-choice-v5', 'feedback-choice-v6', 'feedback-choice-v7', 'feedback-choice-v8', 'feedback-choice-v9', 'feedback-choice-v10', 'feedback-choice-v11', 'feedback-choice-v12', 'feedback-choice-v13', 'whole-trace-v3'].includes(policy ?? '');
 }
 export function attentionActorPolicyVersion(options: Pick<TraceOptions, 'actorPolicyVersion' | 'learnerIdentity' | 'attentionExperience'>) {
   return options.actorPolicyVersion ?? options.learnerIdentity?.policyVersion

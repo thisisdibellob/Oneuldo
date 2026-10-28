@@ -56,7 +56,7 @@ test('v7 is default and explicit v1-v6 complete frames preserve frozen bytes', (
   assert.equal(isFeedbackActorPolicy(v7), true);
   assert.equal(isExperienceFeedbackPolicy(v7), true);
   assert.equal(isStructuredFeedbackPolicy(v7), true);
-  assert.equal(isFeedbackActorPolicy('feedback-choice-v8'), false);
+  assert.equal(isFeedbackActorPolicy('feedback-choice-v14'), false);
   const hashes = [
     '3a7d745023f9ffcc7a038bdd079171b1bb309fbd83d32acf1a3b63f7fac34e66',
     '5979250eef39e3b26864371fd98a492fecc196cbb7190e6bc449e545fffd0c1d',

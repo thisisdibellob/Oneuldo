@@ -57,14 +57,28 @@ export type MarketReplayTrace = {
   attentionExperience?: { layoutKey: string; memory: Record<string, unknown>; source: 'planned-trace' };
   /** Fresh LLM requests are not seed deterministic. A captured trace is replayable. */
   generation?: { model: string; reproducibility: 'seed-and-snapshot' | 'captured-trace'; requestId?: string;
-    timingProfile?: 'compact-v1' | 'actor-preserved-v1' | 'activity-duration-v1' | 'activity-duration-v2'; sourceTraceId?: string; actorPolicyVersion?: 'episodic-choice-v1' | 'episodic-choice-v2' | 'episodic-choice-v3' | 'episodic-choice-v4' | 'episodic-choice-v5' | 'episodic-choice-v6' | 'episodic-choice-v7' | 'episodic-choice-v8' | 'episodic-choice-v9' | 'episodic-choice-v10' | 'feedback-choice-v1' | 'feedback-choice-v2' | 'feedback-choice-v3' | 'feedback-choice-v4' | 'feedback-choice-v5' | 'feedback-choice-v6' | 'feedback-choice-v7' | 'whole-trace-v1' | 'whole-trace-v2' | 'whole-trace-v3';
+    timingProfile?: 'compact-v1' | 'actor-preserved-v1' | 'activity-duration-v1' | 'activity-duration-v2'; sourceTraceId?: string; actorPolicyVersion?: 'episodic-choice-v1' | 'episodic-choice-v2' | 'episodic-choice-v3' | 'episodic-choice-v4' | 'episodic-choice-v5' | 'episodic-choice-v6' | 'episodic-choice-v7' | 'episodic-choice-v8' | 'episodic-choice-v9' | 'episodic-choice-v10' | 'feedback-choice-v1' | 'feedback-choice-v2' | 'feedback-choice-v3' | 'feedback-choice-v4' | 'feedback-choice-v5' | 'feedback-choice-v6' | 'feedback-choice-v7' | 'feedback-choice-v8' | 'feedback-choice-v9' | 'feedback-choice-v10' | 'feedback-choice-v11' | 'feedback-choice-v12' | 'feedback-choice-v13' | 'whole-trace-v1' | 'whole-trace-v2' | 'whole-trace-v3';
     movementContract?: 'joystick-direction-v1';
     movementPolicy?: MarketReplayMovementPolicy;
     reasoningEffort?: 'low';
     feedback?: { observationScope: 'current-screen'; contextDelivery: 'stateless-http' | 'external-frame'; decisions: number } & (
       | { version: '1'; memory: 'actor-authored' }
       | { version: '2'; memory: 'actor-authored-with-recent-experience'; experienceContract: 'bounded-observed-experience-v1'; intentContract: 'persistent-intent-v1' }
-      | { version: '3'; memory: 'actor-authored-with-recent-experience'; experienceContract: 'bounded-observed-experience-v2'; intentContract: 'persistent-intent-v1'; beliefContract: 'quantity-source-beliefs-v1' });
+      | { version: '3'; memory: 'actor-authored-with-recent-experience'; experienceContract: 'bounded-observed-experience-v2'; intentContract: 'persistent-intent-v1'; beliefContract: 'quantity-source-beliefs-v1' }
+      | { version: '4'; memory: 'actor-authored-with-recent-experience'; experienceContract: 'bounded-observed-experience-v2'; intentContract: 'persistent-intent-v1'; beliefContract: 'quantity-source-beliefs-v1';
+        reflectionContract: 'result-reflection-next-step-v1'; observationContract: 'shelf-in-cart-cue-v1' }
+      | { version: '5'; memory: 'actor-authored-with-recent-experience'; experienceContract: 'bounded-observed-experience-v2'; intentContract: 'persistent-intent-v1'; beliefContract: 'quantity-source-beliefs-v1';
+        reflectionContract: 'result-reflection-next-step-v1'; observationContract: 'shelf-in-cart-cue-v1'; revisitContract: 'shelf-revisit-notes-v1' }
+      | { version: '6'; memory: 'actor-authored-with-recent-experience'; experienceContract: 'bounded-observed-experience-v2'; intentContract: 'persistent-intent-v1'; beliefContract: 'quantity-source-beliefs-v1';
+        reflectionContract: 'result-reflection-next-step-v1'; observationContract: 'shelf-in-cart-cue-v1'; revisitContract: 'shelf-revisit-notes-v1'; choiceContract: 'recent-shelf-choice-marker-v1' }
+      | { version: '7'; memory: 'actor-authored-with-recent-experience'; experienceContract: 'bounded-observed-experience-v2'; intentContract: 'persistent-intent-v1'; beliefContract: 'quantity-source-beliefs-v1';
+        reflectionContract: 'result-reflection-next-step-v1'; observationContract: 'shelf-in-cart-cue-v1'; revisitContract: 'shelf-revisit-notes-v1'; choiceContract: 'recent-shelf-choice-marker-v1'; movementNoteContract: 'recent-movement-notes-v1' }
+      | { version: '8'; memory: 'actor-authored-with-recent-experience'; experienceContract: 'bounded-observed-experience-v2'; intentContract: 'persistent-intent-v1'; beliefContract: 'quantity-source-beliefs-v1';
+        reflectionContract: 'result-reflection-next-step-v1'; observationContract: 'shelf-in-cart-cue-v1'; revisitContract: 'shelf-revisit-notes-v1'; choiceContract: 'recent-shelf-choice-marker-v1'; movementNoteContract: 'recent-movement-notes-v1';
+        passageContract: 'anonymous-passage-visit-marker-v1'; choiceIdContract: 'per-frame-short-ids-v1' }
+      | { version: '9'; memory: 'actor-authored-with-recent-experience'; experienceContract: 'bounded-observed-experience-v2'; intentContract: 'persistent-intent-v1'; beliefContract: 'quantity-source-beliefs-v1';
+        reflectionContract: 'result-reflection-next-step-v1'; observationContract: 'shelf-in-cart-cue-v1'; revisitContract: 'shelf-revisit-notes-v1'; choiceContract: 'recent-shelf-choice-marker-v1'; movementNoteContract: 'recent-movement-notes-v1';
+        passageContract: 'anonymous-passage-visit-marker-v1'; choiceIdContract: 'per-frame-short-ids-v1'; listMarkerContract: 'recent-list-read-marker-v1'; progressNoteContract: 'belief-progress-checkout-notes-v1' });
     planningMode?: 'whole-trace'; observationScope?: 'whole-world'; actorKnowledgeScope?: 'observed-and-remembered'; actorStateVersion?: '1'; planningSubmissions?: number; repairSubmissions?: number;
     controlledStop?: MarketReplayControlledStop;
     systemCompletion?: MarketReplaySystemCompletion;
@@ -223,16 +237,16 @@ export function validateMarketReplayTrace(value: unknown, snapshot?: MarketRepla
   } else if (['whole-trace-v1', 'whole-trace-v2', 'whole-trace-v3'].includes(generation?.learnerIdentity?.policyVersion ?? '')) {
     errors.push('A whole-trace learner requires explicit whole-trace planning metadata.');
   }
-  const experienceFeedback = ['feedback-choice-v4', 'feedback-choice-v5', 'feedback-choice-v6', 'feedback-choice-v7'].includes(generation?.actorPolicyVersion ?? '');
+  const experienceFeedback = ['feedback-choice-v4', 'feedback-choice-v5', 'feedback-choice-v6', 'feedback-choice-v7', 'feedback-choice-v8', 'feedback-choice-v9', 'feedback-choice-v10', 'feedback-choice-v11', 'feedback-choice-v12', 'feedback-choice-v13'].includes(generation?.actorPolicyVersion ?? '');
   const explorationFeedback = generation?.actorPolicyVersion === 'feedback-choice-v3' || experienceFeedback;
   const explorationVersion = experienceFeedback ? 'exploration-v2' : 'exploration-v1';
   const directionalFeedback = generation?.actorPolicyVersion === 'feedback-choice-v2' || explorationFeedback;
   const feedback = generation?.actorPolicyVersion === 'feedback-choice-v1' || directionalFeedback;
   if (feedback) {
     if (trace.generationPolicy !== 'llm' || trace.traceSchemaVersion !== '2' || trace.policyVersion !== '6'
-      || generation?.feedback?.version !== (generation?.actorPolicyVersion === 'feedback-choice-v7' ? '3' : experienceFeedback ? '2' : '1')
+      || generation?.feedback?.version !== (generation?.actorPolicyVersion === 'feedback-choice-v13' ? '9' : generation?.actorPolicyVersion === 'feedback-choice-v12' ? '8' : generation?.actorPolicyVersion === 'feedback-choice-v11' ? '7' : generation?.actorPolicyVersion === 'feedback-choice-v10' ? '6' : generation?.actorPolicyVersion === 'feedback-choice-v9' ? '5' : generation?.actorPolicyVersion === 'feedback-choice-v8' ? '4' : generation?.actorPolicyVersion === 'feedback-choice-v7' ? '3' : experienceFeedback ? '2' : '1')
       || !(directionalFeedback ? generation.timingProfile === 'activity-duration-v2' : ['actor-preserved-v1', 'activity-duration-v1'].includes(generation.timingProfile ?? ''))
-      || generation.learnerIdentity || generation.systemCompletion || generation.controlledStop
+      || generation.learnerIdentity || generation.systemCompletion && !['feedback-choice-v9', 'feedback-choice-v10', 'feedback-choice-v11', 'feedback-choice-v12', 'feedback-choice-v13'].includes(generation.actorPolicyVersion ?? '') || generation.controlledStop
       || trace.experienceMode !== 'first-play') errors.push('Feedback planning requires a fresh schema 2 / policy 6 actor, current-screen belief metadata and supported actor timing without automatic completion.');
   } else if (generation?.feedback !== undefined) errors.push('Feedback metadata requires feedback-choice-v1, feedback-choice-v2, feedback-choice-v3 or feedback-choice-v4.');
   const directionalSteps = trace.steps.some(step => step.type === 'moveDirection');
@@ -249,9 +263,10 @@ export function validateMarketReplayTrace(value: unknown, snapshot?: MarketRepla
   if (explorationFeedback) {
     if (trace.steps.filter(step => step.movementPolicy !== undefined).length !== generation?.feedback?.decisions)
       errors.push('Exploration policy provenance count must match the recorded feedback decision count.');
-    for (const step of trace.steps) {
+    const systemFirst = generation?.systemCompletion ? trace.steps.findIndex(step => step.id === generation.systemCompletion!.firstStepId) : -1;
+    for (const [index, step] of trace.steps.entries()) {
       const policy = step.movementPolicy;
-      const systemStep = ['start', 'awaitReviewAccepted', 'skipRating', 'leave'].includes(step.type);
+      const systemStep = ['start', 'awaitReviewAccepted', 'skipRating', 'leave'].includes(step.type) || systemFirst >= 0 && index >= systemFirst;
       if (step.type === 'moveDirection' && !policy) errors.push(`${step.id}: directional movement requires exploration policy provenance.`);
       else if (!systemStep && !policy) errors.push(`${step.id}: actor steps require exploration policy provenance.`);
       if (!policy) continue;
@@ -300,6 +315,7 @@ export function validateMarketReplayTrace(value: unknown, snapshot?: MarketRepla
   if ((submit >= 0) === (quit >= 0)) errors.push('An AI review trace must either submit for review or give up.');
   if (submit >= 0 && (submit !== trace.steps.length - 3 || trace.steps[submit + 1].type !== 'awaitReviewAccepted')) errors.push('AI review must terminate with submitForReview, awaitReviewAccepted, leave.');
   if (quit >= 0 && (quit !== trace.steps.length - 3 || trace.steps[quit + 1].type !== 'skipRating')) errors.push('giveUp must terminate with skipRating, leave.');
+  if (quit >= 0 && ['feedback-choice-v9', 'feedback-choice-v10', 'feedback-choice-v11', 'feedback-choice-v12', 'feedback-choice-v13'].includes(trace.generation?.actorPolicyVersion ?? '')) errors.push(`${trace.generation!.actorPolicyVersion} offers no giveUp; it ends with an actor submission or the system checkout.`);
   if (trace.generation?.controlledStop) {
     const stop = trace.generation.controlledStop;
     if (trace.generationPolicy !== 'llm' || trace.traceSchemaVersion !== '2' || !['5','6'].includes(trace.policyVersion)) errors.push('Controlled stops require an LLM trace with schema 2 and policy 5 or 6.');
@@ -318,7 +334,7 @@ export function validateMarketReplayTrace(value: unknown, snapshot?: MarketRepla
     const completion = trace.generation.systemCompletion;
     if (trace.generation.controlledStop) errors.push('System completion and controlled stop are mutually exclusive.');
     if (trace.generationPolicy !== 'llm' || trace.traceSchemaVersion !== '2' || !['5','6'].includes(trace.policyVersion)
-      || !['episodic-choice-v9','episodic-choice-v10','whole-trace-v1','whole-trace-v2','whole-trace-v3'].includes(trace.generation.actorPolicyVersion ?? '')) errors.push('System completion requires an episodic-choice-v9, v10 or whole-trace-v1/v2/v3 LLM trace with schema 2 and policy 5 or 6.');
+      || !['episodic-choice-v9','episodic-choice-v10','feedback-choice-v9','feedback-choice-v10','feedback-choice-v11','feedback-choice-v12','feedback-choice-v13','whole-trace-v1','whole-trace-v2','whole-trace-v3'].includes(trace.generation.actorPolicyVersion ?? '')) errors.push('System completion requires an episodic-choice-v9, v10, feedback-choice-v9 to v13 or whole-trace-v1/v2/v3 LLM trace with schema 2 and policy 5 or 6.');
     const first = trace.steps.findIndex(step => step.id === completion.firstStepId);
     if (first < 101 || first > submit) errors.push('System completion must begin after at least 100 actor steps and no later than submission.');
     if (quit >= 0 || submit < 0) errors.push('System completion must submit for review, await acceptance and leave; it cannot give up.');

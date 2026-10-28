@@ -21,8 +21,8 @@ function safeOptions(options) {
     'attentionExperience', 'learnerIdentity', 'trialBinding', 'actorPolicyVersion', 'tracePolicyVersion', 'feedbackMovement']);
   result.mode ??= 'llm';
   result.maxActions ??= 1000;
-  result.timingProfile ??= ['feedback-choice-v1','feedback-choice-v2','feedback-choice-v3','feedback-choice-v4', 'feedback-choice-v5', 'feedback-choice-v6', 'feedback-choice-v7','whole-trace-v3'].includes(options.actorPolicyVersion) ? 'original' : 'compact';
-  if (['feedback-choice-v3', 'feedback-choice-v4', 'feedback-choice-v5', 'feedback-choice-v6', 'feedback-choice-v7'].includes(result.actorPolicyVersion) && result.feedbackMovement === undefined)
+  result.timingProfile ??= ['feedback-choice-v1','feedback-choice-v2','feedback-choice-v3','feedback-choice-v4', 'feedback-choice-v5', 'feedback-choice-v6', 'feedback-choice-v7', 'feedback-choice-v8', 'feedback-choice-v9', 'feedback-choice-v10', 'feedback-choice-v11', 'feedback-choice-v12', 'feedback-choice-v13', 'whole-trace-v3'].includes(options.actorPolicyVersion) ? 'original' : 'compact';
+  if (['feedback-choice-v3', 'feedback-choice-v4', 'feedback-choice-v5', 'feedback-choice-v6', 'feedback-choice-v7', 'feedback-choice-v8', 'feedback-choice-v9', 'feedback-choice-v10', 'feedback-choice-v11', 'feedback-choice-v12', 'feedback-choice-v13'].includes(result.actorPolicyVersion) && result.feedbackMovement === undefined)
     result.feedbackMovement = { wanderProbability: .2 };
   if (result.mode === 'llm') {
     result.llm = pick(options.llm, ['model', 'protocol', 'maxCalls', 'timeoutMs']);

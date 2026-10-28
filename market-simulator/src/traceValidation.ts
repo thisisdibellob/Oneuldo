@@ -24,7 +24,8 @@ export class TraceGuard {
   private readonly presentation;
   private readonly mission;
   private readonly helpLines;
-  constructor(snapshot: MarketReplaySnapshot, personaId = 'trace-validator', personaVersion = '1', model = 'trace-validation/1', private readonly attentionMode = false, private readonly extendedActor = false, private readonly feedbackMode = false, private readonly directionalMovement = false, private readonly richFeedbackObservation = false) {
+  private readonly initialStock: Record<string, number>;
+  constructor(snapshot: MarketReplaySnapshot, personaId = 'trace-validator', personaVersion = '1', model = 'trace-validation/1', private readonly attentionMode = false, private readonly extendedActor = false, private readonly feedbackMode = false, private readonly directionalMovement = false, private readonly richFeedbackObservation = false, private readonly shelfCartCue = false) {
     const valid = validateMarketReplaySnapshot(snapshot);
     if (!valid.valid) throw new Error(valid.errors.join('; '));
     this.adapter = createMarketAgentAdapter({ ...snapshot.config,
@@ -32,6 +33,7 @@ export class TraceGuard {
     }, snapshot.environment);
     this.presentation = snapshot.presentation ?? DEFAULT_REPLAY_PRESENTATION;
     this.mission = snapshot.mission;
+    this.initialStock = snapshot.initialStock;
     this.helpLines = getMarketHelpLines(snapshot.config.alarmPenaltyPoints);
   }
   observe(): Observation { return this.adapter.observe(); }
@@ -56,7 +58,10 @@ export class TraceGuard {
       visibleStations: stations, anchors: world ? visibleAnchors(o.environment, o.playerPosition, this.presentation, o.cashierAvailability) : [],
       ...(this.directionalMovement ? { visibleStructures: world
         ? visibleUnlabelledShelfBodies(o.environment, o.playerPosition, this.presentation, o.cashierAvailability) : [] } : {}),
-      products: shelfOpen ? o.products.filter(p => visible.has(p.id)).map(p => ({ ...p, stock: o.stock[p.id] })) : [],
+      // The shelf add control reads "한 개 더 담기" once a product is in the basket; it never shows the amount.
+      // The raw observation hides the closed basket, and shelf stock only falls by what was put into it.
+      products: shelfOpen ? o.products.filter(p => visible.has(p.id)).map(p => ({ ...p, stock: o.stock[p.id],
+        ...(this.shelfCartCue ? { inCart: o.stock[p.id] < (this.initialStock[p.id] ?? o.stock[p.id]) } : {}) })) : [],
       shelf: page ? { page: page.page, pageCount: page.pageCount, scrollFraction: this.scrollFraction,
         pageFractions: replayShelfPageFractions(o.products.map(p => p.id), this.presentation) } : null,
       listAvailable: world, cart: o.view === 'cart' || o.phase === 'checkout' ? o.cart : null,
@@ -252,18 +257,19 @@ export function validateTrace(value: unknown, snapshot?: MarketReplaySnapshot) {
   try {
     const trace = value as MarketReplayTrace;
     const guard = new TraceGuard(snapshot, trace.personaId, trace.personaVersion, trace.generation?.model, trace.traceSchemaVersion === '2',
-      ['episodic-choice-v9', 'episodic-choice-v10', 'feedback-choice-v1', 'feedback-choice-v2', 'feedback-choice-v3', 'feedback-choice-v4', 'feedback-choice-v5', 'feedback-choice-v6', 'feedback-choice-v7', 'whole-trace-v3'].includes(trace.generation?.actorPolicyVersion ?? ''),
-      ['feedback-choice-v1', 'feedback-choice-v2', 'feedback-choice-v3', 'feedback-choice-v4', 'feedback-choice-v5', 'feedback-choice-v6', 'feedback-choice-v7'].includes(trace.generation?.actorPolicyVersion ?? ''),
-      ['feedback-choice-v2', 'feedback-choice-v3', 'feedback-choice-v4', 'feedback-choice-v5', 'feedback-choice-v6', 'feedback-choice-v7'].includes(trace.generation?.actorPolicyVersion ?? ''),
-      ['feedback-choice-v5', 'feedback-choice-v6', 'feedback-choice-v7'].includes(trace.generation?.actorPolicyVersion ?? ''));
+      ['episodic-choice-v9', 'episodic-choice-v10', 'feedback-choice-v1', 'feedback-choice-v2', 'feedback-choice-v3', 'feedback-choice-v4', 'feedback-choice-v5', 'feedback-choice-v6', 'feedback-choice-v7', 'feedback-choice-v8', 'feedback-choice-v9', 'feedback-choice-v10', 'feedback-choice-v11', 'feedback-choice-v12', 'feedback-choice-v13', 'whole-trace-v3'].includes(trace.generation?.actorPolicyVersion ?? ''),
+      ['feedback-choice-v1', 'feedback-choice-v2', 'feedback-choice-v3', 'feedback-choice-v4', 'feedback-choice-v5', 'feedback-choice-v6', 'feedback-choice-v7', 'feedback-choice-v8', 'feedback-choice-v9', 'feedback-choice-v10', 'feedback-choice-v11', 'feedback-choice-v12', 'feedback-choice-v13'].includes(trace.generation?.actorPolicyVersion ?? ''),
+      ['feedback-choice-v2', 'feedback-choice-v3', 'feedback-choice-v4', 'feedback-choice-v5', 'feedback-choice-v6', 'feedback-choice-v7', 'feedback-choice-v8', 'feedback-choice-v9', 'feedback-choice-v10', 'feedback-choice-v11', 'feedback-choice-v12', 'feedback-choice-v13'].includes(trace.generation?.actorPolicyVersion ?? ''),
+      ['feedback-choice-v5', 'feedback-choice-v6', 'feedback-choice-v7', 'feedback-choice-v8', 'feedback-choice-v9', 'feedback-choice-v10', 'feedback-choice-v11', 'feedback-choice-v12', 'feedback-choice-v13'].includes(trace.generation?.actorPolicyVersion ?? ''),
+      ['feedback-choice-v8', 'feedback-choice-v9', 'feedback-choice-v10', 'feedback-choice-v11', 'feedback-choice-v12', 'feedback-choice-v13'].includes(trace.generation?.actorPolicyVersion ?? ''));
     const completion = trace.generation?.systemCompletion;
-    const movementPolicy = ['feedback-choice-v3', 'feedback-choice-v4', 'feedback-choice-v5', 'feedback-choice-v6', 'feedback-choice-v7'].includes(trace.generation?.actorPolicyVersion ?? '')
+    const movementPolicy = ['feedback-choice-v3', 'feedback-choice-v4', 'feedback-choice-v5', 'feedback-choice-v6', 'feedback-choice-v7', 'feedback-choice-v8', 'feedback-choice-v9', 'feedback-choice-v10', 'feedback-choice-v11', 'feedback-choice-v12', 'feedback-choice-v13'].includes(trace.generation?.actorPolicyVersion ?? '')
       ? new FeedbackMovementPolicy(trace.seed, { wanderProbability: trace.generation!.movementPolicy!.wanderProbability },
         trace.generation!.movementPolicy!.version) : null;
     let movementDecisions = 0;
     for (const step of trace.steps) {
       const systemOwned = isMarketReplaySystemCompletionStep(trace, step.id);
-      if (movementPolicy && !['start', 'awaitReviewAccepted', 'skipRating', 'leave'].includes(step.type)) {
+      if (movementPolicy && !systemOwned && !['start', 'awaitReviewAccepted', 'skipRating', 'leave'].includes(step.type)) {
         const expected = movementPolicy.prepare(guard.observeActor(), movementDecisions++);
         if (canonicalMarketReplayJson(step.movementPolicy) !== canonicalMarketReplayJson(expected))
           throw new Error(`${step.id}: movement policy differs from the seeded decision and observed movement feedback`);

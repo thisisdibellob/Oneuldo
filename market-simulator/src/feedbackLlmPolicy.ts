@@ -1,4 +1,4 @@
-import { buildFeedbackActorFrame, emptyFeedbackBeliefMemory, feedbackDecisionFromChoice, validateFeedbackBeliefMemory, carryFeedbackBeliefMemory, projectFeedbackObservation, isExperienceFeedbackPolicy, isStructuredFeedbackPolicy, FEEDBACK_ACTOR_POLICY_VERSION, type FeedbackActorPolicyVersion } from './feedbackActor';
+import { buildFeedbackActorFrame, emptyFeedbackBeliefMemory, feedbackDecisionFromChoice, validateFeedbackBeliefMemory, carryFeedbackBeliefMemory, projectFeedbackObservation, isExperienceFeedbackPolicy, isStructuredFeedbackPolicy, isQuantityBeliefFeedbackPolicy, isMovementNoteFeedbackPolicy, isPassageMarkerFeedbackPolicy, isProgressNoteFeedbackPolicy, presentFeedbackActorFrame, isResultReflectionFeedbackPolicy, FEEDBACK_ACTOR_POLICY_VERSION, type FeedbackActorPolicyVersion } from './feedbackActor';
 import { assertDecision } from './llmPolicy';
 import type { ActorObservation, Decision, Persona, TraceEntry, TraceOptions } from './types';
 import { FeedbackMovementPolicy, type FeedbackMovementPolicyOptions } from './feedbackMovementPolicy';
@@ -12,7 +12,9 @@ export function createFeedbackLlmPolicy(options: NonNullable<TraceOptions['llm']
   if (movementOptions !== undefined && !exploration) throw new Error('feedbackMovement requires feedback-choice-v3 or feedback-choice-v4');
   const movement = exploration ? new FeedbackMovementPolicy(seed, movementOptions,
     isExperienceFeedbackPolicy(policyVersion) ? 'exploration-v2' : 'exploration-v1') : null;
-  const experience = new FeedbackExperience({ version: policyVersion === 'feedback-choice-v7' ? 'bounded-observed-experience-v2' : 'bounded-observed-experience-v1' });
+  const experience = new FeedbackExperience({ version: isQuantityBeliefFeedbackPolicy(policyVersion) ? 'bounded-observed-experience-v2' : 'bounded-observed-experience-v1',
+      movementHistory: isMovementNoteFeedbackPolicy(policyVersion), passageHistory: isPassageMarkerFeedbackPolicy(policyVersion),
+      progressHistory: isProgressNoteFeedbackPolicy(policyVersion) });
   let pending: { before: ActorObservation; decision: Decision } | null = null;
   const baseUrl = options.baseUrl ?? process.env.MARKET_LLM_BASE_URL;
   const model = options.model ?? process.env.MARKET_LLM_MODEL;
@@ -46,8 +48,11 @@ export function createFeedbackLlmPolicy(options: NonNullable<TraceOptions['llm']
       if (++calls > (options.maxCalls ?? 300)) throw new Error('ATTENTION_GENERATION_LIMIT: model-call-limit (including format repairs)');
       const messages = [
         { role: 'system', content: (policyVersion !== 'feedback-choice-v1' ? 'moveDirection is a held directional input: durationMs must be 100..2000; follow its choice timing. ' : '') + 'Choose one available choice for this fictional individual. Return JSON with exactly choiceId, durationMs, reason, memory. There is no waiting before an ordinary action: its durationMs must be 0. For pause, lookAround, readList and browse, durationMs is the action duration in integer milliseconds 100..120000. viewCart and viewHelp allow 0..120000 for optional inspection. memory is a complete replacement of the short belief memory, including rememberedItems, currentTask and notes. ' + (isExperienceFeedbackPolicy(policyVersion) ? 'Exception: optional memory.ongoingIntent persists when omitted; a string changes it and null clears it. Use the bounded recent experience and distinguish a brief check from abandoning the ongoing intention. ' : '') + 'Follow the frame instructions. No private reasoning or long explanation. A format repair has not executed any action.' + (isStructuredFeedbackPolicy(policyVersion) ? ' For a grouped add/remove choice, also return choiceParameters matching its parameterSchema and catalog. Select action, product, quantity and drag outcome in this same response. For all other choices omit choiceParameters. Thus exactly the four base fields are required, with choiceParameters only for grouped choices.' : '') },
-        { role: 'user', content: JSON.stringify({ ...frame, ...(formatCorrection ? { formatCorrection } : {}) }) },
+        { role: 'user', content: JSON.stringify({ ...presentFeedbackActorFrame(frame), ...(formatCorrection ? { formatCorrection } : {}) }) },
       ];
+      // v8 has no currentTask: the controller records the chosen action and the actor writes what follows it.
+      if (isResultReflectionFeedbackPolicy(policyVersion)) messages[0].content = messages[0].content
+        .replace('including rememberedItems, currentTask and notes.', 'including rememberedItems, nextStep and notes. First reflect frame.lastAction and its result in memory; nextStep is what follows the action chosen now, never that action itself.');
       if (isStructuredFeedbackPolicy(policyVersion)) messages[0].content = messages[0].content.replace('Return JSON with exactly choiceId, durationMs, reason, memory.', 'Return JSON with choiceId, durationMs, reason, memory, plus choiceParameters only for grouped add/remove choices.');
       const wire = options.protocol === 'ollama'
         ? { model, messages, think: false, stream: false, options: { num_ctx: 18432, num_predict: 1600 } }

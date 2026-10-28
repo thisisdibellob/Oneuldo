@@ -99,7 +99,13 @@
             "feedback-choice-v4",
             "feedback-choice-v5",
             "feedback-choice-v6",
-            "feedback-choice-v7"
+            "feedback-choice-v7",
+            "feedback-choice-v8",
+            "feedback-choice-v9",
+            "feedback-choice-v10",
+            "feedback-choice-v11",
+            "feedback-choice-v12",
+            "feedback-choice-v13"
           ]
         },
         "feedback": {
@@ -236,6 +242,420 @@
                 },
                 "beliefContract": {
                   "const": "quantity-source-beliefs-v1"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "version",
+                "observationScope",
+                "memory",
+                "contextDelivery",
+                "decisions",
+                "experienceContract",
+                "intentContract",
+                "beliefContract",
+                "reflectionContract",
+                "observationContract"
+              ],
+              "properties": {
+                "version": {
+                  "const": "4"
+                },
+                "observationScope": {
+                  "enum": [
+                    "current-screen"
+                  ]
+                },
+                "memory": {
+                  "enum": [
+                    "actor-authored-with-recent-experience"
+                  ]
+                },
+                "contextDelivery": {
+                  "enum": [
+                    "stateless-http",
+                    "external-frame"
+                  ]
+                },
+                "decisions": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 100
+                },
+                "experienceContract": {
+                  "const": "bounded-observed-experience-v2"
+                },
+                "intentContract": {
+                  "const": "persistent-intent-v1"
+                },
+                "beliefContract": {
+                  "const": "quantity-source-beliefs-v1"
+                },
+                "reflectionContract": {
+                  "const": "result-reflection-next-step-v1"
+                },
+                "observationContract": {
+                  "const": "shelf-in-cart-cue-v1"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "version",
+                "observationScope",
+                "memory",
+                "contextDelivery",
+                "decisions",
+                "experienceContract",
+                "intentContract",
+                "beliefContract",
+                "reflectionContract",
+                "observationContract",
+                "revisitContract"
+              ],
+              "properties": {
+                "version": {
+                  "const": "5"
+                },
+                "observationScope": {
+                  "enum": [
+                    "current-screen"
+                  ]
+                },
+                "memory": {
+                  "enum": [
+                    "actor-authored-with-recent-experience"
+                  ]
+                },
+                "contextDelivery": {
+                  "enum": [
+                    "stateless-http",
+                    "external-frame"
+                  ]
+                },
+                "decisions": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 100
+                },
+                "experienceContract": {
+                  "const": "bounded-observed-experience-v2"
+                },
+                "intentContract": {
+                  "const": "persistent-intent-v1"
+                },
+                "beliefContract": {
+                  "const": "quantity-source-beliefs-v1"
+                },
+                "reflectionContract": {
+                  "const": "result-reflection-next-step-v1"
+                },
+                "observationContract": {
+                  "const": "shelf-in-cart-cue-v1"
+                },
+                "revisitContract": {
+                  "const": "shelf-revisit-notes-v1"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "version",
+                "observationScope",
+                "memory",
+                "contextDelivery",
+                "decisions",
+                "experienceContract",
+                "intentContract",
+                "beliefContract",
+                "reflectionContract",
+                "observationContract",
+                "revisitContract",
+                "choiceContract"
+              ],
+              "properties": {
+                "version": {
+                  "const": "6"
+                },
+                "observationScope": {
+                  "enum": [
+                    "current-screen"
+                  ]
+                },
+                "memory": {
+                  "enum": [
+                    "actor-authored-with-recent-experience"
+                  ]
+                },
+                "contextDelivery": {
+                  "enum": [
+                    "stateless-http",
+                    "external-frame"
+                  ]
+                },
+                "decisions": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 100
+                },
+                "experienceContract": {
+                  "const": "bounded-observed-experience-v2"
+                },
+                "intentContract": {
+                  "const": "persistent-intent-v1"
+                },
+                "beliefContract": {
+                  "const": "quantity-source-beliefs-v1"
+                },
+                "reflectionContract": {
+                  "const": "result-reflection-next-step-v1"
+                },
+                "observationContract": {
+                  "const": "shelf-in-cart-cue-v1"
+                },
+                "revisitContract": {
+                  "const": "shelf-revisit-notes-v1"
+                },
+                "choiceContract": {
+                  "const": "recent-shelf-choice-marker-v1"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "version",
+                "observationScope",
+                "memory",
+                "contextDelivery",
+                "decisions",
+                "experienceContract",
+                "intentContract",
+                "beliefContract",
+                "reflectionContract",
+                "observationContract",
+                "revisitContract",
+                "choiceContract",
+                "movementNoteContract"
+              ],
+              "properties": {
+                "version": {
+                  "const": "7"
+                },
+                "observationScope": {
+                  "enum": [
+                    "current-screen"
+                  ]
+                },
+                "memory": {
+                  "enum": [
+                    "actor-authored-with-recent-experience"
+                  ]
+                },
+                "contextDelivery": {
+                  "enum": [
+                    "stateless-http",
+                    "external-frame"
+                  ]
+                },
+                "decisions": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 100
+                },
+                "experienceContract": {
+                  "const": "bounded-observed-experience-v2"
+                },
+                "intentContract": {
+                  "const": "persistent-intent-v1"
+                },
+                "beliefContract": {
+                  "const": "quantity-source-beliefs-v1"
+                },
+                "reflectionContract": {
+                  "const": "result-reflection-next-step-v1"
+                },
+                "observationContract": {
+                  "const": "shelf-in-cart-cue-v1"
+                },
+                "revisitContract": {
+                  "const": "shelf-revisit-notes-v1"
+                },
+                "choiceContract": {
+                  "const": "recent-shelf-choice-marker-v1"
+                },
+                "movementNoteContract": {
+                  "const": "recent-movement-notes-v1"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "version",
+                "observationScope",
+                "memory",
+                "contextDelivery",
+                "decisions",
+                "experienceContract",
+                "intentContract",
+                "beliefContract",
+                "reflectionContract",
+                "observationContract",
+                "revisitContract",
+                "choiceContract",
+                "movementNoteContract",
+                "passageContract",
+                "choiceIdContract"
+              ],
+              "properties": {
+                "version": {
+                  "const": "8"
+                },
+                "observationScope": {
+                  "enum": [
+                    "current-screen"
+                  ]
+                },
+                "memory": {
+                  "enum": [
+                    "actor-authored-with-recent-experience"
+                  ]
+                },
+                "contextDelivery": {
+                  "enum": [
+                    "stateless-http",
+                    "external-frame"
+                  ]
+                },
+                "decisions": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 100
+                },
+                "experienceContract": {
+                  "const": "bounded-observed-experience-v2"
+                },
+                "intentContract": {
+                  "const": "persistent-intent-v1"
+                },
+                "beliefContract": {
+                  "const": "quantity-source-beliefs-v1"
+                },
+                "reflectionContract": {
+                  "const": "result-reflection-next-step-v1"
+                },
+                "observationContract": {
+                  "const": "shelf-in-cart-cue-v1"
+                },
+                "revisitContract": {
+                  "const": "shelf-revisit-notes-v1"
+                },
+                "choiceContract": {
+                  "const": "recent-shelf-choice-marker-v1"
+                },
+                "movementNoteContract": {
+                  "const": "recent-movement-notes-v1"
+                },
+                "passageContract": {
+                  "const": "anonymous-passage-visit-marker-v1"
+                },
+                "choiceIdContract": {
+                  "const": "per-frame-short-ids-v1"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "version",
+                "observationScope",
+                "memory",
+                "contextDelivery",
+                "decisions",
+                "experienceContract",
+                "intentContract",
+                "beliefContract",
+                "reflectionContract",
+                "observationContract",
+                "revisitContract",
+                "choiceContract",
+                "movementNoteContract",
+                "passageContract",
+                "choiceIdContract",
+                "listMarkerContract",
+                "progressNoteContract"
+              ],
+              "properties": {
+                "version": {
+                  "const": "9"
+                },
+                "observationScope": {
+                  "enum": [
+                    "current-screen"
+                  ]
+                },
+                "memory": {
+                  "enum": [
+                    "actor-authored-with-recent-experience"
+                  ]
+                },
+                "contextDelivery": {
+                  "enum": [
+                    "stateless-http",
+                    "external-frame"
+                  ]
+                },
+                "decisions": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 100
+                },
+                "experienceContract": {
+                  "const": "bounded-observed-experience-v2"
+                },
+                "intentContract": {
+                  "const": "persistent-intent-v1"
+                },
+                "beliefContract": {
+                  "const": "quantity-source-beliefs-v1"
+                },
+                "reflectionContract": {
+                  "const": "result-reflection-next-step-v1"
+                },
+                "observationContract": {
+                  "const": "shelf-in-cart-cue-v1"
+                },
+                "revisitContract": {
+                  "const": "shelf-revisit-notes-v1"
+                },
+                "choiceContract": {
+                  "const": "recent-shelf-choice-marker-v1"
+                },
+                "movementNoteContract": {
+                  "const": "recent-movement-notes-v1"
+                },
+                "passageContract": {
+                  "const": "anonymous-passage-visit-marker-v1"
+                },
+                "choiceIdContract": {
+                  "const": "per-frame-short-ids-v1"
+                },
+                "listMarkerContract": {
+                  "const": "recent-list-read-marker-v1"
+                },
+                "progressNoteContract": {
+                  "const": "belief-progress-checkout-notes-v1"
                 }
               }
             }

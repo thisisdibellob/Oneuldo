@@ -58,7 +58,7 @@ test('v7 is the default while explicit v1-v6 retain every legacy instruction byt
     assert.equal(isStructuredFeedbackPolicy(policy), v >= 5);
     if (v <= 4) assert.equal(createHash('sha256').update(frame(observation(), policy).instructions).digest('hex'), legacy[v - 1]);
   }
-  assert.equal(isFeedbackActorPolicy('feedback-choice-v8'), false);
+  assert.equal(isFeedbackActorPolicy('feedback-choice-v14'), false);
   const o = shelf();
   assert.deepEqual(projectFeedbackObservation(observation({ view: 'cart', cart: { curry: 1 }, cartItems: [
     { id: 'curry', name: '순한 카레', quantity: 1 }] })).cartItems, [{ id: 'curry', name: '순한 카레', quantity: 1 }]);
