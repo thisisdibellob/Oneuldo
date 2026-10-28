@@ -3,6 +3,9 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
+const { assertSpec, powerWarning, preserveMeasurement, historicalReport } = require('./personaValidationSpec.cjs');
+const analysis = require('./personaValidationAnalysis.cjs');
+const reviewers = require('./personaValidationReviewers.cjs');
 const { catalog, resolveProfiles } = require('./personaTraitProfiles.cjs');
 const spec = require('../validation/persona-trait-validation-spec.json');
 const { WHOLE_TRACE_POLICY_VERSION, WHOLE_TRACE_BUNDLE_VERSION, WHOLE_TRACE_CANDIDATE_VERSION, WHOLE_TRACE_MODEL } = require('./wholeTraceContracts.ts');
@@ -40,7 +43,8 @@ function assertManifest(m, directory = m?.runDirectory) {
   if (!m || m.schema !== 'oneuldo.persona-fidelity-run' || m.version !== 3 || path.resolve(directory) !== m.runDirectory) throw new Error('Invalid trait validation manifest');
   validateConfiguration({ runId: m.runId, seeds: m.seeds, outputDirectory: path.dirname(m.runDirectory),
     snapshotFilePaths: Object.fromEntries(CONDITIONS.map(c => [c, m.snapshots?.[c]?.filePath])) });
-  if (m.specHash !== digest(spec) || m.specHash !== digest(read(path.join(__dirname, '../validation/persona-trait-validation-spec.json')))) throw new Error('Trait validation spec changed; create a separate run');
+  assertSpec(m, spec, 'traits');
+  if (m.analysisVersion === 1 && (!m.opportunityAudit || m.opportunityAuditHash !== digest(m.opportunityAudit))) throw new Error('Opportunity audit changed');
   if (m.catalogHash !== digest(catalog) || m.catalogHash !== digest(read(path.join(__dirname, '../validation/persona-traits.json')))) throw new Error('Trait catalog changed; create a separate run');
   if (digest(m.versions) !== digest(versions())) throw new Error('Validation generation versions changed');
   const current = profileMap(m.profileSelection);
@@ -74,7 +78,7 @@ function evidencePaths(slot) {
 function evidenceHashes(slot) { return Object.fromEntries(Object.entries(evidencePaths(slot)).map(([key, file]) => [key, fs.existsSync(file) ? fileHash(file) : null])); }
 function inventory(m) {
   assertManifest(m);
-  return digest({ specHash: m.specHash, catalogHash: m.catalogHash, profiles: m.profiles, snapshots: m.snapshots,
+  return digest({ ...(m.analysisVersion ? { analysisVersion: m.analysisVersion, opportunityAuditHash: m.opportunityAuditHash } : {}), specHash: m.specHash, catalogHash: m.catalogHash, profiles: m.profiles, snapshots: m.snapshots,
     sources: m.slots.map(evidenceHashes) });
 }
 function observeSlot(slot) {
@@ -88,12 +92,13 @@ function observeSlot(slot) {
   slot.exists = true; slot.traceId = trace.traceId; slot.evidenceHashes = hashes;
 }
 function refresh(m) {
-  assertManifest(m); m.slots.forEach(observeSlot); write(manifestAt(m.runDirectory), m);
+  assertManifest(m); m.slots.forEach(observeSlot); if (m.analysisVersion !== undefined) write(manifestAt(m.runDirectory), m);
   return { validationMode: 'traits', runDirectory: m.runDirectory, manifestPath: manifestAt(m.runDirectory),
     catalog, profiles: Object.values(m.profiles).map(p => ({ id: p.id, presetId: p.presetId, traits: p.traits, contextHash: p.contextHash })),
     slots: m.slots.map(slot => ({ ...slot, prepareWholeTrace: { personaId: slot.personaId, seed: slot.seed,
       snapshotFilePath: m.snapshots[slot.condition].filePath, outputPath: slot.tracePath, attentionExperience: { visit: 'first-play' } } })),
-    complete: m.slots.filter(s => s.exists).length, required: m.slots.length };
+    complete: m.slots.filter(s => s.exists).length, required: m.slots.length,
+    recommendedSeedCount: 20, powerWarning: powerWarning(m.seeds), opportunityAudit: m.opportunityAudit ?? null };
 }
 function prepare(args) {
   validateConfiguration(args);
@@ -119,8 +124,10 @@ function prepare(args) {
   }))));
   const baseIds = [...new Set(Object.values(profiles).map(p => p.basePersonaId))];
   const m = { schema: 'oneuldo.persona-fidelity-run', version: 3, validationMode: 'traits', runId: args.runId, runDirectory: dir,
-    snapshots, seeds: args.seeds, personaIds, profileSelection, profiles, slots, versions: v, specHash: digest(spec), catalogHash: digest(catalog),
+    snapshots, seeds: args.seeds, personaIds, profileSelection, profiles, slots, versions: v, specHash: digest(spec), specVersion: spec.version, analysisVersion: spec.analysisVersion, catalogHash: digest(catalog),
     baseHashes: Object.fromEntries(baseIds.map(id => [id, fileHash(path.join(__dirname, '../personas', `${id}.json`))])), fixtureOnly: false };
+  m.opportunityAudit = require('./personaValidationOpportunity.cjs').auditManifestSnapshots(m);
+  m.opportunityAuditHash = digest(m.opportunityAudit);
   fs.mkdirSync(dir, { recursive: true, mode: 0o700 }); write(file, m); return refresh(m);
 }
 function lookupValidationSlot(args, snapshot) {
@@ -247,9 +254,14 @@ function measure({ runDirectory, allowFixture = false }) {
       terminationReview: s.terminationReview, annotationReview: s.personaReview?.annotationReview ?? null,
       evidenceSources: s.evidenceSources })),
     missingSlots: missing.map(s => ({ personaId: s.personaId, condition: s.condition, seed: s.seed, tracePath: s.tracePath })) };
-  m.fixtureOnly = result.fixtureOnly; write(manifestAt(m.runDirectory), m);
-  const measurementsPath = path.join(m.runDirectory, 'measurements.json'); write(measurementsPath, result);
-  return { validationMode: 'traits', measurementsPath, completed: result.completed, missing: result.missing,
+  const readiness = require('./personaValidationReadiness.cjs').fromManifest(m, { samples });
+  if (m.analysisVersion === 1) Object.assign(result, analysis.readinessFields(readiness, findings, samples),
+    { opportunityAudit: m.opportunityAudit, powerWarning: powerWarning(m.seeds), analysisVersion: m.analysisVersion, specVersion: m.specVersion },
+    analysis.analyze(m, samples, findings, spec));
+  m.fixtureOnly = result.fixtureOnly; if (m.analysisVersion !== undefined) write(manifestAt(m.runDirectory), m);
+  const measurementsPath = path.join(m.runDirectory, 'measurements.json');
+  if (!preserveMeasurement(m, measurementsPath, result)) write(measurementsPath, result);
+  return { validationMode: 'traits', readiness: readiness.readiness, readinessReasons: readiness.reasons, measurementsPath, completed: result.completed, missing: result.missing,
     comparisons: contrasts.length, unmatchedTraits: result.unmatchedTraits, fixtureOnly: result.fixtureOnly };
 }
 function readBlind(m) {
@@ -258,10 +270,10 @@ function readBlind(m) {
   for (const [file, hash] of Object.entries(saved.hashes)) if (fileHash(path.join(m.runDirectory, file)) !== hash) throw new Error('Blind evidence changed');
   return saved;
 }
-function prepareBlind({ runDirectory, allowFixture = false, panel = 'A' }) {
-  const m = readManifest(runDirectory), reviewFile = path.join(m.runDirectory, 'blind-review.json');
+function prepareBlind({ runDirectory, allowFixture = false, panel = 'A', reviewerId, reviewerKind }) {
+  const m = readManifest(runDirectory);
   if (!['A', 'B'].includes(panel)) throw new Error('Expected blind panel A or B');
-  if (panel === 'B' && (!fs.existsSync(reviewFile) || !read(reviewFile).scores?.A)) throw new Error('Score panel A before requesting panel B');
+  reviewers.assertPanelReady({ runDirectory: m.runDirectory, panel, reviewerId, reviewerKind });
   const statePath = path.join(m.runDirectory, 'blind-state.json'); let state;
   if (fs.existsSync(statePath)) state = readBlind(m);
   else {
@@ -272,31 +284,19 @@ function prepareBlind({ runDirectory, allowFixture = false, panel = 'A' }) {
     for (const [file, value] of Object.entries(files)) write(path.join(m.runDirectory, file), value);
     state = { dataFingerprint: inventory(m), fixtureOnly: samples.some(s => s.fixture),
       hashes: Object.fromEntries(Object.keys(files).map(file => [file, fileHash(path.join(m.runDirectory, file))])) };
-    write(statePath, state); write(manifestAt(m.runDirectory), m);
+    write(statePath, state); if (m.analysisVersion !== undefined) write(manifestAt(m.runDirectory), m);
   }
   if (state.fixtureOnly && !allowFixture) throw new Error('Stochastic trace cannot be validation evidence');
   const bundle = { panels: { [panel]: read(path.join(m.runDirectory, 'blind-bundle.json')).panels[panel] } };
   require('./personaValidationBlind.cjs').assertAnonymous(bundle, Object.values(m.profiles));
   const bundlePath = path.join(m.runDirectory, `blind-${panel}.json`); write(bundlePath, bundle);
-  return { validationMode: 'traits', panel, bundlePath, bundle, ...read(path.join(m.runDirectory, 'blind-rubric.json')),
+  return { validationMode: 'traits', reviewerId: reviewerId ?? null, reviewerKind: reviewerKind ?? null, panel, bundlePath, bundle, ...read(path.join(m.runDirectory, 'blind-rubric.json')),
     answerFormat: { traits: Object.fromEntries(TRAITS.map(key => [key, 'low|medium|high|unknown'])), confidence: 'optional 0..1' }, fixtureOnly: state.fixtureOnly };
 }
-function submitBlind({ runDirectory, panel, answers, reviewerModel, reviewerSession }) {
-  const m = readManifest(runDirectory), state = readBlind(m), file = path.join(m.runDirectory, 'blind-review.json');
-  const previous = fs.existsSync(file) ? read(file) : null;
-  if (!['A', 'B'].includes(panel)) throw new Error('Submit panel A or B');
-  if (panel === 'B' && !previous?.scores?.A) throw new Error('Panel A must be scored before panel B');
-  if (![reviewerModel, reviewerSession].every(value => typeof value === 'string' && value.trim())) throw new Error('Self-reported reviewer model and session are required');
-  if (previous && (previous.reviewerModel !== reviewerModel || previous.reviewerSession !== reviewerSession)) throw new Error('Reviewer label changed');
-  if (previous?.answers?.[panel]) {
-    if (digest(previous.answers[panel]) !== digest(answers)) throw new Error('Scored answers are frozen');
-    return { reviewPath: file, panel, score: previous.scores[panel], independenceVerified: false, keyIsolationVerified: false };
-  }
-  const rows = read(path.join(m.runDirectory, 'blind-key.json')).filter(row => row.version === panel);
-  const score = require('./personaValidationStatistics.cjs').scoreTraitReview(rows, answers, { traitKeys: TRAITS });
-  write(file, { reviewerModel, reviewerSession, dataFingerprint: state.dataFingerprint, fixtureOnly: state.fixtureOnly,
-    independenceVerified: false, keyIsolationVerified: false, scores: { ...previous?.scores, [panel]: score }, answers: { ...previous?.answers, [panel]: answers } });
-  return { reviewPath: file, panel, score, independenceVerified: false, keyIsolationVerified: false };
+function submitBlind({ runDirectory, panel, answers, reviewerId, reviewerKind, reviewerModel, reviewerSession }) {
+  const m = readManifest(runDirectory), state = readBlind(m);
+  return reviewers.submitReview({ runDirectory: m.runDirectory, panel, answers, reviewerId, reviewerKind, reviewerModel, reviewerSession,
+    state, key: read(path.join(m.runDirectory, 'blind-key.json')), validationMode: 'traits', traitKeys: TRAITS });
 }
 function summarizeTraitFindings(findings) {
   const summarize = rows => {
@@ -346,9 +346,15 @@ function report({ runDirectory }) {
       'A/B는 같은 표본이며 독립 반복이 아니다. 판별자 독립성과 정답 키 미열람은 자기 신고이고, unknown은 정답으로 세지 않는다.',
       '계획 검증은 실제 앱 재생이나 실제 사람의 행동 검증을 수행하지 않는다. 미발생·자료 부족은 통과가 아니다.',
     ] };
+  if (fs.existsSync(path.join(m.runDirectory, 'blind-reviews.json'))) readBlind(m);
+  Object.assign(output, analysis.reportFields(measurements), { referenceComparison: null },
+    reviewers.summarizeReviews({ runDirectory: m.runDirectory, dataFingerprint: measurements.dataFingerprint,
+      validationMode: 'traits', traitKeys: TRAITS }));
+  const preserved = historicalReport(m, measurements);
+  if (preserved) return { validationMode: 'traits', ...preserved };
   const reportPath = path.join(m.runDirectory, 'report.json'), markdownPath = path.join(m.runDirectory, 'report.ko.md');
   write(reportPath, output);
-  const lines = ['# 공통 성향 검증 보고서', '', `Run: ${m.runId}. 저장 trace ${output.completed}/${output.required}.`,
+  const lines = ['# 공통 성향 검증 보고서', ...analysis.readinessMarkdown(output), '', `Run: ${m.runId}. 저장 trace ${output.completed}/${output.required}.`,
     output.fixtureOnly ? '테스트 fixture 파이프라인 확인용이며 페르소나 검증 결과가 아님.' : 'whole-trace-v3 계획 표본.', '',
     '## 과업 결과와 종료', '', '| 인물 | 조건 | 목표 충족 | 시도 | 종료 | 종료 검토 |', '| --- | --- | ---: | ---: | --- | --- |',
     ...output.axes.taskOutcomes.map(s => `| ${s.personaId} | ${s.condition} | ${s.completedGoalCount}/${s.goalCount} | ${s.attemptedGoalCount}/${s.goalCount} | ${s.ending} | ${s.terminationReview?.status ?? 'unknown'} |`),
@@ -362,9 +368,9 @@ function report({ runDirectory }) {
       ...(row.review?.findings ?? []).map(f => `  - ${f.code}, 결정 ${f.decisionIndexes.join(', ')}: ${f.improvementTarget}. ${f.recommendation}`),
     ]),
     '', '## 블라인드 성향 추정', '', '개인 이름 대신 다섯 성향의 수준을 추정한다. unknown을 포함한 정확도와 판별 비율을 함께 보고한다.',
-    '', '```json', JSON.stringify(output.blindReview, null, 2), '```', '', '## 해석 범위', '', ...output.limitations.map(x => `- ${x}`),
+    '', '기존 단일 판별자 점수이며 명시 ID 판별자 점수는 다음 표에 표시한다.', '', '```json', JSON.stringify(output.blindReview, null, 2), '```', ...analysis.blindMarkdown(output), ...analysis.supplementaryMarkdown(output), '', '## 해석 범위', '', ...output.limitations.map(x => `- ${x}`),
     '', '분자·분모·관찰 기회·step ID·프로필별 설명적 집계는 measurements.json 및 report.json에 저장되어 있다.', ''];
   fs.writeFileSync(markdownPath, lines.join('\n'), { mode: 0o600 });
-  return { validationMode: 'traits', reportPath, markdownPath, completed: output.completed, required: output.required, fixtureOnly: output.fixtureOnly };
+  return { validationMode: 'traits', readiness: output.readiness, readinessReasons: output.readinessReasons, reportPath, markdownPath, completed: output.completed, required: output.required, fixtureOnly: output.fixtureOnly };
 }
 module.exports = { prepare, refresh, readManifest, lookupValidationSlot, load, measure, prepareBlind, submitBlind, report, matchedContrasts, summarizeTraitFindings, summarizeFlags };

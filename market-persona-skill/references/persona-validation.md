@@ -2,7 +2,63 @@
 
 기본 검증은 공통 행동 성향을 사용한다. 인물 이름에 고정된 정답 행동을 요구하지 않고, 같은 기본 맥락에서 성향 설정을 바꿨을 때 상황에 맞는 행동 차이가 나타나는지 살핀다. 각 인물은 성향·수행 기준·취향·경험의 조합이며, 유형과 `low / medium / high`는 합성 설계값이다. 심리검사 점수, 실제 성인의 평균, 지적장애 집단의 실측 행동이나 임상적 타당성을 뜻하지 않는다.
 
-기존 MCP 도구 5개를 그대로 사용한다: `prepare_persona_validation` → `measure_persona_validation` → `prepare_blind_review` → `submit_blind_review` → `persona_validation_report`. 전체 trace 작성·제출은 준비와 측정 사이에서 별도로 한다. 검증 도구는 모델·provider·앱·백엔드를 호출하거나 trace를 수정·재생성하지 않으며, 일반 생성 경로에서 자동 실행되지 않는다. MCP 입력 객체는 interactive CLI에서 `{"tool":"도구명","arguments":입력객체}` 형식의 한 줄로 전달한다.
+MCP 도구 6개를 사용한다. 권장 순서는 `prepare_persona_validation` → `check_persona_validation_readiness` → 부족 슬롯 생성 → readiness 재확인 → `measure_persona_validation` → 다중 `prepare_blind_review`/`submit_blind_review` → `persona_validation_report`다. 전체 trace 작성·제출은 준비와 측정 사이에서 별도로 한다. 검증 도구는 모델·provider·앱·백엔드를 호출하거나 trace를 수정·재생성하지 않으며, 일반 생성 경로에서 자동 실행되지 않는다. MCP 입력 객체는 interactive CLI에서 `{"tool":"도구명","arguments":입력객체}` 형식의 한 줄로 전달한다.
+
+## 판정 가능성 점검과 추가 분석
+
+새 run은 legacy 명세 v3 또는 성향 명세 v2와 `analysisVersion:1`을 기록한다. 주 판정 기준은 유효 쌍 8 이상, 기대 방향, |delta| ≥ 0.33, 95% CI의 0 제외이며 플래그 허용률은 10%로 유지한다. **조건별 seed는 20개 이상을 권장한다.** 아래 8개 seed 예제는 입력 호환을 보여주는 축소 예제이며 충분한 검정력을 보장하지 않는다. `prepare_persona_validation`은 `recommendedSeedCount:20`, 20개 미만이면 `powerWarning`, snapshot의 `opportunityAudit`를 반환한다.
+
+### readiness → 부족 슬롯 생성 → measure
+
+`check_persona_validation_readiness({runDirectory})`는 읽기 전용이다. 인물×조건의 완료/필요 수(`byPersonaCondition`), 지정 대조군(`control`), 실제 비교 기준 프로필(`referenceControls`), 조건·seed가 어긋난 쌍(`unmatchedSlots`), 지표별 최대 유효 쌍 상한(`expectedValidPairs`), 생성할 슬롯(`missingSlots`)을 반환한다. 각 `missingSlots[i].prepareWholeTrace`를 그대로 사용한다. 기술 실패 근거가 있는 슬롯과 미시도를 구분하며, 이미 저장된 잘못된 자료를 덮어써 재생성하지 않는다.
+
+다음은 **입출력 형식 예시이며 실행 결과가 아니다**. 배열은 일부만 표시했다.
+
+```json
+{"runDirectory":"/absolute/output/new-validation-run"}
+```
+
+```json
+{
+  "readiness":"blocked",
+  "complete":0,
+  "required":160,
+  "byPersonaCondition":[{"personaId":"neutral-adult-control","condition":"low","complete":0,"required":20,"technicalFailures":0}],
+  "control":{"personaId":"neutral-adult-control","required":true,"present":false,"completed":0},
+  "missingSlots":[{
+    "condition":"low","seed":"s01","personaId":"neutral-adult-control","status":"missing",
+    "prepareWholeTrace":{"personaId":"neutral-adult-control","seed":"s01","snapshotFilePath":"/absolute/low.json","outputPath":"/absolute/output/new-validation-run/traces/low/opaque-seed-dir/neutral-adult-control.json","attentionExperience":{"visit":"first-play"}}
+  }]
+}
+```
+
+지표별 `maximumValidPairs`는 현재 완료된 쌍의 상한이고 `plannedMaximumValidPairs`는 모든 슬롯을 채웠을 때의 구조적 상한이다. 실제로 두 trace가 모두 기회를 경험한 유효 쌍 수는 측정 후에만 알 수 있다. v2는 지정 대조군 완료가 0이면 blocked다. v3는 기존 계약대로 같은 맥락·단일 성향 대비의 낮은 수준 프로필이 비교 기준이며, `neutral-adult-control` ID 자체가 필수는 아니다. 두 경로 모두 모든 비교의 예상 유효 쌍이 0이면 blocked다. 나머지 미완료 또는 최대 유효 쌍 8 미만은 incomplete, 슬롯과 쌍 상한이 충족되면 ready다. ready는 실제 기회 발현이나 성향 통과가 아니다.
+
+blocked여도 측정 가능한 자료는 측정한다. 기존 응답 필드를 유지하고 `readiness`, `readinessReasons`를 덧붙인다. 저장 측정/보고서의 `readinessDetails`, `inabilityCauses`와 한국어 보고서 맨 위의 **판정 불가 원인** 표에서 표본 부족·대조군 없음·기회 미발생·기술 실패를 읽는다. 기회 미발생은 `count`(양쪽 trace가 모두 있는 쌍 기준)와 `perTraceCount`(짝과 무관한 개별 trace 기준)를 함께 표시한다. 쌍 기준 0은 개별 trace에 미발생 지표가 없다는 뜻이 아니다. 출처가 바뀌거나 변조된 trace는 기존 검증대로 거절한다.
+
+### 검증 전용 snapshot과 기회 audit
+
+`node market-simulator/scripts/build-validation-snapshots.cjs --output-directory /absolute/new-snapshots`로 별도 snapshot 세트를 만든다. 생성기 옵션은 스크립트 도움말을 따른다. 기존 파일을 덮어쓰지 않으며 새 snapshot ID와 hash를 기록한다. 목표 매대의 관련 후보, 비목표 관심 상품 접근, high의 수량 2 이상, first-play 첫 매대, 표시 불일치·피드백과 도움을 경험할 수 있는 구조를 고정한다.
+
+`opportunityAudit`는 준비 시 manifest에 저장한다. 구조적으로 불가능한 지표는 준비 응답의 audit 경고로 드러난다. seed는 배우의 선택을 바꾸지만 저장된 snapshot은 고정이다. 따라서 기회가 **발생할 수 있는 구조**와 실제 노출·오류·도움·회복은 구분한다. 카레가 목표인 조건, 관심 상품을 보지 못한 경로, 중도 종료 등은 여전히 unexercised일 수 있다. 기회를 채우려고 오류나 관심·확인 행동을 강제하지 않는다.
+
+### 다중 블라인드
+
+같은 판에 여러 독립 판별자의 답안을 받는다. `prepare_blind_review`에 `reviewerId`를 전달하고 제출에 `reviewerId`, `reviewerKind:"llm"|"expert"`를 쓴다. 판별자별 A 채점 후 B 준비·제출, 채점한 답안의 변경 금지, 자기 신고 라벨 고정을 적용한다. 전문가는 `reviewerModel`을 생략할 수 있고 `reviewerSession`은 별도 판별 회차 라벨로 기록한다. llm은 모델 라벨도 필요하다.
+
+```json
+{"runDirectory":"/absolute/output/new-validation-run","panel":"A","reviewerId":"expert-01","reviewerKind":"expert"}
+```
+
+위 객체는 준비 요청 형식 예시이며 실행 결과가 아니다. 제출은 기존 `answers`에 같은 ID/kind와 `reviewerSession`을 추가한다. 여러 판별자 답안은 `blind-reviews.json`에 저장하고 기존 `blind-review.json`은 단일 판별자 형식으로 계속 읽는다. 보고서의 `blindReviews`는 판별자별 점수, `interReviewerAgreement`는 판별자가 공통으로 채점한 각 판의 일치도다. 2명은 Cohen’s κ, 3명 이상은 Fleiss’ κ를 사용하며 legacy 인물 판별과 v3 각 성향 수준 모두에 적용한다. unknown도 범주로 남고 표본 부족·분모 퇴화는 null이다. 일치도는 정확도나 독립성의 증명이 아니다. 전문가에게는 [한국어 사용 안내](blind-review-guide.ko.md)와 공개 판만 전달한다.
+
+### 설명 지표와 통계 보조 분석
+
+- `sequenceMetrics.descriptiveOnly:true`: 행동 전 대기 중앙값·IQR·변동계수·상위 10% 꼬리, 행동 전이 행렬·bigram·인물/조건별 전이 엔트로피, 유사 상품 혼동·규격·수량 누락/초과·비목표 구매의 관측 step ID, 피드백·표시 불일치 뒤 회복 행동 수, 같은 오선택 반복을 기록한다. 관심 구매는 오류에서 제외한다. 자동 시작·시스템 행동도 제외한다. 기회가 없으면 null/unexercised다.
+- `pooledAnalysis`: low/high 조건을 층화하고 같은 조건·seed의 쌍을 함께 재표집한다. 같은 seed가 두 조건에 있으면 그 의존성도 보존한다. 조건 간 차이를 무시한 단순 합산이 아니며 주 판정에는 사용하지 않는다.
+- `powerAnalysis`: 현재 지표별 유효 쌍 수에서 |delta| 0.33을 검출할 확률을 고정 seed로 모의 계산한다. 가정한 분포·반복 수·Monte Carlo 오차, CI 검출률과 기존 통과 기준 충족률을 함께 읽는다. 실제 표본의 분포를 보장하지 않는다.
+
+**실수 강제 금지** 원칙은 유지한다. 오류가 많을수록 지적장애인과 비슷하다고 해석하지 않는다. 이 검증은 실제 지적장애인과의 유사성을 입증하지 않는다. 보고서의 `referenceComparison:null`은 아직 실제 데이터 비교가 없음을 뜻한다. [출처 확장 설계 메모](persona-validation-extension-design.md)에 순수 지표 함수와 미래 어댑터 경계를 남겼다. 과거 run·trace·bundle·manifest·보고서는 변환하거나 덮어쓰지 않으며, 새 명세는 새 runId에만 적용한다. 보관 명세 hash의 run은 준비·점검에서 manifest를 다시 쓰지 않는다. 기존 측정과 같은 재측정은 저장 파일을 보존하고 결과가 달라지면 새 runId를 요구한다. 이미 저장된 과거 보고서는 `historicalArtifactPreserved:true`와 기존 경로를 반환하며 새 분석으로 다시 쓰지 않는다.
 
 ## 공통 성향 모드와 기존 실행의 구분
 
@@ -115,7 +171,7 @@
 
 남은 목표가 있는데 기록된 오류나 표시 불일치 없이 포기하면 `terminationReview`에 검토 신호를 남긴다. 선언된 불확실성은 따로 보여준다. 이것은 상황을 더 살펴보라는 신호이며 포기 자체를 기술 실패·성격 실패로 확정하지 않는다. 기록만으로 모든 중단 이유를 알 수 없다는 한계도 남긴다.
 
-오류나 관심 횟수의 분산 0, 도움 사용, 익숙한 선택에서의 낮은 정확도만으로 자동 실패하지 않는다. 도움·정확도 관련 신호는 `reviewSignals`, 집합 분포 진단은 `diagnosticWarnings`에 검토·정보로 남긴다. 금지 패턴의 실패 판정에는 명확한 피드백 뒤 같은 오선택 반복과 역할·장애를 직접 언급하는 등 코드에 명시된 위반만 사용하며, 해당 trace 수는 `violationTraces`로 별도 보고한다. 오류 없이 완료한 표본에 실수를 강제하지 않으며, 금지 패턴 검사 통과를 전체 충실도 통과로 읽지 않는다.
+오류나 관심 횟수의 분산 0, 도움 사용, 익숙한 선택에서의 낮은 정확도만으로 자동 실패하지 않는다. 도움·정확도 관련 신호는 `reviewSignals`, 집합 분포 진단은 `diagnosticWarnings`에 검토·정보로 남긴다. 금지 패턴의 실패 판정에는 명확한 피드백 뒤 같은 오선택 반복과 역할·장애를 직접 언급하는 등 코드에 명시된 위반만 사용하며, 해당 trace 수는 `violationTraces`로 별도 보고한다. 익숙한 목표를 모두 채우지 못한 trace는 목표 상품을 한 번이라도 담으려 했으면 `all-familiar-goals-failed`, 시도 없이 끝났으면 `familiar-goals-unattempted`로 구분한다. 두 플래그 모두 `review`이며 플래그율 집계에 기존과 같이 포함한다. 오류 없이 완료한 표본에 실수를 강제하지 않으며, 금지 패턴 검사 통과를 전체 충실도 통과로 읽지 않는다.
 
 새 작성 가이드 v2로 생성한 자료에는 제출 결과와 `.persona-review.json`의 선택적 `annotationReview`가 추가된다. `reviewVersion:"actor-annotation-v1"`이며 자체 `status:"clear"|"review"`와 `findings`를 읽는다. 닫기만 수행한 `check` 표기나 focus 불일치에 대해 결정 번호·실제 행동·선언 근거와 함께 `improvementTarget`(`activity-annotation` 또는 `focus-annotation`), `recommendation`을 제공한다. 이는 주석 작성의 개선 지점을 찾는 사후 검토이며 행동을 변경하거나 성향 실패를 확정하지 않는다. 이미 보이는 화면을 암묵적으로 살폈을 가능성은 남고, 경고를 없애려고 확인 행동을 추가하지 않는다. 상위 persona review의 `status:"clear"`만 보고 이 별도 검토도 clear라고 판단하지 않는다. 과거 가이드 자료에는 이 항목이 없을 수 있으며 부재를 통과로 해석하지 않는다.
 

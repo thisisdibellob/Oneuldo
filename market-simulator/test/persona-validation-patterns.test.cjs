@@ -22,6 +22,12 @@ test('familiar goals are failed only when no familiar goal reaches its final req
   assert.ok(!codes({ steps: [add('a', 'milk', 2)] }).includes('all-familiar-goals-failed'));
   assert.ok(codes({ steps: [add('a', 'milk', 2), step('b', 'removeProduct', { productId: 'milk', quantity: 1 })] }).includes('all-familiar-goals-failed'));
 });
+test('ending before any familiar goal attempt is reported as unattempted, not failed', () => {
+  const ended = flagsForTrace({ steps: [step('a', 'readList'), step('b', 'giveUp')] }, snapshot, undefined, persona);
+  assert.deepEqual(ended.map(f => [f.code, f.severity, f.stepIds]), [['familiar-goals-unattempted', 'review', ['b']]]);
+  const missed = codes({ steps: [step('a', 'readList'), step('b', 'dragProduct', { productId: 'milk', quantity: 2, gesture: { outcome: 'miss' } })] });
+  assert.ok(missed.includes('all-familiar-goals-failed')); assert.ok(!missed.includes('familiar-goals-unattempted'));
+});
 test('an interest purchase that physically satisfies a familiar goal is not a failed goal', () => {
   const trace = { steps: [add('a', 'milk', 2, { attentionTag: 'interest' })] };
   assert.ok(!codes(trace).includes('all-familiar-goals-failed'));

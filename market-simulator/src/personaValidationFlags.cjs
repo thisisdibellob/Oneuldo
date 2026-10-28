@@ -6,7 +6,7 @@ const { actorEvents, validationGoals, isGoalProduct, selectedEvent, feedbackOf, 
 function flagsForTrace(trace, snapshot, audit, persona, evidence = {}, patterns = spec.patterns) {
   const events = actorEvents(trace, audit, evidence), flags = [];
   const add = (code, entries) => flags.push({ code,
-    severity: ['no-independent-choice', 'all-familiar-goals-failed'].includes(code) ? 'review' : 'warning',
+    severity: ['no-independent-choice', 'all-familiar-goals-failed', 'familiar-goals-unattempted'].includes(code) ? 'review' : 'warning',
     stepIds: [...new Set(entries.flatMap(s => s.stepIds))],
     decisionIndexes: entries.map(s => s.decisionIndex).filter(Number.isInteger) });
   const repeats = new Map();
@@ -24,8 +24,12 @@ function flagsForTrace(trace, snapshot, audit, persona, evidence = {}, patterns 
   const goals = validationGoals(snapshot), choices = events.filter(selectedEvent), basket = basketAt(events);
   // This flag concerns the actual purchase outcome, regardless of its declared motive.
   const familiarGoals = goals.filter(g => [...familiar].some(id => isGoalProduct(id, g)));
-  if (familiarGoals.length && familiarGoals.every(g => goalError(basket, g) > 0))
-    add('all-familiar-goals-failed', choices.length ? choices : events.length ? [events.at(-1)] : []);
+  if (familiarGoals.length && familiarGoals.every(g => goalError(basket, g) > 0)) {
+    // Ending before any attempt is a different finding from attempting and missing the goals.
+    const attempts = events.filter(e => e.type === 'dragProduct' && familiarGoals.some(g => isGoalProduct(e.productId, g)));
+    if (attempts.length) add('all-familiar-goals-failed', choices.length ? choices : attempts);
+    else add('familiar-goals-unattempted', events.length ? [events.at(-1)] : []);
+  }
   if (choices.length && choices.every(s => !independentChoice(s, events))) add('no-independent-choice', choices);
   for (const event of events) if (/장애|연기|페르소나|persona|disability|role.?play/i.test(`${event.reason ?? ''} ${event.currentTask ?? ''} ${trace.steps[event.sourceStepIndex]?.reason ?? ''} ${trace.steps[event.sourceStepIndex]?.currentTask ?? ''}`))
     add('role-or-disability-mentioned', [event]);

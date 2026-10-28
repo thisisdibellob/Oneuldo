@@ -1,6 +1,6 @@
 {
   "schema": "oneuldo.persona-fidelity-spec",
-  "version": 2,
+  "version": 3,
   "note": "효과 크기와 플래그 기준은 설계값이며 임상 기준이 아님.",
   "controlPersonaId": "neutral-adult-control",
   "minValidPairs": 8,
@@ -232,5 +232,34 @@
     "errorDefinition": "목표를 위한 선택 구간이 끝날 때 수량·규격 불일치가 남은 횟수 또는 실패한 담기 횟수. 동일 매대에서 나누어 담기는 한 구간이며 명시적인 관심 구매는 목표 시도로 세지 않는다. 같은 상품을 추가로 담아도 명시적 관심 수량은 목표 수량 평가에서 제외하며, 반품 수량은 선언된 목적의 수량부터 차감한다.",
     "interestDefinition": "연속 관심 행동 구간의 수. 구간 안 행동 수와 구별한다.",
     "interpretation": "분산 0은 정해진 횟수 강제의 검토 신호다. 오류가 전혀 없을 때도 이 신호가 발생할 수 있으며 그 자체가 과장 원인을 입증하지 않는다."
+  },
+  "analysisVersion": 1,
+  "recommendedSeedCount": 20,
+  "sequenceMetrics": {
+    "descriptiveOnly": true,
+    "unexercisedValue": null,
+    "kinds": [
+      "preActionDelayDistribution",
+      "actionTransitions",
+      "errorTaxonomy",
+      "recoveryActions",
+      "perseveration"
+    ],
+    "interpretation": "작성 시간·순서·오류는 설명 지표이며 주 판정에 사용하지 않는다. 실수나 회복을 강제하지 않는다."
+  },
+  "pooledAnalysis": {
+    "descriptiveOnly": true,
+    "method": "stratified-paired-bootstrap",
+    "strata": [
+      "low",
+      "high"
+    ],
+    "usedForPrimaryDecision": false
+  },
+  "powerSimulation": {
+    "descriptiveOnly": true,
+    "targetAbsDelta": 0.33,
+    "fixedSeed": "persona-validation-power-v1",
+    "interpretation": "모의 분포 가정에 따른 대략적 검정력이며 실제 사람 자료 또는 관측된 효과의 증거가 아니다."
   }
 }

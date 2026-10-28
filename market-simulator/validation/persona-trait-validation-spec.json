@@ -1,6 +1,6 @@
 {
   "schema": "oneuldo.persona-trait-validation-spec",
-  "version": 1,
+  "version": 2,
   "note": "성향별 합성 행동 설계 검증이다. 심리검사·임상 기준이 아니며 효과 크기와 표본 기준은 설계값이다. 오류, 도움 또는 관심 행동을 정해진 횟수로 강제하지 않는다.",
   "minValidPairs": 8,
   "minAbsDelta": 0.33,
@@ -11,8 +11,17 @@
     "minimumVarianceSamples": 2,
     "interpretation": "동일한 잘못된 선택 반복과 역할 노출만 금지 패턴으로 판정한다. 도움·과업 실패·수정 부재·동일 횟수는 검토 신호다. 임계치는 합성 설계값이다."
   },
-  "conditions": ["low", "high"],
-  "traits": ["deliberation", "checking", "exploration", "persistence", "helpSeeking"],
+  "conditions": [
+    "low",
+    "high"
+  ],
+  "traits": [
+    "deliberation",
+    "checking",
+    "exploration",
+    "persistence",
+    "helpSeeking"
+  ],
   "metrics": [
     {
       "id": "deliberation:comparisonRate",
@@ -86,12 +95,45 @@
   ],
   "comparisonPolicy": {
     "design": "matched-single-trait-contrast",
-    "levels": ["low", "medium", "high"],
+    "levels": [
+      "low",
+      "medium",
+      "high"
+    ],
     "directionReference": "higher-versus-lower-configured-level",
     "controlPersonaRequired": false,
     "unexercisedValue": null,
     "abilityOutcomesAreDescriptive": true,
     "zeroVarianceIsFailure": false,
     "authoredTimingMustBeSeparated": true
+  },
+  "analysisVersion": 1,
+  "recommendedSeedCount": 20,
+  "sequenceMetrics": {
+    "descriptiveOnly": true,
+    "unexercisedValue": null,
+    "kinds": [
+      "preActionDelayDistribution",
+      "actionTransitions",
+      "errorTaxonomy",
+      "recoveryActions",
+      "perseveration"
+    ],
+    "interpretation": "작성 시간·순서·오류는 설명 지표이며 주 판정에 사용하지 않는다. 실수나 회복을 강제하지 않는다."
+  },
+  "pooledAnalysis": {
+    "descriptiveOnly": true,
+    "method": "stratified-paired-bootstrap",
+    "strata": [
+      "low",
+      "high"
+    ],
+    "usedForPrimaryDecision": false
+  },
+  "powerSimulation": {
+    "descriptiveOnly": true,
+    "targetAbsDelta": 0.33,
+    "fixedSeed": "persona-validation-power-v1",
+    "interpretation": "모의 분포 가정에 따른 대략적 검정력이며 실제 사람 자료 또는 관측된 효과의 증거가 아니다."
   }
 }

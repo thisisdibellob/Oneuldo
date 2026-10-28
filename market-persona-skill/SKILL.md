@@ -42,7 +42,7 @@ Luna 계획을 실행하는 Codex 세션은 실제로 `gpt-6-luna`/`low`로 설�
 
 전체 계획 작성은 **한 인물·한 조건·한 seed·한 request/bundle마다 새 actor 문맥**에서 수행한다. 저부하와 고부하, 다른 인물 또는 다른 요청의 bundle을 같은 작성 문맥에 함께 주지 않는다. 준비 결과의 `requestId`·`bundle.inputHash`를 해당 후보와 함께 기록하고 `bundle.authoringGuide`의 식별 정보·문법·상태 전이 예제를 확인한다. 호스트 MCP는 여러 요청을 관리할 수 있지만 서버가 actor 문맥의 분리를 강제하거나 입증하지는 않는다. 이는 기술적 일관성을 위한 작성 절차이며 페르소나 충실도의 개선을 보장하지 않는다.
 
-페르소나 충실도 검증은 수동 MCP 도구 5개로 실행한다. 기본 공통 성향 모드는 숙고·확인·탐색·지속·도움 요청의 다섯 축과 성격 유형으로 1~32개 프로필을 구성하고, 수행 기준·취향·경험이 같으며 한 성향만 다른 쌍을 비교한다. 기술 유효성·과업 결과·성향 표현·관찰 기회를 분리하고 A/B 블라인드에서는 인물 이름 대신 성향 수준을 추정한다. 기존 네 인물 요청과 과거 manifest는 legacy 의미를 유지한다. 일반 생성 경로에서 자동 실행하지 않는다. 입력·출력과 독립 배우 세션 절차는 [검증 절차](references/persona-validation.md)를 따른다.
+페르소나 충실도 검증은 수동 MCP 도구 6개로 실행한다. 새 run은 조건별 seed 20개 이상을 권장하며, `prepare_persona_validation`의 `opportunityAudit`·`powerWarning`을 확인하고 readiness → 부족 슬롯 생성 → measure → 다중 블라인드 → report 순서로 진행한다. `check_persona_validation_readiness({runDirectory})`의 부족 슬롯 `prepareWholeTrace`를 그대로 사용한다. 판별자는 `reviewerId`와 자기 신고 `reviewerKind`를 기록하고 각자 A 채점 뒤 B를 받는다. 새 보고서의 설명용 `sequenceMetrics`·`pooledAnalysis`·`powerAnalysis`는 주 판정을 바꾸지 않는다. 실제 사람 비교는 수행하지 않으며 `referenceComparison:null`로 남긴다. 실수 강제 금지와 유효 쌍 8·|delta| 0.33·95% CI 0 제외·플래그 10%를 유지한다. 기본 공통 성향 모드는 숙고·확인·탐색·지속·도움 요청의 다섯 축과 성격 유형으로 1~32개 프로필을 구성하고, 수행 기준·취향·경험이 같으며 한 성향만 다른 쌍을 비교한다. 기술 유효성·과업 결과·성향 표현·관찰 기회를 분리하고 A/B 블라인드에서는 인물 이름 대신 성향 수준을 추정한다. 기존 네 인물 요청과 과거 manifest는 legacy 의미를 유지한다. 일반 생성 경로에서 자동 실행하지 않는다. 입력·출력과 독립 배우 세션 절차는 [검증 절차](references/persona-validation.md)를 따른다.
 
 ## 페르소나 선택
 

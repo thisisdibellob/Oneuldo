@@ -165,4 +165,42 @@ function grade(key, answers) {
   }));
 }
 
-module.exports = { IDS, sanitize, assertAnonymous, build, buildTraits, grade };
+/** Nominal agreement concerns raters' labels, not their accuracy against a key.
+ * Unknown is an explicit category; shared abstention is not trait evidence. */
+function categoricalAgreement(ratings) {
+  if (!Array.isArray(ratings) || ratings.some(row => !Array.isArray(row))) throw new Error('Agreement requires a rating matrix');
+  const n = ratings.length, reviewers = ratings[0]?.length ?? 0;
+  if (ratings.some(row => row.length !== reviewers || row.some(label => typeof label !== 'string' || !label))) {
+    throw new Error('Agreement requires equally sized categorical rating rows');
+  }
+  const method = reviewers === 2 ? 'cohen-kappa' : reviewers > 2 ? 'fleiss-kappa' : null;
+  const base = { method, n, reviewers, kappa: null, observedAgreement: null, expectedAgreement: null,
+    descriptiveOnly: true, unknownTreatment: 'separate-category' };
+  if (reviewers < 2 || n < 2) return { ...base, status: 'insufficient', reason: 'At least two reviewers and two common items are required' };
+  const categories = [...new Set(ratings.flat())], counts = categories.map(label => ratings.map(row => row.filter(value => value === label).length));
+  const observedAgreement = reviewers === 2
+    ? ratings.filter(row => row[0] === row[1]).length / n
+    : counts.reduce((sum, rows) => sum + rows.reduce((total, count) => total + count * (count - 1), 0), 0) / (n * reviewers * (reviewers - 1));
+  const expectedAgreement = reviewers === 2
+    ? categories.reduce((sum, label) => sum + ratings.filter(row => row[0] === label).length * ratings.filter(row => row[1] === label).length / (n * n), 0)
+    : counts.reduce((sum, rows) => sum + (rows.reduce((total, count) => total + count, 0) / (n * reviewers)) ** 2, 0);
+  if (Math.abs(1 - expectedAgreement) < 1e-12) return { ...base, observedAgreement, expectedAgreement, status: 'undefined', reason: 'No category variation; chance agreement is one' };
+  return { ...base, observedAgreement, expectedAgreement, kappa: (observedAgreement - expectedAgreement) / (1 - expectedAgreement), status: 'available', reason: null };
+}
+
+function reviewerAgreement(reviews, { validationMode = 'legacy', traitKeys = [] } = {}) {
+  return Object.fromEntries(['A', 'B'].map(panel => {
+    const selected = reviews.filter(review => review.scores?.[panel] && review.answers?.[panel]);
+    const allIds = [...new Set(selected.flatMap(review => Object.keys(review.answers[panel])))];
+    const ids = allIds.filter(id => selected.every(review => Object.hasOwn(review.answers[panel], id)));
+    const common = { reviewerIds: selected.map(review => review.reviewerId), reviewers: selected.length,
+      commonItems: ids.length, excludedItems: allIds.length - ids.length, descriptiveOnly: true };
+    const agreement = pick => ({ ...categoricalAgreement(ids.map(id => selected.map(review => pick(review.answers[panel][id])))),
+      ...common, reviewers: selected.length });
+    if (validationMode === 'traits') return [panel, { ...common, perTrait: Object.fromEntries(traitKeys.map(traitKey =>
+      [traitKey, agreement(answer => answer.traits[traitKey])])) }];
+    return [panel, { ...common, persona: agreement(answer => typeof answer === 'string' ? answer : answer.personaId) }];
+  }));
+}
+
+module.exports = { IDS, sanitize, assertAnonymous, build, buildTraits, grade, categoricalAgreement, reviewerAgreement };

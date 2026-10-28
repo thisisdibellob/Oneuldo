@@ -28,7 +28,7 @@ function lookupValidationSlot(args, snapshot) {
   return legacy.lookupControlSlot(args, snapshot);
 }
 module.exports = {
-  prepare, lookupValidationSlot, lookupControlSlot: lookupValidationSlot,
+  prepare, checkReadiness: args => require('./personaValidationReadiness.cjs').check(args), lookupValidationSlot, lookupControlSlot: lookupValidationSlot,
   refresh: manifest => (manifest.version === 3 ? universal() : legacy).refresh(manifest),
   load: (manifest, options) => (manifest.version === 3 ? universal() : legacy).load(manifest, options),
   readManifest: directory => runner(directory).readManifest(directory),

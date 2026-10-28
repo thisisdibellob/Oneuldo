@@ -61,6 +61,14 @@ Luna 전체 계획 경로는 전체 세계를 전개 계산용 참고 자료로 
 
 새 사용자 정의 프로필 버전 `traits-2-<hash>`는 실제 프롬프트를 포함한 작성 내용을 반영한다. 수행 기준·취향·경험이 같으면 비교용 `contextHash`는 유지된다. 카탈로그·작성 지침 변경 후에는 새 runId와 bundle을 사용한다. 과거 저장 자료는 다시 쓰지 않으며, hash가 달라진 과거 run을 현재 코드로 그대로 재측정할 수 있다는 뜻은 아니다.
 
+새 run은 **조건별 seed 20개 이상**을 권장한다. 20개 미만도 허용하며 준비 응답의 `powerWarning`에 표시한다. 절차는 준비 → `check_persona_validation_readiness({runDirectory})` → 부족 슬롯의 `prepareWholeTrace`로 생성 → readiness 재확인 → measure → 다중 블라인드 → report다. readiness는 인물×조건 완료 수, 대조군·짝 불일치, 지표별 최대 유효 쌍 상한과 부족 슬롯을 읽기 전용으로 반환한다. 대조군 또는 비교 가능한 쌍이 없으면 측정 응답과 보고서 상단에 `readiness:"blocked"`와 이유를 기록한다. v3의 비교 기준은 같은 맥락·단일 성향 대비 프로필이다.
+
+검증 전용 snapshot은 `scripts/build-validation-snapshots.cjs`로 새 디렉터리에 만들며 기존 snapshot을 덮어쓰지 않는다. 준비 manifest의 `opportunityAudit`는 구조적 기회와 불가능 경고를 기록한다. 구조적 가능성이 실제 노출·오류·회복을 보장하지는 않는다.
+
+새 `sequenceMetrics`는 대기시간 분포·전이·오류 근거·회복·반복을 설명하며 `descriptiveOnly:true`다. `pooledAnalysis`는 low/high 층화 쌍 부트스트랩, `powerAnalysis`는 고정 seed의 가정 기반 검정력이며 둘 다 주 판정에 사용하지 않는다. 유효 쌍 8·|delta| ≥ 0.33·95% CI의 0 제외·플래그 10%는 유지한다. **실수 강제 금지**: 오류가 많다고 장애 특성에 충실하다고 해석하지 않는다.
+
+다중 판별은 준비·제출의 `reviewerId`, 제출의 `reviewerKind:"llm"|"expert"`로 구분하고 판별자마다 A 채점 뒤 B, 채점 답안 동결을 지킨다. `blindReviews`에 판별자별 점수, `interReviewerAgreement`에 Cohen’s κ(2명)/Fleiss’ κ(3명 이상)를 보고한다. 기존 단일 `blind-review.json`도 읽는다. [전문가 안내](../market-persona-skill/references/blind-review-guide.ko.md)와 [상세 입출력·한계](../market-persona-skill/references/persona-validation.md)를 따른다. 실제 사람 자료는 수집·비교하지 않으며 `referenceComparison:null`과 [확장 메모](../market-persona-skill/references/persona-validation-extension-design.md)만 남긴다. 기존 spec 원문은 validation/archive에 보존하고 새 명세(legacy v3/traits v2)는 새 run에만 적용한다.
+
 다음 `prepare_persona_validation` 예시는 같은 기본 맥락에서 확인 성향만 다른 두 인물을 준비한다. 8개 seed × 2조건 × 2인물 = 32칸을 만들며 모델 생성은 자동 실행하지 않는다.
 
 ```json
@@ -230,6 +238,7 @@ MARKET_REPLAY_CONFIG=/absolute/path/to/target.local.json node market-simulator/s
 | `repair_whole_trace` | 수정할 decisions suffix만 제출; 서버가 요청 정보를 채우고 기존 수정 1회 제한 적용 |
 | `whole_trace_status` | 전체 계획 요청의 상태·실패 진단·저장 결과 조회 |
 | `prepare_persona_validation` | 성향 조합·조건·seed의 검증 슬롯 준비; 기존 v2 run 호환 |
+| `check_persona_validation_readiness` | 완료·대조군·짝·최대 유효 쌍·부족 슬롯 읽기 전용 점검 |
 | `measure_persona_validation` | 공통 성향 지표·전체 목표 결과·관찰 기회·한 축 비교 측정 |
 | `prepare_blind_review` | 공통 성향 판정 지침과 A/B 익명 표본 준비 |
 | `submit_blind_review` | 다섯 성향 수준·unknown 답안 채점; legacy 인물 답안 호환 |
