@@ -76,7 +76,7 @@ export function buildWholeTraceBundle(settings: WholeTraceSettings, requestId: s
   const memory = new ActorLearningMemory(settings.attentionExperience?.learning, true);
   memory.observe(initialObservation);
   const knowledge = new WholeTraceKnowledgeLedger(persona, settings.attentionExperience?.learning).observe(initialObservation).knowledge;
-  const paths = ['src/actorInstructions.ts', 'src/actorChoices.ts', '../frontend/src/game/marketReplayPerception.ts', '../frontend/src/game/marketSession.ts',
+  const paths = ['src/actorInstructions.ts', 'src/actorChoices.ts', '../frontend/src/game/marketReplayPerception.ts', '../frontend/src/game/marketHudLayout.ts', '../frontend/src/game/marketSession.ts',
     'src/simulator.ts', 'src/traceValidation.ts', 'src/wholeTraceBundle.ts', 'src/wholeTraceContracts.ts', 'src/wholeTraceKnowledge.ts', 'src/wholeTraceCompiler.ts', 'src/wholeTracePersona.ts', 'src/wholeTraceActorState.ts', 'src/wholeTraceChoices.ts', 'src/wholeTraceCognition.ts', 'src/wholeTraceTaskMemory.ts', 'src/wholeTraceTaskExpression.ts', 'src/wholeTraceAuthoring.ts'];
   const sourceFiles = paths.map(p => ({ path: p, sha256: createHash('sha256').update(readFileSync(resolve(__dirname, '..', p))).digest('hex') }));
   const inputHash = wholeTraceInputHash(settings);

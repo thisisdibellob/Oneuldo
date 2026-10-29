@@ -6,6 +6,9 @@ MCP 도구 6개를 사용한다. 권장 순서는 `prepare_persona_validation` �
 
 ## 판정 가능성 점검과 추가 분석
 
+**판정 불가 표본 — `persona-pilot-20261028`**: HUD 고정 마스크 결함으로 64개 입력 모두 시작점에서 23/139 지점·매대 0곳에만 도달했으므로, 저장 trace 55개의 매대 열기·담기 0건과 포기 55건을 인물 특성 신호로 사용하지 않는다([결함 주석](../../output/persona-pilot-20261028/pilot-validity-note.ko.md)).
+원본은 보존하며 판정 코드의 자동 제외는 아직 적용되지 않았다. 기존 판정·블라인드 진행 문구를 재사용하지 않고, 수정 후 새 입력의 검증 결과와 구분한다.
+
 새 run은 legacy 명세 v3 또는 성향 명세 v2와 `analysisVersion:1`을 기록한다. 주 판정 기준은 유효 쌍 8 이상, 기대 방향, |delta| ≥ 0.33, 95% CI의 0 제외이며 플래그 허용률은 10%로 유지한다. **조건별 seed는 20개 이상을 권장한다.** 아래 8개 seed 예제는 입력 호환을 보여주는 축소 예제이며 충분한 검정력을 보장하지 않는다. `prepare_persona_validation`은 `recommendedSeedCount:20`, 20개 미만이면 `powerWarning`, snapshot의 `opportunityAudit`를 반환한다.
 
 ### readiness → 부족 슬롯 생성 → measure

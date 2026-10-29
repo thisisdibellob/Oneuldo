@@ -4,7 +4,7 @@ import { isMarketNavigationSegmentClear } from '../src/game/marketNavigation';
 import { createMarketReplaySnapshot, marketReplayTraceId, validateMarketReplaySnapshot, validateMarketReplayTrace,
   type MarketReplayTrace } from '../src/game/marketReplayTrace';
 import { DEFAULT_REPLAY_PRESENTATION, getReplayShelfPage, replayShelfPageFractions, resolveReplayAnchor,
-  visibleAnchors, visibleStations, visibleUnlabelledShelfBodies } from '../src/game/marketReplayPerception';
+  visibleAnchors, visibleStations, visibleUnlabelledShelfBodies, wholeReplayWaypointGraph } from '../src/game/marketReplayPerception';
 import { MARKET_SHELF_PAIR_HEIGHT, MARKET_SHELF_PAIR_WIDTH } from '../src/game/marketFixtureLayout';
 
 const environment = () => createMarketEnvironment({ seed: 'replay-motor-test', employeeCount: 1, customerCount: 1,
@@ -28,7 +28,7 @@ test('public exploration offers only opaque nearby straight, collision-safe choi
 });
 
 test('planning excludes a HUD-edge anchor lost after a valid 0.55px arrival residual, without expanding actual visibility', () => {
-  const e = environment(), p = { viewport: { width: 390, height: 701 }, zoom: 1.3 };
+  const e = environment(), p = { viewport: { width: 390, height: 663 }, zoom: 1.3 };
   const planned = { x: 160, y: 400 }, actual = { x: 160, y: 400.55 }, id = 'anchor-5db7b70d';
   expect(resolveReplayAnchor(e, planned, id, p)).toEqual({ x: 160, y: 320 });
   expect(resolveReplayAnchor(e, actual, id, p)).toBeNull();
@@ -38,6 +38,37 @@ test('planning excludes a HUD-edge anchor lost after a valid 0.55px arrival resi
   for (const choice of choices) for (const dx of [-1, 0, 1]) for (const dy of [-1, 0, 1]) {
     expect(resolveReplayAnchor(e, { x: planned.x + dx, y: planned.y + dy }, choice.id, p)).not.toBeNull();
   }
+});
+
+test('the pilot 390x600 world has directed paths from its start to a shelf and staffed checkout', () => {
+  // Keep the pilot's geometry portable: no generated bundle, output directory,
+  // or AI trace is needed to reproduce its original blocked-start regression.
+  const e = createMarketEnvironment({
+    seed: 'persona-pilot-20261028:validation-opportunities-v1',
+    layoutId: 'classic', entranceConstruction: false,
+    employeeCount: 1, customerCount: 1, pillarCount: 0, chairCount: 0,
+    cashierCount: 2, kioskPresent: false, kioskLane: 'none',
+    shelfOrder: ['fresh', 'produce', 'meal', 'household', 'drink'],
+  });
+  const graph = wholeReplayWaypointGraph(e, e.spawn, {
+    viewport: { width: 390, height: 600 }, zoom: 1.3,
+    fontScale: 1, safeArea: { top: 0, bottom: 0 },
+  });
+  const byId = new Map(graph.nodes.map(node => [node.waypointId, node]));
+  const reached = new Set(graph.startAllowedWaypointIds);
+  const queue = [...reached];
+  const stations = [...graph.startNearbyStations];
+  for (let index = 0; index < queue.length; index++) {
+    const node = byId.get(queue[index]);
+    expect(node).toBeDefined();
+    stations.push(...node!.nearbyStations);
+    for (const id of node!.allowedWaypointIds) if (!reached.has(id)) {
+      reached.add(id);
+      queue.push(id);
+    }
+  }
+  expect(stations.some(station => station.kind === 'shelf')).toBe(true);
+  expect(stations.some(station => station.kind === 'checkout')).toBe(true);
 });
 
 test('a planned nearby station remains inside the real interaction range across arrival residuals', () => {
@@ -94,6 +125,26 @@ function isolatedShelfBody(x: number, y: number) {
   e.stationDetails[0].point = { x: x + MARKET_SHELF_PAIR_WIDTH / 2, y: y + MARKET_SHELF_PAIR_HEIGHT + 10 };
   return e;
 }
+
+test.each([
+  ['top safe area', { safeArea: { top: 75, bottom: 0 } }],
+  ['font scaling', { fontScale: 2 }],
+] as const)('both passage points and shelf bodies respect the shopping HUD expanded by %s', (_name, accessibility) => {
+  const e = environment(), from = { x: 160, y: 400 }, id = 'anchor-5db7b70d';
+  const presentation = { viewport: { width: 390, height: 690 }, zoom: 1.3 };
+  // This passage projects to y241, below the default card's y227 bottom.
+  expect(resolveReplayAnchor(e, from, id, presentation)).toEqual({ x: 160, y: 320 });
+  expect(visibleAnchors(e, from, presentation).some(anchor => anchor.id === id)).toBe(true);
+  expect(resolveReplayAnchor(e, from, id, { ...presentation, ...accessibility })).toBeNull();
+  expect(visibleAnchors(e, from, { ...presentation, ...accessibility }).some(anchor => anchor.id === id)).toBe(false);
+
+  // The sign is off-screen; only the actual shelf artwork extending below the
+  // default card can supply a cue. Moving/enlarging the card hides that patch.
+  const shelf = isolatedShelfBody(800, 675);
+  expect(visibleStations(shelf, bodyObserver, bodyPresentation)).toEqual([]);
+  expect(visibleUnlabelledShelfBodies(shelf, bodyObserver, bodyPresentation).length).toBeGreaterThan(0);
+  expect(visibleUnlabelledShelfBodies(shelf, bodyObserver, { ...bodyPresentation, ...accessibility })).toEqual([]);
+});
 
 test('v2 notices a visible shelf body when its label is below the viewport, without changing v1 cues', () => {
   const e = isolatedShelfBody(640, 800);

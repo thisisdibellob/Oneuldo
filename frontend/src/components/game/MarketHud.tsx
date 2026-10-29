@@ -3,6 +3,7 @@ import { useEffect, useRef } from 'react';
 import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { PressScale } from '../PressScale';
 import { fonts } from '../../theme';
+import { MARKET_HUD_LAYOUT as layout } from '../../game/marketHudLayout';
 
 export type MarketHudControlMode = 'joystick' | 'touch';
 export type MarketHudProps = {
@@ -60,14 +61,14 @@ export function MarketHud({
             onContentSizeChange={width => { extent.current.content = width; }}
             contentContainerStyle={s.items} accessibilityLabel="사야 할 물품과 개수" keyboardShouldPersistTaps="handled">
             {objectives.map(objective => <View key={objective.id} style={s.item}>
-              <Text style={s.itemName} numberOfLines={2}>{objective.label}</Text>
+              <Text style={s.itemName} numberOfLines={layout.itemNameLines}>{objective.label}</Text>
               <Text style={s.itemQuantity}>{objective.quantity}{objective.quantityUnit ?? '개'}</Text>
             </View>)}
           </ScrollView>
         </View>
         <PressScale accessibilityRole="button" accessibilityLabel="장바구니 열기"
           accessibilityHint="내가 담은 물건과 개수를 확인해요" onPress={onOpenCart} style={s.cart}>
-          <Ionicons name="basket-outline" color="#4C6758" size={24} />
+          <Ionicons name="basket-outline" color="#4C6758" size={layout.cartIconSize} />
           <Text style={s.cartLabel}>장바구니</Text>
         </PressScale>
       </View>
@@ -76,28 +77,28 @@ export function MarketHud({
 }
 
 const s = StyleSheet.create({
-  anchor: { position: 'absolute', left: 0, right: 0, paddingHorizontal: 12, alignItems: 'center', zIndex: 30 },
+  anchor: { position: 'absolute', left: 0, right: 0, paddingHorizontal: layout.horizontalPadding, alignItems: 'center', zIndex: 30 },
   card: {
-    width: '100%', maxWidth: 420, borderRadius: 16, backgroundColor: '#F9F7F0',
-    borderWidth: 1, borderColor: '#DFE2D7', overflow: 'hidden',
+    width: '100%', maxWidth: layout.maxWidth, borderRadius: 16, backgroundColor: '#F9F7F0',
+    borderWidth: layout.borderWidth, borderColor: '#DFE2D7', overflow: 'hidden',
     ...Platform.select({
       web: { boxShadow: '0 4px 16px rgba(47, 67, 52, 0.10)' },
       default: { shadowColor: '#2F4334', shadowOpacity: 0.10, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 3 },
     }),
   },
-  header: { minHeight: 44, paddingLeft: 14, paddingRight: 2, flexDirection: 'row', alignItems: 'center', gap: 2 },
-  title: { flex: 1, color: '#405D50', fontFamily: fonts.laundryBold, fontSize: 17, lineHeight: 24 },
+  header: { minHeight: layout.headerMinHeight, paddingLeft: 14, paddingRight: 2, flexDirection: 'row', alignItems: 'center', gap: 2 },
+  title: { flex: 1, color: '#405D50', fontFamily: fonts.laundryBold, fontSize: 17, lineHeight: layout.titleLineHeight },
   budget: { color: '#536457', fontFamily: fonts.medium, fontSize: 12, lineHeight: 18, marginRight: 4 },
   score: { color: '#647668', fontFamily: fonts.semibold, fontSize: 13, lineHeight: 20, fontVariant: ['tabular-nums'], marginRight: 4 },
   penalty: { color: '#9A604E' },
   iconButton: { width: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
-  noteRow: { flexDirection: 'row', minHeight: 62, paddingBottom: 10, paddingRight: 10, alignItems: 'center' },
+  noteRow: { flexDirection: 'row', minHeight: layout.noteMinHeight, paddingBottom: layout.notePaddingBottom, paddingRight: 10, alignItems: 'center' },
   note: { flex: 1, minWidth: 0 },
   itemsScroll: { flexGrow: 0 },
   items: { alignItems: 'center', paddingHorizontal: 14, gap: 18 },
-  item: { minWidth: 48, maxWidth: 128, gap: 3 },
-  itemName: { color: '#536457', fontFamily: fonts.medium, fontSize: 13, lineHeight: 18 },
-  itemQuantity: { color: '#405D50', fontFamily: fonts.bold, fontSize: 16, lineHeight: 20, fontVariant: ['tabular-nums'] },
-  cart: { width: 70, minHeight: 52, borderRadius: 12, backgroundColor: '#E8EDDF', alignItems: 'center', justifyContent: 'center', gap: 2 },
-  cartLabel: { color: '#4C6758', fontFamily: fonts.medium, fontSize: 11, lineHeight: 15 },
+  item: { minWidth: 48, maxWidth: layout.itemMaxWidth, gap: layout.itemGap },
+  itemName: { color: '#536457', fontFamily: fonts.medium, fontSize: 13, lineHeight: layout.itemNameLineHeight },
+  itemQuantity: { color: '#405D50', fontFamily: fonts.bold, fontSize: layout.itemQuantityFontSize, lineHeight: layout.itemQuantityLineHeight, fontVariant: ['tabular-nums'] },
+  cart: { width: layout.cartWidth, minHeight: layout.cartMinHeight, borderRadius: 12, backgroundColor: '#E8EDDF', alignItems: 'center', justifyContent: 'center', gap: layout.cartGap },
+  cartLabel: { color: '#4C6758', fontFamily: fonts.medium, fontSize: layout.cartLabelFontSize, lineHeight: layout.cartLabelLineHeight },
 });

@@ -9,6 +9,7 @@ import { MarketKioskCheckout } from '../components/game/MarketKioskCheckout';
 import { MarketStaffedCheckout } from '../components/game/MarketStaffedCheckout';
 import { MarketMap } from '../components/game/MarketMap';
 import { MarketHud, type MarketHudControlMode } from '../components/game/MarketHud';
+import { getMarketHudTopInset } from '../game/marketHudLayout';
 import { MarketStaffDialogue, MarketStaffDialogueChoice } from '../components/game/MarketStaffDialogue';
 import { MarketPanelTransition } from '../components/game/MarketPanelTransition';
 import { MarketShelfScene } from '../components/game/MarketShelfScene';
@@ -741,7 +742,7 @@ export function MarketSimulationScreen({
         budget={mission?.budget}
         onContactRequester={!embedded ? contactRequester : undefined}
         score={aiAssessment ? undefined : session.score}
-        topInset={hudTopInset ?? (embedded ? Math.max(112, (insets?.top ?? 0) + 64) : Math.max(12, insets?.top ?? 0))}
+        topInset={hudTopInset ?? getMarketHudTopInset(insets?.top, embedded)}
         controlMode={embedded ? undefined : controlMode}
         onControlModeChange={embedded ? undefined : onControlModeChange}
         onGiveUp={giveUp}

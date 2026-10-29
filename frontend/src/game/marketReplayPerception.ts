@@ -3,6 +3,7 @@ import { getNearestMarketStation, isMarketEnvironmentBlocked, isNearMarketStatio
   type MarketEnvironmentStationId } from './marketEnvironment';
 import { isMarketNavigationSegmentClear } from './marketNavigation';
 import { getMarketShelfLayout } from './marketShelfLayout';
+import { getMarketHudOcclusionRect, type MarketHudRect } from './marketHudLayout';
 import { getMarketShelfUnitRects, MARKET_SHELF_ART_BOTTOM, MARKET_SHELF_ART_HEIGHT, MARKET_SHELF_ART_WIDTH, MARKET_SHELF_SCALE } from './marketFixtureLayout';
 import { marketCategories } from './scenarios';
 import type { Point } from './prototypeWorld';
@@ -54,8 +55,8 @@ function visiblePoint(environment: MarketEnvironment, position: Point, point: Po
   const y = p.viewport.height / 2 + (point.y - frame.center.y) * p.zoom;
   if (x < 12 || x > p.viewport.width - 12 || y < 12 || y > p.viewport.height - 12) return false;
   // The embedded shopping list covers the centre of the upper world. Do not read a sign through it.
-  const hudLeft = Math.max(0, (p.viewport.width - 420) / 2);
-  if (x >= hudLeft && x <= p.viewport.width - hudLeft && y >= 100 && y <= 246) return false;
+  const hud = getMarketHudOcclusionRect(p);
+  if (x >= hud.left && x <= hud.right && y >= hud.top && y <= hud.bottom) return false;
   return true;
 }
 function marker(environment: MarketEnvironment, station: MarketEnvironment['stationDetails'][number]): Point {
@@ -84,7 +85,7 @@ export function visibleStations(environment: MarketEnvironment, position: Point,
     });
 }
 
-type ScreenRect = { left: number; top: number; right: number; bottom: number };
+type ScreenRect = MarketHudRect;
 function intersectRect(a: ScreenRect, b: ScreenRect): ScreenRect | null {
   const clipped = { left: Math.max(a.left, b.left), top: Math.max(a.top, b.top),
     right: Math.min(a.right, b.right), bottom: Math.min(a.bottom, b.bottom) };
@@ -94,16 +95,7 @@ function unmaskedBodyPieces(rect: ScreenRect, presentation: ReplayPresentation):
   const clipped = intersectRect(rect, { left: 12, top: 12,
     right: presentation.viewport.width - 12, bottom: presentation.viewport.height - 12 });
   if (!clipped) return [];
-  // Keep the v1 list exclusion, extending it conservatively for the embedded
-  // HUD's safe-area/font-scaled layout (MarketHud + MarketSimulationScreen).
-  // This is a geometry projection, not a pixel-level occlusion measurement.
-  const hudLeft = Math.max(0, (presentation.viewport.width - 420) / 2);
-  const hudTop = Math.max(112, (presentation.safeArea?.top ?? 0) + 64);
-  const fontScale = presentation.fontScale ?? 1;
-  const hudBottom = hudTop + Math.max(44, 24 * fontScale)
-    + Math.max(62, 56 * fontScale + 13) + 2;
-  const mask = { left: hudLeft, right: presentation.viewport.width - hudLeft,
-    top: Math.min(100, hudTop), bottom: Math.max(246, hudBottom) };
+  const mask = getMarketHudOcclusionRect(presentation);
   const overlap = intersectRect(clipped, mask);
   if (!overlap) return [clipped];
   return [
@@ -114,7 +106,7 @@ function unmaskedBodyPieces(rect: ScreenRect, presentation: ReplayPresentation):
 }
 
 /**
- * Opt-in v2 body cues. v1 labelled stations/anchors are deliberately unchanged.
+ * Opt-in v2 body cues, using the same HUD mask as labelled stations/anchors.
  * Use the two actual sprite frames rather than the pair's empty aisle or sign
  * centre. A 24px-square visible patch avoids treating an edge sliver as a shelf.
  * The cue never contains a station/category ID, product, coordinate or route.

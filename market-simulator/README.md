@@ -161,6 +161,22 @@ actor policy는 whole-trace-v3, trace schema 2 / policy 6을 유지한다. 새 �
 
 candidate 7의 `personaReview.taskExpression`은 `task-expression-v1`로 표현 coverage를 기록한다. `coverage.status:"unexercised"`는 기억 부담과 이후 회복을 관찰하지 못했다는 뜻이다. 관심 동안 목표를 유지한 사실만으로 어려움이 발현됐다고 보지 않는다. 추가 soft warning은 `INTEREST_PRODUCTS_WITHOUT_FOCUS`·`UNIFORM_ORIENT_WALK_DELAYS`이며 실제 관심 상품 focus와 비교 행동, 이동 상황에 따른 지연을 검토한다. 경로 재방문은 왕복 이동일 수 있어 방황으로 단정하지 않는다.
 
+## Whole-trace 이동 그래프 진단
+
+목록 HUD 가림은 `frontend/src/game/marketHudLayout.ts`의 공통 계산을 사용한다. 렌더 카드 폭은 `min(viewport.width - 24, 420)`, embedded top은 `max(112, safeArea.top + 64)`다. 기본 배율에서 이름 두 줄을 포함한 높이 상한은 115px이므로 390×600 화면의 가림 사각형은 x=12..378, y=112..227이다. 화면 높이는 카메라 투영과 clipping에 영향을 주며 상단 카드 위치를 바꾸지 않는다. bottom safe area도 상단 카드에 영향을 주지 않는다. 큰 fontScale에서는 이름·수량·장바구니 글자의 줄 높이와 줄바꿈 상한을 반영한다. 실제 텍스트 측정값이 없는 replay presentation이므로 한 줄 목록에도 두 줄 공간을 보수적으로 가린다.
+
+다음 명령은 저장된 actor별 bundle의 초기 그래프와 현재 코드의 그래프에 각각 BFS를 실행한다. source snapshot SHA, 시작점, 환경, presentation, 계산대 상태, 전체 waypoint/anchor 카탈로그의 동일성을 확인한다. 시작 가상 노드는 지점 수에서 제외하고, 매대는 도달 노드의 `nearbyStations` 중 `kind === 'shelf'`인 고유 ID로 센다. 초기 계산대 상태만 진단하며 모델 호출·후보 컴파일·앱 재생은 하지 않는다.
+
+```sh
+node market-simulator/scripts/diagnose-whole-trace-reachability.cjs \
+  --pilot-directory output/persona-pilot-20261028 \
+  --output-directory output/persona-waypoint-reachability-new
+```
+
+출력 디렉터리는 원래 파일럿 밖의 새 경로여야 한다. `reachability.md`에는 입력별 전후 표, `reachability.json`에는 소스 hash·BFS 경로·도달 지점 목록이 저장된다. 2026-10-28 파일럿 64개 입력(공유 snapshot 2개)은 모두 23/139→131/139 지점, 매대 0→5곳, 계산대 도달 불가→가능으로 바뀌었다. 구조적 도달성 결과이며 실제 페르소나의 구매 성공률은 재측정하지 않았다.
+
+snapshot과 anchor ID 생성 규칙, bundle/candidate 버전은 유지한다. 기존 bundle의 그래프와 choice 메뉴는 자동 갱신되지 않으므로 이후 생성에는 새 bundle을 준비해야 한다. `inputHash`는 설정과 bundle 버전을 묶으며 코드/그래프 변경은 포함하지 않는다. `sourceFiles`에 공통 HUD 모듈 hash도 기록하지만 compiler는 이 hash를 호환성 차단 조건으로 검사하지 않는다. 따라서 같은 snapshotId/inputHash가 같은 이동 선택지를 보장하지 않는다. 과거 trace의 재검증도 현재 가림 판정을 사용하므로 당시 환경의 재현에는 당시 소스가 필요하다. 기존 파일럿·후보·trace를 다시 쓰거나 새 계약으로 변환하지 않는다.
+
 ## 구성과 시작
 
 Node 22 이상, 설치된 `frontend/node_modules`가 필요하다. TypeScript 컴파일러와 WebSocket 라이브러리를 프런트엔드 설치에서 재사용한다. 전역 Codex 설정을 자동 변경하지 않는다.

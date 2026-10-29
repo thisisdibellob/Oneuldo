@@ -87,8 +87,14 @@ test('initial snapshot identity excludes execution identity and rejects stale or
   damaged.snapshotId = `snapshot-${marketReplayFingerprint(body)}`;
   assert.equal(validateMarketReplaySnapshot(damaged).valid, false, 'resealing cannot bypass stock/config consistency');
   const withMission = createMarketReplaySnapshot(second, { ...marketMission, id: 'bound-mission' });
-  const bound = await generateTrace({ personaId: 'careful-checker', seed: 1, snapshot: withMission });
+  // This tests mission identity, independently of whether a stochastic walk
+  // finishes under the current visible-anchor graph and its action budget.
+  const bound = await generateTrace({ mode: 'llm', llm: { model: 'offline-binding-fixture' },
+    personaId: 'careful-checker', seed: 1, snapshot: withMission,
+    actorDecisionProvider: async () => ({ action: { type: 'giveUp' }, delayMs: 100, reason: 'Offline mission binding fixture' }) });
   assert.equal(bound.target.missionId, 'bound-mission');
+  assert.equal(validateTrace(bound, withMission).valid, true);
+  assert.equal(validateTrace(bound, createMarketReplaySnapshot(second)).valid, false);
 });
 
 test('different policy seeds vary choices in one snapshot, preserving visible family-name matching', async () => {
