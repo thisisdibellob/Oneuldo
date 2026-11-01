@@ -1,5 +1,5 @@
 import { randomUUID, createHash } from 'node:crypto';
-import { existsSync, mkdirSync, writeFileSync, renameSync, unlinkSync, openSync, closeSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync, appendFileSync, renameSync, unlinkSync, openSync, closeSync } from 'node:fs';
 import { resolve, dirname, join } from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { canonicalMarketReplayJson } from '../../frontend/src/game/marketReplayTrace';
@@ -10,6 +10,8 @@ import { WHOLE_TRACE_MODEL, WHOLE_TRACE_POLICY_VERSION, validateWholeTraceCandid
   type WholeTraceValidation, type WholeTraceWireDecision } from './wholeTraceContracts';
 import { validateTrace } from './traceValidation';
 import { summarizeTrace } from './simulator';
+import { createWholeTraceExecutionAuthoringCursor, type WholeTraceAuthoringOptions } from './wholeTraceExecutionAuthoring';
+import type { WholeTraceSourceDecisionDraft } from './wholeTraceAuthoringSource';
 
 const { beginGeneration } = require('../generation-journal.cjs');
 function saveNew(file: string, value: unknown) {
@@ -54,6 +56,9 @@ export class WholeTraceSession {
   // Keep the original binding for identical suffix-only delivery retries, even
   // after compilation has advanced the accepted prefix or closed the request.
   private lastRepairBinding?: { baseAttempt: number; fromDecisionIndex: number; candidateVersion: string };
+  private authoring?: Awaited<ReturnType<typeof createWholeTraceExecutionAuthoringCursor>>;
+  private authoringStart?: Promise<Awaited<ReturnType<typeof createWholeTraceExecutionAuthoringCursor>>>;
+  private authoringOptions?: WholeTraceAuthoringOptions;
 
   constructor(input: WholeTraceSettings) {
     if (!input || typeof input !== 'object') throw new Error('Whole trace settings are required');
@@ -83,7 +88,67 @@ export class WholeTraceSession {
       canRepair: this.state === 'invalid' && this.attempts < 1 + (this.settings.maxRepairs ?? 0),
       model: WHOLE_TRACE_MODEL, reasoningEffort: 'low', policyVersion: WHOLE_TRACE_POLICY_VERSION,
       inputHash: this.inputHash, diagnosticDirectory: this.diagnosticDirectory,
+      ...(this.authoring ? { authoring: this.authoring.metrics() } : {}),
       ...(this.lastResult ? { result: structuredClone(this.lastResult) } : {}) };
+  }
+  async beginAuthoring(options: WholeTraceAuthoringOptions = {}) {
+    if (this.state !== 'prepared') throw new Error('Authoring requires the same unsubmitted prepared request');
+    const normalized = { maxRewritesPerDecision: options.maxRewritesPerDecision ?? 3 };
+    if (this.authoringOptions && canonicalMarketReplayJson(normalized) !== canonicalMarketReplayJson(this.authoringOptions))
+      throw new Error('An authoring rewrite budget cannot be changed after beginning');
+    if (!this.authoringStart) {
+      this.authoringOptions = normalized;
+      this.authoringStart = createWholeTraceExecutionAuthoringCursor(this.settings, this.bundle, normalized);
+    }
+    try { this.authoring = await this.authoringStart; }
+    catch (error) {
+      // A failed initialization accepted no decision and froze no rewrite budget.
+      this.authoringStart = undefined; this.authoringOptions = undefined;
+      throw error;
+    }
+    this.persistStatus();
+    return { requestId: this.requestId, menu: await this.authoring.menu(), authoring: this.authoring.metrics() };
+  }
+  private requireAuthoring() {
+    if (!this.authoring || this.state !== 'prepared') throw new Error('Begin authoring on the same unsubmitted prepared request first');
+    return this.authoring;
+  }
+  async authoringMenu(nextDecision?: Parameters<NonNullable<WholeTraceSession['authoring']>['menu']>[0]) {
+    const cursor = this.requireAuthoring();
+    return { requestId: this.requestId, menu: await cursor.menu(nextDecision), authoring: cursor.metrics() };
+  }
+  async appendAuthoring(decision: WholeTraceSourceDecisionDraft) {
+    const cursor = this.requireAuthoring();
+    try {
+      const result = await cursor.append(decision);
+      const response = { ...result, requestId: this.requestId, authoring: result.metrics };
+      appendFileSync(join(this.diagnosticDirectory, 'authoring.jsonl'), JSON.stringify({
+        time: new Date().toISOString(), decision: scrub(decision), ...response }) + '\n', { mode: 0o600 });
+      if (!result.accepted && !result.canRetry) {
+        this.state = 'failed';
+        this.lastResult = { status: 'failed', requestId: this.requestId, code: 'AUTHORING_REWRITE_LIMIT',
+          validation: result, authoring: result.metrics, canRepair: false, completeTrace: false, appExecuted: false };
+      }
+      this.persistStatus();
+      return response;
+    } catch (error) {
+      if ((error as { code?: string }).code === 'AUTHORING_BUSY') throw error;
+      this.state = 'failed';
+      this.lastResult = { status: 'failed', requestId: this.requestId,
+        code: (error as { code?: string }).code ?? 'AUTHORING_CHECK_FAILED', error: (error as Error).message,
+        authoring: cursor.metrics(), canRepair: false, completeTrace: false, appExecuted: false };
+      try {
+        appendFileSync(join(this.diagnosticDirectory, 'authoring.jsonl'), JSON.stringify({
+          time: new Date().toISOString(), decision: scrub(decision), ...this.lastResult }) + '\n', { mode: 0o600 });
+      } catch (writeError) { this.lastResult.diagnosticWriteError = (writeError as Error).message; }
+      try { this.persistStatus(); }
+      catch (writeError) { this.lastResult.statusWriteError = (writeError as Error).message; }
+      throw error;
+    }
+  }
+  finishAuthoring() {
+    const cursor = this.requireAuthoring();
+    return { requestId: this.requestId, candidate: cursor.finish(), authoring: cursor.metrics() };
   }
   /** Submit only the not-yet-accepted tail of one bounded technical repair. */
   async submitRepair(value: unknown): Promise<Record<string, unknown>> {
@@ -166,6 +231,9 @@ export class WholeTraceSession {
   }
   async submit(value: unknown): Promise<Record<string, unknown>> {
     if (this.state === 'compiling') throw new Error('This whole trace request is already compiling');
+    if (this.state === 'prepared' && this.authoring
+      && canonicalMarketReplayJson(value) !== canonicalMarketReplayJson(this.authoring.finish()))
+      throw new Error('Submit the exact finished authoring candidate; accepted decisions cannot be replaced');
     value = structuredClone(value);
     const json = canonicalMarketReplayJson(value);
     if (json.length > 1000000) throw new Error('Candidate exceeds the bounded JSON size');
@@ -240,6 +308,7 @@ export class WholeTraceSession {
       saveNew(personaReviewPath, review); reviewSaved = true;
       const completeAt = performance.now();
       const metrics = { planningSubmissions: this.attempts, repairSubmissions: this.attempts - 1,
+        ...(this.authoring ? { authoring: this.authoring.metrics() } : {}),
         acceptedActions: compiled.acceptedActions, planningAndDeliveryWallMs: planningGapMs,
         compileAndValidationMs: validatedAt - compileStart, finalValidationMs: validatedAt - validationStart,
         persistenceMs: completeAt - validatedAt, wholeRequestWallMs: completeAt - this.createdTick,
@@ -285,6 +354,7 @@ export class WholeTraceSession {
       try { saveNew(`${attemptPath}.failure.json`, scrub(this.lastResult)); }
       catch (writeError) { this.lastResult.diagnosticWriteError = (writeError as Error).message; }
     }
+    if (this.authoring && this.lastResult) this.lastResult.authoring = this.authoring.metrics();
     try {
       this.persistStatus();
       if (this.state === 'complete' && completedTrace) journal!.complete(completedTrace);

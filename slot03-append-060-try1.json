@@ -1,0 +1,47 @@
+{
+  "contextFilePath": "context.json",
+  "operationId": "slot03-append-060-try1",
+  "tool": "append_whole_trace_decision",
+  "arguments": {
+    "decision": {
+      "choiceRef": {
+        "choiceId": "control/closeStation"
+      },
+      "delayMs": 1600,
+      "reason": "달걀 한 개를 담은 뒤 냉장 진열대를 닫고 다음 목록 항목을 확인한다.",
+      "basis": {
+        "intent": "task",
+        "goalId": "objective-4",
+        "memoryUses": [
+          {
+            "goalId": "objective-4",
+            "field": "name",
+            "mode": "remembered",
+            "value": "달걀"
+          },
+          {
+            "goalId": "objective-4",
+            "field": "requiredQuantity",
+            "mode": "remembered",
+            "value": 1
+          }
+        ]
+      },
+      "actorState": {
+        "activity": "orient",
+        "task": "달걀 담기를 마치고 다음 할 일을 확인한다",
+        "heldGoalIds": [],
+        "uncertainGoalIds": [],
+        "focusedGoalId": null,
+        "focusedProductId": null,
+        "orientation": "familiar",
+        "taskUpdate": [
+          {
+            "type": "complete",
+            "goalId": "objective-4"
+          }
+        ]
+      }
+    }
+  }
+}

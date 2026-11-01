@@ -57,6 +57,14 @@ const definitions = [
   { name: 'record_learning_failure', description: 'Record a technical failure separately from measured gameplay and keep it in experiment accounting.', inputSchema: schema({ trialFile: string, arm: { enum: ['A', 'B', 'C'] }, roundId: string, stage: string, code: string }, ['trialFile', 'arm', 'roundId', 'stage', 'code']) },
   { name: 'compare_learning_trial', description: 'Compare completed baseline/probe measurements and report incomplete pairs and technical failures. Improvement is never presumed.', inputSchema: schema({ trialFile: string }, ['trialFile']), annotations: { readOnlyHint: true } },
 ];
+// Local offline authoring operations share session ownership and validation,
+// while the existing public MCP tool catalog stays unchanged.
+const authoringDefinitions = [
+  { name: 'begin_whole_trace_authoring', description: 'Begin offline decision authoring for the same prepared request. Each explicit draft uses unchanged prefix execution validation, with bounded technical rewrites and advisory calculations only; no model or app calls.', inputSchema: schema({requestId:string,maxRewritesPerDecision:{type:'integer',minimum:0}},['requestId']) },
+  { name: 'append_whole_trace_decision', description: 'Check one source-free actor decision. Rejection retains the accepted prefix and returns reasons, the current menu and rewrite metrics; it never supplies replacement declarations.', inputSchema: schema({requestId:string,decision:object},['requestId','decision']) },
+  { name: 'whole_trace_authoring_menu', description: 'Read current choices and reference-only calculated pressures, observed product IDs and open goals. Optional nextDecision supplies actorState and delayMs for an exact pre-action preview; no declarations are filled.', inputSchema: schema({requestId:string,nextDecision:object},['requestId']),annotations:{readOnlyHint:true} },
+  { name: 'finish_whole_trace_authoring', description: 'Return the complete actor-authored candidate and first-attempt/rewrite metrics. Submit this unchanged candidate through submit_whole_trace for final validation.', inputSchema: schema({requestId:string},['requestId']) },
+];
 function checkArguments(value, contract, at = 'arguments') {
   if (contract.anyOf) { if (!contract.anyOf.some(option => { try { checkArguments(value, option, at); return true; } catch { return false; } })) throw new Error(`${at}: invalid value`); return; }
   if (contract.enum && !contract.enum.includes(value)) throw new Error(`${at}: expected ${contract.enum.join(' | ')}`);
@@ -135,7 +143,7 @@ function createService(options = {}) {
     return args.tabId ? (await getBridge()).snapshot(args.tabId) : args.snapshot ?? readJson(args.snapshotFilePath);
   }
   async function invokeTool(name, args = {}) {
-    const tool = definitions.find(item => item.name === name);
+    const tool = [...definitions, ...authoringDefinitions].find(item => item.name === name);
     if (!tool) throw new Error(`Unknown tool: ${name}`);
     checkArguments(args, tool.inputSchema);
     if (name === 'list_personas') {
@@ -333,6 +341,23 @@ function createService(options = {}) {
       const session=controlSlot?require('./src/personas.ts').withValidationPersona(createSession,controlSlot.persona):createSession();
       const prepared=session.prepare();wholeTraceSessions.set(prepared.requestId,{session,trialRound,controlSlot,submitting:false,finished:false,trialFailureRecorded:false});
       return {...prepared,...(trialRound??{})};
+    }
+    if(['begin_whole_trace_authoring','append_whole_trace_decision','whole_trace_authoring_menu','finish_whole_trace_authoring'].includes(name)){
+      const record=wholeTraceSessions.get(args.requestId);if(!record) throw new Error('Unknown whole-trace request; use the same persistent MCP or interactive CLI process');
+      if(record.submitting) throw new Error('A whole-trace candidate is already being submitted');
+      const author=()=>name==='begin_whole_trace_authoring'?record.session.beginAuthoring({maxRewritesPerDecision:args.maxRewritesPerDecision})
+        :name==='append_whole_trace_decision'?record.session.appendAuthoring(args.decision)
+        :name==='whole_trace_authoring_menu'?record.session.authoringMenu(args.nextDecision):record.session.finishAuthoring();
+      const result=await (record.controlSlot?require('./src/personas.ts').withValidationPersona(author,record.controlSlot.persona):author());
+      if(result.authoring?.failed){
+        record.finished=true;
+        if(record.trialRound && !record.trialFailureRecorded){
+          require('./learning-trial.cjs').recordTrialFailure({trialFile:record.trialRound.trialFile,arm:record.trialRound.arm,
+            roundId:record.trialRound.roundId,stage:'generation',code:'WHOLE_TRACE_GENERATION_FAILED'});
+          record.trialFailureRecorded=true;
+        }
+      }
+      return {...result,...(record.trialRound??{})};
     }
     if(name==='submit_whole_trace' || name==='repair_whole_trace' || name==='whole_trace_status'){
       const record=wholeTraceSessions.get(args.requestId);if(!record) throw new Error('Unknown whole-trace request; use the same persistent MCP or interactive CLI process');

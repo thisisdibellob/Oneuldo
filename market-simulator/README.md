@@ -124,7 +124,7 @@ Luna 전체 계획 경로는 전체 세계를 전개 계산용 참고 자료로 
 
 ## Luna 전체 계획 생성
 
-실제 Codex 세션을 `gpt-6-luna` / `low`로 설정하고 지속형 MCP 또는 `node market-simulator/cli.cjs interactive`에서 실행한다. MCP는 모델을 전환하거나 Luna 세션을 자동 생성하지 않는다. 다른 모델의 감독 세션은 사용자가 이양을 허용한 기존 Luna 세션에 전체 계획 작성을 맡긴다. 서버의 모델 라벨은 실제 세션 설정·내부 API 호출 횟수의 증거가 아니다. 전체 계획 생성에는 학교 Qwen 서버·API 키·SSH 터널이 필요하지 않으며 앱 재생·분석은 기존 서비스 연결을 사용한다.
+실제 Codex 세션을 `gpt-6-luna` / `low`로 설정하고 지속형 MCP 또는 `node market-simulator/cli.cjs interactive`에서 실행한다. 배우와 분리한 오프라인 요청 호스트는 아래 `host-start`로 시작할 수 있다. MCP는 모델을 전환하거나 Luna 세션을 자동 생성하지 않는다. 다른 모델의 감독 세션은 사용자가 이양을 허용한 기존 Luna 세션에 전체 계획 작성을 맡긴다. 서버의 모델 라벨은 실제 세션 설정·내부 API 호출 횟수의 증거가 아니다. 전체 계획 생성에는 학교 Qwen 서버·API 키·SSH 터널이 필요하지 않으며 앱 재생·분석은 기존 서비스 연결을 사용한다.
 
 한 인물·한 조건·한 seed·한 request/bundle마다 새 actor 작성 문맥을 사용하고 저부하·고부하 bundle을 같은 문맥에 함께 주지 않는다. `requestId`·`bundle.inputHash`를 후보 출처로 기록하고 새 `bundle.authoringGuide`(`authoringVersion:"2"`)의 식별 정보·문법·상태 전이 예제를 확인한다. 저장된 가이드 v1은 그대로 보존한다. 호스트 MCP는 여러 요청을 관리할 수 있지만 서버가 actor 문맥 분리를 강제하거나 입증하지는 않는다. `taskUpdate`는 한 건도 배열이며 `basis.intent`와 `actorState.activity`의 허용값은 서로 다르다. 직전 행동 결과와 같은 결정의 taskUpdate를 반영한 행동 직전 상태를 작성한다. 세부 규칙은 [작성 시점과 문법 확인](../market-persona-skill/references/whole-trace.md#작성-시점과-문법-확인)을 따른다.
 
@@ -132,6 +132,41 @@ Luna 전체 계획 경로는 전체 세계를 전개 계산용 참고 자료로 
 2. Luna는 전체 맵·상품·재고·목표를 다음 화면과 행동 결과를 예상하는 세계 참고 자료로 사용한다. 인물의 선택에는 그 시점에 보이는 단서·발견 기억·같은 프로필 JSON의 상세 개인 지침을 사용해 **전체 행동 배열과 단계별 상태·근거를 직접** 작성한다. 아직 읽지 않은 목록·열지 않은 상품 페이지·화면 밖의 미발견 위치는 인물이 알고 있는 사실이 아니다. 코드가 행동마다 정답이나 확률 선택을 대신 넣지 않는다.
 3. `submit_whole_trace({requestId,candidate})` 또는 `{requestId,candidateFilePath}`로 전체 배열을 제출한다. Node가 기존 attention loop·`projectDecision`·`TraceGuard`·게임 어댑터로 컴파일하고 최종 구조/의미 검증 후 파일을 저장한다. 정상 흐름에서는 별도 finalize가 필요 없다. `whole_trace_status({requestId})`로 상태와 저장 결과를 다시 확인할 수 있다.
 4. 요청이 생성·검증뿐이면 파일 저장에서 끝낸다. 앱 실행까지 요청받았다면 `validate_trace` → `play_trace` → `replay_status`로 전체 trace를 전달하고 실제 실행을 확인한다.
+
+#### 결정별 오프라인 작성
+
+작성 JSON은 `node market-simulator/cli.cjs author-whole request.json` 또는 `node market-simulator/cli.cjs author-whole - < request.json`으로만 전달한다. JSON은 `{contextFilePath,operationId,tool,arguments}`이며 스크립트 경로나 추가 위치 인자는 받지 않는다. 준비 담당자가 저장한 `context.json`에서 전송용 `hostDirectory`·`requestId`를 읽고, 요청 최상위나 arguments에 두 값을 다시 적으면 값이 같아도 `AUTHORING_CONTEXT_OVERRIDE`로 연결 전에 거절한다. 파일 입력의 상대 contextFilePath는 그 요청 파일 디렉터리, stdin은 현재 작업 디렉터리 기준이며 context 내부 상대 hostDirectory는 context 파일 디렉터리 기준이다.
+
+예를 들어 작성 시작 입력은 `{"contextFilePath":"context.json","operationId":"authoring-begin-1","tool":"begin_whole_trace_authoring","arguments":{"maxRewritesPerDecision":3}}`이다. 같은 준비 요청에서 `begin_whole_trace_authoring` → `whole_trace_authoring_menu` / `append_whole_trace_decision` → `finish_whole_trace_authoring` → `submit_whole_trace`를 사용한다. append의 arguments는 `{decision}`, finish·상태 조회는 `{}`, 제출은 `{candidate}` 또는 `{candidateFilePath}`다. candidate·repair 내부의 requestId와 모든 행동·상태 값은 그대로 기존 검증기에 전달하며 누락·불일치를 자동 수정하지 않는다. 전송 안내는 `transportRevision:"prepared-context-v1"`로 구분한다.
+
+결정마다 기존 실행 검증기를 접두 구간에 재사용한다. 거절 시 같은 결정을 기본 최대 3회 다시 쓰며 `maxRewritesPerDecision`으로 설정한다. 이 예산은 최종 제출 뒤 `maxRepairs`와 별도다. 메뉴의 압력/상태·관찰 상품·열린 목표는 참고용 계산값으로, 보조기는 `uncertainGoalIds` 등 행동·상태 선언을 채우거나 수정하지 않는다. 기본 압력은 직전 활동·추가 지연 0 기준이며 AI가 작성한 다음 활동/지연으로 별도 조회할 수 있다. 결과와 `authoring.jsonl`, 호스트 저널에 첫 시도 통과·재작성 횟수·거절 규칙을 기록한다. [입력 형식과 같은 결정 재작성](../market-persona-skill/references/whole-trace.md#결정별-실행-검증과-재작성)을 따른다.
+
+메뉴의 `presentationRevision:"current-choice-menu-v1"`은 `interactionContext`로 매대·장바구니·도움말·직원·계산대 등 현재 메뉴를 설명하고, `availableChoices`에 기존 `choiceIds`와 같은 순서의 행동 이름을 표시한다. `view:"world"`에서도 매대가 열려 있을 수 있다. 전역 catalog나 activeStation만으로 선택 가능 여부를 추론하지 않고 매 결정의 최신 `choiceIds`를 따른다. 거절 응답의 `rewrite`는 같은 결정의 재작성 대기(`awaiting-rewrite`) 또는 소진(`exhausted`), 수락된 결정 수, 남은 횟수를 명시한다. `canRetry:true`는 전체 실패가 아니다. AI가 기존 의도를 유지하며 그 결정의 기술 오류를 다시 작성할 수 있고, 보조기는 대체 행동을 추천·삽입하거나 상태를 채우지 않는다. 수락된 앞부분과 기존 판정·최종 수정 예산은 유지한다.
+
+실행 메뉴의 `currentObservation`은 `kind:"validated-prefix-observation-v1"`, `acceptedDecisionCount`, `notice`와 선택적 `readObjectives`로 기존 접두 검증의 현재 목록 관찰을 제공한다. 수락된 `readList` 다음 한 관찰에만 목록이 표시되고, 다음 행동 수락 후 기존 수명대로 갱신된다. 필드 생략은 현재 미표시, `[]`는 표시된 빈 목록이며 과거 목록이나 worldReference로 채우지 않는다. 메뉴 조회·활동/지연 미리보기·거절은 관찰을 소비하지 않는다. `advisory.goalFields:[]`는 활성 기억 필드 없음, `openGoalIds:[]`는 열린 목표 없음, `observedProductIds:[]`는 관찰 상품 없음을 뜻한다. 목록이 표시됐지만 아직 목표를 선택하지 않았다면 이 배열들이 비어 있어도 정상이다. AI가 기존 계약에 따라 목표 선택과 상태를 직접 선언하며 보조기는 자동으로 채우지 않는다.
+
+## 오프라인 요청 호스트의 수명
+
+macOS/Linux에서 `host-start`는 호출자의 stdin을 받지 않는 독립 프로세스를 시작한다. 배우 작업이나 `host-call` 클라이언트가 끝나도 준비한 요청은 같은 호스트 메모리에 남는다. 호스트 디렉터리는 부모가 존재하는 새 경로를 지정하며, 종료된 디렉터리도 다시 사용하지 않는다.
+
+```sh
+node market-simulator/cli.cjs host-start /absolute/new-host-directory
+node market-simulator/cli.cjs host-status /absolute/new-host-directory
+node market-simulator/cli.cjs host-call /absolute/new-host-directory --options-file /absolute/prepare-call.json
+node market-simulator/cli.cjs host-close /absolute/new-host-directory
+```
+
+준비 담당자의 호출 파일은 `{"operationId":"prepare-01","tool":"prepare-whole","arguments":{"personaId":"...","seed":"...","snapshotFilePath":"/absolute/snapshot.json","maxRepairs":0}}` 형태다. 준비 응답의 requestId와 실제 hostDirectory를 해당 배우의 context.json에 저장한 다음, 작성·제출에는 위의 `author-whole` 진입점을 사용한다. 별칭과 정식 도구명은 같은 도구로 해석한다. `hostId`·`requestId`·`inputHash`·operationId는 후보 밖의 실행 출처에도 기록한다. 호스트의 직접 호출 API와 기존 MCP 인자 계약은 유지한다.
+
+작성 요청을 전달하기 전과 제출 전에 `host-status`로 같은 호스트와 요청이 살아 있는지 확인한다. 응답 연결만 끊겼다면 **같은 살아 있는 호스트에 같은 operationId와 변경 없는 입력**으로 재전송한다. 진행 중이거나 끝난 동일 작업의 결과를 공유하므로 제출·수정 예산을 다시 소비하지 않는다. 같은 ID의 변경된 입력은 거절한다. 지원하는 candidate/repair/snapshot/trace 파일은 호출 시 내용으로 고정해 해시에 반영한다. 이는 전송 재시도이며 AI 재생성이나 기술 수정 허가가 아니다.
+
+독립 호스트는 `list_personas`, whole-trace 준비·작성·제출·수정·상태, `validate_trace`만 지원한다. `tabId`, learner/trial/job/generation 파일이나 persona-validation 디렉터리 작업은 지원하지 않으며 기존 CLI/MCP 경로를 사용한다. 이 경계로 요청 파일을 대기 중에 다시 읽어 다른 내용으로 실행하는 일을 막는다. 앱 실행이나 provider 생성은 호스트 호출로 시작할 수 없다.
+
+`status.json`은 PID·시작/종료·요청 상태·attempts를, `events.jsonl`은 작업 ID·상태와 관측된 종료 신호를 기록한다. `process.log`에는 프로세스 오류가 남는다. 접근 자격 파일 `connection.json`은 공유하지 않는다. `host-close`와 SIGTERM은 대기 작업을 마친 뒤 종료하며, SIGKILL 등 기록하지 못한 종료는 원인 불명 `unavailable`로 보고한다. 기록은 체크포인트가 아니므로 종료한 호스트의 요청을 자동 복원하지 않는다. 새 호스트는 이전 requestId를 모르며, 기존 후보의 requestId를 바꾸거나 새 요청으로 옮겨 제출하지 않는다.
+
+종료 요청의 응답은 `state:"closing"`으로 종료 접수를 알린다. 호스트는 접수된 작업과 서비스 정리 뒤에도 이 응답 및 작업 응답의 writable `finish` 또는 연결 종료를 기다린 다음 소켓을 제거한다. 응답을 읽지 않는 클라이언트에는 최대 5초의 전송 대기만 허용하며, 초과 시 `host_response_drain_timeout`을 기록한다. 접수 응답은 서비스 정리의 성공 보증이 아니므로 최종 `host-status`/종료 기록의 closed·exitCode를 따로 확인한다. 서비스 정리가 실패해도 접수 응답 전송을 기다린 뒤 failed·exitCode 1로 기록한다.
+
+### 후보 작성과 제출 계약
 
 기술 수정이 허용된 실패에는 `repair_whole_trace({requestId,repair:{decisions:[...]}})`로 수정할 suffix만 보낸다. `repairFilePath`도 같은 `{ "decisions": [...] }` 객체를 받는다. 서버가 요청·버전·수정 시작 위치를 채우고 이미 수락한 prefix와 원래 종료 의도, 수정 1회 제한을 유지한다. 기존 명시형 wrapper도 지원하며 잘못 명시한 값은 거절한다. 별도 사전 검사 왕복이나 행동별 AI 호출을 추가하지 않는다.
 
@@ -148,6 +183,18 @@ Luna 전체 계획 경로는 전체 세계를 전개 계산용 참고 자료로 
 각 판단의 필수 actorState는 candidate 7에서 `{activity,task,heldGoalIds,uncertainGoalIds,focusedGoalId,focusedProductId,orientation,triggerCueRefs?,memoryUpdate?,taskUpdate?}`이며 행동 직전의 허구 상태를 요약한다. 작업 기억과 과제 snapshot은 코드가 계산하고 모델이 덮어쓰지 않는다. optional memoryUpdate는 `{type:"selfRecall",goalId,values:{name?,specification?,requiredQuantity?}}`, `{type:"deactivate",goalId}`, `{type:"uncertain",goalId,fields:[...]}` patch 배열이다. deactivate는 열린 과제의 complete/abandon을 대신하지 않는다. selfRecall은 선언값을 uncertain belief로 기록하며 원장의 정답을 복사해 clear로 바꾸지 않는다. remembered 값은 계산상 clear 기억값과 일치해야 하고 guess는 uncertain belief, current-display는 현재 readObjectives 값과 일치해야 한다. unavailable인 필드는 실제 목록 재확인이나 selfRecall 없이 사용할 수 없다. 활성 목표의 필수 세부가 불확실하거나 unavailable이면 uncertainGoalIds에 그 목표를 포함한다. non-null basis.goalId는 focus와 무관하게 name 사용이 필요하되 실제 readList/viewCart/viewHelp는 기억 없이 외부 확인을 먼저 할 수 있다. 관심 이외의 add/remove는 goalId가 필요하며 목표에 연결된 add/remove에는 name·requiredQuantity 사용을 선언한다. non-null goal focus는 basis.goalId와 같아야 한다. 선택한 상품·수량의 정답 검사는 하지 않는다. 실행 대상/control과 objective proof는 기억 사용·정확 회상 근거를 대신하지 않는다. task는 최대 160자의 관찰 가능한 활동이고 trace currentTask로 연결한다. 상태·지연·근거는 내면 사고나 측정된 심리 상태가 아니다. 역할 검토는 별도 soft warning이며 행동을 정답으로 교정하지 않는다.
 
 `worldReference.navigation.states`는 방향이 있는 이동을 예상하기 위한 참고다. 각 결정에서 실제 허용 선택은 current source와 일치하는 choice frame의 available choice IDs로 정한다. 지도상 이웃이나 future choice가 현재 선택 frame에 없으면 바로 고를 수 없다. 다음 선택은 개인의 관심·목표·확인·배회 의도로 고르고 재방문·휴식·도움을 허용한다. 최단 경로/목표 상품 정답 선택기는 없다.
+
+새 작성 안내는 `authoringVersion:"2"`, `guidanceRevision:"declaration-preflight-v3"`를 기록한다. add/remove의 명시적 quantity, 완전한 결정 예제, 서로 다른 intent/activity enum, **actorState 안의 taskUpdate 배열**, 준비된 실제 수정 예산을 설명한다. `basis.memoryUses`의 **모든 항목에는 goalId·field·mode·value가 필요**하고 상위 basis.goalId가 항목의 goalId를 대신하지 않는다. candidate 7에서 직접 쓴 `basis.cueRefs`의 `objective:<id>`는 이미 읽은 목표여도 non-null `basis.goalId`가 필요하다. `goalId:null`, `memoryUses:[]`만으로는 허용되지 않는다. 이 필드는 상태 변화의 알려진 계기를 적는 `actorState.triggerCueRefs`, 컴파일러가 파생하는 관찰 증명과 구분한다. 어느 증명도 필요한 memoryUses를 대신하지 않는다. 53·56번 유형의 기존 거절 의미를 유지한다.
+
+선택적 `createWholeTraceSourceAuthoringCursor(bundle)`는 배우가 선택한 결정에서 source만 제외해 `append`로 받고, 저장된 메뉴와 전이로 예상 source를 작성한다. `finish()`는 동일한 후보 형식 검사를 수행한다. 게임 실행·관찰 피드백·행동 선택·경로 삽입·수량 보정은 하지 않는다. 이미 source를 가진 후보를 덮어쓰지 않으며 전체 제출 검증은 계속 필요하다. 매대에서 장바구니를 열면 station은 유지하고 pageIndex는 null, 닫으면 직전 페이지로 돌아간다. 키오스크와 앱/컴파일러 전이가 모호한 직원 호출은 보조기가 지원하지 않고 오류로 남긴다. 자세한 사용 계약은 [source 작성 보조](../market-persona-skill/references/whole-trace.md#선택한-행동의-source-작성-보조)를 따른다. 향후 표본에는 안내 revision과 보조기 사용 여부를 후보 밖에 기록하고, 이전 표본과 작성 조건이 같다고 취급하지 않는다.
+
+`source-task-preflight-v3`의 `cursor.menu()`는 현재 예상 source의 순위 없는 choiceIds·방향별 allowedWaypointIds·저장된 통로 표시를 반환한다. W 번호의 연속성·역방향 이동 이력으로 현재 간선을 추정하지 않으며 열린 패널에서는 통로 메뉴를 사용하지 않는다. `append` 오류의 `error.context`에도 변경되지 않은 source·메뉴·실패 인덱스를 남긴다. `append` 초안에는 source 키 자체를 생략하고, 직접 제출에는 source가 필수다. source 없는 완전한 예제와 인터페이스 설명은 새 authoringGuide에 포함된다. 작성 중 조회와 전체 초안 후 조립은 다른 작성 조건으로 기록한다.
+
+`append`는 명시한 목표 ID의 select/complete/abandon 이력과 같은 결정의 held/basis/focus 정합성을 검사하고, 모순은 `AUTHORING_TASK_DECLARATION`으로 작성 단계에서 거절한다. readList 다음 한 결정에만 예상 표시 ID를 사용하며 알려진 ID에서 기억값을 되살리지 않는다. select를 쓴 같은 결정의 heldGoalIds가 비어 있거나, 열린 목표 참조 없이 recover를 쓰거나, 예외 행동이 아닌데 목록 직후 필요한 목표 선택을 빠뜨린 경우가 해당한다. task/recover의 목표 참조와 non-goal check/help의 null을 구분하는 완전한 조건부 예제는 `sourceAuthoring.taskDeclarationExamples`에 있다. 목표·행동·intent·수량·종료를 대신 선택하지 않고, 오류는 입력과 cursor를 그대로 둔다. snapshot/menu에 목표 상태·기억 정답은 노출하지 않는다.
+
+이 검사는 선언의 상징적 일관성만 다룬다. 작성한 add/complete는 실제 구매 수락·관측 증거가 아니며 기억 압력·확실성·정답은 계산하지 않는다. 기존 최종 compiler·지식·목표·작업 기억 검증은 계속 적용한다. 현재 안내·보조기 revision과 sourceFiles 해시를 새 준비 결과에 기록하며 기존 `directed-source-memory-v2` / `source-menu-v2` 결과는 바꾸지 않는다. 사전검사 오류가 수정·재생성 권한을 추가하지 않는다.
+
+새 `authoringGuide.workingMemory`는 행동 전 기억 계산 순서, 열린 목표와 focus의 차이, 불확실성 필수 선언, 세 가지 memoryUses 모드를 설명한다. source 보조기는 기억 상태를 계산하거나 수정하지 않는다. 지연·직전 행동 시간·관심·수량 부담으로 기존 임계치를 넘으면 닫기나 이동에서도 해당 목표의 uncertainty를 선언해야 한다. 지연을 줄이거나 확인·포기를 삽입해 통과시키지 않는다. bundle/candidate 8/7, 기존 임계값·기억 계약·검증기는 유지하며 안내 revision과 sourceFiles 해시만 새 준비 결과에 반영된다. 저장된 후보·trace·bundle은 변환하지 않는다.
 
 전체 세계와 waypoint 자료는 `worldReference`에 유지하고 기본 bundle의 생성기 원문 `generatorReference`는 연결 정보로 교체한다. `sourceFiles` 경로·SHA-256 출처 목록은 보존한다. 참고 코드는 모델 안에서 실행되지 않으며, 입력 구성 변경의 실제 시간 효과는 별도 측정한다.
 

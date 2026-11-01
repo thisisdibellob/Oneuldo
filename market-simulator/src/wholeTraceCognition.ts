@@ -57,7 +57,7 @@ export type WholeTraceCognitionPreview = {
 };
 
 /** One rule source for the single model submission and independent post-submission replay. */
-export const WHOLE_TRACE_COGNITION_INSTRUCTIONS = `Working memory is separate from the factual observation archive. In these rules cognitionProfile is shorthand for the supplied persona.behavior.cognition object. It is a fictional deterministic design, not a clinical probability model. Node recomputes it after the complete candidate is submitted; you do not receive runtime cognition feedback between decisions. A full worldReference in the same model context cannot guarantee that hidden information had no influence.
+export const WHOLE_TRACE_COGNITION_INSTRUCTIONS = `Working memory is separate from the factual observation archive. In these rules cognitionProfile is shorthand for the supplied persona.behavior.cognition object. It is a fictional deterministic design, not a clinical probability model. Node recomputes it after the complete candidate is submitted. The offline authoring aid also reuses these execution checks for each supplied prefix and displays reference calculations before the next decision; it never fills or changes actor declarations. A full worldReference in the same model context cannot guarantee that hidden information had no influence.
 Only heldGoalIds occupy active slots, at most cognitionProfile.goalMemoryCapacity. Removing a held goal deletes its working values; bringing its ID back never copies the archived list. Every goal field is {value,status:clear|uncertain|unavailable,pressure,ageMs,source}. Only an actual current readObjectives observation supplies exact name/requiredQuantity and an explicitly displayed specification; do not invent a specification from a product catalogue. A cart confirms purchasedCounts and a product detail confirms that product specification, never a forgotten requested quantity/specification.
 actorState.memoryUpdate is optional: [{type:"selfRecall",goalId,values:{name?,specification?,requiredQuantity?}},{type:"uncertain",goalId,fields:["name","specification","requiredQuantity"]},{type:"deactivate",goalId}]. selfRecall supplies your own belief values for a previously read active goal, never reads the archive, and always produces uncertain fields. A deactivate goal must also be absent from heldGoalIds. Missing fields remain unavailable. Declared uncertain fields cannot be promoted to clear by recall or by an empty uncertainGoalIds array.
 basis.memoryUses is an array (empty is allowed when no goal detail is used). Every entry is {goalId,field:"name|specification|requiredQuantity",mode:"remembered|guess|current-display",value}. value is REQUIRED: text for name/specification, integer 1..99 for requiredQuantity. remembered requires an active clear field and the same retained value. guess requires an active uncertain field and may supply a correct or mistaken value without a hidden-answer comparison. unavailable requires an explicit selfRecall or real list read first. current-display requires that exact field/value in the current actual readObjectives; prior archive, cart, products or help cannot substitute. Memory belief values never constrain the chosen action quantity or replace a selected product.
@@ -190,7 +190,17 @@ export class WholeTraceCognitionEngine {
   snapshot(): WholeTraceCognitionState { return structuredClone(this.state); }
   preview(observation: ActorObservation, actorState: WholeTraceCognitionActorState,
     memoryUses: readonly WholeTraceMemoryUse[] = [], delayMs = 1): WholeTraceCognitionPreview {
-    this.pending = undefined;
+    return this.evaluate(observation, actorState, memoryUses, delayMs, false);
+  }
+  /** Reference calculation only: carries current slots, never supplies an actor declaration. */
+  project(observation: ActorObservation, context?: { activity: string; delayMs: number }): WholeTraceCognitionState {
+    return this.evaluate(observation, { activity: context?.activity ?? this.state.context.activity ?? 'orient',
+      heldGoalIds: this.state.activeGoals.map(goal => goal.goalId), uncertainGoalIds: this.state.uncertainGoalIds },
+      [], context?.delayMs ?? 0, true).state;
+  }
+  private evaluate(observation: ActorObservation, actorState: WholeTraceCognitionActorState,
+    memoryUses: readonly WholeTraceMemoryUse[], delayMs: number, projection: boolean): WholeTraceCognitionPreview {
+    if (!projection) this.pending = undefined;
     const next = structuredClone(this.state), errors: string[] = [], events: WholeTraceCognitionEvent[] = [];
     const useCheck = validateWholeTraceMemoryUses(memoryUses), updateCheck = validateWholeTraceMemoryUpdate(actorState.memoryUpdate);
     errors.push(...useCheck.errors, ...updateCheck.errors);
@@ -199,7 +209,7 @@ export class WholeTraceCognitionEngine {
     if (actorState.heldGoalIds?.length > this.profile.goalMemoryCapacity) errors.push(`Working memory exceeds goalMemoryCapacity (${this.profile.goalMemoryCapacity})`);
     if (actorState.uncertainGoalIds !== undefined && (!Array.isArray(actorState.uncertainGoalIds)
       || actorState.uncertainGoalIds.some(id => !ref(id)) || new Set(actorState.uncertainGoalIds).size !== actorState.uncertainGoalIds.length)) errors.push('uncertainGoalIds must contain distinct short references');
-    if (!Number.isInteger(delayMs) || delayMs < 1 || delayMs > 120000) errors.push('Cognition delayMs must be 1..120000');
+    if (!Number.isInteger(delayMs) || delayMs < (projection ? 0 : 1) || delayMs > 120000) errors.push('Cognition delayMs must be 1..120000');
     if (errors.length) return { valid: false, errors, state: next, events };
 
     const held = new Set(actorState.heldGoalIds);
@@ -289,8 +299,13 @@ export class WholeTraceCognitionEngine {
     }
     next.uncertainGoalIds = next.activeGoals.filter(goal => (next.knownGoalFields[goal.goalId] ?? ['name', 'requiredQuantity'])
       .some(key => goal.fields[key].status !== 'clear')).map(goal => goal.goalId);
-    for (const goalId of next.uncertainGoalIds) if (!(actorState.uncertainGoalIds ?? []).includes(goalId))
-      errors.push(`actorState.uncertainGoalIds must include ${goalId}: working goal fields are uncertain or unavailable`);
+    for (const goalId of next.uncertainGoalIds) if (!(actorState.uncertainGoalIds ?? []).includes(goalId)) {
+      const goal = next.activeGoals.find(goal => goal.goalId === goalId)!;
+      const previous = this.state.activeGoals.find(goal => goal.goalId === goalId);
+      const evidence = (next.knownGoalFields[goalId] ?? ['name', 'requiredQuantity']).filter(key => goal.fields[key].status !== 'clear')
+        .map(key => `${goalId}.${key} pressure ${previous?.fields[key].pressure ?? 0}→${goal.fields[key].pressure}, threshold ${RULES.uncertainThreshold} (${goal.fields[key].status})`);
+      errors.push(`actorState.uncertainGoalIds must include ${goalId}: working goal fields are uncertain or unavailable; ${evidence.join('; ')}`);
+    }
 
     for (const use of memoryUses) {
       if (use.mode === 'current-display') {
@@ -308,7 +323,7 @@ export class WholeTraceCognitionEngine {
     }
     next.context.activity = actorState.activity;
     next.decisionIndex++;
-    if (!errors.length) this.pending = structuredClone(next);
+    if (!errors.length && !projection) this.pending = structuredClone(next);
     return { valid: !errors.length, errors, state: structuredClone(next), events: structuredClone(events) };
   }
   commit(): WholeTraceCognitionState {

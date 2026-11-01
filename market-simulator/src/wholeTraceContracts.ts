@@ -76,7 +76,9 @@ export type WholeTraceBundle = {
 };
 export type WholeTraceSettings = Pick<TraceOptions, 'personaId' | 'seed' | 'snapshot' | 'timingProfile' | 'maxActions' |
   'timeBudgetMs' | 'attentionExperience' | 'learnerIdentity' | 'trialBinding' | 'llm'> & { outputPath?: string; maxRepairs?: number };
-export type WholeTraceValidation = { valid: boolean; errors: string[]; code?: string; failedDecisionIndex?: number;
+export type WholeTraceValidationIssue = { decisionIndex: number; decisionNumber: number; path: string; rule: string; message: string;
+  evidence?: Record<string, unknown> };
+export type WholeTraceValidation = { issues?: WholeTraceValidationIssue[]; valid: boolean; errors: string[]; code?: string; failedDecisionIndex?: number;
   acceptedPrefixLength?: number; before?: ActorObservation; knowledge?: WholeTraceKnowledgeSnapshot; workingMemory?: WholeTraceCognitionState;
   proposedWorkingMemory?: WholeTraceCognitionState;
   taskMemory?: WholeTraceTaskState; proposedTaskMemory?: WholeTraceTaskState;
@@ -135,15 +137,40 @@ function validateChoiceDecision(d: Record<string, unknown>, at: string, errors: 
   if (source.activeStation !== null && (typeof source.activeStation !== 'string' || !source.activeStation.trim() || source.activeStation.length > 200)) errors.push(`${at}: invalid source activeStation`);
   if (source.pageIndex !== null && (!Number.isInteger(source.pageIndex) || (source.pageIndex as number) < 0 || (source.pageIndex as number) > 1000)) errors.push(`${at}: invalid source pageIndex`);
 }
+/** The existing wire checks for one authored choice, without executing it or inventing an ending.
+ * Full-candidate identity, objective spelling, horizon and terminal checks still run at submission.
+ */
+export function validateWholeTraceChoiceDecisionSyntax(value: unknown,
+  candidateVersion: '4' | '5' | '6' | '7' = '7'): WholeTraceValidation {
+  const errors: string[] = [], at = 'decision';
+  if (!plain(value)) return { valid: false, errors: [`${at}: expected object`], code: 'CANDIDATE_SCHEMA' };
+  if (!['4', '5', '6', '7'].includes(candidateVersion))
+    return { valid: false, errors: ['Unsupported choice candidateVersion'], code: 'CANDIDATE_SCHEMA' };
+  if (!Number.isInteger(value.delayMs) || (value.delayMs as number) < 1 || (value.delayMs as number) > 120000)
+    errors.push(`${at}: delayMs must be 1..120000`);
+  if (typeof value.reason !== 'string' || !value.reason.trim() || value.reason.length > 1000)
+    errors.push(`${at}: reason must be a short nonempty description`);
+  validateChoiceDecision(value, at, errors, candidateVersion !== '4', ['6', '7'].includes(candidateVersion), candidateVersion === '7');
+  return { valid: !errors.length, errors, ...(errors.length ? { code: 'CANDIDATE_SCHEMA' } : {}) };
+}
 export function validateWholeTraceCandidate(value: unknown, requestId: string,
   options: { objectiveIds?: readonly string[] } = {}): WholeTraceValidation {
+  return validateCandidate(value, requestId, options, false);
+}
+/** A prefix has no ending yet; every supplied decision keeps the full wire contract. */
+export function validateWholeTraceCandidatePrefix(value: unknown, requestId: string,
+  options: { objectiveIds?: readonly string[] } = {}): WholeTraceValidation {
+  return validateCandidate(value, requestId, options, true);
+}
+function validateCandidate(value: unknown, requestId: string,
+  options: { objectiveIds?: readonly string[] }, prefix: boolean): WholeTraceValidation {
   const errors: string[] = [];
   if (!plain(value)) return { valid: false, errors: ['Candidate must be a JSON object'], code: 'CANDIDATE_SCHEMA' };
   if (Object.keys(value).some(k => !['candidateVersion', 'requestId', 'decisions'].includes(k))) errors.push('Unknown candidate field');
   if (!['3', '4', '5', '6', '7'].includes(value.candidateVersion as string))
     errors.push('candidateVersion must be 7 (persistent task memory), 6 (working-memory choices), 5 (focused choices), 4 (state-bound choices) or explicit legacy 3');
   if (value.requestId !== requestId) errors.push('Candidate requestId differs from the prepared input');
-  if (!Array.isArray(value.decisions) || value.decisions.length < 1 || value.decisions.length > WHOLE_TRACE_ACTION_LIMIT)
+  if (!Array.isArray(value.decisions) || value.decisions.length < (prefix ? 0 : 1) || value.decisions.length > WHOLE_TRACE_ACTION_LIMIT)
     return { valid: false, errors: [...errors, 'decisions must contain 1..100 complete actor decisions'], code: 'CANDIDATE_SCHEMA' };
   const decisions = value.decisions;
   decisions.forEach((d, i) => {
@@ -193,7 +220,7 @@ export function validateWholeTraceCandidate(value: unknown, requestId: string,
     }
     if (wholeTraceTerminalIntent(d as WholeTraceWireDecision) && i !== decisions.length - 1) errors.push(`${at}: terminal action must be last`);
   });
-  if (decisions.length < WHOLE_TRACE_ACTION_LIMIT && !wholeTraceTerminalIntent(decisions.at(-1) as WholeTraceWireDecision))
+  if (!prefix && decisions.length < WHOLE_TRACE_ACTION_LIMIT && !wholeTraceTerminalIntent(decisions.at(-1) as WholeTraceWireDecision))
     errors.push('A plan shorter than 100 decisions must end with submit or giveUp');
   return { valid: errors.length === 0, errors, ...(errors.length ? { code: 'CANDIDATE_SCHEMA' } : {}) };
 }

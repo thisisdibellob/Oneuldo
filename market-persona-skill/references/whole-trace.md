@@ -1,6 +1,6 @@
 # Luna 전체 행동 계획
 
-Luna가 전체 세계 참고 자료와 페르소나를 한 번 받아 종료까지의 행동 배열을 작성한다. 세계 참고 자료는 이동 후 화면과 행동 결과를 예상하는 데 쓰고, 인물의 선택 지식은 그 시점의 화면·관찰 사실·작업 기억·개인 특성으로 구분한다. Node는 제출된 배열을 실행하며 단서 출처와 선언한 기억 사용·변화를 검증하고 앱용 trace로 컴파일한다. 이 사후 계산 상태를 Luna의 다음 판단에 실시간 재주입하거나 실제 앱 재생 중 다시 계획하지 않는다. 매 행동을 Luna와 주고받거나 코드가 행동을 대신 선택하지 않는다. 생성에는 학교 Qwen 서버나 SSH 터널이 필요하지 않다. 앱 재생과 퀘스트 분석은 기존 앱·백엔드 연결을 사용한다.
+Luna가 전체 세계 참고 자료와 페르소나를 한 번 받아 종료까지의 행동 배열을 작성한다. 세계 참고 자료는 이동 후 화면과 행동 결과를 예상하는 데 쓰고, 인물의 선택 지식은 그 시점의 화면·관찰 사실·작업 기억·개인 특성으로 구분한다. Node는 제출된 배열을 실행하며 단서 출처와 선언한 기억 사용·변화를 검증하고 앱용 trace로 컴파일한다. 오프라인 작성 중에는 같은 실행 검증기로 각 접두 구간을 확인하고 다음 결정 메뉴에 참고용 계산값을 표시할 수 있다. 실제 앱 재생 중 다시 계획하거나 행동마다 새 모델을 호출하지 않으며, 코드가 행동을 대신 선택하지 않는다. 생성에는 학교 Qwen 서버나 SSH 터널이 필요하지 않다. 앱 재생과 퀘스트 분석은 기존 앱·백엔드 연결을 사용한다.
 
 ## 실행 흐름
 
@@ -9,6 +9,8 @@ Luna가 전체 세계 참고 자료와 페르소나를 한 번 받아 종료까�
 ```sh
 node market-simulator/cli.cjs interactive
 ```
+
+배우 작업과 stdin 수명을 분리해야 하는 오프라인 생성에는 `node market-simulator/cli.cjs host-start <새 호스트 디렉터리>`를 사용한다. 감독자가 호스트를 소유하고 배우 전달 전·제출 전에 `host-status`로 같은 hostId/requestId가 살아 있는지 확인한다. `host-call`은 operationId와 도구/인자를 받고, 연결 실패의 재전송은 같은 살아 있는 호스트·같은 operationId·같은 입력에 한정한다. 종료 후에는 `host-close`를 호출한다. 독립 호스트는 whole-trace와 trace 검증에 한정하고 persona-validation 디렉터리 작업은 기존 CLI/MCP에서 실행한다. 호스트 종료 기록은 체크포인트가 아니며, 사라진 요청을 새 호스트에 복구하거나 기존 후보를 다른 requestId로 옮기지 않는다. 명령·지원 입력·종료 진단은 [오프라인 요청 호스트의 수명](../../market-simulator/README.md#오프라인-요청-호스트의-수명)을 따른다.
 
 1. `list_personas`로 현재 버전을 확인한다. 오프라인에서는 시작 전 `snapshotFilePath`를 준비한다. 앱 재생까지 요청받았다면 스킬의 pairing 절차로 시작 전 탭을 준비한다.
 2. `prepare_whole_trace`에 `personaId`, 새 `seed`, `tabId` 또는 `snapshot` 또는 `snapshotFilePath` 중 정확히 하나를 전달한다. 결과의 `requestId`와 `bundle`을 보관하고 `bundle.inputHash`를 후보 외부의 출처 기록에 남긴다. candidate 최상위 필드는 `candidateVersion`, `requestId`, `decisions` 세 개이며 `inputHash`를 추가하지 않는다. 출력 경로와 검증된 개인 기억 파일은 `outputPath`·`learnerFile`로 지정할 수 있다. 기본 `maxRepairs:0`을 유지하며 요청이 기술 수정 재제출을 허용하면 `1`을 지정한다.
@@ -34,29 +36,92 @@ interactive에서는 표준입력 한 줄에 같은 도구를 전달한다.
 {"tool":"repair_whole_trace","arguments":{"requestId":"RETURNED_REQUEST_ID","repair":{"decisions":[{"choiceRef":{"source":{"location":"CURRENT_LOCATION","navigationStateId":"CURRENT_NAVIGATION_STATE","phase":"shopping","view":"world","activeStation":null,"pageIndex":null},"choiceId":"CURRENT_AVAILABLE_CHOICE_ID"},"delayMs":2100,"reason":"기존 목표를 위한 다음 이동 참조를 고친다.","basis":{"intent":"task","goalId":"CURRENT_OPEN_GOAL_ID","memoryUses":[{"goalId":"CURRENT_OPEN_GOAL_ID","field":"name","mode":"remembered","value":"CURRENT_CLEAR_GOAL_NAME"}]},"actorState":{"activity":"orient","task":"현재 목표를 위한 통로 이동","heldGoalIds":["CURRENT_OPEN_GOAL_ID"],"uncertainGoalIds":[],"focusedGoalId":null,"focusedProductId":null,"orientation":"recognizing"}}]}}}
 ```
 
-위 수정 예시는 필드 형태만 설명하며 열린 목표 하나와 clear 이름 기억을 전제로 한다. 실제 repair는 수락된 열린 목표·기억 상태와 원래 행동·종료 의도를 유지하고 진단에 맞는 기술 문제만 고친다. 여러 열린 목표나 uncertain/unavailable 상태를 이 예시의 값으로 덮어쓰지 않는다. `repair`에는 `decisions` 배열만 쓰고, 실패한 위치 이후의 suffix와 각 결정의 source를 실제 `repairContext`·원본 후보에 맞춘다. 서버가 준비된 요청에서 `repairVersion`, `requestId`, `baseAttempt`, `fromDecisionIndex`, `candidateVersion`을 채운다. `repairFilePath`에는 같은 `{ "decisions": [...] }` 객체를 저장한다. 기존 전체 wrapper나 일부 필드를 적은 요청도 지원하지만, 명시한 값이 현재 요청과 다르면 거절한다. 동일한 수정안을 재전송하면 저장된 결과를 반환하며 수정 예산은 늘어나지 않는다. 전달 형식 오류로 도구가 예외를 반환하면 호스트는 요청 상태를 확인해 실제 후보 거부와 구분한다. 이 처리는 기존 수정 제출 안에서 끝나며 행동마다 모델을 호출하지 않는다. `repair-whole` CLI 별칭은 같은 persistent MCP/`interactive` 프로세스 안에서만 동작한다.
+위 수정 예시는 필드 형태만 설명하며 열린 목표 하나와 clear 이름 기억을 전제로 한다. 실제 repair는 수락된 열린 목표·기억 상태와 원래 행동·종료 의도를 유지하고 진단에 맞는 기술 문제만 고친다. 여러 열린 목표나 uncertain/unavailable 상태를 이 예시의 값으로 덮어쓰지 않는다. `repair`에는 `decisions` 배열만 쓰고, 실패한 위치 이후의 suffix와 각 결정의 source를 실제 `repairContext`·원본 후보에 맞춘다. 서버가 준비된 요청에서 `repairVersion`, `requestId`, `baseAttempt`, `fromDecisionIndex`, `candidateVersion`을 채운다. `repairFilePath`에는 같은 `{ "decisions": [...] }` 객체를 저장한다. 기존 전체 wrapper나 일부 필드를 적은 요청도 지원하지만, 명시한 값이 현재 요청과 다르면 거절한다. 동일한 수정안을 재전송하면 저장된 결과를 반환하며 수정 예산은 늘어나지 않는다. 전달 형식 오류로 도구가 예외를 반환하면 호스트는 요청 상태를 확인해 실제 후보 거부와 구분한다. 이 처리는 기존 수정 제출 안에서 끝나며 행동마다 모델을 호출하지 않는다. `repair-whole` CLI 별칭은 같은 요청을 보유한 persistent MCP/`interactive` 프로세스 또는 독립 호스트의 `host-call`에서 동작한다.
 
 진행이나 저장 결과를 다시 확인할 때 `whole_trace_status({requestId})`를 사용한다. 동기 제출이 완료된 뒤 행동마다 이 도구를 호출할 필요는 없다. `begin_actor_plan`/`observe_actor_plan`/`append_actor_plan`을 이 경로에 섞지 않는다.
 
-호스트 MCP/interactive 프로세스는 여러 요청을 관리할 수 있다. 새 문맥 규칙은 후보를 작성하는 actor에 적용하며 서버가 세션 분리나 다른 bundle의 미열람을 강제·입증하지는 않는다. `requestId`·`inputHash`는 출처 연결용이고 후보에 스키마 밖의 필드를 추가하지 않는다. 가이드 v2는 조건부 성향 표현과 실제 활동·focus 선언을 안내하지만 행동 선택을 대신하거나 구매 결과·통과 기준을 교정하지 않는다. 지침 변경 자체는 충실도 개선의 증거가 아니며, 저장된 v1 가이드와 기존 검토 의미를 유지한다.
+호스트 MCP/interactive 또는 독립 호스트 프로세스는 여러 요청을 관리할 수 있다. 새 문맥 규칙은 후보를 작성하는 actor에 적용하며 서버가 세션 분리나 다른 bundle의 미열람을 강제·입증하지는 않는다. `requestId`·`inputHash`는 출처 연결용이고 후보에 스키마 밖의 필드를 추가하지 않는다. 가이드 v2는 조건부 성향 표현과 실제 활동·focus 선언을 안내하지만 행동 선택을 대신하거나 구매 결과·통과 기준을 교정하지 않는다. 지침 변경 자체는 충실도 개선의 증거가 아니며, 저장된 v1 가이드와 기존 검토 의미를 유지한다.
 
 ## 작성 시점과 문법 확인
 
 `actorState`와 `choiceRef.source`는 **이번 행동을 실행하기 직전**을 적는다. 직전 행동이 만든 결과를 반영하고, 같은 결정의 `taskUpdate`로 바뀐 열린 목표 집합도 반영한다. 이번 행동으로 앞으로 보게 될 목록·상품·이동 결과를 앞당겨 쓰지 않는다. 이 예상 상태 기록은 전체 계획 작성의 일부이며 중간 실행 결과를 받아 행동마다 다시 계획하는 절차가 아니다.
 
+새 작성 안내의 `guidanceRevision:"declaration-preflight-v3"`은 `authoringVersion:"2"`의 검토 의미와 bundle 8/candidate 7을 유지하면서 작성 단계의 형식·목표 선언 사전검사를 안내한다. `syntax.decision`·`syntax.choiceRef`는 필수 필드를, `examples.completeProductDecisions`는 완전한 add/remove 한 결정의 형태를 제공한다. 예제의 수량 1과 기억 총수량 2는 일부러 다르며 기본값이 아니다. 배우가 실제로 선택한 수량·행동·종료를 기록한다. `taskUpdate`는 반드시 **actorState 안**에 두고 type/goalId만 넣는다. decision 최상위에 두거나 기억 field/mode/value를 섞으면 거절한다. **각 `basis.memoryUses` 항목에도 goalId가 필요**하며 상위 `basis.goalId`에서 상속하지 않는다. `syntax.repair.maxRepairs`는 실제 요청 예산과 같으며 0이면 수정 재제출이 허용되지 않는다.
+
 | 상황 | 작성 규칙 |
 | --- | --- |
-| 목표 상태 변경 | `taskUpdate:[{type:"select",goalId:"실제 목표 ID"}]`처럼 한 건도 배열로 쓴다. 변경이 없으면 생략하거나 `[]`를 쓴다. |
+| 목표 상태 변경 | `actorState.taskUpdate:[{type:"select",goalId:"실제 목표 ID"}]`처럼 actorState 안에 한 건도 배열로 쓴다. 같은 결정의 heldGoalIds는 이 변경을 적용한 열린 목표 집합이다. 변경이 없으면 생략하거나 `[]`를 쓴다. |
+| 목표 세부 사용 | `basis.memoryUses`의 각 항목은 `{goalId,field,mode,value}` 네 필드를 명시한다. 상위 basis.goalId만 적어 항목의 goalId를 생략할 수 없다. |
+| 목표 복귀와 도움 | task/recover는 열린 목표의 basis.goalId가 필수다. 목표에 연결되지 않은 check/help는 null일 수 있지만 기존 pending heldGoalIds는 유지한다. 도움말 닫기라도 recover로 선언했다면 목표 참조를 생략하지 않는다. |
 | 목적과 활동 | `basis.intent`: `explore`, `interest`, `task`, `check`, `recover`, `help`, `finish`, `rest`. `actorState.activity`: `orient`, `shop`, `interest`, `recover`, `check`, `finish`, `rest`. 두 열의 값을 서로 복사하지 않는다. |
 | 초기 목표가 없는 첫 목록 읽기 | 아직 읽지 않은 목표를 같은 결정에서 select하지 않는다. `basis.goalId:null`, `memoryUses:[]`, 빈 목표 배열과 null goal focus로 읽고 다음 결정에서 표시된 목표를 선택한다. 재확인하는 목록 읽기에서 기존 pending 목표까지 비우지는 않는다. |
 | 이동 | 이번 source는 출발 위치다. 다음 결정은 도착 위치와 그때의 navigation state·화면 source를 쓴다. 출발점 `start`를 계속 복사하지 않는다. |
 | 매대 열기 | 다음 결정은 실제 열린 매대의 view·activeStation·표시 페이지를 쓴다. 상품 페이지가 열렸는데 pageIndex를 `null`로 쓰지 않는다. |
+| 도움말 열기 | world에서 열면 다음 source는 view=help, activeStation=null, pageIndex=null이다. 위치는 그대로다. |
+| 장바구니 열기 | 다음 view=cart, pageIndex=null이다. 매대에서 열었으면 activeStation은 그 매대를 유지하고, 매대 없이 열었으면 null이다. cart를 station ID로 쓰지 않는다. |
+| 장바구니/도움말 닫기 | view=world로 돌아간다. 열린 매대가 남아 있으면 그 매대의 이전 페이지를 복원하고, 아니면 activeStation/pageIndex=null이다. |
+| 매대 닫기 | phase=shopping, view=world, activeStation/pageIndex=null이다. 다음에 매대를 새로 열면 pageIndex=0이다. |
 | 계산대 이용·제출 | `checkout/<계산대 ID>`(예: `checkout/checkout`)를 쓴다. 수락 뒤 다음 source는 위치·navigationStateId를 유지하고 `phase:"checkout"`, `view:"world"`, `activeStation:"해당 계산대 ID"`, `pageIndex:null`이다. 그 계산대에 직원이 있고 제출을 선택했다면 이 source로 `control/submit`을 쓴다. |
 | 목표 완료·포기 | 이전 add 결과를 관찰한 뒤 complete를 선언하거나 목표를 abandon하면, 같은 결정의 heldGoalIds에서 그 목표를 뺀다. 완료·포기한 목표를 basis.goalId·focusedGoalId·memoryUses로 계속 참조하지 않는다. 다른 열린 목표는 유지하며 새 행동의 basis와 focus에 맞게 기록한다. |
 
 완료한 목표 하나를 해제한다는 이유로 다른 pending 목표까지 비우지 않는다. 새 행동이 목표에 연결되지 않으면 허용된 intent와 `basis.goalId:null`, `memoryUses:[]`, null goal focus를 쓰고, 다른 열린 목표를 수행한다면 그 목표의 실제 상태를 선언한다. 기술 예제는 상태·형식의 예시이며 구매·확인·실수·관심·포기의 횟수나 행동 순서를 강제하지 않는다.
 
 가이드 v2의 `selectObservedProduct` 예시는 실제 관찰한 상품을 열린 목표와 연결해 선택하는 경우의 focus·기억 선언이다. 실제로 다른 상품을 골랐다면 그 선택을 보존하고, 관심이나 목표 없는 탐색의 null goal focus도 유지한다. `interestWithPendingGoal`은 관심 상품에 주의가 옮겨가도 진행 중인 목표를 잃어버리지 않는 예시다. `completeAfterAdd`의 닫기는 `orient`/`explore`로 표현하며 모든 닫기에 같은 활동을 강제하는 규칙은 아니다. 닫기 자체를 확인으로 세거나 지연만으로 숙고를 나타내지 않는다. 같은 페이지에서 본 정보를 비교했는지는 별도의 행동 근거가 제한될 수 있으므로 선언과 독립 관찰을 구분한다.
+
+### 결정별 실행 검증과 재작성
+
+새 작성 경로는 `executionAuthoring.revision:"prefix-execution-authoring-v1"`이다. 같은 준비 요청에서 `begin_whole_trace_authoring` → `whole_trace_authoring_menu` / `append_whole_trace_decision` → `finish_whole_trace_authoring`을 사용하고, 반환된 완성 candidate를 그대로 `submit_whole_trace`에 제출한다. 각 append는 저장 선택지·목표 선언 검사 후 **최종 제출과 같은 실행 검증기**로 해당 결정까지 실행한다. 미관찰 상품 focus와 감쇠 후 불확실성 누락도 해당 결정에서 거절하며, 미완성 접두 구간을 검사하기 위해 행동이나 종료를 추가하지 않는다. 앱 재생이나 새 모델 호출은 없다.
+
+작성 명령은 아래 고정 진입점 하나를 사용한다. 스크립트 경로나 여러 위치 인자를 조립하지 않는다. JSON 파일 한 개 또는 `-`로 표준입력만 받으며, 알 수 없는 옵션·중복 경로·남는 인자는 파일 읽기와 후보 검증 전에 `AUTHORING_UNEXPECTED_ARGUMENT`로 거절한다.
+
+```sh
+node market-simulator/cli.cjs author-whole request.json
+node market-simulator/cli.cjs author-whole - < request.json
+```
+
+`request.json`은 `{contextFilePath,operationId,tool,arguments}`이다. 전송 형식은 `executionAuthoring.transportRevision:"prepared-context-v1"`로 표시한다. 준비 담당자가 같은 호스트에서 요청을 준비한 뒤 저장한 `context.json`의 최상위 `hostDirectory`와 `requestId`를 읽는다. 배우가 이 두 값을 다시 조합하지 않는다. 기존 context의 `hostId`, `inputHash`, 인물·조건·seed 등 출처 메타데이터는 그대로 보존하며 전송 인자나 행동·상태로 복사하지 않는다. 호스트 시작과 `prepare_whole_trace`는 준비 담당자의 `host-call` 단계이며, 준비 완료 뒤 작성·메뉴·제출·수정·상태 조회에 고정 진입점을 사용한다.
+
+파일 입력의 상대 `contextFilePath`는 **그 요청 JSON 파일의 디렉터리** 기준이고, stdin은 **현재 작업 디렉터리** 기준이다. context 내부의 상대 `hostDirectory`는 **context 파일의 디렉터리** 기준이다. 절대 context 경로는 두 입력 방식에서 동일하게 사용할 수 있다. `candidateFilePath`·`repairFilePath`는 기존 호스트의 경로 해석을 유지하므로 절대 경로를 사용한다.
+
+예를 들어 다음은 요청 파일과 같은 디렉터리에 준비된 `context.json`을 사용하는 작성 시작 요청이며 기본 재작성 상한은 3이다.
+
+```json
+{"contextFilePath":"context.json","operationId":"authoring-begin-1","tool":"begin_whole_trace_authoring","arguments":{"maxRewritesPerDecision":3}}
+```
+
+다음 요청도 같은 명령과 context를 사용한다. 이 진입점에서 `append_whole_trace_decision`의 arguments는 `{decision}`이며 `decision.choiceRef`에는 `{choiceId,quantity?}`만 적는다. `source` 키는 null/undefined를 포함해 완전히 생략한다. 보조기는 기계적으로 추적한 source만 붙이며, AI가 쓴 나머지 행동·상태·수량·지연·이유·종료는 수정하거나 채우지 않는다. `finish_whole_trace_authoring`과 `whole_trace_status`의 arguments는 `{}`다. 반환된 candidate 최상위 키는 기존 `candidateVersion,requestId,decisions` 세 개이며, 제출은 `tool:"submit_whole_trace"`와 `{candidate}` 또는 `{candidateFilePath}`를 쓴다. 기술 수정은 `tool:"repair_whole_trace"`와 `{repair}` 또는 `{repairFilePath}`를 쓴다. CLI가 전송 인자의 requestId만 context에서 연결하고, 기존 MCP·호스트 도구의 requestId 인자 계약은 유지한다.
+
+요청 최상위나 arguments에 `hostDirectory`·`requestId`를 중복 선언하면 값이 같아도 호스트 연결 전에 `AUTHORING_CONTEXT_OVERRIDE`로 거절한다. context 파일의 읽기 실패·잘못된 JSON·필수 전송 필드 오류도 후보 실행 전에 `AUTHORING_INVALID_CONTEXT`로 거절한다. candidate·repair 내부의 명시된 requestId는 덮어쓰지 않으며 기존 검증 규칙을 그대로 적용한다. 직접 작성한 candidate에서 requestId나 행동·상태 필드를 빠뜨려도 이 진입점이 채우지 않는다. 기존 전송 envelope는 contextFilePath 형식으로 바꾸되 과거 실험의 저장 입력·결과는 수정하지 않는다.
+
+메뉴의 `choiceIds`, `allowedWaypointIds`, `visibleWalkChoices`는 현재 source에서 허용되는 선택지다. W 번호의 순서·역방향 방문·전역 catalog만으로 현재 이동을 추정하지 않는다. 중간 경로를 자동 삽입하지 않으며 매대·도움말·장바구니가 열렸으면 해당 화면의 메뉴를 따른다.
+
+`presentationRevision:"current-choice-menu-v1"` 메뉴는 `interactionContext:{kind,stationId,label}`로 현재 메뉴를 설명하고, `availableChoices:[{choiceId,label}]`로 기존 행동 이름을 표시한다. 허용 ID와 순서는 `choiceIds`와 정확히 같으며 선택을 추천하거나 정렬하지 않는다. `view:"world"`여도 `activeStation:"fresh"`이면 매대가 열린 상태다. 매 결정 작성 전에 **가장 최근 메뉴**의 화면 설명과 허용 목록을 확인한다. 전역 catalog에 `control/readList`가 있어도 현재 `choiceIds`에 없으면 작성하지 않는다. `activeStation:null`만으로 허용 여부를 추론하지 않으며 장바구니·도움말·직원·계산대에서도 기존 메뉴가 판단 기준이다. 화면 설명은 기존 메뉴 분기에서 함께 산출하며 별도 허용 규칙을 만들지 않는다.
+
+실행 작성 메뉴는 `currentObservation:{kind:"validated-prefix-observation-v1",acceptedDecisionCount,notice,readObjectives?}`를 별도로 제공한다. `acceptedDecisionCount`개의 수락 결정을 기존 검증기로 실행한 뒤의 **현재 목록 관찰**이며 실제 앱 재생 결과를 뜻하지 않는다. `readObjectives`의 ID·이름·수량·match는 그 관찰에 있는 값만 그대로 복사한다. 이 객체는 전체 실행 관찰 중 목록만 표시하므로 `elapsedMs` 같은 다른 필드가 없다고 경과 시간이 0이라고 해석하지 않는다. 행동을 아직 실행하기 전인 `readList` 선언에는 그 결과를 미리 제공하지 않으며, 수락된 `readList` 다음 한 관찰에만 표시한다. 다음 행동이 수락되면 기존 관찰 수명대로 갱신한다. 다시 읽기를 수락한 경우에는 새 목록 관찰을 제공한다.
+
+`readObjectives` 필드가 없으면 **현재 미표시**이며 한 번도 읽지 않았거나 잊었다고 판정한 것이 아니다. 필드가 있고 `[]`이면 **표시된 빈 목록**이다. 메뉴 재조회·`nextDecision` 활동/지연 미리보기·거절된 제출은 목록 관찰을 소비하거나 새로 만들지 않는다. 과거 메뉴에 목록이 있었다는 이유로 현재 `current-display`에 계속 쓰지 않는다. 보조기는 `worldReference`·과거 목록·지식 원장으로 현재 표시값을 보충하지 않는다. 실행하지 않는 하위 source 보조기에는 이 관찰을 붙이지 않는다.
+
+함께 반환되는 `advisory`는 **참고용 계산값**이다. `goalFields`는 목표별·필드별 `pressure`(감쇠 후 소수 6자리 반올림)와 `clear/uncertain/unavailable`, `observedProductIds`는 지금까지 실제로 관찰한 상품, `openGoalIds`는 현재 열린 목표를 표시한다. 이번에 매대를 열거나 페이지를 넘긴 결과로 새로 보게 될 상품은 그 행동 전 목록에 없다. 기본 압력 계산은 현재 관찰까지의 경과 시간과 직전 활동, 추가 `delayMs:0`을 사용하며 `assumptions`에 표시한다. 다음 행동의 정확한 시간·활동 조건을 확인하려면 `whole_trace_authoring_menu`에 자신이 작성한 `nextDecision:{actorState:{activity:"..."},delayMs:...}`를 함께 전달한다. 이 참고 계산은 새 `taskUpdate`·`memoryUpdate` 이전의 유지된 목표 기준이다. 완전한 선언과 그 변경은 append에서 기존 순서대로 검사한다.
+
+| 빈 배열 | 뜻 |
+|---|---|
+| `advisory.goalFields:[]` | 계산할 활성 작업기억 필드가 없음 |
+| `advisory.openGoalIds:[]` | 현재 수행 중인 열린 목표가 없음 |
+| `advisory.observedProductIds:[]` | 지금까지 실제 관찰한 상품이 없음 |
+
+이 배열들은 표시된 장보기 목록이 아니다. 첫 목록 읽기 후 아직 목표를 선택하지 않았다면 **현재 목록 2개 / 열린 목표 0개 / 활성 기억 필드 0개** 같은 상태가 정상적으로 가능하다. 빈 `advisory`만으로 목록 정보 부재나 작성 실패를 판단하지 않는다. 최신 `currentObservation.readObjectives`와 기존 과제 계약에 따라 AI가 선택할 목표와 `taskUpdate`, `heldGoalIds`, `uncertainGoalIds`, focus, `memoryUses`를 직접 작성한다. 목록의 모든 항목을 자동으로 선택하거나 예제의 배열을 그대로 채우지 않는다. 목록 읽기 직후의 기존 선택 조건·완료 이력·종료 예외는 그대로 유지한다.
+
+보조기는 기억 정답을 공급하거나 `uncertainGoalIds`를 자동으로 채우지 않는다. 모든 선언은 계속 AI가 한다. 활동·지연·기억 업데이트를 바꾸어 거절을 회피하라는 권고도 하지 않는다. `sourceAuthoring.taskDeclarationExamples`와 `workingMemory` 안내의 조건을 확인하고, 예제의 빈 배열이나 값으로 다른 열린 목표와 실제 불확실성을 덮어쓰지 않는다.
+
+거절 응답은 `accepted:false`, `decisionIndex`(0부터), `decisionNumber`(1부터), `issues`의 `path/rule/message/evidence`, `canRetry`, 거절 전 메뉴를 포함한다. 입력·수락된 접두 구간·실행 상태는 바뀌지 않는다. AI는 사유를 보고 **같은 결정만** 다시 제출한다. 같은 요청 안의 기술 수정이며 구매 결과 최적화·자동 대체·새 표본 재생성이 아니다. 기본은 첫 시도 + 최대 3회 재작성이고 `begin_whole_trace_authoring.maxRewritesPerDecision`으로 설정한다. 마지막 허용 시도도 거절되면 요청이 실패로 끝나며 상한을 다시 초기화하지 않는다. 최종 제출 뒤의 `maxRepairs:0|1` 및 `repair_whole_trace`의 정확한 prefix·원래 종료 의도 보존 규칙은 별도로 그대로 유지한다.
+
+거절 응답의 `rewrite`는 `status`, `decisionIndex`, `decisionNumber`, `acceptedDecisionCount`, `remainingRewrites`, `message`를 제공한다. `status:"awaiting-rewrite"`와 `canRetry:true`는 **같은 결정의 재작성 대기**이며 전체 요청 실패가 아니다. 예를 들어 20개 결정이 수락된 뒤 21번의 첫 시도가 거절되면 기본 상한에서는 앞의 20개를 유지한 채 남은 재작성 3회를 표시한다. 작성자는 원래 의도와 수락된 앞부분을 보존하면서 기술 오류를 수정하고 같은 요청·결정에 새 operationId로 제출한다. `status:"exhausted"`, `canRetry:false`, `remainingRewrites:0`이면 기존 규칙대로 요청이 실패로 끝난다.
+
+“보조기가 행동을 자동으로 대체·삽입하지 않는다”는 원칙과 “AI가 허용된 기술적 재작성을 할 수 있다”는 절차를 구분한다. 보조기는 현재 메뉴와 거절 사유를 보여주며 닫기·읽기 같은 후속 행동이나 그 상태를 대신 작성하지 않는다. 잘못된 선택을 고친다는 이유로 구매 목표·수량·종료를 통과 목적으로 재계획하지 않는다. 목록 읽기를 계속하려고 AI가 닫기 행동을 직접 작성한 경우에도, 그 행동이 수락된 **다음 메뉴**에서 목록 읽기 가능 여부를 다시 확인하고 새 결정을 직접 작성한다. 재작성 예산이 남은 상태에서 작성자가 중단했다면 그 중단 사유를 기록하고, 검증기의 강제 종료나 상한 소진과 구분한다.
+
+각 결정의 `firstAttemptPassed`, `attempts`, `rewriteCount`, `rejectedRules`와 전체 `firstAttemptAccuracy`는 응답의 `authoring`, 최종 결과/metrics, 요청 진단 디렉터리의 `authoring.jsonl`에 남는다. 독립 호스트 저널에도 요약을 기록한다. 통신 응답을 잃은 재전송에는 같은 `operationId`·같은 입력을 사용하며, AI가 고쳐 쓴 결정에는 새 operationId를 사용한다. 첫 시도 정확도와 재작성 후 수락률을 구분하고, 이 횟수를 실제 모델 호출 수로 설명하지 않는다.
+
+기존 동기식 `createWholeTraceSourceAuthoringCursor(bundle)`는 저장된 source·선택지·목표 선언만 확인하는 하위 보조기로 유지한다. 이 하위 보조기 자체가 재작성 예산을 부여하지 않는다는 안내는 실행 작성 경로의 이미 설정된 재작성 예산을 취소한다는 뜻이 아니다. 새 비동기 `createWholeTraceExecutionAuthoringCursor(settings,bundle,options)`가 이를 사용하고 접두 실행 검증·참고 메뉴·재작성 기록을 더한다. 기존 후보·bundle·파일럿 측정은 수정하지 않고 작성 revision/보조기 사용 여부를 별도 출처로 기록한다. 모든 최종 검증 규칙·임계값·계약 의미와 전체 후보 제출 검증은 유지한다.
 
 ### 계산대 참조 별칭
 
@@ -100,6 +165,8 @@ interactive에서는 표준입력 한 줄에 같은 도구를 전달한다.
 자기회상으로 선언한 값은 관찰 원장과 일치하더라도 자동으로 clear 기억이 되지 않는다. 기존 `objective:<id>` 참조나 컴파일러가 붙인 read-goal proof도 잊힌 세부를 정확하게 복원하지 못한다. 실제 `readList` 다음 관찰에서 표시된 목록의 내용만 명확한 목록 기억의 출처가 된다. 장바구니 관찰은 담긴 상품·수량을 보여주며 필요한 목표 수량을 알려주지 않는다. 목표 규격은 표시된 목록 label이 주는 정보 범위로 한정하고 숨은 정답 상품의 규격을 추출하지 않는다. 별도 규격이 표시되지 않으면 `specification`은 unavailable일 수 있다.
 
 코드가 계산한 활성 목표의 이름·필요 수량 또는 실제 표시된 규격이 uncertain/unavailable이면 그 목표를 `uncertainGoalIds`에 포함해야 한다. 추가로 느끼는 불확실성은 더 선언할 수 있지만 이 배열을 비워 계산된 부담을 지울 수는 없다.
+
+새 `authoringGuide.workingMemory`는 이 계산의 행동 전 순서와 `remembered`/`guess`/`current-display` 차이를 정리한다. 열린 목표를 계속 들고 있는 것과 그 목표의 이름·수량을 또렷하게 기억하는 것은 다르다. 현재 focus가 null이거나 닫기·이동처럼 목표 세부를 쓰지 않는 행동이어도 열린 목표의 불확실성 선언은 필요하다. 직전 행동의 경과 시간과 이번 `delayMs`, 현재 관심·수량 맥락 등을 반영한 제안 상태를 기준으로 선언하며 직전 `uncertainGoalIds:[]`를 복사하지 않는다. 현재 선택한 readList의 결과는 다음 결정에만 반영된다. 이번 재검증의 수량 압력 0.607059 → 0.706822 사례는 기존 0.7 경계 통과를 설명하는 예이며, 기본 압력이나 특정 행동·지연·불확실성 횟수를 요구하는 규칙이 아니다. 보조기가 기억 배열을 채우거나 통과하도록 지연·행동·수량을 바꾸지 않는다.
 
 프로필의 관심 전환·구분·수량 추적 설정은 현재 상황의 합성 부담을 연결한다. 오류·망각 횟수를 채우거나 확률만으로 오답을 강제하지 않는다. 틀린 수량을 기억하거나 선택했어도 실제 조작의 재고·수량 범위 안이면 그 오구매를 정답으로 교정하지 않는다. 기술적인 기억 사용/출처 위반과 구매 결과의 불일치를 구분한다.
 
@@ -179,6 +246,10 @@ candidate 7의 `taskContract:"persistent-task-memory-v1"`는 순간 focus와 열
 candidate 7과 legacy 6/5의 목표 참조는 상품 ID와 구분한다. 상품 `milk`를 요구하는 목표가 `objective-1`이면 `focusedGoalId`·`heldGoalIds`·`uncertainGoalIds`와 기억 선언의 `goalId`는 `objective-1`을 사용하고, 상품 집중은 `focusedProductId:"milk"`를 사용한다. 준비된 목표 ID에 없는 참조는 스키마 오류이며 실제 `readList` 전에 목표 ID를 활용할 수 없다. 검사기가 잘못된 ID를 대신 바꾸지 않는다.
 
 `basis`는 candidate 7에서 `{intent,goalId,cueRefs?,memoryUses}`다. `intent`와 nullable goalId의 연결은 위 과제 계약을 따른다. `memoryUses`는 필수 배열이고 목표 세부를 사용하지 않으면 `[]`로 둔다. `cueRefs`는 선택 사항이며 실제 알려진 추가 참조를 최대 24개 적고 빈 배열도 허용한다. 선택 대상·control·실제 읽은 목표의 proof는 컴파일러가 파생하지만 이는 기억 사용 선언이나 정확한 회상으로 승격되지 않는다. 명시한 참조는 알려져 있어야 한다. `control:viewCart`와 `list`는 조작 표시이며 cart 내용이나 목표 세부를 알려주지 않는다. 도움 본문도 도움 화면을 실제 연 뒤에만 알려진다.
+
+candidate 7의 **배우가 직접 작성한 `basis.cueRefs`에 `objective:<id>`가 있으면**, 현재 검증기는 이 ID 참조 자체를 목표 세부 사용으로 취급한다. 이미 읽은 목표라도 `basis.goalId:null`이면 `memoryUses:[]`와 함께 썼는지와 무관하게 `TASK_MEMORY`로 거절한다. 이 참조를 쓰는 목표 행동은 현재 열린 non-null goalId와 기존 intent·이름 기억 규칙을 충족해야 한다. 이는 53·56번 실패 당시와 같은 검사이며 허용 기준을 바꾸지 않았다.
+
+비목표 탐색·확인을 의도했다면 열린 목표를 held에 유지하면서 `goalId:null`, `memoryUses:[]`, raw objective basis 참조가 없는 선언을 사용할 수 있다. 어떤 의도를 선택할지는 배우가 정한다. 검사 통과를 위해 근거를 자동 삭제하거나 다른 필드로 이동하지 않는다. `actorState.triggerCueRefs`는 실제 알려진 상태 변화 계기이고, 컴파일러가 파생한 objective proof는 관찰 출처 증명이다. 둘은 위 raw basis와 구분되지만 필수 memoryUses를 대신하거나 미관찰 목표·잊은 세부를 복원하지 못한다.
 
 `actorState`는 행동 직전의 공개용 요약이다. candidate 7은 `{activity,task,heldGoalIds,uncertainGoalIds,focusedGoalId,focusedProductId,orientation,triggerCueRefs?,memoryUpdate?,taskUpdate?}`를 받는다. focus는 기억의 정확성이나 구매 결과와 별개다. `focusedGoalId`는 이번 방문에서 읽고 `heldGoalIds`에 포함된 목표이거나 `null`이며 uncertain과 겹칠 수 있지만 uncertain에만 있는 목표는 허용되지 않는다. v7에서 non-null goal focus는 basis.goalId와 일치해야 한다. 첫 `readList` 전 goal focus는 `null`이다. `focusedProductId`는 실제 선반/cart에서 본 상품이거나 `null`이다. 목록을 읽기 전에 상품을 봤다면 product focus를 기록할 수 있다. `activity`는 `orient`, `shop`, `interest`, `recover`, `check`, `finish`, `rest`, `orientation`은 `unfamiliar`, `recognizing`, `familiar` 중 하나다. 비어 있지 않은 160자 이하의 `task`는 trace의 `currentTask`가 된다. 목표 배열은 실제 읽은 목표 ID만 사용하고 held는 열린 목표와 같은 집합으로 프로필 용량 이하를 유지한다. `triggerCueRefs`는 선택 사항이며 명시하면 실제 알려진 참조를 최대 12개 적는다. 생략 시 파생되는 실행 proof는 기억 갱신이나 회상 출처를 대신하지 않는다. `memoryUpdate`와 `taskUpdate`는 위 기억·과제 계약을 따른다. 이 상태는 허구의 행동 요약이며 내면 사고·임상 측정이 아니다.
 

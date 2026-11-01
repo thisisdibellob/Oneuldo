@@ -3,21 +3,82 @@ import { canonicalMarketReplayJson } from '../../frontend/src/game/marketReplayT
 import { generateTrace } from './simulator';
 import { wholeTraceInputHash } from './wholeTraceBundle';
 import { WHOLE_TRACE_BUNDLE_VERSION, WHOLE_TRACE_MODEL, WHOLE_TRACE_POLICY_VERSION, validateWholeTraceCandidate,
+  validateWholeTraceCandidatePrefix, wholeTraceTerminalIntent,
   type WholeTraceBundle, type WholeTraceCandidate, type WholeTraceDecision, type WholeTraceSettings,
-  type WholeTraceValidation } from './wholeTraceContracts';
+  type WholeTraceValidation, type WholeTraceValidationIssue } from './wholeTraceContracts';
 import type { ActorObservation, Decision, GenerationCheckpoint, PolicyAction } from './types';
 import { getWholeTracePersona } from './personas';
 import { WholeTraceKnowledgeLedger, type WholeTraceKnowledgeSnapshot } from './wholeTraceKnowledge';
 import { validateWholeTraceActorState, auditWholeTraceActorFidelity, type WholeTraceActorState } from './wholeTraceActorState';
 import { resolveWholeTraceChoice, wholeTraceChoiceFrame } from './wholeTraceChoices';
 import { createMarketSession } from '../../frontend/src/game/marketSession';
-import { WholeTraceCognitionEngine } from './wholeTraceCognition';
+import { WholeTraceCognitionEngine, WHOLE_TRACE_GOAL_FIELDS, type WholeTraceCognitionState } from './wholeTraceCognition';
 import { buildWholeTracePersonaInput } from './wholeTracePersona';
 import { WholeTraceTaskMemoryEngine } from './wholeTraceTaskMemory';
 import { reviewWholeTraceTaskExpression } from './wholeTraceTaskExpression';
 
 export class WholeTraceCompileError extends Error {
   constructor(readonly validation: WholeTraceValidation) { super(validation.errors.join('; ')); }
+}
+
+export type WholeTracePrefixOptions = {
+  nextDecision?: { actorState: Pick<WholeTraceActorState, 'activity'>; delayMs: number };
+};
+export type WholeTraceCalculatedAdvisory = {
+  kind: 'reference-calculated-state-v1'; notice: string;
+  assumptions: { activity: string; delayMs: number; includesActorMemoryUpdates: false };
+  goalFields: { goalId: string; field: typeof WHOLE_TRACE_GOAL_FIELDS[number]; pressure: number;
+    status: 'clear' | 'uncertain' | 'unavailable' }[];
+  observedProductIds: string[]; openGoalIds: string[];
+};
+export type WholeTracePrefixResult = {
+  valid: true; acceptedActions: number; terminal: boolean; before: ActorObservation;
+  knowledge: WholeTraceKnowledgeSnapshot; workingMemory?: WholeTraceCognitionState;
+  taskMemory?: ReturnType<WholeTraceTaskMemoryEngine['snapshot']>; advisory: WholeTraceCalculatedAdvisory;
+};
+class WholeTracePrefixComplete extends Error {
+  constructor(readonly result: WholeTracePrefixResult) { super('Whole trace prefix checked'); }
+}
+/** Replays exactly the supplied decisions through the final compiler's runtime guards. */
+export async function validateWholeTracePrefix(settings: WholeTraceSettings, bundle: WholeTraceBundle,
+  value: unknown, options: WholeTracePrefixOptions = {}): Promise<WholeTracePrefixResult> {
+  const context = options.nextDecision;
+  if (context && (!Number.isInteger(context.delayMs) || context.delayMs < 0 || context.delayMs > 120000
+    || !context.actorState || typeof context.actorState.activity !== 'string'))
+    throw new Error('Prefix advisory requires an actor activity and delayMs in 0..120000');
+  try {
+    await executeWholeTraceCandidate(settings, bundle, value, 1, undefined, options);
+  } catch (error) {
+    if (error instanceof WholeTracePrefixComplete) return error.result;
+    throw error;
+  }
+  throw new Error('Whole trace prefix did not produce a validation result');
+}
+function runtimeIssues(code: string, errors: string[], decisionIndex: number,
+  previous?: WholeTraceCognitionState, proposed?: WholeTraceCognitionState,
+  thresholds?: { uncertainThreshold: number; unavailableThreshold: number }): WholeTraceValidationIssue[] {
+  return errors.map(message => {
+    let path = message.match(/(?:actorState|basis|choiceRef)\.[A-Za-z]+(?:\[\d+\])?(?:\.[A-Za-z]+)?/)?.[0]
+      ?? (code.startsWith('CHOICE_') ? 'choiceRef' : code === 'KNOWLEDGE_BASIS' ? 'basis.cueRefs'
+        : code === 'WORKING_MEMORY' ? 'basis.memoryUses' : code === 'TASK_MEMORY' ? 'actorState.taskUpdate' : '');
+    let rule = code;
+    let evidence: Record<string, unknown> | undefined;
+    if (message.startsWith('actorState.focusedProductId: unobserved product ')) {
+      rule = 'focused-product-observed';
+      evidence = { productId: message.slice('actorState.focusedProductId: unobserved product '.length), observed: false };
+    } else if (message.startsWith('actorState.uncertainGoalIds must include ')) {
+      rule = 'uncertain-goal-required'; path = 'actorState.uncertainGoalIds';
+      const goalId = message.slice('actorState.uncertainGoalIds must include '.length).split(':')[0];
+      const goal = proposed?.activeGoals.find(goal => goal.goalId === goalId);
+      const old = previous?.activeGoals.find(goal => goal.goalId === goalId);
+      evidence = { goalId, thresholds, fields: goal ? (proposed?.knownGoalFields[goalId] ?? ['name', 'requiredQuantity'])
+        .filter(field => goal.fields[field].status !== 'clear').map(field => ({ field,
+          previousPressure: old?.fields[field].pressure ?? 0, pressure: goal.fields[field].pressure,
+          status: goal.fields[field].status })) : [] };
+    }
+    return { decisionIndex, decisionNumber: decisionIndex + 1, path: `decisions[${decisionIndex}]${path ? `.${path}` : ''}`, rule, message,
+      ...(evidence ? { evidence } : {}) };
+  });
 }
 
 /** Translation only: never chooses an alternative waypoint, product, quantity, or route. */
@@ -42,13 +103,21 @@ export function resolveWholeTraceDecision(d: WholeTraceDecision, o: ActorObserva
 
 export async function compileWholeTraceCandidate(settings: WholeTraceSettings, bundle: WholeTraceBundle,
   value: unknown, submissions = 1, onCheckpoint?: (entry: GenerationCheckpoint) => void) {
+  return executeWholeTraceCandidate(settings, bundle, value, submissions, onCheckpoint);
+}
+async function executeWholeTraceCandidate(settings: WholeTraceSettings, bundle: WholeTraceBundle,
+  value: unknown, submissions: number, onCheckpoint?: (entry: GenerationCheckpoint) => void,
+  prefix?: WholeTracePrefixOptions) {
   settings = structuredClone(settings); bundle = structuredClone(bundle); value = structuredClone(value);
   if (bundle.bundleVersion !== WHOLE_TRACE_BUNDLE_VERSION || bundle.inputHash !== wholeTraceInputHash(settings) || bundle.snapshotId !== settings.snapshot.snapshotId
     || bundle.persona.id !== settings.personaId || bundle.model !== WHOLE_TRACE_MODEL || bundle.policyVersion !== WHOLE_TRACE_POLICY_VERSION)
     throw new WholeTraceCompileError({ valid: false, code: 'PREPARED_INPUT_MISMATCH', errors: ['Candidate input differs from the prepared bundle'] });
-  const structure = validateWholeTraceCandidate(value, bundle.requestId,
+  const structure = (prefix ? validateWholeTraceCandidatePrefix : validateWholeTraceCandidate)(value, bundle.requestId,
     { objectiveIds: bundle.worldReference.objectives.map(goal => goal.id) });
-  if (!structure.valid) throw new WholeTraceCompileError(structure);
+  if (!structure.valid) throw new WholeTraceCompileError({ ...structure, issues: structure.errors.map(message => {
+    const decisionIndex = Number(message.match(/^decisions\[(\d+)\]/)?.[1] ?? 0);
+    return runtimeIssues(structure.code ?? 'CANDIDATE_SCHEMA', [message], decisionIndex)[0];
+  }) });
   const candidate = value as WholeTraceCandidate;
   const persona = getWholeTracePersona(settings.personaId);
   const persistent = candidate.candidateVersion === '7';
@@ -80,7 +149,29 @@ export async function compileWholeTraceCandidate(settings: WholeTraceSettings, b
   let pending: typeof knowledgeAudit[number] | undefined;
   let acceptedFrame = { location: 'start', navigationStateId: bundle.worldReference.navigation.initialStateId };
   let accepted = 0, activeIndex = 0, before: ActorObservation | undefined;
-  let checkpointFailure: unknown;
+  let checkpointFailure: unknown, lastApplied: ActorObservation | undefined;
+  const capturePrefix = (observation: ActorObservation, terminal: boolean): never => {
+    const knowledge = ledger.observe(observation).knowledge;
+    const context = prefix?.nextDecision;
+    const workingMemory = cognition?.project(observation, context ? {
+      activity: context.actorState.activity, delayMs: context.delayMs,
+    } : undefined);
+    const taskState = taskMemory?.snapshot();
+    const observedProductIds = [...new Set(knowledge.cues.filter(cue =>
+      cue.source === 'current-observation' || cue.source === 'observed-this-visit').flatMap(cue =>
+      cue.kind === 'displayed-product' ? [cue.cueRef.slice('product:'.length)]
+        : cue.kind === 'displayed-cart-item' ? [cue.cueRef.slice('cart:product:'.length)] : []))].sort();
+    throw new WholeTracePrefixComplete({ valid: true, acceptedActions: accepted, terminal,
+      before: structuredClone(observation), knowledge,
+      ...(workingMemory ? { workingMemory } : {}), ...(taskState ? { taskMemory: taskState } : {}),
+      advisory: { kind: 'reference-calculated-state-v1',
+        notice: '참고용 계산값. 보조기는 행동이나 상태 값을 채우거나 고치지 않으며, 선언은 계속 AI가 한다.',
+        assumptions: { activity: context?.actorState.activity ?? cognition?.snapshot().context.activity ?? 'orient',
+          delayMs: context?.delayMs ?? 0, includesActorMemoryUpdates: false },
+        goalFields: workingMemory?.activeGoals.flatMap(goal => WHOLE_TRACE_GOAL_FIELDS.map(field => ({
+          goalId: goal.goalId, field, pressure: Math.round(goal.fields[field].pressure * 1000000) / 1000000,
+          status: goal.fields[field].status }))) ?? [], observedProductIds, openGoalIds: taskState?.openGoalIds ?? [] } });
+  };
   try {
     const trace = await generateTrace({
       ...settings, mode: 'llm', planningMode: 'whole-trace', tracePolicyVersion: '6',
@@ -90,6 +181,7 @@ export async function compileWholeTraceCandidate(settings: WholeTraceSettings, b
       llm: { ...settings.llm, model: WHOLE_TRACE_MODEL, maxCalls: settings.llm?.maxCalls ?? 100 },
       actorDecisionProvider: async o => {
         activeIndex = accepted; before = structuredClone(o);
+        if (prefix && !candidate.decisions.length) capturePrefix(o, false);
         proposedWorkingMemory = undefined;
         proposedTaskMemory = undefined;
         const observation = ledger.observe(o);
@@ -111,12 +203,12 @@ export async function compileWholeTraceCandidate(settings: WholeTraceSettings, b
         const stateCheck = validateWholeTraceActorState(d.actorState, { knowledge: observation.knowledge, persona, previous: previousState,
           requireFocusFields: candidate.candidateVersion === '5' || cognitive, allowMemoryUpdate: cognitive, allowTaskMemory: persistent,
           ...(composedBounds ? { maximumTriggerCueRefs: composedBounds.maximumTriggerCueRefs } : {}) });
-        if (!stateCheck.valid) throw Object.assign(new Error(stateCheck.errors.join('; ')), { code: 'ACTOR_STATE' });
+        if (!stateCheck.valid) throw Object.assign(new Error(stateCheck.errors.join('; ')), { code: 'ACTOR_STATE', errors: stateCheck.errors });
         const rawBasis = (wire as import('./wholeTraceContracts').WholeTraceTaskChoiceDecision).basis;
         const taskCheck = taskMemory?.preview(o, wire.actorState, rawBasis as import('./wholeTraceTaskMemory').WholeTraceTaskBasis, decision.action);
         if (taskCheck) {
           proposedTaskMemory = taskCheck.state;
-          if (!taskCheck.valid) throw Object.assign(new Error(taskCheck.errors.join('; ')), { code: 'TASK_MEMORY' });
+          if (!taskCheck.valid) throw Object.assign(new Error(taskCheck.errors.join('; ')), { code: 'TASK_MEMORY', errors: taskCheck.errors });
           if (rawBasis.goalId === null && (rawBasis.cueRefs?.some(ref => ref.startsWith('objective:')) || rawBasis.memoryUses.length))
             throw Object.assign(new Error('Goal detail use requires an explicit basis.goalId even when focusedGoalId is null'), { code: 'TASK_MEMORY' });
           if ((decision.action.type === 'add' || decision.action.type === 'remove') && rawBasis.goalId === null
@@ -131,7 +223,7 @@ export async function compileWholeTraceCandidate(settings: WholeTraceSettings, b
           (wire as import('./wholeTraceContracts').WholeTraceCognitiveChoiceDecision).basis.memoryUses, d.delayMs);
         if (memoryCheck) {
           proposedWorkingMemory = memoryCheck.state;
-          if (!memoryCheck.valid) throw Object.assign(new Error(memoryCheck.errors.join('; ')), { code: 'WORKING_MEMORY' });
+          if (!memoryCheck.valid) throw Object.assign(new Error(memoryCheck.errors.join('; ')), { code: 'WORKING_MEMORY', errors: memoryCheck.errors });
           const focus = wire.actorState.focusedGoalId;
           const uses = (wire as import('./wholeTraceContracts').WholeTraceCognitiveChoiceDecision).basis.memoryUses;
           if (!persistent && focus && wire.actorState.activity !== 'interest') {
@@ -175,6 +267,11 @@ export async function compileWholeTraceCandidate(settings: WholeTraceSettings, b
         }
         pending = undefined; accepted++;
       },
+      onActorDecisionApplied: after => {
+        lastApplied = structuredClone(after);
+        if (prefix && accepted === candidate.decisions.length && accepted < 100
+          && !wholeTraceTerminalIntent(candidate.decisions.at(-1))) capturePrefix(after, false);
+      },
       onCheckpoint: onCheckpoint ? entry => {
         try { onCheckpoint(entry); }
         catch (error) { checkpointFailure = error; throw error; }
@@ -191,6 +288,7 @@ export async function compileWholeTraceCandidate(settings: WholeTraceSettings, b
       ...(bundle.authoringGuide?.authoringVersion === '2' ? { annotationReview: 'actor-annotation-v1' as const } : {}),
     });
     const taskExpression = persistent ? reviewWholeTraceTaskExpression(roleEntries) : undefined;
+    if (prefix) capturePrefix(lastApplied ?? before!, true);
     return { trace, acceptedActions: accepted, knowledgeAudit,
       ...(cognition ? { workingMemory: cognition.snapshot() } : {}),
       ...(taskMemory ? { taskMemory: taskMemory.snapshot() } : {}),
@@ -199,11 +297,14 @@ export async function compileWholeTraceCandidate(settings: WholeTraceSettings, b
           status: personaReview.findings.length || taskExpression.findings.length ? 'review' as const : 'clear' as const,
           findings: [...personaReview.findings, ...taskExpression.findings] } : {}) } };
   } catch (error) {
+    if (error instanceof WholeTracePrefixComplete) throw error;
     if (checkpointFailure) throw Object.assign(new Error('Whole trace diagnostic write failed', { cause: checkpointFailure }),
       { stage: 'persistence', code: (checkpointFailure as NodeJS.ErrnoException).code ?? 'WHOLE_TRACE_DIAGNOSTIC_WRITE_FAILED' });
     const code = (error as { code?: string }).code;
     throw new WholeTraceCompileError({ valid: false, code: code === 'KNOWLEDGE_BASIS' || code === 'ACTOR_STATE' || code === 'WORKING_MEMORY' || code === 'TASK_MEMORY' || code?.startsWith('CHOICE_') ? code : 'CANDIDATE_EXECUTION',
       errors: [(error as Error).message], failedDecisionIndex: activeIndex,
+      issues: runtimeIssues(code ?? 'CANDIDATE_EXECUTION', (error as { errors?: string[] }).errors ?? [(error as Error).message],
+        activeIndex, cognition?.snapshot(), proposedWorkingMemory, cognition?.profile.rules),
       acceptedPrefixLength: accepted, ...(before ? { before } : {}), knowledge: ledger.snapshot(),
       ...(cognition ? { workingMemory: cognition.snapshot(), ...(proposedWorkingMemory ? { proposedWorkingMemory } : {}) } : {}),
       ...(taskMemory ? { taskMemory: taskMemory.snapshot(), ...(proposedTaskMemory ? { proposedTaskMemory } : {}) } : {}),
