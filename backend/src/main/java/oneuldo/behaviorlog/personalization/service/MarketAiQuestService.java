@@ -55,9 +55,10 @@ public class MarketAiQuestService {
         String validationFeedback = "";
         tools.jackson.databind.JsonNode invalidCandidate = null;
         Map<String, Object> validationDetails = Map.of();
-        String userPrompt = promptFactory.withPracticeHistory(
+        var practiceHistory = history.forProfile(memberId, profile);
+        String userPrompt = promptFactory.withPracticeDesign(promptFactory.withPracticeHistory(
                 promptFactory.withEnvironmentContext(promptFactory.userPrompt(analysis, recommendation), environmentContext),
-                history.forProfile(memberId, profile));
+                practiceHistory), practiceHistory);
         // Recommendation IDs/times change on every read; only its AI plan/settings affect generation.
         var semanticPrompt=(tools.jackson.databind.node.ObjectNode)new oneuldo.behaviorlog.analysis.service.LosslessTables(objectMapper).decode(objectMapper.readTree(userPrompt));
         // History has its own lossless dictionaries/shared records. Decode those
@@ -112,6 +113,7 @@ public class MarketAiQuestService {
                 if (draft.objectives().size() != recommendation.adjustments().itemCount()) {
                     throw new IllegalArgumentException("AI_PLAN_ITEM_COUNT_MISMATCH");
                 }
+                rejectPracticeDesign(draft, practiceHistory);
                 var reviewInput = MarketQuestConsistencyReview.context(objectMapper, draft, semanticPrompt, environmentContext);
                 Map<String, Object> reviewDetails;
                 try { reviewDetails = reviewCandidate(reviewInput); }
@@ -221,6 +223,19 @@ public class MarketAiQuestService {
         }
         throw new IllegalStateException("REVIEW_RETRY_BOUND");
     }
+    /** Opt-in: reserved products and the practice-design contract, all broken rules reported in one repair turn. */
+    private void rejectPracticeDesign(MarketAiQuestDraft draft, tools.jackson.databind.JsonNode practiceHistory) {
+        var reserved = draft.objectives().stream().map(MarketAiQuestDraft.Objective::productId)
+                .filter(promptFactory.reservedProductIds()::contains).toList();
+        var design = promptFactory.skillTransferChecks()
+                ? SkillTransferRules.violation(draft, practiceHistory, promptFactory.reservedProductIds(), promptFactory.heldOutScenarioIds()) : null;
+        if (!reserved.isEmpty()) throw new MarketQuestValidationException("예약 상품", Map.of(
+                "code", "RESERVED_PRODUCT_ID", "reservedProductIds", reserved,
+                "otherViolations", design == null ? List.of() : design.get("violations"),
+                "sizeVariantFamilies", SkillTransferRules.describedFamilies(promptFactory.reservedProductIds())));
+        if (design != null) throw new MarketQuestValidationException("연습 설계", design);
+    }
+
     private static final class ReviewUnavailable extends RuntimeException {
         final List<Map<String,Object>> audit;
         ReviewUnavailable(RuntimeException cause,List<Map<String,Object>> audit){super(cause);this.audit=List.copyOf(audit);}

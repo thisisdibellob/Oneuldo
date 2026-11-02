@@ -14,6 +14,13 @@ public class MarketAiQuestPromptFactory {
 
     public static final String PROMPT_VERSION = "market-ai-quest-v54-review-failure-boundary";
     private final ObjectMapper objectMapper;
+    // Opt-in practice-design contract from the 2026-11 low-model actor runs (output/claude-rlv2-*-qwen*). Off by default.
+    @org.springframework.beans.factory.annotation.Value("${market.quest.reserved-product-ids:}")
+    private java.util.List<String> reservedProductIds = java.util.List.of();
+    @org.springframework.beans.factory.annotation.Value("${market.quest.held-out-scenario-ids:}")
+    private java.util.List<String> heldOutScenarioIds = java.util.List.of();
+    @org.springframework.beans.factory.annotation.Value("${market.quest.skill-transfer-checks:false}")
+    private boolean skillTransferChecks;
 
     public MarketAiQuestPromptFactory(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
@@ -31,6 +38,36 @@ public class MarketAiQuestPromptFactory {
                 + "직선 좌표 차이를 실제 이동 거리나 최적 경로라고 단정할 수 없다. 현재 배치가 없으면 가까워졌다·위치가 바뀌었다고 주장하지 않는다. "
                 + "이전 배치는 practiceHistory.recordedPractice.sourceMovementContext의 실제 recordedGeometry에 있는 경우만 비교한다. "
                 + "이전 또는 현재 배치가 없으면 이전보다 이동 부담을 줄였다·매대를 옮겼다고 쓰지 않는다.");
+        return objectMapper.writeValueAsString(root);
+    }
+
+    public java.util.List<String> reservedProductIds() {
+        return reservedProductIds == null ? java.util.List.of() : reservedProductIds;
+    }
+
+    public java.util.List<String> heldOutScenarioIds() {
+        return heldOutScenarioIds == null ? java.util.List.of() : heldOutScenarioIds;
+    }
+
+    public boolean skillTransferChecks() {
+        return skillTransferChecks;
+    }
+
+    /** Facts and rules for the opt-in checks; the server only rejects, it never rewrites the quest. */
+    public String withPracticeDesign(String prompt, tools.jackson.databind.JsonNode history) {
+        if (!skillTransferChecks && reservedProductIds().isEmpty()) return prompt;
+        var root = (tools.jackson.databind.node.ObjectNode) objectMapper.readTree(prompt);
+        if (!reservedProductIds().isEmpty()) {
+            root.set("reservedProductIds", objectMapper.valueToTree(reservedProductIds()));
+            root.put("reservedProductRule", "reservedProductIds의 상품은 다른 확인 과제를 위해 남겨 둔 상품이다. objectives와 사용자 문장에 쓰지 않고, 같은 기술을 연습할 다른 실제 상품을 고른다.");
+        }
+        if (skillTransferChecks) {
+            root.set("sizeVariantFamilies", objectMapper.valueToTree(SkillTransferRules.describedFamilies(reservedProductIds())));
+            root.set("missedSizeFamilies", objectMapper.valueToTree(SkillTransferRules.unresolvedMissedFamilies(history, reservedProductIds())));
+            root.put("practiceDesignRule", "규격·구매 단위 연습의 상품은 sizeVariantFamilies에서만 고른다. missedSizeFamilies가 비어 있지 않으면 그중 한 묶음의 상품을 넣고, 같은 상품보다 같은 묶음의 다른 규격을 권한다. "
+                    + "확인 과제(" + String.join(", ", heldOutScenarioIds()) + ")와 상품·수량이 모두 같은 목표는 쓰지 않는다. briefing에 모든 목표의 이름·규격을 쓰고, 상품 이름 없는 비교 방법 문장('상품 이름 아래 숫자와 단위를 목록과 비교해요')을 하나 둔다. "
+                    + "checkoutDialogue는 장바구니의 규격·개수를 목록과 다시 보게 하고, 품목을 짚는다면 놓친 묶음 품목을 모두 짚는다. 필드 이름(detail 등)을 문장에 쓰지 않는다.");
+        }
         return objectMapper.writeValueAsString(root);
     }
 
