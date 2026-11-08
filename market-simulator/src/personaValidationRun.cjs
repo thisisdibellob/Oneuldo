@@ -13,7 +13,7 @@ function runner(directory) {
 function prepare(args) {
   if (args.validationMode !== undefined && !['traits', 'legacy'].includes(args.validationMode)) throw new Error('Unknown validationMode');
   if (args.validationMode === 'legacy' && args.profiles !== undefined) throw new Error('Legacy validation cannot accept trait profiles');
-  const oldShape = args.profiles === undefined && Array.isArray(args.personaIds)
+  const oldShape = args.catalogSchemaVersion === undefined && args.profiles === undefined && Array.isArray(args.personaIds)
     && args.personaIds.length === legacyIds.length && legacyIds.every(id => args.personaIds.includes(id));
   const selected = args.validationMode === 'legacy' || args.validationMode === undefined && oldShape ? legacy : universal();
   return selected.prepare(args);

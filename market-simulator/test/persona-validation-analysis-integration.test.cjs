@@ -11,7 +11,7 @@ const ids = ['mild-intellectual-disability-adult', 'careful-checker', 'quick-dec
 const read = file => JSON.parse(fs.readFileSync(file, 'utf8'));
 const write = (file, value) => fs.writeFileSync(file, JSON.stringify(value));
 const digest = value => crypto.createHash('sha256').update(canonicalMarketReplayJson(value)).digest('hex');
-function setup(t, mode, seeds = ['s1']) {
+function setup(t, mode, seeds = ['s1'], catalogSchemaVersion = 'persona-traits-v2') {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'persona-analysis-'));
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
   const snapshotFilePaths = {};
@@ -22,12 +22,12 @@ function setup(t, mode, seeds = ['s1']) {
     { id: 'less-checking', basePersonaId: ids[3], traits: { checking: 'low' } },
     { id: 'more-checking', basePersonaId: ids[3], traits: { checking: 'high' } },
   ] };
-  const args = { runId: 'new-run', outputDirectory: directory, snapshotFilePaths, seeds, validationMode: mode, ...selection };
+  const args = { runId: 'new-run', outputDirectory: directory, snapshotFilePaths, seeds, validationMode: mode, ...(mode === 'traits' ? { catalogSchemaVersion } : {}), ...selection };
   return { args, prepared: run.prepare(args) };
 }
 for (const mode of ['legacy', 'traits']) test(`${mode}: blocked measurements retain fields and report starts with causes`, async t => {
   const { prepared } = setup(t, mode), manifest = read(prepared.manifestPath);
-  assert.equal(manifest.analysisVersion, 1);
+  assert.equal(manifest.analysisVersion, mode === 'traits' ? 2 : 1);
   assert.equal(prepared.recommendedSeedCount, 20); assert.equal(prepared.powerWarning.provided, 1);
   assert.ok(manifest.opportunityAudit.byPersonaCondition.length);
   const before = fs.readFileSync(prepared.manifestPath, 'utf8');
@@ -54,7 +54,7 @@ for (const mode of ['legacy', 'traits']) test(`${mode}: blocked measurements ret
   assert.match(markdown, /\| 기회 미발생 \| 쌍 0 \/ 개별 trace 0 \|/);
 });
 for (const mode of ['legacy', 'traits']) test(`${mode}: previous spec hashes remain readable without adding new analysis to old manifests`, t => {
-  const { prepared } = setup(t, mode), m = read(prepared.manifestPath);
+  const { prepared } = setup(t, mode, ['s1'], 'persona-traits-v1'), m = read(prepared.manifestPath);
   const archive = require(mode === 'legacy' ? '../validation/archive/persona-validation-spec.v2.json' : '../validation/archive/persona-trait-validation-spec.v1.json');
   m.specHash = digest(archive); delete m.specVersion; delete m.analysisVersion; delete m.opportunityAudit;
   write(prepared.manifestPath, m);

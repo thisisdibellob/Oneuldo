@@ -4,8 +4,39 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { getMarketProduct } = require('../../frontend/src/game/scenarios.ts');
 const { getMarketNavigationPath } = require('../../frontend/src/game/marketNavigation.ts');
-const { visibleStations, visibleShelfProductIds, replayShelfPageFractions, DEFAULT_REPLAY_PRESENTATION } = require('../../frontend/src/game/marketReplayPerception.ts');
+const { visibleStations, visibleShelfProductIds, replayShelfPageFractions, wholeReplayWaypointGraph, DEFAULT_REPLAY_PRESENTATION } = require('../../frontend/src/game/marketReplayPerception.ts');
 const { validationGoals, isGoalProduct } = require('./personaValidationMetrics.cjs');
+const firstPlayRouteCache = new WeakMap();
+
+/** A static witness only; this path is never provided to the actor or counted as observed movement. */
+function firstPlayRouteStructure(snapshot, presentation) {
+  const environment = snapshot.environment;
+  if (!environment?.spawn || !environment.world || !environment.stationDetails || !environment.checkouts) return { possible: null, reason: 'missing-navigation-structure' };
+  const cacheKey = JSON.stringify([environment, presentation, snapshot.cashierAvailability]);
+  const cached = firstPlayRouteCache.get(snapshot);
+  if (cached?.key === cacheKey) return structuredClone(cached.result);
+  const graph = wholeReplayWaypointGraph(environment, environment.spawn, presentation, snapshot.cashierAvailability);
+  const nodes = new Map(graph.nodes.map(node => [node.waypointId, node.allowedWaypointIds]));
+  const paths = new Map(), queue = graph.startAllowedWaypointIds.map(id => [id]);
+  for (let i = 0; i < queue.length; i++) {
+    const route = queue[i], id = route.at(-1);
+    if (paths.has(id)) continue;
+    paths.set(id, route);
+    for (const next of nodes.get(id) ?? []) if (!paths.has(next)) queue.push([...route, next]);
+  }
+  let witness = null;
+  // A route returning towards an earlier waypoint while another remains unvisited is sufficient.
+  for (const [id, route] of paths) {
+    const choices = nodes.get(id) ?? [], visited = choices.find(next => route.includes(next)), unseen = choices.find(next => !route.includes(next));
+    if (visited && unseen) { witness = { path: route, atWaypointId: id, visitedChoiceId: visited, unvisitedChoiceId: unseen }; break; }
+  }
+  const branchCount = [...paths.keys()].filter(id => (nodes.get(id)?.length ?? 0) >= 2).length;
+  const result = { possible: witness ? true : branchCount === 0 ? false : null,
+    reason: witness ? 'reachable-visited-and-unvisited-choice' : branchCount === 0 ? 'no-reachable-branch' : 'no-confirmed-mixed-choice-witness',
+    reachableWaypointCount: paths.size, reachableBranchCount: branchCount, witness };
+  firstPlayRouteCache.set(snapshot, { key: cacheKey, result: structuredClone(result) });
+  return result;
+}
 
 function routeStations(snapshot, categories) {
   const environment = snapshot.environment, presentation = snapshot.presentation ?? DEFAULT_REPLAY_PRESENTATION;
@@ -30,7 +61,7 @@ function routeStations(snapshot, categories) {
   }
   return { reachableGoalCategories: reachable, visibleStationIds: [...visible].sort(), route: 'objective-order-reference-route' };
 }
-function auditSnapshot(snapshot, { condition, persona = {} } = {}) {
+function auditSnapshot(snapshot, { condition, persona = {}, analysisVersion = 1 } = {}) {
   const goals = validationGoals(snapshot), inventory = snapshot.config?.inventoryProductIds;
   const presentation = snapshot.presentation ?? DEFAULT_REPLAY_PRESENTATION;
   const ids = inventory ? [...new Set(Object.values(inventory).flat())] : null;
@@ -93,22 +124,48 @@ function auditSnapshot(snapshot, { condition, persona = {} } = {}) {
     '익숙한 상품을 실제 선택하고 대기시간을 작성해야 한다.', { familiarProductIds: (persona.character?.familiarProductIds ?? []).filter(id => available.includes(id)) }, ['familiar-product-selection', 'authored-delay']);
   put('highLoadMismatchRate', measurable, '시도한 목표의 실제 수량·규격 일치 여부를 관찰한다. 불일치는 강제하지 않는다.', { quantityGoals, exactAlternatives }, ['goal-attempt']);
   put('preCheckoutCartRate', measurable, '계산 단계에 도달해야 한다.', { checkoutCount: snapshot.environment?.checkouts?.length ?? null }, ['actor-checkout']);
+  if (analysisVersion === 2) {
+    const operations = { open: hasShelf, browse: inventory ? comparisonGoals.some(row => row.pageCount > 1) : null,
+      add: measurable, viewCart: true, checkout: snapshot.environment?.checkouts ? snapshot.environment.checkouts.length > 0 : null };
+    put('initialCautionCount', true, '시작부터 첫 매대 열기 또는 담기 직전까지의 살핌 행동을 관찰한다. 열기·담기 없이 끝나면 관찰 종료까지 포함하며 작성 대기시간은 사용하지 않는다.',
+      { goalCategories, segment: 'start-before-first-open-or-add-or-observation-end', opportunityPerTrace: 1 }, ['observed-actor-actions']);
+    put('operationLearningRate', Object.values(operations).some(Boolean), '조작 종류를 처음 쓰는 시점 직전의 살핌만 관찰한다. 드래그 실패나 숙달 변화를 추정하지 않는다.',
+      { operations }, ['first-use-of-operation', 'preceding-observed-actions']);
+    const routeStructure = firstPlayRouteStructure(snapshot, presentation);
+    put('routeRelianceRate', routeStructure.possible, '가 본 waypoint와 처음 보는 waypoint가 함께 선택 가능한 이동이 필요하다. 갈림길이 없거나 선택지 근거가 없으면 판단할 수 없다.',
+      routeStructure, ['observed-visited-waypoints', 'saved-current-walk-choices', 'observed-walk-selection']);
+    const simultaneousGoals = comparisonGoals.map(row => {
+      const shelf = inventory?.[row.categoryId] ?? [];
+      const goal = goals.find(item => item.id === row.goalId);
+      const pages = replayShelfPageFractions(shelf, presentation).flatMap(scrollFraction => {
+        const visibleIds = visibleShelfProductIds(shelf, presentation, scrollFraction).filter(id => row.candidateProductIds.includes(id));
+        const variants = new Set(visibleIds.map(id => { const p = getMarketProduct(id); return JSON.stringify([p?.name, p?.detail]); }));
+        return variants.size >= 2 && visibleIds.some(id => isGoalProduct(id, goal)) ? [{ scrollFraction, visibleProductIds: visibleIds }] : [];
+      });
+      return { goalId: row.goalId, categoryId: row.categoryId, simultaneousPages: pages };
+    });
+    put('textCueLoadRate', inventory ? simultaneousGoals.some(row => row.simultaneousPages.length > 0) : null,
+      '같은 계열의 이름·규격이 다른 상품이 한 페이지에 함께 표시되는 목표 구매가 필요하다. 관심 구매와 기존 숙고 지표에 쓰인 비교 행동은 제외한다.',
+      { goals: simultaneousGoals }, ['simultaneously-visible-same-family-variants', 'goal-selection', 'non-overlapping-check-action']);
+  }
   return { version: 1, scope: 'static-structural-possibility', snapshotId: snapshot.snapshotId ?? null, condition: condition ?? null,
     seedInvariant: !!inventory && !!snapshot.environment, route, metrics,
     limitations: ['Snapshot 구조의 가능성만 점검한다. 실제 단서 노출·기회 도달·오류·행동을 보장하지 않는다.',
       '기회가 없으면 측정값은 null/unexercised이며 실수를 강제하지 않는다.', '기준 동선은 정적 점검용이며 배우에게 따라야 할 동선으로 제공하지 않는다.'] };
 }
-function auditManifestSnapshots({ snapshots, profiles, personaIds = Object.keys(profiles ?? {}), validationMode }) {
+function auditManifestSnapshots({ snapshots, profiles, personaIds = Object.keys(profiles ?? {}), validationMode, analysisVersion = 1 }) {
   const byPersonaCondition = [];
   for (const [condition, record] of Object.entries(snapshots)) {
     const snapshot = record.filePath ? JSON.parse(fs.readFileSync(record.filePath, 'utf8')) : record;
     for (const personaId of personaIds) {
       const entry = profiles?.[personaId];
       const persona = entry?.persona ?? (entry?.character ? entry : JSON.parse(fs.readFileSync(path.join(__dirname, '../personas', `${personaId}.json`), 'utf8')));
-      byPersonaCondition.push({ personaId, condition, ...auditSnapshot(snapshot, { condition, persona }) });
+      byPersonaCondition.push({ personaId, condition, ...auditSnapshot(snapshot, { condition, persona, analysisVersion }) });
     }
   }
-  const spec = require(validationMode === 'traits' ? '../validation/persona-trait-validation-spec.json' : '../validation/persona-validation-spec.json');
+  const spec = require(validationMode === 'traits'
+    ? analysisVersion === 2 ? '../validation/persona-trait-validation-spec-v2.json' : '../validation/persona-trait-validation-spec.json'
+    : '../validation/persona-validation-spec.json');
   const warnings = byPersonaCondition.flatMap(row => spec.metrics.filter(metric => (metric.applies === 'both' || metric.applies === row.condition)
     && (!metric.personaId || metric.personaId === row.personaId) && row.metrics[metric.kind]?.possible === false)
     .map(metric => ({ personaId: row.personaId, condition: row.condition, metricId: metric.id, kind: metric.kind,

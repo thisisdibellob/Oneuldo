@@ -48,12 +48,14 @@ function inspectSlot(m, slot) {
   } catch (error) { return { complete: false, reason: error.message }; }
 }
 function fromManifest(m, { samples } = {}) {
-  const traits = m.version === 3, spec = require(traits ? '../validation/persona-trait-validation-spec.json' : '../validation/persona-validation-spec.json');
+  const traits = m.version === 3, current = require(traits ? '../validation/persona-trait-validation-spec.json' : '../validation/persona-validation-spec.json');
+  const spec = require('./personaValidationSpec.cjs').assertSpec(m, current, traits ? 'traits' : 'legacy');
   const sampleByKey = samples && new Map(samples.map(sample => [key(sample), sample]));
   const slots = m.slots.map(slot => ({ ...slot, ...(sampleByKey?.has(key(slot)) ? { complete: true, fixture: sampleByKey.get(key(slot)).fixture } : inspectSlot(m, slot)),
     prepareWholeTrace: prepareWholeTrace(m, slot) }));
   const completed = new Set(slots.filter(slot => slot.complete).map(key)), byKey = new Map(slots.map(slot => [key(slot), slot]));
-  const contrasts = traits ? require('./personaTraitValidationRun.cjs').matchedContrasts(m.profiles).map(contrast => ({
+  const catalogSchemaVersion = m.catalogSchemaVersion ?? Object.values(m.profiles ?? {})[0]?.persona?.traitProfile?.schemaVersion ?? 'persona-traits-v1';
+  const contrasts = traits ? require('./personaTraitValidationRun.cjs').matchedContrasts(m.profiles, catalogSchemaVersion).map(contrast => ({
     comparisonId: contrast.id, traitKey: contrast.traitKey, actorPersonaId: contrast.higherProfileId, referencePersonaId: contrast.lowerProfileId,
   })) : m.personaIds.filter(id => id !== CONTROL).map(id => ({ comparisonId: `${id}:${CONTROL}`, actorPersonaId: id, referencePersonaId: CONTROL }));
   const conditions = Object.keys(m.snapshots), unmatchedSlots = [], expectedValidPairs = [];
@@ -89,6 +91,8 @@ function fromManifest(m, { samples } = {}) {
   if (missingSlots.length) reasons.push({ code: 'incomplete-slot-grid', message: `${missingSlots.length}개 슬롯이 아직 완료되지 않았다.` });
   if (expectedValidPairs.some(row => row.maximumValidPairs < spec.minValidPairs)) reasons.push({ code: 'insufficient-pair-capacity', message: `현재 완료 슬롯으로는 일부 비교에서 유효 쌍 ${spec.minValidPairs}개에 도달할 수 없다.` });
   if (technicalFailures.length) reasons.push({ code: 'technical-failures', message: `${technicalFailures.length}개 슬롯의 기술 실패 또는 근거 불일치를 확인했다.` });
+  if (m.analysisVersion === 2) for (const warning of m.opportunityAudit?.warnings ?? []) reasons.push({ ...warning,
+    message: `${warning.personaId}/${warning.condition}: ${warning.message}` });
   return { runDirectory: m.runDirectory, manifestPath: path.join(m.runDirectory, 'manifest.json'), validationMode: traits ? 'traits' : 'legacy',
     readiness: blocked ? 'blocked' : missingSlots.length || expectedValidPairs.some(row => row.maximumValidPairs < spec.minValidPairs) ? 'incomplete' : 'ready', reasons,
     complete: completed.size, required: m.slots.length, containsFixture: slots.some(slot => slot.complete && slot.fixture),

@@ -5,7 +5,9 @@ const fs = require('node:fs');
 const {createRequire} = require('node:module');
 const vm = require('node:vm');
 require('../runtime.cjs');
-const {catalog,resolveProfiles,validatePersona,assertValidPersona,MAX_PROFILES} = require('../src/personaTraitProfiles.cjs');
+const {getCatalog,resolveProfiles:resolveVersionedProfiles,validatePersona,assertValidPersona,MAX_PROFILES} = require('../src/personaTraitProfiles.cjs');
+const catalog = getCatalog('persona-traits-v1');
+const resolveProfiles = options => resolveVersionedProfiles(options, 'persona-traits-v1');
 const {listPersonas,getPersona,getWholeTracePersona,withValidationPersona,assertPersonaLearningAllowed} = require('../src/personas.ts');
 const {buildWholeTracePersonaInput} = require('../src/wholeTracePersona.ts');
 const {buildWholeTraceCognitionProfile} = require('../src/wholeTraceCognition.ts');
@@ -105,7 +107,7 @@ test('custom persona provenance changes when authored wording changes, without c
     const target = {exports:{}};
     const load = vm.runInThisContext(`(function(require,module,exports){${source}\n})`, {filename:file});
     load(name => name === '../validation/persona-traits.json' ? changedCatalog : localRequire(name), target, target.exports);
-    return target.exports.resolveProfiles({profiles:[definition('versioned-person', {checking:'high'})]})[0];
+    return target.exports.resolveProfiles({profiles:[definition('versioned-person', {checking:'high'})]}, 'persona-traits-v1')[0];
   }
   const current = resolve(definition('versioned-person', {checking:'high'}));
   const repeated = resolveWithCatalog(structuredClone(catalog));

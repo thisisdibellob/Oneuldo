@@ -50,7 +50,7 @@ test('MCP accepts arbitrary trait profile populations and no mandatory control c
   const f = fixture(t);
   const single = await f.service.invokeTool('prepare_persona_validation', { ...f.args, profiles: profiles.slice(0, 1) });
   assert.equal(single.required, 4); assert.equal(single.validationMode, 'traits');
-  assert.equal(single.catalog.traits.length, 5); assert.equal(single.catalog.presets.length, 5);
+  assert.equal(single.catalog.traits.length, 9); assert.equal(single.catalog.presets.length, 5);
   const many = await f.service.invokeTool('prepare_persona_validation', { ...f.args, runId: 'many',
     profiles: Array.from({ length: 5 }, (_, i) => ({ ...profiles[0], id: `population-${i}` })) });
   assert.equal(many.required, 20);
@@ -90,7 +90,7 @@ test('common trait blind answers support abstention, A/B ordering, and answer/ev
   run.measure({ runDirectory: prepared.runDirectory, allowFixture: true });
   assert.throws(() => run.prepareBlind({ runDirectory: prepared.runDirectory, panel: 'B', allowFixture: true }), /Score panel A/);
   const blind = run.prepareBlind({ runDirectory: prepared.runDirectory, allowFixture: true });
-  assert.equal(blind.traitRubric.length, 5); assert.equal(blind.publicProfiles, undefined);
+  assert.equal(blind.traitRubric.length, 9); assert.equal(blind.publicProfiles, undefined);
   assert.ok(!JSON.stringify(blind.bundle).includes('checking-low'));
   const key = JSON.parse(fs.readFileSync(path.join(prepared.runDirectory, 'blind-key.json')));
   const answers = Object.fromEntries(key.filter(row => row.version === 'A').map(row => [row.opaqueId,
@@ -99,7 +99,7 @@ test('common trait blind answers support abstention, A/B ordering, and answer/ev
   const graded = run.submitBlind(args);
   assert.equal(graded.score.perTrait.persistence.coverage, 0);
   assert.equal(graded.score.perTrait.checking.accuracy, 1);
-  assert.equal(graded.score.macroAccuracy, .8);
+  assert.equal(graded.score.macroAccuracy, 8 / 9);
   assert.deepEqual(run.submitBlind(args).score, graded.score);
   const changed = structuredClone(args); changed.answers[Object.keys(answers)[0]].confidence = .7;
   assert.throws(() => run.submitBlind(changed), /frozen/);

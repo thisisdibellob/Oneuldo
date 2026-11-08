@@ -91,6 +91,7 @@ function actorEvents(trace, audit = null, evidence = {}) {
       decisionIndex: decision.decisionIndex ?? index, sourceStepIndex: stepIndex, stepIds: [step.id], action: decision.action,
       before: decision.before, after: decision.after, actorState: decision.actorState, basis: decision.basis,
       knowledge: decision.knowledge, cognition: decision.cognition, taskMemory: decision.taskMemory,
+      choiceResolution: decision.choiceResolution,
       interest: decision.actorState?.activity === 'interest' || decision.basis?.intent === 'interest' || step.attentionTag === 'interest',
       attentionAvailable: Boolean(decision.actorState?.activity || decision.basis?.intent || step.attentionTag),
     };
@@ -319,7 +320,7 @@ function extract(trace, snapshot, persona, audit = null, evidence = {}) {
   return results;
 }
 /** Universal rules consume recorded opportunities, never a person's name or diagnosis. */
-function extractUniversal(trace, snapshot, persona = {}, audit = null, evidence = {}) {
+function extractUniversal(trace, snapshot, persona = {}, audit = null, evidence = {}, options = {}) {
   const events = actorEvents(trace, audit, evidence), goals = validationGoals(snapshot);
   const legacy = extract(trace, snapshot, persona, audit, evidence), metrics = {};
   const observed = events.some(event => event.before || event.after);
@@ -396,7 +397,7 @@ function extractUniversal(trace, snapshot, persona = {}, audit = null, evidence 
     });
 
   const difficulties = difficultyOpportunities(events, goals);
-  const responseEvents = [], helpEvents = [];
+  const responseEvents = [], helpEvents = [], observedDifficultyResponses = [], declaredDifficultyResponses = [];
   const byEvidenceType = {};
   for (let index = 0; index < difficulties.length; index++) {
     const opportunity = difficulties[index], next = difficulties.find(item => item.event.index > opportunity.event.index);
@@ -420,6 +421,8 @@ function extractUniversal(trace, snapshot, persona = {}, audit = null, evidence 
     });
     if (help) helpEvents.push(help);
     if (response) responseEvents.push(response);
+    (opportunity.evidenceType === 'actor-declaration' ? declaredDifficultyResponses : observedDifficultyResponses)
+      .push(...[help, response].filter(Boolean));
     const category = byEvidenceType[opportunity.evidenceType] ??= { opportunities: 0, responses: 0, helpUses: 0 };
     category.opportunities++; category.responses += Number(Boolean(response)); category.helpUses += Number(Boolean(help));
   }
@@ -472,9 +475,26 @@ function extractUniversal(trace, snapshot, persona = {}, audit = null, evidence 
     evidence: eventEvidence([terminal]), declaredUncertaintyCount: priorDifficulties.length,
     explanation: 'Goals remain but no recorded feedback or displayed mismatch supports the stop. This is a review signal, not a personality failure.',
   });
+  if (options.analysisVersion === 2) {
+    // Preserve all original definitions. Only the new metrics yield an action already
+    // used as a manifestation of comparison/checking/exploration/difficulty response.
+    const oldChecks = events.filter(event =>
+      event.type === 'browse' && legacy.comparisonRate.evidence.some(id => event.stepIds.includes(id))
+      || event.type === 'readList' && legacy.postSelectionListRate.evidence.some(id => event.stepIds.includes(id))
+      || event.type === 'viewCart' && legacy.preCheckoutCartRate.evidence.some(id => event.stepIds.includes(id)));
+    const observedReservations = [...oldChecks, ...detours, ...recoveries, ...observedDifficultyResponses];
+    Object.assign(metrics, require('./personaValidationFirstPlay.cjs').extractFirstPlay({
+      trace, events, goals, evidence, isGoalProduct,
+      reservedEvents: [...oldChecks, ...detours, ...recoveries, ...helpEvents, ...responseEvents],
+      declaredOnlyOverlapEvents: declaredDifficultyResponses.filter(event => !observedReservations.includes(event)),
+    }));
+  }
   const coverage = Object.fromEntries(Object.entries(metrics).map(([kind, metric]) => [kind, {
     status: metric.status, opportunityCount: metric.denominator, evidenceType: metric.evidenceType,
     reason: metric.reason ?? null, ...(metric.byEvidenceType ? { byEvidenceType: metric.byEvidenceType } : {}),
+    ...Object.fromEntries(['missingObservationCount', 'missingArrivalCount', 'missingEvidenceReasons',
+      'excludedOpportunityEvidence', 'exclusionReason', 'unknownVisitExclusionEvidence']
+      .filter(key => Object.hasOwn(metric, key)).map(key => [key, metric[key]])),
   }]));
   return { metrics, outcome, coverage, terminationReview: { status: signals.length ? 'review' : 'clear', signals,
     observedDifficultyCount: observedDifficulties.length, declaredUncertaintyCount: priorDifficulties.length - observedDifficulties.length,

@@ -1,0 +1,311 @@
+{
+  "schemaVersion": "persona-traits-v2",
+  "interpretation": "쇼핑 상황의 합성 행동 성향 설계값이다. 심리검사 점수, 임상 기준, 장애 또는 실제 사람의 측정값이 아니다. 성격과 인지·수행 특성, 취향, 경험을 분리한다. 낮음은 능력 부족을 뜻하지 않으며 각 행동은 실제 기회와 상황에 따라 선택한다.",
+  "levels": [
+    "low",
+    "medium",
+    "high"
+  ],
+  "traits": [
+    {
+      "key": "deliberation",
+      "label": "숙고 성향",
+      "description": "선택 전 후보와 조건을 살펴보려는 성향",
+      "levels": {
+        "low": "관찰한 후보가 기억하는 조건을 충분히 만족하면 다른 후보를 더 찾기보다 선택하는 편이다. 조건 충족 여부가 불분명하거나 관찰한 후보끼리 중요한 차이가 있으면 필요한 정보를 살필 수 있다. 선택이 충분히 분명해지면 비교를 마친다. 미확인 정보를 아는 것으로 꾸미거나 실수를 강제하지 않는다.",
+        "medium": "관찰한 후보들의 차이가 선택에 중요하거나 여러 조건이 얽혀 있으면 관련 후보의 상품 정보와 기억하는 조건을 대조할지 판단한다. 익숙하고 조건이 분명한 후보라면 추가 비교 없이 선택할 수 있다. 선택이 충분히 분명해지면 비교를 마친다.",
+        "high": "관련 후보를 둘 이상 실제로 관찰했거나 여러 조건을 함께 고려해야 할 때, 바로 담기 전에 후보별로 어떤 조건이 맞고 다른지 살펴본 뒤 선택하려는 편이다. 더 알아야 할 정보가 있으면 현재 허용된 상품·매대 관찰 행동을 선택한다. 하나의 지정 상품만 보이거나 선택이 충분히 분명해지면 비교를 마친다. 머무는 시간을 늘리거나 비교 횟수를 채우는 것으로 숙고를 대신하지 않는다."
+      }
+    },
+    {
+      "key": "checking",
+      "label": "확인 성향",
+      "description": "목록·수량·장바구니를 다시 확인하려는 성향",
+      "levels": {
+        "low": "방금 관찰한 목표와 수량이 분명하고 기억하고 있으면 그대로 다음 단계로 진행하는 편이다. 수량이 헷갈리거나 관찰과 기억이 어긋나면 실제로 목록·장바구니를 열어 필요한 정보를 확인할 수 있다. 충분히 명확해지면 추가 확인을 마친다.",
+        "medium": "상품을 담고 다음 목표로 넘어갈 때, 수량이 불확실할 때, 결제를 결정할 때 현재 기억과 관찰이 충분한지 살핀다. 빠진 조건이나 불확실한 수량이 있으면 해당 정보가 보이는 목록·장바구니 등을 실제로 열어 대조할지 판단한다. 충분히 명확해지면 추가 확인을 마친다.",
+        "high": "상품을 담고 다음 목표로 넘어가거나 결제를 결정할 때, 방금 선택한 상품·수량과 기억하는 목표 조건을 다시 대조하고 싶어 하는 편이다. 특히 수량이 헷갈리거나 관심 전환 뒤 무엇을 담았는지 불확실하면 목록·장바구니처럼 필요한 정보가 실제로 보이는 화면을 열어 확인하는 쪽을 선호한다. 현재 관찰과 유지한 기억으로 충분히 명확하면 추가 확인을 마친다. 매 단계의 확인을 의무화하거나 완벽한 장바구니를 보장하지 않는다."
+      }
+    },
+    {
+      "key": "exploration",
+      "label": "탐색 성향",
+      "description": "새로운 상품·단서·대안을 살펴보려는 성향",
+      "levels": {
+        "low": "익숙하고 필요한 단서를 중심으로 진행하는 편이다. 배치가 달라지거나 정보가 부족하면 새 단서를 찾을 수 있다.",
+        "medium": "필요한 과업과 눈에 들어온 관심 단서 사이에서 상황에 맞게 살펴볼 범위를 정한다.",
+        "high": "실제로 눈에 들어온 새로운 상품이나 대안을 살펴보는 편이다. 보이지 않는 관심 단서를 만들거나 정해진 이탈 횟수를 채우지 않는다."
+      }
+    },
+    {
+      "key": "persistence",
+      "label": "지속 성향",
+      "description": "어려움 뒤 재시도·전략 변경·중단을 선택하는 성향",
+      "levels": {
+        "low": "부담이나 반복 실패가 커지면 쉬거나 중단하는 선택을 비교적 쉽게 고려한다. 이유 없는 포기나 실패를 의무로 만들지 않는다.",
+        "medium": "실패 원인과 남은 부담을 보고 재시도·다른 전략·중단을 선택한다.",
+        "high": "어려움이 생겨도 단서를 확인하고 다른 방법이나 지원을 활용해 이어가려는 편이다. 같은 행동을 무한 반복하거나 완료를 강제하지 않는다."
+      }
+    },
+    {
+      "key": "helpSeeking",
+      "label": "도움 활용 성향",
+      "description": "불확실할 때 제공된 설명·도움을 활용하려는 성향",
+      "levels": {
+        "low": "먼저 직접 확인하는 편이지만 해결이 어렵거나 불확실성이 크면 제공된 도움을 사용할 수 있다.",
+        "medium": "현재 정보와 부담을 보고 직접 확인하거나 제공된 도움을 선택한다.",
+        "high": "불확실한 단계에서는 제공된 설명이나 도움을 적극적으로 활용하는 편이다. 도움 사용은 자기 결정 능력의 부족이나 복종을 뜻하지 않는다."
+      }
+    },
+    {
+      "key": "initialCaution",
+      "label": "초반 신중함",
+      "description": "처음 시작한 화면과 가능한 행동을 살펴본 뒤 진입하려는 성향",
+      "levels": {
+        "low": "첫 화면에서 할 일이 분명하면 바로 매장 활동을 시작하는 편이다. 무엇을 할 수 있는지 불분명하면 주변·목록·도움말을 살필 수 있다. 충분히 분명해지면 멈춘다. 실수를 강제하지 않는다. [근거: palmqvist-2018; 개인차가 큰 집단 연구를 참고한 합성 경향]",
+        "medium": "처음 시작한 화면에서 무엇을 할 수 있는지 살피고, 낯선 단서가 있으면 주변·목록·도움말 중 필요한 정보를 볼지 판단한다. 충분히 분명해지면 멈춘다. 실수를 강제하지 않는다. [근거: palmqvist-2018; 개인차가 큰 집단 연구를 참고한 합성 경향]",
+        "high": "처음 시작한 화면에서는 바로 매대에 진입하기보다 주변·목록·도움말을 살펴 상황과 가능한 행동을 파악하려는 편이다. 충분히 분명해지면 멈춘다. 실수를 강제하지 않는다. [근거: palmqvist-2018; 개인차가 큰 집단 연구를 참고한 합성 경향]"
+      },
+      "observationCriteria": "시작부터 첫 매대 열기 또는 담기 직전까지 관찰된 주변 살핌·목록 읽기·도움말·잠시 살핌 행동을 본다. 작성된 대기시간과 이유 선언은 근거가 아니다. 판정에는 관찰된 행동(behavioralEvidence)만 사용하며 reason 등 배우 선언과 작성된 대기시간은 사용하지 않는다.",
+      "sources": [
+        "palmqvist-2018"
+      ]
+    },
+    {
+      "key": "operationLearning",
+      "label": "조작 익히기",
+      "description": "처음 사용하는 조작의 화면과 설명을 살펴보려는 성향",
+      "levels": {
+        "low": "처음 사용하는 조작도 화면의 작동 방식이 분명하면 직접 선택하는 편이다. 어떻게 사용하는지 불분명하면 해당 화면이나 도움말을 살필 수 있다. 충분히 분명해지면 멈춘다. 실수를 강제하지 않는다. [근거: first-use-support; 개인차가 큰 집단 연구를 참고한 합성 경향]",
+        "medium": "매대 열기·페이지 보기·담기·장바구니 보기·계산을 처음 사용할 때, 화면 단서로 조작 방법이 분명한지 보고 설명이나 관찰이 필요한지 판단한다. 충분히 분명해지면 멈춘다. 실수를 강제하지 않는다. [근거: first-use-support; 개인차가 큰 집단 연구를 참고한 합성 경향]",
+        "high": "매대 열기·페이지 보기·담기·장바구니 보기·계산을 처음 사용할 때, 바로 조작하기보다 화면 단서나 제공된 설명을 살펴 사용 방법을 파악하려는 편이다. 충분히 분명해지면 멈춘다. 실수를 강제하지 않는다. [근거: first-use-support; 개인차가 큰 집단 연구를 참고한 합성 경향]"
+      },
+      "observationCriteria": "각 조작의 첫 사용 직전 관찰된 도움말·관찰·잠시 살핌 행동을 본다. 실제 어려움 뒤 도움과 다른 축의 같은 행동을 제외한다. 드래그 실패나 조작 성공률은 이 성향의 근거가 아니다. 판정에는 관찰된 행동(behavioralEvidence)만 사용하며 reason 등 배우 선언과 작성된 대기시간은 사용하지 않는다.",
+      "sources": [
+        "first-use-support"
+      ]
+    },
+    {
+      "key": "routeReliance",
+      "label": "익힌 동선 고수",
+      "description": "관찰해 본 이동 경로를 다시 선택하려는 성향",
+      "levels": {
+        "low": "가 본 길과 처음 보는 길이 함께 가능하면 현재 보이는 단서를 따라 경로를 정하며, 낯선 길도 선택할 수 있다. 충분히 분명해지면 멈춘다. 실수를 강제하지 않는다. [근거: route-learning; 개인차가 큰 집단 연구를 참고한 합성 경향]",
+        "medium": "가 본 길과 처음 보는 길이 함께 가능하면 익숙함과 현재 보이는 이동 단서를 함께 고려해 경로를 정한다. 충분히 분명해지면 멈춘다. 실수를 강제하지 않는다. [근거: route-learning; 개인차가 큰 집단 연구를 참고한 합성 경향]",
+        "high": "가 본 길과 처음 보는 길이 함께 가능하면 이미 지나며 확인한 경로를 중심으로 움직이려는 편이다. 새로운 길의 단서가 명확하면 그 길도 선택할 수 있다. 충분히 분명해지면 멈춘다. 실수를 강제하지 않는다. [근거: route-learning; 개인차가 큰 집단 연구를 참고한 합성 경향]"
+      },
+      "observationCriteria": "걷기 선택지에 이미 방문한 waypoint와 처음 보는 waypoint가 동시에 실제로 있을 때, 가 본 waypoint 선택 비율을 본다. 선택지 기록이 없으면 판단하지 않는다. 판정에는 관찰된 행동(behavioralEvidence)만 사용하며 reason 등 배우 선언과 작성된 대기시간은 사용하지 않는다.",
+      "sources": [
+        "route-learning"
+      ]
+    },
+    {
+      "key": "textCueLoad",
+      "label": "글자 단서 부담",
+      "description": "비슷한 상품의 이름·규격이 혼동될 때 정보를 확인하려는 성향",
+      "levels": {
+        "low": "비슷한 상품이 함께 보여도 이름과 규격의 뜻이 분명하면 선택하는 편이다. 글자 단서가 혼동되면 해당 정보를 살펴볼 수 있다. 충분히 분명해지면 멈춘다. 실수를 강제하지 않는다. [근거: harrysson-2004; 개인차가 큰 집단 연구를 참고한 합성 경향]",
+        "medium": "비슷한 상품이 함께 보일 때 이름이나 규격이 혼동되면, 현재 표시된 상품 정보를 살펴 차이를 확인할지 판단한다. 충분히 분명해지면 멈춘다. 실수를 강제하지 않는다. [근거: harrysson-2004; 개인차가 큰 집단 연구를 참고한 합성 경향]",
+        "high": "비슷한 상품이 함께 보여 이름이나 규격을 구분하기 어려우면, 바로 담기보다 표시된 상품 정보를 살펴 글자 단서의 차이를 확인하려는 편이다. 충분히 분명해지면 멈춘다. 실수를 강제하지 않는다. [근거: harrysson-2004; 개인차가 큰 집단 연구를 참고한 합성 경향]"
+      },
+      "observationCriteria": "같은 계열의 이름·규격이 다른 상품이 동시에 표시된 목표 담기 기회에서 직전 탐색·비교·확인을 본다. 관심 구매와 기존 관련 후보 비교로 센 행동은 제외한다. 혼동 오류율과 이유 선언은 근거가 아니다. 판정에는 관찰된 행동(behavioralEvidence)만 사용하며 reason 등 배우 선언과 작성된 대기시간은 사용하지 않는다.",
+      "sources": [
+        "harrysson-2004"
+      ]
+    }
+  ],
+  "presets": [
+    {
+      "id": "deliberate-checker",
+      "label": "숙고·확인형",
+      "description": "후보와 조건을 차례로 살피고 선택을 확인하는 기본 묶음",
+      "traits": {
+        "deliberation": "high",
+        "checking": "high",
+        "exploration": "medium",
+        "persistence": "high",
+        "helpSeeking": "medium",
+        "initialCaution": "medium",
+        "operationLearning": "medium",
+        "routeReliance": "medium",
+        "textCueLoad": "medium"
+      }
+    },
+    {
+      "id": "quick-satisficer",
+      "label": "신속 결정형",
+      "description": "조건을 만족하는 후보를 빠르게 정하는 기본 묶음",
+      "traits": {
+        "deliberation": "low",
+        "checking": "low",
+        "exploration": "low",
+        "persistence": "medium",
+        "helpSeeking": "low",
+        "initialCaution": "medium",
+        "operationLearning": "medium",
+        "routeReliance": "medium",
+        "textCueLoad": "medium"
+      }
+    },
+    {
+      "id": "curious-explorer",
+      "label": "탐색·호기심형",
+      "description": "눈에 들어온 새로운 단서와 대안을 살피는 기본 묶음",
+      "traits": {
+        "deliberation": "medium",
+        "checking": "medium",
+        "exploration": "high",
+        "persistence": "medium",
+        "helpSeeking": "medium",
+        "initialCaution": "medium",
+        "operationLearning": "medium",
+        "routeReliance": "medium",
+        "textCueLoad": "medium"
+      }
+    },
+    {
+      "id": "familiar-routine",
+      "label": "익숙함 선호형",
+      "description": "익숙한 단서와 연습한 절차를 중심으로 진행하는 기본 묶음",
+      "traits": {
+        "deliberation": "medium",
+        "checking": "medium",
+        "exploration": "low",
+        "persistence": "high",
+        "helpSeeking": "medium",
+        "initialCaution": "medium",
+        "operationLearning": "medium",
+        "routeReliance": "medium",
+        "textCueLoad": "medium"
+      }
+    },
+    {
+      "id": "help-seeker",
+      "label": "도움 활용형",
+      "description": "불확실할 때 설명과 지원을 활용하는 기본 묶음",
+      "traits": {
+        "deliberation": "medium",
+        "checking": "high",
+        "exploration": "medium",
+        "persistence": "medium",
+        "helpSeeking": "high",
+        "initialCaution": "medium",
+        "operationLearning": "medium",
+        "routeReliance": "medium",
+        "textCueLoad": "medium"
+      }
+    }
+  ],
+  "legacyMappings": {
+    "mild-intellectual-disability-adult": {
+      "presetId": "help-seeker",
+      "traits": {
+        "deliberation": "medium",
+        "checking": "high",
+        "exploration": "high",
+        "persistence": "high",
+        "helpSeeking": "high",
+        "initialCaution": "high",
+        "operationLearning": "high",
+        "routeReliance": "high",
+        "textCueLoad": "high"
+      },
+      "annotation": "원본 설정을 보존한 설계 해석이며 실제 행동의 측정 결과가 아니다."
+    },
+    "careful-checker": {
+      "presetId": "deliberate-checker",
+      "traits": {
+        "deliberation": "high",
+        "checking": "high",
+        "exploration": "medium",
+        "persistence": "high",
+        "helpSeeking": "medium",
+        "initialCaution": "medium",
+        "operationLearning": "medium",
+        "routeReliance": "medium",
+        "textCueLoad": "low"
+      },
+      "annotation": "원본 설정을 보존한 설계 해석이며 실제 행동의 측정 결과가 아니다."
+    },
+    "quick-decider": {
+      "presetId": "quick-satisficer",
+      "traits": {
+        "deliberation": "low",
+        "checking": "low",
+        "exploration": "low",
+        "persistence": "high",
+        "helpSeeking": "low",
+        "initialCaution": "low",
+        "operationLearning": "low",
+        "routeReliance": "high",
+        "textCueLoad": "low"
+      },
+      "annotation": "원본 설정을 보존한 설계 해석이며 실제 행동의 측정 결과가 아니다."
+    },
+    "neutral-adult-control": {
+      "presetId": null,
+      "traits": {
+        "deliberation": "medium",
+        "checking": "medium",
+        "exploration": "medium",
+        "persistence": "medium",
+        "helpSeeking": "medium",
+        "initialCaution": "medium",
+        "operationLearning": "medium",
+        "routeReliance": "medium",
+        "textCueLoad": "medium"
+      },
+      "annotation": "기존 대조군을 연결한 설계 해석이며 일반 성인의 평균을 뜻하지 않는다."
+    }
+  },
+  "references": {
+    "palmqvist-2018": [
+      {
+        "title": "Palmqvist, Danielsson & Jönsson. Behavioural Patterns in a Computerized Training Program for Individuals with ID",
+        "url": "https://www.ida.liu.se/~arnjo82/papers/ecidd-18.pdf"
+      }
+    ],
+    "first-use-support": [
+      {
+        "title": "PLOS ONE 2022",
+        "url": "https://doi.org/10.1371/journal.pone.0269793",
+        "interpretation": "첫 블록에서 스스로 시작하지 못한 사례가 집중된 직접 근거. 조작 전 살핌 지표 자체의 임상 타당성을 입증하지 않는다."
+      },
+      {
+        "title": "JARID 2023: video prompting for cooking tasks in three participants",
+        "url": "https://doi.org/10.1111/jar.13139",
+        "interpretation": "촉구·지원의 간접 근거. 확인한 초록에서 첫 블록의 시작 실패 집중은 검증되지 않아 PLOS ONE과 동일한 직접 근거로 해석하지 않는다.",
+        "verificationUrl": "https://pubmed.ncbi.nlm.nih.gov/37417242/"
+      },
+      {
+        "title": "Standen, Brown & Cromby: virtual environment research",
+        "url": "https://www.icdvrat.com/2000/P/2000_19.pdf"
+      },
+      {
+        "title": "Standen et al. 2001",
+        "url": "https://doi.org/10.1111/1467-8535.00199"
+      },
+      {
+        "title": "JMIR Serious Games 2026 exergame study",
+        "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC13476731/"
+      }
+    ],
+    "route-learning": [
+      {
+        "title": "Mengue-Topio, Courbois et al. 2011: route learning and shortcut use",
+        "url": "https://doi.org/10.1016/j.ridd.2010.10.014"
+      },
+      {
+        "title": "Courbois et al. 2019: route description, not direct shortcut evidence",
+        "url": "https://doi.org/10.1352/1944-7558-124.2.116",
+        "interpretation": "경로 묘사·랜드마크 지식의 간접 근거이며 새 지름길 발견 실패를 직접 확인하는 근거로 사용하지 않는다."
+      }
+    ],
+    "harrysson-2004": [
+      {
+        "title": "Harrysson, Svensk & Johansson 2004",
+        "url": "https://doi.org/10.1111/j.0952-3383.2004.00344.x"
+      }
+    ]
+  }
+}

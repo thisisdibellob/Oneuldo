@@ -21,7 +21,8 @@ export type Decision = { action: PolicyAction; delayMs: number; reason: string; 
   exchange?: { request: unknown; response: unknown } };
 export type PrimitiveDecision = { action: MarketAgentAction; delayMs: number; reason: string };
 export type TraceEntry = Decision;
-export type PersonaTraitKey = 'deliberation' | 'checking' | 'exploration' | 'persistence' | 'helpSeeking';
+export type PersonaTraitKeyV1 = 'deliberation' | 'checking' | 'exploration' | 'persistence' | 'helpSeeking';
+export type PersonaTraitKey = PersonaTraitKeyV1 | 'initialCaution' | 'operationLearning' | 'routeReliance' | 'textCueLoad';
 export type PersonaTraitLevel = 'low' | 'medium' | 'high';
 export type PersonaTraitContext = {
   capability: {
@@ -40,9 +41,11 @@ export type PersonaTraitContext = {
   };
 };
 export type PersonaTraitProfile = {
-  schemaVersion: 'persona-traits-v1'; basePersonaId: string; presetId: string | null;
-  traits: Record<PersonaTraitKey, PersonaTraitLevel>; contextHash: string; context: PersonaTraitContext;
-};
+  basePersonaId: string; presetId: string | null; contextHash: string; context: PersonaTraitContext;
+} & (
+  { schemaVersion: 'persona-traits-v1'; traits: Record<PersonaTraitKeyV1, PersonaTraitLevel> }
+  | { schemaVersion: 'persona-traits-v2'; traits: Record<PersonaTraitKey, PersonaTraitLevel> }
+);
 export type Persona = {
   id: string; version: string; name: string; description: string; prompt: string;
   /** Validation-only composition. Canonical persona files and ordinary generation remain unchanged. */

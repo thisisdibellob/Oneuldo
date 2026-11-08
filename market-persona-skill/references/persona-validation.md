@@ -4,6 +4,63 @@
 
 MCP 도구 6개를 사용한다. 권장 순서는 `prepare_persona_validation` → `check_persona_validation_readiness` → 부족 슬롯 생성 → readiness 재확인 → `measure_persona_validation` → 다중 `prepare_blind_review`/`submit_blind_review` → `persona_validation_report`다. 전체 trace 작성·제출은 준비와 측정 사이에서 별도로 한다. 검증 도구는 모델·provider·앱·백엔드를 호출하거나 trace를 수정·재생성하지 않으며, 일반 생성 경로에서 자동 실행되지 않는다. MCP 입력 객체는 interactive CLI에서 `{"tool":"도구명","arguments":입력객체}` 형식의 한 줄로 전달한다.
 
+## 성향 카탈로그 v2 — 첫 플레이의 네 성향
+
+새 traits run의 기본은 [카탈로그 `persona-traits-v2`](../../market-simulator/validation/persona-traits-v2.json)의 아홉 축이다. 기존 다섯 축에 첫 플레이 성향 네 축을 더한다. [새 명세](../../market-simulator/validation/persona-trait-validation-spec-v2.json)는 명세 `version:3`, `analysisVersion:2`이며, run manifest의 `version:3`이나 legacy 검증의 v2와는 별개의 버전이다. 아래의 기존 다섯 축 설명과 답안 예시는 **카탈로그 v1 기록**으로 보존하며, 현재 기본값·새 축에는 이 절을 적용한다.
+
+`prepare_persona_validation`에 `validationMode:"traits"`, `catalogSchemaVersion:"persona-traits-v2"`를 명시할 수 있다. 사용자 정의 `profiles[]`의 `schemaVersion`도 같은 값을 사용한다. 혼합 버전은 거절한다. `catalogSchemaVersion:"persona-traits-v1"`을 명시하면 [기존 카탈로그](../../market-simulator/validation/persona-traits.json)와 기존 명세를 사용한다. 저장 프로필과 manifest의 schemaVersion으로 카탈로그·필수 축·블라인드 답안 수를 선택하며, 과거 v1의 프로필 `traits-2-…` 해시·명세 hash·manifest·측정·보고서를 새 버전으로 다시 쓰지 않는다.
+
+v2의 `personaIds` 경로도 traits 검증 scope 안에서 아래 매핑의 지침을 실제 배우 입력에 넣는다. 원본 인물 JSON·prompt, 일반 생성과 `validationMode:"legacy"`, `WHOLE_*_INTERPRETATION`은 바꾸지 않는다. `parameters`, `attention`, cognition의 `labelConfusion`, 성향과 분리된 `contextHash`도 바꾸지 않는다. 사용자 정의 프로필은 같은 `basePersonaId`에서 한 축만 달리하여 개인차를 표현한다.
+
+| 인물 | `initialCaution` | `operationLearning` | `routeReliance` | `textCueLoad` |
+| --- | --- | --- | --- | --- |
+| 지민 (`mild-intellectual-disability-adult`) | high | high | high | high |
+| 서연 (`careful-checker`) | medium | medium | medium | low |
+| 민수 (`quick-decider`) | low | low | high | low |
+| `neutral-adult-control` | medium | medium | medium | medium |
+
+기존 다섯 축의 인물별 값은 v1 그대로다. 다섯 preset은 기존 다섯 축을 유지하고 새 네 축을 모두 `medium`으로 채운다. preset 없는 사용자 정의 프로필도 아홉 축의 `medium`에서 시작한다. `basePersonaId`만 지정하는 것은 해당 인물의 모든 성향 매핑을 복사하는 요청이 아니다. 원하는 성향은 `traits`에 명시한다. 원본 지민과 같은 성향 묶음을 기준으로 한 축만 바꾸려면 아래 README 예시처럼 나머지 축도 동일하게 명시한다.
+
+### 기회와 관찰 행동
+
+| 축 / 지표 | 기회와 분모 | 분자와 판정 근거 |
+| --- | --- | --- |
+| 초반 신중함 / `initialCautionCount` | 배우 행동이 있는 first-play trace당 시작 구간 1건. 첫 `open` 또는 `add` 직전까지이며, 둘 다 없으면 기록된 초기 행동 구간을 사용한다. 빈 trace는 기회 없음이다. | 구간 안의 실제 `lookAround`, `pause`, `readList`, `viewHelp` 선택 수. 따라서 값은 비율이 아니라 행동 수다. |
+| 조작 익히기 / `operationLearningRate` | `open`, `browse`, `add`, `viewCart`, `checkout` 각 조작 종류의 첫 사용. 두 번째 이후 사용은 제외한다. | 첫 사용 직전 한두 행동 중 도움말·관찰·잠시 살핌을 선택한 첫 사용 건수 / 첫 사용 기회 수. |
+| 익힌 동선 고수 / `routeRelianceRate` | 현재 `walk` 선택지에 이미 방문한 waypoint와 아직 방문하지 않은 waypoint가 모두 있는 경우. | 그중 방문한 waypoint 선택 건수 / 혼합 선택지 기회 수. |
+| 글자 단서 부담 / `textCueLoadRate` | 목표 상품을 담을 때 같은 계열의 서로 다른 이름·규격 상품이 같은 화면에 동시에 표시된 경우. 관심 구매는 제외한다. | 담기 직전의 관찰 가능한 탐색·정보 확인·비교 반응 건수 / 동시 표시 목표 담기 기회 수. |
+
+`actorState.activity:"orient"`, `"compare"`, `"check"`라는 표기나 `reason` 설명만으로 행동을 추가하지 않는다. 판단에는 `behavioralEvidence`만 쓰며 작성된 대기시간은 사용하지 않는다. `pause`는 선택한 행동으로만 세고 오래 기다린 정도를 점수로 삼지 않는다. `lookAround`는 현 위치를 살피는 선택이며 카메라 회전·새 영역 노출·실제 이해를 증명하지 않는다. 글자 단서 축은 혼동에 대응해 정보를 살피는 경향이며, 혼동 오류율을 다시 평가하지 않는다.
+
+whole-trace의 `add`는 항상 성공한 드래그로 펼쳐진다. 드래그 실패나 조작 성공률·숙달 향상을 만들지 않고, 조작 익히기는 처음 사용하기 **전에 살핌을 선택하는 행동**으로 한정한다. 실제 방문은 기록된 걷기와 결과로 확인하며 배우가 작성한 기억을 방문 기록으로 대체하지 않는다. 동선 선택지는 저장 bundle의 현재 위치·navigation state 메뉴와 해당 행동 직전 관측의 보이는 anchors를 함께 확인한다. 필요한 메뉴나 관측이 없으면 경로를 추측하지 않고 `unexercised`와 이유를 남긴다. 글자 단서 역시 관측된 상품 `name`·`detail`과 동시 표시 여부가 필요하며, 카탈로그에 상품이 존재한다는 사실만으로 노출을 인정하지 않는다.
+
+같은 행동을 성향 발현에 중복 사용하지 않는다. **기존 지표 → 초반 신중함 → 글자 단서 부담 → 조작 익히기** 순서로 이미 사용한 행동을 새 지표에서 제외한다. 기존 도움 활용은 어려움 뒤 도움, 숙고는 관련 후보 비교, 탐색은 관심 단서 반응이라는 정의를 유지한다. 초기 도움말을 첫 조작 준비에도 다시 세지 않으며, 기존 숙고 비교로 센 `browse`를 글자 단서 확인으로 다시 세지 않는다. 배우 선언에만 기대는 기존 지표와 겹쳐 새 축의 관찰 여부를 독립적으로 구분할 수 없는 경우에는 새 축 쪽 기회를 제외한다. 제외 후 기회가 없으면 값은 0이 아닌 `null`이다. 제외 근거와 step ID를 함께 읽는다.
+
+### 비교·진단·블라인드
+
+같은 `contextHash`이고 나머지 **여덟 축**이 같은 프로필만 비교한다. 같은 조건·seed에서 양쪽 모두 관찰 기회가 있는 쌍을 사용한다. 유효 쌍 8개 이상, 기대 방향(high > low), |Cliff’s delta| ≥ 0.33, 쌍 부트스트랩 95% CI가 0을 제외해야 지지한다. 일부 기회만 관찰됐으면 `partial`, 기회가 없으면 `unexercised`, 표본이 부족하면 `insufficient`, 한 축 대비가 없으면 `unmatched`로 구분한다. 기대 방향을 지지하는 경우 `supported`, 반대 방향을 지지하는 경우 `contradicted`다. 효과가 불분명한 결과를 통과로 바꾸지 않는다. 기존 축과 과거 run의 판정 기준은 바꾸지 않는다.
+
+같은 인물·조건에서 기회가 있는 trace가 둘 이상인데 축 지표 값이 모두 같으면 `diagnosticWarnings`에 trace·seed·근거 step ID를 남긴다. 이 진단은 주 판정에 사용하지 않는다. 성장, 시간에 따른 성향 감쇠, 과장 상한은 검사하지 않는다. 지침의 모든 수준에는 “충분히 분명해지면 멈춘다”, “실수를 강제하지 않는다”를 포함하며, 정해진 행동 횟수·실수·지연·포기를 요구하지 않는다.
+
+`opportunityAudit`·readiness·보고서의 성향 표현과 커버리지에는 새 네 축을 포함한다. 구조적으로 갈림길이나 유사 상품 동시 표시가 불가능하면 경고를 남긴다. 검토한 현행 검증 snapshot과 [생성기](../../market-simulator/scripts/build-validation-snapshots.cjs)의 구조에는 131개 reachable waypoint, 125개 reachable branch와 우유 계열의 동시 표시가 있었으므로 생성기 옵션은 추가하지 않았다. 정적 구조 점검은 배우가 그곳에 도달했거나 HUD가 올바르게 표시됐음을 보장하지 않는다. HUD 결함이 있었던 과거 파일럿은 아래 결함 주석을 유지한다.
+
+블라인드는 run 카탈로그에 따라 v1은 정확히 다섯 축, v2는 정확히 아홉 축의 `low / medium / high / unknown` 답안을 받는다. 새 `traitRubric`에는 네 축의 관찰 기준이 포함된다. 기존 익명화는 원관측의 상품 목록·이동 선택지를 판에 내보내지 않으므로, 동선·글자 단서 축은 판별 자료가 부족해 `unknown`일 수 있다. B판의 설명이나 작성된 시간으로 이를 보충하지 않는다. `unknown`을 제거해 정확도를 부풀리지 않으며, 블라인드 결과로 조건부 행동 지표의 주 판정을 대체하지 않는다.
+
+### 연구 근거와 해석 한계
+
+각 지침의 `[근거: …]`는 v2 카탈로그 `references`에 연결한다. 연구에서 관찰한 집단 차이와 개인차를 참고해 합성 경향을 설계했으며, 수준값이나 효과 크기 기준을 실제 사람 자료에서 추정하지 않았다.
+
+| 근거 | 적용과 범위 |
+| --- | --- |
+| [Palmqvist, Danielsson & Jönsson, *Behavioural Patterns in a Computerized Training Program for Individuals with ID*](https://www.ida.liu.se/~arnjo82/papers/ecidd-18.pdf) | 지적장애 집단의 초기 분당 클릭 수가 낮았다는 관찰을 초반 신중함 설계에 참고한다. 클릭 속도를 대기시간 의무나 개인의 고정 성질로 옮기지 않는다. |
+| [PLOS ONE 2022, 10.1371/journal.pone.0269793](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0269793) | 스스로 시작하지 못한 사례가 첫 블록에 집중된 결과를 첫 사용 지원 필요성의 근거로 참고한다. |
+| [JARID 2023, 10.1111/jar.13139](https://pubmed.ncbi.nlm.nih.gov/37417242/) | 세 참여자의 요리 과제에 video prompting을 적용한 연구다. 촉구·지원의 간접 근거이며, 확인한 초록으로는 PLOS와 같은 첫 블록 결과를 확인할 수 없다. |
+| [Standen·Brown·Cromby 등의 가상환경 연구](https://www.icdvrat.com/2000/P/2000_19.pdf), [2001 연구](https://doi.org/10.1111/1467-8535.00199), [JMIR Serious Games 2026 엑서게임 연구](https://pmc.ncbi.nlm.nih.gov/articles/PMC13476731/) | 가상환경 조작의 부담·지원 필요와 개인차를 참고한다. 현재 whole-trace에서는 조작 전 살핌만 측정한다. |
+| [Mengue-Topio·Courbois 외 2011](https://doi.org/10.1016/j.ridd.2010.10.014), [2019 경로 연구](https://doi.org/10.1352/1944-7558-124.2.116) | 2011의 경로 학습·지름길 사용을 익힌 경로 의존 설계에 참고한다. 2019는 경로 묘사·랜드마크 지식의 간접 근거이며 지름길 발견 실패의 직접 근거로 쓰지 않는다. |
+| [Harrysson, Svensk & Johansson 2004](https://doi.org/10.1111/j.0952-3383.2004.00344.x) | 글자 중심 탐색의 어려움을 정보 확인 반응 설계에 참고한다. 오류율이나 읽기 능력 점수로 해석하지 않는다. |
+
+연구 근거로 설계한 첫 플레이 성향이 수준대로 행동에 나타나는지를 본 것이며, 실제 지적장애인과의 유사성을 입증하지 않는다. 집단 연구를 모든 개인에게 적용하지 않으며, 지민·서연·민수와 사용자 정의 변형의 차이는 합성 설계값이다. 이번 구현에서는 모델·provider·앱·백엔드를 호출하거나 파일럿을 생성하지 않았고, 실제 사람 데이터와 비교하지 않았다. 남은 작업은 **HUD 결함을 고친 snapshot, 새 runId, 조건별 seed 20개 이상**으로 별도 파일럿을 실행하는 것이다. 요청 예시는 [README의 v2 프로필 예시](../../market-simulator/README.md#첫-플레이-성향-v2-프로필-요청-예시)를 따른다.
+
 ## 판정 가능성 점검과 추가 분석
 
 **판정 불가 표본 — `persona-pilot-20261028`**: HUD 고정 마스크 결함으로 64개 입력 모두 시작점에서 23/139 지점·매대 0곳에만 도달했으므로, 저장 trace 55개의 매대 열기·담기 0건과 포기 55건을 인물 특성 신호로 사용하지 않는다([결함 주석](../../output/persona-pilot-20261028/pilot-validity-note.ko.md)).

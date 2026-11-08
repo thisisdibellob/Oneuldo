@@ -6,12 +6,15 @@ const crypto = require('node:crypto');
 const { assertSpec, powerWarning, preserveMeasurement, historicalReport } = require('./personaValidationSpec.cjs');
 const analysis = require('./personaValidationAnalysis.cjs');
 const reviewers = require('./personaValidationReviewers.cjs');
-const { catalog, resolveProfiles } = require('./personaTraitProfiles.cjs');
-const spec = require('../validation/persona-trait-validation-spec.json');
+const { getCatalog, getTraitKeys, resolveProfiles } = require('./personaTraitProfiles.cjs');
+const currentSpec = require('../validation/persona-trait-validation-spec-v2.json');
+const previousSpec = require('../validation/persona-trait-validation-spec.json');
 const { WHOLE_TRACE_POLICY_VERSION, WHOLE_TRACE_BUNDLE_VERSION, WHOLE_TRACE_CANDIDATE_VERSION, WHOLE_TRACE_MODEL } = require('./wholeTraceContracts.ts');
 const { canonicalMarketReplayJson, marketReplayTraceId, validateMarketReplaySnapshot } = require('../../frontend/src/game/marketReplayTrace.ts');
 const CONDITIONS = ['low', 'high'];
-const TRAITS = ['deliberation', 'checking', 'exploration', 'persistence', 'helpSeeking'];
+const catalogVersion = m => m.catalogSchemaVersion ?? Object.values(m.profiles ?? {}).find(p => p.persona?.traitProfile)?.persona.traitProfile.schemaVersion ?? 'persona-traits-v1';
+const specFor = m => assertSpec(m, currentSpec, 'traits');
+const writableManifest = m => m.analysisVersion === 2;
 const LEVEL = { low: 0, medium: 1, high: 2 };
 const DEFAULT_PERSONAS = ['mild-intellectual-disability-adult', 'careful-checker', 'quick-decider'];
 const read = file => JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -38,16 +41,18 @@ function validateConfiguration(args) {
 function selectionOf(args) {
   return args.profiles !== undefined ? { profiles: args.profiles } : { personaIds: args.personaIds ?? DEFAULT_PERSONAS };
 }
-function profileMap(selection) { return Object.fromEntries(resolveProfiles(selection).map(p => [p.id, p])); }
+function profileMap(selection, schemaVersion) { return Object.fromEntries(resolveProfiles(selection, schemaVersion).map(p => [p.id, p])); }
 function assertManifest(m, directory = m?.runDirectory) {
   if (!m || m.schema !== 'oneuldo.persona-fidelity-run' || m.version !== 3 || path.resolve(directory) !== m.runDirectory) throw new Error('Invalid trait validation manifest');
   validateConfiguration({ runId: m.runId, seeds: m.seeds, outputDirectory: path.dirname(m.runDirectory),
     snapshotFilePaths: Object.fromEntries(CONDITIONS.map(c => [c, m.snapshots?.[c]?.filePath])) });
-  assertSpec(m, spec, 'traits');
-  if (m.analysisVersion === 1 && (!m.opportunityAudit || m.opportunityAuditHash !== digest(m.opportunityAudit))) throw new Error('Opportunity audit changed');
-  if (m.catalogHash !== digest(catalog) || m.catalogHash !== digest(read(path.join(__dirname, '../validation/persona-traits.json')))) throw new Error('Trait catalog changed; create a separate run');
+  const spec = specFor(m), schemaVersion = catalogVersion(m), catalog = getCatalog(schemaVersion);
+  if (spec.analysisVersion === 2 && schemaVersion !== spec.catalogSchemaVersion || spec.analysisVersion !== 2 && schemaVersion !== 'persona-traits-v1') throw new Error('Trait catalog and analysis version differ');
+  if (m.analysisVersion >= 1 && (!m.opportunityAudit || m.opportunityAuditHash !== digest(m.opportunityAudit))) throw new Error('Opportunity audit changed');
+  const catalogFile = schemaVersion === 'persona-traits-v1' ? 'persona-traits.json' : 'persona-traits-v2.json';
+  if (m.catalogHash !== digest(catalog) || m.catalogHash !== digest(read(path.join(__dirname, '../validation', catalogFile)))) throw new Error('Trait catalog changed; create a separate run');
   if (digest(m.versions) !== digest(versions())) throw new Error('Validation generation versions changed');
-  const current = profileMap(m.profileSelection);
+  const current = profileMap(m.profileSelection, schemaVersion);
   if (digest(Object.keys(current)) !== digest(m.personaIds) || digest(current) !== digest(m.profiles)) throw new Error('Trait profile definition changed');
   for (const [id, hash] of Object.entries(m.baseHashes))
     if (fileHash(path.join(__dirname, '../personas', `${id}.json`)) !== hash) throw new Error(`Base persona definition changed: ${id}`);
@@ -92,9 +97,9 @@ function observeSlot(slot) {
   slot.exists = true; slot.traceId = trace.traceId; slot.evidenceHashes = hashes;
 }
 function refresh(m) {
-  assertManifest(m); m.slots.forEach(observeSlot); if (m.analysisVersion !== undefined) write(manifestAt(m.runDirectory), m);
+  assertManifest(m); m.slots.forEach(observeSlot); if (writableManifest(m)) write(manifestAt(m.runDirectory), m);
   return { validationMode: 'traits', runDirectory: m.runDirectory, manifestPath: manifestAt(m.runDirectory),
-    catalog, profiles: Object.values(m.profiles).map(p => ({ id: p.id, presetId: p.presetId, traits: p.traits, contextHash: p.contextHash })),
+    catalog: getCatalog(catalogVersion(m)), profiles: Object.values(m.profiles).map(p => ({ id: p.id, presetId: p.presetId, traits: p.traits, contextHash: p.contextHash })),
     slots: m.slots.map(slot => ({ ...slot, prepareWholeTrace: { personaId: slot.personaId, seed: slot.seed,
       snapshotFilePath: m.snapshots[slot.condition].filePath, outputPath: slot.tracePath, attentionExperience: { visit: 'first-play' } } })),
     complete: m.slots.filter(s => s.exists).length, required: m.slots.length,
@@ -102,14 +107,19 @@ function refresh(m) {
 }
 function prepare(args) {
   validateConfiguration(args);
-  const profileSelection = selectionOf(args), profiles = profileMap(profileSelection), personaIds = Object.keys(profiles);
+  const profileSelection = selectionOf(args);
+  const requestedVersion = args.catalogSchemaVersion ?? args.profiles?.find(p => p.schemaVersion)?.schemaVersion;
   const dir = path.resolve(args.outputDirectory, args.runId), file = manifestAt(dir);
   if (fs.existsSync(file)) {
     const m = readManifest(dir);
+    if (requestedVersion !== undefined && requestedVersion !== catalogVersion(m)) throw new Error('Existing run catalog differs');
     if (digest(m.profileSelection) !== digest(profileSelection) || digest(m.seeds) !== digest(args.seeds)
       || CONDITIONS.some(c => path.resolve(args.snapshotFilePaths[c]) !== m.snapshots[c].filePath)) throw new Error('Existing run configuration differs');
     return refresh(m);
   }
+  const schemaVersion = requestedVersion ?? 'persona-traits-v2', catalog = getCatalog(schemaVersion);
+  const spec = schemaVersion === 'persona-traits-v1' ? previousSpec : currentSpec;
+  const profiles = profileMap(profileSelection, schemaVersion), personaIds = Object.keys(profiles);
   const snapshots = Object.fromEntries(CONDITIONS.map(condition => {
     const filePath = path.resolve(args.snapshotFilePaths[condition]), snapshot = read(filePath), validation = validateMarketReplaySnapshot(snapshot);
     if (!validation.valid) throw new Error(`Invalid ${condition} snapshot: ${validation.errors.join('; ')}`);
@@ -124,7 +134,7 @@ function prepare(args) {
   }))));
   const baseIds = [...new Set(Object.values(profiles).map(p => p.basePersonaId))];
   const m = { schema: 'oneuldo.persona-fidelity-run', version: 3, validationMode: 'traits', runId: args.runId, runDirectory: dir,
-    snapshots, seeds: args.seeds, personaIds, profileSelection, profiles, slots, versions: v, specHash: digest(spec), specVersion: spec.version, analysisVersion: spec.analysisVersion, catalogHash: digest(catalog),
+    snapshots, seeds: args.seeds, personaIds, profileSelection, profiles, slots, versions: v, specHash: digest(spec), specVersion: spec.version, analysisVersion: spec.analysisVersion, ...(schemaVersion === 'persona-traits-v2' ? { catalogSchemaVersion: schemaVersion } : {}), catalogHash: digest(catalog),
     baseHashes: Object.fromEntries(baseIds.map(id => [id, fileHash(path.join(__dirname, '../personas', `${id}.json`))])), fixtureOnly: false };
   m.opportunityAudit = require('./personaValidationOpportunity.cjs').auditManifestSnapshots(m);
   m.opportunityAuditHash = digest(m.opportunityAudit);
@@ -141,6 +151,7 @@ function lookupValidationSlot(args, snapshot) {
 }
 function load(m, { allowFixture = false } = {}) {
   assertManifest(m);
+  const spec = specFor(m);
   const { extractUniversal } = require('./personaValidationMetrics.cjs'), { flagsForTrace } = require('./personaValidationFlags.cjs');
   const samples = [], missing = [];
   for (const slot of m.slots) {
@@ -153,8 +164,8 @@ function load(m, { allowFixture = false } = {}) {
     const audit = fs.existsSync(paths.knowledgeAudit) ? read(paths.knowledgeAudit) : null;
     const actorDecisions = fs.existsSync(paths.actorDecisions) ? read(paths.actorDecisions) : null;
     const personaReview = fs.existsSync(paths.personaReview) ? read(paths.personaReview) : null;
+    const bundle = fs.existsSync(paths.bundle) ? read(paths.bundle) : null;
     if (!fixture) {
-      const bundle = fs.existsSync(paths.bundle) ? read(paths.bundle) : null;
       if (trace.experienceMode !== 'first-play' || trace.generationPolicy !== 'llm'
         || trace.generation?.actorPolicyVersion !== m.versions.policyVersion || trace.generation?.model !== m.versions.model
         || trace.generation?.learnerIdentity || trace.generation?.trialBinding) throw new Error('Mixed policy/model/experience');
@@ -170,8 +181,8 @@ function load(m, { allowFixture = false } = {}) {
     }
     observeSlot(slot);
     const evidenceAudit = audit ?? (actorDecisions ? { decisions: Array.isArray(actorDecisions) ? actorDecisions : actorDecisions.decisions ?? [] } : null);
-    const evidence = { actorDecisions, personaReview };
-    const extracted = extractUniversal(trace, snapshot, persona, evidenceAudit, evidence);
+    const evidence = { actorDecisions, personaReview, ...(m.analysisVersion === 2 ? { bundle } : {}) };
+    const extracted = extractUniversal(trace, snapshot, persona, evidenceAudit, evidence, { analysisVersion: m.analysisVersion });
     samples.push({ ...slot, trace, snapshot, persona, profile, audit: evidenceAudit, actorDecisions, personaReview, ...extracted,
       flags: flagsForTrace(trace, snapshot, evidenceAudit, persona, evidence, spec.patterns), fixture,
       evidenceSources: Object.fromEntries(Object.entries(paths).filter(([, file]) => fs.existsSync(file))) });
@@ -180,8 +191,10 @@ function load(m, { allowFixture = false } = {}) {
   return { samples, missing };
 }
 /** A contrast isolates one configured trait. Preset groups remain descriptive. */
-function matchedContrasts(profiles) {
+function matchedContrasts(profiles, schemaVersion) {
   const contrasts = [], rows = Object.values(profiles);
+  const TRAITS = getTraitKeys(schemaVersion ?? rows.find(p => p.persona?.traitProfile)?.persona.traitProfile.schemaVersion
+    ?? (rows.some(p => Object.hasOwn(p.traits, 'initialCaution')) ? 'persona-traits-v2' : 'persona-traits-v1'));
   for (let i = 0; i < rows.length; i++) for (let j = i + 1; j < rows.length; j++) {
     const a = rows[i], b = rows[j];
     const changed = TRAITS.filter(key => a.traits[key] !== b.traits[key]);
@@ -192,7 +205,21 @@ function matchedContrasts(profiles) {
   }
   return contrasts;
 }
-function summarizeFlags(samples, ids) {
+function firstPlayDiagnostics(rows, spec) {
+  const warnings = [];
+  for (const condition of CONDITIONS) for (const metric of spec.metrics.filter(rule =>
+    ['initialCaution', 'operationLearning', 'routeReliance', 'textCueLoad'].includes(rule.traitKey))) {
+    const observed = rows.filter(row => row.condition === condition && row.metrics?.[metric.kind]?.status === 'measured'
+      && row.metrics[metric.kind].denominator > 0 && Number.isFinite(row.metrics[metric.kind].value));
+    if (observed.length < 2 || new Set(observed.map(row => row.metrics[metric.kind].value)).size !== 1) continue;
+    warnings.push({ code: 'zero-first-play-trait-variance', severity: 'info', condition, traitKey: metric.traitKey, kind: metric.kind,
+      value: observed[0].metrics[metric.kind].value, descriptiveOnly: true, usedForPrimaryDecision: false,
+      interpretation: '같은 인물·조건의 관찰 기회가 있는 trace에서 값이 같다. 변동 진단이며 성향 판정이나 행동 의무가 아니다.',
+      traces: observed.map(row => ({ tracePath: row.tracePath, seed: row.seed, stepIds: row.metrics[metric.kind].evidence })) });
+  }
+  return warnings;
+}
+function summarizeFlags(samples, ids, spec = previousSpec) {
   const { collectionDiagnostics, collectionFindings } = require('./personaValidationFlags.cjs');
   const prohibited = new Set(['same-wrong-choice-after-feedback', 'role-or-disability-mentioned']);
   return Object.fromEntries(ids.map(id => {
@@ -206,14 +233,15 @@ function summarizeFlags(samples, ids) {
       scope: 'prohibited-patterns', violationTraces: violationRows.length,
       violationRate: rows.length ? violationRows.length / rows.length : null,
       status: !rows.length ? 'insufficient' : violationRows.length / rows.length > (spec.maxFlaggedTraceRate ?? .1) ? 'fail' : unavailable ? 'inconclusive' : 'pass',
-      diagnosticWarnings: findings, reviewSignals, collectionViolations: [], collectionDiagnostics: diagnostics,
+      diagnosticWarnings: [...findings, ...(spec.analysisVersion === 2 ? firstPlayDiagnostics(rows, spec) : [])], reviewSignals, collectionViolations: [], collectionDiagnostics: diagnostics,
       evidence: rows.flatMap(s => s.flags.map(f => ({ ...f, tracePath: s.tracePath }))) }];
   }));
 }
 function measure({ runDirectory, allowFixture = false }) {
   const m = readManifest(runDirectory), { samples, missing } = load(m, { allowFixture });
+  const spec = specFor(m), TRAITS = getTraitKeys(catalogVersion(m));
   const { cliffsDelta, bootstrap, judge } = require('./personaValidationStatistics.cjs');
-  const contrasts = matchedContrasts(m.profiles), findings = [];
+  const contrasts = matchedContrasts(m.profiles, catalogVersion(m)), findings = [];
   const byKey = new Map(samples.map(s => [`${s.condition}:${String(s.seed)}:${s.personaId}`, s]));
   for (const contrast of contrasts) for (const metric of spec.metrics.filter(rule => rule.traitKey === contrast.traitKey)) for (const condition of CONDITIONS) {
     if (metric.applies !== 'both' && metric.applies !== condition) continue;
@@ -247,7 +275,7 @@ function measure({ runDirectory, allowFixture = false }) {
   })));
   const result = { schema: 'oneuldo.persona-trait-measurements', version: 1, runId: m.runId, specHash: m.specHash, catalogHash: m.catalogHash,
     dataFingerprint: inventory(m), fixtureOnly: samples.some(s => s.fixture), completed: samples.length, missing: missing.length,
-    contrasts, findings, groups, flags: summarizeFlags(samples, m.personaIds),
+    contrasts, findings, groups, flags: summarizeFlags(samples, m.personaIds, spec),
     unmatchedTraits: TRAITS.filter(key => !contrasts.some(c => c.traitKey === key)),
     perTrace: samples.map(s => ({ personaId: s.personaId, presetId: s.profile.presetId, traits: s.profile.traits, condition: s.condition,
       seed: s.seed, tracePath: s.tracePath, metrics: s.metrics, outcome: s.outcome, coverage: s.coverage,
@@ -255,10 +283,10 @@ function measure({ runDirectory, allowFixture = false }) {
       evidenceSources: s.evidenceSources })),
     missingSlots: missing.map(s => ({ personaId: s.personaId, condition: s.condition, seed: s.seed, tracePath: s.tracePath })) };
   const readiness = require('./personaValidationReadiness.cjs').fromManifest(m, { samples });
-  if (m.analysisVersion === 1) Object.assign(result, analysis.readinessFields(readiness, findings, samples),
+  if (m.analysisVersion >= 1) Object.assign(result, analysis.readinessFields(readiness, findings, samples),
     { opportunityAudit: m.opportunityAudit, powerWarning: powerWarning(m.seeds), analysisVersion: m.analysisVersion, specVersion: m.specVersion },
     analysis.analyze(m, samples, findings, spec));
-  m.fixtureOnly = result.fixtureOnly; if (m.analysisVersion !== undefined) write(manifestAt(m.runDirectory), m);
+  m.fixtureOnly = result.fixtureOnly; if (writableManifest(m)) write(manifestAt(m.runDirectory), m);
   const measurementsPath = path.join(m.runDirectory, 'measurements.json');
   if (!preserveMeasurement(m, measurementsPath, result)) write(measurementsPath, result);
   return { validationMode: 'traits', readiness: readiness.readiness, readinessReasons: readiness.reasons, measurementsPath, completed: result.completed, missing: result.missing,
@@ -271,7 +299,7 @@ function readBlind(m) {
   return saved;
 }
 function prepareBlind({ runDirectory, allowFixture = false, panel = 'A', reviewerId, reviewerKind }) {
-  const m = readManifest(runDirectory);
+  const m = readManifest(runDirectory), catalog = getCatalog(catalogVersion(m)), TRAITS = getTraitKeys(catalogVersion(m));
   if (!['A', 'B'].includes(panel)) throw new Error('Expected blind panel A or B');
   reviewers.assertPanelReady({ runDirectory: m.runDirectory, panel, reviewerId, reviewerKind });
   const statePath = path.join(m.runDirectory, 'blind-state.json'); let state;
@@ -284,7 +312,7 @@ function prepareBlind({ runDirectory, allowFixture = false, panel = 'A', reviewe
     for (const [file, value] of Object.entries(files)) write(path.join(m.runDirectory, file), value);
     state = { dataFingerprint: inventory(m), fixtureOnly: samples.some(s => s.fixture),
       hashes: Object.fromEntries(Object.keys(files).map(file => [file, fileHash(path.join(m.runDirectory, file))])) };
-    write(statePath, state); if (m.analysisVersion !== undefined) write(manifestAt(m.runDirectory), m);
+    write(statePath, state); if (writableManifest(m)) write(manifestAt(m.runDirectory), m);
   }
   if (state.fixtureOnly && !allowFixture) throw new Error('Stochastic trace cannot be validation evidence');
   const bundle = { panels: { [panel]: read(path.join(m.runDirectory, 'blind-bundle.json')).panels[panel] } };
@@ -294,18 +322,18 @@ function prepareBlind({ runDirectory, allowFixture = false, panel = 'A', reviewe
     answerFormat: { traits: Object.fromEntries(TRAITS.map(key => [key, 'low|medium|high|unknown'])), confidence: 'optional 0..1' }, fixtureOnly: state.fixtureOnly };
 }
 function submitBlind({ runDirectory, panel, answers, reviewerId, reviewerKind, reviewerModel, reviewerSession }) {
-  const m = readManifest(runDirectory), state = readBlind(m);
+  const m = readManifest(runDirectory), state = readBlind(m), TRAITS = getTraitKeys(catalogVersion(m));
   return reviewers.submitReview({ runDirectory: m.runDirectory, panel, answers, reviewerId, reviewerKind, reviewerModel, reviewerSession,
     state, key: read(path.join(m.runDirectory, 'blind-key.json')), validationMode: 'traits', traitKeys: TRAITS });
 }
-function summarizeTraitFindings(findings) {
+function summarizeTraitFindings(findings, { firstPlay = false } = {}) {
   const summarize = rows => {
     const exercised = rows.filter(f => f.status !== 'unexercised');
     const status = !rows.length ? 'unmatched' : !exercised.length ? 'unexercised'
       : rows.some(f => f.status === 'insufficient') ? 'insufficient'
       : rows.some(f => f.status === 'unexercised') ? 'partial'
       : rows.every(f => f.status === 'pass') ? 'supported'
-      : rows.every(f => f.status === 'fail') ? 'contradicted' : 'inconclusive';
+      : rows.every(f => f.status === 'fail') ? 'contradicted' : firstPlay ? 'partial' : 'inconclusive';
     return { status, expectedComparisons: rows.length, exercisedComparisons: exercised.length, findings: rows };
   };
   const behavioralEvidence = summarize(findings.filter(f => f.evidenceType !== 'authored-timing'));
@@ -314,12 +342,14 @@ function summarizeTraitFindings(findings) {
     authoredTiming: { ...authoredTiming, note: '작성된 지연시간은 행동 근거의 부족을 보충하거나 성향 판정을 통과시키지 않는다.' }, findings };
 }
 function report({ runDirectory }) {
-  const m = readManifest(runDirectory), measurements = read(path.join(m.runDirectory, 'measurements.json'));
+  const m = readManifest(runDirectory), TRAITS = getTraitKeys(catalogVersion(m)), measurements = read(path.join(m.runDirectory, 'measurements.json'));
   if (measurements.dataFingerprint !== inventory(m)) throw new Error('Measurements are stale; call measure_persona_validation again');
   const file = path.join(m.runDirectory, 'blind-review.json'), review = fs.existsSync(file) ? read(file) : null;
   if (review && review.dataFingerprint !== readBlind(m).dataFingerprint) throw new Error('Blind review does not match measurements');
   const traitResults = Object.fromEntries(TRAITS.map(key =>
-    [key, summarizeTraitFindings(measurements.findings.filter(f => f.traitKey === key))]));
+    [key, summarizeTraitFindings(measurements.findings.filter(f => f.traitKey === key), {
+      firstPlay: m.analysisVersion === 2 && ['initialCaution', 'operationLearning', 'routeReliance', 'textCueLoad'].includes(key),
+    })]));
   const output = { schema: 'oneuldo.persona-trait-report', version: 1, runId: m.runId, validationMode: 'traits', fixtureOnly: measurements.fixtureOnly,
     completed: measurements.completed, required: m.slots.length, specHash: m.specHash, catalogHash: m.catalogHash, dataFingerprint: measurements.dataFingerprint,
     profiles: Object.values(m.profiles).map(p => ({ id: p.id, basePersonaId: p.basePersonaId, presetId: p.presetId, traits: p.traits, contextHash: p.contextHash })),
@@ -336,7 +366,12 @@ function report({ runDirectory }) {
     blindReviewer: { model: review?.reviewerModel ?? null, session: review?.reviewerSession ?? null, independenceVerified: false, keyIsolationVerified: false },
     limitations: [
       '성향 수준과 유형은 합성 설계값이며 심리검사 점수나 임상적 타당성을 의미하지 않는다.',
-      '성향 비교는 인지·취향·경험 문맥과 나머지 네 성향이 같은 프로필 쌍만 사용한다. 유형별 집계는 설명적 결과다.',
+      `성향 비교는 인지·취향·경험 문맥과 나머지 ${TRAITS.length === 5 ? '네' : '여덟'} 성향이 같은 프로필 쌍만 사용한다. 유형별 집계는 설명적 결과다.`,
+      ...(m.analysisVersion === 2 ? [
+        '연구 근거로 설계한 첫 플레이 성향이 수준대로 행동에 나타나는지를 본 것이며, 실제 지적장애인과의 유사성을 입증하지 않는다.',
+        '블라인드 패널은 원관측 상품 정보와 이동 선택지 메뉴를 포함하지 않으므로 동선 고수·글자 단서 부담을 unknown으로 남겨야 할 수 있다.',
+        '기존 지표와 선언된 불확실성만으로 겹치는 새 기회는 점수로 환산하지 않고 제외한다. 관찰 필드 누락·제외 이유와 step ID는 coverage와 measurements.json에 남긴다.',
+      ] : []),
       '같은 조건·seed는 실험 묶음이며 native 모델 출력의 결정적 재현을 보장하지 않는다. 유효 쌍 수는 생성 슬롯 수와 다르다.',
       '기회에 도달하지 못한 표본은 조건부 비교에서 제외되므로 도달 기회·중단·전체 목표 달성도 함께 읽어야 한다.',
       '관심·불확실성 의도는 일부 배우 선언을 사용한다. 대기시간은 계획한 값이며 사람의 반응시간이 아니다.',
@@ -362,12 +397,19 @@ function report({ runDirectory }) {
     '', '| 성향 | 높은 프로필 / 낮은 프로필 | 지표 | 근거 | 조건 | 유효 쌍 | 미발생 | 누락 | 효과 크기 | 95% 구간 | 판정 |',
     '| --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | --- | --- |',
     ...measurements.findings.map(f => `| ${f.traitKey} | ${f.higherProfileId} (${f.higherLevel}) / ${f.lowerProfileId} (${f.lowerLevel}) | ${f.kind} | ${f.evidenceType} | ${f.condition} | ${f.pairs} | ${f.unexercised} | ${f.missingPairs} | ${f.delta ?? '—'} | ${f.interval?.join(' ~ ') ?? '—'} | ${f.status} |`),
+    ...(m.analysisVersion === 2 ? ['', '## 관찰 기회 커버리지', '',
+      '| 인물 | 조건 | seed | 지표 | 기회 수 | 상태 | 관찰 불가 이유 |', '| --- | --- | --- | --- | ---: | --- | --- |',
+      ...measurements.perTrace.flatMap(row => Object.entries(row.coverage).map(([kind, coverage]) =>
+        `| ${row.personaId} | ${row.condition} | ${row.seed} | ${kind} | ${coverage.opportunityCount} | ${coverage.status} | ${coverage.reason ?? coverage.exclusionReason ?? '—'} |`))] : []),
     '', '## 과장 패턴과 진단 경고', '', ...Object.entries(output.flags).map(([id, f]) => `- ${id}: 금지 패턴 ${f.status}, 위반 ${f.violationTraces}/${f.traces}, 검토 신호 ${f.reviewSignals.length}건, 분포 진단 ${f.diagnosticWarnings.length}건. 도움·낮은 정확도·분산 0은 자동 실패가 아니다.`),
+    ...(m.analysisVersion === 2 ? Object.entries(output.flags).flatMap(([id, f]) => f.diagnosticWarnings
+      .filter(w => w.code === 'zero-first-play-trait-variance').map(w =>
+        `- ${id} / ${w.condition} / ${w.traitKey}: 값 ${w.value} 동일(판정 제외). ${w.traces.map(t => `seed=${t.seed}, step=${t.stepIds.join(', ') || '없음'}`).join('; ')}`)) : []),
     '', '## 행동·focus 주석 정합성', '', ...output.annotationReviews.flatMap(row => [
       `- ${row.personaId} (${row.condition}, seed=${row.seed}): ${row.review?.status ?? 'not-recorded'}; 경고 ${row.review?.findings.length ?? '미기록'}건`,
       ...(row.review?.findings ?? []).map(f => `  - ${f.code}, 결정 ${f.decisionIndexes.join(', ')}: ${f.improvementTarget}. ${f.recommendation}`),
     ]),
-    '', '## 블라인드 성향 추정', '', '개인 이름 대신 다섯 성향의 수준을 추정한다. unknown을 포함한 정확도와 판별 비율을 함께 보고한다.',
+    '', '## 블라인드 성향 추정', '', `개인 이름 대신 ${TRAITS.length === 5 ? '다섯' : '아홉'} 성향의 수준을 추정한다. unknown을 포함한 정확도와 판별 비율을 함께 보고한다.`,
     '', '기존 단일 판별자 점수이며 명시 ID 판별자 점수는 다음 표에 표시한다.', '', '```json', JSON.stringify(output.blindReview, null, 2), '```', ...analysis.blindMarkdown(output), ...analysis.supplementaryMarkdown(output), '', '## 해석 범위', '', ...output.limitations.map(x => `- ${x}`),
     '', '분자·분모·관찰 기회·step ID·프로필별 설명적 집계는 measurements.json 및 report.json에 저장되어 있다.', ''];
   fs.writeFileSync(markdownPath, lines.join('\n'), { mode: 0o600 });

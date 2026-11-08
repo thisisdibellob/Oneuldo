@@ -31,7 +31,7 @@ v5/v6에서만 현재 열린 장바구니·계산 화면에 `cartItems:[{id,name
 
 명시적 `feedback-choice-v6`는 v5와 같은 관측·선택지에 지시문만 조정한 비교 후보다. 원래 개인의 장보기 동기와 강점, 현재 기억·관찰에 근거한 구체적 활동을 기존 `currentTask`·`ongoingIntent`에 표현하도록 하되, 기억 슬롯·보존 기간·목표 복원·반복 금지·즉시 목표 복귀·강제 완수는 추가하지 않는다. v5/v6 모두 페르소나 원본, 믿음 기억의 용량·교체 방식, 최근 경험 한도, `exploration-v2`와 기본 배회 신호 20%, 행동 시간·게임 규칙을 v4와 공유한다. 기존 v1~v4의 관측·선택지·지시문과 저장된 자료는 그대로 유지한다. 제품 경로의 feedback 기본·최대 행동 수는 **100**이고 자동 계산을 추가하지 않는다. **300행동은 별도 승인된 동결 실험 경로에서만** 사용하며 제품 한도가 바뀌었다고 설명하지 않는다. v6의 채택 여부와 모델 효과는 같은 개인·조건의 비교 결과, 관찰 기회와 기술 중단을 검토해 별도로 판단한다.
 
-페르소나 충실도 검증은 공통 성향 5축과 유형 5개의 조합을 평가한다. 기존 MCP 도구 5개를 재사용하고, 같은 맥락에서 성향 하나만 다른 표본 비교·기회 미발생 구분·A/B 성향 추정·원본 불변 검사를 제공한다. 일반 생성 경로에서 자동 실행하지 않는다. 자세한 입력·출력·분모·한계와 기존 v2 호환 절차는 [검증 절차](../market-persona-skill/references/persona-validation.md)를 따른다.
+페르소나 충실도 검증은 기존 공통 성향 5축과 첫 플레이 성향 4축, 유형 5개의 조합을 평가한다. MCP 도구 6개를 사용하고, 같은 맥락에서 성향 하나만 다른 표본 비교·기회 미발생 구분·A/B 성향 추정·원본 불변 검사를 제공한다. 일반 생성 경로에서 자동 실행하지 않는다. 자세한 입력·출력·분모·한계와 기존 v2 호환 절차는 [검증 절차](../market-persona-skill/references/persona-validation.md)를 따른다.
 
 페르소나 생성기는 `walkTo`, `readList`, `browse`, `openShelf`, `dragProduct`, `viewCart` 같은 행동 **의도**를 JSON으로 만든다. 개발용 Expo 웹앱이 전체 trace를 받아 기존 이동·버튼·드래그 입력 경로로 실시간 재생한다. 게임 로그는 앱의 기존 `MarketBehaviorTracker`와 큐가 기록·전송한다. 생성기와 MCP에는 `BehaviorLogRequest` 생성·변환·직접 전송 기능이 없다.
 
@@ -45,7 +45,63 @@ Luna 전체 계획 경로는 전체 세계를 전개 계산용 참고 자료로 
 
 ## 공통 성향 기반 충실도 검증
 
-새 run은 `validationMode:"traits"`로 명시할 수 있다. `profiles`는 `{id, basePersonaId, presetId?, traits?, label?}` 형식의 1~32개 인물이고 `personaIds`와 함께 쓰지 않는다. `basePersonaId`는 기존 세 인물 또는 `neutral-adult-control`이며, 유형 기본값에 `traits`의 일부 축을 덮어쓴다. 유형을 생략하면 모든 축은 `medium`에서 시작한다. 사용자 정의 ID는 경로에 안전한 소문자 영문·숫자·`_`·`-` 1~64자이고 첫 글자는 영문 또는 숫자여야 하며 기존 ID와 겹치지 않아야 한다.
+### 첫 플레이 성향 v2 프로필 요청 예시
+
+새 traits run은 [카탈로그 v2](validation/persona-traits-v2.json)의 아홉 축과 [명세 `analysisVersion:2`](validation/persona-trait-validation-spec-v2.json)를 기본으로 사용한다. 아래 기존 다섯 축의 정의를 유지하고 `initialCaution`(초반 신중함), `operationLearning`(조작 익히기), `routeReliance`(익힌 동선 고수), `textCueLoad`(글자 단서 부담)를 더한다. 다섯 preset에서 새 축은 모두 `medium`이다. `catalogSchemaVersion:"persona-traits-v1"`을 명시하면 기존 다섯 축 경로를 사용하며, 저장된 v1 run은 원래 카탈로그·프로필 해시·명세·측정·보고서를 유지한다. v2 카탈로그와 legacy 검증 모드 v2는 다른 버전이다.
+
+다음은 **요청 형식 예시이며 실행한 파일럿이 아니다**. 지민을 기본 맥락으로 하고 `initialCaution` 한 축만 다르게 설정한다. 나머지 여덟 성향은 지민의 v2 매핑에 맞춰 동일하게 명시했다. `basePersonaId`만 지정하면 성향이 자동으로 지민 매핑을 상속하는 것은 아니며, preset을 생략한 미지정 축은 `medium`이다.
+
+```json
+{
+  "validationMode": "traits",
+  "catalogSchemaVersion": "persona-traits-v2",
+  "runId": "first-play-initial-caution-v2-new-01",
+  "outputDirectory": "/absolute/output",
+  "snapshotFilePaths": {
+    "low": "/absolute/hud-fixed-snapshots/low.json",
+    "high": "/absolute/hud-fixed-snapshots/high.json"
+  },
+  "seeds": ["s01","s02","s03","s04","s05","s06","s07","s08","s09","s10","s11","s12","s13","s14","s15","s16","s17","s18","s19","s20"],
+  "profiles": [
+    {
+      "id": "jimin-caution-low",
+      "basePersonaId": "mild-intellectual-disability-adult",
+      "schemaVersion": "persona-traits-v2",
+      "traits": {
+        "deliberation": "medium", "checking": "high", "exploration": "high",
+        "persistence": "high", "helpSeeking": "high",
+        "initialCaution": "low", "operationLearning": "high",
+        "routeReliance": "high", "textCueLoad": "high"
+      }
+    },
+    {
+      "id": "jimin-caution-high",
+      "basePersonaId": "mild-intellectual-disability-adult",
+      "schemaVersion": "persona-traits-v2",
+      "traits": {
+        "deliberation": "medium", "checking": "high", "exploration": "high",
+        "persistence": "high", "helpSeeking": "high",
+        "initialCaution": "high", "operationLearning": "high",
+        "routeReliance": "high", "textCueLoad": "high"
+      }
+    }
+  ]
+}
+```
+
+이 객체를 `prepare_persona_validation`에 전달한다. 조작·동선·글자 성향의 개인차를 비교할 때도 같은 기본 인물에서 **비교할 한 축만** 다르게 만든다. 선언한 profile `schemaVersion`은 run 카탈로그와 일치해야 한다. 원본 인물 파일, `parameters`, `attention`, cognition과 비교용 `contextHash`는 바뀌지 않는다. `personaIds`를 쓰는 v2 traits run에도 인물별 매핑 지침을 검증 scope 안에서만 주입하고 일반 생성·legacy 경로는 유지한다.
+
+초반 신중함은 첫 매대 열기·담기 전의 살핌 행동 수이고, 나머지는 기회당 반응 비율이다. 조작은 종류별 첫 사용만, 동선은 실제 방문한 곳과 미방문한 곳이 모두 이동 선택지에 있는 경우만, 글자 단서는 같은 계열의 다른 이름·규격 상품이 동시에 표시된 목표 담기만 센다. 관심 구매는 글자 지표에서 제외한다. 필요한 관측이 없거나 제외 후 기회가 없으면 `null`/`unexercised`와 이유를 남긴다. 기존 비교·확인·도움 발현에 쓰인 행동을 새 축에 중복 계산하지 않으며, 선언만으로 겹친 기회 역시 새 지표에서 제외한다. `reason`·활동 표기·작성 대기시간은 새 축의 긍정 근거가 아니다.
+
+같은 조건·seed에서 양쪽 모두 기회가 있었던 쌍만 비교하며 유효 쌍 8개, |delta| ≥ 0.33, 95% CI의 0 제외 기준을 유지한다. 같은 인물·조건의 값이 모두 같은 경우는 근거 step ID를 포함한 진단 경고이며 판정 실패가 아니다. 성장·감쇠·과장 상한은 검사하지 않는다. 블라인드 답안은 v1이 다섯 축, v2가 아홉 축 전부를 요구한다. 아래 다섯 축 답안 예시는 v1용이며, v2에서는 준비 응답의 아홉 축 `answerFormat`을 사용한다. 익명 판에서 상품·이동 선택지 관측이 빠진 경우 해당 축은 `unknown`으로 남길 수 있다.
+
+현행 검증 snapshot과 생성기에는 이동 갈림길·유사 상품 동시 표시 구조가 있어 생성기 변경은 하지 않았다. 정적 기회는 실제 노출이나 HUD 정상 동작을 보장하지 않는다. 이번 구현은 파일럿이나 실제 사람 데이터 비교를 수행하지 않았다. 남은 파일럿은 **HUD 결함을 고친 snapshot, 새 runId, 조건별 seed 20개 이상**으로 실행한다. 연구 근거로 설계한 첫 플레이 성향이 수준대로 행동에 나타나는지를 본 것이며, 실제 지적장애인과의 유사성을 입증하지 않는다. 인물별 매핑·관측 필드·출처와 한계는 [v2 검증 절차](../market-persona-skill/references/persona-validation.md#성향-카탈로그-v2--첫-플레이의-네-성향)를 따른다.
+
+### 기존 다섯 축과 공통 절차
+
+다음 다섯 축 설명은 v1과 v2에서 공통으로 유지한다. v1의 다섯 축 예시는 버전을 생략해 새 v2 run에 사용하면 추가 네 축이 `medium`으로 채워진다. 새 v2 비교에서는 나머지 여덟 축이 같아야 하며, 아래의 “나머지 네 성향”과 다섯 축 답안은 v1 설명이다.
+
+새 run은 `validationMode:"traits"`로 명시할 수 있다. `profiles`는 `{id, basePersonaId, schemaVersion?, presetId?, traits?, label?}` 형식의 1~32개 인물이고 `personaIds`와 함께 쓰지 않는다. `basePersonaId`는 기존 세 인물 또는 `neutral-adult-control`이며, 유형 기본값에 `traits`의 일부 축을 덮어쓴다. 유형을 생략하면 모든 축은 `medium`에서 시작한다. 사용자 정의 ID는 경로에 안전한 소문자 영문·숫자·`_`·`-` 1~64자이고 첫 글자는 영문 또는 숫자여야 하며 기존 ID와 겹치지 않아야 한다.
 
 | 성향 키 | 의미 | 수준 |
 | --- | --- | --- |

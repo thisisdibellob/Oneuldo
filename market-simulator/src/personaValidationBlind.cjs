@@ -114,7 +114,9 @@ function buildTraits(samples, profiles, catalog) {
       || typeof trait.description !== 'string' || !trait.levels
       || levels.some(level => typeof trait.levels[level] !== 'string')) throw new Error('Invalid common trait rubric');
     return { key: trait.key, label: trait.label, description: trait.description,
-      levels: Object.fromEntries(levels.map(level => [level, trait.levels[level]])) };
+      levels: Object.fromEntries(levels.map(level => [level, trait.levels[level]])),
+      ...(catalog.schemaVersion === 'persona-traits-v2' && typeof trait.observationCriteria === 'string'
+        ? { observationCriteria: trait.observationCriteria } : {}) };
   });
   const traitKeys = traitRubric.map(trait => trait.key);
   if (new Set(traitKeys).size !== traitKeys.length) throw new Error('Duplicate common trait key');
@@ -127,6 +129,8 @@ function buildTraits(samples, profiles, catalog) {
   if (!Array.isArray(samples) || !Array.isArray(profiles)) throw new Error('Trait blind review requires samples and profiles');
   const byId = new Map();
   for (const profile of profiles) {
+    const profileSchemaVersion = profile?.persona?.traitProfile?.schemaVersion ?? profile?.definition?.schemaVersion ?? profile?.schemaVersion;
+    if (profileSchemaVersion !== undefined && profileSchemaVersion !== catalog.schemaVersion) throw new Error('Trait review profile schemaVersion must match the catalog');
     if (!profile || typeof profile.id !== 'string' || !profile.id || byId.has(profile.id)
       || !profile.traits || typeof profile.traits !== 'object' || Array.isArray(profile.traits)
       || Object.keys(profile.traits).length !== traitKeys.length

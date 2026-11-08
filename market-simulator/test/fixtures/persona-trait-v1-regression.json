@@ -1,0 +1,25 @@
+{
+  "description": "Frozen complete normalized measurement/report hashes from the pre-change implementation; only temporary directory prefixes and path-dependent dataFingerprint fields are excluded.",
+  "sourceRevision": "4d5c1beef82a2d4eddba0491ab0242baa446f091",
+  "catalogHash": "63fc354ad554c57f02e340412980d4e4e8bd6c571f61aaef70b0158fffd5c3c8",
+  "runs": {
+    "1": {
+      "specHash": "bf61f70fef64d0a3c04b421789de18343c6b9b165058a6e0ef9829bd99613be5",
+      "profileVersions": {
+        "checking-low": "traits-2-d75d475af937",
+        "checking-high": "traits-2-749585871119"
+      },
+      "measurementsHash": "e4604b173141f6a82ec1deaac7e793857bc985f819a6bf7f5d6ca3750eb1b8ab",
+      "reportHash": "32beda6a7db6247bcca937646282de665523a6b6eca39eb5e2213f9f42475bee"
+    },
+    "absent": {
+      "specHash": "67256b5957e08642d23b3e60dee8c3a871c667908f9dbbab5ed20378117a59f1",
+      "profileVersions": {
+        "checking-low": "traits-2-d75d475af937",
+        "checking-high": "traits-2-749585871119"
+      },
+      "measurementsHash": "5296af29f5e0323bad07bf932f0727454a28e9e14391610c100569be6bc0f105",
+      "reportHash": "28b3ef341a308b9eca8e1dcb13154194b3752530f1113f9c8b1dc3f0c9d78f4a"
+    }
+  }
+}
