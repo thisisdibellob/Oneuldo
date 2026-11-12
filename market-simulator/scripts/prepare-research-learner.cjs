@@ -46,7 +46,7 @@ if (command === 'init') {
     previousConditionImported: false, clinicalCalibration: false,
     files: Object.fromEntries(['personas/research-learning-minjae-v2.json', 'src/researchLearnerContext.ts',
       'personas/research-learning-seoyeon-v2.json', 'personas/research-learning-minsu-v2.json',
-      'scripts/prepare-research-learner.cjs', '../market-persona-skill/assistant-learning-protocol.md',
+      'scripts/prepare-research-learner.cjs', '../market-persona-skill/legacy/assistant-learning-protocol.md',
       '../docs/ai/research/intellectual-disability/learning-model-sources-2026-10-01.json']
       .map(p => [p, hash(path.resolve(__dirname, '..', p))])) });
   process.stdout.write('Fresh research-learning-v2 condition initialized. No plays or learning outcomes created.\n');

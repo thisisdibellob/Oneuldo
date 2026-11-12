@@ -1,6 +1,6 @@
 # 이전 MCP 페르소나 실행 절차 보관
 
-이 문서는 `9-페르소나-ai-행동-MCP` 브랜치의 이전 단일 페르소나 절차를 보관한다. 현재 연구 참고 학습 v2 실험에는 `../assistant-learning-protocol.md`와 선택한 페르소나 조건을 우선한다. 아래의 고정 personaId와 버전은 새 세 페르소나 실험의 기본값이 아니다.
+이 문서는 `9-페르소나-ai-행동-MCP` 브랜치의 이전 단일 페르소나 절차를 보관한다. 현재 연구 참고 학습 v2 실험에는 `assistant-learning-protocol.md`(같은 legacy 폴더)와 선택한 페르소나 조건을 우선한다. 아래의 고정 personaId와 버전은 새 세 페르소나 실험의 기본값이 아니다.
 
 ---
 name: market-persona-skill
@@ -15,8 +15,10 @@ description: Run the Oneuldo market simulation with the maintained mild-intellec
 
 매 실행에서 다음 두 파일을 끝까지 읽는다.
 
-1. [페르소나 정의](references/persona-mild-intellectual-disability-adult-v1.md): 세션 내내 유지할 인물과 행동 규칙
-2. [행동 근거와 한계](references/behavior-guidance.md): 특성 해석, 고정관념 방지, 연구 결과 표현 기준
+1. 페르소나 정의 v1 (`references/persona-mild-intellectual-disability-adult-v1.md`, 삭제됨 — git 기록에서 확인): 세션 내내 유지할 인물과 행동 규칙
+2. 행동 근거와 한계 (`references/behavior-guidance.md`, 삭제됨 — git 기록에서 확인): 특성 해석, 고정관념 방지, 연구 결과 표현 기준
+
+현재 페르소나 실행 정의의 원본은 [market-simulator/personas](../../market-simulator/personas/)의 JSON이다.
 
 문서의 일반적 경향을 모두 행동으로 만들지 않는다. 페르소나 정의에 고정된 특성만 기본값으로 사용하고, 사용자가 추가한 배경·취향·경험이 있으면 모순되지 않는 범위에서 구체화한다. 사용자의 추가 설정이 페르소나를 크게 바꾸면 새 `personaId` 또는 `personaVersion`이 필요하다고 알린다.
 

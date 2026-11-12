@@ -384,7 +384,7 @@ candidate 7의 `personaReview.taskExpression`은 `task-expression-v1`로 이동 
 
 새 개인은 `create_whole_trace_learner`로 만든다. `create_learner`의 기존 provider 정책과 파일을 공유하거나 기존 trial의 정책 값을 수동 변경하지 않는다. 생성된 계획 기억을 실제 경험으로 승격하지 않는다. 실제 앱 replay와 DB receipt를 검증한 개인 경험 파일만 다음 요청의 `learnerFile`로 사용한다.
 
-전체 계획으로 A/B/C 반복 실험을 하려면 [학습 실험 절차](learning-trials.md)의 계정·고정 과제·증거 조건을 유지하면서 생성 경로만 다음과 같이 바꾼다.
+전체 계획으로 A/B/C 반복 실험을 하려면 [학습 실험 절차](../legacy/learning-trials.md)의 계정·고정 과제·증거 조건을 유지하면서 생성 경로만 다음과 같이 바꾼다.
 
 1. A/B/C 각각 `create_whole_trace_learner({directory,learnerId,memberId,personaId,experimentId,arm})`를 호출한다. 모델·reasoning·정책은 도구가 `gpt-6-luna`/`low`/`whole-trace-v3`로 채운다.
 2. `create_learning_trial` 설정에서 같은 세 learner 파일, `model:"gpt-6-luna"`, `policyVersion:"whole-trace-v3"`, 현재 `personaVersion`, 기준·평가·일반 연습 snapshot을 사용한다. 행동 예산은 `generationLimits.maxActions:100`을 사용한다. 이전 전체 계획 정책의 개인 archive·trial 파일을 바꾸지 말고 새 개인·trial을 만든다.

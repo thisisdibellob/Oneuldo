@@ -73,4 +73,4 @@
 
 원문: `output/minjae-next-focus-3-recommendations-20261002/group-01/`의 각 회차 `events.json`, `analysis.json`, `profile.json`, `performed-quest.json`, `ui/` 파일. 계정·키가 들어 있는 private 파일은 보고서에 포함하지 않았다.
 
-학습 구조와 문헌 출처: [연구 참고 학습 규약](../../market-persona-skill/assistant-learning-protocol.md), [자료별 적용 범위](research/intellectual-disability/learning-model-adjustment-2026-10-01.ko.md).
+학습 구조와 문헌 출처: [연구 참고 학습 규약](../../market-persona-skill/legacy/assistant-learning-protocol.md), [자료별 적용 범위](research/intellectual-disability/learning-model-adjustment-2026-10-01.ko.md).

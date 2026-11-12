@@ -56,7 +56,7 @@
 - 개인 사례: [민재 v2](../../../../market-simulator/personas/research-learning-minjae-v2.json)
 - 관찰/연상/회상/감사 경계: [researchLearnerContext.ts](../../../../market-simulator/src/researchLearnerContext.ts)
 - 실제 파일 검사를 포함한 실행 도구: [prepare-research-learner.cjs](../../../../market-simulator/scripts/prepare-research-learner.cjs)
-- 직접 역할 수행 절차와 명령어: [학습 규약](../../../../market-persona-skill/assistant-learning-protocol.md)
+- 직접 역할 수행 절차와 명령어: [학습 규약](../../../../market-persona-skill/legacy/assistant-learning-protocol.md)
 
 배열/문자수 제한은 입력 크기 보호 장치다. 인간의 기억 슬롯 수를 의미하지 않는다. SHA-256은 원본 파일 변경 감지일 뿐, 원본의 진실성을 보장하는 인증이 아니다. 현재 화면과 이전 회상은 별도 입력이지만 같은 어시스턴트의 대화에 다른 정보가 남을 수 있어 완전한 눈가림은 아니다.
 

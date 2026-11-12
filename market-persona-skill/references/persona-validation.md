@@ -193,7 +193,7 @@ blocked여도 측정 가능한 자료는 측정한다. 기존 응답 필드를 �
 - `pooledAnalysis`: low/high 조건을 층화하고 같은 조건·seed의 쌍을 함께 재표집한다. 같은 seed가 두 조건에 있으면 그 의존성도 보존한다. 조건 간 차이를 무시한 단순 합산이 아니며 주 판정에는 사용하지 않는다.
 - `powerAnalysis`: 현재 지표별 유효 쌍 수에서 |delta| 0.33을 검출할 확률을 고정 seed로 모의 계산한다. 가정한 분포·반복 수·Monte Carlo 오차, CI 검출률과 기존 통과 기준 충족률을 함께 읽는다. 실제 표본의 분포를 보장하지 않는다.
 
-**실수 강제 금지** 원칙은 유지한다. 오류가 많을수록 지적장애인과 비슷하다고 해석하지 않는다. 이 검증은 실제 지적장애인과의 유사성을 입증하지 않는다. 보고서의 `referenceComparison:null`은 아직 실제 데이터 비교가 없음을 뜻한다. [출처 확장 설계 메모](persona-validation-extension-design.md)에 순수 지표 함수와 미래 어댑터 경계를 남겼다. 과거 run·trace·bundle·manifest·보고서는 변환하거나 덮어쓰지 않으며, 새 명세는 새 runId에만 적용한다. 보관 명세 hash의 run은 준비·점검에서 manifest를 다시 쓰지 않는다. 기존 측정과 같은 재측정은 저장 파일을 보존하고 결과가 달라지면 새 runId를 요구한다. 이미 저장된 과거 보고서는 `historicalArtifactPreserved:true`와 기존 경로를 반환하며 새 분석으로 다시 쓰지 않는다.
+**실수 강제 금지** 원칙은 유지한다. 오류가 많을수록 지적장애인과 비슷하다고 해석하지 않는다. 이 검증은 실제 지적장애인과의 유사성을 입증하지 않는다. 보고서의 `referenceComparison:null`은 아직 실제 데이터 비교가 없음을 뜻한다. [출처 확장 설계 메모](../../docs/ai/persona-validation/persona-validation-extension-design.md)에 순수 지표 함수와 미래 어댑터 경계를 남겼다. 과거 run·trace·bundle·manifest·보고서는 변환하거나 덮어쓰지 않으며, 새 명세는 새 runId에만 적용한다. 보관 명세 hash의 run은 준비·점검에서 manifest를 다시 쓰지 않는다. 기존 측정과 같은 재측정은 저장 파일을 보존하고 결과가 달라지면 새 runId를 요구한다. 이미 저장된 과거 보고서는 `historicalArtifactPreserved:true`와 기존 경로를 반환하며 새 분석으로 다시 쓰지 않는다.
 
 ## 공통 성향 모드와 기존 실행의 구분
 

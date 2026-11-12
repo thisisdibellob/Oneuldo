@@ -2,11 +2,11 @@
 
 새 직접 플레이의 기본 조건은 `research-learning-v2`다. 배우는 사용자 요청대로 **Codex 어시스턴트**, 학교 Qwen은 분석/추천을 담당한다. 확률 정책이나 코드가 행동을 대신 고르지 않는다. 실패→실패→성공 순서와 자동 능력 상승을 강제하지 않는다.
 
-근거: [논문 6편·공식 자료 2건의 실제 내용과 변경 대응](../docs/ai/research/intellectual-disability/learning-model-adjustment-2026-10-01.ko.md), [저자·DOI·원출처·확인 범위](../docs/ai/research/intellectual-disability/learning-model-sources-2026-10-01.json). 기억 JSON의 형태나 민재의 학습률을 논문에서 추정한 것은 아니다.
+근거: [논문 6편·공식 자료 2건의 실제 내용과 변경 대응](../../docs/ai/research/intellectual-disability/learning-model-adjustment-2026-10-01.ko.md), [저자·DOI·원출처·확인 범위](../../docs/ai/research/intellectual-disability/learning-model-sources-2026-10-01.json). 기억 JSON의 형태나 민재의 학습률을 논문에서 추정한 것은 아니다.
 
 ## 새 조건과 경험 경계
 
-1. [민재 v2](../market-simulator/personas/research-learning-minjae-v2.json)로 **새 실험 폴더와 빈 기억**을 만든다. 기존 `assistant-observed-v1`은 당시 조건의 보관/조회용이다. 다른 조건이나 다른 사람의 경험을 새 민재에게 이식하지 않는다. 초기 강점과 지원 필요는 고정하되, 실제 행동 변화는 배우가 경험을 바탕으로 선택한다.
+1. [민재 v2](../../market-simulator/personas/research-learning-minjae-v2.json)로 **새 실험 폴더와 빈 기억**을 만든다. 기존 `assistant-observed-v1`은 당시 조건의 보관/조회용이다. 다른 조건이나 다른 사람의 경험을 새 민재에게 이식하지 않는다. 초기 강점과 지원 필요는 고정하되, 실제 행동 변화는 배우가 경험을 바탕으로 선택한다.
 2. 화면을 실제로 읽고 조작한 직후 원본을 저장한다. `research-observed-v2` 감사 기록의 각 에피소드에 id, 실제 sessionId, observationRef, observationSha256, 실제 observedAt, observed를 연결한다. `observed`에는 실제 안내·목록·상품·장바구니·피드백만 적는다. 목록 열기≠이해, 상품 일치≠개념 습득이다. 화면에 없던 정오 판정과 실행하지 않은 계획은 쓰지 않는다.
 3. **전체 원본 기록은 감사자용**이다. 배우의 다음 행동 맥락에 전체 이전 로그, 분석/프로필 원문, 숨은 SKU 정답, 사후 채점표, 이번 검사 목적을 넣지 않는다. 자연어에도 이런 내용을 옮겨 적지 않는다. 현재 UI에 표시된 실제 추천 안내만 배울 기회가 된다.
 
