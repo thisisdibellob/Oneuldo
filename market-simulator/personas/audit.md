@@ -10,7 +10,7 @@
 | 원자료2: 행동 이해 자료 | [intellectual-disability-behavior-analysis.ko.md](references/intellectual-disability-behavior-analysis.ko.md) | 원본 `/Users/mymacbookair/Desktop/Project/오늘도/intellectual-disability-behavior-analysis.ko.md`를 바이트 그대로 복사. 11개 절·참고문헌·자료의 한계 모두 포함 |
 | 실행 정의 | [지민](mild-intellectual-disability-adult.json), [서연](careful-checker.json), [민수](quick-decider.json) | 각 `character`, `parameters`, `attention`, `shoppingStyle`, 전체 `prompt`의 단일 실행 원본 |
 | 읽기용 프롬프트 | [지민 v5](persona-mild-intellectual-disability-adult-v5.md), [서연 v3](persona-careful-checker-v3.md), [민수 v3](persona-quick-decider-v3.md) | 각각 JSON `prompt`와 동일. 게임 지침 뒤에 원자료1·원자료2 전문을 수정 없이 포함 |
-| 이전 정의 | [지민 v4](persona-mild-intellectual-disability-adult-v4.md), [서연 v2](persona-careful-checker-v2.md), [민수 v2](persona-quick-decider-v2.md)와 그 이전 사본 | 당시 설정을 역사 자료로 보존. 활성 프로필은 위 JSON과 현재 사본 |
+| 이전 정의 | [지민 v4](history/persona-mild-intellectual-disability-adult-v4.md), [서연 v2](history/persona-careful-checker-v2.md), [민수 v2](history/persona-quick-decider-v2.md)와 그 이전 사본([history/](history/)) | 당시 설정을 역사 자료로 보존. 활성 프로필은 위 JSON과 현재 사본 |
 | 구조 계약 | [persona.schema.json](persona.schema.json) | 선택적 attention·shoppingStyle 설정의 타입·범위. 최대 관심 단계가 최소보다 작은 조건은 런타임에서 추가 검사 |
 | 무결성 메타데이터 | [sources.json](references/sources.json) | 원문 파일별 출처·SHA-256·바이트 수·문자 수·참고 링크 목록 |
 

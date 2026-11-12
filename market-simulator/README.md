@@ -1,434 +1,13 @@
 # Oneuldo 장보기 의도 trace와 앱 재생
 
-## 현재 기본: feedback-choice-v7
+장보기 미션에서 페르소나의 행동 trace를 생성·검증하고, 개발용 앱에서 재생하는 Node 도구다. 현재 주력 생성 경로는 Luna 전체 계획(whole-trace)의 결정별 작성 모드다: `prepare_whole_trace` → `begin_whole_trace_authoring` → `append_whole_trace_decision` 반복 → `finish_and_submit_whole_trace`. 에이전트가 따르는 절차와 계약은 [market-persona-skill](../market-persona-skill/SKILL.md)에 있고, 이 문서는 설치·연결·실행·테스트를 다룬다.
 
-새 `begin_feedback_plan`의 기본은 `feedback-choice-v7`이며 HTTP 생성은 이를 명시한다. 일반 `generate_trace`의 기존 episodic 기본값은 유지한다. 명시적 v1~v6와 과거 저장 자료는 기존 계약으로 재현한다. 아래 v5/v6의 기본 채택 기록은 과거 상태를 설명하며 새 생성에는 이 v7 절을 우선 적용한다.
+## 문서 지도
 
-v7은 v6의 개인 동기·선택권을 유지하며 다음 표현을 분리한다.
-
-- `experience.checks.cartChangedSinceLastCartView`: 실제 장바구니 확인 이후 관측·적용 결과로 확인한 변화. 닫기·목록 읽기는 기준을 초기화하지 않는다. 변화 없음은 false, 변화 있음은 true, 불확실하거나 24행동 기한이 지난 경우는 null이다.
-- `rememberedItems.quantity`: 배우가 현재 원한다고 믿는 총수량. 선택적 `rememberedCartQuantity`는 마지막으로 담겨 있었다고 기억하는 수량이며 `source`는 list/personal/uncertain 중 배우가 믿는 출처다. 틀린 값·누락·불확실성을 허용하고 코드가 채우거나 정답과 대조하지 않는다.
-- 담기·빼기의 `choiceParameters.quantity`는 추가·제거할 개수다. 기억의 총수량과 구분하며 실제 현재 카탈로그의 상품·수량만 선택한다. 행동 설명이 매개변수를 덮어쓰지 않는다.
-- 확인은 이미 선택한 `ongoingIntent`와 구분하고, 실행 전 응답 기억을 실행 완료 사실로 취급하지 않는다. 다음 실제 결과를 보고 배우가 수정 여부를 결정한다.
-
-상품 기억 12개·메모 8개, 최근 행동 6개·장소 6곳·24행동 기한, 원본 페르소나와 배회 신호 0.2는 유지한다. 반복 금지·자동 수량 조정·목표 복원·강제 구매나 종료는 추가하지 않는다. trace에는 feedback version 3, experienceContract `bounded-observed-experience-v2`, beliefContract `quantity-source-beliefs-v1`을 기록한다. 제품의 최대 100행동은 유지하고 사용자가 요청한 300행동은 별도 동결 실험 사본에서만 실행한다. 실제 모델 성능은 별도로 측정하며 구현 검증만으로 성공률 향상을 주장하지 않는다.
-
-**정책 채택 상태:** feedback 기본·권장 정책은 `feedback-choice-v5`다. 현재 UI 정보 표현의 정확성과 기존 합법 행동 집합 보존 검증을 근거로 채택했으며, 성공률·인간 행동 충실도 개선을 입증한 결정은 아니다. `feedback-choice-v6`는 명시적 실험 옵션으로 유지한다. **모델 비교 결과 상태:** 2026-10-12 동일 S01에서 v5·v6 각 5회, 최대 300행동 비교를 완료했다. 두 조건 모두 관측된 목표 상품 노출·담기·완수는 0회였다. v6 1회는 1행동 뒤 선택 ID 오류로 중단돼 이후가 미관측이다. 성공률 개선은 확인되지 않았으며, 같은 궤적의 100·200·300 누적 구간과 실제 사람의 행동 타당성을 구분한다.
-
-새 페르소나 생성의 권장 경로는 **`feedback-choice-v5`**이다. `begin_feedback_plan`의 기본은 v5이고 첫 관측을 돌려주며, `step_feedback_plan`은 행동 하나를 적용한 결과와 다음 관측을 함께 반환한다. 현재 화면과 배우가 남긴 믿음 기억에 최근 6개 적용 행동·결과와 제한된 매대·통로 관찰 경험을 전달한다. 선택적 `memory.ongoingIntent`로 진행 중인 목적을 현재 활동인 `currentTask`와 분리한다. `exploration-v2`는 실제 막힌 방향을 잠시 제외하고 기본 20%의 seed 기반 배회 신호를 제공하되, 배회·회복 모드에서도 매대 열기·확인·중단 등 현재 가능한 비이동 조작을 모두 유지한다. 이동 여부·방향·100~2000ms 입력 시간은 모델이 선택하며 구매 목적이나 보이는 대상은 필요 없다. 전체 지도·좌표·숨은 목표·정답 원장은 배우에게 주지 않는다. 정확한 목록은 읽은 직후에만 노출하고 오기억·누락·잘못된 완료 믿음을 자동 수정하지 않는다. 최대 행동 한도 100과 자동 계산 없음은 유지한다. 저장된 전체 trace를 검토한 뒤 실제 웹에서 재생하는 흐름은 유지한다. 연결·기억 형식·실패 처리·문맥 격리와 한계는 [새 생성 절차](../market-persona-skill/legacy/feedback-plan.md)에 있다.
-
-HTTP provider는 `generate_trace({actorPolicyVersion:"feedback-choice-v5", feedbackMovement:{wanderProbability:0.2}, ...})`로 선택하며 매 판단에 새 system+현재 frame 메시지만 보낸다. `begin_feedback_plan`도 `feedbackMovement`를 받으며 `wanderProbability`는 0~1, 생략 시 0.2다. 정책을 생략한 일반 `generate_trace`의 기존 `episodic-choice-v4` 기본값은 유지한다. 직접 Codex 배우는 실제 Luna/low의 새 판단 문맥이 필요하며 최근 경험·`movementPolicy`를 포함한 현재 frame 전체를 전달한다. 서버가 외부 배우의 과거 문맥 삭제를 보장하지는 않는다. 새 정책은 첫 방문 생성에 적용하며 기존 learner 원장은 자동 가져오지 않는다. timing은 original이고 compact는 허용하지 않는다. v4~v6 모두 `activity-duration-v2`와 `movementContract:"joystick-direction-v1"`을 사용한다. 명시적 `feedback-choice-v3`는 `exploration-v1`의 강제 방향 이동과 기존 믿음 기억 계약, 명시적 `feedback-choice-v2`는 자동 배회·회피 없이 8방향을 제공하는 계약, 명시적 `feedback-choice-v1`은 기존 anchor 이동·관측·시간 계약을 보존한다. 명시적 v4의 프레임·합법 행동과 저장된 v1/v2/v3/v4 및 아래 whole-trace/v10 경로도 그대로 유지한다.
-
-`exploration-v2`는 `shopping` / `world` / `activeStation` 없음인 판단에 적용한다. `actor-choice`는 일반 선택, `random-wander`는 배회를 고려하는 신호, `blocked-recovery`는 완전 막힘 뒤 다른 선택을 고려하는 신호다. v4~v6는 세 모드 모두 현재 가능한 비이동 조작을 유지한다. 완전히 막힌 방향은 다음 4회의 world 판단에서 제외하며, 실제 24px 이동 또는 관측된 위치 변경이 있으면 차단 기억을 초기화한다. 제자리 패널 열기·닫기로는 이력이 사라지지 않는다. `wanderProbability:0`은 확률 배회 신호만 끄고 막힘 회피는 유지한다. 20%는 적격 판단별 신호 발생 확률이며 실제 이동 횟수 할당량이나 임상 통계가 아니다. frame의 `movementPolicy:{version,mode,eligible,wanderProbability,roll,avoidedDirections}`, trace의 `generation.movementPolicy`와 각 step의 `movementPolicy`에 설정과 개입 출처를 남긴다. 명시적 v3의 `exploration-v1`은 배회·회복 턴에 방향 이동만 제시하는 기존 제한을 유지한다. 분석에서는 v4~v6의 신호와 실제 선택, v3의 강제 이동을 구분한다. 숨은 지도로 우회로를 찾거나 목표 상품·수량·성공을 보정하지 않으며, AI 실패를 대신하는 fallback도 아니다.
-
-v4~v6의 `bounded-observed-experience-v1`은 최근 6개 적용 행동·관찰 결과와 최근 관찰한 매대·통로를 각각 최대 6곳씩 전달한다. 장소 경험은 마지막 관찰 뒤 24개 행동 이내로 제한하고, 매대별 상품·페이지 요약은 실제 관찰한 최대 12개 상품·12개 페이지만 담는다. 전체 방문 원장이나 정확한 쇼핑 목록의 영구 사본은 만들지 않는다. 배우는 최근 확인 뒤 새 정보가 생겼는지, 현재 보이는 장바구니와 자신의 믿음이 일치하는지를 판단하고 다음 행동이나 기억 수정 여부를 선택한다. 반복 확인·재방문·중단을 횟수 규칙으로 금지하지 않는다. `ongoingIntent`는 생략하면 이전 값 유지, 문자열이면 교체, null이면 해제하며 `rememberedItems`·`currentTask`·`notes`는 응답으로 교체한다. 이 형식은 자동 목표 보정이나 임상적 기억력 측정이 아니다. 새 trace의 `generation.feedback`에는 `version:2`, `memory:"actor-authored-with-recent-experience"`, `experienceContract:"bounded-observed-experience-v1"`, `intentContract:"persistent-intent-v1"`을 기록한다.
-
-v2~v6의 `visibleStructures`는 매대 이름을 읽을 수 없어도 보이는 본체의 방향·거리와 익명 `진열대` 단서를 전달한다. 범주·상품·좌표·상호작용 ID를 제공하지 않으며, 가까운 버튼이나 표지로 이름이 확인된 매대와 중복하지 않는다. 보수적인 sprite/HUD 기하 투영이며 실제 픽셀의 모든 가림을 판정하는 기능은 아니다. 본체 단서는 방향 이동의 전제 조건이 아니며, v3~v6의 회피는 실제 관측된 막힘만 이용한다.
-
-기본 `feedback-choice-v5`는 v4의 합법 행동을 유지하면서 화면 정보와 선택의 표현을 보완한다. `begin_feedback_plan`은 생략 시 v5를 사용하며, HTTP `generate_trace`에서는 `actorPolicyVersion:"feedback-choice-v5"`를 명시한다. 담기·내려놓기를 각각 하나의 선택지와 현재 상품 `catalog`로 묶으며, 같은 모델 응답의 `choiceParameters`로 상품·수량·담기 결과를 고른다. 예를 들어 현재 카탈로그에 해당 상품과 수량이 있을 때 담기 매개변수는 `{"productId":"curry","quantity":2,"dragOutcome":"drop"}`이다. add는 세 필드가 모두 필요하고, remove는 `productId`와 `quantity`만 받는다. 실패 `miss`·취소 `cancel`은 기존과 같이 수량 1에서만 가능하다. 그 밖의 선택에는 `choiceParameters`를 생략한다. 기본 상품·수량을 대신 채우거나 목표를 우선 정렬하지 않으며, 기존 v4의 합법 행동 집합을 유지한다. [전체 응답 예제와 검증 규칙](../market-persona-skill/legacy/feedback-plan.md#v5-기본과-v6-실험-계약)을 참고한다.
-
-v5/v6에서만 현재 열린 장바구니·계산 화면에 `cartItems:[{id,name,detail?,quantity}]`를 전달한다. detail은 해당 UI가 표시할 때만 포함하고, 구매 버튼은 실제 화면의 `구매 확정` 및 `구매를 확정하면 이번 시도가 기록되고 결과가 나와요.` 효과를 전달한다. 계산 화면의 닫기는 `다시 고르기`로 매장에 복귀한다. 정답과의 자동 비교·부족 수량·제출 전 추가 확인이나 성공 조건 검사는 넣지 않는다. `cartItems`는 기존의 열린 장바구니 패널 전체 관측 계약에 상품명을 보완한 것으로, 스크롤 밖 행·가림을 픽셀 단위로 재현한 것은 아니다. 장바구니가 닫힌 뒤 현재 내용으로 계속 제공하지 않으며 미관찰 상품·재고를 추가하지 않는다.
-
-명시적 `feedback-choice-v6`는 v5와 같은 관측·선택지에 지시문만 조정한 비교 후보다. 원래 개인의 장보기 동기와 강점, 현재 기억·관찰에 근거한 구체적 활동을 기존 `currentTask`·`ongoingIntent`에 표현하도록 하되, 기억 슬롯·보존 기간·목표 복원·반복 금지·즉시 목표 복귀·강제 완수는 추가하지 않는다. v5/v6 모두 페르소나 원본, 믿음 기억의 용량·교체 방식, 최근 경험 한도, `exploration-v2`와 기본 배회 신호 20%, 행동 시간·게임 규칙을 v4와 공유한다. 기존 v1~v4의 관측·선택지·지시문과 저장된 자료는 그대로 유지한다. 제품 경로의 feedback 기본·최대 행동 수는 **100**이고 자동 계산을 추가하지 않는다. **300행동은 별도 승인된 동결 실험 경로에서만** 사용하며 제품 한도가 바뀌었다고 설명하지 않는다. v6의 채택 여부와 모델 효과는 같은 개인·조건의 비교 결과, 관찰 기회와 기술 중단을 검토해 별도로 판단한다.
-
-페르소나 충실도 검증은 기존 공통 성향 5축과 첫 플레이 성향 4축, 유형 5개의 조합을 평가한다. MCP 도구 6개를 사용하고, 같은 맥락에서 성향 하나만 다른 표본 비교·기회 미발생 구분·A/B 성향 추정·원본 불변 검사를 제공한다. 일반 생성 경로에서 자동 실행하지 않는다. 자세한 입력·출력·분모·한계와 기존 v2 호환 절차는 [검증 절차](../market-persona-skill/references/persona-validation.md)를 따른다.
-
-페르소나 생성기는 `walkTo`, `readList`, `browse`, `openShelf`, `dragProduct`, `viewCart` 같은 행동 **의도**를 JSON으로 만든다. 개발용 Expo 웹앱이 전체 trace를 받아 기존 이동·버튼·드래그 입력 경로로 실시간 재생한다. 게임 로그는 앱의 기존 `MarketBehaviorTracker`와 큐가 기록·전송한다. 생성기와 MCP에는 `BehaviorLogRequest` 생성·변환·직접 전송 기능이 없다.
-
-Luna 전체 계획 경로는 전체 세계를 전개 계산용 참고 자료로 전달하되 인물의 관찰 사실 원장과 현재 작업 기억을 분리한다. 실제 Codex Luna가 각 행동의 상태·사용 기억·근거와 종료까지의 배열을 한 번 작성하고 Node가 제출 후 화면 전개와 기억의 출처·일관성을 검사해 앱용 trace를 저장한다. 코드가 계산한 상태를 Luna의 다음 판단에 실시간 주입하거나 행동마다 모델을 호출하지 않는다. 전체 세계가 모델 문맥에 있으므로 사후 감사는 숨은 정보 영향 차단을 입증하지 않는다. 기존 generate_trace는 실제 LLM이 다음 행동을 선택하는 증분 방식이며, 행동 전부를 결정하는 확률 회귀 정책은 mode:"stochastic"에 한정한다. v4의 `exploration-v2` 신호·막힘 회피와 명시적 v3의 `exploration-v1` 선택 제한은 이와 별개이며 구체적인 방향·시간은 모델이 고른다. 생성기의 가상 시간·좌표·이벤트를 앱에 전송하지 않는다. 화면 재생의 시간과 위치는 실제 앱이 결정한다.
-
-이 기억·이동 정책 구현만으로 대규모 AI 표본이나 클리어 검증 실험을 자동 실행하지 않는다. fixture 테스트를 실제 AI 실행으로 보고하지 않으며, 과거 v1/v2/v3 실험의 frame·추론·trace·보고서 원본은 수정하지 않는다. 별도로 승인된 비교에서는 새 정보 없는 재확인·같은 장소 재방문, 배회·회피 개입과 모델 선택, 상품 관측 기회와 실제 담기, 완성·기술 실패·구매 성공을 각각 집계한다.
-
-정책 옵션·learner 신원 없이 호출한 `generate_trace`는 기존 `episodic-choice-v4` 프롬프트·C1부터 시작하는 선택 ID·선택 순서·300회 기술 상한을 유지한다. `actorPolicyVersion:"episodic-choice-v9"` 또는 `create_learner`로 만든 v9 신원의 `learnerFile`을 명시하면 새 provider 정책을 선택한다. 아래 Codex 직접 증분 계획과 전체 계획도 별도 도구로 명시적으로 시작한다.
-
-현재 Codex 모델이 직접 actor 행동을 고르는 증분 경로는 MCP의 `begin_actor_plan` → `observe_actor_plan` → `append_actor_plan` → `finalize_actor_plan`이다. `append_actor_plan`은 현재 revision의 choice ID 1~3개와 행동마다 `delayMs`/`reasons`를 받는다. 수락된 첫 행동 뒤 현재 actor 관측과 choice ID 집합이 달라지면 나머지 계획을 버리고 새 관측을 요청한다. 항상 3개를 채우지 않는다. 이 모드는 `gpt-6-luna` / `low`, actor policy `episodic-choice-v10`, trace policy `6`으로 표시되고 외부 LLM API 키가 필요 없다. 전체 계획은 아래 별도 도구를 사용한다. 두 경로 모두 생성된 전체 trace를 일반 `validate_trace` 후 `play_trace`로 앱에 전달한다.
-
-## 공통 성향 기반 충실도 검증
-
-### 첫 플레이 성향 v2 프로필 요청 예시
-
-새 traits run은 [카탈로그 v2](validation/persona-traits-v2.json)의 아홉 축과 [명세 `analysisVersion:2`](validation/persona-trait-validation-spec-v2.json)를 기본으로 사용한다. 아래 기존 다섯 축의 정의를 유지하고 `initialCaution`(초반 신중함), `operationLearning`(조작 익히기), `routeReliance`(익힌 동선 고수), `textCueLoad`(글자 단서 부담)를 더한다. 다섯 preset에서 새 축은 모두 `medium`이다. `catalogSchemaVersion:"persona-traits-v1"`을 명시하면 기존 다섯 축 경로를 사용하며, 저장된 v1 run은 원래 카탈로그·프로필 해시·명세·측정·보고서를 유지한다. v2 카탈로그와 legacy 검증 모드 v2는 다른 버전이다.
-
-다음은 **요청 형식 예시이며 실행한 파일럿이 아니다**. 지민을 기본 맥락으로 하고 `initialCaution` 한 축만 다르게 설정한다. 나머지 여덟 성향은 지민의 v2 매핑에 맞춰 동일하게 명시했다. `basePersonaId`만 지정하면 성향이 자동으로 지민 매핑을 상속하는 것은 아니며, preset을 생략한 미지정 축은 `medium`이다.
-
-```json
-{
-  "validationMode": "traits",
-  "catalogSchemaVersion": "persona-traits-v2",
-  "runId": "first-play-initial-caution-v2-new-01",
-  "outputDirectory": "/absolute/output",
-  "snapshotFilePaths": {
-    "low": "/absolute/hud-fixed-snapshots/low.json",
-    "high": "/absolute/hud-fixed-snapshots/high.json"
-  },
-  "seeds": ["s01","s02","s03","s04","s05","s06","s07","s08","s09","s10","s11","s12","s13","s14","s15","s16","s17","s18","s19","s20"],
-  "profiles": [
-    {
-      "id": "jimin-caution-low",
-      "basePersonaId": "mild-intellectual-disability-adult",
-      "schemaVersion": "persona-traits-v2",
-      "traits": {
-        "deliberation": "medium", "checking": "high", "exploration": "high",
-        "persistence": "high", "helpSeeking": "high",
-        "initialCaution": "low", "operationLearning": "high",
-        "routeReliance": "high", "textCueLoad": "high"
-      }
-    },
-    {
-      "id": "jimin-caution-high",
-      "basePersonaId": "mild-intellectual-disability-adult",
-      "schemaVersion": "persona-traits-v2",
-      "traits": {
-        "deliberation": "medium", "checking": "high", "exploration": "high",
-        "persistence": "high", "helpSeeking": "high",
-        "initialCaution": "high", "operationLearning": "high",
-        "routeReliance": "high", "textCueLoad": "high"
-      }
-    }
-  ]
-}
-```
-
-이 객체를 `prepare_persona_validation`에 전달한다. 조작·동선·글자 성향의 개인차를 비교할 때도 같은 기본 인물에서 **비교할 한 축만** 다르게 만든다. 선언한 profile `schemaVersion`은 run 카탈로그와 일치해야 한다. 원본 인물 파일, `parameters`, `attention`, cognition과 비교용 `contextHash`는 바뀌지 않는다. `personaIds`를 쓰는 v2 traits run에도 인물별 매핑 지침을 검증 scope 안에서만 주입하고 일반 생성·legacy 경로는 유지한다.
-
-초반 신중함은 첫 매대 열기·담기 전의 살핌 행동 수이고, 나머지는 기회당 반응 비율이다. 조작은 종류별 첫 사용만, 동선은 실제 방문한 곳과 미방문한 곳이 모두 이동 선택지에 있는 경우만, 글자 단서는 같은 계열의 다른 이름·규격 상품이 동시에 표시된 목표 담기만 센다. 관심 구매는 글자 지표에서 제외한다. 필요한 관측이 없거나 제외 후 기회가 없으면 `null`/`unexercised`와 이유를 남긴다. 기존 비교·확인·도움 발현에 쓰인 행동을 새 축에 중복 계산하지 않으며, 선언만으로 겹친 기회 역시 새 지표에서 제외한다. `reason`·활동 표기·작성 대기시간은 새 축의 긍정 근거가 아니다.
-
-같은 조건·seed에서 양쪽 모두 기회가 있었던 쌍만 비교하며 유효 쌍 8개, |delta| ≥ 0.33, 95% CI의 0 제외 기준을 유지한다. 같은 인물·조건의 값이 모두 같은 경우는 근거 step ID를 포함한 진단 경고이며 판정 실패가 아니다. 성장과 과장 상한은 검사하지 않는다. 앞뒤 성향 유지는 명세 v3에서 설명 지표로만 보고하며 주 판정에 쓰지 않는다. 블라인드 답안은 v1이 다섯 축, v2가 아홉 축 전부를 요구한다. 아래 다섯 축 답안 예시는 v1용이며, v2에서는 준비 응답의 아홉 축 `answerFormat`을 사용한다. 익명 판에서 상품·이동 선택지 관측이 빠진 경우 해당 축은 `unknown`으로 남길 수 있다.
-
-현행 검증 snapshot과 생성기에는 이동 갈림길·유사 상품 동시 표시 구조가 있어 생성기 변경은 하지 않았다. 정적 기회는 실제 노출이나 HUD 정상 동작을 보장하지 않는다. 이번 구현은 파일럿이나 실제 사람 데이터 비교를 수행하지 않았다. 남은 파일럿은 **HUD 결함을 고친 snapshot, 새 runId, 조건별 seed 20개 이상**으로 실행한다. 연구 근거로 설계한 첫 플레이 성향이 수준대로 행동에 나타나는지를 본 것이며, 실제 지적장애인과의 유사성을 입증하지 않는다. 인물별 매핑·관측 필드·출처와 한계는 [v2 검증 절차](../market-persona-skill/references/persona-validation.md#성향-카탈로그-v2--첫-플레이의-네-성향)를 따른다.
-
-### 명세 v3 기준 프로필 요청 예시
-
-새 traits run은 [명세 v3](validation/persona-trait-validation-spec-v3.json)을 기록한다. 주 판정과 블라인드 점수는 v2와 같고, 저장된 v2 run은 `specHash`로 v2 그대로 다시 측정된다. v3은 설명 지표 `baselineComparison`(기준 프로필 대비 위치)과 `positionStability`(기회 순서 앞뒤의 성향 유지, 핵심 출력 `contrastAttenuation`)를 더한다. 둘 다 `descriptiveOnly:true`, `usedForPrimaryDecision:false`다.
-
-다음은 **요청 형식 예시이며 실행한 파일럿이 아니다**. 같은 기본 인물에서 `checking` 한 축만 다른 두 프로필에 `traitMode:"omitted"` 기준 프로필 하나를 더한다.
-
-```json
-{
-  "validationMode": "traits",
-  "catalogSchemaVersion": "persona-traits-v2",
-  "runId": "checking-baseline-v3-new-01",
-  "outputDirectory": "/absolute/output",
-  "snapshotFilePaths": {
-    "low": "/absolute/hud-fixed-snapshots/low.json",
-    "high": "/absolute/hud-fixed-snapshots/high.json"
-  },
-  "seeds": ["seed-01", "seed-02", "seed-03", "seed-04", "seed-05", "seed-06", "seed-07", "seed-08", "seed-09", "seed-10",
-    "seed-11", "seed-12", "seed-13", "seed-14", "seed-15", "seed-16", "seed-17", "seed-18", "seed-19", "seed-20"],
-  "profiles": [
-    { "id": "checking-low", "basePersonaId": "neutral-adult-control", "schemaVersion": "persona-traits-v2", "traits": { "checking": "low" } },
-    { "id": "checking-high", "basePersonaId": "neutral-adult-control", "schemaVersion": "persona-traits-v2", "traits": { "checking": "high" } },
-    { "id": "neutral-baseline", "basePersonaId": "neutral-adult-control", "schemaVersion": "persona-traits-v2", "traitMode": "omitted" }
-  ]
-}
-```
-
-기준 프로필은 같은 `contextHash`·공통 지침을 갖고 성향 지침 문장만 없다(`traits:null`). 다섯 성향이 `medium`인 `neutral-adult-control` 자체와는 다른 조건이다. `traitMode`는 `presetId`·`traits`와 함께 줄 수 없고 v1 카탈로그에서는 거절한다. 기준 프로필 슬롯은 readiness의 `missingSlots`에 생성 요청과 함께 포함되며, 기본 인물당 조건 2 × seed 수(이 예시는 40개) trace가 더 든다. 성향 대비·`groups`·블라인드 묶음에서는 빠지고 보고서에 `excludedBaselineTraces`가 표시된다. 위치 분류(`high-only-shift`·`low-only-shift`·`both-shift`·`baseline-beyond-range`·`indistinguishable`)는 모델의 기본 경향일 뿐 실제 사람의 평균이나 정상 범위가 아니다. 뒷부분에는 과제 단계 효과가 섞이므로 `contrastAttenuation`만으로 성향 감쇠를 확정하지 않는다. 정의와 한계는 [명세 v3 절차](../market-persona-skill/references/persona-validation.md#명세-v3--기준-프로필과-앞뒤-성향-유지-설명-지표)를 따른다.
-
-### 기존 다섯 축과 공통 절차
-
-다음 다섯 축 설명은 v1과 v2에서 공통으로 유지한다. v1의 다섯 축 예시는 버전을 생략해 새 v2 run에 사용하면 추가 네 축이 `medium`으로 채워진다. 새 v2 비교에서는 나머지 여덟 축이 같아야 하며, 아래의 “나머지 네 성향”과 다섯 축 답안은 v1 설명이다.
-
-새 run은 `validationMode:"traits"`로 명시할 수 있다. `profiles`는 `{id, basePersonaId, schemaVersion?, presetId?, traits?, label?}` 형식의 1~32개 인물이고 `personaIds`와 함께 쓰지 않는다. `basePersonaId`는 기존 세 인물 또는 `neutral-adult-control`이며, 유형 기본값에 `traits`의 일부 축을 덮어쓴다. 유형을 생략하면 모든 축은 `medium`에서 시작한다. 사용자 정의 ID는 경로에 안전한 소문자 영문·숫자·`_`·`-` 1~64자이고 첫 글자는 영문 또는 숫자여야 하며 기존 ID와 겹치지 않아야 한다.
-
-| 성향 키 | 의미 | 수준 |
-| --- | --- | --- |
-| `deliberation` | 선택 전 후보·조건 숙고 | `low / medium / high` |
-| `checking` | 목록·수량·장바구니 확인 | `low / medium / high` |
-| `exploration` | 새로운 단서·관심 상품 탐색 | `low / medium / high` |
-| `persistence` | 어려움 뒤 지속·전략 변경 | `low / medium / high` |
-| `helpSeeking` | 불확실할 때 도움 활용 | `low / medium / high` |
-
-유형 ID는 `deliberate-checker`(숙고·확인형), `quick-satisficer`(신속 결정형), `curious-explorer`(탐색·호기심형), `familiar-routine`(익숙함 선호형), `help-seeker`(도움 활용형)다. [카탈로그](validation/persona-traits.json)에 수준별 지침과 기존 인물의 설계 매핑을 저장한다. 이 유형·수준은 심리검사 점수가 아니다. 성향을 바꿔도 기본 인물의 숫자 인지·반응·보행 기준, 상품 취향과 친숙함은 유지한다. 새 배우 지시문은 기존의 상충하는 성격 서술을 공통 성향 지침으로 대체하며 원본 인물 파일은 바꾸지 않는다.
-
-숙고는 실제 관찰한 관련 후보·복수 조건을 살필지, 확인은 다음 목표 전환·불확실한 수량·결제 시 어떤 정보를 대조할지에 반영한다. 낮은 수준도 필요하면 확인할 수 있고 모든 수준은 충분히 명확해지면 멈춘다. 고정된 행동·실수·도움 횟수를 요구하지 않는다. 닫기·이동·대기나 `check` 표기만으로 실제 확인을 대신하지 않는다. 같은 페이지의 후보를 살필 수 있지만 별도 UI 행동 없는 설명은 배우 선언이며 독립적으로 측정한 비교 행동이 아니다.
-
-새 사용자 정의 프로필 버전 `traits-2-<hash>`는 실제 프롬프트를 포함한 작성 내용을 반영한다. 수행 기준·취향·경험이 같으면 비교용 `contextHash`는 유지된다. 카탈로그·작성 지침 변경 후에는 새 runId와 bundle을 사용한다. 과거 저장 자료는 다시 쓰지 않으며, hash가 달라진 과거 run을 현재 코드로 그대로 재측정할 수 있다는 뜻은 아니다.
-
-새 run은 **조건별 seed 20개 이상**을 권장한다. 20개 미만도 허용하며 준비 응답의 `powerWarning`에 표시한다. 절차는 준비 → `check_persona_validation_readiness({runDirectory})` → 부족 슬롯의 `prepareWholeTrace`로 생성 → readiness 재확인 → measure → 다중 블라인드 → report다. readiness는 인물×조건 완료 수, 대조군·짝 불일치, 지표별 최대 유효 쌍 상한과 부족 슬롯을 읽기 전용으로 반환한다. 대조군 또는 비교 가능한 쌍이 없으면 측정 응답과 보고서 상단에 `readiness:"blocked"`와 이유를 기록한다. v3의 비교 기준은 같은 맥락·단일 성향 대비 프로필이다.
-
-검증 전용 snapshot은 `scripts/build-validation-snapshots.cjs`로 새 디렉터리에 만들며 기존 snapshot을 덮어쓰지 않는다. 준비 manifest의 `opportunityAudit`는 구조적 기회와 불가능 경고를 기록한다. 구조적 가능성이 실제 노출·오류·회복을 보장하지는 않는다.
-
-앞뒤 기회를 비교하는 별도 설계에는 `--low-goal-count 3`으로 low 목표를 우유·사과·생수 각 1개로 고정할 수 있다. high는 기존 5개 목표와 수량을 유지하며 배치·재고·화면 조건은 바꾸지 않는다. 옵션을 생략한 과거 기본은 2개다. `snapshot-set.json`의 `design`에 실제 목표 수와 목표를 한 번씩 순차 선택했을 때 가능한 전환 수를 기록한다. 목표 2개를 정상적으로 한 번씩 구매하면 `postSelectionListRate`의 기회는 1개뿐이므로 앞뒤 분할에 충분하지 않다. 목표 3개도 실제 도달·구매·전환을 보장하지 않는다. 이 변경은 새 snapshot·새 run에만 적용하고 과거 결과와 같은 조건으로 합치지 않는다.
-
-해당 traits v2 run의 `prepare_persona_validation`에도 `lowGoalCount:3`을 명시한다. manifest의 `taskDesign`/`taskDesignHash`가 low 3/high 5 구성과 snapshot 목표 수를 고정하며 준비·readiness·측정·보고서에 이어진다. 미지정 기본은 low 2/high 5이고, 기존 run에 옵션을 나중에 바꿔 붙이지 못한다. legacy·traits v1은 이 옵션을 거절한다. v3 판정 명세와 specHash는 그대로 유지한다.
-
-새 `sequenceMetrics`는 대기시간 분포·전이·오류 근거·회복·반복을 설명하며 `descriptiveOnly:true`다. `pooledAnalysis`는 low/high 층화 쌍 부트스트랩, `powerAnalysis`는 고정 seed의 가정 기반 검정력이며 둘 다 주 판정에 사용하지 않는다. 유효 쌍 8·|delta| ≥ 0.33·95% CI의 0 제외·플래그 10%는 유지한다. **실수 강제 금지**: 오류가 많다고 장애 특성에 충실하다고 해석하지 않는다.
-
-다중 판별은 준비·제출의 `reviewerId`, 제출의 `reviewerKind:"llm"|"expert"`로 구분하고 판별자마다 A 채점 뒤 B, 채점 답안 동결을 지킨다. `blindReviews`에 판별자별 점수, `interReviewerAgreement`에 Cohen’s κ(2명)/Fleiss’ κ(3명 이상)를 보고한다. 기존 단일 `blind-review.json`도 읽는다. [전문가 안내](../market-persona-skill/references/blind-review-guide.ko.md)와 [상세 입출력·한계](../market-persona-skill/references/persona-validation.md)를 따른다. 실제 사람 자료는 수집·비교하지 않으며 `referenceComparison:null`과 [확장 메모](../docs/ai/persona-validation/persona-validation-extension-design.md)만 남긴다. 기존 spec 원문은 validation/archive에 보존하고 새 명세(legacy v3/traits v2)는 새 run에만 적용한다.
-
-다음 `prepare_persona_validation` 예시는 같은 기본 맥락에서 확인 성향만 다른 두 인물을 준비한다. 8개 seed × 2조건 × 2인물 = 32칸을 만들며 모델 생성은 자동 실행하지 않는다.
-
-```json
-{
-  "validationMode": "traits",
-  "runId": "checking-contrast-01",
-  "outputDirectory": "/absolute/output",
-  "snapshotFilePaths": {"low":"/absolute/low.json","high":"/absolute/high.json"},
-  "seeds": ["s01","s02","s03","s04","s05","s06","s07","s08"],
-  "profiles": [
-    {"id":"checking-low","basePersonaId":"neutral-adult-control","presetId":"deliberate-checker","traits":{"checking":"low"}},
-    {"id":"checking-high","basePersonaId":"neutral-adult-control","presetId":"deliberate-checker","traits":{"checking":"high"}}
-  ]
-}
-```
-
-반환된 각 `slot.prepareWholeTrace`를 그대로 사용한다. **슬롯마다 새 `gpt-6-luna / low` 문맥**에서 bundle 하나의 전체 계획을 작성·제출하며, 다른 인물·조건·검증 점수를 함께 주지 않는다. 사용자 정의 인물은 검증 manifest에 바인딩된 전체 계획 scope에서만 사용할 수 있고 일반 인물 목록·확률/증분 생성·learner 등록으로 확대되지 않는다. first-play만 사용하며 앱 재생은 별도 요청과 절차다.
-
-새 `authoringGuide` v2는 읽고 선택한 열린 목표와 실제 관찰한 상품의 focus 예시를 제공한다. `null` 예시를 모든 결정에 복사하거나 실제 선택 오류를 정답에 맞춰 수정하지 않는다. 닫기 예시는 그 자체로 확인이 아니다. candidate의 최상위 키는 `candidateVersion`, `requestId`, `decisions` 세 개뿐이다. 입력 식별용 `inputHash`·`snapshotId`·`personaId`·`seed`는 candidate에 추가하지 않는다.
-
-저장 후 `measure_persona_validation({runDirectory})`를 호출한다. 비교 쌍은 `contextHash`가 같고 나머지 네 성향이 같을 때만 만들어지며 동일 조건·seed에서 실제 평가 기회가 있었던 표본을 사용한다. 높은 설정 수준 대비 낮은 수준을 비교하므로 `high-low`뿐 아니라 `high-medium`, `medium-low`도 포함한다. 여러 유형이 함께 다른 집단의 집계는 설명적이다. 위 예제에서 효과 비교 대상은 확인 성향뿐이다. 같은 seed는 비교 식별자이며 native 모델 난수·동일 출력을 보장하지 않는다. 유효 쌍 8개 기준은 생성 슬롯 8개와 다르다. Cliff’s delta는 두 집단 전체 분포를 비교하고 부트스트랩은 seed 쌍을 함께 재표집한다. 인접 수준에도 같은 |delta| ≥ 0.33 기준을 적용하며, 이는 아직 실험적으로 보정하지 않은 설계값이다.
-
-보고서는 네 축을 나눈다: 기술적으로 저장된 trace·누락 슬롯, **전체 목표**의 시도·충족·미시도·종료 결과, 성향 표현, 실제 평가 기회와 근거 충분성. 어려움의 관찰 근거 없이 미완료 목표를 남기고 포기하면 검토 신호를 남기며 자동 성격 실패로 처리하지 않는다. 시도한 목표의 불일치율을 전체 목표 달성률과 혼동하지 않는다. 도움 사용·낮은 정확도·오류/관심 횟수의 분산 0은 검토·정보 신호이며 자동 실패가 아니다. 금지 패턴 실패는 명시된 위반에만 적용한다. 관찰된 행동·작성된 시간·배우 선언도 구분한다. 누락 슬롯에는 미시도와 기술 실패가 함께 포함되므로 별도 요청 기록 없이 생성 실패율을 추정하지 않는다.
-
-작성 가이드 v2 자료의 제출 결과와 `.persona-review.json`에는 선택적 `annotationReview`(`reviewVersion:"actor-annotation-v1"`)가 있다. 닫기와 `check` 표기·focus 불일치에 대해 자체 `status`, `findings`, 결정별 근거, `improvementTarget`, `recommendation`을 제공한다. 상위 review가 `clear`여도 별도 주석 검토는 `review`일 수 있으므로 각각 읽는다. 과거 가이드에 항목이 없다는 사실을 통과로 해석하지 않는다. 검토 신호는 주석 보완용이며 행동 변경·추가 확인·성향 실패를 요구하지 않는다.
-
-측정의 `measurements.perTrace[i].annotationReview`와 JSON 보고서 `annotationReviews[{personaId,condition,seed,tracePath,review}]`에 이 결과를 전달하고, 항목이 없으면 검토 값을 `null`로 둔다. 한국어 보고서 **행동·focus 주석 정합성**에는 발견 근거와 권장 조치가 표시된다.
-
-성향 주 판정은 `behavioralEvidence`만 사용하고 `authoredTiming`은 별도로 보고한다. 작성 시간 차이가 행동 근거의 부족을 보충하지 않는다. 관찰된/예상 비교 수(`exercisedComparisons / expectedComparisons`)를 표시하며, 일부 행동 비교가 미발생이면 나머지가 모두 pass여도 `partial`이다. 모두 미발생이면 `unexercised`, 표본 부족이 하나라도 있으면 `insufficient`로 남긴다.
-
-`prepare_blind_review({runDirectory,panel:"A"})`는 공통 `traitRubric`, `publicStyles`와 익명 판을 제공한다. 새 판별 문맥은 이것만 읽고 개인별 프로필·manifest·정답 키·측정 결과는 읽지 않는다. A는 행동·시간, B는 여기에 이유를 더하며 A 채점 후 B를 준비한다. B 판단 전에 A 점수·정답을 알려주지 않는다. 새 모드의 `submit_blind_review` 답안은 인물 ID 대신 다음 형식이며 실제 판의 모든 opaque ID를 포함해야 한다.
-
-```json
-{
-  "runDirectory": "/absolute/output/checking-contrast-01",
-  "panel": "A",
-  "answers": {
-    "opaque-id-from-panel": {
-      "traits": {"deliberation":"medium","checking":"high","exploration":"unknown","persistence":"unknown","helpSeeking":"unknown"},
-      "confidence": 0.6
-    }
-  },
-  "reviewerModel": "self-reported-model",
-  "reviewerSession": "self-reported-new-session"
-}
-```
-
-다섯 축마다 `low / medium / high / unknown`을 답한다. `confidence`는 선택적 0~1이다. `unknown`은 정확도의 분모에 남으며, 축별 정확도와 판별 비율을 함께 보고한다. 고정된 25% 우연 정확도나 장애 분류를 적용하지 않는다. A/B는 같은 표본이고 독립적인 두 반복이 아니며 판별 세션의 독립성·정답 미열람은 자기 신고다. 마지막 `persona_validation_report({runDirectory})`가 JSON·한국어 보고서를 저장한다.
-
-새 공통 성향 run은 manifest `version:3`이다. `profiles`와 `personaIds`를 모두 생략하면 기존 세 인물을 설계 성향에 매핑한다. 기존 네 ID를 모두 전달하는 과거 `personaIds` 형식은 모드를 생략하면 legacy로 유지한다. 같은 네 ID에 공통 성향을 적용하려면 `validationMode:"traits"`를 명시한다. `validationMode:"legacy"`와 저장된 v2 run은 [기존 네 인물 고정 검증](../market-persona-skill/references/persona-validation.md#legacy-v2--기존-네-인물-고정-검증-절차와-구현-기록)을 유지하며 v2/v3 자료를 섞지 않는다.
-
-공통 성향 구현 테스트와 `allowFixture:true` 자료는 파이프라인 확인용이다. 이번 지침 보완으로 새 LLM 실험의 행동 개선 효과를 입증한 것은 아니며, 계획 검증은 실제 앱 수행·DB 수신·사람 행동의 타당성을 증명하지 않는다.
-
-## Luna 전체 계획 생성
-
-실제 Codex 세션을 `gpt-6-luna` / `low`로 설정하고 지속형 MCP 또는 `node market-simulator/cli.cjs interactive`에서 실행한다. 배우와 분리한 오프라인 요청 호스트는 아래 `host-start`로 시작할 수 있다. MCP는 모델을 전환하거나 Luna 세션을 자동 생성하지 않는다. 다른 모델의 감독 세션은 사용자가 이양을 허용한 기존 Luna 세션에 전체 계획 작성을 맡긴다. 서버의 모델 라벨은 실제 세션 설정·내부 API 호출 횟수의 증거가 아니다. 전체 계획 생성에는 학교 Qwen 서버·API 키·SSH 터널이 필요하지 않으며 앱 재생·분석은 기존 서비스 연결을 사용한다.
-
-한 인물·한 조건·한 seed·한 request/bundle마다 새 actor 작성 문맥을 사용하고 저부하·고부하 bundle을 같은 문맥에 함께 주지 않는다. `requestId`·`bundle.inputHash`를 후보 출처로 기록하고 새 `bundle.authoringGuide`(`authoringVersion:"2"`)의 식별 정보·문법·상태 전이 예제를 확인한다. 저장된 가이드 v1은 그대로 보존한다. 호스트 MCP는 여러 요청을 관리할 수 있지만 서버가 actor 문맥 분리를 강제하거나 입증하지는 않는다. `taskUpdate`는 한 건도 배열이며 `basis.intent`와 `actorState.activity`의 허용값은 서로 다르다. 직전 행동 결과와 같은 결정의 taskUpdate를 반영한 행동 직전 상태를 작성한다. 세부 규칙은 [작성 시점과 문법 확인](../market-persona-skill/references/whole-trace.md#작성-시점과-문법-확인)을 따른다.
-
-1. `prepare_whole_trace({personaId,seed,tabId})` 또는 시작 전 `snapshot`/`snapshotFilePath`로 불변 입력 패키지를 준비한다. 출력은 `{requestId,bundle}`이다. `outputPath`, `learnerFile`, `maxRepairs`도 지정할 수 있다.
-2. Luna는 전체 맵·상품·재고·목표를 다음 화면과 행동 결과를 예상하는 세계 참고 자료로 사용한다. 인물의 선택에는 그 시점에 보이는 단서·발견 기억·같은 프로필 JSON의 상세 개인 지침을 사용해 **전체 행동 배열과 단계별 상태·근거를 직접** 작성한다. 아직 읽지 않은 목록·열지 않은 상품 페이지·화면 밖의 미발견 위치는 인물이 알고 있는 사실이 아니다. 코드가 행동마다 정답이나 확률 선택을 대신 넣지 않는다.
-3. `submit_whole_trace({requestId,candidate})` 또는 `{requestId,candidateFilePath}`로 전체 배열을 제출한다. Node가 기존 attention loop·`projectDecision`·`TraceGuard`·게임 어댑터로 컴파일하고 최종 구조/의미 검증 후 파일을 저장한다. 정상 흐름에서는 별도 finalize가 필요 없다. `whole_trace_status({requestId})`로 상태와 저장 결과를 다시 확인할 수 있다.
-4. 요청이 생성·검증뿐이면 파일 저장에서 끝낸다. 앱 실행까지 요청받았다면 `validate_trace` → `play_trace` → `replay_status`로 전체 trace를 전달하고 실제 실행을 확인한다.
-
-#### 결정별 오프라인 작성
-
-작성 JSON은 `node market-simulator/cli.cjs author-whole request.json` 또는 `node market-simulator/cli.cjs author-whole - < request.json`으로만 전달한다. JSON은 `{contextFilePath,operationId,tool,arguments}`이며 스크립트 경로나 추가 위치 인자는 받지 않는다. 준비 담당자가 저장한 `context.json`에서 전송용 `hostDirectory`·`requestId`를 읽고, 요청 최상위나 arguments에 두 값을 다시 적으면 값이 같아도 `AUTHORING_CONTEXT_OVERRIDE`로 연결 전에 거절한다. 파일 입력의 상대 contextFilePath는 그 요청 파일 디렉터리, stdin은 현재 작업 디렉터리 기준이며 context 내부 상대 hostDirectory는 context 파일 디렉터리 기준이다.
-
-예를 들어 작성 시작 입력은 `{"contextFilePath":"context.json","operationId":"authoring-begin-1","tool":"begin_whole_trace_authoring","arguments":{"maxRewritesPerDecision":3}}`이다. 같은 준비 요청에서 `begin_whole_trace_authoring` → `whole_trace_authoring_menu` / `append_whole_trace_decision` → `finish_whole_trace_authoring` → `submit_whole_trace`를 사용한다. append의 arguments는 `{decision}`, finish·상태 조회는 `{}`, 제출은 `{candidate}` 또는 `{candidateFilePath}`다. candidate·repair 내부의 requestId와 모든 행동·상태 값은 그대로 기존 검증기에 전달하며 누락·불일치를 자동 수정하지 않는다. 전송 안내는 `transportRevision:"prepared-context-v1"`로 구분한다.
-
-결정마다 기존 실행 검증기를 접두 구간에 재사용한다. 거절 시 같은 결정을 기본 최대 3회 다시 쓰며 `maxRewritesPerDecision`으로 설정한다. 이 예산은 최종 제출 뒤 `maxRepairs`와 별도다. 메뉴의 압력/상태·관찰 상품·열린 목표는 참고용 계산값으로, 보조기는 `uncertainGoalIds` 등 행동·상태 선언을 채우거나 수정하지 않는다. 기본 압력은 직전 활동·추가 지연 0 기준이며 AI가 작성한 다음 활동/지연으로 별도 조회할 수 있다. 결과와 `authoring.jsonl`, 호스트 저널에 첫 시도 통과·재작성 횟수·거절 규칙을 기록한다. [입력 형식과 같은 결정 재작성](../market-persona-skill/references/whole-trace.md#결정별-실행-검증과-재작성)을 따른다.
-
-메뉴의 `presentationRevision:"current-choice-menu-v1"`은 `interactionContext`로 매대·장바구니·도움말·직원·계산대 등 현재 메뉴를 설명하고, `availableChoices`에 기존 `choiceIds`와 같은 순서의 행동 이름을 표시한다. `view:"world"`에서도 매대가 열려 있을 수 있다. 전역 catalog나 activeStation만으로 선택 가능 여부를 추론하지 않고 매 결정의 최신 `choiceIds`를 따른다. 거절 응답의 `rewrite`는 같은 결정의 재작성 대기(`awaiting-rewrite`) 또는 소진(`exhausted`), 수락된 결정 수, 남은 횟수를 명시한다. `canRetry:true`는 전체 실패가 아니다. AI가 기존 의도를 유지하며 그 결정의 기술 오류를 다시 작성할 수 있고, 보조기는 대체 행동을 추천·삽입하거나 상태를 채우지 않는다. 수락된 앞부분과 기존 판정·최종 수정 예산은 유지한다.
-
-이전 anchor 실행 메뉴의 `currentObservation`은 `kind:"validated-prefix-observation-v3"`, `acceptedDecisionCount`, `notice`, `observation`과 선택적 `readObjectives`를 제공한다. `observation`은 접두 검증의 공용 `observeActor()`가 반환한 현재 화면 그대로다. 보이는 먼 매대 표지(`near:false`)와 열 수 있는 매대를 구분하고 현재 상품·도움말·화면 단서를 누락 없이 전달한다. 미관찰 상품·목표·지도·추천 경로를 추가하지 않고 기존 선택지 집합·순서를 보존한다. 과거 목록 전용 v1과 구분하며 명시적 directional-v2는 기존 관찰 v2를 유지한다. `readObjectives`는 현재 관찰의 호환 별칭이다. 수락된 `readList` 다음 한 관찰에만 목록이 표시되고, 다음 행동 수락 후 기존 수명대로 갱신된다. 필드 생략은 현재 미표시, `[]`는 표시된 빈 목록이며 과거 목록이나 worldReference로 채우지 않는다. 메뉴 조회·활동/지연 미리보기·거절은 관찰을 소비하지 않는다. `advisory.goalFields:[]`는 활성 기억 필드 없음, `openGoalIds:[]`는 열린 목표 없음, `observedProductIds:[]`는 관찰 상품 없음을 뜻한다. 목록이 표시됐지만 아직 목표를 선택하지 않았다면 이 배열들이 비어 있어도 정상이다. AI가 기존 계약에 따라 목표 선택과 상태를 직접 선언하며 보조기는 자동으로 채우지 않는다.
-
-새 독립 anchor 요청은 `observationVersion:"anchor-visible-structures-v1"`과 `validated-prefix-observation-v4`를 기록한다. 실제 그림 일부가 보이지만 이름표는 읽을 수 없는 진열대는 `visibleStructures`에 `kind:"shelf"`, 일반 라벨, 현재 방향·거리만 표시한다. 화면/HUD에 가린 몸체는 제외하며 카테고리·상품·station ID·좌표·추천 경로는 제공하지 않는다. 이 단서는 현재 관찰에서만 유효하고 다음 관찰에서 사라지면 기억 원장에도 남기지 않는다. 몸체가 보인다는 사실이 매대 열기 가능을 뜻하지 않으며 기존 near 조건·행동 집합을 유지한다. 계약은 inputHash·trace generation·knowledge audit에 연결된다. marker 없는 저장 bundle/trace와 기존 directional·학습 trial은 원래 관찰을 유지한다.
-
-`current-choice-menu-v2`는 같은 메뉴의 `visibleWalkChoices`에 이미 있던 현재 통로 라벨·방향·거리를 `availableChoices`의 해당 이동 ID 옆에도 표시한다. 새로운 장소 정보·추천·좌표를 추가하지 않고 ID·순서·비이동 선택지·행동·시간·종료를 바꾸지 않는다. 저장된 v1 또는 marker 없는 bundle의 메뉴는 기존 표현을 유지한다. 두 표현 수정의 성능 효과는 새 독립 수집으로 확인하며 과거 trace를 재작성하거나 결과가 나올 때까지 반복하지 않는다.
-
-
-`finish`는 이미 작성한 전체 계획의 최종화다. 종료 없는 100행동 미만 계획을 최종화하면 `AUTHORING_INCOMPLETE_FINALIZATION`으로 원본 수락 prefix를 보존하고 요청을 기술 실패로 닫는다. 그 뒤 새 `giveUp`을 추가하거나 begin·submit·repair로 재개할 수 없다. 작성 중 선택한 자발적 종료는 그대로 허용하며, 아직 거절된 결정의 기술 재작성 대기(`AUTHORING_REWRITE_PENDING`)는 기존 한도에서 유지한다. 이 구분은 `finalizationContract:"incomplete-finalization-fails-request-v1"`로 기록한다.
-
-### 방향 이동 v2 작성 예시
-
-기본 whole-trace는 기존 waypoint 메뉴를 유지한다. `movementVersion:"directional-v1"`은 8방향 조작을 추가하고, `movementVersion:"directional-v2"`는 결정별 prefix 실행 뒤 정확한 연속 위치로 다음 관찰·메뉴까지 갱신한다. v1의 `D<결정 번호>` 계약과 저장 입력은 바꾸지 않는다. v2에서도 8방향은 world 조작이 가능하면 모두 제공하며 HUD·화면 가장자리 가림은 기존 인지 정보에만 적용한다. 실제 충돌과 이동은 기존 motor를 사용하고 `walk` 지름길도 유지한다. 별도 `movementFeedbackVersion:"recent-movement-v1"`을 함께 지정하면 최근 적용 이동의 문장과 현재 보이는 통로의 방문 표시만 추가한다. 이 메모는 방향을 추천하거나 선택지를 제거하지 않는다.
-
-`movementFeedbackVersion:"recent-movement-anchor-v1"`은 `movementVersion`을 생략한 anchor 이동과 `observationVersion:"anchor-visible-structures-v1"` 계약에서만 켠다. 관찰 계약은 새 독립 anchor 요청에서 자동으로 정해지며 기본값은 꺼짐이다. 최근 24행동 안의 자기 accepted 도착 기록을 현재 보이는 걷기 선택지에 ` · 최근에 N번 간 통로`와 `recentVisit:{timesArrived:N}`으로 표시하고, 같은 창의 이동 경험을 `movementNotes`로 전달한다. 선택지 ID·순서·가용성은 유지하며 표시와 메모는 권고가 아니다. `prepare_persona_validation`에서는 별도 실행 설정에 `movementValidationVersion:"1"`과 이 옵션을 지정하며 명세 JSON은 바꾸지 않는다.
-
-`movementFeedbackVersion:"recent-movement-anchor-capacity-v1"`은 같은 anchor 조건에서만 켜는 별도 옵션이다. 기존 24행동 보존 창에 더해 선택된 페르소나의 `spatialMemoryCapacity`를 최근 도착한 서로 다른 통로 수의 상한으로 쓴다. 용량을 넘으면 마지막 accepted 도착이 가장 오래된 통로의 횟수 기록을 모두 지우며, 다시 도착하면 1회부터 센다. 보기만 하거나 메뉴를 조회한 것은 최근성을 갱신하지 않는다. 방향별 `movementNotes`의 24행동 창은 그대로이며 이동 권고·선택지 변경은 없다. 기본 페르소나 값은 모두 96곳이므로 현재 창에서 용량 제한은 걸리지 않는다. 이 값은 합성 구현 설정이며 실측 기억 능력이 아니다. 기본값과 기존 두 피드백 버전은 바꾸지 않는다.
-
-다음은 독립 호스트에서 준비하는 예시다. 부모 디렉터리가 존재하는 새 호스트 경로와 실제 시작 전 snapshot을 사용한다.
-
-```sh
-node market-simulator/cli.cjs host-start /absolute/new-host-directory
-node market-simulator/cli.cjs host-status /absolute/new-host-directory
-node market-simulator/cli.cjs host-call /absolute/new-host-directory --options-file /absolute/prepare-call.json
-```
-
-`prepare-call.json`:
-
-```json
-{"operationId":"prepare-directional-01","tool":"prepare_whole_trace","arguments":{"personaId":"mild-intellectual-disability-adult","seed":"directional-v2-01","snapshotFilePath":"/absolute/mission.snapshot.json","outputPath":"/absolute/directional-v2-01.trace.json","movementVersion":"directional-v2","movementFeedbackVersion":"recent-movement-v1","maxRepairs":0}}
-```
-
-반환된 실제 requestId와 같은 hostDirectory를 `/absolute/context.json`에 저장한다. 이미 있는 hostId·inputHash 등 출처 필드는 보존한다.
-
-```json
-{"hostDirectory":"/absolute/new-host-directory","requestId":"RETURNED_REQUEST_ID"}
-```
-
-작성 시작 요청 파일은 `{"contextFilePath":"/absolute/context.json","operationId":"begin-01","tool":"begin_whole_trace_authoring","arguments":{"maxRewritesPerDecision":3}}`이다. 모든 작성 호출은 `node market-simulator/cli.cjs author-whole /absolute/request.json`으로 전달한다. 다음은 시작 world 메뉴에서 북쪽 방향을 직접 선택한 append 파일의 완전한 형태다. 시간과 상태는 예시이며 실제 배우가 현재 상황에 맞게 작성한다.
-
-```json
-{"contextFilePath":"/absolute/context.json","operationId":"move-01","tool":"append_whole_trace_decision","arguments":{"decision":{"choiceRef":{"choiceId":"moveDirection/north","durationMs":700},"delayMs":900,"reason":"위쪽으로 잠시 걷는다.","basis":{"intent":"explore","goalId":null,"memoryUses":[]},"actorState":{"activity":"orient","task":"통로를 살피며 걷기","heldGoalIds":[],"uncertainGoalIds":[],"focusedGoalId":null,"focusedProductId":null,"orientation":"unfamiliar"}}}}
-```
-
-source는 작성자가 공급하지 않는다. 서버가 채운 source.location은 `P`로 시작하는 위치 참조, navigationStateId는 `nav-v2-`로 시작하는 상태 참조다. 내부 연속 좌표·고정 입력·직원 상태·표시 조건에 묶인 불투명한 값이며 좌표나 경로로 해석하지 않는다. 다음 응답 발췌는 형태만 설명하며 실제 이동·선택지는 snapshot과 충돌 결과에 따라 달라진다.
-
-```json
-{"accepted":true,"menu":{"expectedSource":{"location":"P<opaque hash>","navigationStateId":"nav-v2-<opaque hash>","phase":"shopping","view":"world","activeStation":null,"pageIndex":null},"currentObservation":{"kind":"validated-prefix-observation-v2","acceptedDecisionCount":1,"notice":"현재 prefix 실행의 표시 정보","observation":{"schemaVersion":"attention-observation-v1","phase":"shopping","view":"world","activeStation":null,"visibleStations":[],"anchors":[],"products":[],"shelf":null,"listAvailable":true,"cart":null,"cashiers":{}}},"movementResult":{"actualDirection":"north","progress":"full","blocked":false},"movementNotes":[]}}
-```
-
-공개 메뉴에는 내부 좌표·픽셀 이동량·전역 지도·숨은 목적지를 넣지 않는다. `movementResult`는 실제 이동 방향 또는 `null`, 진행 결과 `full|partial|blocked`, 막힘 여부를 전달한다. 새 관찰에서 실제 표시된 표지·매대·직원·상품만 후속 판단에 사용하며, 최신 `choiceIds`에서 다음 조작을 고른다. 방향 이동의 `choiceRef.durationMs`는 100~2000 정수이고, 판단 지연인 `delayMs`와 별개다. v2는 위치를 waypoint로 스냅하거나 충돌을 우회하는 경로를 추가하지 않는다.
-
-`full`은 입력이 충돌 제약 없이 적용됐다는 뜻이고 목적지 도착을 뜻하지 않는다. `partial`은 충돌로 일부 이동이 제한된 경우, `blocked`는 실제 이동량이 없는 경우다. 막힘 여부 `blocked:true`는 부분 제약에도 표시한다. 이동량이 0이면 `actualDirection:null`이며, 벽을 따라 미끄러진 경우에는 입력 방향 대신 실제 변위 방향을 반환한다.
-
-배우가 원래 종료 의도까지 작성한 뒤 같은 context로 `finish_whole_trace_authoring`(`arguments:{}`), 반환된 candidate의 `submit_whole_trace`를 호출한다. 제출 전에는 `host-status`로 같은 호스트를 확인하고, 최종 제출은 수락된 prefix를 다시 실행해 source와 선택지를 검증한다. 완료 후 `node market-simulator/cli.cjs host-close /absolute/new-host-directory`로 종료한다. 재전송은 아래 호스트 수명 규칙을 따르며, v2를 기존 trial·persona validation slot에 덧붙여 조건을 바꿀 수 없다.
-
-### 검증 run에 이동 옵션 고정하기
-
-새 검증 run에서만 `movementValidationVersion:"1"`을 명시해 이동 계약을 고정할 수 있다. `prepare_persona_validation`에 다음 옵션을 공통 인물·snapshot·seed 설정과 함께 전달한다. 서로 다른 실험군은 서로 다른 새 `runId`를 사용한다.
-
-| 실험군 | 추가 입력 |
-| --- | --- |
-| 기존 통로 이동 대조군 | `{"movementValidationVersion":"1"}` |
-| 연속 위치 방향 이동군 | `{"movementValidationVersion":"1","movementVersion":"directional-v2"}` |
-| 최근 이동 단서까지 제공하는 별도 실험 | 위 방향 이동 입력에 `"movementFeedbackVersion":"recent-movement-v1"` 추가 |
-
-예를 들어 원본 네 인물을 유지하는 16칸 방향 이동 run의 interactive CLI 입력은 다음과 같다. 이는 준비 예시이며 모델 생성은 실행하지 않는다. 같은 16칸 대조군은 새 `runId`에서 `movementVersion`만 생략한다. `validationMode:"legacy"`를 명시하므로 traits v2 지침을 원본 인물에 추가하지 않는다.
-
-```json
-{"tool":"prepare_persona_validation","arguments":{"validationMode":"legacy","runId":"directional-16-new","outputDirectory":"/absolute/output/new-pilot","snapshotFilePaths":{"low":"/absolute/low.snapshot.json","high":"/absolute/high.snapshot.json"},"personaIds":["mild-intellectual-disability-adult","careful-checker","quick-decider","neutral-adult-control"],"seeds":["idblind-20261031-current-001","idblind-20261031-current-002"],"movementValidationVersion":"1","movementVersion":"directional-v2"}}
-```
-
-준비 또는 readiness가 반환한 각 슬롯의 `prepareWholeTrace`를 그대로 사용한다. marker·이동·단서 옵션은 manifest와 모든 슬롯, 준비 요청, bundle, trace generation, knowledge audit에서 같아야 한다. 누락·혼합·기존 run에 사후 추가는 거절한다. 원본 네 인물과 traits 프로필 경로 모두 같은 계약을 사용하며, `directional-v1`·학습 trial에는 이 검증 옵션을 붙일 수 없다. 새 검증 계약의 candidate는 7만 지원한다. 옵션이 없는 기존 버전의 지원 목록과 manifest·trace·측정·보고서에는 필드를 추가하지 않는다.
-
-옵션을 켜면 서버가 수락된 각 결정의 실제 메뉴와 이동 전후 불투명 위치 ID를 `knowledge-audit`의 `navigationEvidence`(`continuous-route-v1`)에 기록한다. 연속 좌표를 격자에 맞추거나 가까운 통로로 추정하지 않는다. 도착은 이미 실제 메뉴에 제공된 anchor와 실행 후 위치가 앱의 도착 허용 거리(1px) 안에 있을 때만 확인하며, 이 분석 증거로 배우 관찰에 숨은 정보를 추가하지 않는다.
-
-`routeRelianceRate`는 방문·미방문 anchor가 함께 제공된 메뉴에서 실제 `walkToAnchor`를 선택한 경우만 분모로 센다. 목적지가 정해지지 않은 `moveDirection`은 해당 비율에서 제외하고 입력 수, 혼합 메뉴에서의 입력 수, 정확히 같은 위치로 돌아온 수, 차단·부분 차단 수, 확인된 anchor 도착 수와 step ID를 별도 진단에 남긴다. 방향 이동의 확인된 도착은 이후 통로 선택의 방문 근거가 된다. 위치·메뉴·실행 결과의 연결이 없거나 모순되면 `null`/`unexercised`와 이유를 남긴다. 같은 위치로 돌아왔다는 사실만으로 익힌 동선을 고수했다고 판정하지 않는다.
-
-legacy와 traits v1의 기존 판정은 유지하고, 새 `movementOpportunities`에 아홉 축의 관찰 기회(11개 지표)와 coverage를 설명용으로 추가한다. traits v2는 명시적 옵션 안에서 새 경로 근거를 사용한다. 보고서 JSON/Markdown에 계약과 기회 표가 포함된다. 기존 어려움·지속·도움 요청 판정과 반복 선택 정의는 그대로여서, 수락됐지만 벽에 막힌 방향 입력을 자동으로 어려움 기회로 세지는 않는다. 이 한계는 파일럿 해석에 함께 기록한다. 두 seed의 소규모 실험으로 성향 차이의 통계적 지지를 주장하지 않는다.
-
-## 오프라인 요청 호스트의 수명
-
-macOS/Linux에서 `host-start`는 호출자의 stdin을 받지 않는 독립 프로세스를 시작한다. 배우 작업이나 `host-call` 클라이언트가 끝나도 준비한 요청은 같은 호스트 메모리에 남는다. 호스트 디렉터리는 부모가 존재하는 새 경로를 지정하며, 종료된 디렉터리도 다시 사용하지 않는다.
-
-```sh
-node market-simulator/cli.cjs host-start /absolute/new-host-directory
-node market-simulator/cli.cjs host-status /absolute/new-host-directory
-node market-simulator/cli.cjs host-call /absolute/new-host-directory --options-file /absolute/prepare-call.json
-node market-simulator/cli.cjs host-close /absolute/new-host-directory
-```
-
-준비 담당자의 호출 파일은 `{"operationId":"prepare-01","tool":"prepare-whole","arguments":{"personaId":"...","seed":"...","snapshotFilePath":"/absolute/snapshot.json","maxRepairs":0}}` 형태다. 준비 응답의 requestId와 실제 hostDirectory를 해당 배우의 context.json에 저장한 다음, 작성·제출에는 위의 `author-whole` 진입점을 사용한다. 별칭과 정식 도구명은 같은 도구로 해석한다. `hostId`·`requestId`·`inputHash`·operationId는 후보 밖의 실행 출처에도 기록한다. 호스트의 직접 호출 API와 기존 MCP 인자 계약은 유지한다.
-
-작성 요청을 전달하기 전과 제출 전에 `host-status`로 같은 호스트와 요청이 살아 있는지 확인한다. 응답 연결만 끊겼다면 **같은 살아 있는 호스트에 같은 operationId와 변경 없는 입력**으로 재전송한다. 진행 중이거나 끝난 동일 작업의 결과를 공유하므로 제출·수정 예산을 다시 소비하지 않는다. 같은 ID의 변경된 입력은 거절한다. 지원하는 candidate/repair/snapshot/trace 파일은 호출 시 내용으로 고정해 해시에 반영한다. 이는 전송 재시도이며 AI 재생성이나 기술 수정 허가가 아니다.
-
-독립 호스트는 `list_personas`, whole-trace 준비·작성·제출·수정·상태, `validate_trace`만 지원한다. `tabId`, learner/trial/job/generation 파일이나 persona-validation 디렉터리 작업은 지원하지 않으며 기존 CLI/MCP 경로를 사용한다. 이 경계로 요청 파일을 대기 중에 다시 읽어 다른 내용으로 실행하는 일을 막는다. 앱 실행이나 provider 생성은 호스트 호출로 시작할 수 없다.
-
-`status.json`은 PID·시작/종료·요청 상태·attempts를, `events.jsonl`은 작업 ID·상태와 관측된 종료 신호를 기록한다. `process.log`에는 프로세스 오류가 남는다. 접근 자격 파일 `connection.json`은 공유하지 않는다. `host-close`와 SIGTERM은 대기 작업을 마친 뒤 종료하며, SIGKILL 등 기록하지 못한 종료는 원인 불명 `unavailable`로 보고한다. 기록은 체크포인트가 아니므로 종료한 호스트의 요청을 자동 복원하지 않는다. 새 호스트는 이전 requestId를 모르며, 기존 후보의 requestId를 바꾸거나 새 요청으로 옮겨 제출하지 않는다.
-
-종료 요청의 응답은 `state:"closing"`으로 종료 접수를 알린다. 호스트는 접수된 작업과 서비스 정리 뒤에도 이 응답 및 작업 응답의 writable `finish` 또는 연결 종료를 기다린 다음 소켓을 제거한다. 응답을 읽지 않는 클라이언트에는 최대 5초의 전송 대기만 허용하며, 초과 시 `host_response_drain_timeout`을 기록한다. 접수 응답은 서비스 정리의 성공 보증이 아니므로 최종 `host-status`/종료 기록의 closed·exitCode를 따로 확인한다. 서비스 정리가 실패해도 접수 응답 전송을 기다린 뒤 failed·exitCode 1로 기록한다.
-
-### 후보 작성과 제출 계약
-
-기술 수정이 허용된 실패에는 `repair_whole_trace({requestId,repair:{decisions:[...]}})`로 수정할 suffix만 보낸다. `repairFilePath`도 같은 `{ "decisions": [...] }` 객체를 받는다. 서버가 요청·버전·수정 시작 위치를 채우고 이미 수락한 prefix와 원래 종료 의도, 수정 1회 제한을 유지한다. 기존 명시형 wrapper도 지원하며 잘못 명시한 값은 거절한다. 별도 사전 검사 왕복이나 행동별 AI 호출을 추가하지 않는다.
-
-계산대 참조는 `checkout/<계산대 ID>`(예: `checkout/checkout`)이며, 수락 뒤 source의 `phase:"checkout"`, `view:"world"`, `activeStation:<해당 계산대 ID>`, `pageIndex:null`과 기존 위치·navigationStateId를 이어 쓴다. 직원이 있고 제출을 선택할 때 `control/submit`을 사용한다. 새 catalog의 `referenceAliases` 배열은 `{aliasChoiceId,canonicalChoiceId,kind:"checkout-open-v1"}`로 같은 계산대의 `open/<ID>` → `checkout/<ID>` 별칭만 명시한다. 정확한 현재 source·실제 계산대 대상·현재 사용 가능한 정식 버튼을 모두 확인해 로컬에서 연결하며, 별칭 없는 저장 bundle은 기존 엄격한 해석을 유지한다. 원본 후보는 보존하고 `choiceResolution.choiceRef`에 작성 참조, `resolvedChoiceRef`에 실행 참조, 별칭 사용 시 `normalization:{kind,authoredChoiceId,canonicalChoiceId}`를 기록한다. 다른 대상·경로·수량·이유·지연·종료를 자동 수정하지 않으며 추가 AI 호출 없이 전체 계획 1회·최대 1회 기술 수정 구조를 유지한다.
-
-기본 후보 형식은 bundle 8 / candidate 7이다. 각 결정은 `{choiceRef:{source:{location,navigationStateId,phase,view,activeStation,pageIndex},choiceId,quantity?},delayMs,reason,basis:{intent,goalId,cueRefs?,memoryUses},actorState}`를 사용한다. `goalId`는 필수이며 task/recover는 열린 목표 ID, check/help는 열린 목표 ID 또는 null, explore/interest/rest/finish는 null을 쓴다. 과제를 위한 이동과 행동은 focus와 별개로 goalId에 연결한다. `memoryUses`는 필수 배열이며 목표 세부를 쓰지 않으면 `[]`다. 항목은 `{goalId,field:"name"|"specification"|"requiredQuantity",mode:"remembered"|"guess"|"current-display",value}`다. value는 필수이고 name/specification에는 문자열, requiredQuantity에는 숫자를 쓴다. 기억·추정·현재 표시값의 검사는 아래 기억 계약을 따른다.
-
-`actorState.taskUpdate`는 선택적 `[{type:"select"|"complete"|"abandon",goalId}]` 배열이다. 선택된 `openGoalIds`는 관심·탐색·focus null에서도 유지되며 `heldGoalIds`는 열린 목표와 같은 집합으로 프로필 기억 용량 안에 둔다. 목록을 실제 읽은 다음 관찰에 열린 목표가 없고 보이는 목표 중 명시적 완료 이력이 없는 목표가 있으면 보이는 목표를 하나 이상 선택한다. 예외는 실제 checkout/submit/requestCashier/giveUp 행동이며 finish label만으로는 선택을 건너뛰지 않는다. select는 현재 실제 목록 또는 같은 결정의 명시적 selfRecall 이름 belief를 사용한다. complete는 그 목표에 연결한 이전 add의 실제 수락 결과를 관찰한 뒤 선언하며 올바른 상품·수량을 담았는지 검사하지 않는다. 포기는 abandon으로 명시할 수 있지만 pending 목표를 held 배열이나 memoryUpdate.deactivate만으로 조용히 지울 수 없다. 첫 readList 전 goal focus는 null이고 상품 focus는 실제 선반/cart에서 본 상품만 가리킨다. Goal focus는 이 방문에서 읽고 heldGoalIds에도 든 목표만 허용하며 uncertain과 겹칠 수 있다. source는 실제 행동 직전 상태와 일치해야 하고 choiceId는 그 source의 선택지에서 고른다. quantity는 add/remove에 필수이고 보이는 재고·반환 범위의 정수를 명시한다. 기본값·정답 수량을 대신 넣지 않으며 합법적인 오구매와 관심 구매도 그대로 기록한다. legacy 6은 기존 기억 계약, 5는 focus 계약, 4는 source-bound 선택, 3은 직접 action과 필수 cue 배열의 의미를 유지한다. 형식을 섞거나 기존 파일을 바꾸지 않는다. 1~100개의 행동을 받으며 100회 전에는 submit 또는 자발적 giveUp으로 끝나야 한다. 100회 후에도 진행 중일 때만 당시 장바구니 그대로 시스템 계산을 붙인다.
-
-`taskMemory.completedGoalIds`는 수락된 명시적 완료 선언만 기록한다. 표시된 목표가 모두 완료된 뒤의 목록 재확인은 재선택 없이 장바구니 확인·이동으로 이어갈 수 있다. 재선택하면 완료 이력을 해제하고 abandon은 완료로 세지 않는다. 완료 이력으로 구매 정답을 판정하거나 기억 세부를 복원하지 않는다.
-
-`bundleVersion:"8"`에는 전체 세계 참고 자료, choiceCatalog·initialChoiceFrame과 초기 `actorState.workingMemory`, 과제 계약이 있다. 전체 catalog는 전개 참고이며 현재 source의 frame만 가능한 선택을 정한다. `persona.behavior`는 같은 JSON에서 추출한 개인 지침, 목표 기억 용량, timingBaseline, 상황별 인지 설정 `cognition`과 `cognitionSourceHash`를 제공한다. 관심 전환 뒤 세부 기억·유사 상품 구분·수량 추적 설정은 합성 부담을 연결하며 강제 오답 확률이나 임상 척도가 아니다. source parameters와 페르소나 성격을 다시 정의하지 않는다. 표시된 사실의 원장인 actorState.knowledge와 현재 작업 기억, 계속 수행 중인 과제 목표를 구분한다. readList 다음 관찰의 목록값만 명확한 목록 기억의 출처가 되고 cart는 실제 담긴 수량만 알려준다. 목표 규격은 표시된 label 범위를 넘어 숨은 정답에서 추출하지 않으며 별도 규격이 없으면 unavailable일 수 있다. 상세 계약과 예시는 [전체 계획 절차](../market-persona-skill/references/whole-trace.md#관찰-원장과-작업-기억)를 따른다.
-
-각 판단의 필수 actorState는 candidate 7에서 `{activity,task,heldGoalIds,uncertainGoalIds,focusedGoalId,focusedProductId,orientation,triggerCueRefs?,memoryUpdate?,taskUpdate?}`이며 행동 직전의 허구 상태를 요약한다. 작업 기억과 과제 snapshot은 코드가 계산하고 모델이 덮어쓰지 않는다. optional memoryUpdate는 `{type:"selfRecall",goalId,values:{name?,specification?,requiredQuantity?}}`, `{type:"deactivate",goalId}`, `{type:"uncertain",goalId,fields:[...]}` patch 배열이다. deactivate는 열린 과제의 complete/abandon을 대신하지 않는다. selfRecall은 선언값을 uncertain belief로 기록하며 원장의 정답을 복사해 clear로 바꾸지 않는다. remembered 값은 계산상 clear 기억값과 일치해야 하고 guess는 uncertain belief, current-display는 현재 readObjectives 값과 일치해야 한다. unavailable인 필드는 실제 목록 재확인이나 selfRecall 없이 사용할 수 없다. 활성 목표의 필수 세부가 불확실하거나 unavailable이면 uncertainGoalIds에 그 목표를 포함한다. non-null basis.goalId는 focus와 무관하게 name 사용이 필요하되 실제 readList/viewCart/viewHelp는 기억 없이 외부 확인을 먼저 할 수 있다. 관심 이외의 add/remove는 goalId가 필요하며 목표에 연결된 add/remove에는 name·requiredQuantity 사용을 선언한다. non-null goal focus는 basis.goalId와 같아야 한다. 선택한 상품·수량의 정답 검사는 하지 않는다. 실행 대상/control과 objective proof는 기억 사용·정확 회상 근거를 대신하지 않는다. task는 최대 160자의 관찰 가능한 활동이고 trace currentTask로 연결한다. 상태·지연·근거는 내면 사고나 측정된 심리 상태가 아니다. 역할 검토는 별도 soft warning이며 행동을 정답으로 교정하지 않는다.
-
-`worldReference.navigation.states`는 방향이 있는 이동을 예상하기 위한 참고다. 각 결정에서 실제 허용 선택은 current source와 일치하는 choice frame의 available choice IDs로 정한다. 지도상 이웃이나 future choice가 현재 선택 frame에 없으면 바로 고를 수 없다. 다음 선택은 개인의 관심·목표·확인·배회 의도로 고르고 재방문·휴식·도움을 허용한다. 최단 경로/목표 상품 정답 선택기는 없다.
-
-새 작성 안내는 `authoringVersion:"2"`, `guidanceRevision:"declaration-preflight-v3"`를 기록한다. add/remove의 명시적 quantity, 완전한 결정 예제, 서로 다른 intent/activity enum, **actorState 안의 taskUpdate 배열**, 준비된 실제 수정 예산을 설명한다. `basis.memoryUses`의 **모든 항목에는 goalId·field·mode·value가 필요**하고 상위 basis.goalId가 항목의 goalId를 대신하지 않는다. candidate 7에서 직접 쓴 `basis.cueRefs`의 `objective:<id>`는 이미 읽은 목표여도 non-null `basis.goalId`가 필요하다. `goalId:null`, `memoryUses:[]`만으로는 허용되지 않는다. 이 필드는 상태 변화의 알려진 계기를 적는 `actorState.triggerCueRefs`, 컴파일러가 파생하는 관찰 증명과 구분한다. 어느 증명도 필요한 memoryUses를 대신하지 않는다. 53·56번 유형의 기존 거절 의미를 유지한다.
-
-선택적 `createWholeTraceSourceAuthoringCursor(bundle)`는 배우가 선택한 결정에서 source만 제외해 `append`로 받고, 저장된 메뉴와 전이로 예상 source를 작성한다. `finish()`는 동일한 후보 형식 검사를 수행한다. 게임 실행·관찰 피드백·행동 선택·경로 삽입·수량 보정은 하지 않는다. 이미 source를 가진 후보를 덮어쓰지 않으며 전체 제출 검증은 계속 필요하다. 매대에서 장바구니를 열면 station은 유지하고 pageIndex는 null, 닫으면 직전 페이지로 돌아간다. 키오스크와 앱/컴파일러 전이가 모호한 직원 호출은 보조기가 지원하지 않고 오류로 남긴다. 자세한 사용 계약은 [source 작성 보조](../market-persona-skill/references/whole-trace.md#선택한-행동의-source-작성-보조)를 따른다. 향후 표본에는 안내 revision과 보조기 사용 여부를 후보 밖에 기록하고, 이전 표본과 작성 조건이 같다고 취급하지 않는다.
-
-`source-task-preflight-v3`의 `cursor.menu()`는 현재 예상 source의 순위 없는 choiceIds·방향별 allowedWaypointIds·저장된 통로 표시를 반환한다. W 번호의 연속성·역방향 이동 이력으로 현재 간선을 추정하지 않으며 열린 패널에서는 통로 메뉴를 사용하지 않는다. `append` 오류의 `error.context`에도 변경되지 않은 source·메뉴·실패 인덱스를 남긴다. `append` 초안에는 source 키 자체를 생략하고, 직접 제출에는 source가 필수다. source 없는 완전한 예제와 인터페이스 설명은 새 authoringGuide에 포함된다. 작성 중 조회와 전체 초안 후 조립은 다른 작성 조건으로 기록한다.
-
-`append`는 명시한 목표 ID의 select/complete/abandon 이력과 같은 결정의 held/basis/focus 정합성을 검사하고, 모순은 `AUTHORING_TASK_DECLARATION`으로 작성 단계에서 거절한다. readList 다음 한 결정에만 예상 표시 ID를 사용하며 알려진 ID에서 기억값을 되살리지 않는다. select를 쓴 같은 결정의 heldGoalIds가 비어 있거나, 열린 목표 참조 없이 recover를 쓰거나, 예외 행동이 아닌데 목록 직후 필요한 목표 선택을 빠뜨린 경우가 해당한다. task/recover의 목표 참조와 non-goal check/help의 null을 구분하는 완전한 조건부 예제는 `sourceAuthoring.taskDeclarationExamples`에 있다. 목표·행동·intent·수량·종료를 대신 선택하지 않고, 오류는 입력과 cursor를 그대로 둔다. snapshot/menu에 목표 상태·기억 정답은 노출하지 않는다.
-
-이 검사는 선언의 상징적 일관성만 다룬다. 작성한 add/complete는 실제 구매 수락·관측 증거가 아니며 기억 압력·확실성·정답은 계산하지 않는다. 기존 최종 compiler·지식·목표·작업 기억 검증은 계속 적용한다. 현재 안내·보조기 revision과 sourceFiles 해시를 새 준비 결과에 기록하며 기존 `directed-source-memory-v2` / `source-menu-v2` 결과는 바꾸지 않는다. 사전검사 오류가 수정·재생성 권한을 추가하지 않는다.
-
-새 `authoringGuide.workingMemory`는 행동 전 기억 계산 순서, 열린 목표와 focus의 차이, 불확실성 필수 선언, 세 가지 memoryUses 모드를 설명한다. source 보조기는 기억 상태를 계산하거나 수정하지 않는다. 지연·직전 행동 시간·관심·수량 부담으로 기존 임계치를 넘으면 닫기나 이동에서도 해당 목표의 uncertainty를 선언해야 한다. 지연을 줄이거나 확인·포기를 삽입해 통과시키지 않는다. bundle/candidate 8/7, 기존 임계값·기억 계약·검증기는 유지하며 안내 revision과 sourceFiles 해시만 새 준비 결과에 반영된다. 저장된 후보·trace·bundle은 변환하지 않는다.
-
-전체 세계와 waypoint 자료는 `worldReference`에 유지하고 기본 bundle의 생성기 원문 `generatorReference`는 연결 정보로 교체한다. `sourceFiles` 경로·SHA-256 출처 목록은 보존한다. 참고 코드는 모델 안에서 실행되지 않으며, 입력 구성 변경의 실제 시간 효과는 별도 측정한다.
-
-기본 `maxRepairs:0`은 일괄 제출 1회다. `maxRepairs:1`이면 실패한 첫 후보의 `repairContext`를 받아 `repair_whole_trace({requestId,repair})` 또는 `repairFilePath`로 단 한 번 뒤쪽 suffix를 제출할 수 있다. 권장 repair payload는 `{decisions:[...]}`이며 서버가 요청·버전·수정 시작 위치를 채운다. 기존 전체 wrapper를 제공하면 명시한 값의 일치를 검사한다. 행동 suffix는 `repairContext`의 최신 before/source/choiceFrame/known facts를 기준으로 고친다. 서버는 수락된 정확한 prefix와 원래 종료 의도를 보존한다. 같은 persistent MCP/CLI interactive 프로세스에서 `repair-whole` 별칭도 쓸 수 있다. 상품 정답률·최단 경로를 최적화하지 않는다. 원본·수정본과 제출/수정 횟수를 보존한다. 미완성 계획을 완성 trace나 실제 경험으로 저장하지 않는다.
-
-actor policy는 whole-trace-v3, trace schema 2 / policy 6을 유지한다. 새 기본 bundle/candidate는 8/7이고 actorStateVersion:"1"도 유지한다. candidate 7은 knowledge audit auditVersion:"6", taskContract:"persistent-task-memory-v1"·taskStateVersion:"persistent-task-v1"와 기존 memoryContract:"working-memory-v1", cognitionVersion:"context-cognition-v1"를 기록한다. actionBinding:"state-bound-choice-v1"·focusContract:"explicit-focus-v1"도 유지한다. legacy 6/5/4/3은 각자 기존 audit 5/4/3/2와 검증 의미를 유지하며 저장된 trace 재생을 바꾸지 않는다. 관찰 사실, 계산한 열린 목표·작업 기억, 과제 전이와 기억 사용·갱신 선언을 sidecar audit에 기록한다. 전체 세계를 받는 observationScope:whole-world와 선언된 actorKnowledgeScope:observed-and-remembered의 한계는 유지된다. 정책 이름이 같아도 과제·기억 계약이 다른 표본을 같은 생성 조건으로 비교하지 않는다. 사후 감사 통과는 실제 Luna의 인지 과정·앱 실행·DB 수신·임상적 재현을 검증하지 않는다. 새 모델 호출의 seed 동일 출력과 시간 개선도 별도 측정 없이 주장하지 않는다. Codex 내부 추론/API 횟수는 미확인이면 그대로 두고 실제 계획 제출 수·도구 호출 수를 보고한다.
-
-전체 계획용 개인은 `create_whole_trace_learner`로 새 파일을 만든다. 이전 `whole-trace-v1`/`whole-trace-v2`·provider·Codex 증분 정책의 learner·trial과 섞거나 정책 값을 수동 변경하지 않는다. 실제 앱 실행·DB 수신을 검증한 경험만 `learnerFile`로 넘기고, 시스템 계산 구간은 개인 기억·독립 완수 비교에서 제외한다. `whole-trace-v3`로 만든 새 A/B/C trial은 `prepare_whole_trace({trialFile,arm,tabId,...})`가 기존 회차 준비·기억·분석 연결 조건을 적용한다. 후보 제출 후 실제 앱/DB 증거는 기존 `record_learning_round`로 기록한다. 구체적인 후보·interactive·반복 실험 예시와 페르소나 지침은 [전체 계획 스킬 절차](../market-persona-skill/references/whole-trace.md)에 있다.
-
-역할 표현의 자동 검토는 `actor-fidelity-v2`이며 `<trace 경로>.persona-review.json`과 결과의 `personaReviewPath`·`personaReviewHash`·`personaReview`에 별도 저장한다. `status:"review"`의 경고는 코드·판단 인덱스·설명과 함께 보고하고, `status:"clear"`는 자동 경고가 없다는 뜻으로만 해석한다. 실제 accepted add의 상품→목표 matcher 전이와 focus 변화, 지민의 다음 목표 목록 재확인, 제품/goal focus mismatch, 선언된 관심 복귀·불확실성 해소의 단서 연결을 soft warning으로 검토한다. 경고 코드는 `UNIFORM_REACTION_DELAYS`, `NEXT_GOAL_WITHOUT_LIST_RECHECK`, `INTEREST_RETURN_WITHOUT_RECORDED_RECOVERY`, `FOCUS_ACTION_MISMATCH`, `FOCUS_GOAL_SELECTION_MISMATCH`, `UNCERTAINTY_CLEARED_WITHOUT_RECORDED_CUE`다. `summary`는 `decisions`, `distinctReactionDelays`, `activityCounts`, `maximumHeldGoals`, 실제 선택 목표 기반 `goalSwitches`, `focusGoalSwitches`, `productSwitches`, `interestReturns`를 기록한다. `focusCoverage`는 기록된 판단과 focus 미기록 인덱스를 나누고, `transitions`는 purchase-goal/focus-goal/interest-return/uncertainty-cleared 인덱스와 cue·check/listRechecked 정보를 보존한다. purchase-goal에는 `selectionFocus:"consistent"|"unrecorded"|"different-goal"|"no-goal"`을 기록한다. `situations.unfamiliar`는 초기 orientation·국소 cue·새 매대, `situations.memoryLoad`는 실제 읽은 목표 수와 설계 용량·선언 uncertainty·check 인덱스, `situations.interestExposure`는 `categorySignDecisionIndexes`·`productDecisionIndexes`·`interestDecisionIndexes`를 구분해 기록한다. 이들은 coverage/상황 정보이고, 목표 수가 용량을 넘었다는 것 자체는 임상적 기억 부담 측정이 아니다. 관심 동안 유지한 작업 기억이 없으면 해당 부담의 표현 기회는 `unexercised`로 보고하고 개선 증거로 삼지 않는다. 열린 목표가 있어도 실제 압력·불확실성·회상·확인 행동을 함께 살핀다. 매대를 단순히 열고 닫은 것, 상품을 실제로 focus한 것, 종류·맛·규격을 비교한 행동을 구분하며 reason만으로 비교를 인정하지 않는다. 낯섦·기억 부담·관심 노출은 상황/coverage 정보이지 명확성 보증이 아니다. 경고는 기술 오류나 임상적 판정이 아니다. 경고를 없애려고 행동을 교체하거나 고정된 실수·배회·도움 횟수를 넣지 않는다. 기술 검증 결과와 역할 검토 결과를 함께 보고한다.
-
-candidate 7의 `personaReview.taskExpression`은 `task-expression-v1`로 표현 coverage를 기록한다. `coverage.status:"unexercised"`는 기억 부담과 이후 회복을 관찰하지 못했다는 뜻이다. 관심 동안 목표를 유지한 사실만으로 어려움이 발현됐다고 보지 않는다. 추가 soft warning은 `INTEREST_PRODUCTS_WITHOUT_FOCUS`·`UNIFORM_ORIENT_WALK_DELAYS`이며 실제 관심 상품 focus와 비교 행동, 이동 상황에 따른 지연을 검토한다. 경로 재방문은 왕복 이동일 수 있어 방황으로 단정하지 않는다.
-
-### 소켓 없는 파일 mailbox
-
-`node market-simulator/whole-trace-mailbox.cjs serve /absolute/new-owner --prepare-file /absolute/prepare.json`은 감독자가 소유하는 단일 whole-trace 요청 프로세스다. prepare 파일에는 readiness의 인자를 그대로 담는다. 배우는 자기 `prepare-response.json`만 받고, `call /absolute/new-owner --operation-file /absolute/operation.json`으로 기존 begin/menu/append 도구를 호출한다. 요청 파일은 `{operationId,tool,arguments}`이며 requestId는 owner가 고정한다.
-
-최종 `finish_and_submit_whole_trace`의 인자는 `{}`다. finish가 반환한 후보 객체 하나만 단일 JSON으로 원자적으로 저장하고, 재파싱·동일성 검사·기존 submit·status·저장 trace validate를 마쳐야 `completion.json`을 기록하고 정상 종료한다. JSONL에서 후보를 추출하거나 배우에게 EOF 종료를 맡기지 않는다. 전달 오류와 배우 클라이언트 종료는 준비 요청을 닫지 않으며, 같은 operationId의 동일 입력 재조회는 행동을 다시 실행하지 않는다. 감독자만 `abort /absolute/new-owner --reason "사유"`로 중단할 수 있다. 이 방식은 소켓을 열거나 이전 요청을 복원하지 않는다. 행동·프로필·검증 명세·repair 예산은 그대로이며 세부 절차는 [전체 계획 전달 규약](../market-persona-skill/references/whole-trace.md#소켓-없는-단일-요청-전달)을 따른다.
-
-## Whole-trace 이동 그래프 진단
-
-목록 HUD 가림은 `frontend/src/game/marketHudLayout.ts`의 공통 계산을 사용한다. 렌더 카드 폭은 `min(viewport.width - 24, 420)`, embedded top은 `max(112, safeArea.top + 64)`다. 기본 배율에서 이름 두 줄을 포함한 높이 상한은 115px이므로 390×600 화면의 가림 사각형은 x=12..378, y=112..227이다. 화면 높이는 카메라 투영과 clipping에 영향을 주며 상단 카드 위치를 바꾸지 않는다. bottom safe area도 상단 카드에 영향을 주지 않는다. 큰 fontScale에서는 이름·수량·장바구니 글자의 줄 높이와 줄바꿈 상한을 반영한다. 실제 텍스트 측정값이 없는 replay presentation이므로 한 줄 목록에도 두 줄 공간을 보수적으로 가린다.
-
-다음 명령은 저장된 actor별 bundle의 초기 그래프와 현재 코드의 그래프에 각각 BFS를 실행한다. source snapshot SHA, 시작점, 환경, presentation, 계산대 상태, 전체 waypoint/anchor 카탈로그의 동일성을 확인한다. 시작 가상 노드는 지점 수에서 제외하고, 매대는 도달 노드의 `nearbyStations` 중 `kind === 'shelf'`인 고유 ID로 센다. 초기 계산대 상태만 진단하며 모델 호출·후보 컴파일·앱 재생은 하지 않는다.
-
-```sh
-node market-simulator/scripts/diagnose-whole-trace-reachability.cjs \
-  --pilot-directory output/persona-pilot-20261028 \
-  --output-directory output/persona-waypoint-reachability-new
-```
-
-출력 디렉터리는 원래 파일럿 밖의 새 경로여야 한다. `reachability.md`에는 입력별 전후 표, `reachability.json`에는 소스 hash·BFS 경로·도달 지점 목록이 저장된다. 2026-10-28 파일럿 64개 입력(공유 snapshot 2개)은 모두 23/139→131/139 지점, 매대 0→5곳, 계산대 도달 불가→가능으로 바뀌었다. 구조적 도달성 결과이며 실제 페르소나의 구매 성공률은 재측정하지 않았다.
-
-snapshot과 anchor ID 생성 규칙, bundle/candidate 버전은 유지한다. 기존 bundle의 그래프와 choice 메뉴는 자동 갱신되지 않으므로 이후 생성에는 새 bundle을 준비해야 한다. `inputHash`는 설정과 bundle 버전을 묶으며 코드/그래프 변경은 포함하지 않는다. `sourceFiles`에 공통 HUD 모듈 hash도 기록하지만 compiler는 이 hash를 호환성 차단 조건으로 검사하지 않는다. 따라서 같은 snapshotId/inputHash가 같은 이동 선택지를 보장하지 않는다. 과거 trace의 재검증도 현재 가림 판정을 사용하므로 당시 환경의 재현에는 당시 소스가 필요하다. 기존 파일럿·후보·trace를 다시 쓰거나 새 계약으로 변환하지 않는다.
-
-### 이동 모델별 회귀 검사
-
-두 이동 모델의 도달성을 같은 화면·환경 조합에서 검사한다. `walkToAnchor`는 공용 waypoint 그래프의 방향 있는 BFS를 사용한다. 방향 이동은 `directionalInputSlices`와 `resolveMarketEnvironmentMovement`로 실제 입력을 적용한 끝점을 이어 간다. HUD나 화면 가장자리로 방향 이동 자체를 걸러내지 않으며, 목표 도달은 기존 `visibleStations`에서 **모든 매대와 최소 한 계산대가 실제로 가깝고 인지 가능한지**로 검사한다. 도달한 매대가 일부뿐이거나 탐색 노드 예산을 소진하면 실패다.
-
-```sh
-npm --prefix market-simulator run test:reachability
-npm --prefix market-simulator run test:reachability:full
-npm --prefix market-simulator run test:reachability:full -- --output-directory /absolute/new-reachability-directory
-```
-
-대표 명령은 화면 조건 5개 × 환경 3개인 15조합을 검사한다. 360×640 대표 조건은 가장 큰 검사 글꼴 `fontScale:2`와 `safeArea.top:59`다. 전체 명령은 다음 135조합에서 각각 두 이동 모델을 검사한다.
-
-| 축 | 값 |
-| --- | --- |
-| 화면 크기 | 360×640, 390×600, 390×844, 430×932, 768×1024 |
-| 글꼴 배율 | 1, 1.3, 2 |
-| 상단 safe area | 0, 47, 59 |
-| 환경 | 실행할 때 현재 `createMarketSession()`으로 생성한 default, 역사적 low, 역사적 high |
-
-low/high는 [고정 도달성 fixture](test/fixtures/whole-trace-reachability-snapshots.json)에 저장된 2026-10-28 환경·presentation·초기 계산대 상태를 사용한다. 원본 snapshotId·경로·파일 SHA-256을 기록하고 추출한 내용도 고정 해시로 검증한다. 상품 목표·과거 배우 계획을 새로 생성하거나 원본을 수정하지 않는다. default는 현재 환경 생성기의 변경을 잡기 위해 고정 복사본을 쓰지 않는다. 화면 조건은 위 행렬로 바꾸고 배율 `zoom:1.3`과 하단 safe area 0을 사용한다.
-
-결과 표는 anchor 도달/전체 waypoint 수, 방향 이동 도달/전체 cell 수, 매대 수와 계산대 도달을 구분한다. anchor 수는 가상 시작 노드를 제외한다. 방향 이동의 전체 cell 수는 막힌 cell도 포함하므로 두 모델의 분모를 같은 것으로 비교하지 않는다. 실패에는 환경·viewport·fontScale·safe area, 도달 수, 누락 매대, 계산대 상태와 HUD/화면 가장자리/충돌 경계 예시를 남긴다. 도달성 실패가 하나라도 있으면 종료 코드 **2**, 잘못된 인자나 파일 오류면 **1**이다. 실패 조합을 허용 목록으로 통과시키지 않는다.
-
-`--output-directory`는 부모가 존재하는 **새 디렉터리**만 받는다. 지정하면 `reachability.json`과 `reachability.md`를 저장하고 이미 존재하는 경로는 거절한다. 옵션을 생략하면 터미널에 표와 진단을 출력한다. 기존 파일럿·검증 결과를 덮어쓰지 않는다.
-
-기본 `npm test`에는 대표 15조합과 default 360×640의 글꼴·safe area 9조합, 역사적 HUD 사각형 주입 대조, 방향 이동의 정확한 끝점·재생 가능한 도달 경로 검사를 넣는다. 전체 135조합은 개발 중 단일 추가 회귀 검사의 10초 예산과 분리해 위 `test:reachability:full` 명령으로 실행한다. 실행 시간은 결과의 `elapsedMs`에 기록하며 장비·병렬 실행 상황에 따라 달라진다.
-
-2026-11-08 최종 측정에서 전체 135조합은 **두 이동 모델 모두 135/135 통과**, 실패 0건이며 25,199ms가 걸렸다. 대표 행렬·compact 화면 9조건·역사적 HUD 대조 등을 묶은 행렬 테스트 5개는 모두 통과했고 전체 실행 시간은 8,135ms였다. 전체 행렬은 위 10초 예산을 넘기므로 별도 명령으로 유지한다. 조합별 도달 수·분모·매대·계산대 결과는 [최종 결과 표](../output/whole-trace-reachability-20261108-final/reachability.md)와 [JSON 진단](../output/whole-trace-reachability-20261108-final/reachability.json)을 따른다.
-
-좁고 짧은 화면(`width < 390`, `height <= 640`)에서는 실제 market 카메라가 HUD 아래 가시영역의 중앙에 플레이어가 보이도록 구도를 조정한다. 렌더러와 인지 투영은 같은 `getMarketWorldCameraFrame`을 사용한다. HUD의 실제 카드·글꼴 확대·가림 사각형, 80px waypoint 간격과 충돌 규칙은 유지한다. 390px 이상 화면은 기존 카메라를 사용하므로 390×600의 역사적 사각형 `{left:0,top:100,right:390,bottom:246}`을 주입하면 anchor 이동의 단절을 계속 검출하고, 방향 이동은 같은 물리 공간에서 매대·계산대에 도달하는 대조가 남는다.
-
-이 카메라 변경은 앱 재생에 쓰는 `GamePrototypeScreen`의 embedded market 경로에 적용한다. standalone `MarketMap`은 변경하지 않는다. bundle의 `sourceFiles`에 카메라 구현 해시를 추가한다. 저장된 bundle·trace·검증 파일은 수정하지 않으며, 작은 화면에서 새로 컴파일하거나 재검증할 때는 현재 카메라 투영을 사용한다.
-
-방향 BFS는 24px cell을 방문 중복 판정에만 쓰고 실제 끝점을 cell 중심이나 waypoint로 옮기지 않는다. 입력은 8방향, 400ms, `speedMultiplier:0.7`, `accelerationMs:200`의 고정된 합법 motor profile이다. cell마다 한 도착점만 보존하는 유한 탐색이므로 실패는 이 설정에서 경로를 찾지 못했다는 뜻이며 연속 공간에서의 물리적 불가능 증명은 아니다. 이 검사는 기계적 도달성 회귀이며 페르소나의 행동 선택·구매 성공률·실제 앱 실행을 측정하지 않는다.
+- [Luna 전체 계획 상세](docs/whole-trace.md): 결정별 작성, 후보 작성·제출 계약, 방향 이동 옵션, 이동 그래프 진단
+- [페르소나 성향 검증 상세](docs/persona-validation.md): 성향 v2/v3 프로필 요청 예시와 공통 절차
+- [변경 이력과 레거시 경로](docs/history.md): feedback-choice v1~v13, 2026-09 경험·학습 실험 기록
+- [페르소나 정의와 출처](personas/audit.md): 실행 JSON, 읽기용 프롬프트, 이전 버전(`personas/history/`)
 
 ## 구성과 시작
 
@@ -453,18 +32,6 @@ const validation = validateTrace(trace, snapshot);
 ```
 
 `generateBatch`는 같은 snapshot을 대상으로 여러 seed의 의도 trace를 워커에서 병렬 생성한다. JSONL 각 줄은 trace만 포함한다. 앱 재생은 별도이며 실제 화면 시간만큼 걸린다. 여러 앱 탭은 서로 다른 테스트 계정으로 병렬 재생할 수 있다.
-
-## 시험 재생 시간
-
-새 `feedback-choice-v5`와 명시적 v2/v3/v4/v6는 `activity-duration-v2`를 기록한다. 모든 행동 전 `reactionDelayMs`는 0이고 배우는 `choiceId,durationMs,reason,memory`를 응답하며 v5/v6의 담기·내려놓기에는 `choiceParameters`도 포함한다. `moveDirection`의 durationMs는 배회·회피 모드에서도 모델이 고르는 조이스틱 입력 지속 시간 100~2000ms다. 일반 조작은 0, pause/lookAround/readList/browse는 100~120000ms, viewCart/viewHelp는 화면을 연 뒤 확인할 0~120000ms다. `reason`은 짧은 공개 행동 서술이며 목적의 정당화가 아니다. 목록 읽기 2초 같은 고정 활동 시간도 배우가 선택한 값으로 대체한다. 실제 보행·드래그·UI 전환·서버 접수 시간은 유지하며 확인 시간과 중복하지 않는다. 구형 delayMs 요청은 거절한다. 명시적 v2에는 자동 배회·회피를 추가하지 않으며 명시적 v3는 `exploration-v1`을 유지한다. 명시적 feedback v1은 `activity-duration-v1`과 `durationMs:0`의 기존 anchor 이동을 유지하고, 저장된 v1/v2/v3 및 actor-preserved-v1 trace는 원래 의미로 재생한다. [시간 계약과 예시](../market-persona-skill/legacy/feedback-plan.md#행동-시간)를 참고한다.
-
-`whole-trace-v3`의 `prepare_whole_trace`는 `timingProfile` 기본값과 허용값이 `original`이며 명시적 `compact`는 거절한다. Luna가 판단마다 제출한 `delayMs`와 프로필 보행 기준을 유지하며 임의 시간 지터나 compact 압축을 적용하지 않는다. 완성 trace에는 `generation.timingProfile:"actor-preserved-v1"`·`generation.actorStateVersion:"1"`을 기록한다. 반응 지연은 실제 이동·읽기·드래그·서버 대기와 별개이며 이동은 기존 물리적 보행과 어댑터의 한 번에 32 이하 이동 입력 상한을 계속 따른다. 생성 시간 예산은 판단 시간을 일괄 단축하는 지침이 아니다.
-
-명시적 feedback/whole-trace 정책이 없는 기존 `generate_trace`/CLI `generate`의 기본 `timingProfile`은 `compact`다. 행동 계획을 먼저 생성한 뒤 실행 시간만 조정한다. 연속 이동 전 대기는 0ms, 이동 시작 대기는 최대 350ms, 다른 행동 전 대기는 최대 1,500ms이며 이동 속도는 기본 걷기의 최소 75%다. 관찰·읽기·드래그 동작 시간, 경로, 상품 선택, 수량, 도움 요청, 실패/포기 행동은 유지한다. 시간을 맞추기 위해 과제를 조기 종료하거나 로그 시각을 바꾸지 않는다.
-
-기존 조건 재현에는 `"timingProfile":"original"`을 명시한다. 이미 저장된 trace는 자동으로 바뀌지 않는다. 빠른 trace에는 `generation.timingProfile=compact-v1`과 원래 계획의 `sourceTraceId`를 기록하고 새 trace ID를 부여한다. 이는 시험 속도 설정이며 실제 사람의 수행 시간이나 능력 향상 지표가 아니다. 서로 다른 timing profile의 소요 시간을 학습 효과로 비교하지 않는다.
-
-기존 compact 시험의 목표는 일반적인 재생을 약 3~5분 안에 완료하는 것이다. 짧은 과제를 3분까지 강제로 늘리지 않으며, 매우 긴 탐색이나 네트워크 대기는 5분을 넘을 수 있다. 전체 계획의 판단 지연을 이 목표에 맞춰 줄이지 않는다. `timeBudgetMs`는 기존 **행동 계획 생성**의 예산이며 실제 실행을 5분에 강제 종료하는 기능이 아니다.
 
 ## 격리 설정과 앱 연결
 
@@ -540,6 +107,18 @@ MARKET_REPLAY_CONFIG=/absolute/path/to/target.local.json node market-simulator/c
 
 원활함은 화면 확인과 앱의 실제 측정값으로 판단한다. 생성기의 seed 재현이나 의도 스키마 통과가 실제 렌더링 FPS, 드래그 성공, 백엔드 수락을 증명하지 않는다. 앱이 보고한 이동 간격·프레임 간격·회전·teleport·드래그 결과와 실제 로그/응답을 별도로 검증한다.
 
+## 시험 재생 시간
+
+새 `feedback-choice-v5`와 명시적 v2/v3/v4/v6는 `activity-duration-v2`를 기록한다. 모든 행동 전 `reactionDelayMs`는 0이고 배우는 `choiceId,durationMs,reason,memory`를 응답하며 v5/v6의 담기·내려놓기에는 `choiceParameters`도 포함한다. `moveDirection`의 durationMs는 배회·회피 모드에서도 모델이 고르는 조이스틱 입력 지속 시간 100~2000ms다. 일반 조작은 0, pause/lookAround/readList/browse는 100~120000ms, viewCart/viewHelp는 화면을 연 뒤 확인할 0~120000ms다. `reason`은 짧은 공개 행동 서술이며 목적의 정당화가 아니다. 목록 읽기 2초 같은 고정 활동 시간도 배우가 선택한 값으로 대체한다. 실제 보행·드래그·UI 전환·서버 접수 시간은 유지하며 확인 시간과 중복하지 않는다. 구형 delayMs 요청은 거절한다. 명시적 v2에는 자동 배회·회피를 추가하지 않으며 명시적 v3는 `exploration-v1`을 유지한다. 명시적 feedback v1은 `activity-duration-v1`과 `durationMs:0`의 기존 anchor 이동을 유지하고, 저장된 v1/v2/v3 및 actor-preserved-v1 trace는 원래 의미로 재생한다. [시간 계약과 예시](../market-persona-skill/legacy/feedback-plan.md#행동-시간)를 참고한다.
+
+`whole-trace-v3`의 `prepare_whole_trace`는 `timingProfile` 기본값과 허용값이 `original`이며 명시적 `compact`는 거절한다. Luna가 판단마다 제출한 `delayMs`와 프로필 보행 기준을 유지하며 임의 시간 지터나 compact 압축을 적용하지 않는다. 완성 trace에는 `generation.timingProfile:"actor-preserved-v1"`·`generation.actorStateVersion:"1"`을 기록한다. 반응 지연은 실제 이동·읽기·드래그·서버 대기와 별개이며 이동은 기존 물리적 보행과 어댑터의 한 번에 32 이하 이동 입력 상한을 계속 따른다. 생성 시간 예산은 판단 시간을 일괄 단축하는 지침이 아니다.
+
+명시적 feedback/whole-trace 정책이 없는 기존 `generate_trace`/CLI `generate`의 기본 `timingProfile`은 `compact`다. 행동 계획을 먼저 생성한 뒤 실행 시간만 조정한다. 연속 이동 전 대기는 0ms, 이동 시작 대기는 최대 350ms, 다른 행동 전 대기는 최대 1,500ms이며 이동 속도는 기본 걷기의 최소 75%다. 관찰·읽기·드래그 동작 시간, 경로, 상품 선택, 수량, 도움 요청, 실패/포기 행동은 유지한다. 시간을 맞추기 위해 과제를 조기 종료하거나 로그 시각을 바꾸지 않는다.
+
+기존 조건 재현에는 `"timingProfile":"original"`을 명시한다. 이미 저장된 trace는 자동으로 바뀌지 않는다. 빠른 trace에는 `generation.timingProfile=compact-v1`과 원래 계획의 `sourceTraceId`를 기록하고 새 trace ID를 부여한다. 이는 시험 속도 설정이며 실제 사람의 수행 시간이나 능력 향상 지표가 아니다. 서로 다른 timing profile의 소요 시간을 학습 효과로 비교하지 않는다.
+
+기존 compact 시험의 목표는 일반적인 재생을 약 3~5분 안에 완료하는 것이다. 짧은 과제를 3분까지 강제로 늘리지 않으며, 매우 긴 탐색이나 네트워크 대기는 5분을 넘을 수 있다. 전체 계획의 판단 지연을 이 목표에 맞춰 줄이지 않는다. `timeBudgetMs`는 기존 **행동 계획 생성**의 예산이며 실제 실행을 5분에 강제 종료하는 기능이 아니다.
+
 ## 페르소나와 LLM
 
 [프로필 JSON](personas/)에 개인 배경 `character`, 자연어 `prompt`, 기존 시간·선호·지원 `parameters`, 주의·기억 `attention`, 선택·확인 습관 `shoppingStyle`을 보존한다. 같은 프로필이 전체 계획과 증분 정책에 사용된다. 전체 계획도 인물의 선택 지식에는 제한된 화면·발견 기억을 적용하지만 모델 자체에는 전체 세계 참고 자료가 있으므로 두 모드의 정보 노출 조건을 같다고 보고하지 않는다. 익숙한 상품 선호·시작 습관은 현재 매장의 상품 위치나 재고를 알려주는 공간 기억이 아니다.
@@ -586,6 +165,33 @@ trace v2의 이동은 가까운 segment 앵커를 목적지로 연결하고, `re
 
 새 attention 생성에서 `maxActions`·`timeBudgetMs` 또는 LLM `maxCalls`를 넘으면 기술적인 생성 중단 오류로 처리한다. 이는 아래 명시적 v9·v10·전체 계획의 행동 100회 관찰 상한과 별개여서, 해당 모드에서도 너무 작은 기술 예산은 100회 전에 오류를 낼 수 있다. 오류로 끊긴 계획을 인물이 자발적으로 포기한 trace로 꾸미지 않는다. 기존 레거시 정책의 상한 처리 호환은 유지한다. 실제 `giveUp` 선택과 검토 접수 요청도 구매 성공이나 AI 분석 성공의 증거는 아니다.
 
+## 오프라인 요청 호스트의 수명
+
+macOS/Linux에서 `host-start`는 호출자의 stdin을 받지 않는 독립 프로세스를 시작한다. 배우 작업이나 `host-call` 클라이언트가 끝나도 준비한 요청은 같은 호스트 메모리에 남는다. 호스트 디렉터리는 부모가 존재하는 새 경로를 지정하며, 종료된 디렉터리도 다시 사용하지 않는다.
+
+```sh
+node market-simulator/cli.cjs host-start /absolute/new-host-directory
+node market-simulator/cli.cjs host-status /absolute/new-host-directory
+node market-simulator/cli.cjs host-call /absolute/new-host-directory --options-file /absolute/prepare-call.json
+node market-simulator/cli.cjs host-close /absolute/new-host-directory
+```
+
+준비 담당자의 호출 파일은 `{"operationId":"prepare-01","tool":"prepare-whole","arguments":{"personaId":"...","seed":"...","snapshotFilePath":"/absolute/snapshot.json","maxRepairs":0}}` 형태다. 준비 응답의 requestId와 실제 hostDirectory를 해당 배우의 context.json에 저장한 다음, 작성·제출에는 위의 `author-whole` 진입점을 사용한다. 별칭과 정식 도구명은 같은 도구로 해석한다. `hostId`·`requestId`·`inputHash`·operationId는 후보 밖의 실행 출처에도 기록한다. 호스트의 직접 호출 API와 기존 MCP 인자 계약은 유지한다.
+
+작성 요청을 전달하기 전과 제출 전에 `host-status`로 같은 호스트와 요청이 살아 있는지 확인한다. 응답 연결만 끊겼다면 **같은 살아 있는 호스트에 같은 operationId와 변경 없는 입력**으로 재전송한다. 진행 중이거나 끝난 동일 작업의 결과를 공유하므로 제출·수정 예산을 다시 소비하지 않는다. 같은 ID의 변경된 입력은 거절한다. 지원하는 candidate/repair/snapshot/trace 파일은 호출 시 내용으로 고정해 해시에 반영한다. 이는 전송 재시도이며 AI 재생성이나 기술 수정 허가가 아니다.
+
+독립 호스트는 `list_personas`, whole-trace 준비·작성·제출·수정·상태, `validate_trace`만 지원한다. `tabId`, learner/trial/job/generation 파일이나 persona-validation 디렉터리 작업은 지원하지 않으며 기존 CLI/MCP 경로를 사용한다. 이 경계로 요청 파일을 대기 중에 다시 읽어 다른 내용으로 실행하는 일을 막는다. 앱 실행이나 provider 생성은 호스트 호출로 시작할 수 없다.
+
+`status.json`은 PID·시작/종료·요청 상태·attempts를, `events.jsonl`은 작업 ID·상태와 관측된 종료 신호를 기록한다. `process.log`에는 프로세스 오류가 남는다. 접근 자격 파일 `connection.json`은 공유하지 않는다. `host-close`와 SIGTERM은 대기 작업을 마친 뒤 종료하며, SIGKILL 등 기록하지 못한 종료는 원인 불명 `unavailable`로 보고한다. 기록은 체크포인트가 아니므로 종료한 호스트의 요청을 자동 복원하지 않는다. 새 호스트는 이전 requestId를 모르며, 기존 후보의 requestId를 바꾸거나 새 요청으로 옮겨 제출하지 않는다.
+
+종료 요청의 응답은 `state:"closing"`으로 종료 접수를 알린다. 호스트는 접수된 작업과 서비스 정리 뒤에도 이 응답 및 작업 응답의 writable `finish` 또는 연결 종료를 기다린 다음 소켓을 제거한다. 응답을 읽지 않는 클라이언트에는 최대 5초의 전송 대기만 허용하며, 초과 시 `host_response_drain_timeout`을 기록한다. 접수 응답은 서비스 정리의 성공 보증이 아니므로 최종 `host-status`/종료 기록의 closed·exitCode를 따로 확인한다. 서비스 정리가 실패해도 접수 응답 전송을 기다린 뒤 failed·exitCode 1로 기록한다.
+
+### 소켓 없는 파일 mailbox
+
+`node market-simulator/whole-trace-mailbox.cjs serve /absolute/new-owner --prepare-file /absolute/prepare.json`은 감독자가 소유하는 단일 whole-trace 요청 프로세스다. prepare 파일에는 readiness의 인자를 그대로 담는다. 배우는 자기 `prepare-response.json`만 받고, `call /absolute/new-owner --operation-file /absolute/operation.json`으로 기존 begin/menu/append 도구를 호출한다. 요청 파일은 `{operationId,tool,arguments}`이며 requestId는 owner가 고정한다.
+
+최종 `finish_and_submit_whole_trace`의 인자는 `{}`다. finish가 반환한 후보 객체 하나만 단일 JSON으로 원자적으로 저장하고, 재파싱·동일성 검사·기존 submit·status·저장 trace validate를 마쳐야 `completion.json`을 기록하고 정상 종료한다. JSONL에서 후보를 추출하거나 배우에게 EOF 종료를 맡기지 않는다. 전달 오류와 배우 클라이언트 종료는 준비 요청을 닫지 않으며, 같은 operationId의 동일 입력 재조회는 행동을 다시 실행하지 않는다. 감독자만 `abort /absolute/new-owner --reason "사유"`로 중단할 수 있다. 이 방식은 소켓을 열거나 이전 요청을 복원하지 않는다. 행동·프로필·검증 명세·repair 예산은 그대로이며 세부 절차는 [전체 계획 전달 규약](../market-persona-skill/references/whole-trace.md#소켓-없는-단일-요청-전달)을 따른다.
+
 ## 검증
 
 ```sh
@@ -608,50 +214,6 @@ npm --prefix market-simulator run verify:personalities -- --count 12 --output /a
 attention 기반 LLM 정책은 `llm.protocol: "ollama"`로 인증된 `/api/chat`을 호출할 수 있다. API 키는 `apiKeyEnv` 환경변수로만 전달하며, 원본 교환 기록에 인증 헤더는 넣지 않는다. 관찰·확인된 경험·선택지에 18,432 컨텍스트를 사용하므로 해당 크기를 지원하는 서버가 필요하다. 기본 프로토콜은 기존 OpenAI 호환 방식이다.
 
 `ActorObservation.instructions`는 앱 시작 설명·브리핑을 첫 관찰에, 결제 안내를 결제 단계에만 전달한다. 이 필드는 해당 문장을 이해하거나 장기 학습했다는 표시가 아니다. 기존 stochastic 정책은 여전히 확률 시뮬레이터이며 문장을 이해하는 LLM으로 취급하면 안 된다. 조작/상품 기억만으로 학습했다고 판단하지 않는다. 아래 AI 경험 기록을 추가해 관찰 내용과 안내도 다음 선택에 전달한다.
-
-### 경험 기반 AI 행위자 v1 (2026-09-30)
-
-AI 경로는 AttentionPolicy의 확률 선택·기억 소실·감정/능력 수치를 사용하지 않는다. 고정 개인 특성(관심·강점·선호·지원 필요)을 바탕으로, 현재 관찰과 최근 6개 관찰 경험을 모델에 전달한다. 실제 실행 여부가 확인된 이전 회차 경험은 최대 24개다. 이 수는 실행 컨텍스트 예산이며 실제 사람의 기억 용량으로 보정된 값이 아니다. 전체 연구 문서를 매 행동에 반복하기보다 기존 페르소나의 구조화된 개인 특성을 전달한다.
-
-`record-pilot-round.cjs`는 앱 완료 보고서와 DB 로그 연속성을 검증한 AI 재생에만 `experience.learning`을 만든다. 저장 내용은 실제 실행한 목록 읽기·상품 선택/제거·장바구니 열기와 해당 화면의 안내다. v9 시스템 계산 회차에서는 `firstStepId` 이전의 개인 행동 경험만 저장하고 자동 처리 구간은 제외한다. 표시 내용은 바인딩된 스냅샷에서 재구성하므로 실제로 읽고 이해했음을 뜻하지 않는다. 가상 계획의 경험은 같은 계획 생성 안에서만 쓰며 장기 경험으로 승격하지 않는다. 분석의 숨은 정답이나 성공 판정을 주입하지 않는다.
-
-다음 `generate_trace`에는 `attentionExperience: {visit, previousLayoutKey, memory, learning}`을 전달한다. 첫 방문/확률 모드에는 learning을 허용하지 않으며, 앱 탭에 실행할 때 계정도 일치해야 한다. 배운 전략을 정답 문장으로 삽입하거나 반복마다 오류 확률을 낮추지 않는다. AI가 구체적인 경험을 참고하는 과정이며 실제 인간의 학습/망각/전이를 입증한 모델이 아니다. 별도 실제 참여자 자료로 보정하고 평가해야 한다.
-
-사용자가 Codex 어시스턴트의 직접 플레이를 요청한 경우 이 생성기로 행동을 대신 정하지 않는다. 새 실험은 [직접 역할 수행 규약 v2](../market-persona-skill/legacy/assistant-learning-protocol.md)를 따른다. [민재 연구 참고 사례](personas/research-learning-minjae-v2.json)의 빈 기억에서 시작하고, 실제 UI 원본/sessionId/시각/해시를 연결한 `ResearchArchive`와 배우의 `ResearchMemory`, 현재 `ResearchRecall`을 분리한다. `researchEncodingContext`에는 최근 관찰과 자신의 연상만, `researchRetrievalContext`에는 자신의 연상과 현재 UI만, `researchLearnerContext`에는 선택한 회상과 현재 UI만 전달한다. 전체 원본과 분석/채점은 행동 입력에 넣지 않는다. 회상 오류를 정답으로 덮어쓰거나 자동 숙달을 만들지 않는다. CLI `scripts/prepare-research-learner.cjs`가 실제 원본 파일 해시를 확인하며, 내용의 진실성과 UI 일치는 별도로 확인한다. [출처와 구현 범위](../docs/ai/research/intellectual-disability/learning-model-adjustment-2026-10-01.ko.md)를 함께 읽는다. 기존 `AssistantExperience` / `assistantLearnerContext`는 v1 기록을 읽는 경로로 보존하며 새 조건에 이식하지 않는다.
-
-실행 확인 경험에는 읽은 목록, 표시 안내, 열어 본 상품 페이지, 담기/빼기, 장바구니 확인을 담는다. 현재 계획 중 기억에도 선택한 이동/매대와 관찰한 상품을 함께 보관한다. 행동 이름만 남겨 무엇을 봤는지 잃는 문제를 줄이기 위한 변경이다. 실제 요청 검사와 미해결 탐색 반복은 [2026-09-30 검증 기록](../docs/ai/actor-learning-2026-09-30.md)을 따른다.
-
-
-## 관찰 기억 보존 v2 (2026-09-30)
-
-`episodic-choice-v2`는 최근 행동 6개와 별개로 현재 회차에서 실제 표시된 시작/결제 안내, 마지막으로 읽은 목록, 발견 장소·상품·통로, 이동한 연결과 목적지 방문 횟수를 모델에 전달한다. 위치 단서는 관찰 당시 위치 기준임을 표시하며 현재 화면 단서를 우선한다. 아직 보지 않은 지도나 목표 상품 위치를 계산해 넣지 않는다.
-
-AI는 짧은 `currentTask`를 직접 출력할 수 있다(최대 160자). 다음 요청의 `actorChosenTask`로 이어지며 코드가 목표를 대신 선택하지 않는다. 이 문장은 가상 행위자의 임시 의도이며 실제 사람의 발화나 내면 사고를 측정한 것이 아니다. 과거 회차의 현재 작업과 목표 목록은 새 회차에 자동 복사하지 않는다.
-
-장소·상품 기록은 컨텍스트 크기를 제한하는 버퍼다(통로 256, 장소 64, 상품 96, 최근 이동 48). 이는 임상적 기억/망각 모형이 아니다. 정보가 입력에 있다는 사실과 그것을 이해·활용하는 능력은 구분한다. 모델은 기록을 잘못 해석하거나 재확인할 수 있으며 자동 성공률 증가나 정답 행동 대체는 없다.
-
-[보완 및 비교 시험](../docs/ai/actor-memory-v2-2026-09-30.md)
-
-
-후속 `episodic-choice-v3`는 위 기억 보존에 동작 피드백을 추가한다. `lookAround`/`pause`의 선택지에는 제자리 대기이며 화면을 회전/확장하지 않는다는 설명을 붙인다. 대기 전후 관찰이 동일하면 새 장소/상품이 보이지 않았음을 결과에 기록한다. 자동 행동 교체나 반복 금지는 없다.
-
-
-최종 `episodic-choice-v4`는 이동 선택지에 현재 방향·거리와 기억에 기록된 도착 횟수/현재 위치 여부를 같이 표시한다. 별도 목록의 통로 ID를 대조하지 않아도 기존 관찰 이력을 확인할 수 있다. 행동 후보를 정답 기준으로 정렬하거나 방문한 통로를 제거하지 않는다.
-
-
-## 개인별 경험과 A/B/C 반복 실험 (2026-09-30)
-
-현재 인물 버전은 지민 v5, 서연·민수 v3이며 기본 provider 정책은 `episodic-choice-v4`다. `actorPolicyVersion:"episodic-choice-v9"` 또는 v9 learner 신원을 명시한 provider 학습은 `episodic-choice-v9`, 별도로 시작한 Codex 증분 계획은 `episodic-choice-v10`, 전체 계획은 `whole-trace-v3`이다. 성격/시작 습관은 프로필에, 실험 중 확인된 경험은 별도 learner 파일에 저장한다. `learningProfile`은 관찰 영역과 상황 조건이며 매회 능력 상승이나 지정 행동을 강제하지 않는다. 아래 회차 생성 예시는 v9 learner 신원에 묶인 provider 학습 경로다. 전체 계획은 위의 새 개인·trial과 `prepare_whole_trace`/`submit_whole_trace`를 사용하고 실행·증거 기록·비교는 기존 회차 도구를 재사용한다. 기존 `whole-trace-v1`/`whole-trace-v2`의 개인·실험·저장 trace는 새 정책으로 소급 변경하지 않는다.
-
-[학습 실험 절차](../market-persona-skill/legacy/learning-trials.md)에 설정 예제와 전체 MCP 순서가 있다. `create_learner`, `create_learning_trial`, `prepare_learning_round`, `generate_learning_round`, `record_learning_round`, `record_learning_failure`, `compare_learning_trial`을 추가했다. CLI는 각각 `create-learner`, `create-trial`, `prepare-round`, `generate-round`, `record-round`, `record-failure`, `compare-trial`이다.
-
-개인 archive는 완료된 앱 replay와 DB receipt를 검사한 원본을 전부 보관한다. v2 경험은 개인/계정/페르소나 버전/실험군/모델/정책과 각 실행 session/replay/step에 묶인다. AI 입력은 실제 표시된 현재 단서와 관련성·최근성을 기준으로 최대 12개 경험을 선택하며, 성공 여부로 선별하지 않는다. 기존 v1 경험은 과거 수동 생성과 호환되지만 새 실험 저장에는 신원 결합이 필요하다. archive hash는 실수로 바뀐 파일을 찾는 용도이며 DB 서버의 전자서명이나 인간 학습의 증거는 아니다.
-
-A는 일반 과제와 기억, B는 맞춤 과제와 기억, C는 맞춤 과제와 이전 기억 미전달을 사용한다. C도 증거는 보관한다. 기준 과제 → 사전 지정 횟수의 연습 → 공통 평가 과제 순서를 저장하고 중단 후 재개할 수 있다. B/C의 연습은 직전 세션 분석 READY와 연결된 AI 퀘스트의 실제 화면 내용이 일치해야 한다. 고정/평가 과제는 사전 등록 snapshot과 일치해야 하며 일반 과제로 대체된 오류 응답은 맞춤 표본으로 받아들이지 않는다.
-
-현재 회차 도구는 새 앱 화면으로 이동하거나 인증된 분석 API를 대신 호출하지 않는다. Codex가 정상 앱 경로로 다음 미션을 로드하고 실제 응답 파일을 전달하면 준비·기억 전달·증거 연결·비교를 처리한다. `generate_learning_round`는 모델 호출까지 하지만 앱 재생은 `play_trace`로 명시적으로 실행한다. 모델과 앱/격리 서버 연결이 없는 환경의 자동 테스트는 계약 검증이며 수행 향상 실험이 아니다.
-
-최근 관찰에 화면 방향/보이는 표지 설명, 실제 도움 본문, 직원 응답을 포함했다. 의미 없는 ID를 해석하는 부담을 줄였지만 이동 후보를 정답 순서로 정렬하거나 재방문을 금지하지 않는다. 이 보완만으로 LLM의 완주나 향상이 확인됐다고 주장하지 않는다.
 
 ## 행동 100회 상한과 시스템 계산
 

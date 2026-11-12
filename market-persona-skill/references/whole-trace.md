@@ -268,7 +268,7 @@ v2 메뉴의 `currentObservation`은 `{kind:"validated-prefix-observation-v2",ac
 
 `movementFeedbackVersion:"recent-movement-anchor-capacity-v1"`은 같은 anchor 조건에서만 켜는 별도 옵션이다. 기존 24행동 보존 창에 더해 선택된 페르소나의 `spatialMemoryCapacity`를 최근 도착한 서로 다른 통로 수의 상한으로 쓴다. 용량을 넘으면 마지막 accepted 도착이 가장 오래된 통로의 횟수 기록을 모두 지우며, 다시 도착하면 1회부터 센다. 보기만 하거나 메뉴를 조회한 것은 최근성을 갱신하지 않는다. 방향별 `movementNotes`의 24행동 창은 그대로이며 이동 권고·선택지 변경은 없다. 기본 페르소나 값은 모두 96곳이므로 현재 창에서 용량 제한은 걸리지 않는다. 이 값은 합성 구현 설정이며 실측 기억 능력이 아니다. 기본값과 기존 두 피드백 버전은 바꾸지 않는다.
 
-독립 호스트에서 준비하려면 호출의 arguments에 두 옵션을 명시한다. 호스트 시작부터 context 저장·작성·최종 제출까지의 예시는 [방향 이동 v2 작성 예시](../../market-simulator/README.md#방향-이동-v2-작성-예시)를 따른다. 앱 재생을 하기 전의 prefix 결과는 로컬 실행 검증 결과이며 실제 앱에서 확인한 개인 경험으로 저장하지 않는다.
+독립 호스트에서 준비하려면 호출의 arguments에 두 옵션을 명시한다. 호스트 시작부터 context 저장·작성·최종 제출까지의 예시는 [방향 이동 v2 작성 예시](../../market-simulator/docs/whole-trace.md#방향-이동-v2-작성-예시)를 따른다. 앱 재생을 하기 전의 prefix 결과는 로컬 실행 검증 결과이며 실제 앱에서 확인한 개인 경험으로 저장하지 않는다.
 
 검증 전용 인물과 비교 실험은 새 `prepare_persona_validation` run의 `movementValidationVersion:"1"` 뒤에서 v2를 사용한다. 반환된 슬롯의 `prepareWholeTrace`에 있는 marker·이동·단서 옵션을 그대로 유지한다. 기존 검증 run에 옵션을 덧붙이지 않는다. 검증용 실제 메뉴·도착 증거와 경로 기회의 해석은 [명시적 이동 검증 옵션](persona-validation.md#명시적-이동-검증-옵션)을 따른다. 이 분석 증거는 배우에게 미래 경로나 숨은 도착 정보를 제공하지 않는다.
 

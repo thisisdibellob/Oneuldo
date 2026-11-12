@@ -8,7 +8,7 @@ MCP 도구 6개를 사용한다. 권장 순서는 `prepare_persona_validation` �
 
 이동을 비교하는 새 run에는 `prepare_persona_validation`에서 `movementValidationVersion:"1"`을 지정한다. 대조군은 이 marker만, 방향 이동군은 `movementVersion:"directional-v2"`도 지정한다. 최근 이동 단서가 필요한 별도 실험에만 `movementFeedbackVersion:"recent-movement-v1"`을 더한다. 서로 다른 옵션은 서로 다른 새 runId를 사용하며, 준비·readiness가 반환한 `prepareWholeTrace`를 그대로 전달한다. manifest·slot·요청·bundle·trace·audit에서 세 옵션의 누락과 혼합을 거절한다. `directional-v1`과 학습 trial은 이 계약의 대상이 아니다. 옵션 없는 과거 run과 저장 결과를 소급 변경하지 않는다.
 
-원본 네 인물의 비교는 `validationMode:"legacy"`를 명시한다. 이 옵션은 검증 전용 `neutral-adult-control`을 포함한 네 인물 모두에 적용되며 원본 프로필에 traits v2 지침을 추가하지 않는다. traits 모드의 프로필·카탈로그 선택도 그대로 유지한다. [README의 준비 예시](../../market-simulator/README.md#검증-run에-이동-옵션-고정하기)를 참고한다.
+원본 네 인물의 비교는 `validationMode:"legacy"`를 명시한다. 이 옵션은 검증 전용 `neutral-adult-control`을 포함한 네 인물 모두에 적용되며 원본 프로필에 traits v2 지침을 추가하지 않는다. traits 모드의 프로필·카탈로그 선택도 그대로 유지한다. [README의 준비 예시](../../market-simulator/docs/whole-trace.md#검증-run에-이동-옵션-고정하기)를 참고한다.
 
 서버는 수락된 결정의 실제 합법 통로 메뉴, 이동 전후 위치 참조, 실제 이동 결과와 확인된 도착을 `navigationEvidence.version:"continuous-route-v1"`로 저장한다. 좌표는 기록하지 않고 v2의 정확한 연속 위치 ID를 사용한다. 도착은 이미 제공한 anchor에 앱의 도착 허용 거리(1px) 안으로 실제 도달한 경우다. 미래 방향별 도착을 예측하거나 위치를 격자에 맞춰 방문을 추정하지 않는다. 이 분석 증거는 배우 관찰·선택지에 정보를 더하지 않는다.
 
@@ -73,7 +73,7 @@ whole-trace의 `add`는 항상 성공한 드래그로 펼쳐진다. 드래그 �
 | [Mengue-Topio·Courbois 외 2011](https://doi.org/10.1016/j.ridd.2010.10.014), [2019 경로 연구](https://doi.org/10.1352/1944-7558-124.2.116) | 2011의 경로 학습·지름길 사용을 익힌 경로 의존 설계에 참고한다. 2019는 경로 묘사·랜드마크 지식의 간접 근거이며 지름길 발견 실패의 직접 근거로 쓰지 않는다. |
 | [Harrysson, Svensk & Johansson 2004](https://doi.org/10.1111/j.0952-3383.2004.00344.x) | 글자 중심 탐색의 어려움을 정보 확인 반응 설계에 참고한다. 오류율이나 읽기 능력 점수로 해석하지 않는다. |
 
-연구 근거로 설계한 첫 플레이 성향이 수준대로 행동에 나타나는지를 본 것이며, 실제 지적장애인과의 유사성을 입증하지 않는다. 집단 연구를 모든 개인에게 적용하지 않으며, 지민·서연·민수와 사용자 정의 변형의 차이는 합성 설계값이다. 이번 구현에서는 모델·provider·앱·백엔드를 호출하거나 파일럿을 생성하지 않았고, 실제 사람 데이터와 비교하지 않았다. 남은 작업은 **HUD 결함을 고친 snapshot, 새 runId, 조건별 seed 20개 이상**으로 별도 파일럿을 실행하는 것이다. 요청 예시는 [README의 v2 프로필 예시](../../market-simulator/README.md#첫-플레이-성향-v2-프로필-요청-예시)를 따른다.
+연구 근거로 설계한 첫 플레이 성향이 수준대로 행동에 나타나는지를 본 것이며, 실제 지적장애인과의 유사성을 입증하지 않는다. 집단 연구를 모든 개인에게 적용하지 않으며, 지민·서연·민수와 사용자 정의 변형의 차이는 합성 설계값이다. 이번 구현에서는 모델·provider·앱·백엔드를 호출하거나 파일럿을 생성하지 않았고, 실제 사람 데이터와 비교하지 않았다. 남은 작업은 **HUD 결함을 고친 snapshot, 새 runId, 조건별 seed 20개 이상**으로 별도 파일럿을 실행하는 것이다. 요청 예시는 [README의 v2 프로필 예시](../../market-simulator/docs/persona-validation.md#첫-플레이-성향-v2-프로필-요청-예시)를 따른다.
 
 ## 명세 v3 — 기준 프로필과 앞뒤 성향 유지 (설명 지표)
 

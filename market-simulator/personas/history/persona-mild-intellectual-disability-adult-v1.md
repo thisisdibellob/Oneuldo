@@ -1,4 +1,4 @@
-> 역사 보존용 v1입니다. 현재 실행 정의는 [v2 JSON](mild-intellectual-disability-adult.json), 읽기용 전체 프롬프트는 [v2 문서](persona-mild-intellectual-disability-adult-v2.md)입니다. 아래 기존 v1 본문은 변경 없이 보존합니다.
+> 역사 보존용 v1입니다. 현재 실행 정의는 [v2 JSON](../mild-intellectual-disability-adult.json), 읽기용 전체 프롬프트는 [v2 문서](persona-mild-intellectual-disability-adult-v2.md)입니다. 아래 기존 v1 본문은 변경 없이 보존합니다.
 
 # 경도 지적장애가 있는 성인 페르소나 v1
 
