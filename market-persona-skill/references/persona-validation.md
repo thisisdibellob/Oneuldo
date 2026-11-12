@@ -4,9 +4,23 @@
 
 MCP 도구 6개를 사용한다. 권장 순서는 `prepare_persona_validation` → `check_persona_validation_readiness` → 부족 슬롯 생성 → readiness 재확인 → `measure_persona_validation` → 다중 `prepare_blind_review`/`submit_blind_review` → `persona_validation_report`다. 전체 trace 작성·제출은 준비와 측정 사이에서 별도로 한다. 검증 도구는 모델·provider·앱·백엔드를 호출하거나 trace를 수정·재생성하지 않으며, 일반 생성 경로에서 자동 실행되지 않는다. MCP 입력 객체는 interactive CLI에서 `{"tool":"도구명","arguments":입력객체}` 형식의 한 줄로 전달한다.
 
+## 명시적 이동 검증 옵션
+
+이동을 비교하는 새 run에는 `prepare_persona_validation`에서 `movementValidationVersion:"1"`을 지정한다. 대조군은 이 marker만, 방향 이동군은 `movementVersion:"directional-v2"`도 지정한다. 최근 이동 단서가 필요한 별도 실험에만 `movementFeedbackVersion:"recent-movement-v1"`을 더한다. 서로 다른 옵션은 서로 다른 새 runId를 사용하며, 준비·readiness가 반환한 `prepareWholeTrace`를 그대로 전달한다. manifest·slot·요청·bundle·trace·audit에서 세 옵션의 누락과 혼합을 거절한다. `directional-v1`과 학습 trial은 이 계약의 대상이 아니다. 옵션 없는 과거 run과 저장 결과를 소급 변경하지 않는다.
+
+원본 네 인물의 비교는 `validationMode:"legacy"`를 명시한다. 이 옵션은 검증 전용 `neutral-adult-control`을 포함한 네 인물 모두에 적용되며 원본 프로필에 traits v2 지침을 추가하지 않는다. traits 모드의 프로필·카탈로그 선택도 그대로 유지한다. [README의 준비 예시](../../market-simulator/README.md#검증-run에-이동-옵션-고정하기)를 참고한다.
+
+서버는 수락된 결정의 실제 합법 통로 메뉴, 이동 전후 위치 참조, 실제 이동 결과와 확인된 도착을 `navigationEvidence.version:"continuous-route-v1"`로 저장한다. 좌표는 기록하지 않고 v2의 정확한 연속 위치 ID를 사용한다. 도착은 이미 제공한 anchor에 앱의 도착 허용 거리(1px) 안으로 실제 도달한 경우다. 미래 방향별 도착을 예측하거나 위치를 격자에 맞춰 방문을 추정하지 않는다. 이 분석 증거는 배우 관찰·선택지에 정보를 더하지 않는다.
+
+새 경로 기회의 분모는 방문·미방문 anchor가 함께 보이는 실제 메뉴에서 `walkToAnchor`를 선택한 건수다. `moveDirection`은 선택 시점에 확정 목적지가 없으므로 분자·분모에서 제외한다. 방향 이동의 확인된 도착은 이후 anchor 방문 근거로 이어지고, 방향 입력·혼합 메뉴·정확한 위치 재방문·차단·부분 차단·확인된 도착은 `directionalDiagnostics`에 따로 남긴다. 메뉴 전체, 연속 source 연결, 기록된 실행 결과가 불일치하면 경로 지표를 `null`/`unexercised`로 남기고 step ID와 원인을 제공한다. 근거 부족을 기회 0으로 해석하지 않는다.
+
+legacy·traits v1에는 아홉 축 기회와 coverage를 `movementOpportunities`의 설명용 통계로 추가하고 기존 판정은 보존한다. traits v2의 새 옵션은 같은 연속 경로 근거를 주 경로 지표에 사용한다. 다른 축의 어려움·반복 선택 정의는 바꾸지 않으므로, 수락된 방향 입력의 막힘이 자동으로 지속·도움 요청 기회를 만들지는 않는다. 옵션이 없는 기준선은 기존 정적 메뉴 근거로 읽고 이 정의 차이를 비교 보고서에 표시한다.
+
 ## 성향 카탈로그 v2 — 첫 플레이의 네 성향
 
 새 traits run의 기본은 [카탈로그 `persona-traits-v2`](../../market-simulator/validation/persona-traits-v2.json)의 아홉 축이다. 기존 다섯 축에 첫 플레이 성향 네 축을 더한다. [새 명세](../../market-simulator/validation/persona-trait-validation-spec-v2.json)는 명세 `version:3`, `analysisVersion:2`이며, run manifest의 `version:3`이나 legacy 검증의 v2와는 별개의 버전이다. 아래의 기존 다섯 축 설명과 답안 예시는 **카탈로그 v1 기록**으로 보존하며, 현재 기본값·새 축에는 이 절을 적용한다.
+
+새 traits run은 [명세 v3](../../market-simulator/validation/persona-trait-validation-spec-v3.json)을 쓴다. 주 판정은 이 절의 v2 규칙과 같고, 추가된 기준 프로필 비교와 앞뒤 성향 유지는 아래 [명세 v3 절](#명세-v3--기준-프로필과-앞뒤-성향-유지-설명-지표)에서 설명한다.
 
 `prepare_persona_validation`에 `validationMode:"traits"`, `catalogSchemaVersion:"persona-traits-v2"`를 명시할 수 있다. 사용자 정의 `profiles[]`의 `schemaVersion`도 같은 값을 사용한다. 혼합 버전은 거절한다. `catalogSchemaVersion:"persona-traits-v1"`을 명시하면 [기존 카탈로그](../../market-simulator/validation/persona-traits.json)와 기존 명세를 사용한다. 저장 프로필과 manifest의 schemaVersion으로 카탈로그·필수 축·블라인드 답안 수를 선택하며, 과거 v1의 프로필 `traits-2-…` 해시·명세 hash·manifest·측정·보고서를 새 버전으로 다시 쓰지 않는다.
 
@@ -40,7 +54,7 @@ whole-trace의 `add`는 항상 성공한 드래그로 펼쳐진다. 드래그 �
 
 같은 `contextHash`이고 나머지 **여덟 축**이 같은 프로필만 비교한다. 같은 조건·seed에서 양쪽 모두 관찰 기회가 있는 쌍을 사용한다. 유효 쌍 8개 이상, 기대 방향(high > low), |Cliff’s delta| ≥ 0.33, 쌍 부트스트랩 95% CI가 0을 제외해야 지지한다. 일부 기회만 관찰됐으면 `partial`, 기회가 없으면 `unexercised`, 표본이 부족하면 `insufficient`, 한 축 대비가 없으면 `unmatched`로 구분한다. 기대 방향을 지지하는 경우 `supported`, 반대 방향을 지지하는 경우 `contradicted`다. 효과가 불분명한 결과를 통과로 바꾸지 않는다. 기존 축과 과거 run의 판정 기준은 바꾸지 않는다.
 
-같은 인물·조건에서 기회가 있는 trace가 둘 이상인데 축 지표 값이 모두 같으면 `diagnosticWarnings`에 trace·seed·근거 step ID를 남긴다. 이 진단은 주 판정에 사용하지 않는다. 성장, 시간에 따른 성향 감쇠, 과장 상한은 검사하지 않는다. 지침의 모든 수준에는 “충분히 분명해지면 멈춘다”, “실수를 강제하지 않는다”를 포함하며, 정해진 행동 횟수·실수·지연·포기를 요구하지 않는다.
+같은 인물·조건에서 기회가 있는 trace가 둘 이상인데 축 지표 값이 모두 같으면 `diagnosticWarnings`에 trace·seed·근거 step ID를 남긴다. 이 진단은 주 판정에 사용하지 않는다. 성장과 과장 상한은 검사하지 않는다. 앞뒤 성향 유지는 v3에서 설명 지표로만 보고하며 주 판정에 쓰지 않는다. 지침의 모든 수준에는 “충분히 분명해지면 멈춘다”, “실수를 강제하지 않는다”를 포함하며, 정해진 행동 횟수·실수·지연·포기를 요구하지 않는다.
 
 `opportunityAudit`·readiness·보고서의 성향 표현과 커버리지에는 새 네 축을 포함한다. 구조적으로 갈림길이나 유사 상품 동시 표시가 불가능하면 경고를 남긴다. 검토한 현행 검증 snapshot과 [생성기](../../market-simulator/scripts/build-validation-snapshots.cjs)의 구조에는 131개 reachable waypoint, 125개 reachable branch와 우유 계열의 동시 표시가 있었으므로 생성기 옵션은 추가하지 않았다. 정적 구조 점검은 배우가 그곳에 도달했거나 HUD가 올바르게 표시됐음을 보장하지 않는다. HUD 결함이 있었던 과거 파일럿은 아래 결함 주석을 유지한다.
 
@@ -60,6 +74,63 @@ whole-trace의 `add`는 항상 성공한 드래그로 펼쳐진다. 드래그 �
 | [Harrysson, Svensk & Johansson 2004](https://doi.org/10.1111/j.0952-3383.2004.00344.x) | 글자 중심 탐색의 어려움을 정보 확인 반응 설계에 참고한다. 오류율이나 읽기 능력 점수로 해석하지 않는다. |
 
 연구 근거로 설계한 첫 플레이 성향이 수준대로 행동에 나타나는지를 본 것이며, 실제 지적장애인과의 유사성을 입증하지 않는다. 집단 연구를 모든 개인에게 적용하지 않으며, 지민·서연·민수와 사용자 정의 변형의 차이는 합성 설계값이다. 이번 구현에서는 모델·provider·앱·백엔드를 호출하거나 파일럿을 생성하지 않았고, 실제 사람 데이터와 비교하지 않았다. 남은 작업은 **HUD 결함을 고친 snapshot, 새 runId, 조건별 seed 20개 이상**으로 별도 파일럿을 실행하는 것이다. 요청 예시는 [README의 v2 프로필 예시](../../market-simulator/README.md#첫-플레이-성향-v2-프로필-요청-예시)를 따른다.
+
+## 명세 v3 — 기준 프로필과 앞뒤 성향 유지 (설명 지표)
+
+[명세 v3](../../market-simulator/validation/persona-trait-validation-spec-v3.json)은 명세 `version:4`, `analysisVersion:2`다. 성향 검증 명세의 세 번째 파일이며, legacy 검증의 명세 v3(`persona-validation-spec.json`)이나 run manifest의 `version:3`과는 별개다. 지표 정의·임계값·주 판정(유효 쌍 8, |delta| ≥ 0.33, 95% CI의 0 제외)과 블라인드 점수는 v2와 같다. 새 출력 `baselineComparison`과 `positionStability`는 모두 `descriptiveOnly:true`, `usedForPrimaryDecision:false`이며 findings의 status, 성향 판정(`supported`·`contradicted` 등), 블라인드 점수를 바꾸지 않는다. 기대 방향이나 통과·실패도 만들지 않는다.
+
+**기존 run은 그대로 재현된다.** 저장된 manifest는 `specHash`로 자기 명세를 고르므로, v2 명세로 준비한 run은 다시 measure·report해도 v2로 측정된다. measurements·report에 `opportunityRows`, `positionStability`, `baselineComparison` 키가 생기지 않는다. 새 `prepare_persona_validation`만 v3을 기록한다. v3 run의 trace별 지표에는 `opportunityRows: [{ decisionIndex, hit, stepIds }]`가 붙는다. 기회 하나당 한 행이고 `hit`은 그 기회가 분자에 들어갔는지다. 비율이 아닌 지표(시간 합계, 행동 수, 목표 단위의 최종 장바구니 불일치)는 `null`이고, 시스템 완료 구간은 기회에서 빠진다.
+
+### 기준 프로필 — `traitMode:"omitted"`
+
+기준 프로필은 기본 인물의 맥락은 같고 성향 지침 문장만 없는 프로필이다. 같은 run의 `profiles`에 다음처럼 추가한다.
+
+```json
+{ "id": "neutral-baseline", "basePersonaId": "neutral-adult-control", "traitMode": "omitted" }
+```
+
+- `traitMode`는 `"omitted"`만 허용한다. `presetId`·`traits`와 함께 줄 수 없고, v1 카탈로그(`persona-traits-v1`)에서는 거절한다.
+- 같은 `basePersonaId`의 성향 프로필과 `contextHash`·맥락·공통 지침이 같다. 프롬프트의 "## 공통 성향" 절, 설명의 성향 문장, `character.selectedTraits`(빈 배열)만 없고 `traits`는 `null`이다. 프로필 버전 hash는 전달 내용이 달라 자동으로 다르다.
+- **`neutral-adult-control`과 다르다.** 대조 인물은 다섯 성향을 `medium`으로 명시한 성향 프로필이다. 기준 프로필은 수준 문장이 아예 없어 모델의 기본 경향을 본다. 위 예시처럼 `neutral-adult-control`을 기본 인물로 써도 결과는 `medium` 지침이 아닌 지침 없음의 결과다.
+- 프롬프트의 제목·카탈로그 해석문·"성향은 …에 반영한다" 같은 공통 문장은 성향 프로필과 같게 남긴다. 두 프로필의 차이를 성향 줄로만 한정하기 위해서다.
+- readiness의 `required`와 `missingSlots`(생성 요청 `prepareWholeTrace` 포함)에 들어간다. 대조군·`referenceControls`·성향 대비(`matchedContrasts`)·성향 수준별 `groups`에는 들어가지 않는다.
+- 성향 수준이 없으므로 블라인드 묶음과 정답 키에서 제외한다. `prepare_blind_review` 응답과 보고서는 `excludedBaselineTraces`를 표시한다.
+- **비용:** 기본 인물 하나당 조건 2 × seed 수만큼 trace가 더 필요하다. 권장 seed 20이면 40개다. 비교할 기본 인물마다 따로 만든다.
+
+### 기준 프로필 대비 — `baselineComparison`
+
+`baselineContrasts`는 기준 프로필마다 같은 `contextHash`의 성향 프로필을 짝짓는다. 각 짝·지표·조건마다 같은 seed의 성향 프로필 대 기준 프로필 Cliff's delta, 짝 부트스트랩 95% 구간, 유효 쌍·미발생·누락 수를 낸다. 대상 지표는 그 프로필의 `medium`이 아닌 축과, 그 프로필이 속한 성향 대비의 축이다. 기준 프로필이 없으면 `reason:"no-baseline-profile"`이다.
+
+같은 성향의 낮음·높음 대비가 모두 있으면 명세 `baselineComparison.positionRule`대로 위치를 분류한다. "기준≈수준"은 그 delta의 95% 구간이 0을 포함한다는 뜻이다.
+
+| 분류 | 정의 | 읽는 법 |
+| --- | --- | --- |
+| `high-only-shift` | 낮음≈기준, 높음 구간은 0 제외 | 지침 없는 기본값이 낮음 쪽에 있다 |
+| `low-only-shift` | 높음≈기준, 낮음 구간은 0 제외 | 기본값이 높음 쪽에 있다 |
+| `both-shift` | 두 구간 모두 0 제외, 낮음 delta < 0 < 높음 delta | 기본값이 낮음과 높음 사이에 있다 |
+| `baseline-beyond-range` | 두 구간 모두 0 제외, 두 delta가 같은 부호 | 기본값이 설정한 두 수준의 범위 밖에 있다 |
+| `indistinguishable` | 두 구간이 모두 0 포함, 또는 한쪽 유효 쌍이 `minValidPairs` 미만이거나 구간이 없음 | 위치를 말할 근거가 부족하다 |
+
+한쪽 수준만 있는 성향은 분류 없이 delta만 보고한다. **해석 한계:** 기준 프로필은 성향 문장만 뺀 같은 맥락이다. 모델의 기본 경향을 보여줄 뿐 실제 사람의 평균이나 정상 범위가 아니다. 기본 인물이 지적장애 성인 설정(`mild-intellectual-disability-adult`)이어도 기준 프로필 결과를 지적장애 특성이나 실제 지적장애인의 행동 근거로 쓰지 않는다. 같은 기본값이 모델·정책 버전에 따라 달라질 수 있으므로 다른 생성 조건의 run끼리 위치 분류를 비교하지 않는다.
+
+### 앞뒤 성향 유지 — `positionStability`
+
+새 trace를 만들지 않고 저장된 trace의 `opportunityRows`로 계산한다.
+
+- **분할 규칙** (`split:"opportunity-order-halves"`): 한 trace·지표의 기회를 `decisionIndex` 순서로 반씩 나눈다. 홀수면 가운데 기회를 앞쪽에 둔다(`oddMiddle:"early"`). 기회가 `minOpportunitiesPerTrace`(2)보다 적으면 `insufficient-opportunities`, `decisionIndex`가 없으면 `missing-decision-index`로 제외한다. 제외한 trace는 0으로 채우지 않고 이유를 남긴다. 시간 길이나 전체 결정 수가 아니라 기회 순서로 나눈다.
+- **적용 지표** (`positionSplit:true`): `comparisonRate`, `postSelectionListRate`, `interestDetourRate`, `persistenceResponseRate`, `helpSeekingRate`, `operationLearningRate`, `routeRelianceRate`, `textCueLoadRate`. 한 trace에서 기회가 여러 번 생길 수 있는 지표들이다.
+- **제외 지표** (`positionSplit:false`): `preCheckoutCartRate`(계산 직전 1회), `initialCautionCount`(시작 구간 1회의 행동 수), `newShelfDelayMs`(작성 시간 합계). 구조상 trace 앞이나 끝에 고정되어 앞뒤로 나눌 수 없다.
+- `profileShift`: 프로필·조건·지표별 (뒤 비율 − 앞 비율)의 trace 평균·중앙값과 trace 재표집 구간이다.
+- **`contrastAttenuation`이 핵심 출력이다.** 같은 seed의 높음·낮음 trace가 모두 분할될 때 앞 구간끼리, 뒤 구간끼리 Cliff's delta를 구한다. 약화 = |앞 delta| − |뒤 delta|이고 같은 seed 쌍을 함께 재표집한 구간을 붙인다. 한 프로필의 앞뒤 변화(`profileShift`)에는 과제 진행의 공통 효과가 그대로 섞인다. 반면 같은 seed·같은 과제 단계의 높음과 낮음을 비교하면 그 공통 효과가 상당 부분 상쇄되고, 성향 **대비**가 뒷부분에서도 유지되는지를 볼 수 있다.
+- `baselineAdjusted`: 성향 프로필의 (뒤 − 앞)에서 같은 seed 기준 프로필의 (뒤 − 앞)을 뺀 평균과 seed 재표집 구간이다. 기준 프로필이 없으면 `null`과 `no-baseline-profile`이다.
+
+**해석 한계:** 뒷부분은 남은 목표·상황이 달라 과제 단계 효과가 섞인다. 대비 약화(attenuation)만으로 성향 감쇠를 확정하지 않는다. 앞뒤 기회의 종류가 다를 수 있다. 예를 들어 조작 익히기의 앞쪽은 매대 열기·담기, 뒤쪽은 장바구니·계산이다. 기회가 적은 지표는 분할 가능한 trace가 적어 구간이 넓거나 비어 있다. 성장과 과장 상한은 검사하지 않는다.
+
+### 근거와 범위
+
+- 페르소나 없는 기준 조건은 [*The Behavioral Fabric of LLM-Powered GUI Agents: Human Values and Interaction Outcomes* (arXiv 2601.16356)](https://arxiv.org/abs/2601.16356)를 참고했다. 이 연구는 선호·가치 지침 없이 실행한 GUI 에이전트를 페르소나 프롬프트를 준 조건과 비교했다. 페르소나를 조건으로 온라인 쇼핑 행동을 시뮬레이션·평가하는 설계는 [OPeRA (arXiv 2506.05606)](https://arxiv.org/abs/2506.05606)를 참고했다.
+- 앞뒤 유지는 [*LLM-Based Educational Simulation: Evaluating Temporal Student Persona Stability Across ADHD Profiles* (arXiv 2605.06307)](https://arxiv.org/abs/2605.06307)를 참고했다. 이 연구는 대화가 이어질 때 LLM 학생 페르소나의 행동이 표류하는지 보았다.
+- **이 연구들의 수치를 기준값으로 쓰지 않았다.** 위치 분류 규칙, 최소 기회 2, 분할 방식은 이 저장소의 설계값이며 연구에서 추정한 효과 크기나 임계값이 아니다. 연구 대상(GUI 에이전트, 온라인 쇼핑 사용자, ADHD 학생 페르소나)과 이 시뮬레이터의 인물은 다르므로 결과를 직접 옮겨 해석하지 않는다.
 
 ## 판정 가능성 점검과 추가 분석
 
@@ -97,6 +168,10 @@ whole-trace의 `add`는 항상 성공한 드래그로 펼쳐진다. 드래그 �
 blocked여도 측정 가능한 자료는 측정한다. 기존 응답 필드를 유지하고 `readiness`, `readinessReasons`를 덧붙인다. 저장 측정/보고서의 `readinessDetails`, `inabilityCauses`와 한국어 보고서 맨 위의 **판정 불가 원인** 표에서 표본 부족·대조군 없음·기회 미발생·기술 실패를 읽는다. 기회 미발생은 `count`(양쪽 trace가 모두 있는 쌍 기준)와 `perTraceCount`(짝과 무관한 개별 trace 기준)를 함께 표시한다. 쌍 기준 0은 개별 trace에 미발생 지표가 없다는 뜻이 아니다. 출처가 바뀌거나 변조된 trace는 기존 검증대로 거절한다.
 
 ### 검증 전용 snapshot과 기회 audit
+
+앞뒤 분할을 위한 새 실험에는 생성기의 `--low-goal-count 3` 옵션을 사용할 수 있다. low는 우유·사과·생수 각 1개, high는 기존 5개 목표로 생성하며 환경·재고·명세는 유지한다. 목표를 한 번씩 순서대로 선택할 때 low의 다음 목표 전환은 2회가 된다. 기본 2개 목표에서는 마지막 선택을 제외하면 1회뿐이므로 단순한 기회 가능 판정과 앞뒤 분할 가능성을 구분한다. 이는 구조적 가능성이지 실제 행동의 보장이 아니며, 배우에게 구매·확인·전환을 강제하지 않는다. 변경한 과제는 새 snapshot과 run으로 기록하고 이전 자료와 섞지 않는다.
+
+이 snapshot을 쓰는 traits v2 `prepare_persona_validation`에는 `lowGoalCount:3`도 명시한다. manifest는 `taskDesign:{version:"goal-count-v1",goalCounts:{low:3,high:5}}`와 `taskDesignHash`를 기록하고 실제 snapshot 목표 수·재준비 입력을 검증한다. 준비·readiness·측정·보고서에도 이 출처를 표시한다. 미지정은 기존 low 2/high 5이며 과거 manifest에는 필드를 소급 추가하지 않는다. legacy와 traits v1은 이 옵션을 받지 않는다. 이 과제 구성은 판정 명세와 별개이며 v3 specHash·지표·임계값은 바뀌지 않는다.
 
 `node market-simulator/scripts/build-validation-snapshots.cjs --output-directory /absolute/new-snapshots`로 별도 snapshot 세트를 만든다. 생성기 옵션은 스크립트 도움말을 따른다. 기존 파일을 덮어쓰지 않으며 새 snapshot ID와 hash를 기록한다. 목표 매대의 관련 후보, 비목표 관심 상품 접근, high의 수량 2 이상, first-play 첫 매대, 표시 불일치·피드백과 도움을 경험할 수 있는 구조를 고정한다.
 

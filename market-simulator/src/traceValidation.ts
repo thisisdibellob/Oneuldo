@@ -6,6 +6,7 @@ import { Random } from './random';
 import { FeedbackMovementPolicy } from './feedbackMovementPolicy';
 import { DEFAULT_REPLAY_PRESENTATION, visibleStations, visibleAnchors, visibleUnlabelledShelfBodies, resolveReplayAnchor, getReplayShelfPage, replayShelfPageFractions } from '../../frontend/src/game/marketReplayPerception';
 import { directionalInputSlices, MARKET_DIRECTIONAL_MOVE_SPEED } from '../../frontend/src/game/marketDirectionalInput';
+import { localWalkInputSlices } from '../../frontend/src/game/marketLocalInput';
 import { getMarketStationApproachPoint } from '../../frontend/src/game/marketEnvironment';
 import { isMarketNavigationSegmentClear } from '../../frontend/src/game/marketNavigation';
 import { getMarketHelpLines, marketCashierResponse, marketReturnResponse } from '../../frontend/src/game/marketHelp';
@@ -25,7 +26,7 @@ export class TraceGuard {
   private readonly mission;
   private readonly helpLines;
   private readonly initialStock: Record<string, number>;
-  constructor(snapshot: MarketReplaySnapshot, personaId = 'trace-validator', personaVersion = '1', model = 'trace-validation/1', private readonly attentionMode = false, private readonly extendedActor = false, private readonly feedbackMode = false, private readonly directionalMovement = false, private readonly richFeedbackObservation = false, private readonly shelfCartCue = false) {
+  constructor(snapshot: MarketReplaySnapshot, personaId = 'trace-validator', personaVersion = '1', model = 'trace-validation/1', private readonly attentionMode = false, private readonly extendedActor = false, private readonly feedbackMode = false, private readonly directionalMovement = false, private readonly richFeedbackObservation = false, private readonly shelfCartCue = false, private readonly observeDirectionalStructures = true, private readonly fixedAnchorMovement = false, private readonly wholeTraceObservationVersion?: 'anchor-visible-structures-v1') {
     const valid = validateMarketReplaySnapshot(snapshot);
     if (!valid.valid) throw new Error(valid.errors.join('; '));
     this.adapter = createMarketAgentAdapter({ ...snapshot.config,
@@ -56,7 +57,7 @@ export class TraceGuard {
     const result: ActorObservation = {
       schemaVersion: 'attention-observation-v1', phase: o.phase, view: o.view, activeStation: o.activeStation,
       visibleStations: stations, anchors: world ? visibleAnchors(o.environment, o.playerPosition, this.presentation, o.cashierAvailability) : [],
-      ...(this.directionalMovement ? { visibleStructures: world
+      ...(this.directionalMovement && this.observeDirectionalStructures || this.wholeTraceObservationVersion === 'anchor-visible-structures-v1' ? { visibleStructures: world
         ? visibleUnlabelledShelfBodies(o.environment, o.playerPosition, this.presentation, o.cashierAvailability) : [] } : {}),
       // The shelf add control reads "한 개 더 담기" once a product is in the basket; it never shows the amount.
       // The raw observation hides the closed basket, and shelf stock only falls by what was put into it.
@@ -139,9 +140,29 @@ export class TraceGuard {
       }
       case 'walkToAnchor': {
         if (!this.attentionMode || before.phase !== 'shopping' || before.view !== 'world' || before.activeStation) throw new Error(`${step.id}: anchor walking requires an unobstructed attention world view`);
-        if (!this.observeActor().anchors.some(anchor => anchor.id === step.target.anchorId)) throw new Error(`${step.id}: anchor is not a visible local movement choice with arrival margin`);
+        const anchor = this.observeActor().anchors.find(anchor => anchor.id === step.target.anchorId);
+        if (!anchor) throw new Error(`${step.id}: anchor is not a visible local movement choice with arrival margin`);
         const target = resolveReplayAnchor(before.environment, before.playerPosition, step.target.anchorId, this.presentation, before.cashierAvailability);
         if (!target) throw new Error(`${step.id}: anchor is not a visible local movement choice`);
+        if (this.fixedAnchorMovement) {
+          let movedDistancePx = 0, constrained = false;
+          for (const slice of localWalkInputSlices(before.environment, before.playerPosition, target,
+            before.cashierAvailability, step.movement, step.timeoutMs)) {
+            const previous = this.observe().playerPosition;
+            const dx = slice.input.x * MARKET_DIRECTIONAL_MOVE_SPEED * slice.durationMs / 1000;
+            const dy = slice.input.y * MARKET_DIRECTIONAL_MOVE_SPEED * slice.durationMs / 1000;
+            apply({ type: 'moveInput', dx, dy }, slice.durationMs);
+            const current = this.observe().playerPosition;
+            movedDistancePx += Math.hypot(current.x - previous.x, current.y - previous.y);
+            constrained ||= Math.hypot(current.x - previous.x - dx, current.y - previous.y - dy) > 1e-7;
+            movementMs += slice.durationMs;
+          }
+          const current = this.observe().playerPosition;
+          movementResult = { direction: anchor.direction, durationMs: movementMs,
+            actualDelta: { dx: current.x - before.playerPosition.x, dy: current.y - before.playerPosition.y },
+            movedDistancePx, outcome: movedDistancePx < 1e-7 ? 'blocked' : constrained ? 'partially-blocked' : 'moved' };
+          break;
+        }
         const dx = target.x - before.playerPosition.x, dy = target.y - before.playerPosition.y;
         const distance = Math.hypot(dx, dy), count = Math.max(1, Math.ceil(distance / 24));
         const delay = Math.max(1, Math.ceil(distance / count / (190 * step.movement.speedMultiplier) * 1000));
@@ -256,12 +277,16 @@ export function validateTrace(value: unknown, snapshot?: MarketReplaySnapshot) {
   if (!shape.valid || !snapshot) return shape;
   try {
     const trace = value as MarketReplayTrace;
+    const wholeTraceDirectionalMovement = trace.generation?.actorPolicyVersion === 'whole-trace-v3'
+      && ['directional-v1', 'directional-v2'].includes(trace.generation.wholeTraceMovementVersion ?? '');
     const guard = new TraceGuard(snapshot, trace.personaId, trace.personaVersion, trace.generation?.model, trace.traceSchemaVersion === '2',
       ['episodic-choice-v9', 'episodic-choice-v10', 'feedback-choice-v1', 'feedback-choice-v2', 'feedback-choice-v3', 'feedback-choice-v4', 'feedback-choice-v5', 'feedback-choice-v6', 'feedback-choice-v7', 'feedback-choice-v8', 'feedback-choice-v9', 'feedback-choice-v10', 'feedback-choice-v11', 'feedback-choice-v12', 'feedback-choice-v13', 'whole-trace-v3'].includes(trace.generation?.actorPolicyVersion ?? ''),
       ['feedback-choice-v1', 'feedback-choice-v2', 'feedback-choice-v3', 'feedback-choice-v4', 'feedback-choice-v5', 'feedback-choice-v6', 'feedback-choice-v7', 'feedback-choice-v8', 'feedback-choice-v9', 'feedback-choice-v10', 'feedback-choice-v11', 'feedback-choice-v12', 'feedback-choice-v13'].includes(trace.generation?.actorPolicyVersion ?? ''),
-      ['feedback-choice-v2', 'feedback-choice-v3', 'feedback-choice-v4', 'feedback-choice-v5', 'feedback-choice-v6', 'feedback-choice-v7', 'feedback-choice-v8', 'feedback-choice-v9', 'feedback-choice-v10', 'feedback-choice-v11', 'feedback-choice-v12', 'feedback-choice-v13'].includes(trace.generation?.actorPolicyVersion ?? ''),
+      ['feedback-choice-v2', 'feedback-choice-v3', 'feedback-choice-v4', 'feedback-choice-v5', 'feedback-choice-v6', 'feedback-choice-v7', 'feedback-choice-v8', 'feedback-choice-v9', 'feedback-choice-v10', 'feedback-choice-v11', 'feedback-choice-v12', 'feedback-choice-v13'].includes(trace.generation?.actorPolicyVersion ?? '')
+        || wholeTraceDirectionalMovement,
       ['feedback-choice-v5', 'feedback-choice-v6', 'feedback-choice-v7', 'feedback-choice-v8', 'feedback-choice-v9', 'feedback-choice-v10', 'feedback-choice-v11', 'feedback-choice-v12', 'feedback-choice-v13'].includes(trace.generation?.actorPolicyVersion ?? ''),
-      ['feedback-choice-v8', 'feedback-choice-v9', 'feedback-choice-v10', 'feedback-choice-v11', 'feedback-choice-v12', 'feedback-choice-v13'].includes(trace.generation?.actorPolicyVersion ?? ''));
+      ['feedback-choice-v8', 'feedback-choice-v9', 'feedback-choice-v10', 'feedback-choice-v11', 'feedback-choice-v12', 'feedback-choice-v13'].includes(trace.generation?.actorPolicyVersion ?? ''),
+      !wholeTraceDirectionalMovement, trace.generation?.wholeTraceMovementVersion === 'directional-v2', trace.generation?.wholeTraceObservationVersion);
     const completion = trace.generation?.systemCompletion;
     const movementPolicy = ['feedback-choice-v3', 'feedback-choice-v4', 'feedback-choice-v5', 'feedback-choice-v6', 'feedback-choice-v7', 'feedback-choice-v8', 'feedback-choice-v9', 'feedback-choice-v10', 'feedback-choice-v11', 'feedback-choice-v12', 'feedback-choice-v13'].includes(trace.generation?.actorPolicyVersion ?? '')
       ? new FeedbackMovementPolicy(trace.seed, { wanderProbability: trace.generation!.movementPolicy!.wanderProbability },

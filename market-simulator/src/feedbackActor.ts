@@ -365,11 +365,8 @@ function currentChoices(observation: ActorObservation, seed: string | number, de
       recentVisit: { timesOpened: opened },
       effect: 'Opens this shelf again. This person already opened it within the retained recent experience, and it displays the same shelf as before; products seen there are in experience.exploration.recentShelves. The marker describes observed experience and does not forbid or discourage any particular purpose.' };
   }) : projected;
-  const visited = isPassageMarkerFeedbackPolicy(policyVersion) ? marked.map(choice => {
-    const arrived = choice.action.type === 'walkToAnchor'
-      ? experience?.exploration.passageArrivals?.find(passage => passage.id === (choice.action as { anchorId: string }).anchorId)?.arrivals ?? 0 : 0;
-    return arrived < 1 ? choice : { ...choice, label: `${choice.label} · 최근에 ${arrived}번 간 통로`, recentVisit: { timesArrived: arrived } };
-  }) : marked;
+  const visited = isPassageMarkerFeedbackPolicy(policyVersion) ? marked.map(choice => markRecentPassageVisit(choice,
+    choice.action.type === 'walkToAnchor' ? choice.action.anchorId : undefined, experience)) : marked;
   const read = experience?.checks.listReadActionsAgo ?? null;
   const listed = isProgressNoteFeedbackPolicy(policyVersion) && read !== null ? visited.map(choice => choice.action.type !== 'readList' ? choice : {
     ...choice, label: `${choice.label} · ${read === 0 ? '방금' : `${read}번의 행동 전에`} 읽음, 최근 ${experience!.limits.retentionActions}번의 행동 안에 ${experience!.checks.listReadsInRetention ?? 1}번 읽음`,
@@ -400,7 +397,8 @@ function stablePersona(persona: Persona) {
         transferConditions: [...character.learningProfile.transferConditions],
       } }),
     } }),
-    ...(persona.traitProfile === undefined ? {} : { traits: pick(persona.traitProfile.traits,
+    // A traitMode:'omitted' baseline has traits:null and sends no trait levels.
+    ...(!persona.traitProfile?.traits ? {} : { traits: pick(persona.traitProfile.traits,
       ['deliberation', 'checking', 'exploration', 'persistence', 'helpSeeking']) }),
   };
 }
@@ -493,7 +491,7 @@ const DIRECTION_WORDS = { north: '위쪽', northeast: '오른쪽 위', east: '�
   south: '아래쪽', southwest: '왼쪽 아래', west: '왼쪽', northwest: '왼쪽 위' } as const;
 
 /** Words for the actor's own retained walking only; never a route, a position or a recommended direction. */
-function recentMovementNotes(experience: FeedbackExperienceSnapshot): string[] {
+export function recentMovementNotes(experience: FeedbackExperienceSnapshot): string[] {
   const movement = experience.exploration.recentMovement;
   if (!movement || movement.walks < MOVEMENT_NOTE_MINIMUM_WALKS) return [];
   const directions = Object.keys(DIRECTION_WORDS) as (keyof typeof DIRECTION_WORDS)[];
@@ -509,6 +507,14 @@ function recentMovementNotes(experience: FeedbackExperienceSnapshot): string[] {
   if (movement.directional && movement.directional.travelledPx > 0 && movement.directional.netPx * 4 <= movement.directional.travelledPx)
     notes.push('그 걸음들은 오간 끝에 처음 자리 가까이에서 끝났습니다.');
   return notes;
+}
+
+/** The v12 label is applied only to an already available control; it never changes availability or order. */
+export function markRecentPassageVisit<T extends { label: string }>(choice: T, anchorId: string | undefined,
+  experience?: FeedbackExperienceSnapshot): T | (T & { recentVisit: { timesArrived: number } }) {
+  const arrived = anchorId === undefined ? 0
+    : experience?.exploration.passageArrivals?.find(passage => passage.id === anchorId)?.arrivals ?? 0;
+  return arrived < 1 ? choice : { ...choice, label: `${choice.label} · 최근에 ${arrived}번 간 통로`, recentVisit: { timesArrived: arrived } };
 }
 
 const DISTANCE_WORDS: Record<string, string> = { near: '가까이', medium: '조금 떨어진 곳', far: '멀리' };

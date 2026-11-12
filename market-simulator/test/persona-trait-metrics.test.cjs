@@ -134,3 +134,88 @@ test('zero error variance preserves legacy code but is informational, never a un
   const finding = collectionFindings(samples).find(row => row.code === 'zero-error-variance');
   assert.equal(finding.severity, 'info'); assert.match(finding.interpretation, /not evidence/);
 });
+
+// opportunityRows: per-opportunity records for spec v3 position-stability descriptions.
+const metricCases = require('./fixtures/persona-trait-metric-cases.cjs');
+const golden = require('./fixtures/persona-trait-metrics-golden.json');
+const specV3 = require('../validation/persona-trait-validation-spec-v3.json');
+function measureCase(c, opportunityRows) {
+  const evidence = c.bundle ? { bundle: c.bundle } : {}, persona = c.persona ?? {}, rows = opportunityRows ? { opportunityRows: true } : {};
+  return { extract: extract(c.trace, c.snapshot, persona, c.audit, evidence, rows),
+    universal: extractUniversal(c.trace, c.snapshot, persona, c.audit, evidence, rows),
+    universalV2: extractUniversal(c.trace, c.snapshot, persona, c.audit, evidence,
+      { analysisVersion: 2, ...rows, ...(c.routeOpportunityVersion ? { routeOpportunityVersion: c.routeOpportunityVersion } : {}) }) };
+}
+const metricMaps = result => [result.extract, result.universal.metrics, result.universalV2.metrics];
+function withoutRows(result) {
+  const strip = metrics => Object.fromEntries(Object.entries(metrics).map(([kind, { opportunityRows, ...metric }]) => [kind, metric]));
+  return { extract: strip(result.extract), universal: { ...result.universal, metrics: strip(result.universal.metrics) },
+    universalV2: { ...result.universalV2, metrics: strip(result.universalV2.metrics) } };
+}
+const NON_RATE = { extract: ['firstShelfOrientationCount', 'interestRunLength', 'newShelfDelayMs', 'familiarSelectionDelayMs', 'highLoadMismatchRate'],
+  universal: ['newShelfDelayMs', 'initialCautionCount'] };
+test('opportunityRows leave every pre-existing metric field and order unchanged', () => {
+  for (const c of metricCases.cases()) {
+    assert.equal(JSON.stringify(measureCase(c, false)), JSON.stringify(golden[c.name]), `${c.name} default path`);
+    assert.equal(JSON.stringify(withoutRows(measureCase(c, true))), JSON.stringify(golden[c.name]), `${c.name} without opportunityRows`);
+    for (const metrics of metricMaps(measureCase(c, false))) assert.ok(Object.values(metrics).every(m => !Object.hasOwn(m, 'opportunityRows')));
+  }
+});
+const allCases = () => [...metricCases.cases(), ...metricCases.extraCases()];
+test('opportunityRows match denominator and numerator for every rate metric; non-rate metrics keep null', () => {
+  let checkedRows = 0;
+  for (const c of allCases()) {
+    const result = measureCase(c, true);
+    for (const [index, metrics] of metricMaps(result).entries()) for (const [kind, metric] of Object.entries(metrics)) {
+      const label = `${c.name} ${['extract', 'universal', 'universalV2'][index]} ${kind}`;
+      assert.ok(Object.hasOwn(metric, 'opportunityRows'), label);
+      if ((index ? NON_RATE.universal : NON_RATE.extract).includes(kind)) { assert.equal(metric.opportunityRows, null, label); continue; }
+      const rows = metric.opportunityRows;
+      assert.ok(Array.isArray(rows), label);
+      assert.equal(rows.length, metric.denominator, label);
+      assert.equal(rows.filter(row => row.hit).length, metric.numerator, label);
+      for (const row of rows) {
+        assert.deepEqual(Object.keys(row), ['decisionIndex', 'hit', 'stepIds'], label);
+        assert.ok(Number.isInteger(row.decisionIndex) && typeof row.hit === 'boolean' && row.stepIds.length > 0, label);
+        assert.ok(row.stepIds.every(id => metric.evidence.includes(id) || metric.opportunityEvidence?.includes(id)), label);
+      }
+      assert.ok(rows.every((row, i) => !i || rows[i - 1].decisionIndex <= row.decisionIndex), `${label} opportunity order`);
+      checkedRows += rows.length;
+    }
+  }
+  assert.ok(checkedRows > 40);
+  const rows = allCases().flatMap(c => Object.entries(measureCase(c, true).universalV2.metrics)
+    .flatMap(([kind, m]) => (m.opportunityRows ?? []).map(row => [kind, row.hit])));
+  for (const kind of specV3.metrics.filter(m => m.positionSplit).map(m => m.kind))
+    for (const hit of [true, false]) assert.ok(rows.some(row => row[0] === kind && row[1] === hit), `${kind} has ${hit ? 'hit' : 'miss'} rows`);
+});
+test('opportunityRows identify the counted opportunity and its manifestation', () => {
+  const byName = Object.fromEntries(metricCases.cases().map(c => [c.name, measureCase(c, true).universalV2.metrics]));
+  assert.deepEqual(byName['checking-sequence'].postSelectionListRate.opportunityRows, [
+    { decisionIndex: 1, hit: true, stepIds: ['s1', 's2', 's3'] }, { decisionIndex: 3, hit: false, stepIds: ['s3', 's4'] }]);
+  assert.deepEqual(byName['comparison-and-text'].comparisonRate.opportunityRows, [
+    { decisionIndex: 3, hit: true, stepIds: ['s2', 's3'] }, { decisionIndex: 6, hit: false, stepIds: ['s6'] }]);
+  assert.deepEqual(byName['route-relies'].routeRelianceRate.opportunityRows, [{ decisionIndex: 2, hit: true, stepIds: ['s2'] }]);
+  assert.deepEqual(byName['route-explores'].routeRelianceRate.opportunityRows, [{ decisionIndex: 2, hit: false, stepIds: ['s2'] }]);
+  assert.deepEqual(byName['continuous-route-missing-evidence'].routeRelianceRate.opportunityRows, []);
+  assert.deepEqual(byName.revisit.operationLearningRate.opportunityRows, []);
+  assert.equal(byName.revisit.initialCautionCount.opportunityRows, null);
+  const difficulty = byName['correction-and-difficulty'];
+  assert.deepEqual(difficulty.helpSeekingRate.opportunityRows.map(row => row.decisionIndex),
+    difficulty.persistenceResponseRate.opportunityRows.map(row => row.decisionIndex));
+});
+test('opportunityRows exclude decisions after system completion starts', () => {
+  const systemIds = ['sys1', 'sys2', 'sys3', 'sys4', 'sys5', 'sys6'];
+  const audited = metricCases.cases().find(c => c.name === 'system-completion');
+  const fallback = { ...audited, audit: null };
+  const uncut = { ...fallback, trace: { ...fallback.trace, generation: undefined } };
+  const rowsOf = c => metricMaps(measureCase(c, true)).flatMap(metrics => Object.values(metrics).flatMap(m => m.opportunityRows ?? []));
+  for (const c of [audited, fallback]) {
+    const rows = rowsOf(c);
+    assert.ok(rows.length > 0);
+    assert.ok(rows.every(row => row.stepIds.every(id => !systemIds.includes(id))), 'system suffix leaked into opportunityRows');
+    assert.ok(rows.every(row => row.decisionIndex < 2));
+  }
+  // Without the system boundary the same steps do create opportunities, so the check above is not vacuous.
+  assert.ok(rowsOf(uncut).some(row => row.stepIds.some(id => systemIds.includes(id))));
+});

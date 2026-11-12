@@ -16,6 +16,7 @@ function prepare(args) {
   const oldShape = args.catalogSchemaVersion === undefined && args.profiles === undefined && Array.isArray(args.personaIds)
     && args.personaIds.length === legacyIds.length && legacyIds.every(id => args.personaIds.includes(id));
   const selected = args.validationMode === 'legacy' || args.validationMode === undefined && oldShape ? legacy : universal();
+  if (selected === legacy && args.lowGoalCount !== undefined) throw new Error('lowGoalCount is supported only for traits catalog v2');
   return selected.prepare(args);
 }
 function lookupValidationSlot(args, snapshot) {

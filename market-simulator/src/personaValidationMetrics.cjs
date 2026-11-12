@@ -92,11 +92,15 @@ function actorEvents(trace, audit = null, evidence = {}) {
       before: decision.before, after: decision.after, actorState: decision.actorState, basis: decision.basis,
       knowledge: decision.knowledge, cognition: decision.cognition, taskMemory: decision.taskMemory,
       choiceResolution: decision.choiceResolution,
+      ...(decision.navigationEvidence ? { navigationEvidence: decision.navigationEvidence } : {}),
       interest: decision.actorState?.activity === 'interest' || decision.basis?.intent === 'interest' || step.attentionTag === 'interest',
       attentionAvailable: Boolean(decision.actorState?.activity || decision.basis?.intent || step.attentionTag),
     };
   });
 }
+/** One row per counted opportunity in actor order; hit means it entered the numerator. */
+const opportunityRow = (event, hit, related = []) => ({ decisionIndex: event.decisionIndex ?? event.index ?? null, hit: Boolean(hit),
+  stepIds: [...new Set([event, ...related].filter(Boolean).sort((a, b) => a.index - b.index).flatMap(row => row.stepIds ?? []))] });
 const selectedEvent = event => event.type === 'dragProduct' && event.gesture?.outcome === 'drop';
 const returnEvent = event => event.type === 'removeProduct' || event.type === 'talkToStaff' && event.choice === 'returnProduct';
 const helpEvent = event => event.type === 'viewHelp' || event.type === 'talkToStaff' && event.choice !== 'returnProduct';
@@ -231,20 +235,22 @@ function correctionOpportunities(events, goals) {
   }
   return opportunities;
 }
-function extract(trace, snapshot, persona, audit = null, evidence = {}) {
+function extract(trace, snapshot, persona, audit = null, evidence = {}, options = {}) {
   const events = actorEvents(trace, audit, evidence), goals = validationGoals(snapshot), selected = events.filter(selectedEvent);
   const firstShelf = events.findIndex(s => s.type === 'openShelf');
   const checkout = events.findIndex(s => s.type === 'checkout' || s.type === 'submitForReview');
   const runs = interestRuns(events), results = {};
-  function put(kind, numerator, denominator, evidenceEvents = []) {
+  // rows: one opportunityRow per opportunity; null when the numerator is not a count of opportunities.
+  function put(kind, numerator, denominator, evidenceEvents = [], rows = null) {
     const unique = [...new Set(evidenceEvents)];
     const decisionIndexes = unique.map(s => s.decisionIndex).filter(Number.isInteger);
     results[kind] = { status: denominator ? 'measured' : 'unexercised', numerator, denominator,
       value: denominator ? numerator / denominator : null, evidence: [...new Set(unique.flatMap(s => s.stepIds))], decisionIndexes,
       reviewFindings: (evidence.personaReview?.findings ?? []).filter(f => f.decisionIndexes?.some(i => decisionIndexes.includes(i))),
+      ...(options.opportunityRows ? { opportunityRows: rows } : {}),
     };
   }
-  const postOpportunities = [], postChecks = [];
+  const postOpportunities = [], postChecks = [], postRows = [];
   for (const event of selected) {
     const goal = eventGoal(event, goals);
     if (!goal) continue;
@@ -253,8 +259,9 @@ function extract(trace, snapshot, persona, audit = null, evidence = {}) {
     if (!next) continue; // Last selections have no next-goal opportunity.
     const check = events.slice(event.index + 1, next.index).find(s => s.type === 'readList');
     postOpportunities.push(event, next); if (check) postChecks.push(check);
+    postRows.push(opportunityRow(event, check, [check, next]));
   }
-  put('postSelectionListRate', postChecks.length, postOpportunities.length / 2, [...postOpportunities, ...postChecks]);
+  put('postSelectionListRate', postChecks.length, postOpportunities.length / 2, [...postOpportunities, ...postChecks], postRows);
   const orientation = firstShelf < 0 ? [] : events.slice(0, firstShelf).filter(s => ['lookAround', 'viewHelp'].includes(s.type)
     || helpEvent(s) || ['walkTo', 'walkToAnchor'].includes(s.type) && ['explore', 'orient'].includes(s.basis?.intent ?? s.attentionTag));
   put('firstShelfOrientationCount', orientation.length, firstShelf < 0 || trace.experienceMode === 'revisit' ? 0 : 1,
@@ -267,11 +274,12 @@ function extract(trace, snapshot, persona, audit = null, evidence = {}) {
   // One continuous visibility episode is one exposed opportunity, and only later entries count.
   const exposures = curryCues.filter((s, i) => i === 0 || curryCues[i - 1].index < s.index - 1);
   const eligibleExposures = !goalShelves.has('meal') ? exposures : [];
-  const detours = eligibleExposures.map((cue, i) => events.slice(cue.index, eligibleExposures[i + 1]?.index ?? events.length)
-    .find(s => s.type === 'openShelf' && s.stationId === 'meal' && s.interest)).filter(Boolean);
-  put('curryDetourRate', detours.length, eligibleExposures.length, [...eligibleExposures, ...detours]);
+  const detourHits = eligibleExposures.map((cue, i) => events.slice(cue.index, eligibleExposures[i + 1]?.index ?? events.length)
+    .find(s => s.type === 'openShelf' && s.stationId === 'meal' && s.interest)), detours = detourHits.filter(Boolean);
+  put('curryDetourRate', detours.length, eligibleExposures.length, [...eligibleExposures, ...detours],
+    eligibleExposures.map((cue, i) => opportunityRow(cue, detourHits[i], [detourHits[i]])));
   const recoveryRuns = runs.filter(run => goals.some(g => goalError(taskBasketAt(events, run.end + 1), g) > 0));
-  const recoveries = [];
+  const recoveries = [], recoveryRows = [];
   for (const run of recoveryRuns) {
     const nextInterest = runs.find(other => other.start > run.end)?.start ?? events.length;
     const tail = events.slice(run.end + 1, nextInterest);
@@ -280,8 +288,10 @@ function extract(trace, snapshot, persona, audit = null, evidence = {}) {
     const goalAction = check && tail.find(s => s.index > check.index && (pending.has(s.basis?.goalId)
       || selectedEvent(s) && pending.has(eventGoal(s, goals)?.id)) && !['readList', 'viewCart', 'viewHelp'].includes(s.type));
     if (goalAction) recoveries.push(check, goalAction);
+    // The opportunity opens when the interest run ends; recoveries holds one check/action pair per hit.
+    recoveryRows.push(opportunityRow(run.events.at(-1), goalAction, [...run.events, ...(goalAction ? [check, goalAction] : [])]));
   }
-  put('interestRecoveryRate', recoveries.length / 2, recoveryRuns.length, [...recoveryRuns.flatMap(r => r.events), ...recoveries]);
+  put('interestRecoveryRate', recoveries.length / 2, recoveryRuns.length, [...recoveryRuns.flatMap(r => r.events), ...recoveries], recoveryRows);
   put('interestRunLength', runs.reduce((n, r) => n + r.events.length, 0), runs.length, runs.flatMap(r => r.events));
   const detourRuns = runs.filter(run => detours.some(s => s.index >= run.start && s.index <= run.end));
   results.curryDetourRate.meanRunLength = detourRuns.length ? detourRuns.reduce((n, r) => n + r.events.length, 0) / detourRuns.length : null;
@@ -291,7 +301,7 @@ function extract(trace, snapshot, persona, audit = null, evidence = {}) {
     return trace.experienceMode !== 'revisit' && s.actorState?.orientation !== 'familiar';
   });
   put('newShelfDelayMs', newShelves.reduce((n, s) => n + s.reactionDelayMs, 0), newShelves.length, newShelves);
-  const comparisonOpportunities = [], comparisons = [];
+  const comparisonOpportunities = [], comparisons = [], comparisonRows = [];
   for (const selection of selected) {
     const boundary = events.slice(0, selection.index).findLastIndex(s => ['openShelf', 'closeStation'].includes(s.type) || selectedEvent(s));
     const interval = events.slice(boundary + 1, selection.index + 1), goal = eventGoal(selection, goals);
@@ -302,13 +312,17 @@ function extract(trace, snapshot, persona, audit = null, evidence = {}) {
     comparisonOpportunities.push(selection);
     const browse = interval.find(s => s.type === 'browse');
     // Inspecting one newly found page with only one candidate is search, not a demonstrated comparison.
-    if (browse && candidates.size > 1) comparisons.push(browse);
+    const comparison = browse && candidates.size > 1 ? browse : null;
+    if (comparison) comparisons.push(comparison);
+    comparisonRows.push(opportunityRow(selection, comparison, [comparison]));
   }
-  put('comparisonRate', comparisons.length, comparisonOpportunities.length, [...comparisonOpportunities, ...comparisons]);
+  put('comparisonRate', comparisons.length, comparisonOpportunities.length, [...comparisonOpportunities, ...comparisons], comparisonRows);
   const corrections = correctionOpportunities(events, goals);
   put('correctionRate', corrections.filter(o => o.correctedBy).length, corrections.length,
-    corrections.flatMap(o => [o.event, ...(o.correctedBy ? [o.correctedBy] : [])]));
-  put('independentSelectionRate', selected.filter(s => independentChoice(s, events)).length, selected.length, selected);
+    corrections.flatMap(o => [o.event, ...(o.correctedBy ? [o.correctedBy] : [])]),
+    corrections.map(o => opportunityRow(o.event, o.correctedBy, [o.correctedBy])));
+  put('independentSelectionRate', selected.filter(s => independentChoice(s, events)).length, selected.length, selected,
+    selected.map(s => opportunityRow(s, independentChoice(s, events))));
   const familiar = new Set(persona.character?.familiarProductIds ?? []);
   const familiarSelections = selected.filter(s => familiar.has(s.productId));
   put('familiarSelectionDelayMs', familiarSelections.reduce((n, s) => n + s.reactionDelayMs, 0), familiarSelections.length, familiarSelections);
@@ -316,26 +330,34 @@ function extract(trace, snapshot, persona, audit = null, evidence = {}) {
   put('highLoadMismatchRate', exercised.filter(goal => goalError(basket, goal) > 0).length, exercised.length, selected);
   const checkoutChecks = checkout < 0 ? [] : events.slice(selected.filter(s => s.index < checkout).at(-1)?.index ?? 0, checkout)
     .filter(s => s.type === 'viewCart');
-  put('preCheckoutCartRate', Number(checkoutChecks.length > 0), checkout < 0 ? 0 : 1, checkout < 0 ? [] : [...checkoutChecks, events[checkout]]);
+  put('preCheckoutCartRate', Number(checkoutChecks.length > 0), checkout < 0 ? 0 : 1, checkout < 0 ? [] : [...checkoutChecks, events[checkout]],
+    checkout < 0 ? [] : [opportunityRow(events[checkout], checkoutChecks.length, checkoutChecks)]);
   return results;
 }
 /** Universal rules consume recorded opportunities, never a person's name or diagnosis. */
 function extractUniversal(trace, snapshot, persona = {}, audit = null, evidence = {}, options = {}) {
+  if (options.routeOpportunityVersion !== undefined
+    && (options.routeOpportunityVersion !== 'continuous-route-v1' || options.analysisVersion !== 2))
+    throw new Error('continuous-route-v1 requires explicit analysisVersion 2');
   const events = actorEvents(trace, audit, evidence), goals = validationGoals(snapshot);
-  const legacy = extract(trace, snapshot, persona, audit, evidence), metrics = {};
+  const legacy = extract(trace, snapshot, persona, audit, evidence, { opportunityRows: options.opportunityRows }), metrics = {};
   const observed = events.some(event => event.before || event.after);
   const uniqueEvents = rows => [...new Set(rows.filter(Boolean))];
   const eventEvidence = rows => [...new Set(uniqueEvents(rows).flatMap(event => event.stepIds ?? []))];
-  function put(kind, numerator, denominator, rows, evidenceType, reason, extras = {}) {
+  // opportunities: one opportunityRow per opportunity, emitted only when requested (spec v3 and later).
+  function put(kind, numerator, denominator, rows, evidenceType, reason, extras = {}, opportunities = null) {
     metrics[kind] = { status: denominator > 0 ? 'measured' : 'unexercised', numerator, denominator,
       value: denominator > 0 ? numerator / denominator : null, evidence: eventEvidence(rows),
       decisionIndexes: uniqueEvents(rows).map(row => row.decisionIndex).filter(Number.isInteger),
-      evidenceType, ...(denominator ? {} : { reason }), ...extras };
+      evidenceType, ...(denominator ? {} : { reason }), ...extras,
+      ...(options.opportunityRows ? { opportunityRows: opportunities } : {}) };
   }
   for (const kind of ['postSelectionListRate', 'comparisonRate', 'preCheckoutCartRate']) {
-    metrics[kind] = { ...legacy[kind], evidenceType: 'observed-action',
+    const { opportunityRows, ...measured } = legacy[kind];
+    metrics[kind] = { ...measured, evidenceType: 'observed-action',
       ...(legacy[kind].denominator ? {} : { reason: kind === 'comparisonRate' && !observed
-        ? 'missing-observation-evidence' : 'no-eligible-opportunity' }) };
+        ? 'missing-observation-evidence' : 'no-eligible-opportunity' }),
+      ...(options.opportunityRows ? { opportunityRows } : {}) };
   }
   // Missing authored timing must remain missing rather than turning into zero or NaN.
   const shelfIds = new Set(), firstShelves = events.filter(event => {
@@ -367,37 +389,38 @@ function extractUniversal(trace, snapshot, persona = {}, audit = null, evidence 
   }
   // Exposure must precede the detour. Opening a shelf cannot retroactively expose its products.
   const exposures = events.filter(exposedInterest).filter((event, index, rows) => index === 0 || rows[index - 1].index < event.index - 1);
-  const detours = exposures.map((exposure, index) => events.slice(exposure.index, exposures[index + 1]?.index ?? events.length)
+  const detourHits = exposures.map((exposure, index) => events.slice(exposure.index, exposures[index + 1]?.index ?? events.length)
     .find(event => event.interest && (event.type === 'openShelf' && interestCategories.has(event.stationId) && !goalCategories.has(event.stationId)
       || selectedEvent(event) && isNonGoalInterest(event.productId)
-      || event.type === 'browse' && (event.before?.products ?? []).some(product => isNonGoalInterest(product.id)))))
-    .filter(Boolean);
+      || event.type === 'browse' && (event.before?.products ?? []).some(product => isNonGoalInterest(product.id)))));
+  const detours = detourHits.filter(Boolean);
   put('interestDetourRate', detours.length, exposures.length, [...exposures, ...detours],
     'observed-action+actor-declaration', !productSelectors.size && !categorySelectors.size ? 'no-profile-interest-selectors'
       : !observed ? 'missing-observation-evidence' : 'no-observed-non-goal-interest-cue', {
       selectors: { productOrFamilyIds: [...productSelectors], categoryIds: [...categorySelectors] },
       limitations: ['Interest motive comes from actor annotations; exposure and resulting actions come from recorded observations.'],
-    });
+    }, exposures.map((exposure, index) => opportunityRow(exposure, detourHits[index], [detourHits[index]])));
   const runs = interestRuns(events), profileRuns = runs.filter(run => run.events.some(event =>
     interestProduct(event.productId) || interestCategories.has(event.stationId)
     || interestCategories.has(event.before?.activeStation) || (event.before?.products ?? []).some(product => interestProduct(product.id))));
   const recoveryRuns = profileRuns.filter(run => goals.some(goal => goalError(basketAt(events, run.end + 1), goal) > 0));
-  const recoveries = recoveryRuns.map(run => {
+  const recoveryHits = recoveryRuns.map(run => {
     const pending = goals.filter(goal => goalError(basketAt(events, run.end + 1), goal) > 0);
     const nextRun = runs.find(other => other.start > run.end);
     return events.slice(run.end + 1, nextRun?.start ?? events.length).find(event => !event.interest
       && (selectedEvent(event) && pending.some(goal => eventGoal(event, goals) === goal)
         || !['readList', 'viewCart', 'viewHelp', 'pause', 'closeView', 'closeStation'].includes(event.type)
           && pending.some(goal => goal.id === event.basis?.goalId)));
-  }).filter(Boolean);
+  }), recoveries = recoveryHits.filter(Boolean);
   put('interestRecoveryRate', recoveries.length, recoveryRuns.length, [...recoveryRuns.flatMap(run => run.events), ...recoveries],
     'observed-action+actor-declaration', !productSelectors.size && !categorySelectors.size ? 'no-profile-interest-selectors'
       : 'no-profile-interest-episode-with-pending-goal', {
       interpretation: 'Descriptive recovery ability; spontaneous resumption also counts. Not a required increase over a control.',
-    });
+    }, recoveryRuns.map((run, index) => opportunityRow(run.events.at(-1), recoveryHits[index], [...run.events, recoveryHits[index]])));
 
   const difficulties = difficultyOpportunities(events, goals);
   const responseEvents = [], helpEvents = [], observedDifficultyResponses = [], declaredDifficultyResponses = [];
+  const responseRows = [], helpRows = [];
   const byEvidenceType = {};
   for (let index = 0; index < difficulties.length; index++) {
     const opportunity = difficulties[index], next = difficulties.find(item => item.event.index > opportunity.event.index);
@@ -421,6 +444,8 @@ function extractUniversal(trace, snapshot, persona = {}, audit = null, evidence 
     });
     if (help) helpEvents.push(help);
     if (response) responseEvents.push(response);
+    responseRows.push(opportunityRow(opportunity.event, response, [response]));
+    helpRows.push(opportunityRow(opportunity.event, help, [help]));
     (opportunity.evidenceType === 'actor-declaration' ? declaredDifficultyResponses : observedDifficultyResponses)
       .push(...[help, response].filter(Boolean));
     const category = byEvidenceType[opportunity.evidenceType] ??= { opportunities: 0, responses: 0, helpUses: 0 };
@@ -433,11 +458,11 @@ function extractUniversal(trace, snapshot, persona = {}, audit = null, evidence 
     [...difficulties.map(item => item.event), ...responseEvents], difficultyEvidenceType, difficultyReason, {
       byEvidenceType, interpretation: 'Response or strategy change after difficulty, not accuracy or a quota of deliberate errors.',
       limitations: ['Checking or requesting help is a response, not proof of correction; repeating an unchanged rejected action does not count.'],
-    });
+    }, responseRows);
   put('helpSeekingRate', helpEvents.length, difficulties.length, [...difficulties.map(item => item.event), ...helpEvents],
     difficultyEvidenceType, difficultyReason, { byEvidenceType,
       limitations: ['Uncertain goal declarations are labeled separately from observed error feedback. Routine cashier requests are not help.'],
-    });
+    }, helpRows);
 
   const cart = basketAt(events), attempts = events.filter(event => event.type === 'dragProduct');
   const goalOutcomes = goals.map(goal => {
@@ -484,7 +509,8 @@ function extractUniversal(trace, snapshot, persona = {}, audit = null, evidence 
       || event.type === 'viewCart' && legacy.preCheckoutCartRate.evidence.some(id => event.stepIds.includes(id)));
     const observedReservations = [...oldChecks, ...detours, ...recoveries, ...observedDifficultyResponses];
     Object.assign(metrics, require('./personaValidationFirstPlay.cjs').extractFirstPlay({
-      trace, events, goals, evidence, isGoalProduct,
+      trace, events, goals, evidence, isGoalProduct, opportunityRows: Boolean(options.opportunityRows),
+      ...(options.routeOpportunityVersion ? { routeOpportunityVersion: options.routeOpportunityVersion } : {}),
       reservedEvents: [...oldChecks, ...detours, ...recoveries, ...helpEvents, ...responseEvents],
       declaredOnlyOverlapEvents: declaredDifficultyResponses.filter(event => !observedReservations.includes(event)),
     }));
@@ -495,6 +521,8 @@ function extractUniversal(trace, snapshot, persona = {}, audit = null, evidence 
     ...Object.fromEntries(['missingObservationCount', 'missingArrivalCount', 'missingEvidenceReasons',
       'excludedOpportunityEvidence', 'exclusionReason', 'unknownVisitExclusionEvidence']
       .filter(key => Object.hasOwn(metric, key)).map(key => [key, metric[key]])),
+    ...(metric.routeOpportunityVersion ? { routeOpportunityVersion: metric.routeOpportunityVersion,
+      directionalDiagnostics: metric.directionalDiagnostics } : {}),
   }]));
   return { metrics, outcome, coverage, terminationReview: { status: signals.length ? 'review' : 'clear', signals,
     observedDifficultyCount: observedDifficulties.length, declaredUncertaintyCount: priorDifficulties.length - observedDifficulties.length,
@@ -531,5 +559,5 @@ function difficultyOpportunities(events, goals) {
   }
   return opportunities.sort((left, right) => left.event.index - right.event.index);
 }
-module.exports = { legacyCounts, extract, extractUniversal, actorEvents, validationGoals, isGoalProduct, selectedEvent, returnEvent, feedbackOf,
+module.exports = { opportunityRow, legacyCounts, extract, extractUniversal, actorEvents, validationGoals, isGoalProduct, selectedEvent, returnEvent, feedbackOf,
   independentChoice, basketAt, taskBasketAt, goalError, eventGoal, interestRuns, selectionErrors, correctionOpportunities, difficultyOpportunities };

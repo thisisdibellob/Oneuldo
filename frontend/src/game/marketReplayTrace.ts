@@ -59,6 +59,10 @@ export type MarketReplayTrace = {
   generation?: { model: string; reproducibility: 'seed-and-snapshot' | 'captured-trace'; requestId?: string;
     timingProfile?: 'compact-v1' | 'actor-preserved-v1' | 'activity-duration-v1' | 'activity-duration-v2'; sourceTraceId?: string; actorPolicyVersion?: 'episodic-choice-v1' | 'episodic-choice-v2' | 'episodic-choice-v3' | 'episodic-choice-v4' | 'episodic-choice-v5' | 'episodic-choice-v6' | 'episodic-choice-v7' | 'episodic-choice-v8' | 'episodic-choice-v9' | 'episodic-choice-v10' | 'feedback-choice-v1' | 'feedback-choice-v2' | 'feedback-choice-v3' | 'feedback-choice-v4' | 'feedback-choice-v5' | 'feedback-choice-v6' | 'feedback-choice-v7' | 'feedback-choice-v8' | 'feedback-choice-v9' | 'feedback-choice-v10' | 'feedback-choice-v11' | 'feedback-choice-v12' | 'feedback-choice-v13' | 'whole-trace-v1' | 'whole-trace-v2' | 'whole-trace-v3';
     movementContract?: 'joystick-direction-v1';
+    wholeTraceMovementVersion?: 'directional-v1' | 'directional-v2';
+    wholeTraceObservationVersion?: 'anchor-visible-structures-v1';
+    wholeTraceMovementValidationVersion?: '1';
+    wholeTraceMovementFeedbackVersion?: 'recent-movement-v1' | 'recent-movement-anchor-v1' | 'recent-movement-anchor-capacity-v1';
     movementPolicy?: MarketReplayMovementPolicy;
     reasoningEffort?: 'low';
     feedback?: { observationScope: 'current-screen'; contextDelivery: 'stateless-http' | 'external-frame'; decisions: number } & (
@@ -250,9 +254,28 @@ export function validateMarketReplayTrace(value: unknown, snapshot?: MarketRepla
       || trace.experienceMode !== 'first-play') errors.push('Feedback planning requires a fresh schema 2 / policy 6 actor, current-screen belief metadata and supported actor timing without automatic completion.');
   } else if (generation?.feedback !== undefined) errors.push('Feedback metadata requires feedback-choice-v1, feedback-choice-v2, feedback-choice-v3 or feedback-choice-v4.');
   const directionalSteps = trace.steps.some(step => step.type === 'moveDirection');
+  const directionalWholeTrace = ['directional-v1', 'directional-v2'].includes(generation?.wholeTraceMovementVersion ?? '')
+    && generation?.actorPolicyVersion === 'whole-trace-v3';
+  if (generation?.wholeTraceObservationVersion !== undefined && (generation.wholeTraceObservationVersion !== 'anchor-visible-structures-v1'
+    || generation.actorPolicyVersion !== 'whole-trace-v3' || generation.wholeTraceMovementVersion !== undefined || generation.trialBinding))
+    errors.push('Anchor visible structures require an unbound whole-trace-v3 anchor observation contract.');
+  if (generation?.wholeTraceMovementValidationVersion !== undefined && (generation.wholeTraceMovementValidationVersion !== '1'
+    || generation.actorPolicyVersion !== 'whole-trace-v3' || generation.trialBinding
+    || generation.wholeTraceMovementVersion !== undefined && generation.wholeTraceMovementVersion !== 'directional-v2'))
+    errors.push('Movement validation 1 requires whole-trace-v3 anchor or directional-v2 movement without a learning trial.');
+  if (generation?.wholeTraceMovementFeedbackVersion === 'recent-movement-anchor-v1'
+    || generation?.wholeTraceMovementFeedbackVersion === 'recent-movement-anchor-capacity-v1') {
+    if (generation.wholeTraceMovementVersion !== undefined || generation.wholeTraceObservationVersion !== 'anchor-visible-structures-v1')
+      errors.push('Anchor movement feedback requires omitted movementVersion and anchor-visible-structures-v1.');
+  } else if (generation?.wholeTraceMovementFeedbackVersion !== undefined && (generation.wholeTraceMovementFeedbackVersion !== 'recent-movement-v1'
+    || generation.wholeTraceMovementValidationVersion !== '1' || generation.wholeTraceMovementVersion !== 'directional-v2'))
+    errors.push('Movement validation feedback requires validation 1 and directional-v2.');
+  if (generation?.wholeTraceMovementVersion !== undefined
+    && (!directionalWholeTrace || generation.movementContract !== 'joystick-direction-v1'))
+    errors.push(`Whole-trace ${generation.wholeTraceMovementVersion} requires whole-trace-v3 and joystick-direction-v1 movement.`);
   if (directionalFeedback && generation?.movementContract !== 'joystick-direction-v1')
     errors.push('Feedback-choice-v2, feedback-choice-v3 and feedback-choice-v4 require joystick-direction-v1 movement.');
-  if ((directionalSteps || generation?.movementContract !== undefined) && !directionalFeedback)
+  if ((directionalSteps || generation?.movementContract !== undefined) && !directionalFeedback && !directionalWholeTrace)
     errors.push('Directional movement requires feedback-choice-v2, feedback-choice-v3 or feedback-choice-v4 and its explicit movement contract.');
   if (generation?.timingProfile === 'activity-duration-v2' && !directionalFeedback)
     errors.push('Activity-duration-v2 timing requires feedback-choice-v2, feedback-choice-v3 or feedback-choice-v4.');

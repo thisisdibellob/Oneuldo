@@ -1,6 +1,7 @@
 'use strict';
 // Versioned observational measures. No authored reason, activity, memory or timing is evidence.
 const { getMarketProduct } = require('../../frontend/src/game/scenarios.ts');
+const { opportunityRow } = require('./personaValidationMetrics.cjs');
 const KINDS = Object.freeze({ initialCaution: 'initialCautionCount', operationLearning: 'operationLearningRate',
   routeReliance: 'routeRelianceRate', textCueLoad: 'textCueLoadRate' });
 const inspecting = event => ['lookAround', 'pause', 'readList', 'viewHelp'].includes(event.type);
@@ -43,22 +44,27 @@ function observedWalkChoices(event, bundle) {
     && menu.choiceIds.includes(`walk/${waypoint.waypointId}`)).map(waypoint => waypoint.anchorId);
 }
 
-function extractFirstPlay({ trace, events, goals, reservedEvents = [], declaredOnlyOverlapEvents = [], evidence = {}, isGoalProduct }) {
+function extractFirstPlay({ trace, events, goals, reservedEvents = [], declaredOnlyOverlapEvents = [], evidence = {}, isGoalProduct,
+  routeOpportunityVersion, opportunityRows = false }) {
+  if (routeOpportunityVersion !== undefined && routeOpportunityVersion !== 'continuous-route-v1')
+    throw new Error('Unsupported routeOpportunityVersion');
   const metrics = {}, reserved = new Set(reservedEvents), unresolved = new Set(declaredOnlyOverlapEvents), claimed = new Set();
   const isFirstPlay = trace.experienceMode !== 'revisit';
   const accepted = event => (event.after ?? events[event.index + 1]?.before)?.result?.accepted !== false;
   const available = event => !reserved.has(event) && !claimed.has(event) && accepted(event);
-  function put(kind, numerator, denominator, opportunities, manifestations, reason, extras = {}) {
+  // perOpportunity: one opportunityRow per opportunity; null for the count metric initialCautionCount.
+  function put(kind, numerator, denominator, opportunities, manifestations, reason, extras = {}, perOpportunity = null) {
     const rows = unique([...opportunities, ...manifestations]);
     metrics[kind] = { status: denominator > 0 ? 'measured' : 'unexercised', numerator, denominator,
       value: denominator > 0 ? numerator / denominator : null, evidence: ids(rows),
       decisionIndexes: rows.map(event => event.decisionIndex).filter(Number.isInteger),
       evidenceType: 'observed-action', ...(denominator ? {} : { reason }),
-      opportunityEvidence: ids(opportunities), manifestationEvidence: ids(manifestations), ...extras };
+      opportunityEvidence: ids(opportunities), manifestationEvidence: ids(manifestations), ...extras,
+      ...(opportunityRows ? { opportunityRows: perOpportunity } : {}) };
     manifestations.forEach(event => claimed.add(event));
   }
   if (!isFirstPlay) {
-    for (const kind of Object.values(KINDS)) put(kind, 0, 0, [], [], 'not-first-play');
+    for (const kind of Object.values(KINDS)) put(kind, 0, 0, [], [], 'not-first-play', {}, kind === KINDS.initialCaution ? null : []);
     return metrics;
   }
 
@@ -78,7 +84,7 @@ function extractFirstPlay({ trace, events, goals, reservedEvents = [], declaredO
   // A display check can express text-cue response without assigning an error or inferring confusion.
   // Legacy comparison owns its browses. A remaining concrete lookAround/readList/viewCart is a check;
   // an actorState compare/check label or a pause alone is never proof of reading text.
-  const textOpportunities = [], textResponses = [], textExcluded = [], textExcludedOpportunities = [], textDetails = [];
+  const textOpportunities = [], textResponses = [], textExcluded = [], textExcludedOpportunities = [], textDetails = [], textRows = [];
   let missingText = 0;
   for (const selection of events.filter(add)) {
     if (selection.interest) continue;
@@ -95,8 +101,10 @@ function extractFirstPlay({ trace, events, goals, reservedEvents = [], declaredO
       && previous.before.products.some(product => alternatives.some(alternative => alternative.id === product.id)) ? previous : null;
     if (check && unresolved.has(check)) { textExcludedOpportunities.push(selection); textExcluded.push(check); continue; }
     textOpportunities.push(selection);
-    if (check && available(check)) textResponses.push(check);
+    const response = check && available(check) ? check : null;
+    if (response) textResponses.push(response);
     else if (check && (reserved.has(check) || claimed.has(check))) textExcluded.push(check);
+    textRows.push(opportunityRow(selection, response, [response]));
     textDetails.push({ stepId: selection.id, productIds: [selection.productId, ...alternatives.map(product => product.id)] });
   }
   put(KINDS.textCueLoad, textResponses.length, textOpportunities.length, textOpportunities, textResponses,
@@ -106,9 +114,10 @@ function extractFirstPlay({ trace, events, goals, reservedEvents = [], declaredO
       excludedOverlapEvidence: ids(textExcluded), displays: textDetails,
       excludedOpportunityEvidence: ids(textExcludedOpportunities),
       ...(textExcludedOpportunities.length ? { exclusionReason: 'declared-only-overlap-unresolvable' } : {}),
-      interpretation: 'Observed response to simultaneously displayed similar text; no label-confusion error or authored activity is counted.' });
+      interpretation: 'Observed response to simultaneously displayed similar text; no label-confusion error or authored activity is counted.' }, textRows);
 
   const used = new Set(), firstUses = [], preparations = [], operationExcluded = [], operationDetails = [], operationExcludedOpportunities = [];
+  const operationRows = [];
   for (const event of events) {
     const kind = operation(event);
     if (!kind || used.has(kind)) continue;
@@ -123,6 +132,7 @@ function extractFirstPlay({ trace, events, goals, reservedEvents = [], declaredO
     firstUses.push(event);
     const preparation = candidates.findLast(available);
     if (preparation) { preparations.push(preparation); claimed.add(preparation); }
+    operationRows.push(opportunityRow(event, preparation, [preparation]));
     operationExcluded.push(...candidates.filter(candidate => reserved.has(candidate) || claimed.has(candidate) && candidate !== preparation));
     operationDetails.push({ operation: kind, firstUseStepId: event.id, preparationStepId: preparation?.id ?? null });
   }
@@ -131,10 +141,16 @@ function extractFirstPlay({ trace, events, goals, reservedEvents = [], declaredO
       excludedOverlapEvidence: ids(operationExcluded), firstUses: operationDetails,
       excludedOpportunityEvidence: ids(operationExcludedOpportunities),
       ...(operationExcludedOpportunities.length ? { exclusionReason: 'declared-only-overlap-unresolvable' } : {}),
-      interpretation: 'Inspection in the preceding one or two actor choices of each first-used control; does not measure failed dragging or later improvement.' });
+      interpretation: 'Inspection in the preceding one or two actor choices of each first-used control; does not measure failed dragging or later improvement.' }, operationRows);
 
+  if (routeOpportunityVersion === 'continuous-route-v1') {
+    const route = require('./personaValidationContinuousRoute.cjs').extractContinuousRoute({
+      events, bundle: evidence.bundle, available, unresolved });
+    put(KINDS.routeReliance, route.numerator, route.denominator, route.opportunities, route.manifestations, route.reason, route.extras,
+      route.opportunities.map(event => opportunityRow(event, route.manifestations.includes(event))));
+  } else {
   const visited = new Map(), unknownVisits = new Set(), routeOpportunities = [], routeResponses = [], routeExcluded = [], routeVisits = [], choices = [];
-  const routeDeclaredExclusions = [], routeUnknownExclusions = [];
+  const routeDeclaredExclusions = [], routeUnknownExclusions = [], routeRows = [];
   let missingChoices = 0, missingArrivals = 0;
   for (const event of events) {
     if (event.type !== 'walkToAnchor') continue;
@@ -152,9 +168,9 @@ function extractFirstPlay({ trace, events, goals, reservedEvents = [], declaredO
           routeDeclaredExclusions.push(event); routeExcluded.push(event);
         } else {
           routeOpportunities.push(event);
-          if (visited.has(target)) {
-            if (available(event)) routeResponses.push(event); else routeExcluded.push(event);
-          }
+          const relied = visited.has(target) && available(event);
+          if (relied) routeResponses.push(event); else if (visited.has(target)) routeExcluded.push(event);
+          routeRows.push(opportunityRow(event, relied));
           routeVisits.push(...knownOld.map(id => visited.get(id)));
           choices.push({ stepId: event.id, selectedAnchorId: target, availableAnchorIds: menu,
             visitedAvailableAnchorIds: knownOld, unvisitedAvailableAnchorIds: knownNew, unknownVisitAnchorIds: unknown,
@@ -180,7 +196,8 @@ function extractFirstPlay({ trace, events, goals, reservedEvents = [], declaredO
       excludedOpportunityEvidence: ids([...routeDeclaredExclusions, ...routeUnknownExclusions]),
       ...(routeDeclaredExclusions.length ? { exclusionReason: 'declared-only-overlap-unresolvable' } : {}),
       unknownVisitExclusionEvidence: ids(routeUnknownExclusions), unknownVisitAnchorIds: [...unknownVisits],
-      interpretation: 'A previously reached passage chosen when a legal visible unvisited alternative also exists; no shortest-path inference.' });
+      interpretation: 'A previously reached passage chosen when a legal visible unvisited alternative also exists; no shortest-path inference.' }, routeRows);
+  }
   // Stable catalog order makes JSON diffs and coverage tables easy to compare.
   return Object.fromEntries(Object.values(KINDS).map(kind => [kind, metrics[kind]]));
 }

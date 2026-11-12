@@ -1,4 +1,5 @@
-import { getWorldCameraFrame, MARKET_DEFAULT_ZOOM } from './worldZoom';
+import { MARKET_DEFAULT_ZOOM } from './worldZoom';
+import { getMarketWorldCameraFrame } from './marketWorldCamera';
 import { getNearestMarketStation, isMarketEnvironmentBlocked, isNearMarketStation, type MarketEnvironment, type MarketCashierAvailability,
   type MarketEnvironmentStationId } from './marketEnvironment';
 import { isMarketNavigationSegmentClear } from './marketNavigation';
@@ -50,7 +51,7 @@ function relative(from: Point, to: Point): RelativeCue {
 }
 /** Conservative screen projection. UI panels are excluded by the caller; this is the world HUD view. */
 function visiblePoint(environment: MarketEnvironment, position: Point, point: Point, p: ReplayPresentation): boolean {
-  const frame = getWorldCameraFrame(position, p.viewport, p.zoom, environment.world);
+  const frame = getMarketWorldCameraFrame(position, p, environment.world);
   const x = p.viewport.width / 2 + (point.x - frame.center.x) * p.zoom;
   const y = p.viewport.height / 2 + (point.y - frame.center.y) * p.zoom;
   if (x < 12 || x > p.viewport.width - 12 || y < 12 || y > p.viewport.height - 12) return false;
@@ -115,7 +116,7 @@ export function visibleUnlabelledShelfBodies(environment: MarketEnvironment, pos
   cashiers: Partial<MarketCashierAvailability> = {}): ReplayVisibleStructure[] {
   if (!validateReplayPresentation(presentation)) throw new Error('Invalid replay presentation');
   const labelled = new Set(visibleStations(environment, position, presentation, cashiers).map(station => station.id));
-  const camera = getWorldCameraFrame(position, presentation.viewport, presentation.zoom, environment.world);
+  const camera = getMarketWorldCameraFrame(position, presentation, environment.world);
   const cues = new Map<string, ReplayVisibleStructure>();
   for (const station of environment.stationDetails) {
     if (station.kind !== 'shelf' || labelled.has(station.id) || !station.categoryId) continue;

@@ -10,6 +10,7 @@ import { TraceGuard, validateTrace } from './traceValidation';
 import type { Decision, TraceOptions, TraceEntry, TraceSummary, Observation, Persona } from './types';
 import { generateAttentionTrace } from './attentionSimulator';
 import { compactTraceTiming } from './traceTiming';
+import { wholeTraceHasAnchorMovementFeedback } from './wholeTraceMovementFeedback';
 export { listPersonas } from './personas';
 export { generateBatch } from './batch';
 export { validateTrace } from './traceValidation';
@@ -38,6 +39,23 @@ async function generateOriginalTrace(options: TraceOptions): Promise<MarketRepla
   if (!snapshotCheck.valid) throw new Error(snapshotCheck.errors.join('; '));
   const wholeTraceCompiler = options.planningMode === 'whole-trace' && options.mode === 'llm'
     && options.actorPolicyVersion === 'whole-trace-v3' && typeof options.actorDecisionProvider === 'function';
+  if (options.wholeTraceObservationVersion !== undefined && (options.wholeTraceObservationVersion !== 'anchor-visible-structures-v1'
+    || !wholeTraceCompiler || options.wholeTraceMovementVersion !== undefined || options.trialBinding))
+    throw new Error('wholeTraceObservationVersion requires a new unbound whole-trace anchor request');
+  if (options.wholeTraceMovementValidationVersion !== undefined && (options.wholeTraceMovementValidationVersion !== '1'
+    || !wholeTraceCompiler || options.trialBinding || options.wholeTraceMovementVersion !== undefined && options.wholeTraceMovementVersion !== 'directional-v2'))
+    throw new Error('wholeTraceMovementValidationVersion 1 requires the whole-trace compiler and anchor or directional-v2 movement');
+  if (options.wholeTraceMovementFeedbackVersion !== undefined
+    && !(options.wholeTraceMovementFeedbackVersion === 'recent-movement-v1' && options.wholeTraceMovementValidationVersion === '1'
+      && options.wholeTraceMovementVersion === 'directional-v2')
+    && !(wholeTraceHasAnchorMovementFeedback(options.wholeTraceMovementFeedbackVersion) && wholeTraceCompiler
+      && options.wholeTraceMovementVersion === undefined && options.wholeTraceObservationVersion === 'anchor-visible-structures-v1'))
+    throw new Error('wholeTraceMovementFeedbackVersion requires recent-movement-v1 with movement validation 1 and directional-v2, or recent-movement-anchor-v1/recent-movement-anchor-capacity-v1 with omitted movementVersion and anchor-visible-structures-v1');
+  if (options.wholeTraceMovementVersion !== undefined
+    && (!['directional-v1', 'directional-v2'].includes(options.wholeTraceMovementVersion) || !wholeTraceCompiler))
+    throw new Error(`wholeTraceMovementVersion requires the explicit whole-trace-v3 compiler and ${options.wholeTraceMovementVersion === 'directional-v2' ? 'directional-v2' : 'directional-v1'}`);
+  if (options.wholeTraceMovementVersion !== undefined && options.trialBinding)
+    throw new Error('Whole-trace trial movementVersion is frozen; directional movement requires a separate unbound request');
   const persona = wholeTraceCompiler ? getWholeTracePersona(options.personaId) : getPersona(options.personaId);
   if (options.feedbackMovement !== undefined && (!persona.attention || !['feedback-choice-v3', 'feedback-choice-v4', 'feedback-choice-v5', 'feedback-choice-v6', 'feedback-choice-v7', 'feedback-choice-v8', 'feedback-choice-v9', 'feedback-choice-v10', 'feedback-choice-v11', 'feedback-choice-v12', 'feedback-choice-v13'].includes(options.actorPolicyVersion ?? '')))
     throw new Error('feedbackMovement requires an attention persona with feedback-choice-v3 or feedback-choice-v4');

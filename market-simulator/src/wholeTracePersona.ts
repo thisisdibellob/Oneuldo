@@ -7,7 +7,7 @@ import { buildWholeTraceCognitionProfile, type WholeTraceCognitionProfile } from
 export type WholeTracePersonaInput = {
   source: { personaId: string; version: string; promptHash: string };
   individualInstructions: string;
-  behavioralContext: { goalMemoryCapacity?: number };
+  behavioralContext: { goalMemoryCapacity?: number; spatialMemoryCapacity?: number };
   cognition: WholeTraceCognitionProfile;
   cognitionSourceHash: string;
   timingBaseline: Pick<Persona['parameters'], 'reactionMedianMs' | 'reactionSigma' | 'walkSpeed'>;

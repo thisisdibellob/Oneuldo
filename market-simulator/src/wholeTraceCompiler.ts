@@ -1,7 +1,7 @@
 import { extendedActorChoices as actorChoices } from './actorChoices';
 import { canonicalMarketReplayJson } from '../../frontend/src/game/marketReplayTrace';
 import { generateTrace } from './simulator';
-import { wholeTraceInputHash } from './wholeTraceBundle';
+import { wholeTraceInputHash, wholeTraceSpatialMemoryCapacity } from './wholeTraceBundle';
 import { WHOLE_TRACE_BUNDLE_VERSION, WHOLE_TRACE_MODEL, WHOLE_TRACE_POLICY_VERSION, validateWholeTraceCandidate,
   validateWholeTraceCandidatePrefix, wholeTraceTerminalIntent,
   type WholeTraceBundle, type WholeTraceCandidate, type WholeTraceDecision, type WholeTraceSettings,
@@ -16,6 +16,13 @@ import { WholeTraceCognitionEngine, WHOLE_TRACE_GOAL_FIELDS, type WholeTraceCogn
 import { buildWholeTracePersonaInput } from './wholeTracePersona';
 import { WholeTraceTaskMemoryEngine } from './wholeTraceTaskMemory';
 import { reviewWholeTraceTaskExpression } from './wholeTraceTaskExpression';
+import { wholeTraceCanMove, WHOLE_TRACE_DIRECTIONS, wholeTraceHasDirectionalMovement, wholeTraceContinuousFrame,
+  wholeTracePublicMovement, wholeTracePublicObservation, type WholeTracePublicMovementResult } from './wholeTraceMovement';
+import { createWholeTraceMovementFeedback, validWholeTraceMovementFeedback, wholeTraceHasAnchorMovementFeedback,
+  WHOLE_TRACE_ANCHOR_CAPACITY_MOVEMENT_FEEDBACK_VERSION } from './wholeTraceMovementFeedback';
+import type { WholeTraceChoiceFrame, WholeTraceAcceptedFrame } from './wholeTraceChoices';
+import type { WholeTraceChoiceSource } from './wholeTraceContracts';
+import { createWholeTraceNavigationRecorder, type WholeTraceNavigationEvidence } from './wholeTraceNavigationEvidence';
 
 export class WholeTraceCompileError extends Error {
   constructor(readonly validation: WholeTraceValidation) { super(validation.errors.join('; ')); }
@@ -23,6 +30,7 @@ export class WholeTraceCompileError extends Error {
 
 export type WholeTracePrefixOptions = {
   nextDecision?: { actorState: Pick<WholeTraceActorState, 'activity'>; delayMs: number };
+  expectedSource?: { acceptedActions: number; source: WholeTraceChoiceSource };
 };
 export type WholeTraceCalculatedAdvisory = {
   kind: 'reference-calculated-state-v1'; notice: string;
@@ -35,6 +43,7 @@ export type WholeTracePrefixResult = {
   valid: true; acceptedActions: number; terminal: boolean; before: ActorObservation;
   knowledge: WholeTraceKnowledgeSnapshot; workingMemory?: WholeTraceCognitionState;
   taskMemory?: ReturnType<WholeTraceTaskMemoryEngine['snapshot']>; advisory: WholeTraceCalculatedAdvisory;
+  choiceFrame?: WholeTraceChoiceFrame; movementResult?: WholeTracePublicMovementResult; movementNotes?: string[];
 };
 class WholeTracePrefixComplete extends Error {
   constructor(readonly result: WholeTracePrefixResult) { super('Whole trace prefix checked'); }
@@ -96,7 +105,10 @@ export function resolveWholeTraceDecision(d: WholeTraceDecision, o: ActorObserva
   } else if (a.type === 'readList') action = { type: 'readList', durationMs: 2000 };
   else if (a.type === 'pause' || a.type === 'lookAround') action = { type: a.type, durationMs: 1500 };
   else action = structuredClone(a) as PolicyAction;
-  if (!actorChoices(o).some(c => canonicalMarketReplayJson(c.action) === canonicalMarketReplayJson(action)))
+  const directional = action.type === 'moveDirection' && wholeTraceHasDirectionalMovement(bundle.movementVersion)
+    && wholeTraceCanMove(o) && WHOLE_TRACE_DIRECTIONS.includes(action.direction)
+    && Number.isInteger(action.durationMs) && action.durationMs >= 100 && action.durationMs <= 2000;
+  if (!directional && !actorChoices(o).some(c => canonicalMarketReplayJson(c.action) === canonicalMarketReplayJson(action)))
     throw new Error(`Action ${a.type} is not an available control in the current observation`);
   return { action, delayMs: d.delayMs, reason: d.reason, currentTask: d.actorState.task };
 }
@@ -109,16 +121,36 @@ async function executeWholeTraceCandidate(settings: WholeTraceSettings, bundle: 
   value: unknown, submissions: number, onCheckpoint?: (entry: GenerationCheckpoint) => void,
   prefix?: WholeTracePrefixOptions) {
   settings = structuredClone(settings); bundle = structuredClone(bundle); value = structuredClone(value);
-  if (bundle.bundleVersion !== WHOLE_TRACE_BUNDLE_VERSION || bundle.inputHash !== wholeTraceInputHash(settings) || bundle.snapshotId !== settings.snapshot.snapshotId
-    || bundle.persona.id !== settings.personaId || bundle.model !== WHOLE_TRACE_MODEL || bundle.policyVersion !== WHOLE_TRACE_POLICY_VERSION)
+  if (bundle.observationVersion !== undefined && (bundle.observationVersion !== 'anchor-visible-structures-v1'
+    || bundle.movementVersion !== undefined || settings.trialBinding))
+    throw new WholeTraceCompileError({ valid: false, code: 'PREPARED_INPUT_MISMATCH', errors: ['Unsupported prepared observation contract'] });
+  if (bundle.bundleVersion !== WHOLE_TRACE_BUNDLE_VERSION || bundle.inputHash !== wholeTraceInputHash(settings, bundle.observationVersion) || bundle.snapshotId !== settings.snapshot.snapshotId
+    || bundle.persona.id !== settings.personaId || bundle.model !== WHOLE_TRACE_MODEL || bundle.policyVersion !== WHOLE_TRACE_POLICY_VERSION
+    || bundle.movementVersion !== settings.movementVersion || bundle.movementFeedbackVersion !== settings.movementFeedbackVersion
+    || bundle.movementValidationVersion !== settings.movementValidationVersion)
     throw new WholeTraceCompileError({ valid: false, code: 'PREPARED_INPUT_MISMATCH', errors: ['Candidate input differs from the prepared bundle'] });
   const structure = (prefix ? validateWholeTraceCandidatePrefix : validateWholeTraceCandidate)(value, bundle.requestId,
-    { objectiveIds: bundle.worldReference.objectives.map(goal => goal.id) });
+    { objectiveIds: bundle.worldReference.objectives.map(goal => goal.id), movementVersion: bundle.movementVersion });
   if (!structure.valid) throw new WholeTraceCompileError({ ...structure, issues: structure.errors.map(message => {
     const decisionIndex = Number(message.match(/^decisions\[(\d+)\]/)?.[1] ?? 0);
     return runtimeIssues(structure.code ?? 'CANDIDATE_SCHEMA', [message], decisionIndex)[0];
   }) });
   const candidate = value as WholeTraceCandidate;
+  if (bundle.movementValidationVersion && candidate.candidateVersion !== '7')
+    throw new WholeTraceCompileError({ valid: false, code: 'CANDIDATE_SCHEMA', errors: ['Movement validation 1 requires candidate 7'] });
+  const continuous = bundle.movementVersion === 'directional-v2';
+  const anchorFeedback = wholeTraceHasAnchorMovementFeedback(bundle.movementFeedbackVersion);
+  const spatialMemoryCapacity = bundle.movementFeedbackVersion === WHOLE_TRACE_ANCHOR_CAPACITY_MOVEMENT_FEEDBACK_VERSION
+    ? wholeTraceSpatialMemoryCapacity(settings.personaId) : undefined;
+  if (spatialMemoryCapacity !== undefined && bundle.persona.behavior.behavioralContext.spatialMemoryCapacity !== spatialMemoryCapacity)
+    throw new WholeTraceCompileError({ valid: false, code: 'PREPARED_INPUT_MISMATCH', errors: ['Prepared spatialMemoryCapacity differs from the selected persona'] });
+  if (!validWholeTraceMovementFeedback(bundle.movementFeedbackVersion, bundle.movementVersion, bundle.observationVersion))
+    throw new WholeTraceCompileError({ valid: false, code: 'PREPARED_INPUT_MISMATCH', errors: ['movementFeedbackVersion requires recent-movement-v1 with directional-v2, or recent-movement-anchor-v1/recent-movement-anchor-capacity-v1 with omitted movementVersion and anchor-visible-structures-v1'] });
+  if (continuous && candidate.candidateVersion === '3')
+    throw new WholeTraceCompileError({ valid: false, code: 'CANDIDATE_SCHEMA', errors: ['directional-v2 requires source-bound candidate 4..7'] });
+  if (prefix?.expectedSource && (!continuous || !Number.isInteger(prefix.expectedSource.acceptedActions)
+    || prefix.expectedSource.acceptedActions < 0 || prefix.expectedSource.acceptedActions > candidate.decisions.length))
+    throw new WholeTraceCompileError({ valid: false, code: 'CHOICE_SOURCE_MISMATCH', errors: ['Expected source requires an existing directional-v2 prefix boundary'] });
   const persona = getWholeTracePersona(settings.personaId);
   const persistent = candidate.candidateVersion === '7';
   const cognitive = candidate.candidateVersion === '6' || persistent;
@@ -134,11 +166,12 @@ async function executeWholeTraceCandidate(settings: WholeTraceSettings, bundle: 
     throw new WholeTraceCompileError({ valid: false, code: 'PREPARED_INPUT_MISMATCH', errors: ['Initial working memory differs from the prepared empty state'] });
   let proposedWorkingMemory: ReturnType<WholeTraceCognitionEngine['snapshot']> | undefined;
   let proposedTaskMemory: ReturnType<WholeTraceTaskMemoryEngine['snapshot']> | undefined;
-  const ledger = new WholeTraceKnowledgeLedger(persona, settings.attentionExperience?.learning);
+  const ledger = new WholeTraceKnowledgeLedger(persona, settings.attentionExperience?.learning, bundle.movementVersion, bundle.observationVersion);
   let previousState: WholeTraceActorState = structuredClone(bundle.actorState.initialState);
   const knowledgeAudit: { decisionIndex: number; before: ActorObservation; newCueRefs: string[];
     knowledge: WholeTraceKnowledgeSnapshot; basis: WholeTraceDecision['basis']; actorState: WholeTraceActorState;
     action: PolicyAction; delayMs: number; reason: string; currentTask: string;
+    navigationEvidence?: WholeTraceNavigationEvidence;
     cognition?: ReturnType<WholeTraceCognitionEngine['preview']>;
     taskMemory?: ReturnType<WholeTraceTaskMemoryEngine['preview']>;
     choiceResolution?: { choiceRef: import('./wholeTraceContracts').WholeTraceChoiceDecision['choiceRef'];
@@ -147,10 +180,37 @@ async function executeWholeTraceCandidate(settings: WholeTraceSettings, bundle: 
       derivedCueRefs: string[]; declaredBasisCueRefs: string[]; declaredTriggerCueRefs: string[];
       source: import('./wholeTraceContracts').WholeTraceChoiceDecision['choiceRef']['source'] } }[] = [];
   let pending: typeof knowledgeAudit[number] | undefined;
-  let acceptedFrame = { location: 'start', navigationStateId: bundle.worldReference.navigation.initialStateId };
+  let acceptedFrame: WholeTraceAcceptedFrame = continuous ? structuredClone(bundle.initialChoiceFrame.source)
+    : { location: 'start', navigationStateId: bundle.worldReference.navigation.initialStateId };
+  // Reconstruct the initial identity independently of the supplied bundle frame.
+  if (continuous) {
+    const initial = createMarketSession(settings.snapshot.config, settings.snapshot.environment);
+    acceptedFrame = wholeTraceContinuousFrame(bundle, initial.playerPosition, initial.cashierAvailability);
+  }
+  const movementFeedback = bundle.movementFeedbackVersion ? createWholeTraceMovementFeedback({ spatialMemoryCapacity }) : undefined;
+  const navigationRecorder = bundle.movementValidationVersion ? createWholeTraceNavigationRecorder(settings, bundle) : undefined;
+  let rawBefore: ActorObservation | undefined;
+  const safeObservation = (o: ActorObservation) => continuous ? wholeTracePublicObservation(o) : o;
+  const currentFrame = (o: ActorObservation) => {
+    const frame = wholeTraceChoiceFrame(safeObservation(o), bundle, acceptedFrame);
+    return movementFeedback?.decorate(frame, o) ?? { choiceFrame: frame };
+  };
   let accepted = 0, activeIndex = 0, before: ActorObservation | undefined;
   let checkpointFailure: unknown, lastApplied: ActorObservation | undefined;
+  const assertExpectedSource = (o: ActorObservation) => {
+    if (prefix?.expectedSource && prefix.expectedSource.acceptedActions === accepted
+      && ((o.phase !== 'shopping' && o.phase !== 'checkout')
+        || canonicalMarketReplayJson(prefix.expectedSource.source) !== canonicalMarketReplayJson(currentFrame(o).choiceFrame.source))) {
+      before = structuredClone(safeObservation(o)); activeIndex = accepted;
+      ledger.observe(before);
+      throw Object.assign(new Error('Recomputed continuous prefix source differs from the accepted authoring source'), { code: 'CHOICE_SOURCE_MISMATCH' });
+    }
+  };
   const capturePrefix = (observation: ActorObservation, terminal: boolean): never => {
+    if (!terminal) assertExpectedSource(observation);
+    const movementResult = continuous ? wholeTracePublicMovement(observation) : undefined;
+    const execution = (continuous || anchorFeedback) && !terminal ? currentFrame(observation) : undefined;
+    observation = safeObservation(observation);
     const knowledge = ledger.observe(observation).knowledge;
     const context = prefix?.nextDecision;
     const workingMemory = cognition?.project(observation, context ? {
@@ -163,6 +223,7 @@ async function executeWholeTraceCandidate(settings: WholeTraceSettings, bundle: 
         : cue.kind === 'displayed-cart-item' ? [cue.cueRef.slice('cart:product:'.length)] : []))].sort();
     throw new WholeTracePrefixComplete({ valid: true, acceptedActions: accepted, terminal,
       before: structuredClone(observation), knowledge,
+      ...(execution ? execution : {}), ...(movementResult ? { movementResult } : {}),
       ...(workingMemory ? { workingMemory } : {}), ...(taskState ? { taskMemory: taskState } : {}),
       advisory: { kind: 'reference-calculated-state-v1',
         notice: '참고용 계산값. 보조기는 행동이나 상태 값을 채우거나 고치지 않으며, 선언은 계속 AI가 한다.',
@@ -175,12 +236,20 @@ async function executeWholeTraceCandidate(settings: WholeTraceSettings, bundle: 
   try {
     const trace = await generateTrace({
       ...settings, mode: 'llm', planningMode: 'whole-trace', tracePolicyVersion: '6',
+      ...(bundle.observationVersion ? { wholeTraceObservationVersion: bundle.observationVersion } : {}),
+      ...(bundle.movementVersion ? { wholeTraceMovementVersion: bundle.movementVersion } : {}),
+      ...(bundle.movementValidationVersion ? { wholeTraceMovementValidationVersion: bundle.movementValidationVersion,
+        ...(bundle.movementFeedbackVersion ? { wholeTraceMovementFeedbackVersion: bundle.movementFeedbackVersion } : {}) } : {}),
+      ...(anchorFeedback ? { wholeTraceMovementFeedbackVersion: bundle.movementFeedbackVersion } : {}),
       actorPolicyVersion: WHOLE_TRACE_POLICY_VERSION, reasoningEffort: 'low',
       planningSubmissions: submissions, repairSubmissions: submissions - 1,
       maxActions: settings.maxActions ?? 100,
       llm: { ...settings.llm, model: WHOLE_TRACE_MODEL, maxCalls: settings.llm?.maxCalls ?? 100 },
       actorDecisionProvider: async o => {
+        rawBefore = structuredClone(o);
+        o = safeObservation(o);
         activeIndex = accepted; before = structuredClone(o);
+        assertExpectedSource(o);
         if (prefix && !candidate.decisions.length) capturePrefix(o, false);
         proposedWorkingMemory = undefined;
         proposedTaskMemory = undefined;
@@ -234,6 +303,7 @@ async function executeWholeTraceCandidate(settings: WholeTraceSettings, bundle: 
           }
         }
         pending = { decisionIndex: accepted, before, ...observation, basis: structuredClone(d.basis),
+          ...(navigationRecorder ? { navigationEvidence: navigationRecorder.before(currentFrame(o).choiceFrame, accepted) } : {}),
           actorState: structuredClone(d.actorState), action: structuredClone(decision.action), delayMs: d.delayMs,
           reason: d.reason, currentTask: d.actorState.task,
           ...(memoryCheck ? { cognition: structuredClone(memoryCheck) } : {}),
@@ -249,12 +319,16 @@ async function executeWholeTraceCandidate(settings: WholeTraceSettings, bundle: 
       },
       onActorDecisionAccepted: () => {
         if (pending) {
-          if (pending.action.type === 'walkToAnchor') {
+          if (!continuous && pending.action.type === 'walkToAnchor') {
             const anchorId = pending.action.anchorId;
             const target = bundle.worldReference.waypoints.find(w => w.anchorId === anchorId);
             if (!target) throw new Error('Accepted anchor is missing from the prepared waypoint catalogue');
             acceptedFrame = { ...acceptedFrame, location: target.waypointId };
-          } else if (pending.action.type === 'requestCashier') {
+          } else if (!continuous && pending.action.type === 'moveDirection') {
+            // This identifies an actually applied motor attempt, including a
+            // blocked attempt. It never guesses/snaps the result to a waypoint.
+            acceptedFrame = { ...acceptedFrame, location: `D${accepted + 1}` };
+          } else if (!continuous && pending.action.type === 'requestCashier') {
             const previous = bundle.worldReference.navigation.states.find(s => s.stateId === acceptedFrame.navigationStateId)!;
             const cashiers = { ...previous.cashierAvailability, [pending.action.checkoutId ?? 'checkout']: true };
             const next = bundle.worldReference.navigation.states.find(s => canonicalMarketReplayJson(s.cashierAvailability) === canonicalMarketReplayJson(cashiers));
@@ -267,13 +341,24 @@ async function executeWholeTraceCandidate(settings: WholeTraceSettings, bundle: 
         }
         pending = undefined; accepted++;
       },
-      onActorDecisionApplied: after => {
+      onActorDecisionApplied: (after, applied) => {
+        if (continuous) acceptedFrame = wholeTraceContinuousFrame(bundle, applied.position, applied.cashierAvailability);
+        if (navigationRecorder) {
+          const entry = knowledgeAudit.at(-1)!;
+          navigationRecorder.applied(entry.navigationEvidence!, entry.action, applied, after, acceptedFrame);
+        }
+        assertExpectedSource(after);
+        if (movementFeedback && rawBefore) {
+          const entry = knowledgeAudit.at(-1)!;
+          movementFeedback.record({ action: entry.action, delayMs: entry.delayMs, reason: entry.reason }, rawBefore, after);
+        }
         lastApplied = structuredClone(after);
         if (prefix && accepted === candidate.decisions.length && accepted < 100
           && !wholeTraceTerminalIntent(candidate.decisions.at(-1))) capturePrefix(after, false);
       },
       onCheckpoint: onCheckpoint ? entry => {
-        try { onCheckpoint(entry); }
+        try { onCheckpoint(continuous && entry.kind === 'decision' ? { ...entry,
+          before: wholeTracePublicObservation(entry.before), after: wholeTracePublicObservation(entry.after) } : entry); }
         catch (error) { checkpointFailure = error; throw error; }
       } : undefined,
     });
@@ -309,6 +394,7 @@ async function executeWholeTraceCandidate(settings: WholeTraceSettings, bundle: 
       ...(cognition ? { workingMemory: cognition.snapshot(), ...(proposedWorkingMemory ? { proposedWorkingMemory } : {}) } : {}),
       ...(taskMemory ? { taskMemory: taskMemory.snapshot(), ...(proposedTaskMemory ? { proposedTaskMemory } : {}) } : {}),
       validPrefix: structuredClone(candidate.decisions.slice(0, accepted)), acceptedFrame: structuredClone(acceptedFrame),
-      ...(before ? { choiceFrame: wholeTraceChoiceFrame(before, bundle, acceptedFrame) } : {}) });
+      ...(before && (before.phase === 'shopping' || before.phase === 'checkout') && before.view !== 'requester'
+        ? { choiceFrame: currentFrame(before).choiceFrame } : {}) });
   }
 }

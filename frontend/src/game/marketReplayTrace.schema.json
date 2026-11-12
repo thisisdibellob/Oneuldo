@@ -896,6 +896,21 @@
             "joystick-direction-v1"
           ]
         },
+        "wholeTraceMovementVersion": {
+          "enum": [
+            "directional-v1",
+            "directional-v2"
+          ]
+        },
+        "wholeTraceMovementValidationVersion": {
+          "enum": ["1"]
+        },
+        "wholeTraceObservationVersion": {
+          "enum": ["anchor-visible-structures-v1"]
+        },
+        "wholeTraceMovementFeedbackVersion": {
+          "enum": ["recent-movement-v1", "recent-movement-anchor-v1", "recent-movement-anchor-capacity-v1"]
+        },
         "movementPolicy": {
           "$ref": "#/$defs/movementPolicy"
         }

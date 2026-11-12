@@ -79,3 +79,47 @@ test('real STDIO emits JSON-RPC only and closes after EOF', async () => {
   const messages = stdout.trim().split('\n').map(line => JSON.parse(line));
   assert.equal(messages.length, 2); assert.ok(messages.some(message => message.error?.code === -32700)); assert.ok(messages.some(message => message.id === 7 && message.result));
 });
+test('prepare_persona_validation accepts traitMode omitted and rejects other values', async t => {
+  const tool = definitions.find(item => item.name === 'prepare_persona_validation');
+  assert.deepEqual(tool.inputSchema.properties.profiles.items.properties.traitMode, { enum: ['omitted'] });
+  const { createMarketSession } = require('../../frontend/src/game/marketSession.ts');
+  const { createMarketReplaySnapshot } = require('../../frontend/src/game/marketReplayTrace.ts');
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'oneuldo-server-baseline-'));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const goals = ['milk', 'apple', 'water', 'banana', 'eggs'].map((productId, index) => ({ productId, quantity: index === 2 ? 2 : 1 }));
+  const snapshotFilePaths = {};
+  for (const [condition, n] of [['low', 2], ['high', 5]]) {
+    snapshotFilePaths[condition] = path.join(directory, `${condition}.json`);
+    fs.writeFileSync(snapshotFilePaths[condition], JSON.stringify(createMarketReplaySnapshot(createMarketSession({ seed: condition, difficulty: 'exact', objectives: goals.slice(0, n) }))));
+  }
+  const args = traitMode => ({ runId: `baseline-${traitMode}`, outputDirectory: directory, snapshotFilePaths, seeds: ['s1'], validationMode: 'traits',
+    profiles: [{ id: 'checking-high', basePersonaId: 'quick-decider', traits: { checking: 'high' } }, { id: 'baseline', basePersonaId: 'quick-decider', traitMode }] });
+  const prepared = await invokeTool('prepare_persona_validation', args('omitted'));
+  assert.equal(prepared.profiles.find(profile => profile.id === 'baseline').traitMode, 'omitted');
+  await assert.rejects(invokeTool('prepare_persona_validation', args('neutral')), /traitMode must be "omitted"/);
+  const response = await dispatch({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'prepare_persona_validation', arguments: args('neutral') } });
+  assert.equal(response.result.isError, true);
+});
+test('prepare schemas expose anchor feedback and both argument paths reject mixed contracts', async t => {
+  const service = createService({ bridge: { start() { throw new Error('No app access'); }, close() {} } });
+  t.after(() => service.close());
+  const names = ['prepare_whole_trace', 'prepare_persona_validation'];
+  for (const name of names) {
+    const feedback = definitions.find(tool => tool.name === name).inputSchema.properties.movementFeedbackVersion;
+    assert.deepEqual(feedback.enum, ['recent-movement-v1', 'recent-movement-anchor-v1', 'recent-movement-anchor-capacity-v1']);
+    assert.match(feedback.description, /omitted movementVersion.*anchor-visible-structures-v1/);
+    const required = name === 'prepare_persona_validation' ? { runId: 'unused', outputDirectory: '/unused',
+      snapshotFilePaths: { low: '/unused/low', high: '/unused/high' }, seeds: ['unused'], movementValidationVersion: '1' } : {};
+    for (const options of [
+      { movementFeedbackVersion: 'recent-movement-v1' },
+      { movementVersion: 'directional-v2', movementFeedbackVersion: 'recent-movement-anchor-v1' },
+      { movementVersion: 'directional-v1', movementFeedbackVersion: 'recent-movement-anchor-v1' },
+      { movementVersion: 'directional-v2', movementFeedbackVersion: 'recent-movement-anchor-capacity-v1' },
+      { movementVersion: 'directional-v1', movementFeedbackVersion: 'recent-movement-anchor-capacity-v1' },
+      { movementFeedbackVersion: 'recent-movement-v2' },
+    ]) await assert.rejects(service.invokeTool(name, { ...required, ...options }), /movement|directional|recent-movement/i);
+  }
+  for (const movementFeedbackVersion of ['recent-movement-anchor-v1', 'recent-movement-anchor-capacity-v1'])
+    await assert.rejects(service.invokeTool('prepare_whole_trace', { trialFile: '/unused/trial',
+      movementFeedbackVersion }), /anchor-visible-structures-v1/);
+});

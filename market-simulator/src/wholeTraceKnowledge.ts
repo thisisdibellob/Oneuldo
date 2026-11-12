@@ -2,6 +2,7 @@ import { validateLearning, type ConfirmedLearning } from './actorLearning';
 import { extendedActorChoices as actorChoices } from './actorChoices';
 import type { ActorObservation, Persona, PolicyAction } from './types';
 import { validateWholeTraceMemoryUses, type WholeTraceMemoryUse } from './wholeTraceCognition';
+import { wholeTraceCanMove, wholeTraceHasDirectionalMovement, type WholeTraceMovementVersion } from './wholeTraceMovement';
 
 export const WHOLE_TRACE_INTENTS = ['explore', 'interest', 'task', 'check', 'recover', 'help', 'finish', 'rest'] as const;
 /** A short declared activity and observable references, not private model reasoning. */
@@ -59,7 +60,9 @@ export class WholeTraceKnowledgeLedger {
   private observationIndex = -1;
   private latest?: ActorObservation;
 
-  constructor(persona: Pick<Persona, 'id' | 'version' | 'character'>, prior?: ConfirmedLearning) {
+  constructor(persona: Pick<Persona, 'id' | 'version' | 'character'>, prior?: ConfirmedLearning,
+    private readonly movementVersion?: WholeTraceMovementVersion,
+    private readonly observationVersion?: 'anchor-visible-structures-v1') {
     const remember = (cueRef: string, kind: string, value: unknown) => this.profile.set(cueRef,
       { cueRef, kind, source: 'persona-history', value: structuredClone(value) });
     const character = persona.character;
@@ -91,6 +94,10 @@ export class WholeTraceKnowledgeLedger {
     this.observationIndex++;
     this.latest = structuredClone(o);
     this.visible.clear();
+    // A body cue is a current screen direction, never a persistent fixture ID.
+    // Expire it at the next boundary rather than treating a later body in the
+    // same direction as the same shelf or retaining an old relative location.
+    for (const [ref, cue] of this.observed) if (cue.kind === 'visible-unlabelled-structure') this.observed.delete(ref);
     const newCueRefs: string[] = [];
     const see = (cueRef: string, kind: string, value: unknown) => {
       const previous = this.observed.get(cueRef);
@@ -105,10 +112,13 @@ export class WholeTraceKnowledgeLedger {
     // interface. Keep their values limited to action types: target/product data
     // belongs to its own observed cue and cart contents remain separately gated.
     const availableControls = new Set(actorChoices(o).flatMap(choice => wholeTraceControlCueRefs(choice.action)));
+    if (wholeTraceHasDirectionalMovement(this.movementVersion) && wholeTraceCanMove(o)) availableControls.add('control:moveDirection');
     for (const cueRef of availableControls) see(cueRef, 'available-ui-control', { type: cueRef.slice('control:'.length) });
     if (o.listAvailable) see('list', 'displayed-list-control', true);
     for (const anchor of o.anchors) see(`anchor:${anchor.id}`, 'visible-passage', anchor);
     for (const station of o.visibleStations) see(`station:${station.id}`, 'visible-station', station);
+    for (const body of this.observationVersion ? o.visibleStructures ?? [] : []) see(`structure:${body.kind}:${body.direction}:${body.distanceBand}`,
+      'visible-unlabelled-structure', { kind: body.kind, label: body.label, direction: body.direction, distanceBand: body.distanceBand });
     if (o.activeStation && !o.visibleStations.some(s => s.id === o.activeStation))
       see(`station:${o.activeStation}`, 'open-station', { id: o.activeStation });
     for (const product of o.products) see(`product:${product.id}`, 'displayed-product', product);

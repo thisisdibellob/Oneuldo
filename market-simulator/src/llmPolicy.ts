@@ -14,7 +14,8 @@ const actionFields: Record<string, string[]> = {
   moveDirection: ['direction', 'durationMs'],
 };
 const legacyActionFields = Object.fromEntries(Object.entries(actionFields).filter(([type]) => !['walkToAnchor', 'readList', 'browse', 'pause', 'lookAround', 'moveDirection'].includes(type)));
-export function assertDecision(value: unknown, feedbackTiming = false): asserts value is Decision {
+export function assertDecision(value: unknown, feedbackTiming = false,
+  options: { directionalMovement?: boolean } = {}): asserts value is Decision {
   const d = value as Decision;
   if (!d || typeof d !== 'object' || !d.action || !Object.prototype.hasOwnProperty.call(actionFields, d.action.type)) throw new Error('Decision contains an unsupported agent action.');
   const action = d.action as unknown as Record<string, unknown>;
@@ -27,7 +28,7 @@ export function assertDecision(value: unknown, feedbackTiming = false): asserts 
   if (['add', 'remove', 'requestReturn'].includes(d.action.type) && typeof action.productId !== 'string') throw new Error('Item action requires productId.');
   if (action.quantity !== undefined && (!Number.isInteger(action.quantity) || Number(action.quantity) < 1 || Number(action.quantity) > 99)) throw new Error('quantity must be an integer 1..99.');
   if (d.action.type === 'walkToAnchor' && (typeof action.anchorId !== 'string' || !/^anchor-[a-f0-9]{8}$/.test(action.anchorId))) throw new Error('walkToAnchor requires a visible anchor ID');
-  if (d.action.type === 'moveDirection' && (!feedbackTiming
+  if (d.action.type === 'moveDirection' && (!(feedbackTiming || options.directionalMovement)
     || !['north', 'northeast', 'east', 'southeast', 'south', 'southwest', 'west', 'northwest'].includes(String(action.direction))
     || !Number.isInteger(action.durationMs) || Number(action.durationMs) < 100 || Number(action.durationMs) > 2000))
     throw new Error('moveDirection requires feedback timing, an eight-way direction and durationMs 100..2000');

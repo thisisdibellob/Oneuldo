@@ -72,7 +72,7 @@ export class WholeTraceSession {
     this.settings = structuredClone({ ...input, maxActions: input.maxActions ?? 100, maxRepairs: input.maxRepairs ?? 0,
       timingProfile: input.timingProfile ?? 'original', llm: { ...input.llm, model: WHOLE_TRACE_MODEL, maxCalls: input.llm?.maxCalls ?? 100 } });
     this.bundle = buildWholeTraceBundle(this.settings, this.requestId);
-    this.inputHash = wholeTraceInputHash(this.settings);
+    this.inputHash = wholeTraceInputHash(this.settings, this.bundle.observationVersion);
     this.outputPath = resolve(input.outputPath ?? join(__dirname, '..', 'output', `trace-${this.requestId}.json`));
     for (const file of [this.outputPath, `${this.outputPath}.snapshot.json`, `${this.outputPath}.knowledge-audit.json`, `${this.outputPath}.persona-review.json`]) if (existsSync(file)) throw new Error(`Output already exists: ${file}`);
     this.diagnosticDirectory = `${this.outputPath}.whole-trace`;
@@ -148,7 +148,26 @@ export class WholeTraceSession {
   }
   finishAuthoring() {
     const cursor = this.requireAuthoring();
-    return { requestId: this.requestId, candidate: cursor.finish(), authoring: cursor.metrics() };
+    try {
+      return { requestId: this.requestId, candidate: cursor.finish(), authoring: cursor.metrics() };
+    } catch (error) {
+      if ((error as { code?: string }).code !== 'AUTHORING_INCOMPLETE_FINALIZATION') throw error;
+      this.state = 'failed';
+      const failurePath = join(this.diagnosticDirectory, 'authoring-finalization.failure.json');
+      this.lastResult = { status: 'failed', requestId: this.requestId,
+        code: 'AUTHORING_INCOMPLETE_FINALIZATION', error: (error as Error).message,
+        failureStage: 'authoring-finalization', failurePath, authoring: cursor.metrics(),
+        canRepair: false, completeTrace: false, appExecuted: false };
+      try {
+        saveNew(failurePath, scrub({ ...this.lastResult,
+          acceptedCandidate: (error as { candidate?: unknown }).candidate }));
+        appendFileSync(join(this.diagnosticDirectory, 'authoring.jsonl'), JSON.stringify({
+          time: new Date().toISOString(), operation: 'finish', ...this.lastResult }) + '\n', { mode: 0o600 });
+      } catch (writeError) { this.lastResult.diagnosticWriteError = (writeError as Error).message; }
+      try { this.persistStatus(); }
+      catch (writeError) { this.lastResult.statusWriteError = (writeError as Error).message; }
+      throw error;
+    }
   }
   /** Submit only the not-yet-accepted tail of one bounded technical repair. */
   async submitRepair(value: unknown): Promise<Record<string, unknown>> {
@@ -182,7 +201,7 @@ export class WholeTraceSession {
     const remainingActionBudget = Math.min(100, this.settings.maxActions ?? 100) - this.preservedPrefix.length;
     if (remainingActionBudget < 1 || repair.decisions.length > remainingActionBudget)
       throw new Error('Repair suffix exceeds the remaining action budget');
-    if (wholeTraceInputHash(this.settings) !== this.inputHash) throw new Error('Prepared whole trace input changed');
+    if (wholeTraceInputHash(this.settings, this.bundle.observationVersion) !== this.inputHash) throw new Error('Prepared whole trace input changed');
     const nextAttempt = this.attempts + 1;
     const suffixPath = join(this.diagnosticDirectory, `attempt-${nextAttempt}.repair-suffix.json`);
     if (existsSync(suffixPath)) throw new Error('Repair diagnostic destination already exists');
@@ -223,6 +242,10 @@ export class WholeTraceSession {
   private wireMetadata() {
     if (!this.originalCandidateVersion) return {};
     return { candidateVersion: this.originalCandidateVersion,
+      ...(this.bundle.observationVersion ? { observationVersion: this.bundle.observationVersion } : {}),
+      ...(this.bundle.movementValidationVersion ? { movementValidationVersion: this.bundle.movementValidationVersion } : {}),
+      ...(this.bundle.movementVersion ? { movementVersion: this.bundle.movementVersion } : {}),
+      ...(this.bundle.movementFeedbackVersion ? { movementFeedbackVersion: this.bundle.movementFeedbackVersion } : {}),
       actionBinding: this.originalCandidateVersion === '3' ? 'explicit-legacy-v3' : 'state-bound-choice-v1',
       ...(['5', '6', '7'].includes(this.originalCandidateVersion) ? { focusContract: 'explicit-focus-v1' } : {}),
       ...(['6', '7'].includes(this.originalCandidateVersion) ? { memoryContract: 'working-memory-v1', cognitionVersion: this.bundle.persona.behavior.cognition.cognitionVersion,
@@ -232,7 +255,7 @@ export class WholeTraceSession {
   async submit(value: unknown): Promise<Record<string, unknown>> {
     if (this.state === 'compiling') throw new Error('This whole trace request is already compiling');
     if (this.state === 'prepared' && this.authoring
-      && canonicalMarketReplayJson(value) !== canonicalMarketReplayJson(this.authoring.finish()))
+      && canonicalMarketReplayJson(value) !== canonicalMarketReplayJson(this.finishAuthoring().candidate))
       throw new Error('Submit the exact finished authoring candidate; accepted decisions cannot be replaced');
     value = structuredClone(value);
     const json = canonicalMarketReplayJson(value);
@@ -241,7 +264,7 @@ export class WholeTraceSession {
     if (hash === this.lastHash && this.lastResult) return structuredClone(this.lastResult);
     if (this.state === 'complete' || this.state === 'failed') throw new Error('Whole trace request is closed');
     if (this.attempts >= 1 + (this.settings.maxRepairs ?? 0)) throw new Error('Whole trace repair budget exhausted');
-    if (wholeTraceInputHash(this.settings) !== this.inputHash) throw new Error('Prepared whole trace input changed');
+    if (wholeTraceInputHash(this.settings, this.bundle.observationVersion) !== this.inputHash) throw new Error('Prepared whole trace input changed');
     this.state = 'compiling'; this.attempts++; this.lastHash = hash;
     const compileStart = performance.now();
     const planningGapMs = compileStart - this.createdTick;
@@ -264,7 +287,7 @@ export class WholeTraceSession {
         }
       }
       const shape = validateWholeTraceCandidate(value, this.requestId,
-        { objectiveIds: this.bundle.worldReference.objectives.map(goal => goal.id) });
+        { objectiveIds: this.bundle.worldReference.objectives.map(goal => goal.id), movementVersion: this.bundle.movementVersion });
       if (!shape.valid) throw new WholeTraceCompileError(shape);
       const candidate = value as WholeTraceCandidate;
       if (this.originalCandidateVersion && candidate.candidateVersion !== this.originalCandidateVersion)
@@ -294,6 +317,7 @@ export class WholeTraceSession {
       const knowledgeAuditPath = `${this.outputPath}.knowledge-audit.json`;
       const audit = { auditVersion: this.originalCandidateVersion === '7' ? '6' : this.originalCandidateVersion === '6' ? '5' : this.originalCandidateVersion === '5' ? '4' : this.originalCandidateVersion === '4' ? '3' : '2',
         ...this.wireMetadata(), requestId: this.requestId, inputHash: this.inputHash,
+        ...(this.bundle.movementValidationVersion ? { navigationEvidence: { version: 'continuous-route-v1' } } : {}),
         traceId: compiled.trace.traceId, policyVersion: WHOLE_TRACE_POLICY_VERSION,
         referenceAccess: 'whole-world', actorKnowledgeScope: 'observed-and-remembered',
         validationScope: this.originalCandidateVersion === '7' ? 'declared-cues-persistent-tasks-working-memory-actor-state-and-game-guards' : this.originalCandidateVersion === '6' ? 'declared-cues-working-memory-actor-state-and-game-guards' : 'declared-cues-actor-state-and-game-guards',

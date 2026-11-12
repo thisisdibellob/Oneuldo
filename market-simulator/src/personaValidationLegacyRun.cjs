@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { assertSpec, powerWarning, preserveMeasurement, historicalReport } = require('./personaValidationSpec.cjs');
+const { movementOptions, assertMovementBinding, assertMovementManifest, assertMovementEvidence, movementReportFields, movementMarkdown } = require('./personaValidationMovement.cjs');
 const analysis = require('./personaValidationAnalysis.cjs');
 const reviewers = require('./personaValidationReviewers.cjs');
 const spec = require('../validation/persona-validation-spec.json');
@@ -40,6 +41,7 @@ function assertSnapshots(m) {
 }
 function assertManifest(m, directory = m?.runDirectory) {
   if (!m || m.schema !== SCHEMA || m.version !== 2 || path.resolve(directory) !== m.runDirectory) throw new Error('Invalid validation manifest; use a new runId for the current run format');
+  assertMovementManifest(m);
   validateConfiguration({ ...m, outputDirectory: path.dirname(m.runDirectory), snapshotFilePaths: Object.fromEntries(CONDITIONS.map(c => [c, m.snapshots?.[c]?.filePath])) });
   assertSpec(m, spec, 'legacy');
   if (m.analysisVersion === 1 && (!m.opportunityAudit || m.opportunityAuditHash !== digest(m.opportunityAudit))) throw new Error('Opportunity audit changed');
@@ -61,11 +63,13 @@ function assertManifest(m, directory = m?.runDirectory) {
 function readManifest(directory) { return assertManifest(read(manifestAt(directory)), path.resolve(directory)); }
 function seedDirectory(seed, index) { return `${String(index + 1).padStart(4, '0')}-${digest(String(seed)).slice(0, 12)}`; }
 function prepare(args) {
+  const movement = movementOptions(args);
   validateConfiguration(args);
   const { runId, outputDirectory, snapshotFilePaths, seeds, personaIds } = args;
   const dir = path.resolve(outputDirectory, runId), file = manifestAt(dir);
   if (fs.existsSync(file)) {
     const m = readManifest(dir);
+    assertMovementBinding(m, args, 'Existing run movement binding');
     if (digest(m.seeds) !== digest(seeds) || digest(m.personaIds) !== digest(personaIds) || CONDITIONS.some(k => path.resolve(snapshotFilePaths[k]) !== m.snapshots[k].filePath)) throw new Error('Existing run configuration differs');
     return refresh(m);
   }
@@ -81,9 +85,9 @@ function prepare(args) {
   const versions = { policyVersion: WHOLE_TRACE_POLICY_VERSION, bundleVersion: WHOLE_TRACE_BUNDLE_VERSION, candidateVersion: WHOLE_TRACE_CANDIDATE_VERSION, model: WHOLE_TRACE_MODEL };
   const slots = CONDITIONS.flatMap(condition => seeds.flatMap((seed, index) => personaIds.map(personaId => ({
     condition, seed, personaId, tracePath: path.join(dir, 'traces', condition, seedDirectory(seed, index), `${personaId}.json`),
-    snapshotId: snapshots[condition].snapshotId, ...versions, personaVersion: profile(personaId).version, traceId: null, exists: false,
+    snapshotId: snapshots[condition].snapshotId, ...versions, ...movement, personaVersion: profile(personaId).version, traceId: null, exists: false,
   }))));
-  const m = { schema: SCHEMA, version: 2, runId, runDirectory: dir, snapshots, seeds, personaIds, slots, versions, specHash: digest(spec), specVersion: spec.version, analysisVersion: spec.analysisVersion,
+  const m = { schema: SCHEMA, version: 2, runId, runDirectory: dir, ...movement, snapshots, seeds, personaIds, slots, versions, specHash: digest(spec), specVersion: spec.version, analysisVersion: spec.analysisVersion,
     profiles: Object.fromEntries(IDS.map(id => [id, { version: profile(id).version, hash: digest(profile(id)) }])), fixtureOnly: false };
   m.opportunityAudit = require('./personaValidationOpportunity.cjs').auditManifestSnapshots(m);
   m.opportunityAuditHash = digest(m.opportunityAudit);
@@ -97,11 +101,17 @@ function evidencePaths(slot) {
 }
 function inventory(m) {
   assertManifest(m);
-  return digest({ ...(m.analysisVersion ? { analysisVersion: m.analysisVersion, opportunityAuditHash: m.opportunityAuditHash } : {}), specHash: m.specHash, snapshots: m.snapshots, sources: m.slots.map(slot => Object.fromEntries(Object.entries(evidencePaths(slot)).map(([key, file]) => [key, fs.existsSync(file) ? fileHash(file) : null]))) });
+  return digest({ ...movementOptions(m), ...(m.analysisVersion ? { analysisVersion: m.analysisVersion, opportunityAuditHash: m.opportunityAuditHash } : {}), specHash: m.specHash, snapshots: m.snapshots, sources: m.slots.map(slot => Object.fromEntries(Object.entries(evidencePaths(slot)).map(([key, file]) => [key, fs.existsSync(file) ? fileHash(file) : null]))) });
 }
-function observeSlot(slot) {
+function observeSlot(slot, manifest) {
   if (!fs.existsSync(slot.tracePath)) { if (slot.traceId) throw new Error(`Recorded trace removed: ${slot.tracePath}`); slot.exists = false; return; }
   const trace = read(slot.tracePath), paths = evidencePaths(slot);
+  if (manifest?.movementValidationVersion) {
+    if (trace.generationPolicy === 'stochastic') throw new Error('Validation movement evidence cannot use stochastic fixtures');
+    assertMovementEvidence(manifest, { trace,
+      bundle: fs.existsSync(paths.bundle) ? read(paths.bundle) : null,
+      audit: fs.existsSync(paths.knowledgeAudit) ? read(paths.knowledgeAudit) : null });
+  }
   const hashes = Object.fromEntries(Object.entries(paths).map(([key, file]) => [key, fs.existsSync(file) ? fileHash(file) : null]));
   if (slot.evidenceHashes && digest(slot.evidenceHashes) !== digest(hashes)) throw new Error(`Recorded trace evidence changed: ${slot.tracePath}`);
   if (slot.traceId && slot.traceId !== trace.traceId) throw new Error(`Mixed trace identity: ${slot.tracePath}`);
@@ -114,23 +124,40 @@ function observeSlot(slot) {
 }
 function refresh(m) {
   assertManifest(m);
-  m.slots.forEach(observeSlot);
+  m.slots.forEach(slot => observeSlot(slot, m));
   if (m.analysisVersion !== undefined) write(manifestAt(m.runDirectory), m);
-  return { runDirectory: m.runDirectory, manifestPath: manifestAt(m.runDirectory), slots: m.slots.map(slot => ({ ...slot,
-    prepareWholeTrace: { personaId: slot.personaId, seed: slot.seed, snapshotFilePath: m.snapshots[slot.condition].filePath, outputPath: slot.tracePath, attentionExperience: { visit: 'first-play' } },
+  return { runDirectory: m.runDirectory, manifestPath: manifestAt(m.runDirectory), ...movementOptions(m), slots: m.slots.map(slot => ({ ...slot,
+    prepareWholeTrace: { personaId: slot.personaId, seed: slot.seed, snapshotFilePath: m.snapshots[slot.condition].filePath, outputPath: slot.tracePath, attentionExperience: { visit: 'first-play' }, ...movementOptions(m) },
   })), complete: m.slots.filter(s => s.exists).length, required: m.slots.length,
     recommendedSeedCount: 20, powerWarning: powerWarning(m.seeds), opportunityAudit: m.opportunityAudit ?? null };
 }
 function lookupControlSlot(args, snapshot) {
-  if (args.personaId !== CONTROL) return null;
+  if (args.personaId !== CONTROL) {
+    const requested = movementOptions(args);
+    if (!args.outputPath) {
+      if (requested.movementValidationVersion) throw new Error('Movement validation requires an explicit run slot');
+      return null;
+    }
+    const file = manifestAt(path.dirname(path.dirname(path.dirname(path.dirname(path.resolve(args.outputPath))))));
+    if (!fs.existsSync(file)) {
+      if (requested.movementValidationVersion) throw new Error('Movement validation outputPath is outside a validation run');
+      return null;
+    }
+    const saved = read(file);
+    if (saved.movementValidationVersion === undefined) {
+      assertMovementBinding(saved, args, 'Historical validation request movement binding');
+      return null;
+    }
+  }
   if (!args.outputPath || ['trialFile', 'learnerFile', 'tabId', 'arm', 'jobFilePath', 'generationFilePath'].some(k => args[k] !== undefined)
     || !args.attentionExperience || digest(args.attentionExperience) !== digest({ visit: 'first-play' })) throw new Error('Control requires an explicit first-play validation run slot without memory or learner');
   const directory = path.dirname(path.dirname(path.dirname(path.dirname(path.resolve(args.outputPath)))));
   if (!fs.existsSync(manifestAt(directory))) throw new Error('Control outputPath is outside a validation run');
   const m = readManifest(directory), slot = m.slots.find(s => s.tracePath === path.resolve(args.outputPath));
-  if (!slot || slot.personaId !== CONTROL || String(slot.seed) !== String(args.seed) || slot.snapshotId !== snapshot.snapshotId || fs.existsSync(slot.tracePath)
+  assertMovementBinding(m, args, 'Validation request movement binding');
+  if (!slot || slot.personaId !== args.personaId || String(slot.seed) !== String(args.seed) || slot.snapshotId !== snapshot.snapshotId || fs.existsSync(slot.tracePath)
     || digest(snapshot) !== digest(read(m.snapshots[slot.condition].filePath))) throw new Error('Control slot binding mismatch');
-  return slot;
+  return m.movementValidationVersion ? { ...slot, persona: profile(slot.personaId), validationRunDirectory: directory } : slot;
 }
 function load(m, { allowFixture = false } = {}) {
   assertManifest(m);
@@ -140,18 +167,20 @@ function load(m, { allowFixture = false } = {}) {
   for (const slot of m.slots) {
     if (!fs.existsSync(slot.tracePath)) { if (slot.traceId) throw new Error(`Recorded trace removed: ${slot.tracePath}`); missing.push(slot); continue; }
     const paths = evidencePaths(slot), trace = read(slot.tracePath), snapshot = read(m.snapshots[slot.condition].filePath), fixture = trace.generationPolicy === 'stochastic';
+    if (fixture && m.movementValidationVersion) throw new Error('Validation movement evidence cannot use stochastic fixtures');
     if (fixture && !allowFixture) throw new Error(`Stochastic trace cannot be validation evidence: ${slot.tracePath}`);
     if (trace.personaId !== slot.personaId || String(trace.seed) !== String(slot.seed) || trace.target?.snapshotId !== slot.snapshotId || slot.traceId && trace.traceId !== slot.traceId) throw new Error(`Mixed trace identity: ${slot.tracePath}`);
     if (trace.personaVersion !== m.profiles[slot.personaId].version) throw new Error(`Mixed persona version: ${slot.tracePath}`);
     const audit = fs.existsSync(paths.knowledgeAudit) ? read(paths.knowledgeAudit) : null;
     const actorDecisions = fs.existsSync(paths.actorDecisions) ? read(paths.actorDecisions) : null;
     const personaReview = fs.existsSync(paths.personaReview) ? read(paths.personaReview) : null;
+    const bundle = fs.existsSync(paths.bundle) ? read(paths.bundle) : null;
     if (!fixture) {
       if (trace.experienceMode !== 'first-play') throw new Error(`Mixed experience: ${slot.tracePath}`);
       if (trace.generationPolicy !== 'llm' || trace.generation?.actorPolicyVersion !== m.versions.policyVersion || trace.generation?.model !== m.versions.model) throw new Error(`Mixed policy/model: ${slot.tracePath}`);
       if (trace.generation?.learnerIdentity || trace.generation?.trialBinding) throw new Error('Validation samples cannot carry learner/trial identities');
-      const bundle = fs.existsSync(paths.bundle) ? read(paths.bundle) : null;
       if (!audit || !bundle || bundle.bundleVersion !== m.versions.bundleVersion || audit.candidateVersion !== m.versions.candidateVersion) throw new Error(`Missing or mixed bundle/candidate version: ${slot.tracePath}`);
+      assertMovementEvidence(m, { trace, bundle, audit });
       if (trace.traceId !== marketReplayTraceId(trace) || audit.traceId !== trace.traceId || audit.requestId !== bundle.requestId || audit.inputHash !== bundle.inputHash
         || audit.policyVersion !== m.versions.policyVersion || bundle.policyVersion !== m.versions.policyVersion || bundle.model !== m.versions.model
         || bundle.snapshotId !== slot.snapshotId || bundle.persona?.id !== slot.personaId || bundle.persona?.version !== trace.personaVersion || String(bundle.seed) !== String(slot.seed)) throw new Error(`Mixed or altered whole-trace evidence: ${slot.tracePath}`);
@@ -160,10 +189,15 @@ function load(m, { allowFixture = false } = {}) {
       if (personaReview && (personaReview.traceId !== trace.traceId || personaReview.requestId !== bundle.requestId || personaReview.knowledgeAuditHash !== digest(audit))) throw new Error(`Mixed persona review: ${slot.tracePath}`);
       if (actorDecisions && !Array.isArray(actorDecisions) && actorDecisions.traceId && actorDecisions.traceId !== trace.traceId) throw new Error('Mixed actor decisions');
     }
-    observeSlot(slot);
+    observeSlot(slot, m);
     const evidenceAudit = audit ?? (actorDecisions ? { decisions: Array.isArray(actorDecisions) ? actorDecisions : actorDecisions.decisions ?? [] } : null);
-    const person = profile(slot.personaId), evidence = { actorDecisions, personaReview };
+    const person = profile(slot.personaId), evidence = { actorDecisions, personaReview,
+      ...(m.movementValidationVersion ? { bundle } : {}) };
+    const movement = m.movementValidationVersion ? require('./personaValidationMetrics.cjs').extractUniversal(
+      trace, snapshot, person, evidenceAudit, evidence, { analysisVersion: 2, routeOpportunityVersion: 'continuous-route-v1' }) : null;
     samples.push({ ...slot, trace, snapshot, persona: person, audit: evidenceAudit, actorDecisions, personaReview,
+      ...(movement ? { movementOpportunities: { version: 'continuous-route-v1', descriptiveOnly: true,
+        metrics: movement.metrics, coverage: movement.coverage } } : {}),
       metrics: extract(trace, snapshot, person, evidenceAudit, evidence), flags: flagsForTrace(trace, snapshot, evidenceAudit, person, evidence), fixture,
       evidenceSources: Object.fromEntries(Object.entries(paths).filter(([, file]) => fs.existsSync(file))) });
   }
@@ -207,11 +241,12 @@ function measure({ runDirectory, allowFixture = false }) {
     const values = Object.fromEntries(order.order.map(id => { const nums = pairedSeeds.map(seed => byKey.get(`${condition}:${seed}:${id}`).metrics[order.kind].value); return [id, nums.length ? nums.reduce((a, b) => a + b, 0) / nums.length : null]; }));
     return { ...order, condition, pairedSeeds: pairedSeeds.length, values, status: !pairedSeeds.length ? 'unexercised' : pairedSeeds.length < spec.minValidPairs ? 'insufficient' : order.order.every((id, i) => !i || values[order.order[i - 1]] > values[id]) ? 'pass' : 'fail' };
   }));
-  const result = { schema: 'oneuldo.persona-fidelity-measurements', runId: m.runId, specHash: m.specHash, dataFingerprint: inventory(m),
+  const result = { schema: 'oneuldo.persona-fidelity-measurements', runId: m.runId, ...movementOptions(m), specHash: m.specHash, dataFingerprint: inventory(m),
     fixtureOnly: samples.some(s => s.fixture), completed: samples.length, missing: missing.length,
     unexercised: findings.reduce((n, f) => n + f.unexercised, 0), pairedUnexercised: findings.reduce((n, f) => n + f.unexercised, 0),
     perTraceUnexercised: samples.reduce((n, s) => n + Object.values(s.metrics).filter(metric => metric.status === 'unexercised').length, 0),
-    findings, expectedOrders, flags, perTraceMetrics: samples.map(s => ({ tracePath: s.tracePath, personaId: s.personaId, condition: s.condition, metrics: s.metrics, evidenceSources: s.evidenceSources })),
+    findings, expectedOrders, flags, perTraceMetrics: samples.map(s => ({ tracePath: s.tracePath, personaId: s.personaId, condition: s.condition, metrics: s.metrics, evidenceSources: s.evidenceSources,
+      ...(s.movementOpportunities ? { seed: s.seed, movementOpportunities: s.movementOpportunities } : {}) })),
     metricVectors: samples.map(s => ({ personaId: s.personaId, condition: s.condition, seed: s.seed, tracePath: s.tracePath, values: Object.fromEntries(Object.entries(s.metrics).map(([k, v]) => [k, v.value])) })) };
   const readiness = require('./personaValidationReadiness.cjs').fromManifest(m, { samples });
   if (m.analysisVersion === 1) Object.assign(result, analysis.readinessFields(readiness, findings, samples),
@@ -274,7 +309,8 @@ function report({ runDirectory }) {
     const eligible = metrics.filter(metric => metric.status !== 'unexercised');
     return { selectedTrait: text, status: !eligible.length ? 'unexercised' : eligible.filter(v => v.status === 'pass').length > eligible.length / 2 ? 'expressed' : 'not-established', metrics, findings: rows };
   })]));
-  const output = { schema: 'oneuldo.persona-fidelity-report', runId: m.runId, fixtureOnly: measurements.fixtureOnly, completed: measurements.completed, required: m.slots.length,
+  const output = { schema: 'oneuldo.persona-fidelity-report', runId: m.runId,
+    ...movementReportFields(m, measurements.perTraceMetrics), fixtureOnly: measurements.fixtureOnly, completed: measurements.completed, required: m.slots.length,
     dataFingerprint: measurements.dataFingerprint, specHash: m.specHash, coverage: { pairedUnexercised: measurements.pairedUnexercised, perTraceUnexercised: measurements.perTraceUnexercised },
     criteria: { conditionalMetricsAndEffects: measurements.findings, traits, expectedOrders: measurements.expectedOrders, prohibitedPatterns: measurements.flags, blind: review?.scores ?? null },
     traits, expectedOrders: measurements.expectedOrders, flags: measurements.flags, blindReview: review?.scores ?? null,
@@ -290,7 +326,7 @@ function report({ runDirectory }) {
   const reportPath = path.join(m.runDirectory, 'report.json'), markdownPath = path.join(m.runDirectory, 'report.ko.md');
   write(reportPath, output);
   const markdown = ['# 페르소나 충실도 보고서', ...analysis.readinessMarkdown(output), '', `Run: ${m.runId}. 저장 trace ${output.completed}/${output.required}. ${output.fixtureOnly ? 'stochastic fixture 파이프라인 확인용이며 검증 결과가 아님.' : 'whole-trace-v3 계획 표본.'}`, '', output.limitations,
-    '', '## 조건별 효과와 특성', '', '| 인물 / 지표 | 조건 | 유효 쌍 | 미발생 | Cliff’s delta | 95% 구간 | 판정 |', '| --- | --- | ---: | ---: | ---: | --- | --- |',
+    ...movementMarkdown(output), '', '## 조건별 효과와 특성', '', '| 인물 / 지표 | 조건 | 유효 쌍 | 미발생 | Cliff’s delta | 95% 구간 | 판정 |', '| --- | --- | ---: | ---: | ---: | --- | --- |',
     ...measurements.findings.map(f => `| ${f.metricId} | ${f.condition} | ${f.pairs} | ${f.unexercised} | ${f.delta ?? '—'} | ${f.interval?.join(' ~ ') ?? '—'} | ${f.status} |`), '',
     ...Object.entries(traits).flatMap(([id, rows]) => rows.map((r, i) => `- ${id} 특성 ${i + 1}: ${r.status} — ${r.selectedTrait}`)),
     '', '## 과장·금지 패턴', '', ...Object.entries(output.flags).map(([id, f]) => `- ${id}: ${f.status}, 플래그 ${f.flaggedTraces}/${f.traces}; 집합 ${f.collectionFlags.join(', ') || '없음'}. step ID와 파일 근거는 report.json에 보존.`),

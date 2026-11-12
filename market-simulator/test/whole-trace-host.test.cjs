@@ -167,7 +167,7 @@ test('context-bound authoring preserves current list observations and retry metr
       focusedGoalId: null, focusedProductId: null, orientation: 'unfamiliar', ...state } });
   const begun = await invoke('begin', 'begin_whole_trace_authoring');
   assert.equal(begun.authoring.maxRewritesPerDecision, 3);
-  assert.equal(begun.menu.currentObservation.kind, 'validated-prefix-observation-v1');
+  assert.equal(begun.menu.currentObservation.kind, 'validated-prefix-observation-v4');
   assert.equal(begun.menu.currentObservation.acceptedDecisionCount, 0);
   assert.equal(Object.hasOwn(begun.menu.currentObservation, 'readObjectives'), false);
   const readDecision = draft('control/readList');

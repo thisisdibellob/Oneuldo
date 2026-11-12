@@ -12,6 +12,7 @@ import { createFeedbackLlmPolicy } from './feedbackLlmPolicy';
 import { buildFeedbackActorFrame, feedbackChoiceMatchesDecision, emptyFeedbackBeliefMemory, validateFeedbackBeliefMemory, carryFeedbackBeliefMemory, isFeedbackActorPolicy, isExperienceFeedbackPolicy, isStructuredFeedbackPolicy, isQuantityBeliefFeedbackPolicy, isResultReflectionFeedbackPolicy, isNoGiveUpFeedbackPolicy, isMovementNoteFeedbackPolicy, isPassageMarkerFeedbackPolicy, isProgressNoteFeedbackPolicy, projectFeedbackObservation } from './feedbackActor';
 import { FeedbackMovementPolicy } from './feedbackMovementPolicy';
 import { FeedbackExperience } from './feedbackExperience';
+import { wholeTraceHasAnchorMovementFeedback } from './wholeTraceMovementFeedback';
 import type { ActorObservation, AttentionExperience, Decision, Persona, TraceEntry, TraceOptions } from './types';
 
 type StepIntent = MarketReplayStep extends infer S ? S extends MarketReplayStep ? Omit<S, 'id' | 'reactionDelayMs' | 'reason' | 'timeoutMs'> : never : never;
@@ -26,7 +27,12 @@ export async function generateAttentionTrace(options: TraceOptions, persona: Per
   const wholeTrace = options.planningMode === 'whole-trace';
   const actorPolicyVersion = attentionActorPolicyVersion(options);
   const feedbackActor = isFeedbackActorPolicy(actorPolicyVersion);
-  const directionalMovement = feedbackActor && actorPolicyVersion !== 'feedback-choice-v1';
+  const wholeTraceDirectionalMovement = ['directional-v1', 'directional-v2'].includes(options.wholeTraceMovementVersion ?? '');
+  const fixedAnchorMovement = options.wholeTraceMovementVersion === 'directional-v2';
+  if (options.wholeTraceMovementVersion !== undefined
+    && (!wholeTraceDirectionalMovement || !wholeTrace || actorPolicyVersion !== 'whole-trace-v3'))
+    throw new Error(`wholeTraceMovementVersion requires whole-trace-v3 and ${options.wholeTraceMovementVersion === 'directional-v2' ? 'directional-v2' : 'directional-v1'}`);
+  const directionalMovement = feedbackActor && actorPolicyVersion !== 'feedback-choice-v1' || wholeTraceDirectionalMovement;
   // v9 offers no giveUp, so its action limit ends in the controller-owned checkout instead of a technical failure.
   const systemCheckout = isNoGiveUpFeedbackPolicy(actorPolicyVersion);
   const exploration = actorPolicyVersion === 'feedback-choice-v3' || isExperienceFeedbackPolicy(actorPolicyVersion);
@@ -101,7 +107,7 @@ export async function generateAttentionTrace(options: TraceOptions, persona: Per
   const activity = new ActorActivityMonitor();
   let systemCompletion: NonNullable<MarketReplayTrace['generation']>['systemCompletion'];
   if (options.decisionProvider && !options.actorDecisionProvider) throw new Error('Attention personas require actorDecisionProvider; raw game observations are not exposed');
-  const guard = new TraceGuard(options.snapshot, persona.id, persona.version, model, true, extendedActor, feedbackActor, directionalMovement, isStructuredFeedbackPolicy(actorPolicyVersion), isResultReflectionFeedbackPolicy(actorPolicyVersion));
+  const guard = new TraceGuard(options.snapshot, persona.id, persona.version, model, true, extendedActor, feedbackActor, directionalMovement, isStructuredFeedbackPolicy(actorPolicyVersion), isResultReflectionFeedbackPolicy(actorPolicyVersion), !wholeTraceDirectionalMovement, fixedAnchorMovement, options.wholeTraceObservationVersion);
   const motor = new Random(`${options.seed}:presentation:${persona.id}:${persona.version}`);
   const history: TraceEntry[] = [], steps: MarketReplayStep[] = [];
   let plannedMs = 0;
@@ -149,7 +155,7 @@ export async function generateAttentionTrace(options: TraceOptions, persona: Per
       : await (options.actorDecisionProvider as (o: ActorObservation, h: TraceEntry[], p: Persona) => Promise<Decision>)(before, history, persona)
       : feedbackProvider ? await feedbackProvider(before, history, persona, undefined, undefined, actorFrame!)
       : provider ? await provider(before, history, persona, policy.getState(), feedback) : (policy as AttentionPolicy).next(before);
-    assertDecision(decision, feedbackActor);
+    assertDecision(decision, feedbackActor, { directionalMovement: wholeTraceDirectionalMovement });
     if (feedbackActor) {
       const checked = validateFeedbackBeliefMemory(decision.feedbackMemory, actorPolicyVersion);
       if (!checked.valid) throw new Error(`Invalid feedback belief memory: ${checked.errors.join('; ')}`);
@@ -182,7 +188,12 @@ export async function generateAttentionTrace(options: TraceOptions, persona: Per
     policy.record(decision, before, after);
     activity.record(decision, before, after);
     options.onActorDecisionAccepted?.();
-    options.onActorDecisionApplied?.(after);
+    if (options.onActorDecisionApplied) {
+      const applied = guard.observe();
+      options.onActorDecisionApplied(after, {
+        position: { ...applied.playerPosition }, cashierAvailability: { ...applied.cashierAvailability },
+      });
+    }
     const { exchange: _exchange, ...recordedDecision } = decision;
     options.onCheckpoint?.({ kind: 'decision', index: history.length, before, decision: recordedDecision, after, activity: activity.getState() });
     if (feedbackActor && options.timeBudgetMs !== undefined && plannedMs > options.timeBudgetMs) {
@@ -209,6 +220,13 @@ export async function generateAttentionTrace(options: TraceOptions, persona: Per
       ...(options.reasoningEffort ? { reasoningEffort: options.reasoningEffort } : {}),
       ...(wholeTrace ? { planningMode: 'whole-trace' as const, observationScope: 'whole-world' as const, actorKnowledgeScope: 'observed-and-remembered' as const, actorStateVersion: '1' as const, timingProfile: 'actor-preserved-v1' as const,
         planningSubmissions, repairSubmissions } : {}),
+      ...(wholeTraceDirectionalMovement ? { wholeTraceMovementVersion: options.wholeTraceMovementVersion,
+        movementContract: 'joystick-direction-v1' as const } : {}),
+      ...(options.wholeTraceObservationVersion ? { wholeTraceObservationVersion: options.wholeTraceObservationVersion } : {}),
+      ...(options.wholeTraceMovementValidationVersion ? { wholeTraceMovementValidationVersion: options.wholeTraceMovementValidationVersion,
+        ...(options.wholeTraceMovementFeedbackVersion ? { wholeTraceMovementFeedbackVersion: options.wholeTraceMovementFeedbackVersion } : {}) } : {}),
+      ...(wholeTraceHasAnchorMovementFeedback(options.wholeTraceMovementFeedbackVersion)
+        ? { wholeTraceMovementFeedbackVersion: options.wholeTraceMovementFeedbackVersion } : {}),
       ...(feedbackActor ? { timingProfile: directionalMovement ? 'activity-duration-v2' as const : 'activity-duration-v1' as const,
         ...(directionalMovement ? { movementContract: 'joystick-direction-v1' as const } : {}),
         ...(movementPolicy ? { movementPolicy: movementPolicy.configuration } : {}),

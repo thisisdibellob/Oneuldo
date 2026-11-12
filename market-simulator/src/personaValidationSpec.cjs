@@ -14,7 +14,7 @@ function assertSpec(manifest, current, mode) {
   const candidates = [
     { value: previous, file: `archive/${name}.v${previous.version}.json` },
     { value: require(`../validation/${name}.json`), file: `${name}.json` },
-    ...(mode === 'traits' ? [{ value: require('../validation/persona-trait-validation-spec-v2.json'), file: 'persona-trait-validation-spec-v2.json' }] : []),
+    ...(mode === 'traits' ? ['v2', 'v3'].map(v => ({ value: require(`../validation/persona-trait-validation-spec-${v}.json`), file: `persona-trait-validation-spec-${v}.json` })) : []),
   ];
   const selected = candidates.find(candidate => manifest.specHash === hash(candidate.value));
   if (!selected) throw new Error('Validation spec changed; create a separate run');

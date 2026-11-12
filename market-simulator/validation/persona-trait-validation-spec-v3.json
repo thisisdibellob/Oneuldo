@@ -1,0 +1,223 @@
+{
+  "schema": "oneuldo.persona-trait-validation-spec",
+  "version": 4,
+  "note": "성향별 합성 행동 설계 검증이다. 심리검사·임상 기준이 아니며 효과 크기와 표본 기준은 설계값이다. 오류, 도움 또는 관심 행동을 정해진 횟수로 강제하지 않는다. v3 추가 범위: 성향을 생략한 기준 프로필과의 비교(baselineComparison)와 기회 순서 전반·후반의 유지 여부 설명 지표(positionStability). 두 추가 범위는 설명용이며 주 판정·성향 판정·블라인드 점수에 쓰지 않는다. 기존 지표 정의와 임계값은 v2와 같다.",
+  "minValidPairs": 8,
+  "minAbsDelta": 0.33,
+  "bootstrapReplicates": 1000,
+  "maxFlaggedTraceRate": 0.1,
+  "patterns": {
+    "sameWrongChoiceMinimum": 3,
+    "minimumVarianceSamples": 2,
+    "interpretation": "동일한 잘못된 선택 반복과 역할 노출만 금지 패턴으로 판정한다. 도움·과업 실패·수정 부재·동일 횟수는 검토 신호다. 임계치는 합성 설계값이다."
+  },
+  "conditions": [
+    "low",
+    "high"
+  ],
+  "traits": [
+    "deliberation",
+    "checking",
+    "exploration",
+    "persistence",
+    "helpSeeking",
+    "initialCaution",
+    "operationLearning",
+    "routeReliance",
+    "textCueLoad"
+  ],
+  "metrics": [
+    {
+      "id": "deliberation:comparisonRate",
+      "traitKey": "deliberation",
+      "kind": "comparisonRate",
+      "applies": "both",
+      "expectedDirection": "up",
+      "evidenceType": "observed-action",
+      "description": "관련 후보 또는 추가 선반 페이지가 실제로 제공된 선택 기회 중, 페이지를 살피며 관련 후보 두 개 이상을 관찰한 비율. 높음/낮음 설정을 다른 조건이 같은 표본에서 비교한다.",
+      "positionSplit": true
+    },
+    {
+      "id": "deliberation:newShelfDelayMs",
+      "traitKey": "deliberation",
+      "kind": "newShelfDelayMs",
+      "applies": "both",
+      "expectedDirection": "up",
+      "evidenceType": "authored-timing",
+      "description": "처음 여는 낯선 매대의 행동 전 작성 대기시간. 실제 반응시간이나 이해 능력의 측정값이 아니며 누락된 시간은 0으로 대체하지 않는다.",
+      "positionSplit": false
+    },
+    {
+      "id": "checking:postSelectionListRate",
+      "traitKey": "checking",
+      "kind": "postSelectionListRate",
+      "applies": "both",
+      "expectedDirection": "up",
+      "evidenceType": "observed-action",
+      "description": "목표 선택 뒤 다른 목표로 전환하는 실제 기회 중 목록을 재확인한 비율. 마지막 선택에는 다음 목표 전환 기회를 만들지 않는다.",
+      "positionSplit": true
+    },
+    {
+      "id": "checking:preCheckoutCartRate",
+      "traitKey": "checking",
+      "kind": "preCheckoutCartRate",
+      "applies": "both",
+      "expectedDirection": "up",
+      "evidenceType": "observed-action",
+      "description": "계산 단계에 도달한 경우, 직전 상품 선택 이후 장바구니를 확인했는지 관찰한다. 중도 종료는 확인하지 않은 0점 대신 기회 없음으로 처리한다.",
+      "positionSplit": false
+    },
+    {
+      "id": "exploration:interestDetourRate",
+      "traitKey": "exploration",
+      "kind": "interestDetourRate",
+      "applies": "both",
+      "expectedDirection": "up",
+      "evidenceType": "observed-action+actor-declaration",
+      "description": "프로필의 관심 상품·상품군·카테고리와 일치하는 비목표 단서가 실제로 노출된 뒤 관심으로 살펴보거나 선택한 비율. 관심 의도는 배우 선언이며 노출 이전의 매대 진입은 사후 단서로 소급 인정하지 않는다.",
+      "positionSplit": true
+    },
+    {
+      "id": "persistence:persistenceResponseRate",
+      "traitKey": "persistence",
+      "kind": "persistenceResponseRate",
+      "applies": "both",
+      "expectedDirection": "up",
+      "evidenceType": "observed-action+actor-declaration",
+      "description": "기록된 오류·표시 불일치 또는 명시적으로 선언된 불확실성 뒤 확인·도움·전략 변경을 보인 비율. 두 근거 종류를 구분하며 같은 실패의 무변경 반복은 대응으로 세지 않는다. 정확도가 낮아야 성향이 충실한 것으로 해석하지 않는다.",
+      "positionSplit": true
+    },
+    {
+      "id": "helpSeeking:helpSeekingRate",
+      "traitKey": "helpSeeking",
+      "kind": "helpSeekingRate",
+      "applies": "both",
+      "expectedDirection": "up",
+      "evidenceType": "observed-action+actor-declaration",
+      "description": "기록된 어려움 기회 뒤 도움 화면 또는 설명을 여는 직원 상호작용을 사용한 비율. 일반 결제·반품 요청은 도움으로 세지 않으며 도움을 자율성 부족으로 해석하지 않는다.",
+      "positionSplit": true
+    },
+    {
+      "id": "initialCaution:initialCautionCount",
+      "traitKey": "initialCaution",
+      "kind": "initialCautionCount",
+      "applies": "both",
+      "expectedDirection": "up",
+      "evidenceType": "observed-action",
+      "description": "초반 신중함: 시작부터 첫 매대 열기 또는 담기 직전까지 실제 살핌 행동 수. trace당 기회 1건이며 작성 지연과 활동 선언은 사용하지 않는다.",
+      "positionSplit": false
+    },
+    {
+      "id": "operationLearning:operationLearningRate",
+      "traitKey": "operationLearning",
+      "kind": "operationLearningRate",
+      "applies": "both",
+      "expectedDirection": "up",
+      "evidenceType": "observed-action",
+      "description": "조작 익히기: open, browse, add, viewCart, checkout을 처음 사용하는 기회 중 직전 두 행동 이내의 관찰·도움·pause 비율. 기존 축 및 초반 신중함에 귀속한 행동은 제외한다.",
+      "positionSplit": true
+    },
+    {
+      "id": "routeReliance:routeRelianceRate",
+      "traitKey": "routeReliance",
+      "kind": "routeRelianceRate",
+      "applies": "both",
+      "expectedDirection": "up",
+      "evidenceType": "observed-action",
+      "description": "익힌 동선 고수: 방문한 waypoint와 처음 보는 waypoint가 실제 이동 선택지에 함께 있는 walk 중 방문한 곳을 선택한 비율. 저장된 선택지 근거가 없으면 unexercised다.",
+      "positionSplit": true
+    },
+    {
+      "id": "textCueLoad:textCueLoadRate",
+      "traitKey": "textCueLoad",
+      "kind": "textCueLoadRate",
+      "applies": "both",
+      "expectedDirection": "up",
+      "evidenceType": "observed-action",
+      "description": "글자 단서 부담: 같은 계열의 이름·규격이 다른 상품이 동시에 표시된 목표 담기 중 직전 확인·비교 행동 비율. 관심 구매와 기존 비교·확인에 귀속한 행동은 제외하며 오류율은 측정하지 않는다.",
+      "positionSplit": true
+    }
+  ],
+  "descriptiveMetrics": [
+    {
+      "kind": "interestRecoveryRate",
+      "description": "미완료 목표가 남은 관심 구간 뒤 스스로 또는 목록·장바구니 확인을 거쳐 목표에 복귀한 비율. 유지 가능한 능력의 관찰값이며 대조군보다 높아야 한다는 판정을 하지 않는다."
+    }
+  ],
+  "comparisonPolicy": {
+    "design": "matched-single-trait-contrast",
+    "levels": [
+      "low",
+      "medium",
+      "high"
+    ],
+    "directionReference": "higher-versus-lower-configured-level",
+    "controlPersonaRequired": false,
+    "unexercisedValue": null,
+    "abilityOutcomesAreDescriptive": true,
+    "zeroVarianceIsFailure": false,
+    "authoredTimingMustBeSeparated": true
+  },
+  "analysisVersion": 2,
+  "recommendedSeedCount": 20,
+  "sequenceMetrics": {
+    "descriptiveOnly": true,
+    "unexercisedValue": null,
+    "kinds": [
+      "preActionDelayDistribution",
+      "actionTransitions",
+      "errorTaxonomy",
+      "recoveryActions",
+      "perseveration"
+    ],
+    "interpretation": "작성 시간·순서·오류는 설명 지표이며 주 판정에 사용하지 않는다. 실수나 회복을 강제하지 않는다."
+  },
+  "pooledAnalysis": {
+    "descriptiveOnly": true,
+    "method": "stratified-paired-bootstrap",
+    "strata": [
+      "low",
+      "high"
+    ],
+    "usedForPrimaryDecision": false
+  },
+  "powerSimulation": {
+    "descriptiveOnly": true,
+    "targetAbsDelta": 0.33,
+    "fixedSeed": "persona-validation-power-v1",
+    "interpretation": "모의 분포 가정에 따른 대략적 검정력이며 실제 사람 자료 또는 관측된 효과의 증거가 아니다."
+  },
+  "catalogSchemaVersion": "persona-traits-v2",
+  "firstPlayDiagnostics": {
+    "descriptiveOnly": true,
+    "minimumObservedTraces": 2,
+    "groupBy": [
+      "personaId",
+      "condition"
+    ],
+    "zeroVarianceIsFailure": false,
+    "evidence": "observed step IDs",
+    "note": "감쇠와 과장 상한을 검사하지 않는다."
+  },
+  "baselineComparison": {
+    "enabled": true,
+    "traitMode": "omitted",
+    "descriptiveOnly": true,
+    "approximateRule": "기준≈수준: 해당 성향 프로필 대 기준 프로필 Cliff’s delta의 같은 seed 짝 부트스트랩 95% 구간이 0을 포함한다.",
+    "positionRule": {
+      "high-only-shift": "낮음≈기준이고 높음의 구간은 0을 제외한다(기준이 낮음 쪽).",
+      "low-only-shift": "높음≈기준이고 낮음의 구간은 0을 제외한다(기준이 높음 쪽).",
+      "both-shift": "두 구간이 모두 0을 제외하고 낮음 delta < 0 < 높음 delta다(기준이 사이).",
+      "baseline-beyond-range": "두 구간이 모두 0을 제외하지만 같은 부호다(기준이 낮음·높음 범위 밖).",
+      "indistinguishable": "두 구간이 모두 0을 포함하거나, 어느 한쪽의 유효 쌍이 minValidPairs 미만이거나 구간이 없다."
+    },
+    "interpretation": "기준 프로필은 성향 문장만 뺀 같은 맥락이다. 모델의 기본 경향을 보여줄 뿐 실제 사람의 평균이나 정상 범위가 아니다. 기대 방향과 통과·실패 판정을 만들지 않는다."
+  },
+  "positionStability": {
+    "enabled": true,
+    "split": "opportunity-order-halves",
+    "oddMiddle": "early",
+    "minOpportunitiesPerTrace": 2,
+    "descriptiveOnly": true
+  }
+}

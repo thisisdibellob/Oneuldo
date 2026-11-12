@@ -118,15 +118,19 @@ export class FeedbackExperience {
   private readonly movementHistory: boolean;
   private moves: Move[] = [];
   private readonly passageHistory: boolean;
+  private readonly passageCapacity?: number;
   private arrivals: { id: string; at: number }[] = [];
   private readonly progressHistory: boolean;
   private listReads: number[] = [];
   private checkoutSeen: { at: number; direction: ActorDirection; distanceBand: string } | null = null;
 
-  constructor(options: { version?: FeedbackExperienceVersion; movementHistory?: boolean; passageHistory?: boolean; progressHistory?: boolean } = {}) {
+  constructor(options: { version?: FeedbackExperienceVersion; movementHistory?: boolean; passageHistory?: boolean; progressHistory?: boolean; passageCapacity?: number } = {}) {
+    if (options.passageCapacity !== undefined && (!Number.isInteger(options.passageCapacity) || options.passageCapacity < 4))
+      throw new Error('passageCapacity must be an integer of at least 4');
     this.version = options.version ?? FEEDBACK_EXPERIENCE_VERSION;
     this.movementHistory = options.movementHistory === true;
     this.passageHistory = options.passageHistory === true;
+    this.passageCapacity = options.passageCapacity;
     this.progressHistory = options.progressHistory === true;
   }
 
@@ -218,6 +222,12 @@ export class FeedbackExperience {
       if (result?.accepted && decision.action.type === 'walkToAnchor' && result.anchorId === decision.action.anchorId)
         this.arrivals.push({ id: decision.action.anchorId, at: this.count });
       this.arrivals = this.arrivals.filter(arrival => within(this.count, arrival.at));
+      if (this.passageCapacity !== undefined) {
+        // Only accepted arrivals refresh place recency. Eviction deletes every
+        // retained visit to that place, so seeing or returning cannot restore it.
+        const retained = [...new Set(this.arrivals.map(arrival => arrival.id).reverse())].slice(0, this.passageCapacity);
+        this.arrivals = this.arrivals.filter(arrival => retained.includes(arrival.id));
+      }
     }
     if (this.movementHistory && result?.accepted) {
       const delta = after.result?.movement?.actualDelta;

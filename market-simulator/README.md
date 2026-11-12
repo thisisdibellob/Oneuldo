@@ -93,9 +93,37 @@ Luna 전체 계획 경로는 전체 세계를 전개 계산용 참고 자료로 
 
 초반 신중함은 첫 매대 열기·담기 전의 살핌 행동 수이고, 나머지는 기회당 반응 비율이다. 조작은 종류별 첫 사용만, 동선은 실제 방문한 곳과 미방문한 곳이 모두 이동 선택지에 있는 경우만, 글자 단서는 같은 계열의 다른 이름·규격 상품이 동시에 표시된 목표 담기만 센다. 관심 구매는 글자 지표에서 제외한다. 필요한 관측이 없거나 제외 후 기회가 없으면 `null`/`unexercised`와 이유를 남긴다. 기존 비교·확인·도움 발현에 쓰인 행동을 새 축에 중복 계산하지 않으며, 선언만으로 겹친 기회 역시 새 지표에서 제외한다. `reason`·활동 표기·작성 대기시간은 새 축의 긍정 근거가 아니다.
 
-같은 조건·seed에서 양쪽 모두 기회가 있었던 쌍만 비교하며 유효 쌍 8개, |delta| ≥ 0.33, 95% CI의 0 제외 기준을 유지한다. 같은 인물·조건의 값이 모두 같은 경우는 근거 step ID를 포함한 진단 경고이며 판정 실패가 아니다. 성장·감쇠·과장 상한은 검사하지 않는다. 블라인드 답안은 v1이 다섯 축, v2가 아홉 축 전부를 요구한다. 아래 다섯 축 답안 예시는 v1용이며, v2에서는 준비 응답의 아홉 축 `answerFormat`을 사용한다. 익명 판에서 상품·이동 선택지 관측이 빠진 경우 해당 축은 `unknown`으로 남길 수 있다.
+같은 조건·seed에서 양쪽 모두 기회가 있었던 쌍만 비교하며 유효 쌍 8개, |delta| ≥ 0.33, 95% CI의 0 제외 기준을 유지한다. 같은 인물·조건의 값이 모두 같은 경우는 근거 step ID를 포함한 진단 경고이며 판정 실패가 아니다. 성장과 과장 상한은 검사하지 않는다. 앞뒤 성향 유지는 명세 v3에서 설명 지표로만 보고하며 주 판정에 쓰지 않는다. 블라인드 답안은 v1이 다섯 축, v2가 아홉 축 전부를 요구한다. 아래 다섯 축 답안 예시는 v1용이며, v2에서는 준비 응답의 아홉 축 `answerFormat`을 사용한다. 익명 판에서 상품·이동 선택지 관측이 빠진 경우 해당 축은 `unknown`으로 남길 수 있다.
 
 현행 검증 snapshot과 생성기에는 이동 갈림길·유사 상품 동시 표시 구조가 있어 생성기 변경은 하지 않았다. 정적 기회는 실제 노출이나 HUD 정상 동작을 보장하지 않는다. 이번 구현은 파일럿이나 실제 사람 데이터 비교를 수행하지 않았다. 남은 파일럿은 **HUD 결함을 고친 snapshot, 새 runId, 조건별 seed 20개 이상**으로 실행한다. 연구 근거로 설계한 첫 플레이 성향이 수준대로 행동에 나타나는지를 본 것이며, 실제 지적장애인과의 유사성을 입증하지 않는다. 인물별 매핑·관측 필드·출처와 한계는 [v2 검증 절차](../market-persona-skill/references/persona-validation.md#성향-카탈로그-v2--첫-플레이의-네-성향)를 따른다.
+
+### 명세 v3 기준 프로필 요청 예시
+
+새 traits run은 [명세 v3](validation/persona-trait-validation-spec-v3.json)을 기록한다. 주 판정과 블라인드 점수는 v2와 같고, 저장된 v2 run은 `specHash`로 v2 그대로 다시 측정된다. v3은 설명 지표 `baselineComparison`(기준 프로필 대비 위치)과 `positionStability`(기회 순서 앞뒤의 성향 유지, 핵심 출력 `contrastAttenuation`)를 더한다. 둘 다 `descriptiveOnly:true`, `usedForPrimaryDecision:false`다.
+
+다음은 **요청 형식 예시이며 실행한 파일럿이 아니다**. 같은 기본 인물에서 `checking` 한 축만 다른 두 프로필에 `traitMode:"omitted"` 기준 프로필 하나를 더한다.
+
+```json
+{
+  "validationMode": "traits",
+  "catalogSchemaVersion": "persona-traits-v2",
+  "runId": "checking-baseline-v3-new-01",
+  "outputDirectory": "/absolute/output",
+  "snapshotFilePaths": {
+    "low": "/absolute/hud-fixed-snapshots/low.json",
+    "high": "/absolute/hud-fixed-snapshots/high.json"
+  },
+  "seeds": ["seed-01", "seed-02", "seed-03", "seed-04", "seed-05", "seed-06", "seed-07", "seed-08", "seed-09", "seed-10",
+    "seed-11", "seed-12", "seed-13", "seed-14", "seed-15", "seed-16", "seed-17", "seed-18", "seed-19", "seed-20"],
+  "profiles": [
+    { "id": "checking-low", "basePersonaId": "neutral-adult-control", "schemaVersion": "persona-traits-v2", "traits": { "checking": "low" } },
+    { "id": "checking-high", "basePersonaId": "neutral-adult-control", "schemaVersion": "persona-traits-v2", "traits": { "checking": "high" } },
+    { "id": "neutral-baseline", "basePersonaId": "neutral-adult-control", "schemaVersion": "persona-traits-v2", "traitMode": "omitted" }
+  ]
+}
+```
+
+기준 프로필은 같은 `contextHash`·공통 지침을 갖고 성향 지침 문장만 없다(`traits:null`). 다섯 성향이 `medium`인 `neutral-adult-control` 자체와는 다른 조건이다. `traitMode`는 `presetId`·`traits`와 함께 줄 수 없고 v1 카탈로그에서는 거절한다. 기준 프로필 슬롯은 readiness의 `missingSlots`에 생성 요청과 함께 포함되며, 기본 인물당 조건 2 × seed 수(이 예시는 40개) trace가 더 든다. 성향 대비·`groups`·블라인드 묶음에서는 빠지고 보고서에 `excludedBaselineTraces`가 표시된다. 위치 분류(`high-only-shift`·`low-only-shift`·`both-shift`·`baseline-beyond-range`·`indistinguishable`)는 모델의 기본 경향일 뿐 실제 사람의 평균이나 정상 범위가 아니다. 뒷부분에는 과제 단계 효과가 섞이므로 `contrastAttenuation`만으로 성향 감쇠를 확정하지 않는다. 정의와 한계는 [명세 v3 절차](../market-persona-skill/references/persona-validation.md#명세-v3--기준-프로필과-앞뒤-성향-유지-설명-지표)를 따른다.
 
 ### 기존 다섯 축과 공통 절차
 
@@ -120,6 +148,10 @@ Luna 전체 계획 경로는 전체 세계를 전개 계산용 참고 자료로 
 새 run은 **조건별 seed 20개 이상**을 권장한다. 20개 미만도 허용하며 준비 응답의 `powerWarning`에 표시한다. 절차는 준비 → `check_persona_validation_readiness({runDirectory})` → 부족 슬롯의 `prepareWholeTrace`로 생성 → readiness 재확인 → measure → 다중 블라인드 → report다. readiness는 인물×조건 완료 수, 대조군·짝 불일치, 지표별 최대 유효 쌍 상한과 부족 슬롯을 읽기 전용으로 반환한다. 대조군 또는 비교 가능한 쌍이 없으면 측정 응답과 보고서 상단에 `readiness:"blocked"`와 이유를 기록한다. v3의 비교 기준은 같은 맥락·단일 성향 대비 프로필이다.
 
 검증 전용 snapshot은 `scripts/build-validation-snapshots.cjs`로 새 디렉터리에 만들며 기존 snapshot을 덮어쓰지 않는다. 준비 manifest의 `opportunityAudit`는 구조적 기회와 불가능 경고를 기록한다. 구조적 가능성이 실제 노출·오류·회복을 보장하지는 않는다.
+
+앞뒤 기회를 비교하는 별도 설계에는 `--low-goal-count 3`으로 low 목표를 우유·사과·생수 각 1개로 고정할 수 있다. high는 기존 5개 목표와 수량을 유지하며 배치·재고·화면 조건은 바꾸지 않는다. 옵션을 생략한 과거 기본은 2개다. `snapshot-set.json`의 `design`에 실제 목표 수와 목표를 한 번씩 순차 선택했을 때 가능한 전환 수를 기록한다. 목표 2개를 정상적으로 한 번씩 구매하면 `postSelectionListRate`의 기회는 1개뿐이므로 앞뒤 분할에 충분하지 않다. 목표 3개도 실제 도달·구매·전환을 보장하지 않는다. 이 변경은 새 snapshot·새 run에만 적용하고 과거 결과와 같은 조건으로 합치지 않는다.
+
+해당 traits v2 run의 `prepare_persona_validation`에도 `lowGoalCount:3`을 명시한다. manifest의 `taskDesign`/`taskDesignHash`가 low 3/high 5 구성과 snapshot 목표 수를 고정하며 준비·readiness·측정·보고서에 이어진다. 미지정 기본은 low 2/high 5이고, 기존 run에 옵션을 나중에 바꿔 붙이지 못한다. legacy·traits v1은 이 옵션을 거절한다. v3 판정 명세와 specHash는 그대로 유지한다.
 
 새 `sequenceMetrics`는 대기시간 분포·전이·오류 근거·회복·반복을 설명하며 `descriptiveOnly:true`다. `pooledAnalysis`는 low/high 층화 쌍 부트스트랩, `powerAnalysis`는 고정 seed의 가정 기반 검정력이며 둘 다 주 판정에 사용하지 않는다. 유효 쌍 8·|delta| ≥ 0.33·95% CI의 0 제외·플래그 10%는 유지한다. **실수 강제 금지**: 오류가 많다고 장애 특성에 충실하다고 해석하지 않는다.
 
@@ -199,7 +231,84 @@ Luna 전체 계획 경로는 전체 세계를 전개 계산용 참고 자료로 
 
 메뉴의 `presentationRevision:"current-choice-menu-v1"`은 `interactionContext`로 매대·장바구니·도움말·직원·계산대 등 현재 메뉴를 설명하고, `availableChoices`에 기존 `choiceIds`와 같은 순서의 행동 이름을 표시한다. `view:"world"`에서도 매대가 열려 있을 수 있다. 전역 catalog나 activeStation만으로 선택 가능 여부를 추론하지 않고 매 결정의 최신 `choiceIds`를 따른다. 거절 응답의 `rewrite`는 같은 결정의 재작성 대기(`awaiting-rewrite`) 또는 소진(`exhausted`), 수락된 결정 수, 남은 횟수를 명시한다. `canRetry:true`는 전체 실패가 아니다. AI가 기존 의도를 유지하며 그 결정의 기술 오류를 다시 작성할 수 있고, 보조기는 대체 행동을 추천·삽입하거나 상태를 채우지 않는다. 수락된 앞부분과 기존 판정·최종 수정 예산은 유지한다.
 
-실행 메뉴의 `currentObservation`은 `kind:"validated-prefix-observation-v1"`, `acceptedDecisionCount`, `notice`와 선택적 `readObjectives`로 기존 접두 검증의 현재 목록 관찰을 제공한다. 수락된 `readList` 다음 한 관찰에만 목록이 표시되고, 다음 행동 수락 후 기존 수명대로 갱신된다. 필드 생략은 현재 미표시, `[]`는 표시된 빈 목록이며 과거 목록이나 worldReference로 채우지 않는다. 메뉴 조회·활동/지연 미리보기·거절은 관찰을 소비하지 않는다. `advisory.goalFields:[]`는 활성 기억 필드 없음, `openGoalIds:[]`는 열린 목표 없음, `observedProductIds:[]`는 관찰 상품 없음을 뜻한다. 목록이 표시됐지만 아직 목표를 선택하지 않았다면 이 배열들이 비어 있어도 정상이다. AI가 기존 계약에 따라 목표 선택과 상태를 직접 선언하며 보조기는 자동으로 채우지 않는다.
+이전 anchor 실행 메뉴의 `currentObservation`은 `kind:"validated-prefix-observation-v3"`, `acceptedDecisionCount`, `notice`, `observation`과 선택적 `readObjectives`를 제공한다. `observation`은 접두 검증의 공용 `observeActor()`가 반환한 현재 화면 그대로다. 보이는 먼 매대 표지(`near:false`)와 열 수 있는 매대를 구분하고 현재 상품·도움말·화면 단서를 누락 없이 전달한다. 미관찰 상품·목표·지도·추천 경로를 추가하지 않고 기존 선택지 집합·순서를 보존한다. 과거 목록 전용 v1과 구분하며 명시적 directional-v2는 기존 관찰 v2를 유지한다. `readObjectives`는 현재 관찰의 호환 별칭이다. 수락된 `readList` 다음 한 관찰에만 목록이 표시되고, 다음 행동 수락 후 기존 수명대로 갱신된다. 필드 생략은 현재 미표시, `[]`는 표시된 빈 목록이며 과거 목록이나 worldReference로 채우지 않는다. 메뉴 조회·활동/지연 미리보기·거절은 관찰을 소비하지 않는다. `advisory.goalFields:[]`는 활성 기억 필드 없음, `openGoalIds:[]`는 열린 목표 없음, `observedProductIds:[]`는 관찰 상품 없음을 뜻한다. 목록이 표시됐지만 아직 목표를 선택하지 않았다면 이 배열들이 비어 있어도 정상이다. AI가 기존 계약에 따라 목표 선택과 상태를 직접 선언하며 보조기는 자동으로 채우지 않는다.
+
+새 독립 anchor 요청은 `observationVersion:"anchor-visible-structures-v1"`과 `validated-prefix-observation-v4`를 기록한다. 실제 그림 일부가 보이지만 이름표는 읽을 수 없는 진열대는 `visibleStructures`에 `kind:"shelf"`, 일반 라벨, 현재 방향·거리만 표시한다. 화면/HUD에 가린 몸체는 제외하며 카테고리·상품·station ID·좌표·추천 경로는 제공하지 않는다. 이 단서는 현재 관찰에서만 유효하고 다음 관찰에서 사라지면 기억 원장에도 남기지 않는다. 몸체가 보인다는 사실이 매대 열기 가능을 뜻하지 않으며 기존 near 조건·행동 집합을 유지한다. 계약은 inputHash·trace generation·knowledge audit에 연결된다. marker 없는 저장 bundle/trace와 기존 directional·학습 trial은 원래 관찰을 유지한다.
+
+`current-choice-menu-v2`는 같은 메뉴의 `visibleWalkChoices`에 이미 있던 현재 통로 라벨·방향·거리를 `availableChoices`의 해당 이동 ID 옆에도 표시한다. 새로운 장소 정보·추천·좌표를 추가하지 않고 ID·순서·비이동 선택지·행동·시간·종료를 바꾸지 않는다. 저장된 v1 또는 marker 없는 bundle의 메뉴는 기존 표현을 유지한다. 두 표현 수정의 성능 효과는 새 독립 수집으로 확인하며 과거 trace를 재작성하거나 결과가 나올 때까지 반복하지 않는다.
+
+
+`finish`는 이미 작성한 전체 계획의 최종화다. 종료 없는 100행동 미만 계획을 최종화하면 `AUTHORING_INCOMPLETE_FINALIZATION`으로 원본 수락 prefix를 보존하고 요청을 기술 실패로 닫는다. 그 뒤 새 `giveUp`을 추가하거나 begin·submit·repair로 재개할 수 없다. 작성 중 선택한 자발적 종료는 그대로 허용하며, 아직 거절된 결정의 기술 재작성 대기(`AUTHORING_REWRITE_PENDING`)는 기존 한도에서 유지한다. 이 구분은 `finalizationContract:"incomplete-finalization-fails-request-v1"`로 기록한다.
+
+### 방향 이동 v2 작성 예시
+
+기본 whole-trace는 기존 waypoint 메뉴를 유지한다. `movementVersion:"directional-v1"`은 8방향 조작을 추가하고, `movementVersion:"directional-v2"`는 결정별 prefix 실행 뒤 정확한 연속 위치로 다음 관찰·메뉴까지 갱신한다. v1의 `D<결정 번호>` 계약과 저장 입력은 바꾸지 않는다. v2에서도 8방향은 world 조작이 가능하면 모두 제공하며 HUD·화면 가장자리 가림은 기존 인지 정보에만 적용한다. 실제 충돌과 이동은 기존 motor를 사용하고 `walk` 지름길도 유지한다. 별도 `movementFeedbackVersion:"recent-movement-v1"`을 함께 지정하면 최근 적용 이동의 문장과 현재 보이는 통로의 방문 표시만 추가한다. 이 메모는 방향을 추천하거나 선택지를 제거하지 않는다.
+
+`movementFeedbackVersion:"recent-movement-anchor-v1"`은 `movementVersion`을 생략한 anchor 이동과 `observationVersion:"anchor-visible-structures-v1"` 계약에서만 켠다. 관찰 계약은 새 독립 anchor 요청에서 자동으로 정해지며 기본값은 꺼짐이다. 최근 24행동 안의 자기 accepted 도착 기록을 현재 보이는 걷기 선택지에 ` · 최근에 N번 간 통로`와 `recentVisit:{timesArrived:N}`으로 표시하고, 같은 창의 이동 경험을 `movementNotes`로 전달한다. 선택지 ID·순서·가용성은 유지하며 표시와 메모는 권고가 아니다. `prepare_persona_validation`에서는 별도 실행 설정에 `movementValidationVersion:"1"`과 이 옵션을 지정하며 명세 JSON은 바꾸지 않는다.
+
+`movementFeedbackVersion:"recent-movement-anchor-capacity-v1"`은 같은 anchor 조건에서만 켜는 별도 옵션이다. 기존 24행동 보존 창에 더해 선택된 페르소나의 `spatialMemoryCapacity`를 최근 도착한 서로 다른 통로 수의 상한으로 쓴다. 용량을 넘으면 마지막 accepted 도착이 가장 오래된 통로의 횟수 기록을 모두 지우며, 다시 도착하면 1회부터 센다. 보기만 하거나 메뉴를 조회한 것은 최근성을 갱신하지 않는다. 방향별 `movementNotes`의 24행동 창은 그대로이며 이동 권고·선택지 변경은 없다. 기본 페르소나 값은 모두 96곳이므로 현재 창에서 용량 제한은 걸리지 않는다. 이 값은 합성 구현 설정이며 실측 기억 능력이 아니다. 기본값과 기존 두 피드백 버전은 바꾸지 않는다.
+
+다음은 독립 호스트에서 준비하는 예시다. 부모 디렉터리가 존재하는 새 호스트 경로와 실제 시작 전 snapshot을 사용한다.
+
+```sh
+node market-simulator/cli.cjs host-start /absolute/new-host-directory
+node market-simulator/cli.cjs host-status /absolute/new-host-directory
+node market-simulator/cli.cjs host-call /absolute/new-host-directory --options-file /absolute/prepare-call.json
+```
+
+`prepare-call.json`:
+
+```json
+{"operationId":"prepare-directional-01","tool":"prepare_whole_trace","arguments":{"personaId":"mild-intellectual-disability-adult","seed":"directional-v2-01","snapshotFilePath":"/absolute/mission.snapshot.json","outputPath":"/absolute/directional-v2-01.trace.json","movementVersion":"directional-v2","movementFeedbackVersion":"recent-movement-v1","maxRepairs":0}}
+```
+
+반환된 실제 requestId와 같은 hostDirectory를 `/absolute/context.json`에 저장한다. 이미 있는 hostId·inputHash 등 출처 필드는 보존한다.
+
+```json
+{"hostDirectory":"/absolute/new-host-directory","requestId":"RETURNED_REQUEST_ID"}
+```
+
+작성 시작 요청 파일은 `{"contextFilePath":"/absolute/context.json","operationId":"begin-01","tool":"begin_whole_trace_authoring","arguments":{"maxRewritesPerDecision":3}}`이다. 모든 작성 호출은 `node market-simulator/cli.cjs author-whole /absolute/request.json`으로 전달한다. 다음은 시작 world 메뉴에서 북쪽 방향을 직접 선택한 append 파일의 완전한 형태다. 시간과 상태는 예시이며 실제 배우가 현재 상황에 맞게 작성한다.
+
+```json
+{"contextFilePath":"/absolute/context.json","operationId":"move-01","tool":"append_whole_trace_decision","arguments":{"decision":{"choiceRef":{"choiceId":"moveDirection/north","durationMs":700},"delayMs":900,"reason":"위쪽으로 잠시 걷는다.","basis":{"intent":"explore","goalId":null,"memoryUses":[]},"actorState":{"activity":"orient","task":"통로를 살피며 걷기","heldGoalIds":[],"uncertainGoalIds":[],"focusedGoalId":null,"focusedProductId":null,"orientation":"unfamiliar"}}}}
+```
+
+source는 작성자가 공급하지 않는다. 서버가 채운 source.location은 `P`로 시작하는 위치 참조, navigationStateId는 `nav-v2-`로 시작하는 상태 참조다. 내부 연속 좌표·고정 입력·직원 상태·표시 조건에 묶인 불투명한 값이며 좌표나 경로로 해석하지 않는다. 다음 응답 발췌는 형태만 설명하며 실제 이동·선택지는 snapshot과 충돌 결과에 따라 달라진다.
+
+```json
+{"accepted":true,"menu":{"expectedSource":{"location":"P<opaque hash>","navigationStateId":"nav-v2-<opaque hash>","phase":"shopping","view":"world","activeStation":null,"pageIndex":null},"currentObservation":{"kind":"validated-prefix-observation-v2","acceptedDecisionCount":1,"notice":"현재 prefix 실행의 표시 정보","observation":{"schemaVersion":"attention-observation-v1","phase":"shopping","view":"world","activeStation":null,"visibleStations":[],"anchors":[],"products":[],"shelf":null,"listAvailable":true,"cart":null,"cashiers":{}}},"movementResult":{"actualDirection":"north","progress":"full","blocked":false},"movementNotes":[]}}
+```
+
+공개 메뉴에는 내부 좌표·픽셀 이동량·전역 지도·숨은 목적지를 넣지 않는다. `movementResult`는 실제 이동 방향 또는 `null`, 진행 결과 `full|partial|blocked`, 막힘 여부를 전달한다. 새 관찰에서 실제 표시된 표지·매대·직원·상품만 후속 판단에 사용하며, 최신 `choiceIds`에서 다음 조작을 고른다. 방향 이동의 `choiceRef.durationMs`는 100~2000 정수이고, 판단 지연인 `delayMs`와 별개다. v2는 위치를 waypoint로 스냅하거나 충돌을 우회하는 경로를 추가하지 않는다.
+
+`full`은 입력이 충돌 제약 없이 적용됐다는 뜻이고 목적지 도착을 뜻하지 않는다. `partial`은 충돌로 일부 이동이 제한된 경우, `blocked`는 실제 이동량이 없는 경우다. 막힘 여부 `blocked:true`는 부분 제약에도 표시한다. 이동량이 0이면 `actualDirection:null`이며, 벽을 따라 미끄러진 경우에는 입력 방향 대신 실제 변위 방향을 반환한다.
+
+배우가 원래 종료 의도까지 작성한 뒤 같은 context로 `finish_whole_trace_authoring`(`arguments:{}`), 반환된 candidate의 `submit_whole_trace`를 호출한다. 제출 전에는 `host-status`로 같은 호스트를 확인하고, 최종 제출은 수락된 prefix를 다시 실행해 source와 선택지를 검증한다. 완료 후 `node market-simulator/cli.cjs host-close /absolute/new-host-directory`로 종료한다. 재전송은 아래 호스트 수명 규칙을 따르며, v2를 기존 trial·persona validation slot에 덧붙여 조건을 바꿀 수 없다.
+
+### 검증 run에 이동 옵션 고정하기
+
+새 검증 run에서만 `movementValidationVersion:"1"`을 명시해 이동 계약을 고정할 수 있다. `prepare_persona_validation`에 다음 옵션을 공통 인물·snapshot·seed 설정과 함께 전달한다. 서로 다른 실험군은 서로 다른 새 `runId`를 사용한다.
+
+| 실험군 | 추가 입력 |
+| --- | --- |
+| 기존 통로 이동 대조군 | `{"movementValidationVersion":"1"}` |
+| 연속 위치 방향 이동군 | `{"movementValidationVersion":"1","movementVersion":"directional-v2"}` |
+| 최근 이동 단서까지 제공하는 별도 실험 | 위 방향 이동 입력에 `"movementFeedbackVersion":"recent-movement-v1"` 추가 |
+
+예를 들어 원본 네 인물을 유지하는 16칸 방향 이동 run의 interactive CLI 입력은 다음과 같다. 이는 준비 예시이며 모델 생성은 실행하지 않는다. 같은 16칸 대조군은 새 `runId`에서 `movementVersion`만 생략한다. `validationMode:"legacy"`를 명시하므로 traits v2 지침을 원본 인물에 추가하지 않는다.
+
+```json
+{"tool":"prepare_persona_validation","arguments":{"validationMode":"legacy","runId":"directional-16-new","outputDirectory":"/absolute/output/new-pilot","snapshotFilePaths":{"low":"/absolute/low.snapshot.json","high":"/absolute/high.snapshot.json"},"personaIds":["mild-intellectual-disability-adult","careful-checker","quick-decider","neutral-adult-control"],"seeds":["idblind-20261031-current-001","idblind-20261031-current-002"],"movementValidationVersion":"1","movementVersion":"directional-v2"}}
+```
+
+준비 또는 readiness가 반환한 각 슬롯의 `prepareWholeTrace`를 그대로 사용한다. marker·이동·단서 옵션은 manifest와 모든 슬롯, 준비 요청, bundle, trace generation, knowledge audit에서 같아야 한다. 누락·혼합·기존 run에 사후 추가는 거절한다. 원본 네 인물과 traits 프로필 경로 모두 같은 계약을 사용하며, `directional-v1`·학습 trial에는 이 검증 옵션을 붙일 수 없다. 새 검증 계약의 candidate는 7만 지원한다. 옵션이 없는 기존 버전의 지원 목록과 manifest·trace·측정·보고서에는 필드를 추가하지 않는다.
+
+옵션을 켜면 서버가 수락된 각 결정의 실제 메뉴와 이동 전후 불투명 위치 ID를 `knowledge-audit`의 `navigationEvidence`(`continuous-route-v1`)에 기록한다. 연속 좌표를 격자에 맞추거나 가까운 통로로 추정하지 않는다. 도착은 이미 실제 메뉴에 제공된 anchor와 실행 후 위치가 앱의 도착 허용 거리(1px) 안에 있을 때만 확인하며, 이 분석 증거로 배우 관찰에 숨은 정보를 추가하지 않는다.
+
+`routeRelianceRate`는 방문·미방문 anchor가 함께 제공된 메뉴에서 실제 `walkToAnchor`를 선택한 경우만 분모로 센다. 목적지가 정해지지 않은 `moveDirection`은 해당 비율에서 제외하고 입력 수, 혼합 메뉴에서의 입력 수, 정확히 같은 위치로 돌아온 수, 차단·부분 차단 수, 확인된 anchor 도착 수와 step ID를 별도 진단에 남긴다. 방향 이동의 확인된 도착은 이후 통로 선택의 방문 근거가 된다. 위치·메뉴·실행 결과의 연결이 없거나 모순되면 `null`/`unexercised`와 이유를 남긴다. 같은 위치로 돌아왔다는 사실만으로 익힌 동선을 고수했다고 판정하지 않는다.
+
+legacy와 traits v1의 기존 판정은 유지하고, 새 `movementOpportunities`에 아홉 축의 관찰 기회(11개 지표)와 coverage를 설명용으로 추가한다. traits v2는 명시적 옵션 안에서 새 경로 근거를 사용한다. 보고서 JSON/Markdown에 계약과 기회 표가 포함된다. 기존 어려움·지속·도움 요청 판정과 반복 선택 정의는 그대로여서, 수락됐지만 벽에 막힌 방향 입력을 자동으로 어려움 기회로 세지는 않는다. 이 한계는 파일럿 해석에 함께 기록한다. 두 seed의 소규모 실험으로 성향 차이의 통계적 지지를 주장하지 않는다.
 
 ## 오프라인 요청 호스트의 수명
 
@@ -264,6 +373,12 @@ actor policy는 whole-trace-v3, trace schema 2 / policy 6을 유지한다. 새 �
 
 candidate 7의 `personaReview.taskExpression`은 `task-expression-v1`로 표현 coverage를 기록한다. `coverage.status:"unexercised"`는 기억 부담과 이후 회복을 관찰하지 못했다는 뜻이다. 관심 동안 목표를 유지한 사실만으로 어려움이 발현됐다고 보지 않는다. 추가 soft warning은 `INTEREST_PRODUCTS_WITHOUT_FOCUS`·`UNIFORM_ORIENT_WALK_DELAYS`이며 실제 관심 상품 focus와 비교 행동, 이동 상황에 따른 지연을 검토한다. 경로 재방문은 왕복 이동일 수 있어 방황으로 단정하지 않는다.
 
+### 소켓 없는 파일 mailbox
+
+`node market-simulator/whole-trace-mailbox.cjs serve /absolute/new-owner --prepare-file /absolute/prepare.json`은 감독자가 소유하는 단일 whole-trace 요청 프로세스다. prepare 파일에는 readiness의 인자를 그대로 담는다. 배우는 자기 `prepare-response.json`만 받고, `call /absolute/new-owner --operation-file /absolute/operation.json`으로 기존 begin/menu/append 도구를 호출한다. 요청 파일은 `{operationId,tool,arguments}`이며 requestId는 owner가 고정한다.
+
+최종 `finish_and_submit_whole_trace`의 인자는 `{}`다. finish가 반환한 후보 객체 하나만 단일 JSON으로 원자적으로 저장하고, 재파싱·동일성 검사·기존 submit·status·저장 trace validate를 마쳐야 `completion.json`을 기록하고 정상 종료한다. JSONL에서 후보를 추출하거나 배우에게 EOF 종료를 맡기지 않는다. 전달 오류와 배우 클라이언트 종료는 준비 요청을 닫지 않으며, 같은 operationId의 동일 입력 재조회는 행동을 다시 실행하지 않는다. 감독자만 `abort /absolute/new-owner --reason "사유"`로 중단할 수 있다. 이 방식은 소켓을 열거나 이전 요청을 복원하지 않는다. 행동·프로필·검증 명세·repair 예산은 그대로이며 세부 절차는 [전체 계획 전달 규약](../market-persona-skill/references/whole-trace.md#소켓-없는-단일-요청-전달)을 따른다.
+
 ## Whole-trace 이동 그래프 진단
 
 목록 HUD 가림은 `frontend/src/game/marketHudLayout.ts`의 공통 계산을 사용한다. 렌더 카드 폭은 `min(viewport.width - 24, 420)`, embedded top은 `max(112, safeArea.top + 64)`다. 기본 배율에서 이름 두 줄을 포함한 높이 상한은 115px이므로 390×600 화면의 가림 사각형은 x=12..378, y=112..227이다. 화면 높이는 카메라 투영과 clipping에 영향을 주며 상단 카드 위치를 바꾸지 않는다. bottom safe area도 상단 카드에 영향을 주지 않는다. 큰 fontScale에서는 이름·수량·장바구니 글자의 줄 높이와 줄바꿈 상한을 반영한다. 실제 텍스트 측정값이 없는 replay presentation이므로 한 줄 목록에도 두 줄 공간을 보수적으로 가린다.
@@ -279,6 +394,41 @@ node market-simulator/scripts/diagnose-whole-trace-reachability.cjs \
 출력 디렉터리는 원래 파일럿 밖의 새 경로여야 한다. `reachability.md`에는 입력별 전후 표, `reachability.json`에는 소스 hash·BFS 경로·도달 지점 목록이 저장된다. 2026-10-28 파일럿 64개 입력(공유 snapshot 2개)은 모두 23/139→131/139 지점, 매대 0→5곳, 계산대 도달 불가→가능으로 바뀌었다. 구조적 도달성 결과이며 실제 페르소나의 구매 성공률은 재측정하지 않았다.
 
 snapshot과 anchor ID 생성 규칙, bundle/candidate 버전은 유지한다. 기존 bundle의 그래프와 choice 메뉴는 자동 갱신되지 않으므로 이후 생성에는 새 bundle을 준비해야 한다. `inputHash`는 설정과 bundle 버전을 묶으며 코드/그래프 변경은 포함하지 않는다. `sourceFiles`에 공통 HUD 모듈 hash도 기록하지만 compiler는 이 hash를 호환성 차단 조건으로 검사하지 않는다. 따라서 같은 snapshotId/inputHash가 같은 이동 선택지를 보장하지 않는다. 과거 trace의 재검증도 현재 가림 판정을 사용하므로 당시 환경의 재현에는 당시 소스가 필요하다. 기존 파일럿·후보·trace를 다시 쓰거나 새 계약으로 변환하지 않는다.
+
+### 이동 모델별 회귀 검사
+
+두 이동 모델의 도달성을 같은 화면·환경 조합에서 검사한다. `walkToAnchor`는 공용 waypoint 그래프의 방향 있는 BFS를 사용한다. 방향 이동은 `directionalInputSlices`와 `resolveMarketEnvironmentMovement`로 실제 입력을 적용한 끝점을 이어 간다. HUD나 화면 가장자리로 방향 이동 자체를 걸러내지 않으며, 목표 도달은 기존 `visibleStations`에서 **모든 매대와 최소 한 계산대가 실제로 가깝고 인지 가능한지**로 검사한다. 도달한 매대가 일부뿐이거나 탐색 노드 예산을 소진하면 실패다.
+
+```sh
+npm --prefix market-simulator run test:reachability
+npm --prefix market-simulator run test:reachability:full
+npm --prefix market-simulator run test:reachability:full -- --output-directory /absolute/new-reachability-directory
+```
+
+대표 명령은 화면 조건 5개 × 환경 3개인 15조합을 검사한다. 360×640 대표 조건은 가장 큰 검사 글꼴 `fontScale:2`와 `safeArea.top:59`다. 전체 명령은 다음 135조합에서 각각 두 이동 모델을 검사한다.
+
+| 축 | 값 |
+| --- | --- |
+| 화면 크기 | 360×640, 390×600, 390×844, 430×932, 768×1024 |
+| 글꼴 배율 | 1, 1.3, 2 |
+| 상단 safe area | 0, 47, 59 |
+| 환경 | 실행할 때 현재 `createMarketSession()`으로 생성한 default, 역사적 low, 역사적 high |
+
+low/high는 [고정 도달성 fixture](test/fixtures/whole-trace-reachability-snapshots.json)에 저장된 2026-10-28 환경·presentation·초기 계산대 상태를 사용한다. 원본 snapshotId·경로·파일 SHA-256을 기록하고 추출한 내용도 고정 해시로 검증한다. 상품 목표·과거 배우 계획을 새로 생성하거나 원본을 수정하지 않는다. default는 현재 환경 생성기의 변경을 잡기 위해 고정 복사본을 쓰지 않는다. 화면 조건은 위 행렬로 바꾸고 배율 `zoom:1.3`과 하단 safe area 0을 사용한다.
+
+결과 표는 anchor 도달/전체 waypoint 수, 방향 이동 도달/전체 cell 수, 매대 수와 계산대 도달을 구분한다. anchor 수는 가상 시작 노드를 제외한다. 방향 이동의 전체 cell 수는 막힌 cell도 포함하므로 두 모델의 분모를 같은 것으로 비교하지 않는다. 실패에는 환경·viewport·fontScale·safe area, 도달 수, 누락 매대, 계산대 상태와 HUD/화면 가장자리/충돌 경계 예시를 남긴다. 도달성 실패가 하나라도 있으면 종료 코드 **2**, 잘못된 인자나 파일 오류면 **1**이다. 실패 조합을 허용 목록으로 통과시키지 않는다.
+
+`--output-directory`는 부모가 존재하는 **새 디렉터리**만 받는다. 지정하면 `reachability.json`과 `reachability.md`를 저장하고 이미 존재하는 경로는 거절한다. 옵션을 생략하면 터미널에 표와 진단을 출력한다. 기존 파일럿·검증 결과를 덮어쓰지 않는다.
+
+기본 `npm test`에는 대표 15조합과 default 360×640의 글꼴·safe area 9조합, 역사적 HUD 사각형 주입 대조, 방향 이동의 정확한 끝점·재생 가능한 도달 경로 검사를 넣는다. 전체 135조합은 개발 중 단일 추가 회귀 검사의 10초 예산과 분리해 위 `test:reachability:full` 명령으로 실행한다. 실행 시간은 결과의 `elapsedMs`에 기록하며 장비·병렬 실행 상황에 따라 달라진다.
+
+2026-11-08 최종 측정에서 전체 135조합은 **두 이동 모델 모두 135/135 통과**, 실패 0건이며 25,199ms가 걸렸다. 대표 행렬·compact 화면 9조건·역사적 HUD 대조 등을 묶은 행렬 테스트 5개는 모두 통과했고 전체 실행 시간은 8,135ms였다. 전체 행렬은 위 10초 예산을 넘기므로 별도 명령으로 유지한다. 조합별 도달 수·분모·매대·계산대 결과는 [최종 결과 표](../output/whole-trace-reachability-20261108-final/reachability.md)와 [JSON 진단](../output/whole-trace-reachability-20261108-final/reachability.json)을 따른다.
+
+좁고 짧은 화면(`width < 390`, `height <= 640`)에서는 실제 market 카메라가 HUD 아래 가시영역의 중앙에 플레이어가 보이도록 구도를 조정한다. 렌더러와 인지 투영은 같은 `getMarketWorldCameraFrame`을 사용한다. HUD의 실제 카드·글꼴 확대·가림 사각형, 80px waypoint 간격과 충돌 규칙은 유지한다. 390px 이상 화면은 기존 카메라를 사용하므로 390×600의 역사적 사각형 `{left:0,top:100,right:390,bottom:246}`을 주입하면 anchor 이동의 단절을 계속 검출하고, 방향 이동은 같은 물리 공간에서 매대·계산대에 도달하는 대조가 남는다.
+
+이 카메라 변경은 앱 재생에 쓰는 `GamePrototypeScreen`의 embedded market 경로에 적용한다. standalone `MarketMap`은 변경하지 않는다. bundle의 `sourceFiles`에 카메라 구현 해시를 추가한다. 저장된 bundle·trace·검증 파일은 수정하지 않으며, 작은 화면에서 새로 컴파일하거나 재검증할 때는 현재 카메라 투영을 사용한다.
+
+방향 BFS는 24px cell을 방문 중복 판정에만 쓰고 실제 끝점을 cell 중심이나 waypoint로 옮기지 않는다. 입력은 8방향, 400ms, `speedMultiplier:0.7`, `accelerationMs:200`의 고정된 합법 motor profile이다. cell마다 한 도착점만 보존하는 유한 탐색이므로 실패는 이 설정에서 경로를 찾지 못했다는 뜻이며 연속 공간에서의 물리적 불가능 증명은 아니다. 이 검사는 기계적 도달성 회귀이며 페르소나의 행동 선택·구매 성공률·실제 앱 실행을 측정하지 않는다.
 
 ## 구성과 시작
 

@@ -215,3 +215,46 @@ test('concurrent async validation scopes cannot observe each other or caller mut
   await Promise.all([first,second]);
   assert.throws(() => getWholeTracePersona(a.id), /Unknown persona/);
 });
+
+// traitMode:"omitted" baselines: same base context and shared instructions, no trait levels.
+const traitSection = prompt => prompt.replace(/## 공통 성향\n\n[\s\S]*?\n\n(?=## )/, '');
+const resolveV2 = profiles => resolveVersionedProfiles({profiles}, 'persona-traits-v2');
+test('trait-omitted baseline keeps the context and every shared section and drops only trait lines', () => {
+  const [high, low, baseline] = resolveV2([
+    {id:'checking-high',basePersonaId:'mild-intellectual-disability-adult',traits:{checking:'high'}},
+    {id:'checking-low',basePersonaId:'mild-intellectual-disability-adult',traits:{checking:'low'}},
+    {id:'baseline',basePersonaId:'mild-intellectual-disability-adult',traitMode:'omitted'}]);
+  assert.equal(baseline.traits, null); assert.equal(baseline.presetId, null);
+  assert.equal(baseline.contextHash, high.contextHash); assert.deepEqual(baseline.context, high.context);
+  assert.deepEqual(baseline.persona.traitProfile, {schemaVersion:'persona-traits-v2',basePersonaId:'mild-intellectual-disability-adult',
+    presetId:null,traitMode:'omitted',traits:null,contextHash:high.contextHash,context:high.context});
+  assert.doesNotMatch(baseline.persona.prompt, /## 공통 성향\n/);
+  for (const trait of getCatalog('persona-traits-v2').traits) assert.ok(!baseline.persona.prompt.includes(`(${trait.key}=`), trait.key);
+  for (const profile of [high, low]) {
+    assert.match(profile.persona.prompt, /## 공통 성향\n/);
+    assert.equal(traitSection(profile.persona.prompt.replaceAll(profile.id, 'baseline')), baseline.persona.prompt);
+  }
+  for (const heading of ['## 성향을 행동으로 선택하는 기준', '## 성향과 분리된 기본 맥락', '## 공통 전제와 관찰·실행 범위'])
+    assert.ok(baseline.persona.prompt.includes(heading), heading);
+  assert.equal(baseline.persona.description, 'baseline: 공통 행동 성향으로 구성한 허구의 성인. 인지·수행 기준, 취향과 경험은 별도 기본 맥락을 유지한다.');
+  assert.ok(high.persona.description.startsWith(baseline.persona.description.replace('baseline', 'checking-high') + ' '));
+  assert.deepEqual(baseline.persona.character.selectedTraits, []);
+  assert.deepEqual({...baseline.persona.character, name:null, selectedTraits:null}, {...high.persona.character, name:null, selectedTraits:null});
+  for (const key of ['parameters','attention','shoppingStyle']) assert.deepEqual(baseline.persona[key], high.persona[key]);
+  assert.notEqual(baseline.persona.version, high.persona.version); assert.match(baseline.persona.version, /^traits-2-[0-9a-f]{12}$/);
+  assert.deepEqual(baseline.definition, {id:'baseline',basePersonaId:'mild-intellectual-disability-adult',traitMode:'omitted',schemaVersion:'persona-traits-v2'});
+  assert.equal(validatePersona(baseline.persona).valid, true);
+  const tampered = structuredClone(baseline.persona); tampered.traitProfile.traits = high.traits;
+  assert.equal(validatePersona(tampered).valid, false);
+  const input = buildWholeTracePersonaInput(baseline.persona);
+  assert.equal(input.traitProfile.traits, null);
+  assert.deepEqual(resolveV2([{id:'baseline',basePersonaId:'mild-intellectual-disability-adult',traitMode:'omitted'}])[0].persona, baseline.persona);
+});
+test('traitMode accepts only "omitted", rejects presetId or traits beside it, and is not available in v1', () => {
+  const base = {id:'baseline',basePersonaId:'quick-decider'};
+  assert.throws(() => resolveV2([{...base,traitMode:'neutral'}]), /traitMode must be "omitted"/);
+  assert.throws(() => resolveV2([{...base,traitMode:'omitted',traits:{checking:'high'}}]), /cannot be combined with presetId or traits/);
+  assert.throws(() => resolveV2([{...base,traitMode:'omitted',traits:{}}]), /cannot be combined with presetId or traits/);
+  assert.throws(() => resolveV2([{...base,traitMode:'omitted',presetId:'quick-satisficer'}]), /cannot be combined with presetId or traits/);
+  assert.throws(() => resolveProfiles({profiles:[{...base,traitMode:'omitted'}]}), /requires persona-traits-v2/);
+});

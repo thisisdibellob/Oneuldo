@@ -61,3 +61,46 @@ test('snapshot writer refuses overwrite and records byte hashes and audit warnin
   assert.deepEqual(fs.readFileSync(result.snapshots.low.filePath), before);
   assert.deepEqual(result.opportunityAudit.warnings, []);
 });
+test('a three-goal low condition adds two ordinary goal transitions without changing geometry or high load', () => {
+  const options = { setId: 'three-goal-check', environmentSeed: 'fixed-three-goal-check' };
+  const original = buildSnapshots(options), revised = buildSnapshots({ ...options, lowGoalCount: 3 });
+  assert.equal(original.low.config.objectives.length, 2, 'The historical default remains reproducible');
+  assert.deepEqual(revised.low.config.objectives, [
+    { productId: 'milk', quantity: 1 }, { productId: 'apple', quantity: 1 }, { productId: 'water', quantity: 1 },
+  ]);
+  assert.deepEqual(revised.high, original.high);
+  assert.deepEqual(revised.low.environment, original.low.environment);
+  assert.deepEqual(revised.low.initialStock, original.low.initialStock);
+  assert.deepEqual(revised.low.presentation, original.low.presentation);
+  assert.notEqual(revised.low.snapshotId, original.low.snapshotId);
+  assert.equal(validateMarketReplaySnapshot(revised.low).valid, true);
+  assert.equal(auditSnapshot(revised.low, { persona }).metrics.postSelectionListRate.evidence.goalCount, 3);
+  const { extract } = require('../src/personaValidationMetrics.cjs');
+  const sequentialSelections = snapshot => ({ steps: snapshot.config.objectives.flatMap((goal, index) => [
+    { id: `add-${index}`, type: 'dragProduct', productId: goal.productId, quantity: 1, gesture: { outcome: 'drop' } },
+    { id: `read-${index}`, type: 'readList' },
+  ]) });
+  const oldMetric = extract(sequentialSelections(original.low), original.low, persona, null, {}, { opportunityRows: true }).postSelectionListRate;
+  const newMetric = extract(sequentialSelections(revised.low), revised.low, persona, null, {}, { opportunityRows: true }).postSelectionListRate;
+  assert.equal(oldMetric.opportunityRows.length, 1);
+  assert.equal(newMetric.opportunityRows.length, 2, 'Three distinct selections allow two next-goal intervals under the unchanged metric');
+  assert.equal(newMetric.denominator, 2, 'The last selection still has no fabricated next-goal interval');
+  for (const lowGoalCount of [1, 5, 2.5, NaN, '3'])
+    assert.throws(() => buildSnapshots({ ...options, lowGoalCount }), /lowGoalCount/);
+});
+test('CLI records the explicit three-goal design and rejects invalid counts before creating output', t => {
+  const { spawnSync } = require('node:child_process');
+  const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'validation-three-goals-'));
+  t.after(() => fs.rmSync(parent, { recursive: true, force: true }));
+  const cli = path.resolve(__dirname, '../scripts/build-validation-snapshots.cjs');
+  const directory = path.join(parent, 'fresh');
+  const result = spawnSync(process.execPath, [cli, '--output-directory', directory, '--low-goal-count', '3'], { encoding: 'utf8' });
+  assert.equal(result.status, 0, result.stderr);
+  const output = JSON.parse(result.stdout), metadata = JSON.parse(fs.readFileSync(output.metadataPath, 'utf8'));
+  assert.equal(output.design.lowGoalCount, 3);
+  assert.deepEqual(metadata.design.singleSelectionGoalTransitions, { low: 2, high: 4 });
+  assert.equal(JSON.parse(fs.readFileSync(output.snapshotFilePaths.low, 'utf8')).config.objectives.length, 3);
+  const invalid = path.join(parent, 'invalid');
+  assert.equal(spawnSync(process.execPath, [cli, '--output-directory', invalid, '--low-goal-count', 'wrong']).status, 1);
+  assert.equal(fs.existsSync(invalid), false);
+});

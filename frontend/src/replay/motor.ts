@@ -3,7 +3,9 @@ import { getMarketStationApproachPoint, isNearMarketStation, type MarketEnvironm
 import type { Point } from '../game/prototypeWorld';
 import { replayDelay, replayUntil, type ReplayMotionPort, type ReplayShelfPort } from './ports';
 import { replayPresentationKey, resolveReplayAnchor, visibleStations, type ReplayDirection, type ReplayPresentation } from '../game/marketReplayPerception';
-import { createDirectionalInputPlayback, MARKET_DIRECTIONAL_MOVE_SPEED, type DirectionalMovement } from '../game/marketDirectionalInput';
+import { createDirectionalInputPlayback, createCanonicalInputPlayback, MARKET_DIRECTIONAL_MOVE_SPEED,
+  MARKET_DIRECTIONAL_INPUT_TICK_MS, type DirectionalMovement } from '../game/marketDirectionalInput';
+import { approachMovementVector, nextLocalWalkInput, localWalkInputSlices } from '../game/marketLocalInput';
 
 const MOVE_SPEED = 190;
 export const REPLAY_INPUT_RATE_LIMIT = 10; // Full magnitude ramp >= 100ms; measured in input units/second.
@@ -16,19 +18,20 @@ export const createMotionReport = (): MotionReport => ({ frames: 0, distance: 0,
   maxSpeedRatio: 0, maxInputDelta: 0, maxInputRate: 0, displacementViolations: 0,
   inputViolations: 0, replans: 0, dragFrames: 0, dragCount: 0 });
 
-export function approachVector(previous: Point, target: Point, maximumChange: number): Point {
-  const dx = target.x - previous.x, dy = target.y - previous.y, length = Math.hypot(dx, dy);
-  const scale = length > maximumChange ? maximumChange / length : 1;
-  return { x: previous.x + dx * scale, y: previous.y + dy * scale };
-}
+export const approachVector = approachMovementVector;
 
 /** A bounded joystick input independent of visible targets; collision is an ordinary movement result. */
 export async function moveDirection(port: ReplayMotionPort, direction: ReplayDirection, durationMs: number,
   presentation: ReplayPresentation, movement: DirectionalMovement, signal: AbortSignal, report: MotionReport,
   timeoutMs = 10000): Promise<void> {
   const playback = createDirectionalInputPlayback(direction, durationMs, movement);
+  return playCanonicalInput(port, playback, presentation, signal, report, timeoutMs);
+}
+async function playCanonicalInput(port: ReplayMotionPort, playback: ReturnType<typeof createCanonicalInputPlayback>,
+  presentation: ReplayPresentation, signal: AbortSignal, report: MotionReport, timeoutMs: number,
+  initialSampleMs = 0): Promise<void> {
   const profile = replayPresentationKey(presentation);
-  let previous = port.read().position, previousIntegrationMs = 0, previousInput = { x: 0, y: 0 }, previousSliceMs = 0;
+  let previous = port.read().position, previousIntegrationMs = 0, previousInput = { x: 0, y: 0 }, previousSliceMs = initialSampleMs;
   try {
     await replayUntil(() => !port.read().locked, signal);
     previous = port.read().position;
@@ -189,8 +192,7 @@ async function walkLocal(port: ReplayMotionPort, target: Point, presentation: Re
   const start = port.read();
   if (Math.hypot(target.x - start.position.x, target.y - start.position.y) > 180
     || !isMarketNavigationSegmentClear(start.environment, start.position, target, start.cashiers)) throw new Error('Local replay segment is not visible and clear');
-  const profile = replayPresentationKey(presentation), speed = Math.max(.15, Math.min(1, movement.speedMultiplier));
-  const inputRate = 1000 / Math.max(100, Math.min(300, movement.accelerationMs));
+  const profile = replayPresentationKey(presentation);
   let previous = start.position, previousDt = 0, input = { x: 0, y: 0 }, stopping = false;
   let progressDistance = 0, progressAt = 0;
   await new Promise<void>((resolve, reject) => {
@@ -223,16 +225,14 @@ async function walkLocal(port: ReplayMotionPort, target: Point, presentation: Re
           if (progressDistance < 2 && !stopping) throw new Error('Local exploration blocked; no global replan or teleport');
           progressAt = timestamp; progressDistance = 0;
         }
-        const dx = target.x - current.x, dy = target.y - current.y, distance = Math.hypot(dx, dy);
-        if (distance < .6) stopping = true;
-        const magnitude = stopping ? 0 : Math.min(speed, Math.max(.015, distance / 30 * speed));
-        const desired = distance < .001 ? { x: 0, y: 0 } : { x: dx / distance * magnitude, y: dy / distance * magnitude };
-        const next = approachVector(input, desired, inputRate * dt), change = Math.hypot(next.x - input.x, next.y - input.y);
+        const nextControl = nextLocalWalkInput(current, target, input, stopping, movement, dt);
+        stopping = nextControl.stopping;
+        const next = nextControl.input, change = Math.hypot(next.x - input.x, next.y - input.y);
         report.maxInputDelta = Math.max(report.maxInputDelta, change);
         if (dt > 0) report.maxInputRate = Math.max(report.maxInputRate, change / dt);
         if (change > REPLAY_INPUT_RATE_LIMIT * dt + 1e-6) report.inputViolations++;
         input = next;
-        if (stopping && Math.hypot(input.x, input.y) < .001) { finish(); return { x: 0, y: 0 }; }
+        if (nextControl.done) { finish(); return { x: 0, y: 0 }; }
         return input;
       } catch (error) { finish(error instanceof Error ? error : new Error(String(error))); return { x: 0, y: 0 }; }
     });
@@ -245,6 +245,20 @@ export async function walkToAnchor(port: ReplayMotionPort, id: string, presentat
   const state = port.read(), target = resolveReplayAnchor(state.environment, state.position, id, presentation, state.cashiers);
   if (!target) throw new Error('Anchor is not a visible local exploration choice');
   return walkLocal(port, target, presentation, movement, signal, report, timeoutMs);
+}
+
+/** directional-v2 only: identical canonical controller/collision inputs offline and in the app. */
+export async function walkToAnchorFixed(port: ReplayMotionPort, id: string, presentation: ReplayPresentation,
+  movement: DirectionalMovement, signal: AbortSignal, report: MotionReport, timeoutMs = 120000): Promise<void> {
+  await replayUntil(() => !port.read().locked, signal);
+  const state = port.read(), target = resolveReplayAnchor(state.environment, state.position, id, presentation, state.cashiers);
+  if (!target) throw new Error('Anchor is not a visible local exploration choice');
+  if (Math.hypot(target.x - state.position.x, target.y - state.position.y) > 180
+    || !isMarketNavigationSegmentClear(state.environment, state.position, target, state.cashiers))
+    throw new Error('Local replay segment is not visible and clear');
+  const slices = localWalkInputSlices(state.environment, state.position, target, state.cashiers, movement, timeoutMs);
+  return playCanonicalInput(port, createCanonicalInputPlayback(slices, movement.speedMultiplier), presentation,
+    signal, report, timeoutMs, MARKET_DIRECTIONAL_INPUT_TICK_MS);
 }
 
 export async function walkToVisibleStation(port: ReplayMotionPort, station: MarketEnvironmentStationId, presentation: ReplayPresentation,

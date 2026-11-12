@@ -107,6 +107,7 @@ import {
   zoomFromPinch,
   zoomFromWheel,
 } from '../game/worldZoom';
+import { getMarketWorldCameraFrame } from '../game/marketWorldCamera';
 import { useNpcTransportQuest } from '../game/useNpcTransportQuest';
 import { colors, fonts } from '../theme';
 import {
@@ -485,6 +486,10 @@ type GamePrototypeScreenProps = {
 export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototypeScreenProps) {
   const replayWindow = useWindowDimensions();
   const replayInsets = useContext(SafeAreaInsetsContext);
+  const marketCameraMetrics = useRef({ fontScale: Math.max(1, replayWindow.fontScale),
+    safeArea: { top: replayInsets?.top ?? 0, bottom: replayInsets?.bottom ?? 0 } });
+  marketCameraMetrics.current = { fontScale: Math.max(1, replayWindow.fontScale),
+    safeArea: { top: replayInsets?.top ?? 0, bottom: replayInsets?.bottom ?? 0 } };
   const DEVELOPMENT_AUDIO_MUTED = isSilentGamePreview();
   const { preferences } = useGamePreferences();
   const effectsVolumeRef = useRef(preferences.effectsVolume);
@@ -782,8 +787,10 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
 
   const updateCamera = useCallback(
     (point: Point) => {
-      const frame = getWorldCameraFrame(point, viewport.current, worldZoomCurrentRef.current,
-        worldMapRef.current === 'market' ? marketEnvironmentRef.current.world : undefined);
+      const frame = worldMapRef.current === 'market'
+        ? getMarketWorldCameraFrame(point, { viewport: viewport.current, zoom: worldZoomCurrentRef.current,
+          ...marketCameraMetrics.current }, marketEnvironmentRef.current.world)
+        : getWorldCameraFrame(point, viewport.current, worldZoomCurrentRef.current);
       cameraCenter.current = frame.center;
       camera.setValue(frame.translation);
       playerCameraOffset.setValue(frame.playerOffset);
@@ -794,6 +801,10 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
     },
     [camera, playerCameraOffset, marketPlayerPosition, marketPlayerDepth],
   );
+
+  useEffect(() => {
+    if (worldMapRef.current === 'market') updateCamera(playerPoint.current);
+  }, [replayWindow.fontScale, replayInsets?.top, replayInsets?.bottom, updateCamera]);
 
   const updateNpcProximity = useCallback((point: Point) => {
     const activeMap = worldMapRef.current;
@@ -1278,7 +1289,7 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
 
   function replayPresentation(): ReplayPresentation {
     return { viewport: { width: viewport.current.width, height: viewport.current.height }, zoom: worldZoomCurrentRef.current,
-      fontScale: Math.max(1, replayWindow.fontScale), safeArea: { top: replayInsets?.top ?? 0, bottom: replayInsets?.bottom ?? 0 } };
+      ...marketCameraMetrics.current };
   }
   if (__DEV__ && MARKET_REPLAY_ENABLED) {
     replayMotion.current = {

@@ -45,6 +45,8 @@ export type PersonaTraitProfile = {
 } & (
   { schemaVersion: 'persona-traits-v1'; traits: Record<PersonaTraitKeyV1, PersonaTraitLevel> }
   | { schemaVersion: 'persona-traits-v2'; traits: Record<PersonaTraitKey, PersonaTraitLevel> }
+  /** Baseline: same context and shared instructions, no trait levels. */
+  | { schemaVersion: 'persona-traits-v2'; traitMode: 'omitted'; presetId: null; traits: null }
 );
 export type Persona = {
   id: string; version: string; name: string; description: string; prompt: string;
@@ -141,6 +143,11 @@ export type TraceOptions = {
   mode?: 'stochastic' | 'llm'; maxActions?: number; timeBudgetMs?: number;
   tracePolicyVersion?: '5' | '6'; actorPolicyVersion?: 'episodic-choice-v9' | 'episodic-choice-v10' | 'feedback-choice-v1' | 'feedback-choice-v2' | 'feedback-choice-v3' | 'feedback-choice-v4' | 'feedback-choice-v5' | 'feedback-choice-v6' | 'feedback-choice-v7' | 'feedback-choice-v8' | 'feedback-choice-v9' | 'feedback-choice-v10' | 'feedback-choice-v11' | 'feedback-choice-v12' | 'feedback-choice-v13' | 'whole-trace-v1' | 'whole-trace-v2' | 'whole-trace-v3'; reasoningEffort?: 'low';
   feedbackMovement?: import('./feedbackMovementPolicy').FeedbackMovementPolicyOptions;
+  /** Explicit whole-trace opt-in; absence preserves the original anchor-only contract. */
+  wholeTraceMovementVersion?: 'directional-v1' | 'directional-v2';
+  wholeTraceObservationVersion?: 'anchor-visible-structures-v1';
+  wholeTraceMovementValidationVersion?: '1';
+  wholeTraceMovementFeedbackVersion?: import('./wholeTraceMovementFeedback').WholeTraceMovementFeedbackVersion;
   planningMode?: 'whole-trace'; planningSubmissions?: number; repairSubmissions?: number;
   /** Compact is a test execution schedule, not an estimate of a person's speed. */
   timingProfile?: 'original' | 'compact';
@@ -157,10 +164,12 @@ export type TraceOptions = {
   feedbackDecisionProvider?: (frame: import('./feedbackActor').FeedbackActorFrame) => Promise<Decision>;
   onActorDecisionAccepted?: () => void;
   /** Applied offline UI outcome, including a handled UI rejection; never a correctness verdict. */
-  onActorDecisionApplied?: (after: ActorObservation) => void;
+  onActorDecisionApplied?: (after: ActorObservation, applied: ActorAppliedState) => void;
   /** Local diagnostics only. Unfinished plans never become executed learner experience. */
   onCheckpoint?: (entry: GenerationCheckpoint) => void;
 };
+/** Trusted local execution state. Never part of actor observations or checkpoints. */
+export type ActorAppliedState = { position: Observation['playerPosition']; cashierAvailability: Observation['cashierAvailability'] };
 export type GenerationCheckpoint = { kind: 'decision'; index: number; before: ActorObservation;
   decision: Omit<Decision, 'exchange'>; after: ActorObservation; activity: import('./actorActivity').ActorActivityState }
   | { kind: 'controlled-stop' | 'system-completion'; index: number; activity: import('./actorActivity').ActorActivityState };

@@ -42,6 +42,26 @@ interactive에서는 표준입력 한 줄에 같은 도구를 전달한다.
 
 호스트 MCP/interactive 또는 독립 호스트 프로세스는 여러 요청을 관리할 수 있다. 새 문맥 규칙은 후보를 작성하는 actor에 적용하며 서버가 세션 분리나 다른 bundle의 미열람을 강제·입증하지는 않는다. `requestId`·`inputHash`는 출처 연결용이고 후보에 스키마 밖의 필드를 추가하지 않는다. 가이드 v2는 조건부 성향 표현과 실제 활동·focus 선언을 안내하지만 행동 선택을 대신하거나 구매 결과·통과 기준을 교정하지 않는다. 지침 변경 자체는 충실도 개선의 증거가 아니며, 저장된 v1 가이드와 기존 검토 의미를 유지한다.
 
+## 소켓 없는 단일 요청 전달
+
+배우 클라이언트의 종료와 요청 프로세스의 수명을 분리할 때 감독자는 다음 파일 mailbox를 사용할 수 있다. `prepare.json`은 readiness가 준 `prepareWholeTrace`를 변경 없이 `{tool:"prepare_whole_trace",arguments:...}`로 감싼 파일이다. owner 디렉터리는 새 경로여야 하며 이전 세션을 복원하지 않는다. 이 경로는 소켓을 열지 않는다.
+
+```sh
+node market-simulator/whole-trace-mailbox.cjs serve /absolute/new-owner --prepare-file /absolute/prepare.json
+```
+
+감독자가 이 프로세스를 유지하고, 슬롯별 새 배우 문맥에는 그 owner의 `prepare-response.json`에 있는 준비 응답만 실험 입력으로 준다. 배우가 작성한 도구 요청은 `{operationId:"append-001",tool:"append_whole_trace_decision",arguments:{decision:...}}`처럼 별도 JSON 파일 하나에 저장하고 다음 명령으로 전달한다. requestId는 owner가 고정한 값만 붙인다. 후보·행동·기억 필드는 채우지 않는다.
+
+```sh
+node market-simulator/whole-trace-mailbox.cjs call /absolute/new-owner --operation-file /absolute/operation.json
+```
+
+begin/menu/append/finish/status와 inline repair는 기존 도구 이름을 쓴다. 최종 제출은 `{operationId:"finish-submit-001",tool:"finish_and_submit_whole_trace",arguments:{}}`다. 이 전달 도구가 finish 응답의 **candidate 객체 하나만** owner의 `candidate.json`에 원자적으로 저장하고, 재파싱·동일성을 검사한 뒤 기존 submit과 status를 호출한다. `jq '.candidate' responses.jsonl`처럼 여러 응답에서 후보를 추출하거나 배우가 후보 파일을 다시 작성하지 않는다. 행동·종료·수량·기억·repair 예산은 바뀌지 않는다.
+
+완료 상태, 제출 검증 성공, 실제 저장 파일과 별도 validate 성공을 확인해야 `completion.json`을 남기고 owner가 정상 종료한다. prepared나 수정 가능한 invalid, 전달 예외에서는 owner를 유지한다. 배우 클라이언트의 EOF나 종료는 owner 종료를 뜻하지 않는다. 응답이 유실되면 같은 operationId·동일 입력으로 재전송하며 이미 처리된 행동을 다시 실행하지 않는다. 명시적 오류를 받은 뒤 기술 내용을 고친 요청에는 새 operationId를 쓴다. 확정된 전달 오류 뒤에도 후보 내용은 그대로 두고 새 전달 operationId로 재전송할 수 있으며, 엔진의 동일 후보 캐시가 제출 횟수를 보존한다. 전달 재시도는 새 actor 표본 생성이나 의미 변경을 허용하지 않는다.
+
+배우 도구는 새 prepare, requestId 교체, close/abort를 제공하지 않는다. 감독자의 중단은 `node market-simulator/whole-trace-mailbox.cjs abort /absolute/new-owner --reason "중단 사유"`로 따로 기록한다. SIGTERM과 강제 종료도 완료로 간주하지 않는다. 상태 확인은 `status /absolute/new-owner`를 사용하며, 죽은 프로세스의 파일을 새 요청으로 자동 복원하지 않는다. 기존 interactive·socket host 경로와 저장 결과는 그대로 유지한다.
+
 ## 작성 시점과 문법 확인
 
 `actorState`와 `choiceRef.source`는 **이번 행동을 실행하기 직전**을 적는다. 직전 행동이 만든 결과를 반영하고, 같은 결정의 `taskUpdate`로 바뀐 열린 목표 집합도 반영한다. 이번 행동으로 앞으로 보게 될 목록·상품·이동 결과를 앞당겨 쓰지 않는다. 이 예상 상태 기록은 전체 계획 작성의 일부이며 중간 실행 결과를 받아 행동마다 다시 계획하는 절차가 아니다.
@@ -97,7 +117,14 @@ node market-simulator/cli.cjs author-whole - < request.json
 
 `presentationRevision:"current-choice-menu-v1"` 메뉴는 `interactionContext:{kind,stationId,label}`로 현재 메뉴를 설명하고, `availableChoices:[{choiceId,label}]`로 기존 행동 이름을 표시한다. 허용 ID와 순서는 `choiceIds`와 정확히 같으며 선택을 추천하거나 정렬하지 않는다. `view:"world"`여도 `activeStation:"fresh"`이면 매대가 열린 상태다. 매 결정 작성 전에 **가장 최근 메뉴**의 화면 설명과 허용 목록을 확인한다. 전역 catalog에 `control/readList`가 있어도 현재 `choiceIds`에 없으면 작성하지 않는다. `activeStation:null`만으로 허용 여부를 추론하지 않으며 장바구니·도움말·직원·계산대에서도 기존 메뉴가 판단 기준이다. 화면 설명은 기존 메뉴 분기에서 함께 산출하며 별도 허용 규칙을 만들지 않는다.
 
-실행 작성 메뉴는 `currentObservation:{kind:"validated-prefix-observation-v1",acceptedDecisionCount,notice,readObjectives?}`를 별도로 제공한다. `acceptedDecisionCount`개의 수락 결정을 기존 검증기로 실행한 뒤의 **현재 목록 관찰**이며 실제 앱 재생 결과를 뜻하지 않는다. `readObjectives`의 ID·이름·수량·match는 그 관찰에 있는 값만 그대로 복사한다. 이 객체는 전체 실행 관찰 중 목록만 표시하므로 `elapsedMs` 같은 다른 필드가 없다고 경과 시간이 0이라고 해석하지 않는다. 행동을 아직 실행하기 전인 `readList` 선언에는 그 결과를 미리 제공하지 않으며, 수락된 `readList` 다음 한 관찰에만 표시한다. 다음 행동이 수락되면 기존 관찰 수명대로 갱신한다. 다시 읽기를 수락한 경우에는 새 목록 관찰을 제공한다.
+이전 anchor 실행 작성 메뉴는 `currentObservation:{kind:"validated-prefix-observation-v3",acceptedDecisionCount,notice,observation,readObjectives?}`를 제공한다. `observation`은 `acceptedDecisionCount`개의 수락 결정을 기존 검증기로 실행한 뒤 공용 `observeActor()`가 반환한 **현재 화면 관찰 그대로**이며 실제 앱 재생 결과를 뜻하지 않는다. 보이는 매대 표지의 방향·거리·near, 현재 상품 페이지, 도움말 등 표시된 단서를 전달한다. `near:false`인 매대는 표지가 보여도 아직 열 수 없으며 실제 행동은 기존 `choiceIds`에서 고른다. 지도·추천 경로·미관찰 상품·목표를 보충하지 않고 선택지 집합과 순서도 바꾸지 않는다. 과거 v1은 목록만 전달했고 명시적 directional-v2는 기존 관찰 v2 계약을 유지한다. 관찰 전달 변경을 행동 성공률 개선의 증거로 해석하지 않는다.
+
+새 독립 anchor 요청은 `observationVersion:"anchor-visible-structures-v1"`과 `validated-prefix-observation-v4`를 기록한다. 실제 그림 일부가 보이지만 이름표는 읽을 수 없는 진열대는 `visibleStructures`에 `kind:"shelf"`, 일반 라벨, 현재 방향·거리만 표시한다. 화면/HUD에 가린 몸체는 제외하며 카테고리·상품·station ID·좌표·추천 경로는 제공하지 않는다. 이 단서는 현재 관찰에서만 유효하고 다음 관찰에서 사라지면 기억 원장에도 남기지 않는다. 몸체가 보인다는 사실이 매대 열기 가능을 뜻하지 않으며 기존 near 조건·행동 집합을 유지한다. 계약은 inputHash·trace generation·knowledge audit에 연결된다. marker 없는 저장 bundle/trace와 기존 directional·학습 trial은 원래 관찰을 유지한다.
+
+`current-choice-menu-v2`는 같은 메뉴의 `visibleWalkChoices`에 이미 있던 현재 통로 라벨·방향·거리를 `availableChoices`의 해당 이동 ID 옆에도 표시한다. 새로운 장소 정보·추천·좌표를 추가하지 않고 ID·순서·비이동 선택지·행동·시간·종료를 바꾸지 않는다. 저장된 v1 또는 marker 없는 bundle의 메뉴는 기존 표현을 유지한다. 두 표현 수정의 성능 효과는 새 독립 수집으로 확인하며 과거 trace를 재작성하거나 결과가 나올 때까지 반복하지 않는다.
+
+
+최상위 `readObjectives`는 `observation.readObjectives`의 호환 별칭이다. ID·이름·수량·match는 그 관찰에 있는 값만 그대로 복사한다. 행동을 아직 실행하기 전인 `readList` 선언에는 그 결과를 미리 제공하지 않으며, 수락된 `readList` 다음 한 관찰에만 표시한다. 다음 행동이 수락되면 기존 관찰 수명대로 갱신한다. 다시 읽기를 수락한 경우에는 새 목록 관찰을 제공한다.
 
 `readObjectives` 필드가 없으면 **현재 미표시**이며 한 번도 읽지 않았거나 잊었다고 판정한 것이 아니다. 필드가 있고 `[]`이면 **표시된 빈 목록**이다. 메뉴 재조회·`nextDecision` 활동/지연 미리보기·거절된 제출은 목록 관찰을 소비하거나 새로 만들지 않는다. 과거 메뉴에 목록이 있었다는 이유로 현재 `current-display`에 계속 쓰지 않는다. 보조기는 `worldReference`·과거 목록·지식 원장으로 현재 표시값을 보충하지 않는다. 실행하지 않는 하위 source 보조기에는 이 관찰을 붙이지 않는다.
 
@@ -117,6 +144,8 @@ node market-simulator/cli.cjs author-whole - < request.json
 
 거절 응답의 `rewrite`는 `status`, `decisionIndex`, `decisionNumber`, `acceptedDecisionCount`, `remainingRewrites`, `message`를 제공한다. `status:"awaiting-rewrite"`와 `canRetry:true`는 **같은 결정의 재작성 대기**이며 전체 요청 실패가 아니다. 예를 들어 20개 결정이 수락된 뒤 21번의 첫 시도가 거절되면 기본 상한에서는 앞의 20개를 유지한 채 남은 재작성 3회를 표시한다. 작성자는 원래 의도와 수락된 앞부분을 보존하면서 기술 오류를 수정하고 같은 요청·결정에 새 operationId로 제출한다. `status:"exhausted"`, `canRetry:false`, `remainingRewrites:0`이면 기존 규칙대로 요청이 실패로 끝난다.
 
+`rewriteContract:"terminal-intent-preserved-v1"`은 결정별 **최초 초안**의 구체적인 선택을 `nonterminal`·`submit`·`giveUp`으로 기록한다. 재작성으로 종료를 도입·교체·제거하면 `AUTHORING_REWRITE_CHANGED_ENDING`으로 거절하고 같은 재작성 예산을 사용한다. 예를 들어 `basis.intent:"finish"`가 같아도 거절된 이동을 `control/giveUp`으로 바꿀 수 없다. 최초 `choiceId`가 없거나 알 수 없는 값이면 종료 의도가 확인되지 않은 것이므로 재작성으로 종료를 새로 도입할 수 없다. 미해결 결정은 `finish`나 직접 `submit`으로 건너뛰지 못한다. 올바른 이동 참조나 필요한 비종료 패널 닫기를 배우가 기술 수정으로 작성할 수 있고, 수락된 뒤 **다음 새 결정**의 자발적인 종료는 계속 허용한다. 이 검사는 종료 성격을 보존하는 구조적 보호이며 자연어 의도 전체를 판정하거나 의미 보존을 입증하지 않는다. 행동·상품·수량을 원래 의도대로 유지하는 작성 규칙은 별도로 계속 적용한다.
+
 “보조기가 행동을 자동으로 대체·삽입하지 않는다”는 원칙과 “AI가 허용된 기술적 재작성을 할 수 있다”는 절차를 구분한다. 보조기는 현재 메뉴와 거절 사유를 보여주며 닫기·읽기 같은 후속 행동이나 그 상태를 대신 작성하지 않는다. 잘못된 선택을 고친다는 이유로 구매 목표·수량·종료를 통과 목적으로 재계획하지 않는다. 목록 읽기를 계속하려고 AI가 닫기 행동을 직접 작성한 경우에도, 그 행동이 수락된 **다음 메뉴**에서 목록 읽기 가능 여부를 다시 확인하고 새 결정을 직접 작성한다. 재작성 예산이 남은 상태에서 작성자가 중단했다면 그 중단 사유를 기록하고, 검증기의 강제 종료나 상한 소진과 구분한다.
 
 각 결정의 `firstAttemptPassed`, `attempts`, `rewriteCount`, `rejectedRules`와 전체 `firstAttemptAccuracy`는 응답의 `authoring`, 최종 결과/metrics, 요청 진단 디렉터리의 `authoring.jsonl`에 남는다. 독립 호스트 저널에도 요약을 기록한다. 통신 응답을 잃은 재전송에는 같은 `operationId`·같은 입력을 사용하며, AI가 고쳐 쓴 결정에는 새 operationId를 사용한다. 첫 시도 정확도와 재작성 후 수락률을 구분하고, 이 횟수를 실제 모델 호출 수로 설명하지 않는다.
@@ -124,6 +153,8 @@ node market-simulator/cli.cjs author-whole - < request.json
 기존 동기식 `createWholeTraceSourceAuthoringCursor(bundle)`는 저장된 source·선택지·목표 선언만 확인하는 하위 보조기로 유지한다. 이 하위 보조기 자체가 재작성 예산을 부여하지 않는다는 안내는 실행 작성 경로의 이미 설정된 재작성 예산을 취소한다는 뜻이 아니다. 새 비동기 `createWholeTraceExecutionAuthoringCursor(settings,bundle,options)`가 이를 사용하고 접두 실행 검증·참고 메뉴·재작성 기록을 더한다. 기존 후보·bundle·파일럿 측정은 수정하지 않고 작성 revision/보조기 사용 여부를 별도 출처로 기록한다. 모든 최종 검증 규칙·임계값·계약 의미와 전체 후보 제출 검증은 유지한다.
 
 ### 계산대 참조 별칭
+
+최종화는 작성 중인 접두 구간의 유효성을 시험하는 호출이 아니다. `finalizationContract:"incomplete-finalization-fails-request-v1"`에서 이미 작성된 종료 행동 또는 기존 100행동 상한 없이 `finish`를 호출하면 `AUTHORING_INCOMPLETE_FINALIZATION`으로 요청이 실패 상태에 고정된다. 수락된 원본은 `authoring-finalization.failure.json`에 보존하며 이후 append·begin·submit·repair로 새 종료를 붙이지 못한다. 독립 owner는 실패 응답과 상태를 저장한 뒤 닫고 readiness는 기술 실패로 센다. pending 결정의 `AUTHORING_REWRITE_PENDING`은 별도 상태로서 기존 한도 안의 같은 결정 기술 수정이 가능하다. 작성 중 자연스럽게 선택한 종료에는 최소 행동·구매 수를 요구하지 않는다.
 
 새로 준비한 `choiceCatalog.referenceAliases`는 `{aliasChoiceId,canonicalChoiceId,kind:"checkout-open-v1"}` 배열로 허용 별칭을 명시한다. 계산대 ID가 `checkout`이면 `open/checkout`을 `checkout/checkout`에 연결하는 항목이다. 작성할 때는 정식 `checkout/<계산대 ID>`를 사용한다. 컴파일러는 명시된 별칭에 한해 source가 현재 상태와 정확히 같고, 대상이 실제로 같은 계산대이며, 정식 버튼이 현재 사용 가능할 때 로컬에서 참조를 해석한다. 다른 계산대나 경로를 고르거나 구매·수량·종료를 자동 수정하지 않는다. 멀리 있는 계산대, 잘못된 source, 사용할 수 없는 버튼은 계속 거절한다. 별칭 항목이 없는 저장된 bundle은 기존의 엄격한 ID 일치를 유지한다.
 
@@ -198,6 +229,48 @@ candidate 7의 `taskContract:"persistent-task-memory-v1"`는 순간 focus와 열
 한쪽의 목록에 상대 waypoint가 있어도 반대 방향 이동은 보장되지 않는다. ID 순서는 직렬화용이며 목표 상품까지의 최단 경로·선호 순위가 아니다. 다음 선택은 페르소나의 현재 관심·목표·확인·배회 의도로 결정한다. 재방문을 지우거나 실수·방황 횟수를 강제하지 않는다. 전체 catalog와 navigation은 계획 참고이며 현재 source-bound choice frame만 유효 선택을 정한다. 부적합한 이동을 다른 경로로 자동 교체하지 않는다.
 
 기본 bundle에서 생성기 원문 `generatorReference`는 제외하고 `sourceFiles`의 경로·SHA-256 출처 목록을 보존한다. 원문을 줄인 것은 입력 구성 변경이며 실제 시간 단축은 같은 조건의 실행으로 측정해야 한다.
+
+### 선택적 방향 이동 v1
+
+새 일반 요청을 준비할 때 `prepare_whole_trace`에 `movementVersion:"directional-v1"`을 명시하면 8방향 조작을 추가한다. 생략하면 기존 메뉴·후보 검증·이동 계약을 유지한다. 기본 bundle 8/candidate 7과 `state-choices-v1`은 바뀌지 않으며, 켠 요청은 bundle의 `movementVersion`과 고정 입력 해시에 이 선택을 기록한다. 기존 trial과 persona validation slot은 이동 조건이 고정돼 있으므로 이 옵션을 덧붙일 수 없다. 방향 이동 표본은 별도의 일반 요청으로 준비하고 기존 표본과 같은 조건으로 묶지 않는다.
+
+```json
+{"tool":"prepare_whole_trace","arguments":{"personaId":"mild-intellectual-disability-adult","seed":"directional-01","snapshotFilePath":"/absolute/mission.snapshot.json","outputPath":"/absolute/directional-01.trace.json","movementVersion":"directional-v1","maxRepairs":0}}
+```
+
+선택 ID는 `moveDirection/north`, `moveDirection/northeast`, `moveDirection/east`, `moveDirection/southeast`, `moveDirection/south`, `moveDirection/southwest`, `moveDirection/west`, `moveDirection/northwest`다. 방향은 ID에 고정되며 `choiceRef.durationMs`에 **100~2000의 정수**를 직접 적는다. 생략된 시간을 채우지 않으며 `quantity`는 사용하지 않는다. 이 시간은 판단 지연인 `delayMs`와 별개다. 예를 들어 첫 결정의 선택 참조는 다음 형태다.
+
+```json
+{"source":{"location":"start","navigationStateId":"INITIAL_STATE_ID","phase":"shopping","view":"world","activeStation":null,"pageIndex":null},"choiceId":"moveDirection/north","durationMs":700}
+```
+
+`shopping`/`world`이고 열린 station이 없는 조작 가능 상태에는 8방향이 항상 표시된다. HUD·화면 가장자리 가림, 보이는 waypoint의 유무, 그 방향의 충돌 가능성으로 방향 조작을 제거하지 않는다. 실제 장애물 충돌과 이동량은 기존 motor와 게임 루프가 처리하므로 조작이 허용됐다고 이동 거리나 도착점을 보장하지 않는다. `walk/<waypointId>`는 기존의 보이는 한 번의 이동 지름길로 함께 유지한다.
+
+HUD 가림은 표지·매대·직원·상품 등 기존 인지 정보에 그대로 적용한다. 방향 조작에는 보이지 않는 목적지·매대·상품 단서가 붙지 않으며, 이동 후에도 실제 관찰에 표시된 정보만 새 지식이 된다. 방향 버튼을 선택했다는 사실로 가려진 영역의 정보를 발견했다고 선언할 수 없다.
+
+방향 이동 뒤 `choiceRef.source.location`은 해당 이동 결정의 1부터 세는 번호를 붙인 `D<번호>`다. 첫 결정이 방향 이동이면 다음 source는 `D1`이고, 네 번째 결정이 방향 이동이면 그 뒤는 `D4`다. 이는 실제 좌표나 waypoint를 추측한 값이 아니라 그 이동 뒤 상태를 구분하는 참조다. 이후 `walk`가 수락되면 기존대로 해당 waypoint ID가 된다. `navigationStateId`는 방향 이동으로 바뀌지 않고 기존 직원 호출 전이를 따른다. 컴파일러는 실제 실행 후 관찰로 그 source의 후속 선택을 검사하며 이전 위치의 정적 메뉴를 재사용하지 않는다.
+
+이 단계는 작성 중 물리 이동 결과를 예측하지 않는다. source 작성 보조기는 방향 이동 후 결과 위치가 없는 동안 방향·공통 조작만 제공하고, 이전 waypoint의 이동·근처 매대 메뉴를 새 위치의 정보로 사용하지 않는다. 2단계 연결 지점인 `acceptMovementPosition({decisionCount,position:{x,y}})`는 외부에서 받은 해당 이동 후 위치를 적용하는 인터페이스다. 보조기가 좌표·속도·충돌 결과를 자체 계산하거나 자동으로 채우지는 않는다. 전체 후보의 실행 검증과 실패 시 실제 `choiceFrame` 제공은 기존 제출 흐름을 따른다.
+
+컴파일된 trace는 기존 앱의 `moveDirection` motor 입력을 사용하며 `generation.movementContract:"joystick-direction-v1"`와 `generation.wholeTraceMovementVersion:"directional-v1"`를 함께 기록한다. 기존 feedback 버전이나 옵션이 없는 whole-trace의 계약과 저장된 trace·검증 결과를 소급 변경하지 않는다.
+
+### 실행 후 메뉴를 갱신하는 방향 이동 v2
+
+`movementVersion:"directional-v2"`는 같은 8방향·시간 계약에 결정별 실행 결과를 반영한 작성 메뉴를 더하는 별도 옵션이다. 기본값과 명시적 `directional-v1`의 위 계약은 그대로 유지한다. v2는 `begin_whole_trace_authoring` → `append_whole_trace_decision` → 최신 메뉴 확인을 사용한다. 각 append는 기존 prefix 검증기로 실제 이동 입력을 적용한 뒤 연속 좌표를 내부에 보존하고, 그 위치에서 관찰·허용 선택지를 다시 만든다. 격자점으로 반올림하거나 가장 가까운 waypoint로 바꾸지 않는다. 충돌로 일부만 이동하거나 제자리에 남은 결과도 그대로 따른다.
+
+배우의 draft에는 여전히 `choiceRef.source`를 넣지 않는다. 보조기가 수락된 접두 구간으로 source를 채운다. v2의 source.location은 처음부터 `P`로 시작하는 불투명한 위치 참조이고 navigationStateId는 `nav-v2-`로 시작하는 불투명한 상태 참조다. 내부의 정확한 연속 좌표·고정 입력·직원 상태·표시 조건에 묶이며 좌표나 방향으로 해석하지 않는다. 위치가 바뀌면 새 상태 참조를 사용하고, 실제로 막혀 위치와 상태가 같다면 같은 참조가 유지될 수 있다. `D<결정 번호>`나 `W<번호>`를 source 위치에 직접 쓰는 v1 전이를 v2에 섞지 않는다. 최종 제출은 같은 prefix를 다시 실행해 source·선택의 일치를 검증한다.
+
+v2 메뉴의 `currentObservation`은 `{kind:"validated-prefix-observation-v2",acceptedDecisionCount,notice,observation}` 형태로 현재 `ActorObservation`의 표시 정보만 전달한다. 기존 최상위 `readObjectives`도 그 시점의 목록 표시 수명을 따른다. 관찰·메뉴에는 내부 좌표나 계산에 쓴 전역 지도·숨은 목적지를 추가하지 않는다. 이동의 절대·상대 좌표와 픽셀 거리는 공개 관찰에서 제거하고, 별도 `movementResult:{actualDirection,progress,blocked}`로 실제 이동 방향 또는 `null`, `full|partial|blocked`, 막힘 여부를 표시한다. 요청한 방향과 실제 이동 방향은 충돌 때문에 다를 수 있다. 메뉴 조회·거절된 draft·같은 요청 재전송은 실제 적용된 이동이나 지식으로 세지 않는다.
+
+선택적인 `movementFeedbackVersion:"recent-movement-v1"`은 v2와 함께만 지정한다. feedback v11의 동일한 `movementNotes` 문장과 v12의 `recentVisit:{timesArrived}` 통로 방문 표시를 재사용한다. 최근 적용된 걷기 4회 전에는 이동 메모가 비어 있다. 방향별 횟수·아직 걷지 않은 방향·막혔던 방향은 관찰된 최근 경험만 서술하며 새 방향을 추천하거나 기존 선택을 금지하지 않는다. 통로 마커는 최근 실제로 그 통로까지 걸어간 기록과 현재 보이는 `walk` 선택지가 만나는 경우에만 붙고, 방향 이동으로 지나간 곳이나 본 적만 있는 통로를 도착으로 세지 않는다. 이 옵션은 선택 ID·순서·실행 가드를 바꾸지 않으며 내부 도착 ID 원장·좌표·지도를 공개하지 않는다. 생략하면 메모·마커를 추가하지 않는다.
+
+`movementFeedbackVersion:"recent-movement-anchor-v1"`은 `movementVersion`을 생략한 anchor 이동과 `observationVersion:"anchor-visible-structures-v1"` 계약에서만 켠다. 관찰 계약은 새 독립 anchor 요청에서 자동으로 정해지며 기본값은 꺼짐이다. 최근 24행동 안의 자기 accepted 도착 기록을 현재 보이는 걷기 선택지에 ` · 최근에 N번 간 통로`와 `recentVisit:{timesArrived:N}`으로 표시하고, 같은 창의 이동 경험을 `movementNotes`로 전달한다. 선택지 ID·순서·가용성은 유지하며 표시와 메모는 권고가 아니다. `prepare_persona_validation`에서는 별도 실행 설정에 `movementValidationVersion:"1"`과 이 옵션을 지정하며 명세 JSON은 바꾸지 않는다.
+
+`movementFeedbackVersion:"recent-movement-anchor-capacity-v1"`은 같은 anchor 조건에서만 켜는 별도 옵션이다. 기존 24행동 보존 창에 더해 선택된 페르소나의 `spatialMemoryCapacity`를 최근 도착한 서로 다른 통로 수의 상한으로 쓴다. 용량을 넘으면 마지막 accepted 도착이 가장 오래된 통로의 횟수 기록을 모두 지우며, 다시 도착하면 1회부터 센다. 보기만 하거나 메뉴를 조회한 것은 최근성을 갱신하지 않는다. 방향별 `movementNotes`의 24행동 창은 그대로이며 이동 권고·선택지 변경은 없다. 기본 페르소나 값은 모두 96곳이므로 현재 창에서 용량 제한은 걸리지 않는다. 이 값은 합성 구현 설정이며 실측 기억 능력이 아니다. 기본값과 기존 두 피드백 버전은 바꾸지 않는다.
+
+독립 호스트에서 준비하려면 호출의 arguments에 두 옵션을 명시한다. 호스트 시작부터 context 저장·작성·최종 제출까지의 예시는 [방향 이동 v2 작성 예시](../../market-simulator/README.md#방향-이동-v2-작성-예시)를 따른다. 앱 재생을 하기 전의 prefix 결과는 로컬 실행 검증 결과이며 실제 앱에서 확인한 개인 경험으로 저장하지 않는다.
+
+검증 전용 인물과 비교 실험은 새 `prepare_persona_validation` run의 `movementValidationVersion:"1"` 뒤에서 v2를 사용한다. 반환된 슬롯의 `prepareWholeTrace`에 있는 marker·이동·단서 옵션을 그대로 유지한다. 기존 검증 run에 옵션을 덧붙이지 않는다. 검증용 실제 메뉴·도착 증거와 경로 기회의 해석은 [명시적 이동 검증 옵션](persona-validation.md#명시적-이동-검증-옵션)을 따른다. 이 분석 증거는 배우에게 미래 경로나 숨은 도착 정보를 제공하지 않는다.
 
 ## 기본 후보 7과 화면별 선택
 

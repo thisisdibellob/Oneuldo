@@ -127,8 +127,10 @@ function buildTraits(samples, profiles, catalog) {
   });
   if (new Set(publicStyles.map(style => style.id)).size !== publicStyles.length) throw new Error('Duplicate common style ID');
   if (!Array.isArray(samples) || !Array.isArray(profiles)) throw new Error('Trait blind review requires samples and profiles');
-  const byId = new Map();
+  const byId = new Map(), baselines = new Set();
   for (const profile of profiles) {
+    // A trait-omitted baseline has no levels to infer; its traces stay out of panels and the answer key.
+    if (profile?.traits === null && profile.persona?.traitProfile?.traitMode === 'omitted' && !baselines.has(profile.id)) { baselines.add(profile.id); continue; }
     const profileSchemaVersion = profile?.persona?.traitProfile?.schemaVersion ?? profile?.definition?.schemaVersion ?? profile?.schemaVersion;
     if (profileSchemaVersion !== undefined && profileSchemaVersion !== catalog.schemaVersion) throw new Error('Trait review profile schemaVersion must match the catalog');
     if (!profile || typeof profile.id !== 'string' || !profile.id || byId.has(profile.id)
@@ -140,8 +142,9 @@ function buildTraits(samples, profiles, catalog) {
     byId.set(profile.id, profile);
   }
   const panels = { A: [], B: [] }, key = [], opaqueIds = new Set();
+  const reviewed = samples.filter(sample => !baselines.has(sample?.personaId));
   for (const version of ['A', 'B']) {
-    for (const sample of samples) {
+    for (const sample of reviewed) {
       const profile = byId.get(sample?.personaId);
       if (!profile) throw new Error('Unknown profile in trait blind sample');
       let opaqueId;
@@ -155,7 +158,7 @@ function buildTraits(samples, profiles, catalog) {
   }
   const bundle = { panels };
   assertAnonymous(bundle, profiles);
-  return { bundle, traitRubric, publicStyles, key };
+  return { bundle, traitRubric, publicStyles, key, excludedBaselineTraces: samples.length - reviewed.length };
 }
 
 function grade(key, answers) {

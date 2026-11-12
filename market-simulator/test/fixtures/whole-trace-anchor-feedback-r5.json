@@ -1,0 +1,1843 @@
+{
+  "sourceTrace": "output/trait-v3-pilot-session-20261112-011227-r5/trait-v3-pilot-smoke-20261112-r5/traces/high/0001-477f086d083f/operation-high.json",
+  "sourceFiles": {
+    "output/trait-v3-pilot-session-20261112-011227-r5/trait-v3-pilot-smoke-20261112-r5/traces/high/0001-477f086d083f/operation-high.json": "3c36d4f6bd2677f69fbaec675b74fbd85459a5a0a39d5b34ec1b63deb32ef092",
+    "output/trait-v3-pilot-session-20261112-011227-r5/trait-v3-pilot-smoke-20261112-r5/traces/high/0001-477f086d083f/operation-high.json.snapshot.json": "7e810c674eb7af8ac0b012a779761856cd81bada5490b43eaa8e23afe65e1a43",
+    "output/trait-v3-pilot-session-20261112-011227-r5/trait-v3-pilot-smoke-20261112-r5/traces/high/0001-477f086d083f/operation-high.json.whole-trace/attempt-1.candidate.json": "ffb120023a366dedb585a37f8a36a0df0e60c059a1ea881d58236a9e36c13551"
+  },
+  "stepsSha256": "b3a830edfac8ed7dd8a017aa9bec8a572e5fcfe41ccf5a8c029a4cb95e751334",
+  "personaVersion": "traits-2-13572f988abf",
+  "profileDefinition": {
+    "id": "operation-high",
+    "basePersonaId": "mild-intellectual-disability-adult",
+    "traits": {
+      "deliberation": "medium",
+      "checking": "medium",
+      "exploration": "medium",
+      "persistence": "medium",
+      "helpSeeking": "medium",
+      "initialCaution": "medium",
+      "operationLearning": "high",
+      "routeReliance": "medium",
+      "textCueLoad": "medium"
+    },
+    "schemaVersion": "persona-traits-v2"
+  },
+  "settings": {
+    "snapshot": {
+      "snapshotSchemaVersion": "1",
+      "config": {
+        "seed": "trait-v3-pilot-20261111-r2-verified:validation-opportunities-v1",
+        "difficulty": "exact",
+        "objectives": [
+          {
+            "productId": "milk",
+            "quantity": 2
+          },
+          {
+            "productId": "apple",
+            "quantity": 2
+          },
+          {
+            "productId": "water",
+            "quantity": 2
+          },
+          {
+            "productId": "eggs",
+            "quantity": 1
+          },
+          {
+            "productId": "banana",
+            "quantity": 1
+          }
+        ],
+        "learning": {
+          "stockoutEnabled": false,
+          "allowSubstitution": true,
+          "budgetChoiceEnabled": false,
+          "choiceBudget": 3000,
+          "checkoutReviewMode": "normal"
+        },
+        "stockPerProduct": 6,
+        "alarmPenaltyPoints": 10,
+        "cashierRequestPenaltyPoints": 10,
+        "wrongWayPenaltyPoints": 10,
+        "stockOverrides": {
+          "milk": 6,
+          "milk-small": 6,
+          "eggs": 6,
+          "premium-eggs": 6,
+          "sausage": 6,
+          "brand-sausage": 6,
+          "tofu": 6,
+          "chocolate-milk": 6,
+          "haetteul-large-eggs": 6,
+          "premium-eggs-15": 6,
+          "tofu-silken": 6,
+          "yogurt-plain": 6,
+          "apple": 6,
+          "apple-green": 6,
+          "banana": 6,
+          "banana-single": 6,
+          "watermelon": 6,
+          "tomato": 6,
+          "onion": 6,
+          "carrot": 6,
+          "pear": 6,
+          "tangerine": 6,
+          "strawberry": 6,
+          "grapes": 6,
+          "curry": 6,
+          "brand-curry": 6,
+          "ramen": 6,
+          "mild-ramen": 6,
+          "instant-rice": 6,
+          "dumpling": 6,
+          "curry-spicy": 6,
+          "curry-one-mild": 6,
+          "ramen-cheese": 6,
+          "ramen-mild-single": 6,
+          "instant-rice-single": 6,
+          "seaweed": 6,
+          "water": 6,
+          "water-large": 6,
+          "juice": 6,
+          "soda": 6,
+          "sparkling-water": 6,
+          "grape-juice": 6,
+          "barley-tea": 6,
+          "water-small": 6,
+          "orange-juice-small": 6,
+          "apple-juice": 6,
+          "cola": 6,
+          "barley-tea-small": 6,
+          "striped-slippers": 6,
+          "striped-slippers-blue": 6,
+          "bathroom-slippers": 6,
+          "bathroom-slippers-pink": 6,
+          "aa-batteries": 6,
+          "aaa-batteries": 6,
+          "aa-batteries-8": 6,
+          "aaa-batteries-8": 6,
+          "usb-c-charger": 6,
+          "lightning-charger": 6,
+          "usb-c-charger-long": 6,
+          "dish-soap": 6
+        },
+        "environment": {
+          "layoutId": "classic",
+          "entranceConstruction": false,
+          "seed": "trait-v3-pilot-20261111-r2-verified:validation-opportunities-v1",
+          "employeeCount": 1,
+          "customerCount": 1,
+          "pillarCount": 0,
+          "chairCount": 0,
+          "cashierCount": 2,
+          "kioskPresent": false,
+          "shelfOrder": [
+            "fresh",
+            "produce",
+            "meal",
+            "household",
+            "drink"
+          ],
+          "kioskLane": "none"
+        },
+        "provenance": {
+          "source": "human"
+        },
+        "startedAt": "2000-01-01T00:00:00.000Z",
+        "inventoryProductIds": {
+          "fresh": [
+            "milk",
+            "milk-small",
+            "eggs",
+            "premium-eggs",
+            "sausage",
+            "brand-sausage",
+            "tofu",
+            "chocolate-milk",
+            "haetteul-large-eggs",
+            "premium-eggs-15",
+            "tofu-silken",
+            "yogurt-plain"
+          ],
+          "produce": [
+            "apple",
+            "apple-green",
+            "banana",
+            "banana-single",
+            "watermelon",
+            "tomato",
+            "onion",
+            "carrot",
+            "pear",
+            "tangerine",
+            "strawberry",
+            "grapes"
+          ],
+          "meal": [
+            "curry",
+            "brand-curry",
+            "ramen",
+            "mild-ramen",
+            "instant-rice",
+            "dumpling",
+            "curry-spicy",
+            "curry-one-mild",
+            "ramen-cheese",
+            "ramen-mild-single",
+            "instant-rice-single",
+            "seaweed"
+          ],
+          "drink": [
+            "water",
+            "water-large",
+            "juice",
+            "soda",
+            "sparkling-water",
+            "grape-juice",
+            "barley-tea",
+            "water-small",
+            "orange-juice-small",
+            "apple-juice",
+            "cola",
+            "barley-tea-small"
+          ],
+          "household": [
+            "striped-slippers",
+            "striped-slippers-blue",
+            "bathroom-slippers",
+            "bathroom-slippers-pink",
+            "aa-batteries",
+            "aaa-batteries",
+            "aa-batteries-8",
+            "aaa-batteries-8",
+            "usb-c-charger",
+            "lightning-charger",
+            "usb-c-charger-long",
+            "dish-soap"
+          ]
+        }
+      },
+      "environment": {
+        "schemaVersion": 1,
+        "layoutVersion": 3,
+        "seed": "trait-v3-pilot-20261111-r2-verified:validation-opportunities-v1",
+        "config": {
+          "layoutId": "classic",
+          "entranceConstruction": false,
+          "seed": "trait-v3-pilot-20261111-r2-verified:validation-opportunities-v1",
+          "employeeCount": 1,
+          "customerCount": 1,
+          "pillarCount": 0,
+          "chairCount": 0,
+          "cashierCount": 2,
+          "kioskPresent": false,
+          "shelfOrder": [
+            "fresh",
+            "produce",
+            "meal",
+            "household",
+            "drink"
+          ],
+          "kioskLane": "none"
+        },
+        "shelves": {
+          "fresh": {
+            "slotId": "northwest",
+            "orientation": "horizontal",
+            "x": 354.52500000000003,
+            "y": 191.2,
+            "width": 290.94999999999993,
+            "height": 73.6,
+            "point": {
+              "x": 500,
+              "y": 308
+            }
+          },
+          "produce": {
+            "slotId": "northeast",
+            "orientation": "horizontal",
+            "x": 714.5250000000001,
+            "y": 191.2,
+            "width": 290.94999999999993,
+            "height": 73.6,
+            "point": {
+              "x": 860,
+              "y": 308
+            }
+          },
+          "meal": {
+            "slotId": "middle-west",
+            "orientation": "vertical",
+            "x": 338.425,
+            "y": 422.4,
+            "width": 139.14999999999998,
+            "height": 187.2,
+            "point": {
+              "x": 500,
+              "y": 536
+            }
+          },
+          "household": {
+            "slotId": "middle-center",
+            "orientation": "vertical",
+            "x": 580.425,
+            "y": 422.4,
+            "width": 139.14999999999998,
+            "height": 187.2,
+            "point": {
+              "x": 550,
+              "y": 536
+            }
+          },
+          "drink": {
+            "slotId": "middle-east",
+            "orientation": "vertical",
+            "x": 830.425,
+            "y": 422.4,
+            "width": 139.14999999999998,
+            "height": 187.2,
+            "point": {
+              "x": 800,
+              "y": 536
+            }
+          }
+        },
+        "stationDetails": [
+          {
+            "id": "produce",
+            "kind": "shelf",
+            "categoryId": "produce",
+            "point": {
+              "x": 860,
+              "y": 308
+            }
+          },
+          {
+            "id": "fresh",
+            "kind": "shelf",
+            "categoryId": "fresh",
+            "point": {
+              "x": 500,
+              "y": 308
+            }
+          },
+          {
+            "id": "household",
+            "kind": "shelf",
+            "categoryId": "household",
+            "point": {
+              "x": 550,
+              "y": 536
+            }
+          },
+          {
+            "id": "meal",
+            "kind": "shelf",
+            "categoryId": "meal",
+            "point": {
+              "x": 500,
+              "y": 536
+            }
+          },
+          {
+            "id": "drink",
+            "kind": "shelf",
+            "categoryId": "drink",
+            "point": {
+              "x": 800,
+              "y": 536
+            }
+          },
+          {
+            "id": "checkout",
+            "kind": "checkout",
+            "point": {
+              "x": 807,
+              "y": 880.45
+            }
+          },
+          {
+            "id": "checkout-2",
+            "kind": "checkout",
+            "point": {
+              "x": 1012,
+              "y": 880.45
+            }
+          },
+          {
+            "id": "entrance",
+            "kind": "entrance",
+            "point": {
+              "x": 480,
+              "y": 1030
+            },
+            "available": true
+          },
+          {
+            "id": "exit",
+            "kind": "exit",
+            "point": {
+              "x": 930,
+              "y": 1030
+            }
+          },
+          {
+            "id": "common-door",
+            "kind": "common-door",
+            "point": {
+              "x": 710,
+              "y": 1430
+            }
+          },
+          {
+            "id": "staff:employee-1",
+            "kind": "employee",
+            "point": {
+              "x": 680,
+              "y": 206
+            }
+          }
+        ],
+        "stations": {
+          "produce": {
+            "x": 860,
+            "y": 308
+          },
+          "fresh": {
+            "x": 500,
+            "y": 308
+          },
+          "household": {
+            "x": 550,
+            "y": 536
+          },
+          "meal": {
+            "x": 500,
+            "y": 536
+          },
+          "drink": {
+            "x": 800,
+            "y": 536
+          },
+          "checkout": {
+            "x": 807,
+            "y": 880.45
+          },
+          "checkout-2": {
+            "x": 1012,
+            "y": 880.45
+          },
+          "entrance": {
+            "x": 480,
+            "y": 1030
+          },
+          "exit": {
+            "x": 930,
+            "y": 1030
+          },
+          "common-door": {
+            "x": 710,
+            "y": 1430
+          },
+          "staff:employee-1": {
+            "x": 680,
+            "y": 206
+          }
+        },
+        "employees": [
+          {
+            "id": "employee-1",
+            "kind": "employee",
+            "label": "종업원 1",
+            "slotId": "staff-northwest",
+            "point": {
+              "x": 680,
+              "y": 150
+            },
+            "appearance": 2,
+            "appearanceId": "employee-female-01",
+            "collider": {
+              "x": 669.4761904761905,
+              "y": 140.06428571428572,
+              "width": 22.07936507936508,
+              "height": 13.247619047619047
+            }
+          }
+        ],
+        "customers": [
+          {
+            "id": "customer-1",
+            "kind": "customer",
+            "label": "손님 1",
+            "slotId": "customer-center-west",
+            "point": {
+              "x": 525,
+              "y": 640
+            },
+            "appearance": 1,
+            "appearanceId": "customer-adult-male-02",
+            "collider": {
+              "x": 511.7936507936508,
+              "y": 628.0214285714286,
+              "width": 26.619047619047617,
+              "height": 15.97142857142857
+            }
+          }
+        ],
+        "objects": [
+          {
+            "id": "rest-set-1",
+            "kind": "restSet",
+            "slotId": "rest-west-one",
+            "rect": {
+              "x": 350,
+              "y": 738,
+              "width": 100,
+              "height": 64
+            }
+          },
+          {
+            "id": "rest-set-2",
+            "kind": "restSet",
+            "slotId": "rest-west-two",
+            "rect": {
+              "x": 350,
+              "y": 838,
+              "width": 100,
+              "height": 64
+            }
+          },
+          {
+            "id": "rest-set-lobby-1",
+            "kind": "restSet",
+            "slotId": "rest-lobby-west",
+            "rect": {
+              "x": 165,
+              "y": 1192,
+              "width": 100,
+              "height": 64
+            }
+          },
+          {
+            "id": "rest-set-lobby-2",
+            "kind": "restSet",
+            "slotId": "rest-lobby-east",
+            "rect": {
+              "x": 330,
+              "y": 1192,
+              "width": 100,
+              "height": 64
+            }
+          },
+          {
+            "id": "planter-lobby-1",
+            "kind": "planter",
+            "slotId": "planter-lobby-west",
+            "rect": {
+              "x": 150,
+              "y": 1320,
+              "width": 28,
+              "height": 30
+            }
+          },
+          {
+            "id": "atm-1",
+            "kind": "atm",
+            "slotId": "atm-west",
+            "rect": {
+              "x": 130,
+              "y": 880,
+              "width": 60,
+              "height": 70
+            }
+          },
+          {
+            "id": "elevator-1",
+            "kind": "elevator",
+            "slotId": "elevator-west",
+            "rect": {
+              "x": 60,
+              "y": 194,
+              "width": 80,
+              "height": 50
+            }
+          },
+          {
+            "id": "elevator-2",
+            "kind": "elevator",
+            "slotId": "elevator-east",
+            "rect": {
+              "x": 190,
+              "y": 194,
+              "width": 80,
+              "height": 50
+            }
+          }
+        ],
+        "checkout": {
+          "id": "checkout",
+          "rect": {
+            "x": 712.95,
+            "y": 811.45,
+            "width": 62.099999999999994,
+            "height": 134.54999999999998
+          },
+          "point": {
+            "x": 807,
+            "y": 880.45
+          },
+          "cashierPoint": {
+            "x": 684,
+            "y": 880.45
+          },
+          "kind": "staffed",
+          "cashierCollider": {
+            "x": 672.031746031746,
+            "y": 869.5857142857143,
+            "width": 24.142857142857142,
+            "height": 14.485714285714284
+          },
+          "cashierPresent": true,
+          "cashierAppearance": 0
+        },
+        "checkouts": [
+          {
+            "id": "checkout",
+            "rect": {
+              "x": 712.95,
+              "y": 811.45,
+              "width": 62.099999999999994,
+              "height": 134.54999999999998
+            },
+            "point": {
+              "x": 807,
+              "y": 880.45
+            },
+            "cashierPoint": {
+              "x": 684,
+              "y": 880.45
+            },
+            "kind": "staffed",
+            "cashierCollider": {
+              "x": 672.031746031746,
+              "y": 869.5857142857143,
+              "width": 24.142857142857142,
+              "height": 14.485714285714284
+            },
+            "cashierPresent": true,
+            "cashierAppearance": 0
+          },
+          {
+            "id": "checkout-2",
+            "rect": {
+              "x": 917.95,
+              "y": 811.45,
+              "width": 62.099999999999994,
+              "height": 134.54999999999998
+            },
+            "point": {
+              "x": 1012,
+              "y": 880.45
+            },
+            "cashierPoint": {
+              "x": 889,
+              "y": 880.45
+            },
+            "kind": "staffed",
+            "cashierCollider": {
+              "x": 876,
+              "y": 868.4714285714286,
+              "width": 26.619047619047617,
+              "height": 15.97142857142857
+            },
+            "cashierPresent": true,
+            "cashierAppearance": 1
+          }
+        ],
+        "kiosks": [],
+        "world": {
+          "width": 1100,
+          "height": 1500
+        },
+        "walkableAreas": [
+          {
+            "id": "main-sales-floor",
+            "x": 310,
+            "y": 80,
+            "width": 740,
+            "height": 960
+          },
+          {
+            "id": "elevator-room",
+            "x": 50,
+            "y": 80,
+            "width": 260,
+            "height": 300
+          },
+          {
+            "id": "west-corridor",
+            "x": 120,
+            "y": 340,
+            "width": 190,
+            "height": 700
+          },
+          {
+            "id": "entrance-lobby",
+            "x": 120,
+            "y": 1020,
+            "width": 930,
+            "height": 424
+          },
+          {
+            "id": "common-door-threshold",
+            "x": 620,
+            "y": 1420,
+            "width": 180,
+            "height": 60
+          }
+        ],
+        "walls": [
+          {
+            "x": 26,
+            "y": 56,
+            "width": 1048,
+            "height": 24
+          },
+          {
+            "x": 1050,
+            "y": 80,
+            "width": 24,
+            "height": 1364
+          },
+          {
+            "x": 26,
+            "y": 80,
+            "width": 24,
+            "height": 300
+          },
+          {
+            "x": 26,
+            "y": 380,
+            "width": 94,
+            "height": 24
+          },
+          {
+            "x": 96,
+            "y": 404,
+            "width": 24,
+            "height": 1040
+          },
+          {
+            "x": 120,
+            "y": 1420,
+            "width": 500,
+            "height": 24
+          },
+          {
+            "x": 800,
+            "y": 1420,
+            "width": 250,
+            "height": 24
+          },
+          {
+            "x": 286,
+            "y": 80,
+            "width": 24,
+            "height": 170
+          },
+          {
+            "x": 286,
+            "y": 380,
+            "width": 24,
+            "height": 640
+          },
+          {
+            "x": 630,
+            "y": 780,
+            "width": 18,
+            "height": 240
+          },
+          {
+            "x": 310,
+            "y": 1020,
+            "width": 100,
+            "height": 20
+          },
+          {
+            "x": 550,
+            "y": 1020,
+            "width": 300,
+            "height": 20
+          },
+          {
+            "x": 1010,
+            "y": 1020,
+            "width": 40,
+            "height": 20
+          },
+          {
+            "x": 50,
+            "y": 170,
+            "width": 236,
+            "height": 24
+          }
+        ],
+        "entrance": {
+          "point": {
+            "x": 480,
+            "y": 1030
+          },
+          "gate": {
+            "x": 410,
+            "y": 1010,
+            "width": 140,
+            "height": 40
+          },
+          "alarmBoundaryY": 1030,
+          "rearmY": 970
+        },
+        "alarmGates": [
+          {
+            "id": "entrance",
+            "gate": {
+              "x": 410,
+              "y": 1010,
+              "width": 140,
+              "height": 40
+            },
+            "axis": "y",
+            "boundary": 1030,
+            "rearm": 970,
+            "outward": 1
+          },
+          {
+            "id": "west-door",
+            "gate": {
+              "x": 278,
+              "y": 250,
+              "width": 40,
+              "height": 130
+            },
+            "axis": "x",
+            "boundary": 298,
+            "rearm": 355,
+            "outward": -1
+          },
+          {
+            "id": "exit",
+            "gate": {
+              "x": 850,
+              "y": 1010,
+              "width": 160,
+              "height": 40
+            },
+            "axis": "y",
+            "boundary": 1030,
+            "rearm": 970,
+            "outward": 1
+          }
+        ],
+        "constructionZones": [],
+        "commonDoor": {
+          "point": {
+            "x": 710,
+            "y": 1430
+          },
+          "gate": {
+            "x": 620,
+            "y": 1420,
+            "width": 180,
+            "height": 24
+          }
+        },
+        "obstacles": [
+          {
+            "x": 26,
+            "y": 56,
+            "width": 1048,
+            "height": 24
+          },
+          {
+            "x": 1050,
+            "y": 80,
+            "width": 24,
+            "height": 1364
+          },
+          {
+            "x": 26,
+            "y": 80,
+            "width": 24,
+            "height": 300
+          },
+          {
+            "x": 26,
+            "y": 380,
+            "width": 94,
+            "height": 24
+          },
+          {
+            "x": 96,
+            "y": 404,
+            "width": 24,
+            "height": 1040
+          },
+          {
+            "x": 120,
+            "y": 1420,
+            "width": 500,
+            "height": 24
+          },
+          {
+            "x": 800,
+            "y": 1420,
+            "width": 250,
+            "height": 24
+          },
+          {
+            "x": 286,
+            "y": 80,
+            "width": 24,
+            "height": 170
+          },
+          {
+            "x": 286,
+            "y": 380,
+            "width": 24,
+            "height": 640
+          },
+          {
+            "x": 630,
+            "y": 780,
+            "width": 18,
+            "height": 240
+          },
+          {
+            "x": 310,
+            "y": 1020,
+            "width": 100,
+            "height": 20
+          },
+          {
+            "x": 550,
+            "y": 1020,
+            "width": 300,
+            "height": 20
+          },
+          {
+            "x": 1010,
+            "y": 1020,
+            "width": 40,
+            "height": 20
+          },
+          {
+            "x": 50,
+            "y": 96,
+            "width": 236,
+            "height": 148
+          },
+          {
+            "x": 712.95,
+            "y": 811.45,
+            "width": 62.099999999999994,
+            "height": 134.54999999999998
+          },
+          {
+            "x": 917.95,
+            "y": 811.45,
+            "width": 62.099999999999994,
+            "height": 134.54999999999998
+          },
+          {
+            "x": 354.52500000000003,
+            "y": 191.2,
+            "width": 139.14999999999998,
+            "height": 73.6
+          },
+          {
+            "x": 506.32500000000005,
+            "y": 191.2,
+            "width": 139.14999999999998,
+            "height": 73.6
+          },
+          {
+            "x": 714.5250000000001,
+            "y": 191.2,
+            "width": 139.14999999999998,
+            "height": 73.6
+          },
+          {
+            "x": 866.325,
+            "y": 191.2,
+            "width": 139.14999999999998,
+            "height": 73.6
+          },
+          {
+            "x": 338.425,
+            "y": 422.4,
+            "width": 139.14999999999998,
+            "height": 73.6
+          },
+          {
+            "x": 338.425,
+            "y": 536,
+            "width": 139.14999999999998,
+            "height": 73.6
+          },
+          {
+            "x": 580.425,
+            "y": 422.4,
+            "width": 139.14999999999998,
+            "height": 73.6
+          },
+          {
+            "x": 580.425,
+            "y": 536,
+            "width": 139.14999999999998,
+            "height": 73.6
+          },
+          {
+            "x": 830.425,
+            "y": 422.4,
+            "width": 139.14999999999998,
+            "height": 73.6
+          },
+          {
+            "x": 830.425,
+            "y": 536,
+            "width": 139.14999999999998,
+            "height": 73.6
+          },
+          {
+            "x": 669.4761904761905,
+            "y": 140.06428571428572,
+            "width": 22.07936507936508,
+            "height": 13.247619047619047
+          },
+          {
+            "x": 511.7936507936508,
+            "y": 628.0214285714286,
+            "width": 26.619047619047617,
+            "height": 15.97142857142857
+          },
+          {
+            "x": 350,
+            "y": 738,
+            "width": 100,
+            "height": 64
+          },
+          {
+            "x": 350,
+            "y": 838,
+            "width": 100,
+            "height": 64
+          },
+          {
+            "x": 165,
+            "y": 1192,
+            "width": 100,
+            "height": 64
+          },
+          {
+            "x": 330,
+            "y": 1192,
+            "width": 100,
+            "height": 64
+          },
+          {
+            "x": 150,
+            "y": 1320,
+            "width": 28,
+            "height": 30
+          },
+          {
+            "x": 130,
+            "y": 880,
+            "width": 60,
+            "height": 70
+          },
+          {
+            "x": 672.031746031746,
+            "y": 869.5857142857143,
+            "width": 24.142857142857142,
+            "height": 14.485714285714284
+          },
+          {
+            "x": 876,
+            "y": 868.4714285714286,
+            "width": 26.619047619047617,
+            "height": 15.97142857142857
+          }
+        ],
+        "spawn": {
+          "x": 710,
+          "y": 1350
+        },
+        "exit": {
+          "x": 710,
+          "y": 1430
+        }
+      },
+      "initialStock": {
+        "milk": 6,
+        "milk-small": 6,
+        "eggs": 6,
+        "premium-eggs": 6,
+        "sausage": 6,
+        "brand-sausage": 6,
+        "tofu": 6,
+        "chocolate-milk": 6,
+        "haetteul-large-eggs": 6,
+        "premium-eggs-15": 6,
+        "tofu-silken": 6,
+        "yogurt-plain": 6,
+        "apple": 6,
+        "apple-green": 6,
+        "banana": 6,
+        "banana-single": 6,
+        "watermelon": 6,
+        "tomato": 6,
+        "onion": 6,
+        "carrot": 6,
+        "pear": 6,
+        "tangerine": 6,
+        "strawberry": 6,
+        "grapes": 6,
+        "curry": 6,
+        "brand-curry": 6,
+        "ramen": 6,
+        "mild-ramen": 6,
+        "instant-rice": 6,
+        "dumpling": 6,
+        "curry-spicy": 6,
+        "curry-one-mild": 6,
+        "ramen-cheese": 6,
+        "ramen-mild-single": 6,
+        "instant-rice-single": 6,
+        "seaweed": 6,
+        "water": 6,
+        "water-large": 6,
+        "juice": 6,
+        "soda": 6,
+        "sparkling-water": 6,
+        "grape-juice": 6,
+        "barley-tea": 6,
+        "water-small": 6,
+        "orange-juice-small": 6,
+        "apple-juice": 6,
+        "cola": 6,
+        "barley-tea-small": 6,
+        "striped-slippers": 6,
+        "striped-slippers-blue": 6,
+        "bathroom-slippers": 6,
+        "bathroom-slippers-pink": 6,
+        "aa-batteries": 6,
+        "aaa-batteries": 6,
+        "aa-batteries-8": 6,
+        "aaa-batteries-8": 6,
+        "usb-c-charger": 6,
+        "lightning-charger": 6,
+        "usb-c-charger-long": 6,
+        "dish-soap": 6
+      },
+      "cashierAvailability": {
+        "checkout": true,
+        "checkout-2": true
+      },
+      "catalogVersion": "oneuldo-shopping-content-2026-09-04-v2",
+      "scenarioVersion": "market-runtime-phase2-v1",
+      "completionMode": "ai-review",
+      "presentation": {
+        "viewport": {
+          "width": 390,
+          "height": 600
+        },
+        "zoom": 1.3,
+        "fontScale": 1,
+        "safeArea": {
+          "top": 0,
+          "bottom": 0
+        }
+      },
+      "snapshotId": "snapshot-188b04e0694fd45afb7e52128be41498"
+    },
+    "personaId": "operation-high",
+    "seed": "smoke-01",
+    "maxActions": 100,
+    "maxRepairs": 0,
+    "timingProfile": "original",
+    "attentionExperience": {
+      "visit": "first-play"
+    }
+  },
+  "candidate": {
+    "candidateVersion": "7",
+    "requestId": "1fbf7243-3efe-480b-b153-b3c54b41a427",
+    "decisions": [
+      {
+        "choiceRef": {
+          "choiceId": "control/readList",
+          "source": {
+            "location": "start",
+            "navigationStateId": "cashiers-11",
+            "phase": "shopping",
+            "view": "world",
+            "activeStation": null,
+            "pageIndex": null
+          }
+        },
+        "delayMs": 2400,
+        "reason": "처음 온 화면에서 장보기 목록을 읽어 필요한 물건을 확인한다.",
+        "basis": {
+          "intent": "check",
+          "goalId": null,
+          "memoryUses": []
+        },
+        "actorState": {
+          "activity": "check",
+          "task": "화면의 장보기 목록을 읽는다",
+          "heldGoalIds": [],
+          "uncertainGoalIds": [],
+          "focusedGoalId": null,
+          "focusedProductId": null,
+          "orientation": "unfamiliar"
+        }
+      },
+      {
+        "choiceRef": {
+          "choiceId": "control/lookAround",
+          "source": {
+            "location": "start",
+            "navigationStateId": "cashiers-11",
+            "phase": "shopping",
+            "view": "world",
+            "activeStation": null,
+            "pageIndex": null
+          }
+        },
+        "delayMs": 1800,
+        "reason": "목록에서 우유 목표를 골랐고, 현재 통로에서 주변 위치를 살핀다.",
+        "basis": {
+          "intent": "explore",
+          "goalId": null,
+          "memoryUses": []
+        },
+        "actorState": {
+          "activity": "orient",
+          "task": "주변 통로를 살핀다",
+          "heldGoalIds": [
+            "objective-1"
+          ],
+          "uncertainGoalIds": [],
+          "focusedGoalId": null,
+          "focusedProductId": null,
+          "orientation": "unfamiliar",
+          "taskUpdate": [
+            {
+              "type": "select",
+              "goalId": "objective-1"
+            }
+          ]
+        }
+      },
+      {
+        "choiceRef": {
+          "choiceId": "walk/W072",
+          "source": {
+            "location": "start",
+            "navigationStateId": "cashiers-11",
+            "phase": "shopping",
+            "view": "world",
+            "activeStation": null,
+            "pageIndex": null
+          }
+        },
+        "delayMs": 2100,
+        "reason": "북서쪽의 가까운 통로가 보여 그쪽으로 걸어간다.",
+        "basis": {
+          "intent": "explore",
+          "goalId": null,
+          "memoryUses": []
+        },
+        "actorState": {
+          "activity": "orient",
+          "task": "보이는 가까운 통로로 이동한다",
+          "heldGoalIds": [
+            "objective-1"
+          ],
+          "uncertainGoalIds": [],
+          "focusedGoalId": null,
+          "focusedProductId": null,
+          "orientation": "unfamiliar"
+        }
+      },
+      {
+        "choiceRef": {
+          "choiceId": "walk/W071",
+          "source": {
+            "location": "W072",
+            "navigationStateId": "cashiers-11",
+            "phase": "shopping",
+            "view": "world",
+            "activeStation": null,
+            "pageIndex": null
+          }
+        },
+        "delayMs": 1900,
+        "reason": "북쪽의 가까운 통로가 보여 조금 더 둘러본다.",
+        "basis": {
+          "intent": "explore",
+          "goalId": null,
+          "memoryUses": []
+        },
+        "actorState": {
+          "activity": "orient",
+          "task": "북쪽 통로로 이동하며 주변을 살핀다",
+          "heldGoalIds": [
+            "objective-1"
+          ],
+          "uncertainGoalIds": [],
+          "focusedGoalId": null,
+          "focusedProductId": null,
+          "orientation": "unfamiliar"
+        }
+      },
+      {
+        "choiceRef": {
+          "choiceId": "walk/W070",
+          "source": {
+            "location": "W071",
+            "navigationStateId": "cashiers-11",
+            "phase": "shopping",
+            "view": "world",
+            "activeStation": null,
+            "pageIndex": null
+          }
+        },
+        "delayMs": 1700,
+        "reason": "계속 보이는 북쪽 통로를 따라가 주변을 더 본다.",
+        "basis": {
+          "intent": "explore",
+          "goalId": null,
+          "memoryUses": []
+        },
+        "actorState": {
+          "activity": "orient",
+          "task": "북쪽 통로로 더 이동한다",
+          "heldGoalIds": [
+            "objective-1"
+          ],
+          "uncertainGoalIds": [],
+          "focusedGoalId": null,
+          "focusedProductId": null,
+          "orientation": "unfamiliar"
+        }
+      },
+      {
+        "choiceRef": {
+          "choiceId": "walk/W061",
+          "source": {
+            "location": "W070",
+            "navigationStateId": "cashiers-11",
+            "phase": "shopping",
+            "view": "world",
+            "activeStation": null,
+            "pageIndex": null
+          }
+        },
+        "delayMs": 1800,
+        "reason": "서쪽 가까운 통로를 따라가며 진열대를 찾는다.",
+        "basis": {
+          "intent": "explore",
+          "goalId": null,
+          "memoryUses": []
+        },
+        "actorState": {
+          "activity": "orient",
+          "task": "서쪽 통로에서 진열대를 찾는다",
+          "heldGoalIds": [
+            "objective-1"
+          ],
+          "uncertainGoalIds": [],
+          "focusedGoalId": null,
+          "focusedProductId": null,
+          "orientation": "unfamiliar"
+        }
+      },
+      {
+        "choiceRef": {
+          "choiceId": "walk/W046",
+          "source": {
+            "location": "W061",
+            "navigationStateId": "cashiers-11",
+            "phase": "shopping",
+            "view": "world",
+            "activeStation": null,
+            "pageIndex": null
+          }
+        },
+        "delayMs": 1900,
+        "reason": "북서쪽으로 더 걸어가 입구 근처의 보이는 통로를 살핀다.",
+        "basis": {
+          "intent": "explore",
+          "goalId": null,
+          "memoryUses": []
+        },
+        "actorState": {
+          "activity": "orient",
+          "task": "북서쪽으로 이동해 매장 주변을 살핀다",
+          "heldGoalIds": [
+            "objective-1"
+          ],
+          "uncertainGoalIds": [],
+          "focusedGoalId": null,
+          "focusedProductId": null,
+          "orientation": "unfamiliar"
+        }
+      },
+      {
+        "choiceRef": {
+          "choiceId": "walk/W060",
+          "source": {
+            "location": "W046",
+            "navigationStateId": "cashiers-11",
+            "phase": "shopping",
+            "view": "world",
+            "activeStation": null,
+            "pageIndex": null
+          }
+        },
+        "delayMs": 1900,
+        "reason": "북동쪽 통로가 보여 입구에서 매장 안쪽으로 조금 이동한다.",
+        "basis": {
+          "intent": "explore",
+          "goalId": null,
+          "memoryUses": []
+        },
+        "actorState": {
+          "activity": "orient",
+          "task": "매장 안쪽 통로로 이동한다",
+          "heldGoalIds": [
+            "objective-1"
+          ],
+          "uncertainGoalIds": [],
+          "focusedGoalId": null,
+          "focusedProductId": null,
+          "orientation": "unfamiliar"
+        }
+      },
+      {
+        "choiceRef": {
+          "choiceId": "walk/W046",
+          "source": {
+            "location": "W060",
+            "navigationStateId": "cashiers-11",
+            "phase": "shopping",
+            "view": "world",
+            "activeStation": null,
+            "pageIndex": null
+          }
+        },
+        "delayMs": 1900,
+        "reason": "남쪽으로 이어지는 익숙한 통로 쪽으로 돌아간다.",
+        "basis": {
+          "intent": "explore",
+          "goalId": null,
+          "memoryUses": []
+        },
+        "actorState": {
+          "activity": "orient",
+          "task": "매장 안쪽으로 이어지는 통로를 찾는다",
+          "heldGoalIds": [
+            "objective-1"
+          ],
+          "uncertainGoalIds": [],
+          "focusedGoalId": null,
+          "focusedProductId": null,
+          "orientation": "unfamiliar"
+        }
+      },
+      {
+        "choiceRef": {
+          "choiceId": "walk/W061",
+          "source": {
+            "location": "W046",
+            "navigationStateId": "cashiers-11",
+            "phase": "shopping",
+            "view": "world",
+            "activeStation": null,
+            "pageIndex": null
+          }
+        },
+        "delayMs": 1900,
+        "reason": "남동쪽 통로를 따라 매장 안쪽으로 이동한다.",
+        "basis": {
+          "intent": "explore",
+          "goalId": null,
+          "memoryUses": []
+        },
+        "actorState": {
+          "activity": "orient",
+          "task": "남동쪽 통로로 이동한다",
+          "heldGoalIds": [
+            "objective-1"
+          ],
+          "uncertainGoalIds": [],
+          "focusedGoalId": null,
+          "focusedProductId": null,
+          "orientation": "unfamiliar"
+        }
+      },
+      {
+        "choiceRef": {
+          "choiceId": "walk/W062",
+          "source": {
+            "location": "W061",
+            "navigationStateId": "cashiers-11",
+            "phase": "shopping",
+            "view": "world",
+            "activeStation": null,
+            "pageIndex": null
+          }
+        },
+        "delayMs": 1900,
+        "reason": "계속 이어지는 남쪽 통로를 따라간다.",
+        "basis": {
+          "intent": "explore",
+          "goalId": null,
+          "memoryUses": []
+        },
+        "actorState": {
+          "activity": "orient",
+          "task": "남쪽 통로를 따라 이동한다",
+          "heldGoalIds": [
+            "objective-1"
+          ],
+          "uncertainGoalIds": [],
+          "focusedGoalId": null,
+          "focusedProductId": null,
+          "orientation": "unfamiliar"
+        }
+      },
+      {
+        "choiceRef": {
+          "choiceId": "walk/W071",
+          "source": {
+            "location": "W062",
+            "navigationStateId": "cashiers-11",
+            "phase": "shopping",
+            "view": "world",
+            "activeStation": null,
+            "pageIndex": null
+          }
+        },
+        "delayMs": 1800,
+        "reason": "동쪽으로 이어지는 가까운 통로를 따라간다.",
+        "basis": {
+          "intent": "explore",
+          "goalId": null,
+          "memoryUses": []
+        },
+        "actorState": {
+          "activity": "orient",
+          "task": "동쪽 통로로 이동해 주변을 살핀다",
+          "heldGoalIds": [
+            "objective-1"
+          ],
+          "uncertainGoalIds": [],
+          "focusedGoalId": null,
+          "focusedProductId": null,
+          "orientation": "unfamiliar"
+        }
+      },
+      {
+        "choiceRef": {
+          "choiceId": "walk/W099",
+          "source": {
+            "location": "W071",
+            "navigationStateId": "cashiers-11",
+            "phase": "shopping",
+            "view": "world",
+            "activeStation": null,
+            "pageIndex": null
+          }
+        },
+        "delayMs": 1800,
+        "reason": "동쪽의 가까운 통로를 따라 조금 더 간다.",
+        "basis": {
+          "intent": "explore",
+          "goalId": null,
+          "memoryUses": []
+        },
+        "actorState": {
+          "activity": "orient",
+          "task": "동쪽으로 이동하며 주변을 살핀다",
+          "heldGoalIds": [
+            "objective-1"
+          ],
+          "uncertainGoalIds": [],
+          "focusedGoalId": null,
+          "focusedProductId": null,
+          "orientation": "unfamiliar"
+        }
+      },
+      {
+        "choiceRef": {
+          "choiceId": "walk/W114",
+          "source": {
+            "location": "W099",
+            "navigationStateId": "cashiers-11",
+            "phase": "shopping",
+            "view": "world",
+            "activeStation": null,
+            "pageIndex": null
+          }
+        },
+        "delayMs": 1800,
+        "reason": "동쪽의 가까운 통로를 따라 더 둘러본다.",
+        "basis": {
+          "intent": "explore",
+          "goalId": null,
+          "memoryUses": []
+        },
+        "actorState": {
+          "activity": "orient",
+          "task": "동쪽 통로를 따라 이동한다",
+          "heldGoalIds": [
+            "objective-1"
+          ],
+          "uncertainGoalIds": [],
+          "focusedGoalId": null,
+          "focusedProductId": null,
+          "orientation": "unfamiliar"
+        }
+      },
+      {
+        "choiceRef": {
+          "choiceId": "walk/W115",
+          "source": {
+            "location": "W114",
+            "navigationStateId": "cashiers-11",
+            "phase": "shopping",
+            "view": "world",
+            "activeStation": null,
+            "pageIndex": null
+          }
+        },
+        "delayMs": 1800,
+        "reason": "남쪽 가까운 통로로 방향을 바꾸어 매장 안을 둘러본다.",
+        "basis": {
+          "intent": "explore",
+          "goalId": null,
+          "memoryUses": []
+        },
+        "actorState": {
+          "activity": "orient",
+          "task": "남쪽 통로를 따라 이동한다",
+          "heldGoalIds": [
+            "objective-1"
+          ],
+          "uncertainGoalIds": [],
+          "focusedGoalId": null,
+          "focusedProductId": null,
+          "orientation": "unfamiliar"
+        }
+      },
+      {
+        "choiceRef": {
+          "choiceId": "walk/W100",
+          "source": {
+            "location": "W115",
+            "navigationStateId": "cashiers-11",
+            "phase": "shopping",
+            "view": "world",
+            "activeStation": null,
+            "pageIndex": null
+          }
+        },
+        "delayMs": 1800,
+        "reason": "서쪽으로 이어지는 가까운 통로를 향한다.",
+        "basis": {
+          "intent": "explore",
+          "goalId": null,
+          "memoryUses": []
+        },
+        "actorState": {
+          "activity": "orient",
+          "task": "서쪽 통로로 이동한다",
+          "heldGoalIds": [
+            "objective-1"
+          ],
+          "uncertainGoalIds": [],
+          "focusedGoalId": null,
+          "focusedProductId": null,
+          "orientation": "unfamiliar"
+        }
+      },
+      {
+        "choiceRef": {
+          "choiceId": "walk/W072",
+          "source": {
+            "location": "W100",
+            "navigationStateId": "cashiers-11",
+            "phase": "shopping",
+            "view": "world",
+            "activeStation": null,
+            "pageIndex": null
+          }
+        },
+        "delayMs": 1800,
+        "reason": "서쪽 가까운 통로를 따라 다시 이동한다.",
+        "basis": {
+          "intent": "explore",
+          "goalId": null,
+          "memoryUses": []
+        },
+        "actorState": {
+          "activity": "orient",
+          "task": "서쪽 통로로 이동한다",
+          "heldGoalIds": [
+            "objective-1"
+          ],
+          "uncertainGoalIds": [],
+          "focusedGoalId": null,
+          "focusedProductId": null,
+          "orientation": "unfamiliar"
+        }
+      },
+      {
+        "choiceRef": {
+          "choiceId": "control/viewHelp",
+          "source": {
+            "location": "W072",
+            "navigationStateId": "cashiers-11",
+            "phase": "shopping",
+            "view": "world",
+            "activeStation": null,
+            "pageIndex": null
+          }
+        },
+        "delayMs": 2600,
+        "reason": "진열대를 아직 찾지 못해 이용 방법을 확인한다.",
+        "basis": {
+          "intent": "help",
+          "goalId": null,
+          "memoryUses": []
+        },
+        "actorState": {
+          "activity": "recover",
+          "task": "도움말에서 매장 조작 방법을 확인한다",
+          "heldGoalIds": [
+            "objective-1"
+          ],
+          "uncertainGoalIds": [],
+          "focusedGoalId": null,
+          "focusedProductId": null,
+          "orientation": "unfamiliar"
+        }
+      },
+      {
+        "choiceRef": {
+          "choiceId": "control/closeView",
+          "source": {
+            "location": "W072",
+            "navigationStateId": "cashiers-11",
+            "phase": "shopping",
+            "view": "help",
+            "activeStation": null,
+            "pageIndex": null
+          }
+        },
+        "delayMs": 1200,
+        "reason": "도움말을 읽었으니 화면을 닫고 주변을 다시 본다.",
+        "basis": {
+          "intent": "recover",
+          "goalId": "objective-1",
+          "memoryUses": [
+            {
+              "goalId": "objective-1",
+              "field": "name",
+              "mode": "remembered",
+              "value": "흰 우유"
+            }
+          ]
+        },
+        "actorState": {
+          "activity": "recover",
+          "task": "도움말을 닫고 우유 목표를 이어간다",
+          "heldGoalIds": [
+            "objective-1"
+          ],
+          "uncertainGoalIds": [],
+          "focusedGoalId": "objective-1",
+          "focusedProductId": null,
+          "orientation": "unfamiliar"
+        }
+      },
+      {
+        "choiceRef": {
+          "choiceId": "control/lookAround",
+          "source": {
+            "location": "W072",
+            "navigationStateId": "cashiers-11",
+            "phase": "shopping",
+            "view": "world",
+            "activeStation": null,
+            "pageIndex": null
+          }
+        },
+        "delayMs": 1600,
+        "reason": "이동을 멈추고 현재 화면의 주변 단서를 살핀다.",
+        "basis": {
+          "intent": "explore",
+          "goalId": null,
+          "memoryUses": []
+        },
+        "actorState": {
+          "activity": "orient",
+          "task": "현재 위치의 주변 단서를 살핀다",
+          "heldGoalIds": [
+            "objective-1"
+          ],
+          "uncertainGoalIds": [],
+          "focusedGoalId": null,
+          "focusedProductId": null,
+          "orientation": "unfamiliar"
+        }
+      },
+      {
+        "choiceRef": {
+          "choiceId": "control/giveUp",
+          "source": {
+            "location": "W072",
+            "navigationStateId": "cashiers-11",
+            "phase": "shopping",
+            "view": "world",
+            "activeStation": null,
+            "pageIndex": null
+          }
+        },
+        "delayMs": 2200,
+        "reason": "여러 통로를 살폈지만 아직 목표 물건이 보이지 않아 오늘은 장보기를 그만둔다.",
+        "basis": {
+          "intent": "finish",
+          "goalId": null,
+          "memoryUses": []
+        },
+        "actorState": {
+          "activity": "finish",
+          "task": "장보기를 그만둔다",
+          "heldGoalIds": [
+            "objective-1"
+          ],
+          "uncertainGoalIds": [],
+          "focusedGoalId": null,
+          "focusedProductId": null,
+          "orientation": "unfamiliar"
+        }
+      }
+    ]
+  }
+}

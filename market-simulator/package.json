@@ -9,6 +9,8 @@
     "cli": "node cli.cjs",
     "replay": "node cli.cjs interactive",
     "test": "node --test test/*.test.cjs",
+    "test:reachability": "node scripts/check-whole-trace-reachability.cjs",
+    "test:reachability:full": "node scripts/check-whole-trace-reachability.cjs --full",
     "typecheck": "node ../frontend/node_modules/typescript/bin/tsc -p tsconfig.json",
     "verify": "node scripts/verify.cjs",
     "verify:persona": "node scripts/verify-persona.cjs",

@@ -4,11 +4,17 @@ import { visibleAnchors } from '../../frontend/src/game/marketReplayPerception';
 import type { ActorObservation, PolicyAction } from './types';
 import type { WholeTraceAction, WholeTraceBundle, WholeTraceChoiceDecision, WholeTraceChoiceSource, WholeTraceDecision } from './wholeTraceContracts';
 import { wholeTraceControlCueRefs, type WholeTraceKnowledgeSnapshot } from './wholeTraceKnowledge';
+import { WHOLE_TRACE_DIRECTIONS, WHOLE_TRACE_DIRECTION_LABELS, wholeTraceCanMove, wholeTraceDirectionalLocation, wholeTraceHasDirectionalMovement, wholeTraceIsContinuousFrame,
+  type WholeTraceMovementVersion } from './wholeTraceMovement';
 
-export type WholeTraceChoiceAction = Exclude<WholeTraceAction, { type: 'add' | 'remove' }> | { type: 'add' | 'remove'; productId: string };
+export type WholeTraceChoiceAction = Exclude<WholeTraceAction, { type: 'add' | 'remove' | 'moveDirection' }>
+  | { type: 'add' | 'remove'; productId: string }
+  | { type: 'moveDirection'; direction: import('./types').ActorDirection; durationMs?: number };
 export type WholeTraceChoiceEntry = {
   choiceId: string; label: string; action: WholeTraceChoiceAction; cueRefs: string[];
   quantityBounds?: { min: 1; max: number; instruction: string };
+  recentVisit?: { timesArrived: number };
+  durationBounds?: { min: 100; max: 2000; instruction: string };
 };
 export type WholeTraceChoiceAlias = {
   kind: 'checkout-open-v1'; aliasChoiceId: string; canonicalChoiceId: string;
@@ -22,6 +28,7 @@ export type WholeTraceChoiceCatalog = {
   /** Absent in saved bundles with the original exact-ID-only contract. */
   referenceAliases?: WholeTraceChoiceAlias[];
   common: { world: string[]; shopping: string[]; cart: string[]; help: string[]; shelf: string[]; staff: string[]; checkout: string[] };
+  movementChoiceIds?: string[];
   navigation: { navigationStateId: string; locations: { location: string; choiceIds: string[]; visibleWalkChoices: { choiceId: string; label: string; direction: string; distanceBand: string }[] }[] }[];
   shelves: { stationId: string; pages: { pageIndex: number; choiceIds: string[] }[]; browseChoiceIds: string[] }[];
   staff: { stationId: string; choiceIds: string[] }[];
@@ -38,6 +45,7 @@ const controls: Partial<Record<WholeTraceAction['type'], string>> = {
   giveUp: '이번 장보기 그만하기', submit: 'AI 수행 검토 요청하기',
 };
 export function wholeTraceChoiceId(action: WholeTraceChoiceAction, stationId?: string): string {
+  if (action.type === 'moveDirection') return `moveDirection/${action.direction}`;
   if (action.type === 'walk') return `walk/${action.waypointId}`;
   if (action.type === 'interact') return `open/${action.station}`;
   if (action.type === 'checkout' || action.type === 'requestCashier') return `${action.type}/${action.checkoutId}`;
@@ -65,12 +73,14 @@ function cueRefsFor(action: WholeTraceChoiceAction, world: ChoiceWorld, stationI
   return [...target, ...wholeTraceControlCueRefs({ type } as PolicyAction)];
 }
 /** Construct a stable unranked vocabulary. No goal, persona, price preference or shortest path enters IDs/order. */
-export function buildWholeTraceChoiceCatalog(world: ChoiceWorld): WholeTraceChoiceCatalog {
+export function buildWholeTraceChoiceCatalog(world: ChoiceWorld, movementVersion?: WholeTraceMovementVersion): WholeTraceChoiceCatalog {
   const entries = new Map<string, WholeTraceChoiceEntry>();
   const put = (action: WholeTraceChoiceAction, label?: string, stationId?: string, maxQuantity?: number) => {
     const choiceId = wholeTraceChoiceId(action, stationId);
     if (!entries.has(choiceId)) entries.set(choiceId, { choiceId, label: label ?? controls[action.type] ?? action.type,
       action: structuredClone(action), cueRefs: cueRefsFor(action, world, stationId),
+      ...(action.type === 'moveDirection' ? { durationBounds: { min: 100 as const, max: 2000 as const,
+        instruction: 'Choose durationMs explicitly as an integer in 100..2000. No destination or movement outcome is predicted.' } } : {}),
       ...(['add', 'remove'].includes(action.type) ? { quantityBounds: { min: 1 as const, max: Math.min(99, Math.max(0, maxQuantity ?? 99)),
         instruction: 'Choose quantity explicitly; live displayed stock/cart controls constrain it again. No default quantity is supplied.' } } : {}) });
     return choiceId;
@@ -82,6 +92,8 @@ export function buildWholeTraceChoiceCatalog(world: ChoiceWorld): WholeTraceChoi
     shelf: [put({ type: 'closeStation' }), put({ type: 'viewCart' })], staff: [put({ type: 'closeStation' })],
     checkout: [put({ type: 'closeStation' }), put({ type: 'giveUp' }), put({ type: 'submit' })],
   };
+  const movementChoiceIds = wholeTraceHasDirectionalMovement(movementVersion)
+    ? WHOLE_TRACE_DIRECTIONS.map(direction => put({ type: 'moveDirection', direction }, `${WHOLE_TRACE_DIRECTION_LABELS[direction]}으로 이동 (시간 직접 선택)`)) : undefined;
   const staffIds = new Set<string>();
   const navigation = world.navigation.states.map(state => ({ navigationStateId: state.stateId,
     locations: [{ location: 'start', ...state.start }, ...state.nodes.map(node => ({ location: node.waypointId, ...node }))]
@@ -104,6 +116,16 @@ export function buildWholeTraceChoiceCatalog(world: ChoiceWorld): WholeTraceChoi
           return [put({ type: 'interact', station: station.id }, `${station.label} ${station.kind === 'employee' ? '말 걸기' : '살펴보기'}`)];
         }),
       ] })) }));
+  if (movementChoiceIds) {
+    // A directional arrival can be outside the saved grid menus. Vocabulary is
+    // not visibility: runtime observation still authorizes every target choice.
+    for (const waypoint of world.waypoints) put({ type: 'walk', waypointId: waypoint.waypointId }, `화면 통로 ${waypoint.waypointId}로 걷기`);
+    for (const shelf of world.shelves) put({ type: 'interact', station: shelf.stationId }, `${shelf.stationId} 살펴보기`);
+    for (const employee of world.world.employees) {
+      staffIds.add(employee.id); put({ type: 'interact', station: employee.id }, `${employee.id} 말 걸기`);
+    }
+    for (const checkout of world.world.checkouts) put({ type: 'checkout', checkoutId: checkout.id }, `${checkout.id} 이용하기`);
+  }
   const cartProductChoiceIds: string[] = [];
   const shelves = world.shelves.map(shelf => {
     const productById = new Map(shelf.products.map(product => [product.id, product]));
@@ -118,6 +140,7 @@ export function buildWholeTraceChoiceCatalog(world: ChoiceWorld): WholeTraceChoi
   });
   const cashierChoices = world.world.checkouts.map(checkout => put({ type: 'requestCashier', checkoutId: checkout.id }, `${checkout.id} 직원 호출하기`));
   return { schemaVersion: 'state-choices-v1', entries: [...entries.values()], common, navigation, shelves,
+    ...(movementChoiceIds ? { movementChoiceIds } : {}),
     referenceAliases: world.world.checkouts.flatMap(checkout => {
       const aliasChoiceId = `open/${checkout.id}`, canonicalChoiceId = `checkout/${checkout.id}`;
       return !entries.has(aliasChoiceId) && entries.has(canonicalChoiceId)
@@ -134,9 +157,17 @@ function acceptedFrame(bundle: WholeTraceBundle, frame: WholeTraceAcceptedFrame 
   return { location: frame, navigationStateId: bundle.worldReference.navigation.states[0].stateId };
 }
 function sourceFor(o: ActorObservation, bundle: WholeTraceBundle, tracked: WholeTraceAcceptedFrame | string): WholeTraceChoiceSource {
-  const frame = acceptedFrame(bundle, tracked), state = bundle.worldReference.navigation.states.find(s => s.stateId === frame.navigationStateId);
+  const frame = acceptedFrame(bundle, tracked);
+  if (bundle.movementVersion === 'directional-v2') {
+    if (!wholeTraceIsContinuousFrame(frame)) throw new Error('A continuous execution frame is required');
+    if ((o.phase !== 'shopping' && o.phase !== 'checkout') || o.view === 'requester') throw new Error('No choices in this execution phase/view');
+    return { location: frame.location, navigationStateId: frame.navigationStateId, phase: o.phase, view: o.view,
+      activeStation: o.activeStation, pageIndex: o.shelf?.page ?? null };
+  }
+  const state = bundle.worldReference.navigation.states.find(s => s.stateId === frame.navigationStateId);
   if (!state) throw new Error(`Unknown accepted navigation state ${frame.navigationStateId}`);
-  if (frame.location !== 'start' && !state.nodes.some(node => node.waypointId === frame.location)) throw new Error(`Unknown accepted location ${frame.location}`);
+  if (frame.location !== 'start' && !state.nodes.some(node => node.waypointId === frame.location)
+    && !(bundle.movementVersion === 'directional-v1' && wholeTraceDirectionalLocation(frame.location))) throw new Error(`Unknown accepted location ${frame.location}`);
   if (o.phase !== 'shopping' && o.phase !== 'checkout') throw new Error('No whole-trace actor choices are available after termination');
   if (o.view === 'requester') throw new Error('The requester view is not supported by the whole-trace choice contract');
   for (const [id, available] of Object.entries(o.cashiers))
@@ -144,6 +175,7 @@ function sourceFor(o: ActorObservation, bundle: WholeTraceBundle, tracked: Whole
   return { ...frame, phase: o.phase, view: o.view, activeStation: o.activeStation, pageIndex: o.shelf?.page ?? null };
 }
 function canonicalAction(a: PolicyAction, o: ActorObservation, bundle: WholeTraceBundle): WholeTraceAction | undefined {
+  if (a.type === 'moveDirection' && wholeTraceHasDirectionalMovement(bundle.movementVersion)) return structuredClone(a);
   if (a.type === 'walkToAnchor') {
     const waypoint = bundle.worldReference.waypoints.find(w => w.anchorId === a.anchorId);
     return waypoint ? { type: 'walk', waypointId: waypoint.waypointId } : undefined;
@@ -164,7 +196,8 @@ function availableSelection(o: ActorObservation, bundle: WholeTraceBundle, sourc
     const action = canonicalAction(choice.action, o, bundle); if (!action) continue;
     const choiceId = wholeTraceChoiceId(action, o.activeStation ?? undefined);
     const entry = bundle.choiceCatalog.entries.find(e => e.choiceId === choiceId); if (!entry) continue;
-    if (action.type === 'walk' || action.type === 'interact' || action.type === 'checkout') {
+    if ((action.type === 'walk' || action.type === 'interact' || action.type === 'checkout')
+      && !(bundle.movementVersion === 'directional-v2' || bundle.movementVersion === 'directional-v1' && wholeTraceDirectionalLocation(source.location))) {
       const menu = bundle.choiceCatalog.navigation.find(state => state.navigationStateId === source.navigationStateId)?.locations.find(location => location.location === source.location);
       if (!menu?.choiceIds.includes(choiceId)) continue;
     }
@@ -174,6 +207,13 @@ function availableSelection(o: ActorObservation, bundle: WholeTraceBundle, sourc
     item.policies.push(choice.action);
     if (action.type === 'add' || action.type === 'remove') item.quantities.push(action.quantity);
     map.set(choiceId, item);
+  }
+  if (wholeTraceHasDirectionalMovement(bundle.movementVersion) && wholeTraceCanMove(o)) {
+    for (const direction of WHOLE_TRACE_DIRECTIONS) {
+      const entry = bundle.choiceCatalog.entries.find(entry => entry.choiceId === `moveDirection/${direction}`);
+      if (entry?.action.type === 'moveDirection' && entry.action.direction === direction)
+        map.set(entry.choiceId, { entry, quantities: [], policies: [] });
+    }
   }
   return map;
 }
@@ -212,7 +252,13 @@ export function resolveWholeTraceChoice(d: WholeTraceChoiceDecision, o: ActorObs
   if (parameterized && (d.choiceRef.quantity === undefined || !selected.quantities.includes(d.choiceRef.quantity)))
     throw Object.assign(new Error('A quantity must be explicitly chosen from the current displayed stock/cart bounds'), { code: 'CHOICE_QUANTITY' });
   if (!parameterized && d.choiceRef.quantity !== undefined) throw Object.assign(new Error('This choice does not accept a quantity'), { code: 'CHOICE_QUANTITY' });
-  const policyAction = selected.policies.find(action => !parameterized || (action.type === 'add' || action.type === 'remove') && action.quantity === d.choiceRef.quantity)!;
+  const moving = selected.entry.action.type === 'moveDirection';
+  if (moving && (!Number.isInteger(d.choiceRef.durationMs) || d.choiceRef.durationMs! < 100 || d.choiceRef.durationMs! > 2000)
+    || !moving && d.choiceRef.durationMs !== undefined)
+    throw Object.assign(new Error('Only moveDirection accepts an explicit durationMs integer in 100..2000'), { code: 'CHOICE_DURATION' });
+  const policyAction: PolicyAction = selected.entry.action.type === 'moveDirection'
+    ? { type: 'moveDirection', direction: selected.entry.action.direction, durationMs: d.choiceRef.durationMs! }
+    : selected.policies.find(action => !parameterized || (action.type === 'add' || action.type === 'remove') && action.quantity === d.choiceRef.quantity)!;
   const action = canonicalAction(policyAction, o, bundle)!;
   const actualReadGoals = new Set(knowledge ? knowledge.cues.filter(cue => cue.kind === 'read-objective'
     && ['current-observation', 'observed-this-visit'].includes(cue.source)).map(cue => cue.cueRef)

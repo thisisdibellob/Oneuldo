@@ -275,7 +275,11 @@ test('100 explicit nonterminal decisions keep their horizon; a smaller budget ne
 });
 
 test('real compiler agrees with symbolic shelf/cart/page sources without changing selected products or quantities', async () => {
-  const { bundle, settings } = fixture(), cursor = createWholeTraceSourceAuthoringCursor(bundle);
+  const { bundle, settings } = fixture();
+  // Retain this original-label compatibility case; v2 local binding is covered
+  // separately without changing the candidate or compiler behavior.
+  bundle.authoringGuide.executionAuthoring.menuPresentationRevision = 'current-choice-menu-v1';
+  const cursor = createWholeTraceSourceAuthoringCursor(bundle);
   const shelf = bundle.choiceCatalog.shelves.find(shelf => shelf.stationId === 'fresh'), page = shelf.pages.at(-1);
   const addId = page.choiceIds[0], removeId = addId.replace('add/', 'remove/');
   const actorInputs = [draft('control/viewHelp'), draft('control/closeView'), draft('control/viewCart'),

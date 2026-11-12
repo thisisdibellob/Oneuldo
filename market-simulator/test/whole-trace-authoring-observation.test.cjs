@@ -3,6 +3,8 @@ const assert = require('node:assert/strict');
 require('../runtime.cjs');
 const { createMarketSession } = require('../../frontend/src/game/marketSession.ts');
 const { createMarketReplaySnapshot } = require('../../frontend/src/game/marketReplayTrace.ts');
+const { visibleStations } = require('../../frontend/src/game/marketReplayPerception.ts');
+const { getMarketHelpLines } = require('../../frontend/src/game/marketHelp.ts');
 const { buildWholeTraceBundle } = require('../src/wholeTraceBundle.ts');
 const { compileWholeTraceCandidate, validateWholeTracePrefix } = require('../src/wholeTraceCompiler.ts');
 const { createWholeTraceExecutionAuthoringCursor } = require('../src/wholeTraceExecutionAuthoring.ts');
@@ -45,13 +47,15 @@ test('10: a displayed list remains visible with empty advisory until the actor e
   const { settings, bundle } = fixture(), originalBundle = structuredClone(bundle);
   const cursor = await createWholeTraceExecutionAuthoringCursor(settings, bundle);
   const initial = await cursor.menu();
-  assert.equal(initial.currentObservation.kind, 'validated-prefix-observation-v1');
+  assert.equal(initial.currentObservation.kind, 'validated-prefix-observation-v4');
   assert.equal(initial.currentObservation.acceptedDecisionCount, 0);
   assert.equal(Object.hasOwn(initial.currentObservation, 'readObjectives'), false);
   const read = await append(cursor, draft('control/readList'));
   const prefix = await validateWholeTracePrefix(settings, bundle, plan(bundle, [read.decision]));
   assert.equal(read.menu.currentObservation.acceptedDecisionCount, 1);
   assert.deepEqual(read.menu.currentObservation.readObjectives, prefix.before.readObjectives);
+  assert.deepEqual(read.menu.currentObservation.observation, prefix.before);
+  assert.deepEqual(read.menu.currentObservation.observation.readObjectives, read.menu.currentObservation.readObjectives);
   assert.equal(read.menu.currentObservation.readObjectives.length, 2);
   assert.deepEqual(read.menu.advisory, prefix.advisory);
   assert.deepEqual(read.menu.advisory.goalFields, []);
@@ -80,6 +84,7 @@ test('list display expires after the next accepted action and a later read expos
   const selected = await append(cursor, selectGoal(goal));
   assert.equal(selected.menu.currentObservation.acceptedDecisionCount, 2);
   assert.equal(Object.hasOwn(selected.menu.currentObservation, 'readObjectives'), false);
+  assert.equal(Object.hasOwn(selected.menu.currentObservation.observation, 'readObjectives'), false);
   assert.deepEqual(selected.menu.advisory.openGoalIds, [goal.id], 'An open goal is not a persistent list display');
   const staleDisplay = draft('control/pause', { goal, held: [goal.id], intent: 'task', activity: 'shop' });
   const rejected = await cursor.append(staleDisplay);
@@ -87,6 +92,7 @@ test('list display expires after the next accepted action and a later read expos
   assert.equal(rejected.code, 'WORKING_MEMORY');
   assert.ok(rejected.issues.some(issue => /No current displayed list field\/value/.test(issue.message)));
   assert.equal(Object.hasOwn(rejected.menu.currentObservation, 'readObjectives'), false);
+  assert.equal(Object.hasOwn(rejected.menu.currentObservation.observation, 'readObjectives'), false);
   const bad = { ...staleDisplay, choiceRef: { ...staleDisplay.choiceRef, source: selected.menu.expectedSource } };
   const finalFailure = await compileRejection(compileWholeTraceCandidate(settings, bundle,
     plan(bundle, [read.decision, selected.decision, bad,
@@ -100,6 +106,7 @@ test('list display expires after the next accepted action and a later read expos
   assert.equal(reread.menu.currentObservation.acceptedDecisionCount, 4);
   assert.deepEqual(reread.menu.currentObservation.readObjectives, prefix.before.readObjectives);
   assert.deepEqual(reread.menu.currentObservation.readObjectives, read.menu.currentObservation.readObjectives);
+  assert.deepEqual(reread.menu.currentObservation.observation.readObjectives, reread.menu.currentObservation.readObjectives);
   const movedOn = await append(cursor, draft('control/pause', { held: [goal.id], intent: 'rest', activity: 'rest' }));
   assert.equal(Object.hasOwn(movedOn.menu.currentObservation, 'readObjectives'), false);
   await append(cursor, quit([goal.id]));
@@ -129,6 +136,91 @@ test('schema, task and execution rejections leave the current list and accepted 
   assert.deepEqual(cursor.finish(), plan(bundle, [read.decision, selected.decision, ending.decision]));
   assert.equal(cursor.metrics().decisions[1].rewriteCount, 3);
   assert.equal((await compileWholeTraceCandidate(settings, bundle, cursor.finish())).acceptedActions, 3);
+});
+
+// Test-only search locates a displayed sign without supplying any route or
+// destination to a model. Production menu choices and their order stay intact.
+function routeToStation(bundle, matches) {
+  const { navigation, waypoints, world, presentation } = bundle.worldReference;
+  const state = navigation.states.find(s => s.stateId === navigation.initialStateId);
+  const nodes = new Map(state.nodes.map(node => [node.waypointId, node]));
+  const points = new Map(waypoints.map(w => [w.waypointId, w.point]));
+  const queue = state.start.allowedWaypointIds.map(id => [id]), seen = new Set(state.start.allowedWaypointIds);
+  for (const path of queue) {
+    const location = path.at(-1), point = points.get(location);
+    const station = visibleStations(world, point, presentation, state.cashierAvailability).find(matches);
+    if (station) return { path, station };
+    for (const id of nodes.get(location).allowedWaypointIds) if (!seen.has(id)) {
+      seen.add(id); queue.push([...path, id]);
+    }
+  }
+  assert.fail('Fixture must have a reachable station with the requested visible state');
+}
+async function followTestRoute(cursor, bundle, path) {
+  const source = createWholeTraceSourceAuthoringCursor(bundle), decisions = [];
+  for (const waypointId of path) {
+    const input = draft(`walk/${waypointId}`, { intent: 'explore', activity: 'orient' });
+    const result = await append(cursor, input);
+    source.append(input); decisions.push(result.decision);
+    assert.deepEqual(result.menu.choiceIds, source.menu().choiceIds,
+      'Displaying current observations cannot add, rank or remove any legal control');
+    assert.deepEqual(result.menu.visibleWalkChoices, source.menu().visibleWalkChoices);
+  }
+  return decisions;
+}
+
+test('anchor menu preserves a visible distant shelf sign even before its open control is available', async () => {
+  const { settings, bundle } = fixture(), cursor = await createWholeTraceExecutionAuthoringCursor(settings, bundle);
+  const { path, station } = routeToStation(bundle, s => s.kind === 'shelf' && !s.near);
+  const decisions = await followTestRoute(cursor, bundle, path), menu = await cursor.menu();
+  const prefix = await validateWholeTracePrefix(settings, bundle, plan(bundle, decisions));
+  assert.equal(menu.currentObservation.kind, 'validated-prefix-observation-v4');
+  assert.equal(menu.currentObservation.acceptedDecisionCount, path.length);
+  assert.deepEqual(menu.currentObservation.observation, prefix.before,
+    'The public runtime projection is copied verbatim, not reconstructed from the world catalog');
+  assert.deepEqual(menu.currentObservation.observation.visibleStations.find(s => s.id === station.id), station);
+  assert.equal(menu.choiceIds.includes(`open/${station.id}`), false,
+    'Seeing a distant sign does not authorize an interaction');
+  assert.deepEqual(menu.currentObservation.observation.products, [], 'The closed shelf does not reveal products');
+  assert.equal(Object.hasOwn(menu.currentObservation.observation, 'readObjectives'), false);
+  assert.equal(Object.hasOwn(menu.currentObservation.observation, 'environment'), false);
+  assert.equal(Object.hasOwn(menu.currentObservation.observation, 'playerPosition'), false);
+  const saved = structuredClone(menu);
+  menu.currentObservation.observation.visibleStations[0].label = 'invented';
+  menu.currentObservation.observation.products.push({ id: 'invented' });
+  assert.deepEqual(await cursor.menu(), saved, 'Returned observation objects cannot mutate the accepted boundary');
+  const rejected = await cursor.append(draft(`open/${station.id}`));
+  assert.equal(rejected.accepted, false);
+  assert.equal(rejected.code, 'AUTHORING_CHOICE_NOT_AVAILABLE');
+  assert.deepEqual(rejected.menu.currentObservation, saved.currentObservation,
+    'A rejection cannot advance the screen or manufacture knowledge');
+});
+
+test('anchor menu transmits currently displayed help and product cues and removes them with the panel', async () => {
+  const { settings, bundle } = fixture(), cursor = await createWholeTraceExecutionAuthoringCursor(settings, bundle);
+  const help = await append(cursor, draft('control/viewHelp', { intent: 'help', activity: 'orient' }));
+  assert.deepEqual(help.menu.currentObservation.observation.supportText, getMarketHelpLines(settings.snapshot.config.alarmPenaltyPoints));
+  assert.deepEqual(help.menu.currentObservation.observation.visibleStations, []);
+  assert.deepEqual(help.menu.visibleWalkChoices, []);
+  assert.equal(Object.hasOwn(help.menu.currentObservation.observation, 'readObjectives'), false);
+  const close = await append(cursor, draft('control/closeView', { intent: 'explore', activity: 'orient' }));
+  assert.equal(Object.hasOwn(close.menu.currentObservation.observation, 'supportText'), false);
+  const { path, station } = routeToStation(bundle, s => s.kind === 'shelf' && s.near);
+  const walked = await followTestRoute(cursor, bundle, path);
+  const opened = await append(cursor, draft(`open/${station.id}`, { intent: 'explore', activity: 'orient' }));
+  const prefix = await validateWholeTracePrefix(settings, bundle,
+    plan(bundle, [help.decision, close.decision, ...walked, opened.decision]));
+  assert.deepEqual(opened.menu.currentObservation.observation, prefix.before);
+  assert.ok(opened.menu.currentObservation.observation.products.length > 0);
+  assert.deepEqual(opened.menu.currentObservation.observation.anchors, []);
+  assert.equal(opened.menu.currentObservation.observation.shelf.page, 0);
+  const closed = await append(cursor, draft('control/closeStation', { intent: 'explore', activity: 'orient' }));
+  assert.deepEqual(closed.menu.currentObservation.observation.products, []);
+  assert.equal(closed.menu.currentObservation.observation.shelf, null);
+  const ending = await append(cursor, quit([]));
+  const candidate = cursor.finish();
+  assert.deepEqual(candidate.decisions, [help.decision, close.decision, ...walked, opened.decision, closed.decision, ending.decision]);
+  assert.equal((await compileWholeTraceCandidate(settings, bundle, candidate)).acceptedActions, candidate.decisions.length);
 });
 
 test('menu queries, context previews and mutated response copies cannot create, consume or overwrite observations', async () => {

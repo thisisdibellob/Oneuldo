@@ -1,6 +1,6 @@
 'use strict';
 // Supplementary outputs never participate in the primary verdict.
-function analyze(manifest, samples, findings, spec) {
+function analyze(manifest, samples, findings, spec, { contrasts = [], baselineContrasts = [] } = {}) {
   const { extractSequenceMetrics, summarizeSequenceMetrics } = require('./personaValidationSequence.cjs');
   const { stratifiedPairedBootstrap, simulateDeltaPower } = require('./personaValidationSupplementary.cjs');
   const perTrace = samples.map(s => ({ personaId: s.personaId, condition: s.condition, seed: s.seed, tracePath: s.tracePath,
@@ -31,8 +31,13 @@ function analyze(manifest, samples, findings, spec) {
     if (!simulations.has(f.pairs)) simulations.set(f.pairs, simulateDeltaPower(f.pairs, { seed: 'persona-validation-power-v1' }));
     return { metricId: f.metricId, comparisonId: f.id ?? f.personaId, condition: f.condition, ...simulations.get(f.pairs) };
   });
+  // Spec v3+ only: earlier specs gain no key, so their measurements stay byte-identical.
+  const position = spec.positionStability?.enabled ? { positionStability: require('./personaValidationPosition.cjs')
+    .analyzePosition({ manifest, samples, contrasts, baselineContrasts, spec }) } : {};
+  const baseline = spec.baselineComparison?.enabled ? { baselineComparison: require('./personaValidationBaseline.cjs')
+    .analyzeBaseline({ manifest, samples, spec, contrasts, baselineContrasts }) } : {};
   return { sequenceMetrics: { ...summarizeSequenceMetrics(perTrace), perTrace }, pooledAnalysis,
-    powerAnalysis, referenceComparison: null };
+    powerAnalysis, referenceComparison: null, ...position, ...baseline };
 }
 function causes(readiness, findings, samples = []) {
   return [
@@ -53,7 +58,8 @@ function readinessFields(readiness, findings, samples) {
 }
 function reportFields(measurements) {
   return Object.fromEntries(['analysisVersion', 'specVersion', 'readiness', 'readinessReasons', 'readinessDetails', 'inabilityCauses',
-    'opportunityAudit', 'powerWarning', 'sequenceMetrics', 'pooledAnalysis', 'powerAnalysis'].map(key => [key, measurements[key] ?? null]));
+    'opportunityAudit', 'powerWarning', 'sequenceMetrics', 'pooledAnalysis', 'powerAnalysis',
+    ...['positionStability', 'baselineComparison'].filter(key => Object.hasOwn(measurements, key))].map(key => [key, measurements[key] ?? null]));
 }
 function readinessMarkdown(output) {
   if (!output.readiness) return [];

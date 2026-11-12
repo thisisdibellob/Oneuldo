@@ -49,6 +49,12 @@ export function directionalInputSlices(direction: ReplayDirection, durationMs: n
 /** RAF partition affects only delivery time, not the collision integration sequence. */
 export function createDirectionalInputPlayback(direction: ReplayDirection, durationMs: number, movement: DirectionalMovement) {
   const slices = directionalInputSlices(direction, durationMs, movement);
+  return createCanonicalInputPlayback(slices, movement.speedMultiplier);
+}
+
+/** Delivery clock shared by canonical directional and local-anchor inputs. */
+export function createCanonicalInputPlayback(slices: readonly DirectionalInputSlice[], speedMultiplier: number) {
+  const durationMs = slices.reduce((sum, slice) => sum + slice.durationMs, 0);
   let elapsed = 0, delivered = 0, next = 0;
   return {
     get done() { return next === slices.length; },
@@ -64,7 +70,7 @@ export function createDirectionalInputPlayback(direction: ReplayDirection, durat
         x: sum.x + slice.input.x * slice.durationMs, y: sum.y + slice.input.y * slice.durationMs,
       }), { x: 0, y: 0 });
       const magnitude = dtMs ? Math.hypot(weighted.x, weighted.y) / dtMs : 0;
-      const scale = dtMs ? Math.min(1, movement.speedMultiplier / (magnitude || 1)) / dtMs : 0;
+      const scale = dtMs ? Math.min(1, speedMultiplier / (magnitude || 1)) / dtMs : 0;
       return { x: weighted.x * scale, y: weighted.y * scale, directionalSlices };
     },
   };

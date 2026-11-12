@@ -84,3 +84,60 @@ test('new spec retains every original metric and threshold and mixed first-play 
   assert.equal(summarizeTraitFindings(findings,{firstPlay:true}).status,'partial');
   assert.equal(summarizeTraitFindings(findings).status,'inconclusive');
 });
+
+const crypto = require('node:crypto');
+const { canonicalMarketReplayJson } = require('../../frontend/src/game/marketReplayTrace.ts');
+const { assertSpec } = require('../src/personaValidationSpec.cjs');
+const specV3 = require('../validation/persona-trait-validation-spec-v3.json');
+const digest = value => crypto.createHash('sha256').update(canonicalMarketReplayJson(value)).digest('hex');
+function writeFixtureTraces(prepared) {
+  for (const slot of prepared.slots) {
+    const [slug,level] = slot.personaId.split('-'), fixture = evidence(axes[slugs.indexOf(slug)],level==='high');
+    fs.mkdirSync(path.dirname(slot.tracePath),{recursive:true});
+    write(slot.tracePath,{traceSchemaVersion:'2',traceId:`fixture-${slot.personaId}-${slot.condition}-${slot.seed}`,generationPolicy:'stochastic',experienceMode:'first-play',
+      personaId:slot.personaId,personaVersion:slot.personaVersion,seed:slot.seed,target:{snapshotId:slot.snapshotId},steps:fixture.steps});
+    write(`${slot.tracePath}.knowledge-audit.json`,fixture.audit);
+    if (fixture.bundle) { fs.mkdirSync(`${slot.tracePath}.whole-trace`); write(`${slot.tracePath}.whole-trace/bundle.json`,fixture.bundle); }
+  }
+}
+function normalized(value, directory) {
+  if (typeof value === 'string') return value.replaceAll(directory,'<DIR>');
+  if (Array.isArray(value)) return value.map(item=>normalized(item,directory));
+  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value)
+    .filter(([key])=>!['dataFingerprint','specHash','specVersion','opportunityRows','positionStability','baselineComparison'].includes(key)).map(([key,item])=>[key,normalized(item,directory)]));
+  return value;
+}
+test('v3 spec copies v2 and only adds positionSplit plus descriptive baseline and position-stability blocks', () => {
+  const split = ['comparisonRate','postSelectionListRate','interestDetourRate','persistenceResponseRate','helpSeekingRate','operationLearningRate','routeRelianceRate','textCueLoadRate'];
+  assert.equal(specV3.version,spec.version+1); assert.equal(specV3.analysisVersion,spec.analysisVersion);
+  assert.deepEqual(specV3.metrics.map(({positionSplit,...metric})=>metric),spec.metrics);
+  assert.deepEqual(specV3.metrics.filter(m=>m.positionSplit).map(m=>m.kind).sort(),[...split].sort());
+  assert.deepEqual(specV3.metrics.filter(m=>!m.positionSplit).map(m=>m.kind).sort(),['initialCautionCount','newShelfDelayMs','preCheckoutCartRate']);
+  const {approximateRule,positionRule,interpretation,...baselineKeys} = specV3.baselineComparison;
+  assert.deepEqual(baselineKeys,{enabled:true,traitMode:'omitted',descriptiveOnly:true});
+  assert.match(approximateRule,/95% 구간이 0을 포함/);
+  assert.deepEqual(Object.keys(positionRule),['high-only-shift','low-only-shift','both-shift','baseline-beyond-range','indistinguishable']);
+  assert.deepEqual(specV3.positionStability,{enabled:true,split:'opportunity-order-halves',oddMiddle:'early',minOpportunitiesPerTrace:2,descriptiveOnly:true});
+  const { version, note, metrics, baselineComparison, positionStability, ...rest } = specV3;
+  const { version: v2Version, note: v2Note, metrics: v2Metrics, ...v2Rest } = spec;
+  assert.deepEqual(rest,v2Rest); assert.ok(note.startsWith(v2Note));
+});
+test('new runs use v3 with opportunityRows while saved v2 manifests stay v2 with unchanged measurements', t => {
+  const v3Args = setup(t), v3 = run.prepare(v3Args), v3Manifest = read(v3.manifestPath);
+  assert.equal(v3Manifest.specHash,digest(specV3)); assert.equal(v3Manifest.specVersion,specV3.version); assert.equal(v3Manifest.analysisVersion,2);
+  assert.equal(assertSpec(v3Manifest,null,'traits'),require('../validation/persona-trait-validation-spec-v3.json'));
+  const v2Args = setup(t), v2 = run.prepare(v2Args), v2Manifest = read(v2.manifestPath);
+  // A manifest saved before v3 existed: same layout, v2 spec identity.
+  Object.assign(v2Manifest,{specHash:digest(spec),specVersion:spec.version}); write(v2.manifestPath,v2Manifest);
+  assert.equal(assertSpec(v2Manifest,null,'traits'),spec);
+  writeFixtureTraces(v3); writeFixtureTraces(v2);
+  const v3Data = read(run.measure({runDirectory:v3.runDirectory,allowFixture:true}).measurementsPath);
+  const v2Data = read(run.measure({runDirectory:v2.runDirectory,allowFixture:true}).measurementsPath);
+  assert.equal(read(v2.manifestPath).specHash,digest(spec),'v2 manifest keeps its spec');
+  assert.equal(v2Data.specHash,digest(spec)); assert.equal(v2Data.specVersion,spec.version);
+  assert.ok(!JSON.stringify(v2Data).includes('opportunityRows'),'v2 measurements gain no opportunityRows');
+  const rated = v3Data.perTrace.flatMap(row=>Object.values(row.metrics)).filter(m=>Array.isArray(m.opportunityRows));
+  assert.ok(rated.length>0 && rated.every(m=>m.opportunityRows.length===m.denominator&&m.opportunityRows.filter(r=>r.hit).length===m.numerator));
+  assert.deepEqual(normalized(v3Data,v3Args.outputDirectory),normalized(v2Data,v2Args.outputDirectory));
+  for (const data of [v2Data,v3Data]) assert.ok(data.findings.every(row=>row.pairs===8&&row.delta===1&&row.status==='pass'));
+});

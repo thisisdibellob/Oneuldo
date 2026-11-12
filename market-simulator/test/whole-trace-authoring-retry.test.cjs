@@ -219,8 +219,9 @@ test('the per-decision rewrite limit is configurable and is independent of compl
     assert.equal(rejected.rewrite.status, maxRewritesPerDecision ? 'awaiting-rewrite' : 'exhausted');
     assert.equal(rejected.rewrite.remainingRewrites, maxRewritesPerDecision);
     if (maxRewritesPerDecision) {
+      assert.equal((await cursor.append(draft('control/pause'))).accepted, true);
       assert.equal((await cursor.append(draft('control/giveUp', { intent: 'finish' }))).accepted, true);
-      assert.equal(cursor.finish().decisions.length, 1);
+      assert.equal(cursor.finish().decisions.length, 2);
       assert.equal(cursor.metrics().decisions[0].rewriteCount, 1);
     } else {
       assert.equal(cursor.metrics().failed, true);
@@ -228,6 +229,115 @@ test('the per-decision rewrite limit is configurable and is independent of compl
     }
     assert.equal(cursor.metrics().maxRewritesPerDecision, maxRewritesPerDecision);
   }
+});
+
+test('a rejected checkout-bound walk cannot become giveUp or submit even with the same finish intent', async () => {
+  const { settings, bundle } = fixture(), cursor = await createWholeTraceExecutionAuthoringCursor(settings, bundle);
+  const accepted = await cursor.append(draft('control/pause'));
+  assert.equal(accepted.accepted, true);
+  const before = await cursor.menu(), prefix = structuredClone(accepted.decision);
+  const rejected = await cursor.append(draft('walk/unavailable', { intent: 'finish' }));
+  assert.equal(rejected.accepted, false);
+  assert.equal(rejected.code, 'AUTHORING_CHOICE_NOT_AVAILABLE');
+  for (const choiceId of ['control/giveUp', 'control/submit']) {
+    const input = draft(choiceId, { intent: 'finish' }), original = structuredClone(input);
+    const changed = await cursor.append(input);
+    assert.equal(changed.accepted, false);
+    assert.equal(changed.code, 'AUTHORING_REWRITE_CHANGED_ENDING');
+    assert.equal(changed.issues[0].path, 'choiceRef.choiceId');
+    assert.equal(changed.metrics.decisions[1].originalEnding, 'nonterminal');
+    assert.deepEqual(changed.menu, before);
+    assert.deepEqual(input, original);
+    assert.throws(() => cursor.finish(), error => error.code === 'AUTHORING_REWRITE_PENDING');
+  }
+  // Only the actor chooses a corrected reference; the guard inserts no route.
+  const corrected = await cursor.append(draft(`walk/${before.allowedWaypointIds[0]}`, { intent: 'finish' }));
+  assert.equal(corrected.accepted, true, JSON.stringify(corrected.issues));
+  assert.equal(corrected.metrics.decisions[1].attempts, 4);
+  assert.equal(corrected.metrics.failed, false);
+  assert.equal((await cursor.append(draft('control/giveUp', { intent: 'finish' }))).accepted, true,
+    'A new decision remains free to end voluntarily after the pending correction is resolved');
+  const candidate = cursor.finish();
+  assert.deepEqual(candidate.decisions[0], prefix);
+  assert.equal(candidate.decisions[1].choiceRef.choiceId, `walk/${before.allowedWaypointIds[0]}`);
+  assert.equal(candidate.decisions[2].choiceRef.choiceId, 'control/giveUp');
+  assert.equal(cursor.metrics().rewriteContract, 'terminal-intent-preserved-v1');
+  assert.equal((await compileWholeTraceCandidate(settings, bundle, candidate)).acceptedActions, 3);
+});
+
+test('schema repair preserves an originally chosen ending and cannot switch or remove it', async () => {
+  for (const ending of ['giveUp', 'submit']) {
+    const { settings, bundle } = fixture(ending === 'submit' ? 'checkout' : undefined);
+    const cursor = await createWholeTraceExecutionAuthoringCursor(settings, bundle);
+    if (ending === 'submit') assert.equal((await cursor.append(draft('checkout/checkout', { intent: 'finish' }))).accepted, true);
+    const correct = draft(`control/${ending}`, { intent: 'finish' }), malformed = structuredClone(correct);
+    delete malformed.actorState.uncertainGoalIds;
+    assert.equal((await cursor.append(malformed)).code, 'AUTHORING_SCHEMA');
+    const before = await cursor.menu();
+    for (const choiceId of [ending === 'submit' ? 'control/giveUp' : 'control/submit', 'control/pause']) {
+      const rejected = await cursor.append(draft(choiceId, { intent: 'finish' }));
+      assert.equal(rejected.accepted, false);
+      assert.equal(rejected.code, 'AUTHORING_REWRITE_CHANGED_ENDING');
+      assert.deepEqual(rejected.menu, before);
+    }
+    assert.equal((await cursor.append(correct)).accepted, true);
+    assert.equal(cursor.finish().decisions.at(-1).choiceRef.choiceId, `control/${ending}`);
+    assert.equal(cursor.metrics().decisions.at(-1).originalEnding, ending);
+    await compileWholeTraceCandidate(settings, bundle, cursor.finish());
+  }
+});
+
+test('unknown and malformed original choice references cannot acquire a terminal intent during repair', async () => {
+  for (const choiceRef of [{}, null, { choiceId: 42 }, { choiceId: 'control/giveup' }]) {
+    const { settings, bundle } = fixture(), cursor = await createWholeTraceExecutionAuthoringCursor(settings, bundle);
+    const malformed = { ...draft('control/pause'), choiceRef };
+    assert.equal((await cursor.append(malformed)).accepted, false);
+    const changed = await cursor.append(draft('control/giveUp', { intent: 'finish' }));
+    assert.equal(changed.accepted, false);
+    assert.equal(changed.code, 'AUTHORING_REWRITE_CHANGED_ENDING');
+    assert.equal(changed.metrics.decisions[0].originalEnding, 'nonterminal');
+    assert.equal((await cursor.append(draft('control/pause'))).accepted, true);
+    assert.equal((await cursor.append(draft('control/giveUp', { intent: 'finish' }))).accepted, true);
+  }
+});
+
+test('pending rewrite cannot be skipped with finish or direct submit, and an ending violation exhausts the existing budget', async t => {
+  const session = sessionFixture(t), { bundle, diagnosticDirectory } = session.prepare();
+  await session.beginAuthoring({ maxRewritesPerDecision: 1 });
+  const first = await session.appendAuthoring(draft('control/pause'));
+  assert.equal(first.accepted, true);
+  assert.equal((await session.appendAuthoring(draft('walk/unavailable', { intent: 'finish' }))).accepted, false);
+  assert.throws(() => session.finishAuthoring(), error => error.code === 'AUTHORING_REWRITE_PENDING');
+  const bypass = { candidateVersion: '7', requestId: bundle.requestId, decisions: [first.decision,
+    { ...draft('control/giveUp', { intent: 'finish' }),
+      choiceRef: { choiceId: 'control/giveUp', source: first.menu.expectedSource } }] };
+  await assert.rejects(session.submit(bypass), error => error.code === 'AUTHORING_REWRITE_PENDING');
+  assert.equal(session.status().attempts, 0);
+  const exhausted = await session.appendAuthoring(draft('control/giveUp', { intent: 'finish' }));
+  assert.equal(exhausted.code, 'AUTHORING_REWRITE_CHANGED_ENDING');
+  assert.equal(exhausted.canRetry, false); assert.equal(exhausted.rewrite.remainingRewrites, 0);
+  assert.equal(session.status().status, 'failed');
+  assert.equal(session.status().authoring.decisions[1].attempts, 2);
+  await assert.rejects(session.submit(bypass), /closed/);
+  assert.equal(fs.existsSync(diagnosticDirectory.replace(/\.whole-trace$/, '')), false);
+  const events = fs.readFileSync(path.join(diagnosticDirectory, 'authoring.jsonl'), 'utf8').trim().split('\n').map(JSON.parse);
+  assert.equal(events.length, 3);
+  assert.equal(events.at(-1).code, 'AUTHORING_REWRITE_CHANGED_ENDING');
+  assert.equal(events.at(-1).decision.choiceRef.choiceId, 'control/giveUp', 'Rejected actor input remains in the audit');
+  assert.equal(events.at(-1).authoring.decisions[1].originalEnding, 'nonterminal');
+});
+
+test('a rejected extra append cannot reopen an accepted terminal candidate or block its exact submission', async t => {
+  const session = sessionFixture(t);
+  await session.beginAuthoring();
+  assert.equal((await session.appendAuthoring(draft('control/giveUp', { intent: 'finish' }))).accepted, true);
+  const original = session.finishAuthoring().candidate;
+  const rejected = await session.appendAuthoring(draft('control/pause'));
+  assert.equal(rejected.accepted, false);
+  assert.equal(rejected.code, 'AUTHORING_TERMINAL');
+  assert.equal(rejected.menu.terminal, true);
+  assert.deepEqual(session.finishAuthoring().candidate, original);
+  assert.equal((await session.submit(original)).status, 'complete');
 });
 
 test('invalid initialization can be corrected before any decision, while an initialized budget remains frozen', async t => {

@@ -138,4 +138,4 @@ function simulateDeltaPower(n, { seed = 'persona-validation-power-v1', simulatio
   };
 }
 
-module.exports = { stratifiedPairedBootstrap, simulateDeltaPower };
+module.exports = { stratifiedPairedBootstrap, simulateDeltaPower, percentileInterval };

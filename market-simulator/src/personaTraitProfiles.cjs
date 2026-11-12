@@ -22,6 +22,7 @@ const TRAIT_KEYS = getTraitKeys();
 const MAX_PROFILES = 32;
 const SAFE_ID = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 const forbidden = new Set(['__proto__', 'prototype', 'constructor']);
+const TRAIT_MODES = ['omitted'];
 const clone = value => structuredClone(value);
 const hash = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 function fail(message) { throw new Error(`Invalid persona profile: ${message}`); }
@@ -107,7 +108,7 @@ function assertValidPersona(persona) {
   }
   if (persona.traitProfile !== undefined) {
     const t = persona.traitProfile;
-    shape(t, ['schemaVersion','basePersonaId','presetId','traits','contextHash','context'], [], 'traitProfile');
+    shape(t, ['schemaVersion','basePersonaId','presetId','traits','contextHash','context'], ['traitMode'], 'traitProfile');
     const catalog = getCatalog(t.schemaVersion);
     const base = canonical.find(item => item.id === t.basePersonaId);
     if (!base) fail('custom profile must use a known base and cannot shadow built-ins');
@@ -117,11 +118,13 @@ function assertValidPersona(persona) {
         || JSON.stringify(t.traits) !== JSON.stringify(mapping.traits)) fail('custom profile cannot shadow built-ins outside the exact v2 trait mapping');
     }
     if (t.presetId !== null && !catalog.presets.some(item => item.id === t.presetId)) fail('unknown presetId');
-    validateTraits(t.traits, false, t.schemaVersion);
+    if (t.traitMode !== undefined) assertTraitMode({traitMode:t.traitMode,...(t.presetId !== null ? {presetId:t.presetId} : {}),...(t.traits !== null ? {traits:t.traits} : {})}, t.schemaVersion);
+    else validateTraits(t.traits, false, t.schemaVersion);
     const context = buildSeparatedContext(base);
     if (JSON.stringify(t.context) !== JSON.stringify(context) || t.contextHash !== hash(context)) fail('context does not match the unchanged base capability, preferences and experience');
     for (const key of ['parameters','attention','shoppingStyle']) if (JSON.stringify(persona[key]) !== JSON.stringify(base[key])) fail(`custom traits cannot modify ${key}`);
-    const expected = customPersona(base, {id:persona.id,basePersonaId:base.id,presetId:t.presetId,traits:t.traits,label:persona.name}, t.schemaVersion);
+    const expected = customPersona(base, {id:persona.id,basePersonaId:base.id,presetId:t.presetId,traits:t.traits,label:persona.name,
+      ...(t.traitMode !== undefined ? {traitMode:t.traitMode} : {})}, t.schemaVersion);
     if (JSON.stringify(persona) !== JSON.stringify(expected)) fail('custom persona content does not match its declared trait definition');
   }
   return persona;
@@ -153,24 +156,33 @@ function buildSeparatedContext(persona) {
 function traitInstructions(traits, catalog) {
   return catalog.traits.map(trait => `${trait.label} (${trait.key}=${traits[trait.key]}): ${trait.levels[traits[trait.key]]}`);
 }
+/** A baseline keeps the base context and every shared instruction; only the trait levels are absent. */
+function assertTraitMode(definition, schemaVersion) {
+  if (!TRAIT_MODES.includes(definition.traitMode)) fail('traitMode must be "omitted"');
+  if (schemaVersion === 'persona-traits-v1') fail('traitMode "omitted" requires persona-traits-v2; v1 runs have no baseline profiles');
+  if (definition.presetId != null || definition.traits != null) fail('traitMode "omitted" cannot be combined with presetId or traits; a baseline profile has no trait levels');
+}
 function customPersona(base, definition, schemaVersion = definition.schemaVersion ?? DEFAULT_SCHEMA_VERSION) {
-  const catalog = getCatalog(schemaVersion);
-  validateTraits(definition.traits, false, schemaVersion);
-  const persona = clone(base), context = buildSeparatedContext(base), traits = clone(definition.traits);
-  const label = definition.label ?? definition.id;
-  const traitProfile = {schemaVersion:catalog.schemaVersion,basePersonaId:base.id,presetId:definition.presetId ?? null,traits,contextHash:hash(context),context};
+  const catalog = getCatalog(schemaVersion), omitted = definition.traitMode !== undefined;
+  if (omitted) assertTraitMode(definition, schemaVersion); else validateTraits(definition.traits, false, schemaVersion);
+  const persona = clone(base), context = buildSeparatedContext(base), traits = omitted ? null : clone(definition.traits);
+  const label = definition.label ?? definition.id, instructions = omitted ? [] : traitInstructions(traits, catalog);
+  // traitMode is added only to baselines, so existing trait profile hashes and versions are unchanged.
+  const traitProfile = {schemaVersion:catalog.schemaVersion,basePersonaId:base.id,presetId:omitted ? null : definition.presetId ?? null,
+    ...(omitted ? {traitMode:definition.traitMode} : {}),traits,contextHash:hash(context),context};
   persona.id = definition.id;
   persona.name = label;
-  persona.description = `${label}: 공통 행동 성향으로 구성한 허구의 성인. 인지·수행 기준, 취향과 경험은 별도 기본 맥락을 유지한다. ${traitInstructions(traits, catalog).join(' ')}`;
+  persona.description = `${label}: 공통 행동 성향으로 구성한 허구의 성인. 인지·수행 기준, 취향과 경험은 별도 기본 맥락을 유지한다.${instructions.length ? ` ${instructions.join(' ')}` : ''}`;
   if (persona.character) {
     const character = persona.character;
     character.name = label; character.goal = '화면에 제시된 장보기 목표를 이해한 범위에서 자신의 선택으로 수행하기';
-    character.selectedTraits = traitInstructions(traits, catalog);
+    character.selectedTraits = instructions;
     character.strengths = ['자신의 취향과 최종 선택을 유지한다.', '실제로 관찰한 단서와 명확한 피드백을 활용할 수 있다.'];
     character.preferences = [`상품 취향의 구조화된 설계값: ${JSON.stringify(context.preferences)}`];
     character.practicedStrategies = ['실제 방문·연습 경험은 전달된 attentionExperience만 따른다. 익숙한 상품을 안다는 사실로 현재 매장 위치·재고·조작 경험을 만들지 않는다.'];
   }
-  persona.prompt = `# 공통 성향 기반 성인 프로필\n\n${catalog.interpretation}\n\n## 공통 성향\n\n${traitInstructions(traits, catalog).join('\n')}\n\n## 성향을 행동으로 선택하는 기준\n\n성향은 행동 이름을 붙이는 방식보다 어떤 정보를 더 살펴볼지, 충분히 알았을 때 언제 선택할지에 반영한다. 비교는 실제로 관찰한 후보의 차이와 현재 알고 있는 조건을 대조하는 행동이다. 재확인은 이전에 알던 목표·상품·수량과 현재 확인할 수 있는 정보를 다시 대조하는 행동이다. 아직 관찰하지 않은 목표나 후보를 비교·확인한 것으로 쓰지 않는다.\n\n확인이 필요하다고 판단하면 필요한 정보가 보이는 현재 허용된 행동을 선택한다. 매대를 닫거나 이동하거나 기다렸다는 사실만으로 새 정보를 확인했다고 선언하지 않는다. 반대로 이미 충분히 명확하다면 확인을 더 하지 않고 진행할 수 있다. 행동의 목적과 관찰 가능한 근거를 짧게 일치시켜 기록하며, 성향을 보여주기 위해 활동 표기만 바꾸지 않는다.\n\n## 성향과 분리된 기본 맥락\n\n${JSON.stringify(context)}\n\n성향 수준은 선택의 경향이며 행동 횟수·대기시간·실수·포기·완료를 의무로 정하지 않는다. 성향 변경으로 인지·수행 기준이나 상품 경험을 바꾸지 않는다.\n\n## 공통 전제와 관찰·실행 범위\n\n현재 제공된 관찰과 실제로 확인한 경험만 사용한다. 도움을 받더라도 선호와 최종 선택은 스스로 유지한다.`;
+  const traitSection = omitted ? '' : `## 공통 성향\n\n${instructions.join('\n')}\n\n`;
+  persona.prompt = `# 공통 성향 기반 성인 프로필\n\n${catalog.interpretation}\n\n${traitSection}## 성향을 행동으로 선택하는 기준\n\n성향은 행동 이름을 붙이는 방식보다 어떤 정보를 더 살펴볼지, 충분히 알았을 때 언제 선택할지에 반영한다. 비교는 실제로 관찰한 후보의 차이와 현재 알고 있는 조건을 대조하는 행동이다. 재확인은 이전에 알던 목표·상품·수량과 현재 확인할 수 있는 정보를 다시 대조하는 행동이다. 아직 관찰하지 않은 목표나 후보를 비교·확인한 것으로 쓰지 않는다.\n\n확인이 필요하다고 판단하면 필요한 정보가 보이는 현재 허용된 행동을 선택한다. 매대를 닫거나 이동하거나 기다렸다는 사실만으로 새 정보를 확인했다고 선언하지 않는다. 반대로 이미 충분히 명확하다면 확인을 더 하지 않고 진행할 수 있다. 행동의 목적과 관찰 가능한 근거를 짧게 일치시켜 기록하며, 성향을 보여주기 위해 활동 표기만 바꾸지 않는다.\n\n## 성향과 분리된 기본 맥락\n\n${JSON.stringify(context)}\n\n성향 수준은 선택의 경향이며 행동 횟수·대기시간·실수·포기·완료를 의무로 정하지 않는다. 성향 변경으로 인지·수행 기준이나 상품 경험을 바꾸지 않는다.\n\n## 공통 전제와 관찰·실행 범위\n\n현재 제공된 관찰과 실제로 확인한 경험만 사용한다. 도움을 받더라도 선호와 최종 선택은 스스로 유지한다.`;
   persona.traitProfile = traitProfile;
   // Hash the delivered actor content, including instruction text, rather than only trait values.
   // The context hash remains independent so matched trait comparisons keep their meaning.
@@ -194,7 +206,8 @@ function resolveProfiles(options = {}, schemaVersion) {
   return entries.map(entry => {
     let base, persona, definition, presetId, traits;
     if (custom) {
-      shape(entry, ['id','basePersonaId'], ['presetId','traits','label','schemaVersion'], 'profile');
+      shape(entry, ['id','basePersonaId'], ['presetId','traits','label','schemaVersion','traitMode'], 'profile');
+      if (entry.traitMode !== undefined) assertTraitMode(entry, schemaVersion);
       id(entry.id); id(entry.basePersonaId, 'basePersonaId');
       if (canonical.some(persona => persona.id === entry.id)) fail('custom ID cannot shadow a built-in persona');
       base = canonical.find(persona => persona.id === entry.basePersonaId);
@@ -208,8 +221,10 @@ function resolveProfiles(options = {}, schemaVersion) {
       if (entry.label !== undefined) { string(entry.label, 'label', 80); if (/[\r\n]/.test(entry.label)) fail('label must be a single line'); }
       presetId = preset?.id ?? null;
       const defaults = preset?.traits ?? Object.fromEntries(traitKeys.map(key => [key,'medium']));
-      traits = Object.fromEntries(traitKeys.map(key => [key,entry.traits?.[key] ?? defaults[key]]));
-      definition = {id:entry.id,basePersonaId:base.id,...(presetId ? {presetId} : {}),traits:clone(traits),...(entry.label !== undefined ? {label:entry.label} : {})};
+      // A baseline returns traits:null; callers must not read levels from it.
+      traits = entry.traitMode !== undefined ? null : Object.fromEntries(traitKeys.map(key => [key,entry.traits?.[key] ?? defaults[key]]));
+      definition = {id:entry.id,basePersonaId:base.id,...(presetId ? {presetId} : {}),...(traits ? {traits:clone(traits)} : {traitMode:entry.traitMode}),
+        ...(entry.label !== undefined ? {label:entry.label} : {})};
       if (schemaVersion !== 'persona-traits-v1') definition.schemaVersion = schemaVersion;
       persona = customPersona(base, definition, schemaVersion);
     } else {

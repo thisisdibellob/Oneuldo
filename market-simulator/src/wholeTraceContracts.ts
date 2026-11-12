@@ -8,6 +8,9 @@ import type { WholeTraceChoiceCatalog, WholeTraceChoiceFrame, WholeTraceAccepted
 import type { WholeTraceMemoryUse, WholeTraceCognitionState } from './wholeTraceCognition';
 import type { WholeTraceTaskState } from './wholeTraceTaskMemory';
 import type { WholeTraceAuthoringGuide } from './wholeTraceAuthoring';
+import { WHOLE_TRACE_DIRECTIONS, wholeTraceDirectionalLocation, wholeTraceHasDirectionalMovement, wholeTraceIsContinuousFrame, type WholeTraceMovementVersion } from './wholeTraceMovement';
+import type { ActorDirection } from './types';
+import type { WholeTraceMovementFeedbackVersion } from './wholeTraceMovementFeedback';
 
 export const WHOLE_TRACE_BUNDLE_VERSION = '8' as const;
 export const WHOLE_TRACE_CANDIDATE_VERSION = '7' as const;
@@ -18,6 +21,7 @@ export const WHOLE_TRACE_ACTION_LIMIT = 100;
 export type WholeTraceAction =
   | { type: 'readList' | 'pause' | 'lookAround' | 'viewCart' | 'viewHelp' | 'closeView' | 'closeStation' | 'submit' | 'giveUp' }
   | { type: 'walk'; waypointId: string }
+  | { type: 'moveDirection'; direction: ActorDirection; durationMs: number }
   | { type: 'interact'; station: string }
   | { type: 'checkout' | 'requestCashier'; checkoutId: string }
   | { type: 'add' | 'remove'; productId: string; quantity: number }
@@ -28,7 +32,7 @@ export type WholeTraceChoiceSource = {
   view: 'world' | 'cart' | 'help'; activeStation: string | null; pageIndex: number | null;
 };
 export type WholeTraceChoiceDecision = {
-  choiceRef: { source: WholeTraceChoiceSource; choiceId: string; quantity?: number };
+  choiceRef: { source: WholeTraceChoiceSource; choiceId: string; quantity?: number; durationMs?: number };
   delayMs: number; reason: string;
   basis: { intent: WholeTraceBasis['intent']; cueRefs?: string[]; memoryUses?: WholeTraceMemoryUse[]; goalId?: string | null };
   actorState: Omit<WholeTraceActorState, 'triggerCueRefs'> & { triggerCueRefs?: string[] };
@@ -54,6 +58,11 @@ export type WholeTraceNavigation = {
     nodes: WholeReplayWaypointGraph['nodes'] }[];
 };
 export type WholeTraceBundle = {
+  /** Absent in archived bundles: preserve their original public observation. */
+  observationVersion?: 'anchor-visible-structures-v1';
+  movementValidationVersion?: '1';
+  movementVersion?: WholeTraceMovementVersion;
+  movementFeedbackVersion?: WholeTraceMovementFeedbackVersion;
   bundleVersion: typeof WHOLE_TRACE_BUNDLE_VERSION; requestId: string; inputHash: string; policyVersion: typeof WHOLE_TRACE_POLICY_VERSION;
   model: typeof WHOLE_TRACE_MODEL; reasoningEffort: 'low'; observationScope: 'whole-world'; actorKnowledgeScope: 'observed-and-remembered';
   snapshotId: string; seed: string | number; persona: Pick<Persona, 'id' | 'version' | 'name' | 'description' | 'character'> & { behavior: WholeTracePersonaInput };
@@ -67,7 +76,7 @@ export type WholeTraceBundle = {
       pages: { pageIndex: number; visibleProductIds: string[] }[] }[];
     objectives: { id: string; label: string; quantity: number; match: string }[]; helpText: string[];
   };
-  candidateVersion: typeof WHOLE_TRACE_CANDIDATE_VERSION; supportedCandidateVersions: ['7', '6', '5', '4', '3'];
+  candidateVersion: typeof WHOLE_TRACE_CANDIDATE_VERSION; supportedCandidateVersions: ['7'] | ['7', '6', '5', '4', '3'];
   choiceCatalog: WholeTraceChoiceCatalog; initialChoiceFrame: WholeTraceChoiceFrame;
   actorState: { initialObservation: ActorObservation; knowledge: WholeTraceKnowledgeSnapshot; experience: unknown; initialState: WholeTraceActorState;
     workingMemory: WholeTraceCognitionState; taskMemory: WholeTraceTaskState };
@@ -75,7 +84,7 @@ export type WholeTraceBundle = {
   actionContract: Record<string, string>; sourceFiles: { path: string; sha256: string }[];
 };
 export type WholeTraceSettings = Pick<TraceOptions, 'personaId' | 'seed' | 'snapshot' | 'timingProfile' | 'maxActions' |
-  'timeBudgetMs' | 'attentionExperience' | 'learnerIdentity' | 'trialBinding' | 'llm'> & { outputPath?: string; maxRepairs?: number };
+  'timeBudgetMs' | 'attentionExperience' | 'learnerIdentity' | 'trialBinding' | 'llm'> & { outputPath?: string; maxRepairs?: number; movementValidationVersion?: '1'; movementVersion?: WholeTraceMovementVersion; movementFeedbackVersion?: WholeTraceMovementFeedbackVersion };
 export type WholeTraceValidationIssue = { decisionIndex: number; decisionNumber: number; path: string; rule: string; message: string;
   evidence?: Record<string, unknown> };
 export type WholeTraceValidation = { issues?: WholeTraceValidationIssue[]; valid: boolean; errors: string[]; code?: string; failedDecisionIndex?: number;
@@ -101,7 +110,7 @@ export function wholeTraceTerminalIntent(decision: WholeTraceWireDecision | unde
 }
 const shortRefArray = (value: unknown, maximum: number) => Array.isArray(value) && value.length <= maximum
   && value.every(ref => typeof ref === 'string' && !!ref.trim() && ref.length <= 300) && new Set(value).size === value.length;
-function validateChoiceDecision(d: Record<string, unknown>, at: string, errors: string[], requireFocusFields: boolean, cognitive = false, persistent = false) {
+function validateChoiceDecision(d: Record<string, unknown>, at: string, errors: string[], requireFocusFields: boolean, cognitive = false, persistent = false, movementVersion?: WholeTraceMovementVersion) {
   if (Object.keys(d).some(k => !['choiceRef', 'delayMs', 'reason', 'basis', 'actorState'].includes(k))) errors.push(`${at}: unknown field`);
   const basis = d.basis;
   if (!plain(basis)) errors.push(`${at}: basis must be a JSON object`);
@@ -118,8 +127,16 @@ function validateChoiceDecision(d: Record<string, unknown>, at: string, errors: 
   }
   const ref = d.choiceRef;
   if (!plain(ref)) { errors.push(`${at}: choiceRef must be a JSON object`); return; }
-  if (Object.keys(ref).some(k => !['source', 'choiceId', 'quantity'].includes(k))) errors.push(`${at}: unknown choiceRef field`);
+  const directional = wholeTraceHasDirectionalMovement(movementVersion);
+  if (Object.keys(ref).some(k => !['source', 'choiceId', 'quantity', ...(directional ? ['durationMs'] : [])].includes(k))) errors.push(`${at}: unknown choiceRef field`);
   if (typeof ref.choiceId !== 'string' || !ref.choiceId.trim() || ref.choiceId.length > 300) errors.push(`${at}: invalid choiceId`);
+  if (directional) {
+    const moving = typeof ref.choiceId === 'string' && ref.choiceId.startsWith('moveDirection/');
+    if (moving && !WHOLE_TRACE_DIRECTIONS.some(direction => ref.choiceId === `moveDirection/${direction}`)) errors.push(`${at}: invalid movement direction`);
+    if (moving && (!Number.isInteger(ref.durationMs) || (ref.durationMs as number) < 100 || (ref.durationMs as number) > 2000)) errors.push(`${at}: choiceRef.durationMs must be 100..2000 for moveDirection`);
+    if (!moving && ref.durationMs !== undefined) errors.push(`${at}: this choice does not accept durationMs`);
+    if (moving && ref.quantity !== undefined) errors.push(`${at}: moveDirection does not accept quantity`);
+  }
   // Product choice templates deliberately do not choose a quantity. Report all
   // missing product parameters before execution, so one suffix repair can see
   // every such omission instead of discovering them one action at a time.
@@ -130,7 +147,10 @@ function validateChoiceDecision(d: Record<string, unknown>, at: string, errors: 
   if (!plain(source)) { errors.push(`${at}: choiceRef.source must be a JSON object`); return; }
   const sourceFields = ['location', 'navigationStateId', 'phase', 'view', 'activeStation', 'pageIndex'];
   if (Object.keys(source).some(k => !sourceFields.includes(k)) || sourceFields.some(k => !Object.hasOwn(source, k))) errors.push(`${at}: invalid source fields`);
-  if (typeof source.location !== 'string' || !(source.location === 'start' || /^W[0-9]+$/.test(source.location))) errors.push(`${at}: invalid source location`);
+  if (typeof source.location !== 'string' || !(source.location === 'start' || /^W[0-9]+$/.test(source.location)
+    || movementVersion === 'directional-v1' && wholeTraceDirectionalLocation(source.location)
+    || movementVersion === 'directional-v2' && wholeTraceIsContinuousFrame(source as WholeTraceChoiceSource))) errors.push(`${at}: invalid source location`);
+  if (movementVersion === 'directional-v2' && !wholeTraceIsContinuousFrame(source as WholeTraceChoiceSource)) errors.push(`${at}: directional-v2 requires a continuous execution source`);
   if (typeof source.navigationStateId !== 'string' || !source.navigationStateId.trim() || source.navigationStateId.length > 200) errors.push(`${at}: invalid navigationStateId`);
   if (!['shopping', 'checkout'].includes(source.phase as string)) errors.push(`${at}: invalid source phase`);
   if (!['world', 'cart', 'help'].includes(source.view as string)) errors.push(`${at}: invalid source view`);
@@ -141,7 +161,7 @@ function validateChoiceDecision(d: Record<string, unknown>, at: string, errors: 
  * Full-candidate identity, objective spelling, horizon and terminal checks still run at submission.
  */
 export function validateWholeTraceChoiceDecisionSyntax(value: unknown,
-  candidateVersion: '4' | '5' | '6' | '7' = '7'): WholeTraceValidation {
+  candidateVersion: '4' | '5' | '6' | '7' = '7', options: { movementVersion?: WholeTraceMovementVersion } = {}): WholeTraceValidation {
   const errors: string[] = [], at = 'decision';
   if (!plain(value)) return { valid: false, errors: [`${at}: expected object`], code: 'CANDIDATE_SCHEMA' };
   if (!['4', '5', '6', '7'].includes(candidateVersion))
@@ -150,20 +170,20 @@ export function validateWholeTraceChoiceDecisionSyntax(value: unknown,
     errors.push(`${at}: delayMs must be 1..120000`);
   if (typeof value.reason !== 'string' || !value.reason.trim() || value.reason.length > 1000)
     errors.push(`${at}: reason must be a short nonempty description`);
-  validateChoiceDecision(value, at, errors, candidateVersion !== '4', ['6', '7'].includes(candidateVersion), candidateVersion === '7');
+  validateChoiceDecision(value, at, errors, candidateVersion !== '4', ['6', '7'].includes(candidateVersion), candidateVersion === '7', options.movementVersion);
   return { valid: !errors.length, errors, ...(errors.length ? { code: 'CANDIDATE_SCHEMA' } : {}) };
 }
 export function validateWholeTraceCandidate(value: unknown, requestId: string,
-  options: { objectiveIds?: readonly string[] } = {}): WholeTraceValidation {
+  options: { objectiveIds?: readonly string[]; movementVersion?: WholeTraceMovementVersion } = {}): WholeTraceValidation {
   return validateCandidate(value, requestId, options, false);
 }
 /** A prefix has no ending yet; every supplied decision keeps the full wire contract. */
 export function validateWholeTraceCandidatePrefix(value: unknown, requestId: string,
-  options: { objectiveIds?: readonly string[] } = {}): WholeTraceValidation {
+  options: { objectiveIds?: readonly string[]; movementVersion?: WholeTraceMovementVersion } = {}): WholeTraceValidation {
   return validateCandidate(value, requestId, options, true);
 }
 function validateCandidate(value: unknown, requestId: string,
-  options: { objectiveIds?: readonly string[] }, prefix: boolean): WholeTraceValidation {
+  options: { objectiveIds?: readonly string[]; movementVersion?: WholeTraceMovementVersion }, prefix: boolean): WholeTraceValidation {
   const errors: string[] = [];
   if (!plain(value)) return { valid: false, errors: ['Candidate must be a JSON object'], code: 'CANDIDATE_SCHEMA' };
   if (Object.keys(value).some(k => !['candidateVersion', 'requestId', 'decisions'].includes(k))) errors.push('Unknown candidate field');
@@ -178,7 +198,7 @@ function validateCandidate(value: unknown, requestId: string,
     if (!plain(d)) { errors.push(`${at}: expected object`); return; }
     if (!Number.isInteger(d.delayMs) || (d.delayMs as number) < 1 || (d.delayMs as number) > 120000) errors.push(`${at}: delayMs must be 1..120000`);
     if (typeof d.reason !== 'string' || !d.reason.trim() || d.reason.length > 1000) errors.push(`${at}: reason must be a short nonempty description`);
-    if (['4', '5', '6', '7'].includes(value.candidateVersion as string)) validateChoiceDecision(d, at, errors, value.candidateVersion !== '4', ['6', '7'].includes(value.candidateVersion as string), value.candidateVersion === '7');
+    if (['4', '5', '6', '7'].includes(value.candidateVersion as string)) validateChoiceDecision(d, at, errors, value.candidateVersion !== '4', ['6', '7'].includes(value.candidateVersion as string), value.candidateVersion === '7', options.movementVersion);
     else {
       if (Object.keys(d).some(k => !['action', 'delayMs', 'reason', 'basis', 'actorState'].includes(k))) errors.push(`${at}: unknown field`);
       for (const error of validateWholeTraceBasis(d.basis).errors) errors.push(`${at}: ${error}`);

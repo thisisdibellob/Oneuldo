@@ -2,7 +2,10 @@ import { canonicalMarketReplayJson } from '../../frontend/src/game/marketReplayT
 import { validateWholeTraceCandidate, validateWholeTraceChoiceDecisionSyntax,
   type WholeTraceBundle, type WholeTraceChoiceSource, type WholeTraceTaskChoiceCandidate,
   type WholeTraceTaskChoiceDecision } from './wholeTraceContracts';
-import type { WholeTraceChoiceEntry } from './wholeTraceChoices';
+import type { WholeTraceChoiceEntry, WholeTraceChoiceFrame } from './wholeTraceChoices';
+import { wholeTraceDirectionalLocation, wholeTraceIsContinuousFrame, type WholeTraceMovementPosition } from './wholeTraceMovement';
+import type { ActorObservation } from './types';
+import { visibleAnchors, visibleStations } from '../../frontend/src/game/marketReplayPerception';
 import { createWholeTraceAuthoringTaskState, previewWholeTraceAuthoringTasks,
   type WholeTraceAuthoringTaskIssue } from './wholeTraceAuthoringTasks';
 
@@ -11,11 +14,12 @@ export type WholeTraceSourceDecisionDraft = Omit<WholeTraceTaskChoiceDecision, '
   choiceRef: Omit<WholeTraceTaskChoiceDecision['choiceRef'], 'source'> & { source?: never };
 };
 export type WholeTraceExpectedSourceSnapshot = {
-  kind: 'symbolic-expected-source-v1'; expectedSource: WholeTraceChoiceSource | null;
+  kind: 'symbolic-expected-source-v1' | 'validated-execution-source-v2'; expectedSource: WholeTraceChoiceSource | null;
   decisionCount: number; terminal: boolean;
 };
 export const WHOLE_TRACE_SOURCE_AUTHORING_REVISION = 'source-task-preflight-v3';
-export const WHOLE_TRACE_SOURCE_MENU_PRESENTATION_REVISION = 'current-choice-menu-v1';
+export const WHOLE_TRACE_SOURCE_MENU_PRESENTATION_REVISION = 'current-choice-menu-v2';
+const LEGACY_SOURCE_MENU_PRESENTATION_REVISION = 'current-choice-menu-v1';
 export type WholeTraceInteractionContext = {
   kind: 'world' | 'shelf' | 'cart' | 'help' | 'staff' | 'checkout' | 'terminal';
   stationId: string | null; label: string;
@@ -23,9 +27,10 @@ export type WholeTraceInteractionContext = {
 /** Saved, unranked controls for the expected source, not a runtime observation. */
 export type WholeTraceSourceAuthoringMenu = WholeTraceExpectedSourceSnapshot & {
   authoringRevision: typeof WHOLE_TRACE_SOURCE_AUTHORING_REVISION;
-  presentationRevision: typeof WHOLE_TRACE_SOURCE_MENU_PRESENTATION_REVISION;
+  presentationRevision: typeof WHOLE_TRACE_SOURCE_MENU_PRESENTATION_REVISION | typeof LEGACY_SOURCE_MENU_PRESENTATION_REVISION;
   interactionContext: WholeTraceInteractionContext;
-  availableChoices: { choiceId: string; label: string }[];
+  availableChoices: { choiceId: string; label: string; direction?: string; distanceBand?: string;
+    durationBounds?: WholeTraceChoiceEntry['durationBounds']; recentVisit?: WholeTraceChoiceEntry['recentVisit'] }[];
   notice: string;
   choiceIds: string[];
   allowedWaypointIds: string[];
@@ -35,7 +40,8 @@ export class WholeTraceSourceAuthoringError extends Error {
   context?: WholeTraceSourceAuthoringMenu;
   contextUnavailable?: string;
   constructor(readonly code: 'AUTHORING_SCHEMA' | 'AUTHORING_SOURCE_SUPPLIED' | 'AUTHORING_CHOICE_NOT_AVAILABLE'
-    | 'AUTHORING_UNSUPPORTED_TRANSITION' | 'AUTHORING_TERMINAL' | 'AUTHORING_TASK_DECLARATION', message: string,
+    | 'AUTHORING_UNSUPPORTED_TRANSITION' | 'AUTHORING_TERMINAL' | 'AUTHORING_TASK_DECLARATION'
+    | 'AUTHORING_REWRITE_CHANGED_ENDING', message: string,
     readonly issues?: WholeTraceAuthoringTaskIssue[]) { super(message); }
 }
 const fail = (code: WholeTraceSourceAuthoringError['code'], message: string,
@@ -74,6 +80,14 @@ export function createWholeTraceSourceAuthoringCursor(bundle: WholeTraceBundle) 
   if (bundle.bundleVersion !== '8' || bundle.candidateVersion !== '7')
     fail('AUTHORING_UNSUPPORTED_TRANSITION', 'This drafting cursor requires bundle 8 / candidate 7; it never converts a legacy bundle');
   const catalog = structuredClone(bundle.choiceCatalog);
+  // Saved bundles retain their original presentation. New v2 menus place the
+  // already exposed local direction beside its ID; they add no route knowledge.
+  const contextualWalkLabels = bundle.authoringGuide?.executionAuthoring?.menuPresentationRevision
+    === WHOLE_TRACE_SOURCE_MENU_PRESENTATION_REVISION;
+  const continuous = bundle.movementVersion === 'directional-v2';
+  let executionFrame = continuous ? structuredClone(bundle.initialChoiceFrame) : undefined;
+  let executionObservation = continuous ? structuredClone(bundle.actorState.initialObservation) : undefined;
+  let awaitingExecution = false;
   const navigation = structuredClone(bundle.worldReference.navigation);
   const checkouts = structuredClone(bundle.worldReference.world.checkouts);
   const stationLabels = new Map<string, string>(navigation.states.flatMap(state => [state.start, ...state.nodes]
@@ -89,7 +103,8 @@ export function createWholeTraceSourceAuthoringCursor(bundle: WholeTraceBundle) 
     entries.set(entry.choiceId, entry);
   }
   let source = structuredClone(bundle.initialChoiceFrame.source);
-  if (source.location !== 'start' || source.navigationStateId !== navigation.initialStateId
+  if ((!continuous && (source.location !== 'start' || source.navigationStateId !== navigation.initialStateId))
+    || continuous && !wholeTraceIsContinuousFrame(source)
     || source.phase !== 'shopping' || source.view !== 'world' || source.activeStation !== null || source.pageIndex !== null)
     fail('AUTHORING_UNSUPPORTED_TRANSITION', 'This drafting cursor requires the prepared initial shopping/world source');
   // Counts are predictions from explicitly chosen add/remove operations, not observed
@@ -101,6 +116,7 @@ export function createWholeTraceSourceAuthoringCursor(bundle: WholeTraceBundle) 
     expectedStock[product.id] = product.stock;
   }
   let hiddenShelfPage: number | null = null, terminal = false;
+  let movementPosition: WholeTraceMovementPosition | undefined;
   const decisions: WholeTraceTaskChoiceDecision[] = [];
   const stateFor = (current: WholeTraceChoiceSource) => {
     const matches = navigation.states.filter(state => state.stateId === current.navigationStateId);
@@ -108,8 +124,22 @@ export function createWholeTraceSourceAuthoringCursor(bundle: WholeTraceBundle) 
     return matches[0];
   };
   const nodeFor = (current: WholeTraceChoiceSource) => {
+    if (continuous) return { allowedWaypointIds: (executionFrame?.availableChoices ?? []).flatMap(entry => entry.action.type === 'walk' ? [entry.action.waypointId] : []),
+      nearbyStations: [] };
     const state = stateFor(current);
     if (current.location === 'start') return state.start;
+    if (bundle.movementVersion === 'directional-v1' && wholeTraceDirectionalLocation(current.location)) {
+      // No motor, time integration, guessed waypoint or copied pre-move menu.
+      if (!movementPosition || current.location !== `D${movementPosition.decisionCount}`)
+        return { allowedWaypointIds: [], nearbyStations: [] };
+      const { world, presentation, waypoints } = bundle.worldReference;
+      return {
+        allowedWaypointIds: visibleAnchors(world, movementPosition.position, presentation, state.cashierAvailability)
+          .flatMap(anchor => waypoints.filter(waypoint => waypoint.anchorId === anchor.id).map(waypoint => waypoint.waypointId)),
+        nearbyStations: visibleStations(world, movementPosition.position, presentation, state.cashierAvailability)
+          .filter(station => station.near),
+      };
+    }
     const matches = state.nodes.filter(node => node.waypointId === current.location);
     if (matches.length !== 1) fail('AUTHORING_UNSUPPORTED_TRANSITION', `Unknown or ambiguous location ${current.location}`);
     return matches[0];
@@ -134,6 +164,14 @@ export function createWholeTraceSourceAuthoringCursor(bundle: WholeTraceBundle) 
     return entry;
   };
   const menuAt = (current: WholeTraceChoiceSource) => {
+    if (continuous) {
+      if (!executionFrame || awaitingExecution) return fail('AUTHORING_UNSUPPORTED_TRANSITION', 'Apply the validated prefix frame before requesting another menu');
+      const kind: WholeTraceInteractionContext['kind'] = current.phase === 'checkout' ? 'checkout'
+        : current.view !== 'world' ? current.view : current.activeStation ? shelfFor(current.activeStation) ? 'shelf' : 'staff' : 'world';
+      return { choiceIds: executionFrame.availableChoices.map(entry => entry.choiceId), interactionContext: {
+        kind, stationId: current.activeStation, label: kind === 'world' ? '매장 통로 화면'
+          : `${stationLabels.get(current.activeStation ?? '') ?? current.activeStation ?? ''} ${kind} 화면`.trim() } };
+    }
     const state = stateFor(current);
     const stationLabel = stationLabels.get(current.activeStation ?? '') ?? current.activeStation;
     const describe = (kind: WholeTraceInteractionContext['kind'], choiceIds: string[], label: string) => ({
@@ -174,13 +212,20 @@ export function createWholeTraceSourceAuthoringCursor(bundle: WholeTraceBundle) 
     }
     const states = catalog.navigation.filter(state => state.navigationStateId === current.navigationStateId);
     const locations = states.length === 1 ? states[0].locations.filter(location => location.location === current.location) : [];
+    if (bundle.movementVersion === 'directional-v1' && wholeTraceDirectionalLocation(current.location)) {
+      const node = nodeFor(current);
+      return describe('world', [...common, ...catalog.common.world, ...(catalog.movementChoiceIds ?? []),
+        ...node.allowedWaypointIds.map(id => `walk/${id}`),
+        ...node.nearbyStations.flatMap(station => station.kind === 'checkout' ? [`checkout/${station.id}`]
+          : station.kind === 'shelf' || station.kind === 'employee' ? [`open/${station.id}`] : [])], '매장 통로 화면');
+    }
     if (locations.length !== 1) return fail('AUTHORING_UNSUPPORTED_TRANSITION', `Missing exact location menu ${current.navigationStateId}/${current.location}`);
-    return describe('world', [...common, ...catalog.common.world, ...locations[0].choiceIds], '매장 통로 화면');
+    return describe('world', [...common, ...catalog.common.world, ...(catalog.movementChoiceIds ?? []), ...locations[0].choiceIds], '매장 통로 화면');
   };
   // Fail before accepting any draft when its initial navigation state is unusable.
   nodeFor(source); menuAt(source);
 
-  const snapshot = (): WholeTraceExpectedSourceSnapshot => ({ kind: 'symbolic-expected-source-v1',
+  const snapshot = (): WholeTraceExpectedSourceSnapshot => ({ kind: continuous ? 'validated-execution-source-v2' : 'symbolic-expected-source-v1',
     expectedSource: terminal ? null : structuredClone(source), decisionCount: decisions.length, terminal });
   const menu = (): WholeTraceSourceAuthoringMenu => {
     // Retain the existing menu order. No routes, goal matching or ranking enter this view.
@@ -191,15 +236,33 @@ export function createWholeTraceSourceAuthoringCursor(bundle: WholeTraceBundle) 
       const action = entries.get(id)?.action;
       return action?.type === 'walk' && allowed.includes(action.waypointId) ? [action.waypointId] : [];
     });
-    const visible = catalog.navigation.find(state => state.navigationStateId === source.navigationStateId)
+    const visible = continuous ? (executionFrame?.availableChoices ?? []).flatMap(entry => {
+      if (entry.action.type !== 'walk') return [];
+      const anchor = executionObservation?.anchors.find(anchor => entry.cueRefs.includes(`anchor:${anchor.id}`));
+      return anchor ? [{ choiceId: entry.choiceId, label: entry.label, direction: anchor.direction, distanceBand: anchor.distanceBand }] : [];
+    }) : movementPosition && source.location === `D${movementPosition.decisionCount}`
+      ? visibleAnchors(bundle.worldReference.world, movementPosition.position, bundle.worldReference.presentation, stateFor(source).cashierAvailability)
+        .flatMap(anchor => bundle.worldReference.waypoints.filter(waypoint => waypoint.anchorId === anchor.id)
+          .map(waypoint => ({ choiceId: `walk/${waypoint.waypointId}`, label: `${anchor.label}로 걷기`, direction: anchor.direction, distanceBand: anchor.distanceBand })))
+      : catalog.navigation.find(state => state.navigationStateId === source.navigationStateId)
       ?.locations.find(location => location.location === source.location)?.visibleWalkChoices ?? [];
+    const visibleWalkChoices = visible.filter(choice => choiceIds.includes(choice.choiceId)
+      && allowedWaypointIds.includes(choice.choiceId.replace(/^walk\//, '')));
     return { ...snapshot(), authoringRevision: WHOLE_TRACE_SOURCE_AUTHORING_REVISION,
-      presentationRevision: WHOLE_TRACE_SOURCE_MENU_PRESENTATION_REVISION, interactionContext,
-      availableChoices: choiceIds.map(choiceId => ({ choiceId, label: entries.get(choiceId)?.label ?? choiceId })),
+      presentationRevision: contextualWalkLabels ? WHOLE_TRACE_SOURCE_MENU_PRESENTATION_REVISION
+        : LEGACY_SOURCE_MENU_PRESENTATION_REVISION, interactionContext,
+      availableChoices: choiceIds.map(choiceId => {
+        const entry = continuous ? executionFrame?.availableChoices.find(entry => entry.choiceId === choiceId) : entries.get(choiceId);
+        const walk = contextualWalkLabels && entry?.action.type === 'walk'
+          ? visibleWalkChoices.find(choice => choice.choiceId === choiceId) : undefined;
+        return { choiceId, label: walk?.label ?? entry?.label ?? choiceId,
+          ...(walk ? { direction: walk.direction, distanceBand: walk.distanceBand } : {}),
+          ...(entry?.durationBounds ? { durationBounds: structuredClone(entry.durationBounds) } : {}),
+          ...(entry?.recentVisit ? { recentVisit: structuredClone(entry.recentVisit) } : {}) };
+      }),
       notice: '현재 선택 가능 여부는 이 메뉴의 choiceIds를 기준으로 확인한다. availableChoices는 같은 순서의 라벨이다.',
       choiceIds: [...choiceIds], allowedWaypointIds,
-      visibleWalkChoices: structuredClone(visible.filter(choice => choiceIds.includes(choice.choiceId)
-        && allowedWaypointIds.includes(choice.choiceId.replace(/^walk\//, '')))) };
+      visibleWalkChoices: structuredClone(visibleWalkChoices) };
   };
   const append = (draft: WholeTraceSourceDecisionDraft): WholeTraceTaskChoiceDecision => {
       if (terminal) return fail('AUTHORING_TERMINAL', 'The actor already selected a terminal action; no suffix is inserted or accepted');
@@ -208,7 +271,7 @@ export function createWholeTraceSourceAuthoringCursor(bundle: WholeTraceBundle) 
       if (Object.hasOwn(draft.choiceRef, 'source'))
         return fail('AUTHORING_SOURCE_SUPPLIED', 'cursor.append takes a source-free draft: choiceRef:{choiceId,quantity?}. Omit the source key entirely (not null or undefined). Direct candidates require source, but cursor drafts forbid it; an actor-supplied source is never overwritten');
       const decision = { ...draft, choiceRef: { ...draft.choiceRef, source: structuredClone(source) } };
-      const syntax = validateWholeTraceChoiceDecisionSyntax(decision, '7');
+      const syntax = validateWholeTraceChoiceDecisionSyntax(decision, '7', { movementVersion: bundle.movementVersion });
       if (!syntax.valid) {
         const issues = draftSyntaxIssues(draft);
         return fail('AUTHORING_SCHEMA', [...syntax.errors,
@@ -225,9 +288,25 @@ export function createWholeTraceSourceAuthoringCursor(bundle: WholeTraceBundle) 
         decision: stored, actionType: action.type, phase: source.phase, goalMemoryCapacity });
       if (taskPreview.issues.length) return fail('AUTHORING_TASK_DECLARATION',
         taskPreview.issues.map(issue => `${issue.path}: ${issue.message}`).join('; '), taskPreview.issues);
+      if (continuous) {
+        const live = executionFrame!.availableChoices.find(choice => choice.choiceId === entry.choiceId)!;
+        if (parameterized && (!live.quantityBounds || stored.choiceRef.quantity! > live.quantityBounds.max))
+          return fail('AUTHORING_CHOICE_NOT_AVAILABLE', 'Chosen quantity exceeds the actual displayed bound');
+        // No symbolic movement/panel prediction in v2. The execution cursor
+        // installs the exact accepted result before any following selection.
+        taskDeclarations = taskPreview.nextState;
+        decisions.push(stored);
+        terminal = action.type === 'submit' || action.type === 'giveUp';
+        awaitingExecution = !terminal;
+        return structuredClone(stored);
+      }
       const next = structuredClone(source), nextCart = { ...expectedCart }, nextStock = { ...expectedStock };
       let nextHiddenShelfPage = hiddenShelfPage, nextTerminal = false;
       switch (action.type) {
+        case 'moveDirection':
+          if (bundle.movementVersion !== 'directional-v1') return fail('AUTHORING_UNSUPPORTED_TRANSITION', 'Direction movement requires its explicit bundle version');
+          next.location = `D${decisions.length + 1}`;
+          break;
         case 'walk':
           if (!nodeFor(source).allowedWaypointIds.includes(action.waypointId))
             return fail('AUTHORING_CHOICE_NOT_AVAILABLE', `No directed edge from ${source.location} to ${action.waypointId}; no route is inferred`);
@@ -310,6 +389,7 @@ export function createWholeTraceSourceAuthoringCursor(bundle: WholeTraceBundle) 
       // All checks precede commitment: an error leaves the cursor and caller data intact.
       source = next; expectedCart = nextCart; expectedStock = nextStock;
       hiddenShelfPage = nextHiddenShelfPage; terminal = nextTerminal;
+      if (action.type === 'moveDirection' || action.type === 'walk') movementPosition = undefined;
       taskDeclarations = taskPreview.nextState;
       decisions.push(stored);
       return structuredClone(stored);
@@ -317,6 +397,32 @@ export function createWholeTraceSourceAuthoringCursor(bundle: WholeTraceBundle) 
   return {
     snapshot,
     menu,
+    /** Trusted execution boundary, not a model-writable source or prediction. */
+    acceptExecutionFrame(frame: WholeTraceChoiceFrame, observation: ActorObservation, acceptedActions: number): void {
+      if (!continuous || terminal || acceptedActions !== decisions.length || !wholeTraceIsContinuousFrame(frame.source))
+        return fail('AUTHORING_UNSUPPORTED_TRANSITION', 'Execution frame must match the accepted continuous prefix');
+      executionFrame = structuredClone(frame); executionObservation = structuredClone(observation);
+      source = structuredClone(frame.source); awaitingExecution = false;
+    },
+    acceptExecutionTerminal(acceptedActions: number): void {
+      if (!continuous || acceptedActions !== decisions.length
+        || !terminal && decisions.length !== 100)
+        return fail('AUTHORING_UNSUPPORTED_TRANSITION', 'Execution termination requires the accepted actor ending or full horizon');
+      terminal = true; awaitingExecution = false;
+    },
+    /** A future execution/prediction producer may supply a result here. Nothing
+     * calls this automatically in phase one, and it never bypasses final guards. */
+    acceptMovementPosition(result: WholeTraceMovementPosition): WholeTraceSourceAuthoringMenu {
+      if (bundle.movementVersion !== 'directional-v1' || terminal || !result
+        || !Number.isInteger(result.decisionCount) || result.decisionCount !== decisions.length
+        || source.location !== `D${result.decisionCount}`
+        || !Number.isFinite(result.position?.x) || !Number.isFinite(result.position?.y)
+        || result.position.x < 0 || result.position.y < 0
+        || result.position.x > bundle.worldReference.world.world.width || result.position.y > bundle.worldReference.world.world.height)
+        return fail('AUTHORING_UNSUPPORTED_TRANSITION', 'A movement position must belong to the latest directional decision and lie within the world');
+      movementPosition = structuredClone(result);
+      return menu();
+    },
     append(draft: WholeTraceSourceDecisionDraft): WholeTraceTaskChoiceDecision {
       try { return append(draft); }
       catch (error) {
@@ -339,7 +445,7 @@ export function createWholeTraceSourceAuthoringCursor(bundle: WholeTraceBundle) 
     },
     finish(): WholeTraceTaskChoiceCandidate {
       const candidate: WholeTraceTaskChoiceCandidate = { candidateVersion: '7', requestId, decisions: structuredClone(decisions) };
-      const syntax = validateWholeTraceCandidate(candidate, requestId, { objectiveIds });
+      const syntax = validateWholeTraceCandidate(candidate, requestId, { objectiveIds, movementVersion: bundle.movementVersion });
       if (!syntax.valid) return fail('AUTHORING_SCHEMA', syntax.errors.join('; '));
       return candidate;
     },

@@ -3,14 +3,17 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { canonicalMarketReplayJson, marketReplayTraceId } = require('../../frontend/src/game/marketReplayTrace.ts');
+const { movementOptions, assertMovementBinding, assertMovementManifest, assertMovementEvidence } = require('./personaValidationMovement.cjs');
 const CONTROL = 'neutral-adult-control';
 const read = file => JSON.parse(fs.readFileSync(file, 'utf8'));
 const hash = file => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 const digest = value => crypto.createHash('sha256').update(canonicalMarketReplayJson(value)).digest('hex');
 const key = slot => `${slot.condition}:${String(slot.seed)}:${slot.personaId}`;
 function prepareWholeTrace(m, slot) {
+  assertMovementBinding(m, slot, 'Readiness slot movement binding');
+  if (slot.prepareWholeTrace) assertMovementBinding(m, slot.prepareWholeTrace, 'Readiness request movement binding');
   return slot.prepareWholeTrace ?? { personaId: slot.personaId, seed: slot.seed, snapshotFilePath: m.snapshots[slot.condition].filePath,
-    outputPath: slot.tracePath, attentionExperience: { visit: 'first-play' } };
+    outputPath: slot.tracePath, attentionExperience: { visit: 'first-play' }, ...movementOptions(m) };
 }
 function inspectSlot(m, slot) {
   if (!fs.existsSync(slot.tracePath)) {
@@ -23,6 +26,7 @@ function inspectSlot(m, slot) {
   }
   try {
     const trace = read(slot.tracePath), fixture = trace.generationPolicy === 'stochastic';
+    if (fixture && m.movementValidationVersion) throw new Error('Validation movement evidence cannot use stochastic fixtures');
     const persona = m.version === 3 ? m.profiles[slot.personaId].persona : read(path.join(__dirname, '../personas', `${slot.personaId}.json`));
     if (trace.personaId !== slot.personaId || String(trace.seed) !== String(slot.seed) || trace.target?.snapshotId !== slot.snapshotId
       || trace.personaVersion !== persona.version || slot.traceId && trace.traceId !== slot.traceId) throw new Error('Mixed trace identity or persona version');
@@ -34,6 +38,7 @@ function inspectSlot(m, slot) {
       if (trace.experienceMode !== 'first-play' || trace.generationPolicy !== 'llm' || trace.generation?.actorPolicyVersion !== m.versions.policyVersion
         || trace.generation?.model !== m.versions.model || trace.generation?.learnerIdentity || trace.generation?.trialBinding) throw new Error('Mixed policy/model/experience');
       const audit = read(paths.knowledgeAudit), bundle = read(paths.bundle);
+      assertMovementEvidence(m, { trace, bundle, audit });
       if (audit.candidateVersion !== m.versions.candidateVersion || bundle.bundleVersion !== m.versions.bundleVersion
         || trace.traceId !== marketReplayTraceId(trace) || audit.traceId !== trace.traceId || audit.requestId !== bundle.requestId
         || audit.inputHash !== bundle.inputHash || audit.policyVersion !== m.versions.policyVersion || bundle.policyVersion !== m.versions.policyVersion
@@ -48,6 +53,7 @@ function inspectSlot(m, slot) {
   } catch (error) { return { complete: false, reason: error.message }; }
 }
 function fromManifest(m, { samples } = {}) {
+  assertMovementManifest(m);
   const traits = m.version === 3, current = require(traits ? '../validation/persona-trait-validation-spec.json' : '../validation/persona-validation-spec.json');
   const spec = require('./personaValidationSpec.cjs').assertSpec(m, current, traits ? 'traits' : 'legacy');
   const sampleByKey = samples && new Map(samples.map(sample => [key(sample), sample]));
@@ -93,7 +99,8 @@ function fromManifest(m, { samples } = {}) {
   if (technicalFailures.length) reasons.push({ code: 'technical-failures', message: `${technicalFailures.length}개 슬롯의 기술 실패 또는 근거 불일치를 확인했다.` });
   if (m.analysisVersion === 2) for (const warning of m.opportunityAudit?.warnings ?? []) reasons.push({ ...warning,
     message: `${warning.personaId}/${warning.condition}: ${warning.message}` });
-  return { runDirectory: m.runDirectory, manifestPath: path.join(m.runDirectory, 'manifest.json'), validationMode: traits ? 'traits' : 'legacy',
+  return { runDirectory: m.runDirectory, manifestPath: path.join(m.runDirectory, 'manifest.json'), validationMode: traits ? 'traits' : 'legacy', ...movementOptions(m),
+    ...(m.taskDesign === undefined ? {} : { taskDesign: structuredClone(m.taskDesign), taskDesignHash: m.taskDesignHash }),
     readiness: blocked ? 'blocked' : missingSlots.length || expectedValidPairs.some(row => row.maximumValidPairs < spec.minValidPairs) ? 'incomplete' : 'ready', reasons,
     complete: completed.size, required: m.slots.length, containsFixture: slots.some(slot => slot.complete && slot.fixture),
     fixtureOnly: completed.size > 0 && slots.filter(slot => slot.complete).every(slot => slot.fixture),
