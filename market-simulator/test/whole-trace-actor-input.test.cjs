@@ -9,7 +9,8 @@ require('../runtime.cjs');
 const { createService } = require('../server.cjs');
 const { createMarketSession } = require('../../frontend/src/game/marketSession.ts');
 const { createMarketReplaySnapshot } = require('../../frontend/src/game/marketReplayTrace.ts');
-const { buildActorInput, REPLACEMENTS, OMITTED_BUNDLE_KEYS } = require('../whole-trace-actor-input.cjs');
+const crypto = require('node:crypto');
+const { buildActorInput, renderActorInstructions, REPLACEMENTS, OMITTED_BUNDLE_KEYS, INSTRUCTION_TEMPLATES } = require('../whole-trace-actor-input.cjs');
 
 async function prepared(t, extra = {}) {
   const service = createService();
@@ -59,11 +60,12 @@ test('actor input rejects malformed prepare responses', () => {
   assert.throws(() => buildActorInput({ requestId: 'r', bundle: { requestId: 'other' } }), /does not match/);
 });
 
-test('actor input CLI writes a new file and never overwrites', async t => {
+test('actor input CLI writes input and fixed instructions and never overwrites', async t => {
   const response = await prepared(t);
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'actor-input-cli-'));
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
-  const source = path.join(directory, 'prepare-response.json');
+  fs.mkdirSync(path.join(directory, 'owner'));
+  const source = path.join(directory, 'owner', 'prepare-response.json');
   const output = path.join(directory, 'actor-input.json');
   fs.writeFileSync(source, JSON.stringify(response));
   const cli = path.resolve(__dirname, '../whole-trace-actor-input.cjs');
@@ -73,6 +75,42 @@ test('actor input CLI writes a new file and never overwrites', async t => {
   assert.equal(summary.requestId, response.requestId);
   assert.deepEqual(summary.omittedBundleKeys, ['worldReference', 'choiceCatalog', 'sourceFiles']);
   assert.equal(JSON.parse(fs.readFileSync(output, 'utf8')).bundle.worldReference, undefined);
+  assert.equal(summary.actorInstructions.templateId, 'authoring-v1');
+  const instructions = fs.readFileSync(path.join(directory, 'actor-instructions.txt'), 'utf8');
+  assert.equal(summary.actorInstructions.sha256, crypto.createHash('sha256').update(instructions).digest('hex'));
+  assert.ok(instructions.startsWith(`Your slot directory is ${directory}.`));
+  assert.ok(instructions.includes(`call ${directory}/owner --operation-file`));
+  assert.doesNotMatch(instructions, /__[A-Z_]+__/);
   const second = spawnSync(process.execPath, [cli, source, output], { encoding: 'utf8' });
   assert.notEqual(second.status, 0);
+});
+
+test('actor input refuses a slot without owner and supports --no-instructions', async t => {
+  const response = await prepared(t);
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'actor-input-layout-'));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const source = path.join(directory, 'prepare-response.json');
+  fs.writeFileSync(source, JSON.stringify(response));
+  const cli = path.resolve(__dirname, '../whole-trace-actor-input.cjs');
+  const output = path.join(directory, 'actor-input.json');
+  const refused = spawnSync(process.execPath, [cli, source, output], { encoding: 'utf8' });
+  assert.notEqual(refused.status, 0);
+  assert.match(refused.stderr, /Owner directory not found/);
+  assert.equal(fs.existsSync(output), false, 'nothing is written when the layout is refused');
+  const plain = spawnSync(process.execPath, [cli, source, output, '--no-instructions'], { encoding: 'utf8' });
+  assert.equal(plain.status, 0, plain.stderr);
+  assert.equal(JSON.parse(plain.stdout).actorInstructions, null);
+  assert.equal(fs.existsSync(path.join(directory, 'actor-instructions.txt')), false);
+});
+
+test('authoring-v1 template reproduces the instruction S used in past experiments', () => {
+  // S (sha256 48eafa53...) was the fixed instruction of generation-isolation r2,
+  // procedure-loop arm A and trait-v3 r6, written with the slot placeholder and
+  // this checkout's absolute mailbox path.
+  const template = fs.readFileSync(INSTRUCTION_TEMPLATES['authoring-v1'], 'utf8');
+  const s = template.split('__MAILBOX_CLI__').join('/Users/mymacbookair/Desktop/Project/Oneuldo/market-simulator/whole-trace-mailbox.cjs');
+  assert.equal(crypto.createHash('sha256').update(s).digest('hex'),
+    '48eafa534f2ff71abc2db43a5ae9c8e3e9c2f5611e23d281f8988d38ef633d94');
+  assert.throws(() => renderActorInstructions('authoring-v0', '/tmp/x'), /Unknown/);
+  assert.throws(() => renderActorInstructions('authoring-v1', 'relative/slot'), /absolute/);
 });

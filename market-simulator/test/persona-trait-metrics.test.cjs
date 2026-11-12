@@ -1,8 +1,8 @@
 'use strict';
 require('../runtime.cjs');
 const test = require('node:test'), assert = require('node:assert/strict');
-const { extractUniversal, extract } = require('../src/personaValidationMetrics.cjs');
-const { collectionFlags, collectionFindings } = require('../src/personaValidationFlags.cjs');
+const { extractUniversal, extract } = require('../src/validation/personaValidationMetrics.cjs');
+const { collectionFlags, collectionFindings } = require('../src/validation/personaValidationFlags.cjs');
 const spec = require('../validation/persona-trait-validation-spec.json');
 const step = (id, type, extra = {}) => ({ id, type, reactionDelayMs: 100, ...extra });
 const add = (id, productId, quantity = 1, extra = {}) => step(id, 'dragProduct', { productId, quantity, gesture: { outcome: 'drop' }, ...extra });

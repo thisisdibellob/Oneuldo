@@ -3,7 +3,7 @@ require('../runtime.cjs');
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path');
 const {createMarketSession}=require('../../frontend/src/game/marketSession.ts');
 const {createMarketReplaySnapshot}=require('../../frontend/src/game/marketReplayTrace.ts');
-const run=require('../src/personaValidationRun.cjs');
+const run=require('../src/validation/personaValidationRun.cjs');
 const {invokeTool}=require('../server.cjs');
 const ids=['mild-intellectual-disability-adult','careful-checker','quick-decider','neutral-adult-control'];
 const profile=id=>require(`../personas/${id}.json`);

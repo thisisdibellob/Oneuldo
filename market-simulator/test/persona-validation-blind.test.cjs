@@ -1,7 +1,7 @@
 'use strict';
 require('../runtime.cjs');
 const test = require('node:test'), assert = require('node:assert/strict');
-const { IDS, sanitize, assertAnonymous, build, grade } = require('../src/personaValidationBlind.cjs');
+const { IDS, sanitize, assertAnonymous, build, grade } = require('../src/validation/personaValidationBlind.cjs');
 const profiles = IDS.map(id => require(`../personas/${id}.json`));
 const step = (id, type, extra = {}) => ({ id, type, reactionDelayMs: 1200, reason: '우유를 고른다.', ...extra });
 

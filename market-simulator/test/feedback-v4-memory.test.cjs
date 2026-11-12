@@ -6,7 +6,7 @@ const { buildFeedbackActorFrame, emptyFeedbackBeliefMemory, carryFeedbackBeliefM
 const { FeedbackExperience } = require('../src/feedbackExperience.ts');
 const { FeedbackMovementPolicy } = require('../src/feedbackMovementPolicy.ts');
 const { createFeedbackLlmPolicy } = require('../src/feedbackLlmPolicy.ts');
-const { FeedbackPlanSession } = require('../src/feedbackPlanSession.ts');
+const { FeedbackPlanSession } = require('../src/legacy/feedbackPlanSession.ts');
 const { getPersona } = require('../src/personas.ts');
 const { generateTrace } = require('../src/simulator.ts');
 const { TraceGuard, validateTrace } = require('../src/traceValidation.ts');

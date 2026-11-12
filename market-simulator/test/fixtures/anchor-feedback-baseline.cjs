@@ -8,9 +8,9 @@ async function capture(root = path.resolve(__dirname, '../..'), movementFeedback
   require(path.join(root, 'runtime.cjs'));
   const { createMarketSession } = require(path.join(root, '../frontend/src/game/marketSession.ts'));
   const { createMarketReplaySnapshot } = require(path.join(root, '../frontend/src/game/marketReplayTrace.ts'));
-  const { buildWholeTraceBundle } = require(path.join(root, 'src/wholeTraceBundle.ts'));
-  const { createWholeTraceExecutionAuthoringCursor } = require(path.join(root, 'src/wholeTraceExecutionAuthoring.ts'));
-  const { compileWholeTraceCandidate } = require(path.join(root, 'src/wholeTraceCompiler.ts'));
+  const { buildWholeTraceBundle } = require(path.join(root, 'src/wholeTrace/wholeTraceBundle.ts'));
+  const { createWholeTraceExecutionAuthoringCursor } = require(path.join(root, 'src/wholeTrace/wholeTraceExecutionAuthoring.ts'));
+  const { compileWholeTraceCandidate } = require(path.join(root, 'src/wholeTrace/wholeTraceCompiler.ts'));
   const settings = { snapshot: createMarketReplaySnapshot(createMarketSession({ seed: 'anchor-feedback-off-golden',
     environment: { cashierCount: 2 } })), personaId: 'mild-intellectual-disability-adult',
     seed: 'anchor-feedback-off-golden', timingProfile: 'original', maxActions: 100, maxRepairs: 0,

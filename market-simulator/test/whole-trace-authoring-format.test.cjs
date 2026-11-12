@@ -1,11 +1,11 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 require('../runtime.cjs');
-const { buildWholeTraceAuthoringGuide } = require('../src/wholeTraceAuthoring.ts');
+const { buildWholeTraceAuthoringGuide } = require('../src/wholeTrace/wholeTraceAuthoring.ts');
 const {
   validateWholeTraceChoiceDecisionSyntax, validateWholeTraceCandidate,
   WHOLE_TRACE_BUNDLE_VERSION, WHOLE_TRACE_CANDIDATE_VERSION, WHOLE_TRACE_POLICY_VERSION,
-} = require('../src/wholeTraceContracts.ts');
+} = require('../src/wholeTrace/wholeTraceContracts.ts');
 
 const identity = { requestId: 'authoring-format-request', inputHash: 'authoring-format-input',
   snapshotId: 'authoring-format-snapshot', seed: 'authoring-format-seed', candidateVersion: '7',
@@ -160,7 +160,7 @@ test('repair guidance distinguishes the default zero budget from an explicit one
 test('prepared bundle repair guidance matches its actual generation limits', () => {
   const { createMarketSession } = require('../../frontend/src/game/marketSession.ts');
   const { createMarketReplaySnapshot } = require('../../frontend/src/game/marketReplayTrace.ts');
-  const { buildWholeTraceBundle } = require('../src/wholeTraceBundle.ts');
+  const { buildWholeTraceBundle } = require('../src/wholeTrace/wholeTraceBundle.ts');
   const snapshot = createMarketReplaySnapshot(createMarketSession({ seed: 'authoring-repair-limit', difficulty: 'exact',
     objectives: [{ productId: 'milk', quantity: 2 }] }));
   for (const maxRepairs of [undefined, 0, 1]) {

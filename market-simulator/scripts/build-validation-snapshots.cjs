@@ -8,7 +8,7 @@ const { createMarketSession } = require('../../frontend/src/game/marketSession.t
 const { marketCategories, marketProducts, getMarketProduct } = require('../../frontend/src/game/scenarios.ts');
 const { createMarketReplaySnapshot, validateMarketReplaySnapshot } = require('../../frontend/src/game/marketReplayTrace.ts');
 const { DEFAULT_REPLAY_PRESENTATION } = require('../../frontend/src/game/marketReplayPerception.ts');
-const { auditManifestSnapshots } = require('../src/personaValidationOpportunity.cjs');
+const { auditManifestSnapshots } = require('../src/validation/personaValidationOpportunity.cjs');
 const PERSONAS = ['mild-intellectual-disability-adult', 'careful-checker', 'quick-decider', 'neutral-adult-control'];
 const HIGH_GOALS = [{ productId: 'milk', quantity: 2 }, { productId: 'apple', quantity: 2 },
   { productId: 'water', quantity: 2 }, { productId: 'eggs', quantity: 1 }, { productId: 'banana', quantity: 1 }];

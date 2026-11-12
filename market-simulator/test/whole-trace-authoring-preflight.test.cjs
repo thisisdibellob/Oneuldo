@@ -7,9 +7,9 @@ require('../runtime.cjs');
 const { createMarketSession } = require('../../frontend/src/game/marketSession.ts');
 const { createMarketReplaySnapshot } = require('../../frontend/src/game/marketReplayTrace.ts');
 const { getMarketStationApproachPoint } = require('../../frontend/src/game/marketEnvironment.ts');
-const { buildWholeTraceBundle } = require('../src/wholeTraceBundle.ts');
-const { createWholeTraceSourceAuthoringCursor } = require('../src/wholeTraceAuthoringSource.ts');
-const { compileWholeTraceCandidate } = require('../src/wholeTraceCompiler.ts');
+const { buildWholeTraceBundle } = require('../src/wholeTrace/wholeTraceBundle.ts');
+const { createWholeTraceSourceAuthoringCursor } = require('../src/wholeTrace/wholeTraceAuthoringSource.ts');
+const { compileWholeTraceCandidate } = require('../src/wholeTrace/wholeTraceCompiler.ts');
 
 // Minimal, manually authored versions of the eight failure invariants. Tests
 // never load/rewrite pilot files or call an AI actor; compiler checks are in-memory.
@@ -70,9 +70,9 @@ async function compilerRejects(settings, bundle, candidate, code, index, pattern
 
 test('new bundles fingerprint the authoring-only checker and revision without changing wire contracts', () => {
   const { bundle } = fixture();
-  const entry = bundle.sourceFiles.find(file => file.path === 'src/wholeTraceAuthoringTasks.ts');
+  const entry = bundle.sourceFiles.find(file => file.path === 'src/wholeTrace/wholeTraceAuthoringTasks.ts');
   assert.ok(entry, 'The new authored-task check is part of fresh bundle provenance');
-  assert.equal(entry.sha256, createHash('sha256').update(readFileSync(resolve(__dirname, '../src/wholeTraceAuthoringTasks.ts'))).digest('hex'));
+  assert.equal(entry.sha256, createHash('sha256').update(readFileSync(resolve(__dirname, '../src/wholeTrace/wholeTraceAuthoringTasks.ts'))).digest('hex'));
   assert.equal(bundle.authoringGuide.guidanceRevision, 'declaration-preflight-v3');
   assert.equal(bundle.authoringGuide.sourceAuthoring.revision, 'source-task-preflight-v3');
   assert.equal(bundle.authoringGuide.authoringVersion, '2');

@@ -3,8 +3,8 @@ const assert = require('node:assert/strict');
 require('../runtime.cjs');
 const {
   WholeTraceTaskMemoryEngine, validateWholeTraceTaskUpdate, WHOLE_TRACE_TASK_MEMORY_INSTRUCTIONS,
-} = require('../src/wholeTraceTaskMemory.ts');
-const { WholeTraceCognitionEngine, buildWholeTraceCognitionProfile } = require('../src/wholeTraceCognition.ts');
+} = require('../src/wholeTrace/wholeTraceTaskMemory.ts');
+const { WholeTraceCognitionEngine, buildWholeTraceCognitionProfile } = require('../src/wholeTrace/wholeTraceCognition.ts');
 const { getPersona } = require('../src/personas.ts');
 
 const goal = (id = 'goal-milk', quantity = 2) => ({ id, label: '흰 우유', quantity, match: 'exact' });

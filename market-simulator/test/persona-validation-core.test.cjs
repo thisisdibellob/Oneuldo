@@ -1,10 +1,10 @@
 'use strict';
 require('../runtime.cjs');
 const test=require('node:test'),assert=require('node:assert/strict');
-const {extract}=require('../src/personaValidationMetrics.cjs');
-const {cliffsDelta,bootstrap,judge,scoreReview}=require('../src/personaValidationStatistics.cjs');
-const {flagsForTrace,collectionFlags}=require('../src/personaValidationFlags.cjs');
-const {sanitize,build}=require('../src/personaValidationBlind.cjs');
+const {extract}=require('../src/validation/personaValidationMetrics.cjs');
+const {cliffsDelta,bootstrap,judge,scoreReview}=require('../src/validation/personaValidationStatistics.cjs');
+const {flagsForTrace,collectionFlags}=require('../src/validation/personaValidationFlags.cjs');
+const {sanitize,build}=require('../src/validation/personaValidationBlind.cjs');
 const control=require('../personas/neutral-adult-control.json');
 const step=(id,type,extra={})=>({id,type,reactionDelayMs:100,reason:'ordinary choice',...extra});
 const snapshot={config:{objectives:[{productId:'milk',quantity:2},{productId:'apple',quantity:1}],inventoryProductIds:{meal:['curry']}}};

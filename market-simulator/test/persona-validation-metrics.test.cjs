@@ -1,7 +1,7 @@
 'use strict';
 require('../runtime.cjs');
 const test = require('node:test'), assert = require('node:assert/strict');
-const { extract, actorEvents, selectionErrors } = require('../src/personaValidationMetrics.cjs');
+const { extract, actorEvents, selectionErrors } = require('../src/validation/personaValidationMetrics.cjs');
 const persona = require('../personas/neutral-adult-control.json');
 const snapshot = { config: { difficulty: 'exact', objectives: [{ productId: 'milk', quantity: 2 }, { productId: 'apple', quantity: 1 }] } };
 function fixture(rows) {
@@ -63,7 +63,7 @@ test('displayed mismatch needs actual correction; checking alone and repeated di
 });
 test('split quantity selection is one error opportunity and intentional interest purchases are excluded', () => {
   const good = fixture([add('milk', 1), add('milk', 1), { type: 'closeStation' }]);
-  const { validationGoals } = require('../src/personaValidationMetrics.cjs');
+  const { validationGoals } = require('../src/validation/personaValidationMetrics.cjs');
   assert.equal(selectionErrors(actorEvents(good.trace, good.audit), validationGoals(snapshot)).length, 0);
   const wrong = fixture([add('milk', 3), { type: 'viewCart' }, { type: 'removeProduct', productId: 'milk', quantity: 1 }]);
   assert.equal(selectionErrors(actorEvents(wrong.trace, wrong.audit), validationGoals(snapshot)).length, 1);
@@ -94,6 +94,6 @@ test('intentional interest additions of a goal product do not become goal errors
   const { trace, audit } = fixture(rows), m = extract(trace, snapshot, persona, audit);
   assert.equal(m.highLoadMismatchRate.value, 0);
   assert.equal(m.correctionRate.status, 'unexercised');
-  const { validationGoals } = require('../src/personaValidationMetrics.cjs');
+  const { validationGoals } = require('../src/validation/personaValidationMetrics.cjs');
   assert.equal(selectionErrors(actorEvents(trace, audit), validationGoals(snapshot)).length, 0);
 });

@@ -1,7 +1,7 @@
 'use strict';
 require('../runtime.cjs');
 const test = require('node:test'), assert = require('node:assert/strict'), fs = require('node:fs'), os = require('node:os'), path = require('node:path'), crypto = require('node:crypto');
-const { auditSnapshot } = require('../src/personaValidationOpportunity.cjs');
+const { auditSnapshot } = require('../src/validation/personaValidationOpportunity.cjs');
 const { buildSnapshots, writeSnapshotSet } = require('../scripts/build-validation-snapshots.cjs');
 const { createMarketSession } = require('../../frontend/src/game/marketSession.ts');
 const { createMarketReplaySnapshot, validateMarketReplaySnapshot } = require('../../frontend/src/game/marketReplayTrace.ts');
@@ -75,7 +75,7 @@ test('a three-goal low condition adds two ordinary goal transitions without chan
   assert.notEqual(revised.low.snapshotId, original.low.snapshotId);
   assert.equal(validateMarketReplaySnapshot(revised.low).valid, true);
   assert.equal(auditSnapshot(revised.low, { persona }).metrics.postSelectionListRate.evidence.goalCount, 3);
-  const { extract } = require('../src/personaValidationMetrics.cjs');
+  const { extract } = require('../src/validation/personaValidationMetrics.cjs');
   const sequentialSelections = snapshot => ({ steps: snapshot.config.objectives.flatMap((goal, index) => [
     { id: `add-${index}`, type: 'dragProduct', productId: goal.productId, quantity: 1, gesture: { outcome: 'drop' } },
     { id: `read-${index}`, type: 'readList' },

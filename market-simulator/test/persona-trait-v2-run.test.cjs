@@ -2,8 +2,8 @@
 require('../runtime.cjs');
 const test = require('node:test'), assert = require('node:assert/strict');
 const fs = require('node:fs'), os = require('node:os'), path = require('node:path');
-const run = require('../src/personaValidationRun.cjs');
-const { summarizeTraitFindings } = require('../src/personaTraitValidationRun.cjs');
+const run = require('../src/validation/personaValidationRun.cjs');
+const { summarizeTraitFindings } = require('../src/validation/personaTraitValidationRun.cjs');
 const { createMarketSession } = require('../../frontend/src/game/marketSession.ts');
 const { createMarketReplaySnapshot } = require('../../frontend/src/game/marketReplayTrace.ts');
 const spec = require('../validation/persona-trait-validation-spec-v2.json');
@@ -87,7 +87,7 @@ test('new spec retains every original metric and threshold and mixed first-play 
 
 const crypto = require('node:crypto');
 const { canonicalMarketReplayJson } = require('../../frontend/src/game/marketReplayTrace.ts');
-const { assertSpec } = require('../src/personaValidationSpec.cjs');
+const { assertSpec } = require('../src/validation/personaValidationSpec.cjs');
 const specV3 = require('../validation/persona-trait-validation-spec-v3.json');
 const digest = value => crypto.createHash('sha256').update(canonicalMarketReplayJson(value)).digest('hex');
 function writeFixtureTraces(prepared) {

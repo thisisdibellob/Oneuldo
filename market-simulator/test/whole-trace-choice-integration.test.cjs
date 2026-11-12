@@ -7,10 +7,10 @@ require('../runtime.cjs');
 const { createMarketSession } = require('../../frontend/src/game/marketSession.ts');
 const { createMarketReplaySnapshot } = require('../../frontend/src/game/marketReplayTrace.ts');
 const { getMarketStationApproachPoint } = require('../../frontend/src/game/marketEnvironment.ts');
-const { buildWholeTraceBundle } = require('../src/wholeTraceBundle.ts');
-const { wholeTraceChoiceFrame } = require('../src/wholeTraceChoices.ts');
-const { compileWholeTraceCandidate, WholeTraceCompileError } = require('../src/wholeTraceCompiler.ts');
-const { WholeTraceSession } = require('../src/wholeTraceSession.ts');
+const { buildWholeTraceBundle } = require('../src/wholeTrace/wholeTraceBundle.ts');
+const { wholeTraceChoiceFrame } = require('../src/wholeTrace/wholeTraceChoices.ts');
+const { compileWholeTraceCandidate, WholeTraceCompileError } = require('../src/wholeTrace/wholeTraceCompiler.ts');
+const { WholeTraceSession } = require('../src/wholeTrace/wholeTraceSession.ts');
 const { TraceGuard, validateTrace } = require('../src/traceValidation.ts');
 
 // These are authored transport fixtures, not native actor outputs or clinical samples.
@@ -258,8 +258,8 @@ test('v4 composition preserves all 24 known basis and 12 known trigger declarati
   assert.deepEqual(accepted.choiceResolution.declaredBasisCueRefs, explicit.basis);
   assert.deepEqual(accepted.choiceResolution.declaredTriggerCueRefs, explicit.triggers);
   // Defaults still represent the old wire bounds, rather than silently relaxing all callers.
-  const { validateWholeTraceBasis } = require('../src/wholeTraceKnowledge.ts');
-  const { validateWholeTraceActorState } = require('../src/wholeTraceActorState.ts');
+  const { validateWholeTraceBasis } = require('../src/wholeTrace/wholeTraceKnowledge.ts');
+  const { validateWholeTraceActorState } = require('../src/wholeTrace/wholeTraceActorState.ts');
   assert.equal(validateWholeTraceBasis(accepted.basis).valid, false);
   assert.equal(validateWholeTraceActorState(accepted.actorState).valid, false);
   assert.equal(result.acceptedActions, 3);

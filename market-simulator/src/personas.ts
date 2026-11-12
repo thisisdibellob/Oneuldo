@@ -9,7 +9,7 @@ const profiles = [original, cautious, quick] as Persona[];
 // Validation controls are deliberately outside the ordinary generation/learner registry.
 const validationProfiles = [control] as Persona[];
 export const VALIDATION_CONTROL_PERSONA_ID = control.id;
-const { assertValidPersona } = require('./personaTraitProfiles.cjs') as {
+const { assertValidPersona } = require('./validation/personaTraitProfiles.cjs') as {
   assertValidPersona: (value: unknown) => Persona;
 };
 const validationPersona = new AsyncLocalStorage<Persona>();

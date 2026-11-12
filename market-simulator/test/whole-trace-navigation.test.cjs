@@ -8,8 +8,8 @@ const { isMarketNavigationSegmentClear } = require('../../frontend/src/game/mark
 const { getWorldCameraFrame } = require('../../frontend/src/game/worldZoom.ts');
 const { getPersona } = require('../src/personas.ts');
 const { actorChoices } = require('../src/actorChoices.ts');
-const { buildWholeTraceBundle } = require('../src/wholeTraceBundle.ts');
-const { compileWholeTraceCandidate, WholeTraceCompileError } = require('../src/wholeTraceCompiler.ts');
+const { buildWholeTraceBundle } = require('../src/wholeTrace/wholeTraceBundle.ts');
+const { compileWholeTraceCandidate, WholeTraceCompileError } = require('../src/wholeTrace/wholeTraceCompiler.ts');
 const { TraceGuard, validateTrace } = require('../src/traceValidation.ts');
 
 // Portable reproduction of the world/presentation saved with both failed plans in

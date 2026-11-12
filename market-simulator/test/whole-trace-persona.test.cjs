@@ -4,7 +4,7 @@ const { createHash } = require('node:crypto');
 require('../runtime.cjs');
 const { listPersonas, getPersona } = require('../src/personas.ts');
 const { ACTOR_PERSONA_INSTRUCTIONS } = require('../src/actorInstructions.ts');
-const { buildWholeTracePersonaInput } = require('../src/wholeTracePersona.ts');
+const { buildWholeTracePersonaInput } = require('../src/wholeTrace/wholeTracePersona.ts');
 
 test('whole persona input retains every selected trait, strength and practiced strategy from all three original profiles', () => {
   const personas = listPersonas();

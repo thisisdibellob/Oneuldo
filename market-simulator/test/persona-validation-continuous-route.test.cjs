@@ -1,8 +1,8 @@
 'use strict';
 require('../runtime.cjs');
 const test = require('node:test'), assert = require('node:assert/strict');
-const { extractUniversal, actorEvents } = require('../src/personaValidationMetrics.cjs');
-const { extractFirstPlay } = require('../src/personaValidationFirstPlay.cjs');
+const { extractUniversal, actorEvents } = require('../src/validation/personaValidationMetrics.cjs');
+const { extractFirstPlay } = require('../src/validation/personaValidationFirstPlay.cjs');
 const snapshot = { config: { objectives: [] } };
 const point = n => `P${n.toString(16).padStart(64, '0')}`;
 const source = n => ({ location: point(n), navigationStateId: `nav-v2-${n.toString(16).padStart(64, '0')}` });

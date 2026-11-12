@@ -3,9 +3,9 @@ require('../runtime.cjs');
 const test = require('node:test'), assert = require('node:assert/strict');
 const fs = require('node:fs'), os = require('node:os'), path = require('node:path');
 const { createService, definitions } = require('../server.cjs');
-const run = require('../src/personaValidationRun.cjs');
-const { matchedContrasts } = require('../src/personaTraitValidationRun.cjs');
-const { resolveProfiles } = require('../src/personaTraitProfiles.cjs');
+const run = require('../src/validation/personaValidationRun.cjs');
+const { matchedContrasts } = require('../src/validation/personaTraitValidationRun.cjs');
+const { resolveProfiles } = require('../src/validation/personaTraitProfiles.cjs');
 const { createMarketSession } = require('../../frontend/src/game/marketSession.ts');
 const { createMarketReplaySnapshot } = require('../../frontend/src/game/marketReplayTrace.ts');
 const base = 'neutral-adult-control';
@@ -156,7 +156,7 @@ test('canonical subsets default to traits, historical four-person requests remai
   assert.equal(current.profiles.length, 3); assert.equal(current.validationMode, 'traits');
 });
 test('authored delay alone never supports a trait and unexercised behavior remains partial', () => {
-  const { summarizeTraitFindings } = require('../src/personaTraitValidationRun.cjs');
+  const { summarizeTraitFindings } = require('../src/validation/personaTraitValidationRun.cjs');
   const behavior = status => ({ status, evidenceType: 'observed-action' });
   const timing = status => ({ status, evidenceType: 'authored-timing' });
   const timingOnly = summarizeTraitFindings([behavior('unexercised'), timing('pass')]);

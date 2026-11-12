@@ -1,8 +1,8 @@
 'use strict';
 require('../runtime.cjs');
 const test = require('node:test'), assert = require('node:assert/strict');
-const { actorEvents, extract } = require('../src/personaValidationMetrics.cjs');
-const { flagsForTrace, collectionFlags, collectionDiagnostics } = require('../src/personaValidationFlags.cjs');
+const { actorEvents, extract } = require('../src/validation/personaValidationMetrics.cjs');
+const { flagsForTrace, collectionFlags, collectionDiagnostics } = require('../src/validation/personaValidationFlags.cjs');
 const persona = require('../personas/neutral-adult-control.json');
 const step = (id, type, extra = {}) => ({ id, type, reactionDelayMs: 100, reason: 'choice', ...extra });
 const add = (id, productId, quantity = 1) => step(id, 'dragProduct', { productId, quantity, gesture: { outcome: 'drop' } });

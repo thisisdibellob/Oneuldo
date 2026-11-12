@@ -1,7 +1,7 @@
 'use strict';
 require('../runtime.cjs');
 const test = require('node:test'), assert = require('node:assert/strict');
-const { extractSequenceMetrics, summarizeSequenceMetrics } = require('../src/personaValidationSequence.cjs');
+const { extractSequenceMetrics, summarizeSequenceMetrics } = require('../src/validation/personaValidationSequence.cjs');
 const snapshot = { config: { objectives: [{ id: 'milk-goal', productId: 'milk', quantity: 2 }] } };
 const add = (productId, quantity = 1, extra = {}) => ({ type: 'dragProduct', productId, quantity, gesture: { outcome: 'drop' }, ...extra });
 function measure(rows, target = snapshot) {

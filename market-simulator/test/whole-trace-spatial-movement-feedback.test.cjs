@@ -3,7 +3,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 require('../runtime.cjs');
 const { createWholeTraceMovementFeedback, wholeTraceHasAnchorMovementFeedback, validWholeTraceMovementFeedback,
-  WHOLE_TRACE_ANCHOR_CAPACITY_MOVEMENT_FEEDBACK_VERSION } = require('../src/wholeTraceMovementFeedback.ts');
+  WHOLE_TRACE_ANCHOR_CAPACITY_MOVEMENT_FEEDBACK_VERSION } = require('../src/wholeTrace/wholeTraceMovementFeedback.ts');
 const { FEEDBACK_EXPERIENCE_LIMITS } = require('../src/feedbackExperience.ts');
 
 const ids = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];

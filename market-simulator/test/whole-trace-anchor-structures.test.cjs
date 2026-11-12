@@ -7,13 +7,13 @@ const { buildSnapshots } = require('../scripts/build-validation-snapshots.cjs');
 const { createMarketSession } = require('../../frontend/src/game/marketSession.ts');
 const { createMarketReplaySnapshot, validateMarketReplayTrace } = require('../../frontend/src/game/marketReplayTrace.ts');
 const { visibleStations, visibleUnlabelledShelfBodies } = require('../../frontend/src/game/marketReplayPerception.ts');
-const { buildWholeTraceBundle, wholeTraceInputHash } = require('../src/wholeTraceBundle.ts');
-const { buildWholeTraceAuthoringGuide } = require('../src/wholeTraceAuthoring.ts');
-const { createWholeTraceExecutionAuthoringCursor } = require('../src/wholeTraceExecutionAuthoring.ts');
-const { compileWholeTraceCandidate, validateWholeTracePrefix } = require('../src/wholeTraceCompiler.ts');
-const { WholeTraceSession } = require('../src/wholeTraceSession.ts');
+const { buildWholeTraceBundle, wholeTraceInputHash } = require('../src/wholeTrace/wholeTraceBundle.ts');
+const { buildWholeTraceAuthoringGuide } = require('../src/wholeTrace/wholeTraceAuthoring.ts');
+const { createWholeTraceExecutionAuthoringCursor } = require('../src/wholeTrace/wholeTraceExecutionAuthoring.ts');
+const { compileWholeTraceCandidate, validateWholeTracePrefix } = require('../src/wholeTrace/wholeTraceCompiler.ts');
+const { WholeTraceSession } = require('../src/wholeTrace/wholeTraceSession.ts');
 const { TraceGuard, validateTrace } = require('../src/traceValidation.ts');
-const { WholeTraceKnowledgeLedger } = require('../src/wholeTraceKnowledge.ts');
+const { WholeTraceKnowledgeLedger } = require('../src/wholeTrace/wholeTraceKnowledge.ts');
 const VERSION = 'anchor-visible-structures-v1';
 
 // Reproduces the r4 W017 geometry, without reading or mutating saved pilot data.

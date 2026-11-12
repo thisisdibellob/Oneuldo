@@ -5,14 +5,14 @@ const fs = require('node:fs'), os = require('node:os'), path = require('node:pat
 const { createHash } = require('node:crypto');
 require('../runtime.cjs');
 const saved = require('./fixtures/whole-trace-anchor-feedback-r5.json');
-const { resolveProfiles } = require('../src/personaTraitProfiles.cjs');
+const { resolveProfiles } = require('../src/validation/personaTraitProfiles.cjs');
 const { withValidationPersona } = require('../src/personas.ts');
-const { buildWholeTraceBundle, wholeTraceInputHash } = require('../src/wholeTraceBundle.ts');
-const { compileWholeTraceCandidate, validateWholeTracePrefix } = require('../src/wholeTraceCompiler.ts');
-const { createWholeTraceExecutionAuthoringCursor } = require('../src/wholeTraceExecutionAuthoring.ts');
-const { createWholeTraceMovementFeedback } = require('../src/wholeTraceMovementFeedback.ts');
+const { buildWholeTraceBundle, wholeTraceInputHash } = require('../src/wholeTrace/wholeTraceBundle.ts');
+const { compileWholeTraceCandidate, validateWholeTracePrefix } = require('../src/wholeTrace/wholeTraceCompiler.ts');
+const { createWholeTraceExecutionAuthoringCursor } = require('../src/wholeTrace/wholeTraceExecutionAuthoring.ts');
+const { createWholeTraceMovementFeedback } = require('../src/wholeTrace/wholeTraceMovementFeedback.ts');
 const { FEEDBACK_EXPERIENCE_LIMITS } = require('../src/feedbackExperience.ts');
-const { WholeTraceSession } = require('../src/wholeTraceSession.ts');
+const { WholeTraceSession } = require('../src/wholeTrace/wholeTraceSession.ts');
 const { TraceGuard, validateTrace } = require('../src/traceValidation.ts');
 const VERSION = 'recent-movement-anchor-v1';
 const CAPACITY_VERSION = 'recent-movement-anchor-capacity-v1';
@@ -103,7 +103,7 @@ test('r5 saved decisions recompile and replay unchanged with opt-in feedback and
   assert.deepEqual(bundle.initialChoiceFrame, plainBundle.initialChoiceFrame);
   assert.ok(bundle.initialChoiceFrame.availableChoices.every(choice => !choice.recentVisit && !/최근에/.test(choice.label)));
   assert.match(bundle.actionContract.movementFeedback, /24/);
-  for (const source of ['src/wholeTraceMovementFeedback.ts', 'src/feedbackExperience.ts', 'src/feedbackActor.ts'])
+  for (const source of ['src/wholeTrace/wholeTraceMovementFeedback.ts', 'src/feedbackExperience.ts', 'src/feedbackActor.ts'])
     assert.ok(bundle.sourceFiles.some(file => file.path === source));
   const result = await compileWholeTraceCandidate(settings, bundle, candidate, 1, row => checkpoints.push(row));
   const off = await compileWholeTraceCandidate(plain, plainBundle, candidate);

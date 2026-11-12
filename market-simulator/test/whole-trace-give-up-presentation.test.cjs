@@ -3,9 +3,9 @@ const assert = require('node:assert/strict');
 require('../runtime.cjs');
 const { createMarketSession } = require('../../frontend/src/game/marketSession.ts');
 const { createMarketReplaySnapshot } = require('../../frontend/src/game/marketReplayTrace.ts');
-const { buildWholeTraceBundle } = require('../src/wholeTraceBundle.ts');
-const { createWholeTraceSourceAuthoringCursor } = require('../src/wholeTraceAuthoringSource.ts');
-const { wholeTraceOrderChoiceIds } = require('../src/wholeTraceContracts.ts');
+const { buildWholeTraceBundle } = require('../src/wholeTrace/wholeTraceBundle.ts');
+const { createWholeTraceSourceAuthoringCursor } = require('../src/wholeTrace/wholeTraceAuthoringSource.ts');
+const { wholeTraceOrderChoiceIds } = require('../src/wholeTrace/wholeTraceContracts.ts');
 
 // Optional give-up-last-v1 / walk-while-unseen-v1 presentation options. Fixture only; no actor generation.
 const seed = 'give-up-presentation-v1';

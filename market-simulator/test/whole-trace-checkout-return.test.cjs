@@ -11,8 +11,8 @@ const { wholeReplayWaypointCatalog, visibleAnchors, resolveReplayAnchor } = requ
 const { isMarketNavigationSegmentClear } = require('../../frontend/src/game/marketNavigation.ts');
 const { createMarketSession } = require('../../frontend/src/game/marketSession.ts');
 const { createMarketReplaySnapshot } = require('../../frontend/src/game/marketReplayTrace.ts');
-const { buildWholeTraceBundle } = require('../src/wholeTraceBundle.ts');
-const { wholeTraceChoiceFrame } = require('../src/wholeTraceChoices.ts');
+const { buildWholeTraceBundle } = require('../src/wholeTrace/wholeTraceBundle.ts');
+const { wholeTraceChoiceFrame } = require('../src/wholeTrace/wholeTraceChoices.ts');
 const { TraceGuard } = require('../src/traceValidation.ts');
 
 // Regenerate the geometry: no saved output, actor candidate, or trace is edited.

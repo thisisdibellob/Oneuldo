@@ -2,7 +2,7 @@ const test = require('node:test'), assert = require('node:assert/strict');
 const fs = require('node:fs'), os = require('node:os'), path = require('node:path');
 const { createHash } = require('node:crypto');
 require('../runtime.cjs');
-const { WholeTraceSession } = require('../src/wholeTraceSession.ts');
+const { WholeTraceSession } = require('../src/wholeTrace/wholeTraceSession.ts');
 const { createMarketSession } = require('../../frontend/src/game/marketSession.ts');
 const { createMarketReplaySnapshot, canonicalMarketReplayJson } = require('../../frontend/src/game/marketReplayTrace.ts');
 function fixture(t, extra = {}) {

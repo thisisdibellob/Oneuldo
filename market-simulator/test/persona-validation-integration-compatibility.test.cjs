@@ -5,7 +5,7 @@ const { createMarketSession } = require('../../frontend/src/game/marketSession.t
 const { createMarketReplaySnapshot } = require('../../frontend/src/game/marketReplayTrace.ts');
 const { DEFAULT_REPLAY_PRESENTATION, visibleAnchors, wholeReplayWaypointCatalog, wholeReplayWaypointGraph } = require('../../frontend/src/game/marketReplayPerception.ts');
 const { TraceGuard } = require('../src/traceValidation.ts');
-const { wholeTraceChoiceFrame } = require('../src/wholeTraceChoices.ts');
+const { wholeTraceChoiceFrame } = require('../src/wholeTrace/wholeTraceChoices.ts');
 const step = (type, extra = {}) => ({ id: type, type, reactionDelayMs: 1, timeoutMs: 120000, reason: 'compatibility fixture', ...extra });
 
 test('requester panel is explicitly unsupported by the imported whole-trace contract', () => {

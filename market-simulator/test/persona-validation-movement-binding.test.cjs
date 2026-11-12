@@ -2,9 +2,9 @@
 require('../runtime.cjs');
 const test = require('node:test'), assert = require('node:assert/strict');
 const fs = require('node:fs'), os = require('node:os'), path = require('node:path');
-const run = require('../src/personaValidationRun.cjs');
-const readiness = require('../src/personaValidationReadiness.cjs');
-const { movementOptions, assertMovementBinding, assertMovementManifest, assertMovementEvidence } = require('../src/personaValidationMovement.cjs');
+const run = require('../src/validation/personaValidationRun.cjs');
+const readiness = require('../src/validation/personaValidationReadiness.cjs');
+const { movementOptions, assertMovementBinding, assertMovementManifest, assertMovementEvidence } = require('../src/validation/personaValidationMovement.cjs');
 const { createMarketSession } = require('../../frontend/src/game/marketSession.ts');
 const { createMarketReplaySnapshot } = require('../../frontend/src/game/marketReplayTrace.ts');
 const ids = ['mild-intellectual-disability-adult', 'careful-checker', 'quick-decider', 'neutral-adult-control'];

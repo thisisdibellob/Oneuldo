@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 require('../runtime.cjs');
-const { WholeTraceKnowledgeLedger, validateWholeTraceBasis, wholeTraceControlCueRefs } = require('../src/wholeTraceKnowledge.ts');
+const { WholeTraceKnowledgeLedger, validateWholeTraceBasis, wholeTraceControlCueRefs } = require('../src/wholeTrace/wholeTraceKnowledge.ts');
 const { TraceGuard } = require('../src/traceValidation.ts');
 const { getPersona } = require('../src/personas.ts');
 const { createMarketSession } = require('../../frontend/src/game/marketSession.ts');

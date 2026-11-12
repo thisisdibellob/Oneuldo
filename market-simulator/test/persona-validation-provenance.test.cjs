@@ -6,7 +6,7 @@ const { spawnSync } = require('node:child_process');
 const { createMarketSession } = require('../../frontend/src/game/marketSession.ts');
 const { createMarketReplaySnapshot } = require('../../frontend/src/game/marketReplayTrace.ts');
 const { generateTrace } = require('../src/simulator.ts');
-const run = require('../src/personaValidationRun.cjs');
+const run = require('../src/validation/personaValidationRun.cjs');
 const { createService } = require('../server.cjs');
 const ids = ['mild-intellectual-disability-adult', 'careful-checker', 'quick-decider', 'neutral-adult-control'];
 const read = p => JSON.parse(fs.readFileSync(p, 'utf8'));

@@ -5,9 +5,9 @@ const { createMarketSession } = require('../../frontend/src/game/marketSession.t
 const { createMarketReplaySnapshot, isMarketReplaySystemCompletionStep } = require('../../frontend/src/game/marketReplayTrace.ts');
 const { getMarketStationApproachPoint } = require('../../frontend/src/game/marketEnvironment.ts');
 const { getReplayShelfPage } = require('../../frontend/src/game/marketReplayPerception.ts');
-const { buildWholeTraceBundle } = require('../src/wholeTraceBundle.ts');
-const { compileWholeTraceCandidate, WholeTraceCompileError } = require('../src/wholeTraceCompiler.ts');
-const { validateWholeTraceCandidate } = require('../src/wholeTraceContracts.ts');
+const { buildWholeTraceBundle } = require('../src/wholeTrace/wholeTraceBundle.ts');
+const { compileWholeTraceCandidate, WholeTraceCompileError } = require('../src/wholeTrace/wholeTraceCompiler.ts');
+const { validateWholeTraceCandidate } = require('../src/wholeTrace/wholeTraceContracts.ts');
 const { TraceGuard, validateTrace } = require('../src/traceValidation.ts');
 const { getPersona } = require('../src/personas.ts');
 function fixture(personaId = 'mild-intellectual-disability-adult', near, cashierCount = 2) {

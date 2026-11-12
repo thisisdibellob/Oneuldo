@@ -2,8 +2,8 @@
 require('../runtime.cjs');
 const test = require('node:test'), assert = require('node:assert/strict');
 const fs = require('node:fs'), os = require('node:os'), path = require('node:path');
-const run = require('../src/personaValidationRun.cjs');
-const { matchedContrasts, baselineContrasts } = require('../src/personaTraitValidationRun.cjs');
+const run = require('../src/validation/personaValidationRun.cjs');
+const { matchedContrasts, baselineContrasts } = require('../src/validation/personaTraitValidationRun.cjs');
 const { createMarketSession } = require('../../frontend/src/game/marketSession.ts');
 const { createMarketReplaySnapshot } = require('../../frontend/src/game/marketReplayTrace.ts');
 const read = file => JSON.parse(fs.readFileSync(file, 'utf8'));

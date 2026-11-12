@@ -5,7 +5,7 @@ const { getPersona } = require('../src/personas.ts');
 const {
   buildWholeTraceCognitionProfile, WholeTraceCognitionEngine,
   validateWholeTraceMemoryUses, validateWholeTraceMemoryUpdate, WHOLE_TRACE_COGNITION_INSTRUCTIONS,
-} = require('../src/wholeTraceCognition.ts');
+} = require('../src/wholeTrace/wholeTraceCognition.ts');
 
 const goal = (id = 'objective-1', quantity = 1, specification) => ({ id, label: '흰 우유', quantity, match: 'exact',
   ...(specification ? { specification } : {}) });

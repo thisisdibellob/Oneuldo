@@ -1,7 +1,7 @@
 'use strict';
 require('../runtime.cjs').register();
 const test=require('node:test'); const assert=require('node:assert/strict');
-const {ActorPlanSession,ACTOR_PLAN_MODEL}=require('../src/actorPlanSession.ts');
+const {ActorPlanSession,ACTOR_PLAN_MODEL}=require('../src/legacy/actorPlanSession.ts');
 const {TraceGuard}=require('../src/traceValidation.ts'); const {createMarketSession}=require('../../frontend/src/game/marketSession.ts');
 const {createMarketReplaySnapshot}=require('../../frontend/src/game/marketReplayTrace.ts'); const {getPersona}=require('../src/personas.ts');
 function setup(){const snapshot=createMarketReplaySnapshot(createMarketSession({seed:'plan-contract'}));const guard=new TraceGuard(snapshot);return {snapshot,guard};}

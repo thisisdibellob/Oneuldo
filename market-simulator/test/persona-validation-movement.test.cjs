@@ -11,9 +11,9 @@ const { buildSnapshots } = require('../scripts/build-validation-snapshots.cjs');
 const { canonicalMarketReplayJson, marketReplayTraceId, validateMarketReplayTrace } = require('../../frontend/src/game/marketReplayTrace.ts');
 const { REPLAY_ARRIVAL_MARGIN } = require('../../frontend/src/game/marketReplayPerception.ts');
 const { TraceGuard } = require('../src/traceValidation.ts');
-const { wholeTraceContinuousFrame } = require('../src/wholeTraceMovement.ts');
+const { wholeTraceContinuousFrame } = require('../src/wholeTrace/wholeTraceMovement.ts');
 const { getWholeTracePersona } = require('../src/personas.ts');
-const { movementOptions, assertMovementEvidence, movementMarkdown } = require('../src/personaValidationMovement.cjs');
+const { movementOptions, assertMovementEvidence, movementMarkdown } = require('../src/validation/personaValidationMovement.cjs');
 
 // Hand-authored contract fixtures only: these never invoke an AI actor or use
 // pilot directories, and must not be treated as persona behavior evidence.

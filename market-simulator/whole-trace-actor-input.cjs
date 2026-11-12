@@ -103,12 +103,42 @@ function buildActorInput(prepareResponse) {
 
 const sha256 = text => crypto.createHash('sha256').update(text).digest('hex');
 
-function writeActorInput(prepareResponseFile, outputFile) {
+// Fixed actor instruction templates. A new wording is a new file and id; an
+// existing template is never edited, so recorded SHAs keep identifying it.
+const INSTRUCTION_TEMPLATES = Object.freeze({
+  'authoring-v1': path.join(__dirname, 'actor-instructions', 'authoring-v1.txt'),
+});
+const DEFAULT_INSTRUCTION_TEMPLATE = 'authoring-v1';
+const MAILBOX_CLI = path.join(__dirname, 'whole-trace-mailbox.cjs');
+
+function renderActorInstructions(templateId, slotDirectory) {
+  const templateFile = INSTRUCTION_TEMPLATES[templateId];
+  if (!templateFile) throw new Error(`Unknown actor instruction template: ${templateId}`);
+  if (!path.isAbsolute(slotDirectory)) throw new Error('slotDirectory must be absolute');
+  const template = fs.readFileSync(templateFile, 'utf8');
+  const text = template.split('__SLOT_DIRECTORY__').join(slotDirectory).split('__MAILBOX_CLI__').join(MAILBOX_CLI);
+  if (/__[A-Z_]+__/.test(text)) throw new Error(`Unfilled placeholder remains in ${templateId}`);
+  return { templateId, templateFile, templateSha256: sha256(template), text };
+}
+
+function writeActorInput(prepareResponseFile, outputFile, options = {}) {
   const sourceText = fs.readFileSync(prepareResponseFile, 'utf8');
   const actorInput = buildActorInput(JSON.parse(sourceText));
   const outputText = JSON.stringify(actorInput, null, 2) + '\n';
-  fs.mkdirSync(path.dirname(path.resolve(outputFile)), { recursive: true });
+  const slotDirectory = path.dirname(path.resolve(outputFile));
+  let instructions = null;
+  if (options.instructions !== false) {
+    // The template addresses the owner as <slot>/owner and the input as
+    // <slot>/actor-input.json, so refuse layouts it would describe wrongly.
+    if (path.basename(outputFile) !== 'actor-input.json') throw new Error('actor input must be named actor-input.json for the instruction template');
+    if (!fs.existsSync(path.join(slotDirectory, 'owner'))) throw new Error(`Owner directory not found at ${path.join(slotDirectory, 'owner')}`);
+    instructions = renderActorInstructions(options.template ?? DEFAULT_INSTRUCTION_TEMPLATE, slotDirectory);
+    instructions.file = path.join(slotDirectory, 'actor-instructions.txt');
+    if (fs.existsSync(instructions.file)) throw new Error(`Refusing to overwrite ${instructions.file}`);
+  }
+  fs.mkdirSync(slotDirectory, { recursive: true });
   fs.writeFileSync(outputFile, outputText, { flag: 'wx' });
+  if (instructions) fs.writeFileSync(instructions.file, instructions.text, { flag: 'wx' });
   return {
     version: VERSION,
     requestId: actorInput.requestId,
@@ -121,18 +151,34 @@ function writeActorInput(prepareResponseFile, outputFile) {
     omittedBundleKeys: actorInput.actorInputProjection.omittedBundleKeys,
     omittedTopLevelKeys: actorInput.actorInputProjection.omittedTopLevelKeys,
     replacements: actorInput.actorInputProjection.replacements,
+    actorInstructions: instructions && {
+      templateId: instructions.templateId,
+      templateFile: instructions.templateFile,
+      templateSha256: instructions.templateSha256,
+      file: instructions.file,
+      sha256: sha256(instructions.text),
+    },
   };
 }
 
-module.exports = { VERSION, OMITTED_BUNDLE_KEYS, OMITTED_TOP_LEVEL_KEYS, REPLACEMENTS, buildActorInput, writeActorInput };
+module.exports = { VERSION, OMITTED_BUNDLE_KEYS, OMITTED_TOP_LEVEL_KEYS, REPLACEMENTS, INSTRUCTION_TEMPLATES,
+  DEFAULT_INSTRUCTION_TEMPLATE, buildActorInput, renderActorInstructions, writeActorInput };
 
 if (require.main === module) {
-  const [input, output] = process.argv.slice(2);
+  const args = process.argv.slice(2);
+  const options = {};
+  const positional = [];
+  for (let index = 0; index < args.length; index += 1) {
+    if (args[index] === '--template') options.template = args[++index];
+    else if (args[index] === '--no-instructions') options.instructions = false;
+    else positional.push(args[index]);
+  }
+  const [input, output] = positional;
   if (!input || !output) {
-    process.stderr.write('Usage: node market-simulator/whole-trace-actor-input.cjs <owner/prepare-response.json> <actor-input.json>\nWrites a new file (never overwrites) and prints a provenance summary.\n');
+    process.stderr.write('Usage: node market-simulator/whole-trace-actor-input.cjs <slot>/owner/prepare-response.json <slot>/actor-input.json [--template authoring-v1] [--no-instructions]\nWrites <slot>/actor-input.json and <slot>/actor-instructions.txt (never overwrites) and prints a provenance summary.\n');
     process.exitCode = 2;
   } else {
-    try { process.stdout.write(JSON.stringify(writeActorInput(input, output), null, 2) + '\n'); }
+    try { process.stdout.write(JSON.stringify(writeActorInput(input, output, options), null, 2) + '\n'); }
     catch (error) { process.stderr.write(`${error.message}\n`); process.exitCode = 1; }
   }
 }

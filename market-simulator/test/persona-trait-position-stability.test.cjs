@@ -2,8 +2,8 @@
 require('../runtime.cjs');
 const test = require('node:test'), assert = require('node:assert/strict');
 const fs = require('node:fs'), os = require('node:os'), path = require('node:path'), crypto = require('node:crypto');
-const run = require('../src/personaValidationRun.cjs');
-const { splitOpportunities, analyzePosition, INTERPRETATION } = require('../src/personaValidationPosition.cjs');
+const run = require('../src/validation/personaValidationRun.cjs');
+const { splitOpportunities, analyzePosition, INTERPRETATION } = require('../src/validation/personaValidationPosition.cjs');
 const { createMarketSession } = require('../../frontend/src/game/marketSession.ts');
 const { createMarketReplaySnapshot, canonicalMarketReplayJson } = require('../../frontend/src/game/marketReplayTrace.ts');
 const specV2 = require('../validation/persona-trait-validation-spec-v2.json');

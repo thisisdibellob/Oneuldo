@@ -12,7 +12,7 @@ import { createFeedbackLlmPolicy } from './feedbackLlmPolicy';
 import { buildFeedbackActorFrame, feedbackChoiceMatchesDecision, emptyFeedbackBeliefMemory, validateFeedbackBeliefMemory, carryFeedbackBeliefMemory, isFeedbackActorPolicy, isExperienceFeedbackPolicy, isStructuredFeedbackPolicy, isQuantityBeliefFeedbackPolicy, isResultReflectionFeedbackPolicy, isNoGiveUpFeedbackPolicy, isMovementNoteFeedbackPolicy, isPassageMarkerFeedbackPolicy, isProgressNoteFeedbackPolicy, projectFeedbackObservation } from './feedbackActor';
 import { FeedbackMovementPolicy } from './feedbackMovementPolicy';
 import { FeedbackExperience } from './feedbackExperience';
-import { wholeTraceHasAnchorMovementFeedback } from './wholeTraceMovementFeedback';
+import { wholeTraceHasAnchorMovementFeedback } from './wholeTrace/wholeTraceMovementFeedback';
 import type { ActorObservation, AttentionExperience, Decision, Persona, TraceEntry, TraceOptions } from './types';
 
 type StepIntent = MarketReplayStep extends infer S ? S extends MarketReplayStep ? Omit<S, 'id' | 'reactionDelayMs' | 'reason' | 'timeoutMs'> : never : never;

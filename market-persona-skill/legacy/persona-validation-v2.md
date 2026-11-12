@@ -177,11 +177,11 @@ A를 채점한 후 `prepare_blind_review({... ,"panel":"B"})` → 같은 자기 
 
 | 구분 | 파일 | 역할 |
 | --- | --- | --- |
-| 지표 추출 | [`market-simulator/src/personaValidationMetrics.cjs`](../../market-simulator/src/personaValidationMetrics.cjs) | 관찰·배우 결정·trace 연결, 조건별 분모와 값, 공유 행동 집계 |
-| 통계 | [`market-simulator/src/personaValidationStatistics.cjs`](../../market-simulator/src/personaValidationStatistics.cjs) | Cliff's delta, 재현 가능한 부트스트랩, 판정, 이항 채점·혼동 행렬, 최근접 중심 교차 확인 |
-| 과장 검사 | [`market-simulator/src/personaValidationFlags.cjs`](../../market-simulator/src/personaValidationFlags.cjs) | trace 플래그, 조건별 집합 위반과 경로·step 근거 |
-| 블라인드 묶음 | [`market-simulator/src/personaValidationBlind.cjs`](../../market-simulator/src/personaValidationBlind.cjs) | A/B 익명화, 잔여 식별자 검사, 공개 설명 분리와 순서 섞기 |
-| run 저장·보고 | [`market-simulator/src/personaValidationRun.cjs`](../../market-simulator/src/personaValidationRun.cjs) | 매니페스트·출처·버전 검사, 측정·판별 저장, JSON·한국어 보고서 |
+| 지표 추출 | [`market-simulator/src/validation/personaValidationMetrics.cjs`](../../market-simulator/src/validation/personaValidationMetrics.cjs) | 관찰·배우 결정·trace 연결, 조건별 분모와 값, 공유 행동 집계 |
+| 통계 | [`market-simulator/src/validation/personaValidationStatistics.cjs`](../../market-simulator/src/validation/personaValidationStatistics.cjs) | Cliff's delta, 재현 가능한 부트스트랩, 판정, 이항 채점·혼동 행렬, 최근접 중심 교차 확인 |
+| 과장 검사 | [`market-simulator/src/validation/personaValidationFlags.cjs`](../../market-simulator/src/validation/personaValidationFlags.cjs) | trace 플래그, 조건별 집합 위반과 경로·step 근거 |
+| 블라인드 묶음 | [`market-simulator/src/validation/personaValidationBlind.cjs`](../../market-simulator/src/validation/personaValidationBlind.cjs) | A/B 익명화, 잔여 식별자 검사, 공개 설명 분리와 순서 섞기 |
+| run 저장·보고 | [`market-simulator/src/validation/personaValidationRun.cjs`](../../market-simulator/src/validation/personaValidationRun.cjs) | 매니페스트·출처·버전 검사, 측정·판별 저장, JSON·한국어 보고서 |
 | 명세 | [`market-simulator/validation/persona-validation-spec.json`](../../market-simulator/validation/persona-validation-spec.json) | 15개 지표와 특성 연결, 조건·방향·효과 기준·과장 기준·인물 간 순서 |
 | 대조군 | [`market-simulator/personas/neutral-adult-control.json`](../../market-simulator/personas/neutral-adult-control.json), [prompt 사본](../../market-simulator/personas/neutral-adult-control.md), [`src/personas.ts`](../../market-simulator/src/personas.ts), [`personas/audit.md`](../../market-simulator/personas/audit.md) | 검증 전용 인물, 일반 목록·학습 실험 격리, 설계값과 한계 |
 | MCP·CLI | [`market-simulator/server.cjs`](../../market-simulator/server.cjs), [`cli.cjs`](../../market-simulator/cli.cjs) | 기존 서버의 검증 도구 5개와 동일 interactive 호출 경로 |

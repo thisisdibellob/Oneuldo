@@ -14,12 +14,12 @@
 - 페르소나 성향 검증은 contextHash가 같고 성향 하나만 다른 프로필 쌍을, 같은 조건(low/high)·seed끼리 짝지어 비교한다.
   주 판정은 Cliff's delta, |delta| ≥ 0.33, 짝 부트스트랩 95% CI의 0 제외, 유효 쌍 8 이상이다.
 - 관련 파일:
-  - src/personaTraitProfiles.cjs — 프로필 해석(resolveProfiles), 프롬프트 생성(customPersona), 맥락 분리(buildSeparatedContext)
-  - src/personaTraitValidationRun.cjs — prepare / measure / blind / report, matchedContrasts, groups 집계
-  - src/personaValidationMetrics.cjs — trace별 지표(extract, extractUniversal의 put())
-  - src/personaValidationAnalysis.cjs — 설명용 보조 분석(analyze, supplementaryMarkdown)
-  - src/personaValidationSpec.cjs — assertSpec: manifest.specHash로 명세 후보를 고른다
-  - src/personaValidationBlind.cjs — buildTraits, assertAnonymous
+  - src/validation/personaTraitProfiles.cjs — 프로필 해석(resolveProfiles), 프롬프트 생성(customPersona), 맥락 분리(buildSeparatedContext)
+  - src/validation/personaTraitValidationRun.cjs — prepare / measure / blind / report, matchedContrasts, groups 집계
+  - src/validation/personaValidationMetrics.cjs — trace별 지표(extract, extractUniversal의 put())
+  - src/validation/personaValidationAnalysis.cjs — 설명용 보조 분석(analyze, supplementaryMarkdown)
+  - src/validation/personaValidationSpec.cjs — assertSpec: manifest.specHash로 명세 후보를 고른다
+  - src/validation/personaValidationBlind.cjs — buildTraits, assertAnonymous
   - validation/persona-trait-validation-spec-v2.json — 현재 명세
   - server.cjs — MCP 도구 inputSchema (prepare_persona_validation의 profiles 스키마가 인라인으로 있음)
   - market-persona-skill/references/persona-validation.md — 검증 절차 문서
@@ -120,7 +120,7 @@
 
 목표: 기본 맥락은 같고 성향 지침 문장만 없는 프로필을 만들 수 있게 한다. 이것은 다섯 성향을 medium으로 둔 neutral-adult-control과 다른 조건이다.
 
-1. src/personaTraitProfiles.cjs
+1. src/validation/personaTraitProfiles.cjs
    - resolveProfiles의 사용자 정의 프로필 입력에 traitMode를 허용한다. 값은 "omitted"만 허용한다.
      traitMode와 presetId 또는 traits를 같이 주면 거절한다(fail 메시지로 이유 명시). v1 카탈로그에서는 거절한다.
    - customPersona에서 traitMode가 omitted이면:
@@ -132,13 +132,13 @@
      - traitProfile에 traitMode:'omitted', traits:null을 기록한다. contextHash는 buildSeparatedContext(base) 그대로라 성향 프로필과 같아야 한다.
      - 버전은 기존과 같이 전달 내용 hash로 만든다(자동으로 달라진다).
    - resolveProfiles 반환값의 traits는 null로 둔다. 이 null을 받는 모든 호출부를 찾아 처리한다.
-2. src/personaTraitValidationRun.cjs
+2. src/validation/personaTraitValidationRun.cjs
    - matchedContrasts: traits가 null인 프로필을 건너뛴다.
    - 새 함수 baselineContrasts(profiles): 기준 프로필마다 같은 contextHash의 성향 프로필 목록을 짝으로 만든다
      ({id, baselineProfileId, profileId, contextHash, traits}).
    - measure의 groups 집계, summarizeFlags, perTrace 출력, refresh/profiles 목록에서 traits:null이 오류 없이 처리되게 한다.
      groups(성향 수준별 집계)에는 기준 프로필을 넣지 않는다.
-   - readiness(src/personaValidationReadiness.cjs): 기준 프로필 슬롯도 required에 포함하고 missingSlots로 생성 요청을 반환한다.
+   - readiness(src/validation/personaValidationReadiness.cjs): 기준 프로필 슬롯도 required에 포함하고 missingSlots로 생성 요청을 반환한다.
      기준 프로필을 대조군(control)이나 referenceControls로 취급하지 않는다.
 3. 블라인드: personaValidationBlind.cjs의 buildTraits에서 기준 프로필 trace를 묶음과 정답 키에서 제외하고,
    prepareBlind 응답과 보고서에 excludedBaselineTraces 수를 표시한다. assertAnonymous가 계속 통과해야 한다.
@@ -165,7 +165,7 @@
 
 목표: 각 성향 지표에서 모델 기본값(기준 프로필)이 낮음·높음 사이 어디에 있는지 설명 지표로 보고한다.
 
-1. personaValidationAnalysis.cjs(또는 새 모듈 src/personaValidationBaseline.cjs)에 baselineComparison을 만든다.
+1. personaValidationAnalysis.cjs(또는 새 모듈 src/validation/personaValidationBaseline.cjs)에 baselineComparison을 만든다.
    - baselineContrasts의 각 기준 프로필 × 같은 맥락의 성향 프로필 × 성향 지표 × 조건마다, 같은 seed로 짝지은
      성향 프로필 대 기준 프로필의 Cliff's delta, 짝 부트스트랩 95% 구간, 유효 쌍 수, 미발생·누락 수.
    - 한 성향에 낮음·높음 프로필이 모두 있으면 지표별 위치 분류를 단다:

@@ -10,7 +10,7 @@ import { TraceGuard, validateTrace } from './traceValidation';
 import type { Decision, TraceOptions, TraceEntry, TraceSummary, Observation, Persona } from './types';
 import { generateAttentionTrace } from './attentionSimulator';
 import { compactTraceTiming } from './traceTiming';
-import { wholeTraceHasAnchorMovementFeedback } from './wholeTraceMovementFeedback';
+import { wholeTraceHasAnchorMovementFeedback } from './wholeTrace/wholeTraceMovementFeedback';
 export { listPersonas } from './personas';
 export { generateBatch } from './batch';
 export { validateTrace } from './traceValidation';

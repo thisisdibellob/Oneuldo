@@ -1,8 +1,8 @@
 'use strict';
 require('../runtime.cjs');
 const test = require('node:test'), assert = require('node:assert/strict');
-const { cliffsDelta, bootstrap, judge, binomialTail, scoreReview, nearestCentroidLeaveOneOut } = require('../src/personaValidationStatistics.cjs');
-const { IDS } = require('../src/personaValidationBlind.cjs');
+const { cliffsDelta, bootstrap, judge, binomialTail, scoreReview, nearestCentroidLeaveOneOut } = require('../src/validation/personaValidationStatistics.cjs');
+const { IDS } = require('../src/validation/personaValidationBlind.cjs');
 const close = (actual, expected, tolerance = 1e-12) => assert.ok(Math.abs(actual - expected) < tolerance, `${actual} != ${expected}`);
 
 test('Cliff delta handles ties, unequal sizes, direction, and missing observations', () => {

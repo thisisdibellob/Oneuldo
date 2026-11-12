@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 require('../runtime.cjs');
-const { reviewWholeTraceTaskExpression } = require('../src/wholeTraceTaskExpression.ts');
+const { reviewWholeTraceTaskExpression } = require('../src/wholeTrace/wholeTraceTaskExpression.ts');
 
 function entry(decisionIndex, overrides = {}) {
   return {

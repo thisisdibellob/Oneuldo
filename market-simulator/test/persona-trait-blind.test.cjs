@@ -1,8 +1,8 @@
 'use strict';
 require('../runtime.cjs');
 const test = require('node:test'), assert = require('node:assert/strict');
-const { buildTraits, assertAnonymous } = require('../src/personaValidationBlind.cjs');
-const { scoreTraitReview } = require('../src/personaValidationStatistics.cjs');
+const { buildTraits, assertAnonymous } = require('../src/validation/personaValidationBlind.cjs');
+const { scoreTraitReview } = require('../src/validation/personaValidationStatistics.cjs');
 const catalog = require('../validation/persona-traits.json');
 const traitKeys = catalog.traits.map(trait => trait.key);
 const levels = catalog.levels;

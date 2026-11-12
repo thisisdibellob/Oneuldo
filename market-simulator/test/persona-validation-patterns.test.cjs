@@ -1,7 +1,7 @@
 'use strict';
 require('../runtime.cjs');
 const test = require('node:test'), assert = require('node:assert/strict');
-const { flagsForTrace, collectionFlags, collectionFindings, collectionDiagnostics } = require('../src/personaValidationFlags.cjs');
+const { flagsForTrace, collectionFlags, collectionFindings, collectionDiagnostics } = require('../src/validation/personaValidationFlags.cjs');
 const persona = require('../personas/neutral-adult-control.json');
 const snapshot = { config: { objectives: [{ productId: 'milk', quantity: 2 }, { productId: 'apple', quantity: 1 }] } };
 const step = (id, type, extra = {}) => ({ id, type, reactionDelayMs: 100, reason: '상품을 살펴본다', ...extra });

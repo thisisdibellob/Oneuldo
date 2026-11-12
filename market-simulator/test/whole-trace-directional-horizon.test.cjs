@@ -3,9 +3,9 @@ const assert = require('node:assert/strict');
 require('../runtime.cjs');
 const { createMarketSession } = require('../../frontend/src/game/marketSession.ts');
 const { createMarketReplaySnapshot } = require('../../frontend/src/game/marketReplayTrace.ts');
-const { buildWholeTraceBundle } = require('../src/wholeTraceBundle.ts');
-const { createWholeTraceExecutionAuthoringCursor } = require('../src/wholeTraceExecutionAuthoring.ts');
-const { compileWholeTraceCandidate } = require('../src/wholeTraceCompiler.ts');
+const { buildWholeTraceBundle } = require('../src/wholeTrace/wholeTraceBundle.ts');
+const { createWholeTraceExecutionAuthoringCursor } = require('../src/wholeTrace/wholeTraceExecutionAuthoring.ts');
+const { compileWholeTraceCandidate } = require('../src/wholeTrace/wholeTraceCompiler.ts');
 const { validateTrace } = require('../src/traceValidation.ts');
 
 const pause = () => ({ choiceRef: { choiceId: 'control/pause' }, delayMs: 500,

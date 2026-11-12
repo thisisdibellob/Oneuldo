@@ -3,8 +3,8 @@ const assert = require('node:assert/strict');
 require('../runtime.cjs');
 const { createMarketSession } = require('../../frontend/src/game/marketSession.ts');
 const { createMarketReplaySnapshot } = require('../../frontend/src/game/marketReplayTrace.ts');
-const { buildWholeTraceBundle } = require('../src/wholeTraceBundle.ts');
-const { compileWholeTraceCandidate } = require('../src/wholeTraceCompiler.ts');
+const { buildWholeTraceBundle } = require('../src/wholeTrace/wholeTraceBundle.ts');
+const { compileWholeTraceCandidate } = require('../src/wholeTrace/wholeTraceCompiler.ts');
 
 // Authored contract fixtures only: no saved pilot candidates, model calls or app replay.
 function fixture() {

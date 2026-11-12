@@ -1,7 +1,7 @@
 import { extendedActorChoices, presentActorChoices, type ExtendedActorChoice } from './actorChoices';
 import { ACTOR_PERSONA_INSTRUCTIONS } from './actorInstructions';
 import type { ActorObservation, Decision, Persona, PolicyAction } from './types';
-import { buildWholeTracePersonaInput } from './wholeTracePersona';
+import { buildWholeTracePersonaInput } from './wholeTrace/wholeTracePersona';
 import type { MarketReplayMovementPolicyDecision } from '../../frontend/src/game/marketReplayTrace';
 import type { FeedbackExperienceSnapshot } from './feedbackExperience';
 

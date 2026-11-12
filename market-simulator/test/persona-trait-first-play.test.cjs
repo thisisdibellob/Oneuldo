@@ -1,10 +1,10 @@
 'use strict';
 require('../runtime.cjs');
 const test = require('node:test'), assert = require('node:assert/strict');
-const { extractUniversal, actorEvents } = require('../src/personaValidationMetrics.cjs');
-const { KINDS, extractFirstPlay } = require('../src/personaValidationFirstPlay.cjs');
-const { cliffsDelta, bootstrap, judge } = require('../src/personaValidationStatistics.cjs');
-const { summarizeTraitFindings } = require('../src/personaTraitValidationRun.cjs');
+const { extractUniversal, actorEvents } = require('../src/validation/personaValidationMetrics.cjs');
+const { KINDS, extractFirstPlay } = require('../src/validation/personaValidationFirstPlay.cjs');
+const { cliffsDelta, bootstrap, judge } = require('../src/validation/personaValidationStatistics.cjs');
+const { summarizeTraitFindings } = require('../src/validation/personaTraitValidationRun.cjs');
 const snapshot = { config: { objectives: [{ id: 'milk-goal', productId: 'milk', quantity: 1, match: 'exact' }] } };
 const products = [{ id: 'milk', name: '흰 우유', detail: '1 L' }, { id: 'milk-small', name: '흰 우유', detail: '200 mL' }];
 const step = (type, extra = {}) => ({ type, ...extra });

@@ -5,8 +5,8 @@ const fs = require('node:fs'), os = require('node:os'), path = require('node:pat
 const { createMarketSession } = require('../../frontend/src/game/marketSession.ts');
 const { createMarketReplaySnapshot } = require('../../frontend/src/game/marketReplayTrace.ts');
 const { createService, definitions } = require('../server.cjs');
-const { IDS } = require('../src/personaValidationBlind.cjs');
-const run = require('../src/personaValidationRun.cjs');
+const { IDS } = require('../src/validation/personaValidationBlind.cjs');
+const run = require('../src/validation/personaValidationRun.cjs');
 function fixture(t, validationMode) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'oneuldo-reviewer-integration-'));
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));

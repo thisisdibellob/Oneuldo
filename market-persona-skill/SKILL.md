@@ -5,7 +5,7 @@ description: Generate Oneuldo persona action traces with the whole-trace authori
 
 # Oneuldo 페르소나 행동 trace 생성
 
-이 스킬은 **감독(에이전트)이 읽는 절차서**다. 행동을 작성하는 배우(Luna)에게는 이 스킬이나 하위 문서를 읽게 하지 않는다. 배우에게 필요한 정보는 bundle과 실험 지시문으로 모든 배우에게 같게 전달한다. 실험 지시문은 실험 입력이므로 이 스킬 안에 두지 않고 실험별로 고정·기록한다.
+이 스킬은 **감독(에이전트)이 읽는 절차서**다. 행동을 작성하는 배우(Luna)에게는 이 스킬이나 하위 문서를 읽게 하지 않는다. 배우에게 필요한 정보는 배우 입력(`actor-input.json`)과 배우 지시문(`actor-instructions.txt`) 두 파일로 모든 배우에게 같게 전달한다. 지시문은 실험 입력이므로 이 스킬 안에 두지 않는다. 고정본은 `market-simulator/actor-instructions/`에 버전 파일로 있고, 감독이 새로 쓰거나 요약·번역·보충하지 않는다.
 
 ## 작업별로 읽을 문서
 
@@ -24,7 +24,7 @@ description: Generate Oneuldo persona action traces with the whole-trace authori
 ## 표준 절차: whole-trace 작성 보조 모드
 
 1. 감독이 `prepare_whole_trace({personaId,seed,snapshotFilePath 또는 tabId,maxRepairs})`로 `requestId`와 bundle을 받는다. `bundle.inputHash`는 후보 밖의 출처 기록에 남긴다.
-2. 배우 입력은 준비 응답을 그대로 주지 않고 `node market-simulator/whole-trace-actor-input.cjs <owner/prepare-response.json> <slot/actor-input.json>`으로 만든다. 이 도구는 `worldReference`(숨은 매장 지도·재고·정답 목록)·`choiceCatalog`(전체 선택지 목록)·`sourceFiles`·`diagnosticDirectory`를 빼고, 이 키들을 쓰라고 하던 안내 문장을 작성 보조 모드용 문장으로 바꾼다. 출력 요약(해시·제외 키·바꾼 문장)은 슬롯 기록에 남긴다. 한 인물·한 조건·한 seed·한 request만 받는 **새 배우 문맥**에 이 `actor-input.json`과 실험 지시문만 전달한다. 배우 호출은 요청별 우체통(`market-simulator/whole-trace-mailbox.cjs`)을 통해 같은 요청에 묶는다.
+2. 배우 입력과 지시문은 `node market-simulator/whole-trace-actor-input.cjs <slot>/owner/prepare-response.json <slot>/actor-input.json`으로 함께 만든다. 이 도구는 준비 응답에서 `worldReference`(숨은 매장 지도·재고·정답 목록)·`choiceCatalog`(전체 선택지 목록)·`sourceFiles`·`diagnosticDirectory`를 빼고 이 키들을 쓰라고 하던 안내 문장을 작성 보조 모드용으로 바꾼 `actor-input.json`과, 고정 템플릿(기본 `authoring-v1`)에 슬롯 경로만 채운 `<slot>/actor-instructions.txt`를 쓴다. 출력 요약(입력·지시문 SHA, 템플릿 ID, 제외 키, 바꾼 문장)은 슬롯 기록에 남긴다. 실험에서 지시문을 바꿀 때는 기존 파일을 고치지 말고 새 버전 템플릿을 추가해 `--template`으로 고르고 그 ID와 SHA를 기록한다. 한 인물·한 조건·한 seed·한 request만 받는 **새 배우 문맥**에 지시문 파일 내용을 첫 메시지로 그대로 주고, 다른 설명·요약·힌트를 덧붙이지 않는다. 배우 호출은 요청별 우체통(`market-simulator/whole-trace-mailbox.cjs`)을 통해 같은 요청에 묶는다.
 3. 배우는 `begin_whole_trace_authoring` → `append_whole_trace_decision`을 결정마다 반복한다. 통과하면 응답의 현재 화면·선택지 메뉴로 다음 결정을 쓰고, 거절되면 이유를 보고 같은 결정을 고쳐 쓴다. 필요하면 `whole_trace_authoring_menu`로 현재 메뉴를 다시 읽는다.
 4. 종료 결정 뒤 `finish_and_submit_whole_trace`(우체통) 또는 `finish_whole_trace_authoring` 후 제출로 전체 후보를 제출·검증해 trace 파일을 저장한다.
 5. 생성·검증만 요청받았으면 여기서 끝낸다. 앱 재생까지 요청받았을 때만 `validate_trace` → `play_trace` → `replay_status`를 [앱 연결과 재생](replay/app-replay.md)에 따라 실행한다.

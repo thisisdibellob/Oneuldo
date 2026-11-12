@@ -7,10 +7,10 @@ require('../runtime.cjs');
 const { createMarketSession } = require('../../frontend/src/game/marketSession.ts');
 const { createMarketReplaySnapshot } = require('../../frontend/src/game/marketReplayTrace.ts');
 const { getMarketStationApproachPoint } = require('../../frontend/src/game/marketEnvironment.ts');
-const { buildWholeTraceBundle } = require('../src/wholeTraceBundle.ts');
-const { compileWholeTraceCandidate } = require('../src/wholeTraceCompiler.ts');
-const { validateWholeTraceCandidate } = require('../src/wholeTraceContracts.ts');
-const { WholeTraceSession } = require('../src/wholeTraceSession.ts');
+const { buildWholeTraceBundle } = require('../src/wholeTrace/wholeTraceBundle.ts');
+const { compileWholeTraceCandidate } = require('../src/wholeTrace/wholeTraceCompiler.ts');
+const { validateWholeTraceCandidate } = require('../src/wholeTrace/wholeTraceContracts.ts');
+const { WholeTraceSession } = require('../src/wholeTrace/wholeTraceSession.ts');
 const { validateTrace } = require('../src/traceValidation.ts');
 
 // Authored integration scenarios exercise the actual shared game and compiler.

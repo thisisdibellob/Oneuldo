@@ -2,14 +2,14 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 require('../runtime.cjs');
-const { createWholeTraceMovementFeedback } = require('../src/wholeTraceMovementFeedback.ts');
+const { createWholeTraceMovementFeedback } = require('../src/wholeTrace/wholeTraceMovementFeedback.ts');
 const { FeedbackExperience } = require('../src/feedbackExperience.ts');
 const { recentMovementNotes } = require('../src/feedbackActor.ts');
 const { createMarketSession } = require('../../frontend/src/game/marketSession.ts');
 const { createMarketReplaySnapshot } = require('../../frontend/src/game/marketReplayTrace.ts');
-const { buildWholeTraceBundle } = require('../src/wholeTraceBundle.ts');
-const { createWholeTraceExecutionAuthoringCursor } = require('../src/wholeTraceExecutionAuthoring.ts');
-const { compileWholeTraceCandidate } = require('../src/wholeTraceCompiler.ts');
+const { buildWholeTraceBundle } = require('../src/wholeTrace/wholeTraceBundle.ts');
+const { createWholeTraceExecutionAuthoringCursor } = require('../src/wholeTrace/wholeTraceExecutionAuthoring.ts');
+const { compileWholeTraceCandidate } = require('../src/wholeTrace/wholeTraceCompiler.ts');
 const { TraceGuard } = require('../src/traceValidation.ts');
 
 const observation = (extra = {}) => ({ schemaVersion: 'attention-observation-v1', phase: 'shopping', view: 'world',

@@ -1,11 +1,11 @@
 'use strict';
 require('../runtime.cjs');
 const test = require('node:test'), assert = require('node:assert/strict'), fs = require('node:fs');
-const { catalog, getCatalog, getTraitKeys, TRAIT_KEYS_BY_VERSION, resolveProfiles, validateTraits, assertValidPersona } = require('../src/personaTraitProfiles.cjs');
-const { buildWholeTracePersonaInput } = require('../src/wholeTracePersona.ts');
-const { buildWholeTraceCognitionProfile } = require('../src/wholeTraceCognition.ts');
-const { buildTraits } = require('../src/personaValidationBlind.cjs');
-const { scoreTraitReview } = require('../src/personaValidationStatistics.cjs');
+const { catalog, getCatalog, getTraitKeys, TRAIT_KEYS_BY_VERSION, resolveProfiles, validateTraits, assertValidPersona } = require('../src/validation/personaTraitProfiles.cjs');
+const { buildWholeTracePersonaInput } = require('../src/wholeTrace/wholeTracePersona.ts');
+const { buildWholeTraceCognitionProfile } = require('../src/wholeTrace/wholeTraceCognition.ts');
+const { buildTraits } = require('../src/validation/personaValidationBlind.cjs');
+const { scoreTraitReview } = require('../src/validation/personaValidationStatistics.cjs');
 const { getPersona, getWholeTracePersona, withValidationPersona } = require('../src/personas.ts');
 const newKeys = ['initialCaution', 'operationLearning', 'routeReliance', 'textCueLoad'];
 const definition = (traits = {}, rest = {}) => ({ id:'catalog-participant',basePersonaId:'mild-intellectual-disability-adult',traits,...rest });
@@ -90,7 +90,7 @@ test('one first-play axis can vary while capability, attention, cognition and ma
 });
 
 test('all twelve new instructions stop when clear, forbid forced errors, cite sources and avoid the live next-goal regex', () => {
-  const source = fs.readFileSync(require.resolve('../src/wholeTraceActorState.ts'),'utf8');
+  const source = fs.readFileSync(require.resolve('../src/wholeTrace/wholeTraceActorState.ts'),'utf8');
   const body = source.match(/function nextGoalRecheckTrait[^\{]*\{([\s\S]*?)\n\}/)?.[1];
   assert.ok(body,'read the actual nextGoalRecheckTrait implementation');
   const nextGoalRecheckTrait = new Function('persona',body);

@@ -5,9 +5,9 @@ const fs = require('node:fs'), os = require('node:os'), path = require('node:pat
 require('../runtime.cjs');
 const { createMarketSession } = require('../../frontend/src/game/marketSession.ts');
 const { createMarketReplaySnapshot } = require('../../frontend/src/game/marketReplayTrace.ts');
-const { WholeTraceSession } = require('../src/wholeTraceSession.ts');
+const { WholeTraceSession } = require('../src/wholeTrace/wholeTraceSession.ts');
 const { createService } = require('../server.cjs');
-const run = require('../src/personaValidationRun.cjs');
+const run = require('../src/validation/personaValidationRun.cjs');
 const BASE = 'mild-intellectual-disability-adult';
 const read = file => JSON.parse(fs.readFileSync(file, 'utf8'));
 function fixture(t) {

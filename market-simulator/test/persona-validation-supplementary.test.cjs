@@ -1,7 +1,7 @@
 'use strict';
 require('../runtime.cjs');
 const test = require('node:test'), assert = require('node:assert/strict');
-const { stratifiedPairedBootstrap, simulateDeltaPower } = require('../src/personaValidationSupplementary.cjs');
+const { stratifiedPairedBootstrap, simulateDeltaPower } = require('../src/validation/personaValidationSupplementary.cjs');
 
 test('stratified paired bootstrap is reproducible, order independent and does not compare across loads', () => {
   const rows = ['a', 'b', 'c'].flatMap((seed, index) => [

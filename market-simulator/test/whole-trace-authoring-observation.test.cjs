@@ -5,10 +5,10 @@ const { createMarketSession } = require('../../frontend/src/game/marketSession.t
 const { createMarketReplaySnapshot } = require('../../frontend/src/game/marketReplayTrace.ts');
 const { visibleStations } = require('../../frontend/src/game/marketReplayPerception.ts');
 const { getMarketHelpLines } = require('../../frontend/src/game/marketHelp.ts');
-const { buildWholeTraceBundle } = require('../src/wholeTraceBundle.ts');
-const { compileWholeTraceCandidate, validateWholeTracePrefix } = require('../src/wholeTraceCompiler.ts');
-const { createWholeTraceExecutionAuthoringCursor } = require('../src/wholeTraceExecutionAuthoring.ts');
-const { createWholeTraceSourceAuthoringCursor } = require('../src/wholeTraceAuthoringSource.ts');
+const { buildWholeTraceBundle } = require('../src/wholeTrace/wholeTraceBundle.ts');
+const { compileWholeTraceCandidate, validateWholeTracePrefix } = require('../src/wholeTrace/wholeTraceCompiler.ts');
+const { createWholeTraceExecutionAuthoringCursor } = require('../src/wholeTrace/wholeTraceExecutionAuthoring.ts');
+const { createWholeTraceSourceAuthoringCursor } = require('../src/wholeTrace/wholeTraceAuthoringSource.ts');
 
 function fixture() {
   const snapshot = createMarketReplaySnapshot(createMarketSession({ seed: 'authoring-observation',

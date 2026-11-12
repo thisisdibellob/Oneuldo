@@ -33,7 +33,7 @@ function shoppingSequence(trace) {
 function describe(trace, persona) {
   const steps = trace.steps;
   const reactions = steps.filter(s => s.reactionDelayMs > 0).map(s => s.reactionDelayMs);
-  const shared = require('../src/personaValidationMetrics.cjs').legacyCounts(trace, persona, OBJECTIVES);
+  const shared = require('../src/validation/personaValidationMetrics.cjs').legacyCounts(trace, persona, OBJECTIVES);
   const result = { steps: steps.length, ...shared,
     reactionMs: distribution(reactions), reactionValues: reactions,
     ending: steps.some(s => s.type === 'submitForReview') ? 'review-requested' : 'gave-up',

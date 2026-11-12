@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 require('../runtime.cjs');
-const { auditWholeTraceActorFidelity: reviewActor } = require('../src/wholeTraceActorState.ts');
+const { auditWholeTraceActorFidelity: reviewActor } = require('../src/wholeTrace/wholeTraceActorState.ts');
 const { createMarketSession } = require('../../frontend/src/game/marketSession.ts');
 const persona = { character: { selectedTraits: [] } };
 const objectives = createMarketSession({ difficulty: 'exact', objectives: [

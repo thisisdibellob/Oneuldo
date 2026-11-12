@@ -1,14 +1,14 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 require('../runtime.cjs');
-const { buildWholeTraceMemoryAuthoringGuide } = require('../src/wholeTraceMemoryAuthoringGuide.ts');
-const { WholeTraceCognitionEngine, buildWholeTraceCognitionProfile } = require('../src/wholeTraceCognition.ts');
-const { WholeTraceTaskMemoryEngine } = require('../src/wholeTraceTaskMemory.ts');
+const { buildWholeTraceMemoryAuthoringGuide } = require('../src/wholeTrace/wholeTraceMemoryAuthoringGuide.ts');
+const { WholeTraceCognitionEngine, buildWholeTraceCognitionProfile } = require('../src/wholeTrace/wholeTraceCognition.ts');
+const { WholeTraceTaskMemoryEngine } = require('../src/wholeTrace/wholeTraceTaskMemory.ts');
 const { getPersona } = require('../src/personas.ts');
 const { createMarketSession } = require('../../frontend/src/game/marketSession.ts');
 const { createMarketReplaySnapshot } = require('../../frontend/src/game/marketReplayTrace.ts');
-const { buildWholeTraceBundle } = require('../src/wholeTraceBundle.ts');
-const { compileWholeTraceCandidate } = require('../src/wholeTraceCompiler.ts');
+const { buildWholeTraceBundle } = require('../src/wholeTrace/wholeTraceBundle.ts');
+const { compileWholeTraceCandidate } = require('../src/wholeTrace/wholeTraceCompiler.ts');
 
 const goal = { id: 'objective-1', label: '흰 우유', quantity: 1, match: 'exact' };
 const observation = (overrides = {}) => ({ schemaVersion: 'attention-observation-v1', phase: 'shopping', view: 'world',

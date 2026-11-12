@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 require('../runtime.cjs');
-const { createWholeTraceAuthoringTaskState, previewWholeTraceAuthoringTasks } = require('../src/wholeTraceAuthoringTasks.ts');
+const { createWholeTraceAuthoringTaskState, previewWholeTraceAuthoringTasks } = require('../src/wholeTrace/wholeTraceAuthoringTasks.ts');
 
 // Hand-authored declarative fixtures only. No historical candidate is rewritten,
 // no runtime/cognition engine is called, and no new AI trace is generated.

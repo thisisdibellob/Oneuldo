@@ -4,10 +4,10 @@ require('../runtime.cjs');
 const { createMarketSession } = require('../../frontend/src/game/marketSession.ts');
 const { createMarketReplaySnapshot } = require('../../frontend/src/game/marketReplayTrace.ts');
 const { getMarketStationApproachPoint, createMarketEnvironment } = require('../../frontend/src/game/marketEnvironment.ts');
-const { buildWholeTraceBundle } = require('../src/wholeTraceBundle.ts');
-const { resolveWholeTraceChoice, wholeTraceChoiceFrame } = require('../src/wholeTraceChoices.ts');
-const { validateWholeTraceCandidate } = require('../src/wholeTraceContracts.ts');
-const { WholeTraceKnowledgeLedger } = require('../src/wholeTraceKnowledge.ts');
+const { buildWholeTraceBundle } = require('../src/wholeTrace/wholeTraceBundle.ts');
+const { resolveWholeTraceChoice, wholeTraceChoiceFrame } = require('../src/wholeTrace/wholeTraceChoices.ts');
+const { validateWholeTraceCandidate } = require('../src/wholeTrace/wholeTraceContracts.ts');
+const { WholeTraceKnowledgeLedger } = require('../src/wholeTrace/wholeTraceKnowledge.ts');
 const { TraceGuard } = require('../src/traceValidation.ts');
 const { getPersona } = require('../src/personas.ts');
 function fixture({ near, environment, presentation } = {}) {

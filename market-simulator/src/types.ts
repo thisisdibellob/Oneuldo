@@ -147,7 +147,7 @@ export type TraceOptions = {
   wholeTraceMovementVersion?: 'directional-v1' | 'directional-v2';
   wholeTraceObservationVersion?: 'anchor-visible-structures-v1';
   wholeTraceMovementValidationVersion?: '1';
-  wholeTraceMovementFeedbackVersion?: import('./wholeTraceMovementFeedback').WholeTraceMovementFeedbackVersion;
+  wholeTraceMovementFeedbackVersion?: import('./wholeTrace/wholeTraceMovementFeedback').WholeTraceMovementFeedbackVersion;
   planningMode?: 'whole-trace'; planningSubmissions?: number; repairSubmissions?: number;
   /** Compact is a test execution schedule, not an estimate of a person's speed. */
   timingProfile?: 'original' | 'compact';

@@ -11,10 +11,10 @@ const { createMarketReplaySnapshot } = require('../../frontend/src/game/marketRe
 const { DEFAULT_REPLAY_PRESENTATION } = require('../../frontend/src/game/marketReplayPerception.ts');
 const { resolveMarketEnvironmentMovement } = require('../../frontend/src/game/marketMovement.ts');
 const { MARKET_DIRECTIONAL_MOVE_SPEED } = require('../../frontend/src/game/marketDirectionalInput.ts');
-const { buildWholeTraceBundle } = require('../src/wholeTraceBundle.ts');
-const { compileWholeTraceCandidate, validateWholeTracePrefix } = require('../src/wholeTraceCompiler.ts');
-const { createWholeTraceExecutionAuthoringCursor } = require('../src/wholeTraceExecutionAuthoring.ts');
-const { wholeTraceContinuousFrame } = require('../src/wholeTraceMovement.ts');
+const { buildWholeTraceBundle } = require('../src/wholeTrace/wholeTraceBundle.ts');
+const { compileWholeTraceCandidate, validateWholeTracePrefix } = require('../src/wholeTrace/wholeTraceCompiler.ts');
+const { createWholeTraceExecutionAuthoringCursor } = require('../src/wholeTrace/wholeTraceExecutionAuthoring.ts');
+const { wholeTraceContinuousFrame } = require('../src/wholeTrace/wholeTraceMovement.ts');
 const { TraceGuard, validateTrace } = require('../src/traceValidation.ts');
 const { startHost, closeHost, hostStatus, callHost } = require('../whole-trace-host.cjs');
 
@@ -149,7 +149,7 @@ test('rejected drafts leave v2 source and observations untouched and do not cons
 test('a pending v2 menu preview retains one prefix snapshot when an append commits concurrently', async t => {
   const { settings, bundle } = fixture(), cursor = await createWholeTraceExecutionAuthoringCursor(settings, bundle);
   const initial = await cursor.menu();
-  const compiler = require('../src/wholeTraceCompiler.ts');
+  const compiler = require('../src/wholeTrace/wholeTraceCompiler.ts');
   const executePrefix = compiler.validateWholeTracePrefix;
   let releasePreview, markPreviewStarted;
   const previewGate = new Promise(resolve => { releasePreview = resolve; });

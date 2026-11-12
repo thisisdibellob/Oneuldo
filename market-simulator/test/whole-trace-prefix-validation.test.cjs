@@ -4,11 +4,11 @@ require('../runtime.cjs');
 const { createMarketSession } = require('../../frontend/src/game/marketSession.ts');
 const { createMarketReplaySnapshot } = require('../../frontend/src/game/marketReplayTrace.ts');
 const { getMarketStationApproachPoint } = require('../../frontend/src/game/marketEnvironment.ts');
-const { buildWholeTraceBundle } = require('../src/wholeTraceBundle.ts');
-const { compileWholeTraceCandidate, validateWholeTracePrefix } = require('../src/wholeTraceCompiler.ts');
-const { validateWholeTraceCandidate } = require('../src/wholeTraceContracts.ts');
-const { createWholeTraceExecutionAuthoringCursor } = require('../src/wholeTraceExecutionAuthoring.ts');
-const { WholeTraceCognitionEngine } = require('../src/wholeTraceCognition.ts');
+const { buildWholeTraceBundle } = require('../src/wholeTrace/wholeTraceBundle.ts');
+const { compileWholeTraceCandidate, validateWholeTracePrefix } = require('../src/wholeTrace/wholeTraceCompiler.ts');
+const { validateWholeTraceCandidate } = require('../src/wholeTrace/wholeTraceContracts.ts');
+const { createWholeTraceExecutionAuthoringCursor } = require('../src/wholeTrace/wholeTraceExecutionAuthoring.ts');
+const { WholeTraceCognitionEngine } = require('../src/wholeTrace/wholeTraceCognition.ts');
 
 function fixture(near = 'meal', extra = {}) {
   const config = { seed: 'prefix-validation', difficulty: 'exact', stockPerProduct: 5,

@@ -2,7 +2,7 @@
 require('../runtime.cjs');
 const test = require('node:test'), assert = require('node:assert/strict');
 const fs = require('node:fs'), os = require('node:os'), path = require('node:path'), crypto = require('node:crypto');
-const run = require('../src/personaTraitValidationRun.cjs');
+const run = require('../src/validation/personaTraitValidationRun.cjs');
 const { buildSnapshots } = require('../scripts/build-validation-snapshots.cjs');
 const { canonicalMarketReplayJson } = require('../../frontend/src/game/marketReplayTrace.ts');
 const golden = require('./fixtures/persona-trait-v1-regression.json');

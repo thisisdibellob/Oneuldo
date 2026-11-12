@@ -2,10 +2,10 @@
 require('../runtime.cjs');
 const test = require('node:test'), assert = require('node:assert/strict');
 const fs = require('node:fs'), os = require('node:os'), path = require('node:path');
-const { auditSnapshot, auditManifestSnapshots } = require('../src/personaValidationOpportunity.cjs');
+const { auditSnapshot, auditManifestSnapshots } = require('../src/validation/personaValidationOpportunity.cjs');
 const { buildSnapshots, writeSnapshotSet } = require('../scripts/build-validation-snapshots.cjs');
-const run = require('../src/personaValidationRun.cjs');
-const readiness = require('../src/personaValidationReadiness.cjs');
+const run = require('../src/validation/personaValidationRun.cjs');
+const readiness = require('../src/validation/personaValidationReadiness.cjs');
 const KINDS = ['initialCautionCount', 'operationLearningRate', 'routeRelianceRate', 'textCueLoadRate'];
 const TRAITS = ['initialCaution', 'operationLearning', 'routeReliance', 'textCueLoad'];
 

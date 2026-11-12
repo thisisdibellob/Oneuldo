@@ -2,7 +2,7 @@
 require('../runtime.cjs').register();
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { FeedbackPlanSession } = require('../src/feedbackPlanSession.ts');
+const { FeedbackPlanSession } = require('../src/legacy/feedbackPlanSession.ts');
 const { buildFeedbackActorFrame, emptyFeedbackBeliefMemory } = require('../src/feedbackActor.ts');
 const { getPersona } = require('../src/personas.ts');
 

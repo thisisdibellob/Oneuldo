@@ -31,6 +31,20 @@ const trace = await generateTrace({ mode: 'stochastic', personaId: 'careful-chec
 const validation = validateTrace(trace, snapshot);
 ```
 
+### 코드 구성과 도구 프로필
+
+| 층 | 위치 | 역할 |
+| --- | --- | --- |
+| 입구 | `server.cjs`(MCP STDIO), `cli.cjs`, `whole-trace-host.cjs`, `whole-trace-mailbox.cjs` | 요청을 받아 같은 도구 목록으로 전달 |
+| 도구 등록 | `tools/wholeTrace.cjs`, `tools/validation.cjs`, `tools/replay.cjs`, `tools/trace.cjs`, `tools/personas.cjs` | 영역별 도구 정의와 처리. `tools/legacy/`는 feedback·actor plan·provider 생성·학습 실험으로, 동결된 재현용이다 |
+| 엔진 | `src/`(관측·규칙·선택지·공용 정책), `src/wholeTrace/`, `src/validation/`, `src/legacy/` | 계산. feedback 엔진 파일은 whole-trace가 함께 쓰므로 `src/`에 남아 있다 |
+
+MCP 서버는 `MARKET_SIM_PROFILE` 환경변수(또는 `createService({profile})`)로 노출할 도구를 고른다. 생략하면 `all`이며 기존 공개 목록 35개와 같다(작성 보조 도구 4개는 호출 가능하지만 목록에 없다). `generation`은 whole-trace 생성·작성 보조·`list_personas`·`validate_trace` 10개, `validation`은 여기에 페르소나 검증 도구를 더하고, `replay`는 재생 도구만 연다. 프로필 밖 도구는 호출도 거절된다.
+
+```sh
+MARKET_SIM_PROFILE=generation node market-simulator/server.cjs
+```
+
 `generateBatch`는 같은 snapshot을 대상으로 여러 seed의 의도 trace를 워커에서 병렬 생성한다. JSONL 각 줄은 trace만 포함한다. 앱 재생은 별도이며 실제 화면 시간만큼 걸린다. 여러 앱 탭은 서로 다른 테스트 계정으로 병렬 재생할 수 있다.
 
 ## 격리 설정과 앱 연결

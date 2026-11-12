@@ -2,8 +2,8 @@
 require('../runtime.cjs');
 const test = require('node:test'), assert = require('node:assert/strict');
 const fs = require('node:fs'), os = require('node:os'), path = require('node:path');
-const { IDS, categoricalAgreement, reviewerAgreement } = require('../src/personaValidationBlind.cjs');
-const { DEFAULT_REVIEWER_ID, assertPanelReady, submitReview, readReviews, summarizeReviews } = require('../src/personaValidationReviewers.cjs');
+const { IDS, categoricalAgreement, reviewerAgreement } = require('../src/validation/personaValidationBlind.cjs');
+const { DEFAULT_REVIEWER_ID, assertPanelReady, submitReview, readReviews, summarizeReviews } = require('../src/validation/personaValidationReviewers.cjs');
 const traitKeys = require('../validation/persona-traits.json').traits.map(row => row.key);
 const settings = value => Object.fromEntries(traitKeys.map(key => [key, value]));
 function fixture(t, validationMode = 'legacy') {

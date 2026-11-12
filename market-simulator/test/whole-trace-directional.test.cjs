@@ -28,11 +28,11 @@ function loadReplayMotor() {
   finally { require.extensions['.ts'] = previous; }
 }
 const { moveDirection, createMotionReport } = loadReplayMotor();
-const { buildWholeTraceBundle } = require('../src/wholeTraceBundle.ts');
-const { wholeTraceChoiceFrame, resolveWholeTraceChoice } = require('../src/wholeTraceChoices.ts');
-const { compileWholeTraceCandidate, validateWholeTracePrefix } = require('../src/wholeTraceCompiler.ts');
-const { validateWholeTraceCandidate, validateWholeTraceChoiceDecisionSyntax } = require('../src/wholeTraceContracts.ts');
-const { createWholeTraceSourceAuthoringCursor } = require('../src/wholeTraceAuthoringSource.ts');
+const { buildWholeTraceBundle } = require('../src/wholeTrace/wholeTraceBundle.ts');
+const { wholeTraceChoiceFrame, resolveWholeTraceChoice } = require('../src/wholeTrace/wholeTraceChoices.ts');
+const { compileWholeTraceCandidate, validateWholeTracePrefix } = require('../src/wholeTrace/wholeTraceCompiler.ts');
+const { validateWholeTraceCandidate, validateWholeTraceChoiceDecisionSyntax } = require('../src/wholeTrace/wholeTraceContracts.ts');
+const { createWholeTraceSourceAuthoringCursor } = require('../src/wholeTrace/wholeTraceAuthoringSource.ts');
 const { TraceGuard, validateTrace } = require('../src/traceValidation.ts');
 
 const directions = ['north', 'northeast', 'east', 'southeast', 'south', 'southwest', 'west', 'northwest'];

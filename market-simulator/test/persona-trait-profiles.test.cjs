@@ -5,12 +5,12 @@ const fs = require('node:fs');
 const {createRequire} = require('node:module');
 const vm = require('node:vm');
 require('../runtime.cjs');
-const {getCatalog,resolveProfiles:resolveVersionedProfiles,validatePersona,assertValidPersona,MAX_PROFILES} = require('../src/personaTraitProfiles.cjs');
+const {getCatalog,resolveProfiles:resolveVersionedProfiles,validatePersona,assertValidPersona,MAX_PROFILES} = require('../src/validation/personaTraitProfiles.cjs');
 const catalog = getCatalog('persona-traits-v1');
 const resolveProfiles = options => resolveVersionedProfiles(options, 'persona-traits-v1');
 const {listPersonas,getPersona,getWholeTracePersona,withValidationPersona,assertPersonaLearningAllowed} = require('../src/personas.ts');
-const {buildWholeTracePersonaInput} = require('../src/wholeTracePersona.ts');
-const {buildWholeTraceCognitionProfile} = require('../src/wholeTraceCognition.ts');
+const {buildWholeTracePersonaInput} = require('../src/wholeTrace/wholeTracePersona.ts');
+const {buildWholeTraceCognitionProfile} = require('../src/wholeTrace/wholeTraceCognition.ts');
 const CONTROL = 'neutral-adult-control';
 const definition = (id = 'participant-a', traits = {}) => ({id,basePersonaId:'quick-decider',presetId:'quick-satisficer',traits});
 const resolve = value => resolveProfiles({profiles:[value]})[0];
@@ -99,14 +99,14 @@ test('custom instructions turn deliberation and checking into contextual choices
 });
 
 test('custom persona provenance changes when authored wording changes, without changing the matched context', () => {
-  const file = require.resolve('../src/personaTraitProfiles.cjs');
+  const file = require.resolve('../src/validation/personaTraitProfiles.cjs');
   const localRequire = createRequire(file);
   const source = fs.readFileSync(file, 'utf8');
   function resolveWithCatalog(changedCatalog) {
     // A separate module instance represents a future catalogue revision; do not mutate the frozen live catalogue.
     const target = {exports:{}};
     const load = vm.runInThisContext(`(function(require,module,exports){${source}\n})`, {filename:file});
-    load(name => name === '../validation/persona-traits.json' ? changedCatalog : localRequire(name), target, target.exports);
+    load(name => name === '../../validation/persona-traits.json' ? changedCatalog : localRequire(name), target, target.exports);
     return target.exports.resolveProfiles({profiles:[definition('versioned-person', {checking:'high'})]}, 'persona-traits-v1')[0];
   }
   const current = resolve(definition('versioned-person', {checking:'high'}));

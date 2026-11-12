@@ -10,7 +10,7 @@ const {
   getPersona, listPersonas, getWholeTracePersona, withValidationPersona,
   VALIDATION_CONTROL_PERSONA_ID: CONTROL,
 } = require('../src/personas.ts');
-const { buildWholeTracePersonaInput } = require('../src/wholeTracePersona.ts');
+const { buildWholeTracePersonaInput } = require('../src/wholeTrace/wholeTracePersona.ts');
 const { validateLearnerIdentity, assertPersonaLearningEligible } = require('../src/actorLearning.ts');
 const { createLearner, readLearner } = require('../learner-store.cjs');
 const { createTrial, readTrial } = require('../learning-trial.cjs');
