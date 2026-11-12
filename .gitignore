@@ -83,5 +83,6 @@ coverage/
 # Local experiments and release bundles. Existing tracked reports remain tracked.
 /output/
 /tmp/
+/.codex-tmp/
 __pycache__/
 *.py[cod]

@@ -1,8 +1,0 @@
-Primary content source
-- /Users/bluem/Documents/GitHub/Oneuldo/docs/ai/personalization-system.md
-
-Visual reference and inherited assets
-- /Users/bluem/Downloads/oneuldo-ai-system-presentation-v2-slide12-black (1).pptx
-
-No external web claims or external media are used.
-

@@ -1,9 +1,0 @@
-사용 자료
-
-- /Users/bluem/Documents/GitHub/Oneuldo/docs/ai/personalization-system.md
-- /Users/bluem/Documents/GitHub/Oneuldo/docs/ai-data-rule/1.행동_로그_수집표.md
-- /Users/bluem/Documents/GitHub/Oneuldo/docs/ai-data-rule/2.행동_로그_데이터_정규화.md
-- /Users/bluem/Documents/GitHub/Oneuldo/docs/ai-data-rule/3.행동로그_근거자료_프로파일_설계.md
-- /Users/bluem/Documents/GitHub/Oneuldo/docs/ai-data-rule/4.프로파일_LLM_입력_설계.md
-- /Users/bluem/Downloads/oneuldo-ai-system-presentation-v2-slide12-black (1).pptx
-

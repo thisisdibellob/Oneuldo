@@ -1,7 +1,0 @@
-Intentional deviations from source content
-- All selected slides: original transport-system narrative is replaced with the current shopping personalization narrative.
-- Output slide 1 and 8 reuse source slide 1 for opening and closing system views.
-- Output slide 3 and 6 reuse source slide 6 for raw-log and prompt examples.
-- Output slide 4 and 7 reuse source slide 7 for normalization and output validation examples.
-- No style, geometry, media, master or layout changes are planned.
-
