@@ -190,7 +190,7 @@ node market-simulator/cli.cjs host-close /absolute/new-host-directory
 
 `node market-simulator/whole-trace-mailbox.cjs serve /absolute/new-owner --prepare-file /absolute/prepare.json`은 감독자가 소유하는 단일 whole-trace 요청 프로세스다. prepare 파일에는 readiness의 인자를 그대로 담는다. 배우는 자기 `prepare-response.json`만 받고, `call /absolute/new-owner --operation-file /absolute/operation.json`으로 기존 begin/menu/append 도구를 호출한다. 요청 파일은 `{operationId,tool,arguments}`이며 requestId는 owner가 고정한다.
 
-최종 `finish_and_submit_whole_trace`의 인자는 `{}`다. finish가 반환한 후보 객체 하나만 단일 JSON으로 원자적으로 저장하고, 재파싱·동일성 검사·기존 submit·status·저장 trace validate를 마쳐야 `completion.json`을 기록하고 정상 종료한다. JSONL에서 후보를 추출하거나 배우에게 EOF 종료를 맡기지 않는다. 전달 오류와 배우 클라이언트 종료는 준비 요청을 닫지 않으며, 같은 operationId의 동일 입력 재조회는 행동을 다시 실행하지 않는다. 감독자만 `abort /absolute/new-owner --reason "사유"`로 중단할 수 있다. 이 방식은 소켓을 열거나 이전 요청을 복원하지 않는다. 행동·프로필·검증 명세·repair 예산은 그대로이며 세부 절차는 [전체 계획 전달 규약](../market-persona-skill/references/whole-trace.md#소켓-없는-단일-요청-전달)을 따른다.
+최종 `finish_and_submit_whole_trace`의 인자는 `{}`다. finish가 반환한 후보 객체 하나만 단일 JSON으로 원자적으로 저장하고, 재파싱·동일성 검사·기존 submit·status·저장 trace validate를 마쳐야 `completion.json`을 기록하고 정상 종료한다. JSONL에서 후보를 추출하거나 배우에게 EOF 종료를 맡기지 않는다. 전달 오류와 배우 클라이언트 종료는 준비 요청을 닫지 않으며, 같은 operationId의 동일 입력 재조회는 행동을 다시 실행하지 않는다. 감독자만 `abort /absolute/new-owner --reason "사유"`로 중단할 수 있다. 이 방식은 소켓을 열거나 이전 요청을 복원하지 않는다. 행동·프로필·검증 명세·repair 예산은 그대로이며 세부 절차는 [전체 계획 전달 규약](../market-persona-skill/generation/whole-trace.md#소켓-없는-단일-요청-전달)을 따른다.
 
 ## 검증
 

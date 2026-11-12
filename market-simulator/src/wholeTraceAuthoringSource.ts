@@ -3,6 +3,7 @@ import { validateWholeTraceCandidate, validateWholeTraceChoiceDecisionSyntax,
   type WholeTraceBundle, type WholeTraceChoiceSource, type WholeTraceTaskChoiceCandidate,
   type WholeTraceTaskChoiceDecision } from './wholeTraceContracts';
 import type { WholeTraceChoiceEntry, WholeTraceChoiceFrame } from './wholeTraceChoices';
+import { wholeTraceOrderChoiceIds } from './wholeTraceContracts';
 import { wholeTraceDirectionalLocation, wholeTraceIsContinuousFrame, type WholeTraceMovementPosition } from './wholeTraceMovement';
 import type { ActorObservation } from './types';
 import { visibleAnchors, visibleStations } from '../../frontend/src/game/marketReplayPerception';
@@ -229,8 +230,10 @@ export function createWholeTraceSourceAuthoringCursor(bundle: WholeTraceBundle) 
     expectedSource: terminal ? null : structuredClone(source), decisionCount: decisions.length, terminal });
   const menu = (): WholeTraceSourceAuthoringMenu => {
     // Retain the existing menu order. No routes, goal matching or ranking enter this view.
-    const { choiceIds, interactionContext } = terminal ? { choiceIds: [],
+    const current = terminal ? { choiceIds: [] as string[],
       interactionContext: { kind: 'terminal' as const, stationId: null, label: '작성 종료: 현재 선택지 없음' } } : menuAt(source);
+    // Optional give-up-last-v1 changes display order only; availability is unchanged.
+    const interactionContext = current.interactionContext, choiceIds = wholeTraceOrderChoiceIds(current.choiceIds, bundle.choiceOrderVersion);
     const allowed = terminal ? [] : nodeFor(source).allowedWaypointIds;
     const allowedWaypointIds = choiceIds.flatMap(id => {
       const action = entries.get(id)?.action;

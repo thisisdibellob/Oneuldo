@@ -7,7 +7,7 @@
 | 파일 | 구분 |
 | --- | --- |
 | [market-persona-skill/references/persona-traits-v2-implementation.ko.md](persona-traits-v2-implementation.ko.md) | 신규 |
-| [market-persona-skill/references/persona-validation.md](../../../market-persona-skill/references/persona-validation.md) | 수정 |
+| [market-persona-skill/references/persona-validation.md](../../../market-persona-skill/validation/procedure.md) | 수정 |
 | [market-simulator/README.md](../../../market-simulator/README.md) | 수정 |
 | [market-simulator/server.cjs](../../../market-simulator/server.cjs) | 수정 |
 | [market-simulator/src/personaTraitProfiles.cjs](../../../market-simulator/src/personaTraitProfiles.cjs) | 수정 |
@@ -73,7 +73,7 @@ v1 회귀 fixture는 변경 전 소스 revision `4d5c1beef82a2d4eddba0491ab0242b
 
 ## 하지 않은 것과 남은 작업
 
-모델/provider/실제 앱/backend 호출, 파일럿 생성, 실제 데이터 수집·비교, 과거 output/run/report 수정, 커밋·푸시는 하지 않았다. 원본 인물 파일과 v1 카탈로그·기존 명세의 판정 기준도 수정하지 않았다. 연구 출처와 직접/간접 근거의 구분은 [검증 절차](../../../market-persona-skill/references/persona-validation.md#연구-근거와-해석-한계)에 정리했다.
+모델/provider/실제 앱/backend 호출, 파일럿 생성, 실제 데이터 수집·비교, 과거 output/run/report 수정, 커밋·푸시는 하지 않았다. 원본 인물 파일과 v1 카탈로그·기존 명세의 판정 기준도 수정하지 않았다. 연구 출처와 직접/간접 근거의 구분은 [검증 절차](../../../market-persona-skill/validation/trait-catalog.md#연구-근거와-해석-한계)에 정리했다.
 
 연구 근거로 설계한 첫 플레이 성향이 수준대로 행동에 나타나는지를 본 것이며, 실제 지적장애인과의 유사성을 입증하지 않는다.
 

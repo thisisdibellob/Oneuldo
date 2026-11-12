@@ -95,3 +95,17 @@ AI 정책 `episodic-choice-v9`는 별도로 모델 행동을 최대 100회 관�
 ## 현재 자동화 범위
 
 MCP는 개인 저장·회차 순서·기억 로드·trace 생성·증거 연결·비교를 처리한다. 앱 로그인/다음 미션 진입과 인증된 분석·퀘스트 응답 수집은 Codex의 기존 앱/서버 조작으로 이어간다. `prepare_learning_round`만으로 화면 실행이나 분석 요청이 발생하지 않는다. 영구 프로세스가 필요한 tabId 작업은 MCP 또는 `cli.cjs interactive`에서 수행한다. 파일 기반 CLI는 같은 도구를 사용한다.
+
+## 전체 계획(whole-trace)으로 하는 A/B/C 실험
+
+새 개인은 `create_whole_trace_learner`로 만든다. `create_learner`의 기존 provider 정책과 파일을 공유하거나 기존 trial의 정책 값을 수동 변경하지 않는다. 생성된 계획 기억을 실제 경험으로 승격하지 않는다. 실제 앱 replay와 DB receipt를 검증한 개인 경험 파일만 다음 요청의 `learnerFile`로 사용한다.
+
+전체 계획으로 A/B/C 반복 실험을 하려면 [학습 실험 절차](../legacy/learning-trials.md)의 계정·고정 과제·증거 조건을 유지하면서 생성 경로만 다음과 같이 바꾼다.
+
+1. A/B/C 각각 `create_whole_trace_learner({directory,learnerId,memberId,personaId,experimentId,arm})`를 호출한다. 모델·reasoning·정책은 도구가 `gpt-6-luna`/`low`/`whole-trace-v3`로 채운다.
+2. `create_learning_trial` 설정에서 같은 세 learner 파일, `model:"gpt-6-luna"`, `policyVersion:"whole-trace-v3"`, 현재 `personaVersion`, 기준·평가·일반 연습 snapshot을 사용한다. 행동 예산은 `generationLimits.maxActions:100`을 사용한다. 이전 전체 계획 정책의 개인 archive·trial 파일을 바꾸지 말고 새 개인·trial을 만든다.
+3. 매 회차 `prepare_whole_trace({trialFile,arm,tabId,outputPath,maxRepairs:0})`를 호출한다. B/C 맞춤 연습에는 직전 분석 `READY`와 연결된 실제 `jobFilePath`·`generationFilePath`도 제공한다. trial이 seed·페르소나·경험·생성 조건을 고정하므로 수동 `learnerFile`·`attentionExperience`를 함께 전달하지 않는다.
+4. 반환된 bundle로 Luna가 전체 후보를 작성하고 `submit_whole_trace`에 제출한다. 기존 provider용 `generate_learning_round`를 여기서 다시 호출하지 않는다. 생성 결과의 `trialFile`, `arm`, `roundId`를 후속 증거 연결에 사용한다.
+5. 앱 재생·DB 수신 확인 뒤 기존 `record_learning_round`로 검증된 경험을 기록한다. 실행·저장·분석 실패는 기존 `record_learning_failure`로 남긴다. 다음 맞춤 회차에는 실제 분석과 퀘스트 로딩을 완료하고 새 시작 전 탭을 전달한다. 마지막은 `compare_learning_trial`로 비교한다.
+
+회차 준비와 후보 생성만으로 앱 로그인·재생·DB 저장·AI 분석이 실행되지는 않는다. 시스템 계산 회차의 개인 기억은 actor 앞부분에 한정하고 독립 완수 점수에서는 제외한다.

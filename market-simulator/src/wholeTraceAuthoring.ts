@@ -34,7 +34,8 @@ function declaration(activity: Declaration['actorState']['activity'], intent: De
 export function buildWholeTraceAuthoringGuide(bundle: Pick<WholeTraceBundle,
   'requestId' | 'inputHash' | 'snapshotId' | 'seed' | 'candidateVersion'>
   & { persona: Pick<WholeTraceBundle['persona'], 'id' | 'version'> }, options: { maxRepairs?: number;
-    observationVersion?: WholeTraceBundle['observationVersion'] } = {}) {
+    observationVersion?: WholeTraceBundle['observationVersion'];
+    authoringExampleVersion?: WholeTraceBundle['authoringExampleVersion'] } = {}) {
   const maxRepairs = options.maxRepairs ?? 0;
   if (maxRepairs !== 0 && maxRepairs !== 1) throw new Error('Authoring guide maxRepairs must be 0 or 1');
   const readList = declaration('check', 'check', '화면의 목록을 읽는다');
@@ -81,6 +82,8 @@ export function buildWholeTraceAuthoringGuide(bundle: Pick<WholeTraceBundle,
   checkWithPending.actorState.heldGoalIds = ['READ_GOAL_ID'];
   const helpWithPending = declaration('recover', 'help', '이용 방법을 확인한다');
   helpWithPending.actorState.heldGoalIds = ['READ_GOAL_ID'];
+  const walkWhileUnseen = structuredClone(openTask);
+  walkWhileUnseen.actorState.task = '열린 목표의 매대를 찾으려고 다른 통로로 걸어간다';
   const giveUpWithPending = declaration('finish', 'finish', '지금 장보기를 그만두기로 한다');
   giveUpWithPending.actorState.heldGoalIds = ['READ_GOAL_ID'];
 
@@ -227,6 +230,9 @@ export function buildWholeTraceAuthoringGuide(bundle: Pick<WholeTraceBundle,
           draft: sourceFreeControl('control/giveUp', '지금 장보기를 그만두기로 한다.', declaration('finish', 'finish', '장보기를 중단한다')) },
         giveUpWithPending: { precondition: 'The actor independently chooses available giveUp while READ_GOAL_ID is still pending. Ending need not abandon or complete pending goals, buy anything, or repair the cart.',
           draft: sourceFreeControl('control/giveUp', '진행 중인 목표가 있지만 지금 장보기를 그만두기로 한다.', giveUpWithPending) },
+        ...(options.authoringExampleVersion === 'walk-while-unseen-v1' ? { walkWhileUnseen: {
+          precondition: 'READ_GOAL_ID is open and its name is clear. No shelf, sign or product for it is visible on the current screen yet, and CURRENT_AVAILABLE_WAYPOINT_ID is one walk in the latest choiceIds. The actor independently chooses to keep looking by walking. This is a syntax example, not a required route, minimum walk count or ban on help, pause or giving up.',
+          draft: sourceFreeControl('walk/CURRENT_AVAILABLE_WAYPOINT_ID', '아직 목표 매대가 보이지 않아 다른 통로로 더 걸어가 본다.', walkWhileUnseen) } } : {}),
       },
       taskPreflight: {
         errorCode: 'AUTHORING_TASK_DECLARATION',

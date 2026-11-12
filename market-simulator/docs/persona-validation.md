@@ -1,6 +1,6 @@
 # 페르소나 성향 검증 상세
 
-[README](../README.md)에서 분리한 성향 검증 요청 예시와 공통 절차다. 에이전트 절차는 [스킬 문서](../../market-persona-skill/references/persona-validation.md)를 따른다.
+[README](../README.md)에서 분리한 성향 검증 요청 예시와 공통 절차다. 에이전트 절차는 [스킬 문서](../../market-persona-skill/validation/procedure.md)를 따른다.
 
 ## 공통 성향 기반 충실도 검증
 
@@ -54,7 +54,7 @@
 
 같은 조건·seed에서 양쪽 모두 기회가 있었던 쌍만 비교하며 유효 쌍 8개, |delta| ≥ 0.33, 95% CI의 0 제외 기준을 유지한다. 같은 인물·조건의 값이 모두 같은 경우는 근거 step ID를 포함한 진단 경고이며 판정 실패가 아니다. 성장과 과장 상한은 검사하지 않는다. 앞뒤 성향 유지는 명세 v3에서 설명 지표로만 보고하며 주 판정에 쓰지 않는다. 블라인드 답안은 v1이 다섯 축, v2가 아홉 축 전부를 요구한다. 아래 다섯 축 답안 예시는 v1용이며, v2에서는 준비 응답의 아홉 축 `answerFormat`을 사용한다. 익명 판에서 상품·이동 선택지 관측이 빠진 경우 해당 축은 `unknown`으로 남길 수 있다.
 
-현행 검증 snapshot과 생성기에는 이동 갈림길·유사 상품 동시 표시 구조가 있어 생성기 변경은 하지 않았다. 정적 기회는 실제 노출이나 HUD 정상 동작을 보장하지 않는다. 이번 구현은 파일럿이나 실제 사람 데이터 비교를 수행하지 않았다. 남은 파일럿은 **HUD 결함을 고친 snapshot, 새 runId, 조건별 seed 20개 이상**으로 실행한다. 연구 근거로 설계한 첫 플레이 성향이 수준대로 행동에 나타나는지를 본 것이며, 실제 지적장애인과의 유사성을 입증하지 않는다. 인물별 매핑·관측 필드·출처와 한계는 [v2 검증 절차](../../market-persona-skill/references/persona-validation.md#성향-카탈로그-v2--첫-플레이의-네-성향)를 따른다.
+현행 검증 snapshot과 생성기에는 이동 갈림길·유사 상품 동시 표시 구조가 있어 생성기 변경은 하지 않았다. 정적 기회는 실제 노출이나 HUD 정상 동작을 보장하지 않는다. 이번 구현은 파일럿이나 실제 사람 데이터 비교를 수행하지 않았다. 남은 파일럿은 **HUD 결함을 고친 snapshot, 새 runId, 조건별 seed 20개 이상**으로 실행한다. 연구 근거로 설계한 첫 플레이 성향이 수준대로 행동에 나타나는지를 본 것이며, 실제 지적장애인과의 유사성을 입증하지 않는다. 인물별 매핑·관측 필드·출처와 한계는 [v2 검증 절차](../../market-persona-skill/validation/trait-catalog.md#성향-카탈로그-v2--첫-플레이의-네-성향)를 따른다.
 
 ### 명세 v3 기준 프로필 요청 예시
 
@@ -82,7 +82,7 @@
 }
 ```
 
-기준 프로필은 같은 `contextHash`·공통 지침을 갖고 성향 지침 문장만 없다(`traits:null`). 다섯 성향이 `medium`인 `neutral-adult-control` 자체와는 다른 조건이다. `traitMode`는 `presetId`·`traits`와 함께 줄 수 없고 v1 카탈로그에서는 거절한다. 기준 프로필 슬롯은 readiness의 `missingSlots`에 생성 요청과 함께 포함되며, 기본 인물당 조건 2 × seed 수(이 예시는 40개) trace가 더 든다. 성향 대비·`groups`·블라인드 묶음에서는 빠지고 보고서에 `excludedBaselineTraces`가 표시된다. 위치 분류(`high-only-shift`·`low-only-shift`·`both-shift`·`baseline-beyond-range`·`indistinguishable`)는 모델의 기본 경향일 뿐 실제 사람의 평균이나 정상 범위가 아니다. 뒷부분에는 과제 단계 효과가 섞이므로 `contrastAttenuation`만으로 성향 감쇠를 확정하지 않는다. 정의와 한계는 [명세 v3 절차](../../market-persona-skill/references/persona-validation.md#명세-v3--기준-프로필과-앞뒤-성향-유지-설명-지표)를 따른다.
+기준 프로필은 같은 `contextHash`·공통 지침을 갖고 성향 지침 문장만 없다(`traits:null`). 다섯 성향이 `medium`인 `neutral-adult-control` 자체와는 다른 조건이다. `traitMode`는 `presetId`·`traits`와 함께 줄 수 없고 v1 카탈로그에서는 거절한다. 기준 프로필 슬롯은 readiness의 `missingSlots`에 생성 요청과 함께 포함되며, 기본 인물당 조건 2 × seed 수(이 예시는 40개) trace가 더 든다. 성향 대비·`groups`·블라인드 묶음에서는 빠지고 보고서에 `excludedBaselineTraces`가 표시된다. 위치 분류(`high-only-shift`·`low-only-shift`·`both-shift`·`baseline-beyond-range`·`indistinguishable`)는 모델의 기본 경향일 뿐 실제 사람의 평균이나 정상 범위가 아니다. 뒷부분에는 과제 단계 효과가 섞이므로 `contrastAttenuation`만으로 성향 감쇠를 확정하지 않는다. 정의와 한계는 [명세 v3 절차](../../market-persona-skill/validation/trait-catalog.md#명세-v3--기준-프로필과-앞뒤-성향-유지-설명-지표)를 따른다.
 
 ### 기존 다섯 축과 공통 절차
 
@@ -114,7 +114,7 @@
 
 새 `sequenceMetrics`는 대기시간 분포·전이·오류 근거·회복·반복을 설명하며 `descriptiveOnly:true`다. `pooledAnalysis`는 low/high 층화 쌍 부트스트랩, `powerAnalysis`는 고정 seed의 가정 기반 검정력이며 둘 다 주 판정에 사용하지 않는다. 유효 쌍 8·|delta| ≥ 0.33·95% CI의 0 제외·플래그 10%는 유지한다. **실수 강제 금지**: 오류가 많다고 장애 특성에 충실하다고 해석하지 않는다.
 
-다중 판별은 준비·제출의 `reviewerId`, 제출의 `reviewerKind:"llm"|"expert"`로 구분하고 판별자마다 A 채점 뒤 B, 채점 답안 동결을 지킨다. `blindReviews`에 판별자별 점수, `interReviewerAgreement`에 Cohen’s κ(2명)/Fleiss’ κ(3명 이상)를 보고한다. 기존 단일 `blind-review.json`도 읽는다. [전문가 안내](../../market-persona-skill/references/blind-review-guide.ko.md)와 [상세 입출력·한계](../../market-persona-skill/references/persona-validation.md)를 따른다. 실제 사람 자료는 수집·비교하지 않으며 `referenceComparison:null`과 [확장 메모](../../docs/ai/persona-validation/persona-validation-extension-design.md)만 남긴다. 기존 spec 원문은 validation/archive에 보존하고 새 명세(legacy v3/traits v2)는 새 run에만 적용한다.
+다중 판별은 준비·제출의 `reviewerId`, 제출의 `reviewerKind:"llm"|"expert"`로 구분하고 판별자마다 A 채점 뒤 B, 채점 답안 동결을 지킨다. `blindReviews`에 판별자별 점수, `interReviewerAgreement`에 Cohen’s κ(2명)/Fleiss’ κ(3명 이상)를 보고한다. 기존 단일 `blind-review.json`도 읽는다. [전문가 안내](../../market-persona-skill/validation/blind-review-guide.ko.md)와 [상세 입출력·한계](../../market-persona-skill/validation/procedure.md)를 따른다. 실제 사람 자료는 수집·비교하지 않으며 `referenceComparison:null`과 [확장 메모](../../docs/ai/persona-validation/persona-validation-extension-design.md)만 남긴다. 기존 spec 원문은 validation/archive에 보존하고 새 명세(legacy v3/traits v2)는 새 run에만 적용한다.
 
 다음 `prepare_persona_validation` 예시는 같은 기본 맥락에서 확인 성향만 다른 두 인물을 준비한다. 8개 seed × 2조건 × 2인물 = 32칸을 만들며 모델 생성은 자동 실행하지 않는다.
 
@@ -165,6 +165,6 @@
 
 다섯 축마다 `low / medium / high / unknown`을 답한다. `confidence`는 선택적 0~1이다. `unknown`은 정확도의 분모에 남으며, 축별 정확도와 판별 비율을 함께 보고한다. 고정된 25% 우연 정확도나 장애 분류를 적용하지 않는다. A/B는 같은 표본이고 독립적인 두 반복이 아니며 판별 세션의 독립성·정답 미열람은 자기 신고다. 마지막 `persona_validation_report({runDirectory})`가 JSON·한국어 보고서를 저장한다.
 
-새 공통 성향 run은 manifest `version:3`이다. `profiles`와 `personaIds`를 모두 생략하면 기존 세 인물을 설계 성향에 매핑한다. 기존 네 ID를 모두 전달하는 과거 `personaIds` 형식은 모드를 생략하면 legacy로 유지한다. 같은 네 ID에 공통 성향을 적용하려면 `validationMode:"traits"`를 명시한다. `validationMode:"legacy"`와 저장된 v2 run은 [기존 네 인물 고정 검증](../../market-persona-skill/references/persona-validation.md#legacy-v2--기존-네-인물-고정-검증-절차와-구현-기록)을 유지하며 v2/v3 자료를 섞지 않는다.
+새 공통 성향 run은 manifest `version:3`이다. `profiles`와 `personaIds`를 모두 생략하면 기존 세 인물을 설계 성향에 매핑한다. 기존 네 ID를 모두 전달하는 과거 `personaIds` 형식은 모드를 생략하면 legacy로 유지한다. 같은 네 ID에 공통 성향을 적용하려면 `validationMode:"traits"`를 명시한다. `validationMode:"legacy"`와 저장된 v2 run은 [기존 네 인물 고정 검증](../../market-persona-skill/legacy/persona-validation-v2.md#legacy-v2--기존-네-인물-고정-검증-절차와-구현-기록)을 유지하며 v2/v3 자료를 섞지 않는다.
 
 공통 성향 구현 테스트와 `allowFixture:true` 자료는 파이프라인 확인용이다. 이번 지침 보완으로 새 LLM 실험의 행동 개선 효과를 입증한 것은 아니며, 계획 검증은 실제 앱 수행·DB 수신·사람 행동의 타당성을 증명하지 않는다.

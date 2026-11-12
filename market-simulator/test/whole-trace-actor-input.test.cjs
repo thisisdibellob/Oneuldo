@@ -1,0 +1,78 @@
+'use strict';
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const { spawnSync } = require('node:child_process');
+require('../runtime.cjs');
+const { createService } = require('../server.cjs');
+const { createMarketSession } = require('../../frontend/src/game/marketSession.ts');
+const { createMarketReplaySnapshot } = require('../../frontend/src/game/marketReplayTrace.ts');
+const { buildActorInput, REPLACEMENTS, OMITTED_BUNDLE_KEYS } = require('../whole-trace-actor-input.cjs');
+
+async function prepared(t, extra = {}) {
+  const service = createService();
+  t.after(() => service.close());
+  const snapshot = createMarketReplaySnapshot(createMarketSession({ seed: 'actor-input',
+    objectives: [{ productId: 'milk', quantity: 1 }], environment: { cashierCount: 2 } }));
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'actor-input-test-'));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  return service.invokeTool('prepare_whole_trace', { personaId: 'mild-intellectual-disability-adult',
+    seed: 'actor-input', snapshot, outputPath: path.join(directory, 'trace.json'), ...extra });
+}
+
+const text = value => JSON.stringify(value);
+
+for (const [label, extra] of [['default bundle', {}],
+  ['movement feedback bundle', { movementFeedbackVersion: 'recent-movement-anchor-capacity-v1' }]]) {
+  test(`actor input omits hidden keys and rewrites their directives (${label})`, async t => {
+    const response = await prepared(t, extra);
+    const before = text(response);
+    const actorInput = buildActorInput(response);
+
+    assert.equal(text(response), before, 'the prepared response is not mutated');
+    for (const key of OMITTED_BUNDLE_KEYS) assert.equal(Object.hasOwn(actorInput.bundle, key), false, key);
+    assert.equal(Object.hasOwn(actorInput, 'diagnosticDirectory'), false);
+    assert.equal(actorInput.requestId, response.requestId);
+    assert.equal(actorInput.bundle.inputHash, response.bundle.inputHash);
+    assert.deepEqual(actorInput.bundle.authoringGuide.identity, response.bundle.authoringGuide.identity);
+    assert.deepEqual(actorInput.bundle.initialChoiceFrame, response.bundle.initialChoiceFrame);
+    assert.deepEqual(actorInput.bundle.persona, response.bundle.persona);
+
+    const output = text(actorInput.bundle);
+    for (const entry of REPLACEMENTS) assert.equal(output.includes(entry.from), false, entry.id);
+    assert.equal(output.includes('choiceCatalog.navigation'), false);
+    assert.equal(output.includes('choiceCatalog.referenceAliases entry'), false);
+    assert.match(actorInput.bundle.actionContract.walk, /current authoring menu/);
+    assert.match(actorInput.actorInputProjection.notice, /currentObservation/);
+    const applied = Object.fromEntries(actorInput.actorInputProjection.replacements.map(entry => [entry.id, entry.count]));
+    assert.ok(applied['walk-from-menu'] >= 1);
+    assert.ok(applied['world-reference-purpose'] >= 1);
+  });
+}
+
+test('actor input rejects malformed prepare responses', () => {
+  assert.throws(() => buildActorInput(null), /object/);
+  assert.throws(() => buildActorInput({ bundle: {} }), /requestId/);
+  assert.throws(() => buildActorInput({ requestId: 'r' }), /bundle/);
+  assert.throws(() => buildActorInput({ requestId: 'r', bundle: { requestId: 'other' } }), /does not match/);
+});
+
+test('actor input CLI writes a new file and never overwrites', async t => {
+  const response = await prepared(t);
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'actor-input-cli-'));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const source = path.join(directory, 'prepare-response.json');
+  const output = path.join(directory, 'actor-input.json');
+  fs.writeFileSync(source, JSON.stringify(response));
+  const cli = path.resolve(__dirname, '../whole-trace-actor-input.cjs');
+  const first = spawnSync(process.execPath, [cli, source, output], { encoding: 'utf8' });
+  assert.equal(first.status, 0, first.stderr);
+  const summary = JSON.parse(first.stdout);
+  assert.equal(summary.requestId, response.requestId);
+  assert.deepEqual(summary.omittedBundleKeys, ['worldReference', 'choiceCatalog', 'sourceFiles']);
+  assert.equal(JSON.parse(fs.readFileSync(output, 'utf8')).bundle.worldReference, undefined);
+  const second = spawnSync(process.execPath, [cli, source, output], { encoding: 'utf8' });
+  assert.notEqual(second.status, 0);
+});

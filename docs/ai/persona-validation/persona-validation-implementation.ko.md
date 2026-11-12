@@ -9,10 +9,10 @@ readiness, 기회 audit와 검증 snapshot 생성기, 다중 판별자와 κ, �
 | 파일 | 구분 |
 | --- | --- |
 | [market-persona-skill/SKILL.md](../../../market-persona-skill/SKILL.md) | 수정 |
-| [market-persona-skill/references/blind-review-guide.ko.md](../../../market-persona-skill/references/blind-review-guide.ko.md) | 신규 |
+| [market-persona-skill/references/blind-review-guide.ko.md](../../../market-persona-skill/validation/blind-review-guide.ko.md) | 신규 |
 | [market-persona-skill/references/persona-validation-extension-design.md](persona-validation-extension-design.md) | 신규 |
 | [market-persona-skill/references/persona-validation-implementation.ko.md](persona-validation-implementation.ko.md) | 신규 |
-| [market-persona-skill/references/persona-validation.md](../../../market-persona-skill/references/persona-validation.md) | 수정 |
+| [market-persona-skill/references/persona-validation.md](../../../market-persona-skill/validation/procedure.md) | 수정 |
 | [market-simulator/README.md](../../../market-simulator/README.md) | 수정 |
 | [market-simulator/cli.cjs](../../../market-simulator/cli.cjs) | 수정 |
 | [market-simulator/scripts/build-validation-snapshots.cjs](../../../market-simulator/scripts/build-validation-snapshots.cjs) | 신규 |
@@ -112,7 +112,7 @@ traits 제출 요청 형식(실제 판의 모든 opaque ID가 필요함):
 }
 ```
 
-응답은 기존 `reviewPath`, `panel`, `score`, 독립성 미입증 필드에 `reviewerId`, `reviewerKind`를 추가한다. LLM은 `reviewerModel`도 필요하다. A→B와 채점 답안 동결을 판별자별로 유지한다. ID를 생략하는 기존 호출과 `blind-review.json`은 호환되며 명시 ID 답안은 `blind-reviews.json`에 저장한다. 전문가에게는 [판별 안내](../../../market-persona-skill/references/blind-review-guide.ko.md)를 제공한다.
+응답은 기존 `reviewPath`, `panel`, `score`, 독립성 미입증 필드에 `reviewerId`, `reviewerKind`를 추가한다. LLM은 `reviewerModel`도 필요하다. A→B와 채점 답안 동결을 판별자별로 유지한다. ID를 생략하는 기존 호출과 `blind-review.json`은 호환되며 명시 ID 답안은 `blind-reviews.json`에 저장한다. 전문가에게는 [판별 안내](../../../market-persona-skill/validation/blind-review-guide.ko.md)를 제공한다.
 
 ## 검증 결과
 

@@ -63,6 +63,9 @@ export type WholeTraceBundle = {
   movementValidationVersion?: '1';
   movementVersion?: WholeTraceMovementVersion;
   movementFeedbackVersion?: WholeTraceMovementFeedbackVersion;
+  /** Optional experiment options; absent in default and archived bundles. */
+  choiceOrderVersion?: WholeTraceChoiceOrderVersion;
+  authoringExampleVersion?: WholeTraceAuthoringExampleVersion;
   bundleVersion: typeof WHOLE_TRACE_BUNDLE_VERSION; requestId: string; inputHash: string; policyVersion: typeof WHOLE_TRACE_POLICY_VERSION;
   model: typeof WHOLE_TRACE_MODEL; reasoningEffort: 'low'; observationScope: 'whole-world'; actorKnowledgeScope: 'observed-and-remembered';
   snapshotId: string; seed: string | number; persona: Pick<Persona, 'id' | 'version' | 'name' | 'description' | 'character'> & { behavior: WholeTracePersonaInput };
@@ -84,7 +87,19 @@ export type WholeTraceBundle = {
   actionContract: Record<string, string>; sourceFiles: { path: string; sha256: string }[];
 };
 export type WholeTraceSettings = Pick<TraceOptions, 'personaId' | 'seed' | 'snapshot' | 'timingProfile' | 'maxActions' |
-  'timeBudgetMs' | 'attentionExperience' | 'learnerIdentity' | 'trialBinding' | 'llm'> & { outputPath?: string; maxRepairs?: number; movementValidationVersion?: '1'; movementVersion?: WholeTraceMovementVersion; movementFeedbackVersion?: WholeTraceMovementFeedbackVersion };
+  'timeBudgetMs' | 'attentionExperience' | 'learnerIdentity' | 'trialBinding' | 'llm'> & { outputPath?: string; maxRepairs?: number; movementValidationVersion?: '1'; movementVersion?: WholeTraceMovementVersion; movementFeedbackVersion?: WholeTraceMovementFeedbackVersion;
+  choiceOrderVersion?: WholeTraceChoiceOrderVersion; authoringExampleVersion?: WholeTraceAuthoringExampleVersion };
+/** give-up-last-v1 lists control/giveUp after every other currently available choice. Availability is unchanged. */
+export const WHOLE_TRACE_CHOICE_ORDER_VERSIONS = ['give-up-last-v1'] as const;
+export type WholeTraceChoiceOrderVersion = typeof WHOLE_TRACE_CHOICE_ORDER_VERSIONS[number];
+/** walk-while-unseen-v1 adds one neutral walk example to the authoring guide. */
+export const WHOLE_TRACE_AUTHORING_EXAMPLE_VERSIONS = ['walk-while-unseen-v1'] as const;
+export type WholeTraceAuthoringExampleVersion = typeof WHOLE_TRACE_AUTHORING_EXAMPLE_VERSIONS[number];
+/** Presentation-only reordering: the same IDs, moved giveUp last. */
+export function wholeTraceOrderChoiceIds(choiceIds: string[], version?: WholeTraceChoiceOrderVersion): string[] {
+  if (version !== 'give-up-last-v1') return choiceIds;
+  return [...choiceIds.filter(id => id !== 'control/giveUp'), ...choiceIds.filter(id => id === 'control/giveUp')];
+}
 export type WholeTraceValidationIssue = { decisionIndex: number; decisionNumber: number; path: string; rule: string; message: string;
   evidence?: Record<string, unknown> };
 export type WholeTraceValidation = { issues?: WholeTraceValidationIssue[]; valid: boolean; errors: string[]; code?: string; failedDecisionIndex?: number;
