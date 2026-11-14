@@ -1,0 +1,59 @@
+{
+  "generator": "built-in image_gen",
+  "assets": [
+    {
+      "name": "window",
+      "file": "window.png",
+      "width": 512,
+      "height": 459,
+      "bytes": 383493,
+      "crop": {
+        "left": 17,
+        "top": 25,
+        "width": 1268,
+        "height": 1136
+      },
+      "alpha": {
+        "transparent": 34667,
+        "outerEdgeNonzero": 0
+      },
+      "sha256": "daf2933921a6ac4051cfa624f58a18d1fe872d99e06b19c2059e443e25fbc76a"
+    },
+    {
+      "name": "display",
+      "file": "display.png",
+      "width": 640,
+      "height": 281,
+      "bytes": 316760,
+      "crop": {
+        "left": 71,
+        "top": 164,
+        "width": 1443,
+        "height": 626
+      },
+      "alpha": {
+        "transparent": 37644,
+        "outerEdgeNonzero": 0
+      },
+      "sha256": "dd10a86cfc49e41938f128aebb24a42e4cbe838e013991136601c66b0bd1ecfe"
+    },
+    {
+      "name": "plants",
+      "file": "plants.png",
+      "width": 384,
+      "height": 435,
+      "bytes": 218575,
+      "crop": {
+        "left": 29,
+        "top": 36,
+        "width": 1097,
+        "height": 1244
+      },
+      "alpha": {
+        "transparent": 85693,
+        "outerEdgeNonzero": 0
+      },
+      "sha256": "ca6a075e2154488bcd3ccaa286716b29776a1b1471a201394f7cc45e414cac47"
+    }
+  ]
+}

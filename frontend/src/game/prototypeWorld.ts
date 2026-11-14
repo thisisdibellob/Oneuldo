@@ -9,7 +9,7 @@ export type Rect = {
 
 export type WorldMapId = 'village' | 'market' | 'home';
 
-export type VillageNpcId = 'minsu' | 'driver' | 'jiyoung' | 'sujin';
+export type VillageNpcId = 'minsu' | 'jiyoung' | 'sujin';
 
 export type VillageNpcDefinition = {
   accentColor: string;
@@ -81,11 +81,11 @@ export const WORLD_BOUNDS: Record<WorldMapId, { height: number; width: number }>
 // data prevents the generated texture layer from drifting away from collision and
 // marking coordinates as the village layout evolves.
 export const VILLAGE_ROADS: readonly VillageRoadDefinition[] = [
-  { height: 1405, id: 'west', width: 175, x: 365, y: 0 },
+  { height: 1500, id: 'west', width: 175, x: 365, y: 0 },
   { height: 190, id: 'main', width: 2200, x: 0, y: 675 },
   { height: 1700, id: 'east', width: 175, x: 1715, y: 0 },
-  { height: 160, id: 'south', width: 1525, x: 365, y: 1405 },
-  { height: 295, id: 'to-coast', width: 175, x: 1715, y: 1405 },
+  { height: 145, id: 'south', width: 1525, x: 365, y: 1500 },
+  { height: 200, id: 'to-coast', width: 175, x: 1715, y: 1500 },
 ];
 
 // The first town is intentionally larger than one viewport. Buildings are laid out as
@@ -127,14 +127,15 @@ export const MARKET_SECOND_CHECKOUT_RECT: Rect = { x: 949 - MARKET_CHECKOUT_WIDT
 export const MARKET_SECOND_CHECKOUT_POINT: Point = { x: 1012, y: MARKET_SECOND_CHECKOUT_RECT.y + 60 * MARKET_CHECKOUT_SIZE_MULTIPLIER };
 export const MARKET_SECOND_CASHIER_POINT: Point = { x: 889, y: MARKET_SECOND_CHECKOUT_POINT.y };
 
-export const HOUSE_ENTRANCE_POINT: Point = { x: 2050, y: 1210 };
-export const HOUSE_RETURN_POINT: Point = { x: 1890, y: 1210 };
+export const HOUSE_ENTRANCE_POINT: Point = { x: 2073, y: 1200 };
+export const HOUSE_RETURN_POINT: Point = { x: 2073, y: 1200 };
 export const HOME_PLAYER_POINT: Point = { x: 450, y: 840 };
 export const HOME_EXIT_POINT: Point = { x: 450, y: 930 };
 export const HOME_FRIDGE_POINT: Point = { x: 170, y: 305 };
 
-export const MARKET_BUS_STOP_POINT: Point = { x: 1005, y: 770 };
-export const BUS_STOP_POINT: Point = { x: 1805, y: 770 };
+// Pedestrian waiting points, set back from the carriageway. Shelter art stands behind them.
+export const MARKET_BUS_STOP_POINT: Point = { x: 1010, y: 638 };
+export const BUS_STOP_POINT: Point = { x: 2060, y: 644 };
 
 export const VILLAGE_PORTAL_INTERACTION_DISTANCE = 92;
 export const HOME_STATION_INTERACTION_DISTANCE = 100;
@@ -154,7 +155,7 @@ export const VILLAGE_BUILDINGS: readonly VillageBuildingDefinition[] = [
     label: '학교',
     outlineWidth: 1.67,
     width: 451,
-    x: 576,
+    x: 630,
     y: 224,
   },
   {
@@ -165,7 +166,7 @@ export const VILLAGE_BUILDINGS: readonly VillageBuildingDefinition[] = [
     label: '하늘마트',
     outlineWidth: 1.52,
     width: 388,
-    x: 1067,
+    x: 1089,
     y: 275,
   },
   {
@@ -176,8 +177,8 @@ export const VILLAGE_BUILDINGS: readonly VillageBuildingDefinition[] = [
     label: '식당',
     outlineWidth: 1.46,
     width: 260,
-    x: 1455,
-    y: 449,
+    x: 1100,
+    y: 65,
   },
   {
     color: '#94A8A7',
@@ -188,7 +189,7 @@ export const VILLAGE_BUILDINGS: readonly VillageBuildingDefinition[] = [
     outlineWidth: 1.48,
     width: 150,
     x: 1975,
-    y: 400,
+    y: 265,
   },
   {
     color: '#A8B79E',
@@ -198,7 +199,7 @@ export const VILLAGE_BUILDINGS: readonly VillageBuildingDefinition[] = [
     label: '주민센터',
     outlineWidth: 1.5,
     width: 266,
-    x: 1415,
+    x: 1363,
     y: 114,
   },
   {
@@ -209,30 +210,30 @@ export const VILLAGE_BUILDINGS: readonly VillageBuildingDefinition[] = [
     label: '민수네',
     outlineWidth: 1.56,
     width: 209,
-    x: 1941,
-    y: 97,
+    x: 1975,
+    y: 25,
   },
   {
     color: '#C99C78',
     entranceHeight: 75,
-    height: 238,
+    height: 226,
     id: 'player-home',
     label: '우리 집',
     outlineWidth: 1.59,
-    width: 246,
-    x: 1930,
-    y: 917,
+    width: 234,
+    x: 1966,
+    y: 945,
   },
   {
     color: '#8EA891',
-    entranceHeight: 93,
-    height: 157,
+    entranceHeight: 83,
+    height: 140,
     id: 'convenience',
     label: '편의점',
     outlineWidth: 1.07,
-    width: 270,
-    x: 1918,
-    y: 1233,
+    width: 235,
+    x: 1965,
+    y: 1260,
   },
   {
     color: '#B795A5',
@@ -242,8 +243,8 @@ export const VILLAGE_BUILDINGS: readonly VillageBuildingDefinition[] = [
     label: '노래방',
     outlineWidth: 1.4,
     width: 261,
-    x: 562,
-    y: 999,
+    x: 630,
+    y: 950,
   },
   {
     color: '#D1A77D',
@@ -253,8 +254,8 @@ export const VILLAGE_BUILDINGS: readonly VillageBuildingDefinition[] = [
     label: '햄버거 가게',
     outlineWidth: 1.63,
     width: 305,
-    x: 845,
-    y: 907,
+    x: 908,
+    y: 951,
   },
   {
     color: '#8FA6B2',
@@ -265,7 +266,7 @@ export const VILLAGE_BUILDINGS: readonly VillageBuildingDefinition[] = [
     outlineWidth: 1.57,
     width: 314,
     x: 861,
-    y: 1149,
+    y: 1176,
   },
   {
     color: '#C8A588',
@@ -275,8 +276,8 @@ export const VILLAGE_BUILDINGS: readonly VillageBuildingDefinition[] = [
     label: '카페',
     outlineWidth: 1.36,
     width: 240,
-    x: 1210,
-    y: 924,
+    x: 1290,
+    y: 951,
   },
   {
     color: '#9AAEAA',
@@ -286,8 +287,8 @@ export const VILLAGE_BUILDINGS: readonly VillageBuildingDefinition[] = [
     label: '은행',
     outlineWidth: 1.62,
     width: 392,
-    x: 1190,
-    y: 1123,
+    x: 1232,
+    y: 1200,
   },
   {
     color: '#C2AD8E',
@@ -297,133 +298,79 @@ export const VILLAGE_BUILDINGS: readonly VillageBuildingDefinition[] = [
     label: '부동산',
     outlineWidth: 1.38,
     width: 230,
-    x: 1467,
-    y: 940,
+    x: 45,
+    y: 920,
   },
   {
     color: '#91A6A0',
-    entranceHeight: 84,
-    height: 227,
+    entranceHeight: 79,
+    height: 213,
     id: 'library',
-    label: '도서관',
-    outlineWidth: 1.62,
-    width: 301,
-    x: 37,
-    y: 1038,
+    label: '마을회관',
+    outlineWidth: 1.52,
+    width: 283,
+    x: 0,
+    y: 1130,
   },
 ];
 
+function villageProp(id: string, kind: VillageDecorationKind, x: number, y: number,
+  width: number, height: number, solid = false, flipX = false): VillageDecorationDefinition {
+  const footprintWidth = kind === 'tree' ? width * 0.24 : kind === 'streetlamp' ? 8 : width * 0.82;
+  const footprintHeight = kind === 'tree' ? 10 : Math.min(12, height * 0.25);
+  return { id, kind, x, y, width, height, flipX, layer: kind === 'tree' || kind === 'shrub' ? 'back' : 'front',
+    ...(solid ? { obstacle: { width: footprintWidth, height: footprintHeight,
+      offsetX: (width - footprintWidth) / 2, offsetY: height - footprintHeight } } : {}) };
+}
+
+// All art is bottom-aligned. Only its grounded base blocks walking; canopies never do.
 export const VILLAGE_DECORATIONS: readonly VillageDecorationDefinition[] = [
-  // 서북쪽 공원
-  {
-    height: 165,
-    id: 'park-tree-west',
-    kind: 'tree',
-    layer: 'back',
-    obstacle: { height: 24, offsetX: 61, offsetY: 137, width: 28 },
-    width: 150,
-    x: 18,
-    y: 130,
-  },
-  {
-    flipX: true,
-    height: 138,
-    id: 'park-tree-east',
-    kind: 'tree',
-    layer: 'back',
-    obstacle: { height: 20, offsetX: 52, offsetY: 115, width: 24 },
-    width: 128,
-    x: 202,
-    y: 255,
-  },
-  { height: 62, id: 'park-shrub-southwest', kind: 'shrub', layer: 'back', width: 104, x: 24, y: 470 },
-  { flipX: true, height: 66, id: 'park-shrub-southeast', kind: 'shrub', layer: 'back', width: 112, x: 205, y: 468 },
-  {
-    height: 78,
-    id: 'park-bench',
-    kind: 'bench',
-    layer: 'front',
-    obstacle: { height: 20, offsetX: 12, offsetY: 53, width: 88 },
-    width: 112,
-    x: 92,
-    y: 400,
-  },
-  { height: 68, id: 'park-flowerbed', kind: 'flowerbed', layer: 'front', width: 126, x: 94, y: 540 },
-
-  // 학교 운동장과 마트 진입광장
-  { height: 46, id: 'school-fence-one', kind: 'fence', layer: 'back', width: 92, x: 600, y: 165 },
-  { height: 46, id: 'school-fence-two', kind: 'fence', layer: 'back', width: 92, x: 696, y: 165 },
-  { height: 46, id: 'school-fence-three', kind: 'fence', layer: 'back', width: 92, x: 792, y: 165 },
-  { height: 46, id: 'school-fence-four', kind: 'fence', layer: 'back', width: 92, x: 888, y: 165 },
-  { height: 64, id: 'school-flowerbed-west', kind: 'flowerbed', layer: 'front', width: 116, x: 600, y: 545 },
-  { flipX: true, height: 64, id: 'school-flowerbed-east', kind: 'flowerbed', layer: 'front', width: 116, x: 842, y: 545 },
-  { height: 65, id: 'school-bicycle', kind: 'bicycle', layer: 'front', width: 102, x: 724, y: 555 },
-  { height: 56, id: 'market-shrub-west', kind: 'shrub', layer: 'back', width: 94, x: 1020, y: 555 },
-  { flipX: true, height: 56, id: 'market-shrub-east', kind: 'shrub', layer: 'back', width: 94, x: 1340, y: 555 },
-  { height: 44, id: 'market-trash', kind: 'trash-bin', layer: 'front', width: 44, x: 1374, y: 582 },
-
-  // 주민센터 사이 작은 정원
-  {
-    height: 128,
-    id: 'civic-tree',
-    kind: 'tree',
-    layer: 'back',
-    obstacle: { height: 18, offsetX: 46, offsetY: 107, width: 24 },
-    width: 116,
-    x: 1460,
-    y: 285,
-  },
-  { height: 62, id: 'civic-bench', kind: 'bench', layer: 'front', width: 96, x: 1585, y: 330 },
-  { flipX: true, height: 58, id: 'civic-shrub', kind: 'shrub', layer: 'back', width: 98, x: 1600, y: 275 },
-  { height: 58, id: 'civic-flowerbed', kind: 'flowerbed', layer: 'front', width: 108, x: 1570, y: 390 },
-
-  // 동쪽 주거지
-  { height: 45, id: 'minsu-fence-one', kind: 'fence', layer: 'back', width: 90, x: 1925, y: 308 },
-  { height: 45, id: 'minsu-fence-two', kind: 'fence', layer: 'back', width: 90, x: 2020, y: 308 },
-  { flipX: true, height: 105, id: 'minsu-tree', kind: 'tree', layer: 'back', width: 95, x: 2084, y: 292 },
-  { height: 52, id: 'minsu-shrub', kind: 'shrub', layer: 'back', width: 88, x: 1925, y: 345 },
-
-  // 서남 문화공간과 남쪽 상점가
-  {
-    height: 125,
-    id: 'library-tree',
-    kind: 'tree',
-    layer: 'back',
-    obstacle: { height: 18, offsetX: 46, offsetY: 104, width: 24 },
-    width: 114,
-    x: 220,
-    y: 925,
-  },
-  { height: 58, id: 'library-shrub', kind: 'shrub', layer: 'back', width: 98, x: 28, y: 960 },
-  { height: 65, id: 'library-bench', kind: 'bench', layer: 'front', width: 102, x: 44, y: 1282 },
-  { height: 61, id: 'library-bicycle', kind: 'bicycle', layer: 'front', width: 98, x: 220, y: 1288 },
-  { height: 48, id: 'karaoke-trash', kind: 'trash-bin', layer: 'front', width: 48, x: 816, y: 1190 },
-  { height: 60, id: 'shops-flowerbed-west', kind: 'flowerbed', layer: 'front', width: 112, x: 585, y: 1288 },
-  { flipX: true, height: 60, id: 'shops-flowerbed-center', kind: 'flowerbed', layer: 'front', width: 112, x: 1010, y: 1288 },
-  { height: 64, id: 'cafe-bench', kind: 'bench', layer: 'front', width: 102, x: 1575, y: 1092 },
-  { flipX: true, height: 62, id: 'cafe-bicycle', kind: 'bicycle', layer: 'front', width: 100, x: 1562, y: 1125 },
-  { height: 56, id: 'bank-flowerbed', kind: 'flowerbed', layer: 'front', width: 104, x: 1220, y: 1137 },
-  { flipX: true, height: 56, id: 'estate-flowerbed', kind: 'flowerbed', layer: 'front', width: 104, x: 1544, y: 1137 },
-
-  // 우리 집과 편의점 주변
-  { height: 54, id: 'home-shrub-west', kind: 'shrub', layer: 'back', width: 92, x: 1928, y: 1160 },
-  { flipX: true, height: 54, id: 'home-shrub-east', kind: 'shrub', layer: 'back', width: 92, x: 2092, y: 1160 },
-  { height: 44, id: 'home-fence-one', kind: 'fence', layer: 'back', width: 88, x: 1925, y: 1450 },
-  { height: 44, id: 'home-fence-two', kind: 'fence', layer: 'back', width: 88, x: 2018, y: 1450 },
-  { height: 44, id: 'home-fence-three', kind: 'fence', layer: 'back', width: 88, x: 2111, y: 1450 },
-  { height: 46, id: 'convenience-trash', kind: 'trash-bin', layer: 'front', width: 46, x: 2118, y: 1360 },
-
-  // 주요 보행로를 잇는 가로등
-  { height: 112, id: 'lamp-west-north', kind: 'streetlamp', layer: 'front', width: 48, x: 536, y: 548 },
-  { height: 106, id: 'lamp-market-north', kind: 'streetlamp', layer: 'front', width: 45, x: 974, y: 553 },
-  { height: 104, id: 'lamp-civic-north', kind: 'streetlamp', layer: 'front', width: 44, x: 1670, y: 606 },
-  { height: 112, id: 'lamp-west-south', kind: 'streetlamp', layer: 'front', width: 48, x: 536, y: 858 },
-  { height: 106, id: 'lamp-market-south', kind: 'streetlamp', layer: 'front', width: 45, x: 1112, y: 872 },
-  { height: 108, id: 'lamp-east-south', kind: 'streetlamp', layer: 'front', width: 46, x: 1662, y: 858 },
-  { height: 105, id: 'lamp-library', kind: 'streetlamp', layer: 'front', width: 44, x: 298, y: 1250 },
-  { height: 108, id: 'lamp-residential', kind: 'streetlamp', layer: 'front', width: 46, x: 2120, y: 790 },
+  villageProp('park-tree-west', 'tree', 32, 104, 148, 165, true),
+  villageProp('park-tree-east', 'tree', 213, 280, 112, 125, true, true),
+  villageProp('park-tree-north', 'tree', 213, 42, 104, 116, true),
+  villageProp('park-shrub-west', 'shrub', 26, 356, 94, 30, true),
+  villageProp('park-shrub-east', 'shrub', 204, 503, 88, 28, true),
+  villageProp('park-shrub-north', 'shrub', 36, 42, 102, 33),
+  villageProp('park-bench', 'bench', 93, 432, 112, 47, true),
+  villageProp('park-flowerbed', 'flowerbed', 85, 568, 156, 27, true),
+  villageProp('park-flowerbed-small', 'flowerbed', 32, 294, 104, 18, true),
+  villageProp('school-fence-one', 'fence', 640, 165, 90, 45),
+  villageProp('school-fence-two', 'fence', 734, 165, 90, 45),
+  villageProp('school-fence-three', 'fence', 828, 165, 90, 45),
+  villageProp('school-flowerbed-west', 'flowerbed', 627, 530, 118, 20, true),
+  villageProp('school-flowerbed-east', 'flowerbed', 870, 516, 130, 22, true),
+  villageProp('school-bench', 'bench', 740, 510, 112, 47, true),
+  villageProp('school-bicycle', 'bicycle', 774, 572, 72, 46),
+  villageProp('market-shrub-west', 'shrub', 1103, 557, 100, 32, true),
+  villageProp('market-shrub-east', 'shrub', 1303, 548, 94, 30, true),
+  villageProp('market-trash', 'trash-bin', 1328, 605, 29, 33),
+  villageProp('civic-tree', 'tree', 1515, 301, 128, 143, true),
+  villageProp('civic-bench', 'bench', 1514, 478, 108, 46, true),
+  villageProp('civic-shrub', 'shrub', 1566, 546, 66, 21, true),
+  villageProp('civic-flowerbed', 'flowerbed', 1483, 561, 120, 21, true),
+  villageProp('minsu-shrub', 'shrub', 2142, 310, 57, 18),
+  villageProp('station-flowerbed', 'flowerbed', 2125, 553, 68, 12, true),
+  villageProp('library-tree', 'tree', 214, 1361, 106, 118, true),
+  villageProp('library-shrub', 'shrub', 36, 1090, 98, 31, true),
+  villageProp('library-bench', 'bench', 42, 1390, 104, 44, true),
+  villageProp('library-flowerbed', 'flowerbed', 25, 1501, 152, 26, true),
+  villageProp('shops-flowerbed-west', 'flowerbed', 620, 1390, 132, 23, true),
+  villageProp('shops-tree-west', 'tree', 599, 1221, 110, 123, true),
+  villageProp('shops-bench-west', 'bench', 711, 1370, 100, 42, true),
+  villageProp('cafe-bench', 'bench', 1540, 1138, 102, 43, true),
+  villageProp('cafe-bicycle', 'bicycle', 1560, 1194, 72, 46),
+  villageProp('bank-flowerbed', 'flowerbed', 1340, 1160, 136, 23, true),
+  villageProp('home-shrub-west', 'shrub', 1968, 1170, 77, 25, true),
+  villageProp('home-shrub-east', 'shrub', 2120, 1170, 77, 25, true),
+  villageProp('home-flowerbed', 'flowerbed', 2010, 1470, 150, 26, true),
+  villageProp('convenience-trash', 'trash-bin', 2158, 1420, 29, 33),
+  villageProp('lamp-west-north', 'streetlamp', 635, 489, 27, 96, true),
+  villageProp('lamp-market-north', 'streetlamp', 1363, 489, 27, 96, true),
+  villageProp('lamp-civic-north', 'streetlamp', 1605, 489, 27, 96, true),
+  villageProp('lamp-west-south', 'streetlamp', 628, 1045, 27, 96, true),
+  villageProp('lamp-east-south', 'streetlamp', 1611, 941, 27, 96, true),
+  villageProp('lamp-library', 'streetlamp', 263, 1420, 27, 96, true),
 ];
-
 const villageBuildingObstacles: readonly Rect[] = VILLAGE_BUILDINGS.map(
   ({ height, width, x, y }) => ({ height, width, x, y }),
 );
@@ -467,17 +414,6 @@ export const VILLAGE_NPCS: readonly VillageNpcDefinition[] = [
     region: '마을 중앙',
     roleLabel: '친구',
     smallTalk: ['오늘도 만나서 반가워!', '천천히 마을을 한 바퀴 걸어볼까?'],
-  },
-  {
-    accentColor: '#5D7F94',
-    id: 'driver',
-    name: '기사님',
-    point: { x: 1990, y: 770 },
-    questHint: '목적지까지 가는 버스를 함께 찾아봐요.',
-    questId: 'bus-route',
-    region: '동쪽 버스정류장',
-    roleLabel: '버스 기사',
-    smallTalk: ['오늘은 길이 한산하네요.', '버스를 타기 전에는 번호를 먼저 확인해요.'],
   },
   {
     accentColor: '#78A386',

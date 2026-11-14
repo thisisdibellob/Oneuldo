@@ -1,0 +1,23 @@
+{
+  "date": "2026-10-03",
+  "generator": "built-in image_gen",
+  "purpose": "Optional grocery environment theme; characters and product assets preserved",
+  "assets": [
+    {
+      "name": "gondola",
+      "prompt": "Use case: style-transfer. Edit target: attached existing empty supermarket fixture. Create a production-ready replacement transparent game sprite of THIS SAME fixture with IDENTICAL front-elevated orthographic camera, bounding proportions, shelf heights, alignment, zero perspective rotation. Two wide empty display shelf tiers. Cream uprights, pale sage green shelf edges, honey oak backpanel. Preserve exact two shelf levels and camera geometry. Art direction: cozy 2D illustrated life-sim, clean gently rounded silhouettes, thick consistent warm dark cocoa brown outlines (not black), broad flat pastel color areas, only one simple cel shadow color. Hand-drawn cartoon furniture at small mobile-game scale. Remove all photo texture, wood grain noise, gradients, metallic highlights and fussy line details. Clear matte flat color fills. No characters, no groceries, no items, no text, no backdrop, no ground plane. Transparent alpha outside the object; fit whole object, tiny even padding. Existing separately rendered product images must line up on the same shelf top edges."
+    },
+    {
+      "name": "fridge",
+      "prompt": "Use case: style-transfer. Edit target: attached existing empty supermarket fixture. Create a production-ready replacement transparent game sprite of THIS SAME fixture with IDENTICAL front-elevated orthographic camera, bounding proportions, shelf heights, alignment, zero perspective rotation. Open supermarket fridge two empty wide tiers. Warm cream outer shell, sage shelf edges, very pale powder blue backing, small bottom vent. Preserve exact shelf levels and geometry. Art direction: cozy 2D illustrated life-sim, clean gently rounded silhouettes, thick consistent warm dark cocoa brown outlines (not black), broad flat pastel color areas, only one simple cel shadow color. Hand-drawn cartoon furniture at small mobile-game scale. Remove all photo texture, wood grain noise, gradients, metallic highlights and fussy line details. Clear matte flat color fills. No characters, no groceries, no items, no text, no backdrop, no ground plane. Transparent alpha outside the object; fit whole object, tiny even padding. Existing separately rendered product images must line up on the same shelf top edges."
+    },
+    {
+      "name": "produce",
+      "prompt": "Use case: style-transfer. Edit target: attached existing empty supermarket fixture. Create a production-ready replacement transparent game sprite of THIS SAME fixture with IDENTICAL front-elevated orthographic camera, bounding proportions, shelf heights, alignment, zero perspective rotation. Two rows of four empty produce cubbies each. Peach oak wood, muted sage edges, simple soft cream legs. Preserve precise shelf geometry and compartment layout. Art direction: cozy 2D illustrated life-sim, clean gently rounded silhouettes, thick consistent warm dark cocoa brown outlines (not black), broad flat pastel color areas, only one simple cel shadow color. Hand-drawn cartoon furniture at small mobile-game scale. Remove all photo texture, wood grain noise, gradients, metallic highlights and fussy line details. Clear matte flat color fills. No characters, no groceries, no items, no text, no backdrop, no ground plane. Transparent alpha outside the object; fit whole object, tiny even padding. Existing separately rendered product images must line up on the same shelf top edges."
+    },
+    {
+      "name": "checkout",
+      "prompt": "Use case: style-transfer. Attached image is the exact game checkout fixture to restyle. Keep its tall narrow shape, almost topdown front view, footprint, screen at TOP, conveyor belt below, all component positions and proportions. Draw as clean cozy 2D cartoon game furniture with thick smooth cocoa-brown outlines, flat pale cream main surface, sage green outer rim and drawer, warm brown cash register, muted slate blue conveyor, pale blue screens. Only flat color and one simple shadow tone, absolutely NO grain, hatching, textures, glossy 3D shading, gradients. Zero backdrop and zero ground shadow, surroundings MUST be fully transparent alpha, not brown, not gray, no halo or glow. No person/products/text. Clean hand inked lineart. Whole object fits canvas with tiny even padding."
+    }
+  ]
+}

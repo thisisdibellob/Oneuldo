@@ -1,0 +1,116 @@
+[
+  {
+    "name": "bus-right",
+    "source": "source/bus-right.png",
+    "sourceWidth": 1942,
+    "sourceHeight": 809,
+    "crop": {
+      "left": 21,
+      "top": 29,
+      "width": 1903,
+      "height": 735
+    },
+    "width": 1280,
+    "height": 494,
+    "bytes": 817334,
+    "hasAlpha": true,
+    "builtInOriginal": "exec-4b5015ad-a50c-4add-9d08-f9b2c19dc039.png"
+  },
+  {
+    "name": "bus-left",
+    "source": "source/bus-left.png",
+    "sourceWidth": 1881,
+    "sourceHeight": 836,
+    "crop": {
+      "left": 52,
+      "top": 75,
+      "width": 1788,
+      "height": 710
+    },
+    "width": 1280,
+    "height": 508,
+    "bytes": 738114,
+    "hasAlpha": true,
+    "builtInOriginal": "exec-85842b86-ac96-433b-ba32-4ebd8e27b09a.png"
+  },
+  {
+    "name": "interior",
+    "source": "source/interior.png",
+    "sourceWidth": 879,
+    "sourceHeight": 1790,
+    "crop": null,
+    "width": 879,
+    "height": 1790,
+    "bytes": 1622196,
+    "hasAlpha": false,
+    "builtInOriginal": "exec-d5c07114-bf17-400b-9e0c-391b7921342c.png"
+  },
+  {
+    "name": "library-exterior",
+    "source": "source/library-exterior.png",
+    "sourceWidth": 1495,
+    "sourceHeight": 1052,
+    "crop": {
+      "left": 22,
+      "top": 143,
+      "width": 1452,
+      "height": 755
+    },
+    "width": 1080,
+    "height": 562,
+    "bytes": 874091,
+    "hasAlpha": true,
+    "builtInOriginal": "exec-d763497d-5c49-4a48-ae9b-0d5dd72401be.png"
+  },
+  {
+    "name": "shelter",
+    "source": "source/shelter.png",
+    "sourceWidth": 1536,
+    "sourceHeight": 1024,
+    "crop": {
+      "left": 90,
+      "top": 97,
+      "width": 1357,
+      "height": 828
+    },
+    "width": 768,
+    "height": 469,
+    "bytes": 318691,
+    "hasAlpha": true,
+    "builtInOriginal": "exec-81c23549-cc57-4dbb-a526-d831357a2490.png"
+  },
+  {
+    "name": "driver",
+    "source": "source/driver.png",
+    "sourceWidth": 995,
+    "sourceHeight": 1580,
+    "crop": {
+      "left": 167,
+      "top": 69,
+      "width": 660,
+      "height": 1461
+    },
+    "width": 192,
+    "height": 424,
+    "bytes": 116993,
+    "hasAlpha": true,
+    "builtInOriginal": "exec-39372351-be99-48f8-9ddb-91b9e2260a0b.png"
+  },
+  {
+    "name": "player-seated",
+    "source": "source/player-seated.png",
+    "sourceWidth": 1149,
+    "sourceHeight": 1368,
+    "crop": {
+      "left": 232,
+      "top": 98,
+      "width": 685,
+      "height": 1181
+    },
+    "width": 197,
+    "height": 340,
+    "bytes": 87212,
+    "hasAlpha": true,
+    "builtInOriginal": "exec-22a88d4b-e329-4f45-89e4-40e314f20850.png"
+  }
+]

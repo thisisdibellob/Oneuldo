@@ -4,6 +4,8 @@ import { StyleSheet, Text, View } from 'react-native';
 import { getMarketElevatorFacadeRect, MARKET_FIXED_OBJECTS, MARKET_WALKABLE_AREAS, MARKET_WALLS, type MarketEnvironment } from '../../game/marketEnvironment';
 import { MARKET_WORLD_HEIGHT, MARKET_WORLD_WIDTH, type Rect } from '../../game/prototypeWorld';
 import { fonts } from '../../theme';
+import { useGamePreferences } from '../../game/gamePreferences';
+import { COZY_MARKET_PALETTE as cozy } from '../../game/marketInteriorThemes';
 
 function rectStyle(rect: Rect) {
   return { left: rect.x, top: rect.y, width: rect.width, height: rect.height };
@@ -24,6 +26,8 @@ function seatingInlay(rects: Rect[]): Rect | null {
 /** Wall finishes and floor graphics never participate in collision or input.
  * Every structural edge is drawn from the same world data used by movement. */
 export const MarketArchitectureLayer = memo(function MarketArchitectureLayer({ environment }: { environment?: MarketEnvironment }) {
+  const { preferences } = useGamePreferences();
+  const illustrated = preferences.marketInteriorTheme === 'cozy';
   const areas = environment?.walkableAreas ?? MARKET_WALKABLE_AREAS;
   const walls = environment?.walls ?? MARKET_WALLS;
   const width = environment?.world.width ?? MARKET_WORLD_WIDTH;
@@ -41,17 +45,23 @@ export const MarketArchitectureLayer = memo(function MarketArchitectureLayer({ e
   const lobbyBrandLeft = lobby ? Math.max(lobby.x + 22, Math.min((common?.point.x ?? lobby.x + lobby.width / 2) - 80, lobby.x + lobby.width - 182)) : 0;
   const lobbyBrandTop = lobby ? Math.max(lobby.y + 52, Math.min(lobby.y + lobby.height * 0.42, (common?.gate.y ?? lobby.y + lobby.height) - 174)) : 0;
   return <View pointerEvents="none" aria-hidden accessibilityElementsHidden importantForAccessibility="no-hide-descendants"
-    style={[styles.root, { width, height }]}>
+    testID={`market-interior-${preferences.marketInteriorTheme}`}
+    style={[styles.root, { width, height }, illustrated && { backgroundColor: cozy.background }]}>
     {areas.map(area => <View key={area.id} testID={`market-floor-${area.id}`}
       style={[styles.floor, area.id === 'entrance-lobby' && styles.lobby,
         { left: area.x, top: area.y, width: area.width, height: area.height }]}>
-      <LinearGradient colors={area.id === 'entrance-lobby' ? ['#EBEEE8', '#E3E9E2'] : ['#F8F6EF', '#EDECE3']}
+      <LinearGradient colors={illustrated ? area.id === 'entrance-lobby' ? [cozy.lobbyLight, cozy.lobby] : [cozy.floorLight, cozy.floor]
+        : area.id === 'entrance-lobby' ? ['#EBEEE8', '#E3E9E2'] : ['#F8F6EF', '#EDECE3']}
         start={{ x: 0, y: 0 }} end={{ x: 0.8, y: 1 }} style={StyleSheet.absoluteFill} />
+      {illustrated ? <MapleFloor width={area.width} height={area.height} lobby={area.id === 'entrance-lobby'} /> : <>
       {Array.from({ length: Math.ceil(width / 48) + 1 }, (_, index) => index * 48).map(x =>
-        <View key={`x${x}`} style={[styles.grout, { left: x - area.x, width: 0.6, top: 0, bottom: 0 }]} />)}
+        <View key={`x${x}`} style={[styles.grout, illustrated && { backgroundColor: cozy.grout }, { left: x - area.x, width: 0.6, top: 0, bottom: 0 }]} />)}
       {Array.from({ length: Math.ceil(height / 48) + 1 }, (_, index) => index * 48).map(y =>
         <View key={`y${y}`} testID={`market-floor-row-${area.id}-${y}`}
-          style={[styles.grout, { top: y - area.y, height: 0.6, left: 0, right: 0 }]} />)}
+          style={[styles.grout, illustrated && { backgroundColor: cozy.grout }, { top: y - area.y, height: 0.6, left: 0, right: 0 }]} />)}
+      </>}
+      {illustrated && <View pointerEvents="none" style={{ position: 'absolute', left: 6, right: 6, top: 6, bottom: 6,
+        borderWidth: 6, borderColor: area.id === 'entrance-lobby' ? '#BFCCA960' : '#E6C5AB60', borderRadius: 10 }} />}
     </View>)}
     {/* Inlaid floor borders distinguish the shopping and service areas without obstacles. */}
     {sales ? <View testID="market-sales-floor-border" style={[styles.salesBorder,
@@ -59,7 +69,7 @@ export const MarketArchitectureLayer = memo(function MarketArchitectureLayer({ e
     {salesSeating ? <View testID="market-service-seating-inlay" style={[styles.serviceFloor, rectStyle(salesSeating)]} /> : null}
     {lobbySeating ? <View testID="market-lobby-seating-inlay" style={[styles.lobbySeatingFloor, rectStyle(lobbySeating)]} /> : null}
     {environment?.checkouts.map((counter, index) => <View key={counter.id} testID={`market-checkout-lane-${index + 1}`}
-      style={[styles.checkoutLane, { left: counter.rect.x - 63, top: counter.rect.y - 42,
+      style={[styles.checkoutLane, illustrated && { backgroundColor: '#B7C3A52E', borderColor: '#AFBB9B55', borderRadius: 13 }, { left: counter.rect.x - 63, top: counter.rect.y - 42,
         width: counter.point.x - counter.rect.x + 90, height: counter.rect.height + 72 }]}>
       <View style={[styles.queueLine, { left: counter.point.x - counter.rect.x + 63 }]} />
       <Text style={[styles.queueArrow, { left: counter.point.x - counter.rect.x + 52 }]}>↓</Text>
@@ -67,9 +77,9 @@ export const MarketArchitectureLayer = memo(function MarketArchitectureLayer({ e
     {lobby ? <>
       <View style={[styles.lobbyRule, { left: lobby.x + 22, top: lobby.y + 80, width: lobby.width - 44 }]} />
       <View style={[styles.lobbyInlay, { left: lobbyBrandLeft, top: lobbyBrandTop }]}>
-        <View style={styles.brandMark}><Text style={styles.brandMarkText}>ㅎ</Text></View>
-        <Text style={styles.lobbyBrand}>하늘마트</Text>
-        <Text style={styles.lobbyTagline}>좋은 하루를 담아가세요</Text>
+        <View style={[styles.brandMark, illustrated && { backgroundColor: cozy.sage }]}><Text style={styles.brandMarkText}>ㅎ</Text></View>
+        <Text style={[styles.lobbyBrand, illustrated && { color: cozy.sageDark }]}>하늘마트</Text>
+        {!illustrated && <Text style={styles.lobbyTagline}>좋은 하루를 담아가세요</Text>}
       </View>
     </> : null}
     {elevatorFacade ? <View testID="market-elevator-wall-facade" style={[styles.elevatorFacade, {
@@ -83,21 +93,24 @@ export const MarketArchitectureLayer = memo(function MarketArchitectureLayer({ e
       const horizontal = wall.width > wall.height;
       return <View key={index} testID={`market-wall-${index}`} style={[styles.wall,
         { left: wall.x, top: wall.y, width: wall.width, height: wall.height }]}>
-        <LinearGradient colors={horizontal ? ['#F9F6ED', '#E8E5D9', '#BCC7B8'] : ['#E3E4D8', '#F8F6ED', '#BBC8B8']}
+        <LinearGradient colors={illustrated ? horizontal ? [cozy.cream, cozy.wall, cozy.sage] : [cozy.peach, cozy.wall, cozy.sage]
+          : horizontal ? ['#F9F6ED', '#E8E5D9', '#BCC7B8'] : ['#E3E4D8', '#F8F6ED', '#BBC8B8']}
           start={{ x: 0, y: 0 }} end={horizontal ? { x: 0, y: 1 } : { x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
         <View style={[styles.wallCoping, horizontal ? { left: 0, right: 0, top: 0, height: 3 }
           : { left: 0, top: 0, bottom: 0, width: 3 }]} />
-        <View style={[styles.wallSkirt, horizontal ? { left: 0, right: 0, bottom: 0, height: 4 }
+        <View style={[styles.wallSkirt, illustrated && { backgroundColor: cozy.sageDark }, horizontal ? { left: 0, right: 0, bottom: 0, height: 4 }
           : { right: 0, top: 0, bottom: 0, width: 4 }]} />
       </View>;
     })}
-    {sales ? <View testID="market-store-fascia" style={[styles.storeFascia,
+    {sales ? <View testID="market-store-fascia" style={[styles.storeFascia, illustrated && styles.cozyFascia,
       { left: sales.x + 24, top: Math.max(4, sales.y - 76), width: sales.width - 48 }]}>
       <View style={styles.fasciaStripe} />
-      <Text style={styles.fasciaSubheading}>우리 동네, 매일의 신선함</Text>
+      {!illustrated && <Text style={styles.fasciaSubheading}>우리 동네, 매일의 신선함</Text>}
       <Text style={styles.fasciaBrand}>하늘마트</Text>
       <View style={styles.fasciaRule} />
-      <Text style={styles.fasciaEnglish}>HANEUL MARKET</Text>
+      {!illustrated && <Text style={styles.fasciaEnglish}>HANEUL MARKET</Text>}
+      {illustrated && <View pointerEvents="none" style={styles.awning}>{Array.from({ length: Math.ceil((sales.width - 48) / 35) }, (_, i) => <View key={i}
+        style={{ height: 13, width: 35, backgroundColor: i % 2 ? cozy.cream : cozy.peach, borderBottomLeftRadius: 7, borderBottomRightRadius: 7 }} />)}</View>}
     </View> : null}
     {gates.map(({ id, gate, axis, boundary }) => {
       const vertical = axis === 'x';
@@ -167,6 +180,8 @@ const styles = StyleSheet.create({
   fasciaBrand: { fontFamily: fonts.cafe24Ssurround, fontSize: 25, color: '#FFF9E8', lineHeight: 30 },
   fasciaRule: { width: 27, height: 1, backgroundColor: '#D6B68C', marginBottom: 3 },
   fasciaEnglish: { fontFamily: fonts.medium, fontSize: 6, color: '#D7DFC9', letterSpacing: 2.4 },
+  cozyFascia: { backgroundColor: '#849877', borderColor: '#6E7D5F', borderWidth: 1, borderRadius: 9 },
+  awning: { position: 'absolute', height: 13, bottom: -11, left: -1, right: -1, flexDirection: 'row', overflow: 'hidden' },
   beam: { position: 'absolute', backgroundColor: 'rgba(185,107,82,0.35)' },
   alarmColumn: { position: 'absolute', width: 10, height: 45, borderRadius: 3, borderWidth: 1,
     borderColor: '#A78870', backgroundColor: '#F4F1E8' },
@@ -180,4 +195,20 @@ const styles = StyleSheet.create({
   threshold: { ...StyleSheet.absoluteFill, backgroundColor: '#B7C3B7', borderTopWidth: 2, borderBottomWidth: 2, borderColor: '#6D8775' },
   glass: { position: 'absolute', height: 32, bottom: 1, backgroundColor: 'rgba(181,216,213,0.64)', borderWidth: 1, borderColor: '#8BA6A0', borderTopWidth: 3 },
   doorJamb: { position: 'absolute', bottom: -2, width: 5, height: 37, backgroundColor: '#698574', borderTopColor: '#D0D9C9', borderTopWidth: 2 },
+});
+
+const MapleFloor = memo(function MapleFloor({ width, height, lobby }: { width: number; height: number; lobby: boolean }) {
+  const rowHeight = 42;
+  return <View testID="market-maple-floor" pointerEvents="none" style={StyleSheet.absoluteFill}>
+    {Array.from({ length: Math.ceil(height / rowHeight) }, (_, row) => <View key={row} style={{
+      position: 'absolute', left: 0, right: 0, top: row * rowHeight, height: rowHeight,
+      backgroundColor: (lobby ? ['#E6E4CC', '#E9E7D0', '#E2E1C8'] : ['#E9D3B3', '#EEDABD', '#EBD5B6', '#F0DEC3'])[row % (lobby ? 3 : 4)],
+      borderBottomWidth: 0.8, borderBottomColor: '#BCA58742',
+    }}>
+      {Array.from({ length: Math.ceil(width / 220) }, (_, col) => <View key={col} style={{ position: 'absolute',
+        left: col * 220 + (row % 3) * 73, width: 0.7, top: 0, bottom: 0, backgroundColor: '#B99A7640' }} />)}
+      <View style={{ position: 'absolute', left: 14 + row % 3 * 47, width: width * 0.56, height: 1,
+        top: 17 + row % 3 * 3, backgroundColor: '#C7AA8020' }} />
+    </View>)}
+  </View>;
 });

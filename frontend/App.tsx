@@ -26,6 +26,7 @@ import { AppShell } from './src/screens/AppShell';
 import { OnboardingScreen } from './src/screens/OnboardingScreen';
 import { MarketSimulationScreen } from './src/screens/MarketSimulationScreen';
 import { MarketAgentHost } from './src/agent/MarketAgentHost';
+import { GamePrototypeScreen } from './src/screens/GamePrototypeScreen';
 import { colors, fonts } from './src/theme';
 
 export default function App() {
@@ -34,6 +35,9 @@ export default function App() {
   const marketAgentEnabled = __DEV__ && Platform.OS === 'web' && typeof window !== 'undefined'
     && (process.env.EXPO_PUBLIC_MARKET_AGENT_ENABLED === 'true'
       || new URLSearchParams(window.location.search).get('marketAgent') === '1');
+  const libraryPreview = __DEV__ && Platform.OS === 'web' && typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('libraryPreview') === '1';
+  const busPreview = __DEV__ && Platform.OS === 'web' && typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('busPreview') === '1';
+  const [activityPreviewOpen, setActivityPreviewOpen] = useState(true);
   const [entered, setEntered] = useState(false);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const aiVariation = useAiVariationSettings();
@@ -84,7 +88,7 @@ export default function App() {
   }, [accessToken, aiVariation.enabled, quests]);
 
   useEffect(() => {
-    if (marketLab) { setQuestsLoading(false); return; }
+    if (marketLab || libraryPreview || busPreview) { setQuestsLoading(false); return; }
     const loadQuests = async () => {
       try {
         const data = await getQuests();
@@ -129,14 +133,14 @@ export default function App() {
     }).start(() => setShowOnboarding(false));
   };
 
-  const fontsReady = entered || marketLab ? allReady : startupReady;
+  const fontsReady = entered || marketLab || libraryPreview || busPreview ? allReady : startupReady;
   if (!fontsReady) {
     return (
       <View style={styles.loading}>
         {!error && <ActivityIndicator color={colors.mint} size="large" />}
         <Text accessibilityRole={error ? 'alert' : undefined} style={styles.loadingText}>
           {error ? '글꼴을 불러오지 못했어요. 연결을 확인하고 다시 시도해 주세요.'
-            : entered || marketLab ? '화면을 준비하고 있어요'
+            : entered || marketLab || libraryPreview || busPreview ? '화면을 준비하고 있어요'
             : '오늘도를 준비하고 있어요'}
         </Text>
         {error && (
@@ -170,9 +174,13 @@ export default function App() {
       <StatusBar style="dark" />
       {marketLab
         ? <MarketSimulationScreen key={marketLabVisit} onExit={() => setMarketLabVisit(visit => visit + 1)} />
-        : marketAgentEnabled
-          ? <MarketAgentHost accessToken={accessToken} fallback={appContent} />
-          : appContent}
+        : (libraryPreview || busPreview) && activityPreviewOpen
+          ? <GamePrototypeScreen
+            previewLocation={busPreview ? 'village-stop' : 'library'}
+            onExit={() => { setActivityPreviewOpen(false); setEntered(true); }} />
+          : marketAgentEnabled
+            ? <MarketAgentHost accessToken={accessToken} fallback={appContent} />
+            : appContent}
     </SafeAreaProvider>
   );
 }

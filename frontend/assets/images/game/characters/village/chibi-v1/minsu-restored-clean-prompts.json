@@ -1,0 +1,15 @@
+{
+  "mode": "built-in image_gen",
+  "date": "2026-09-26",
+  "editBase": "source/minsu-key-v2.png",
+  "userAttachment": "codex-clipboard-62b4ab56-c683-4b19-9608-cb4851ef1201.png",
+  "baseVerification": "첨부와 minsu-key-v2.png의 디코딩된 RGBA 픽셀이 완전히 동일함",
+  "scope": [
+    "첨부의 원래 얼굴·눈·체형·옷·전체 머리 실루엣으로 복원",
+    "앞머리 끝만 조금 가볍게",
+    "주인공 참고의 옅은 갈색 외곽선 및 입 색",
+    "자글자글한 표면 채색 정리"
+  ],
+  "preservedRuntime": "민수 170px 크기, 발 기준 (64,186), 선명한 display 이미지, 현재 지영 크기 유지",
+  "prompt": "Use case: precise-object-edit.\nInput 1 is the EXACT EDIT TARGET and approved character design to restore. Input 2 is reference ONLY for lightly separated fringe tips. Input 3 is reference ONLY for the soft warm light-brown contour and mouth color.\nMake a minimal correction of Input1. Preserve its SAME character: exact head shape/size, rounded crown, tidy side hair, ears, eyes and eye shape, face/cheeks/chin, smile shape, all poses, clothes, wide-open check shirt and white inner tee, blue trouser cut, shoes, proportions, spacing, five-view layout. DO NOT import the hoodie character's hairstyle or anatomy; do NOT redesign Minsu.\nOnly THREE changes are permitted:\n1. The FRONT BANGS only: keep the existing generally level, down-fringe shape and length. Very subtly soften the lower fringe edge with finer tapered ends and tiny shallow gaps, using a few small varied lengths like Input2. This is a LIGHT subtle trim at the tips, not a new hairstyle. Keep the forehead mostly covered. No triangular central gap, no center part, no curtain bangs, no side spikes. Side hair, top, crown and back hair silhouette must stay exactly as Input1.\n2. Change outer/internal contour strokes and tiny mouth stroke from near-black/dark reddish brown to the protagonist reference's soft muted light brown/taupe (approximately #6D5B51 for outline, #9A7968 for the mouth). Retain the same existing line thickness and geometry. Mouth stays the same little curve, not lip fill. Keep black hair interior dark charcoal and do not recolor it brown; preserve the eyes' original deep brown fill.\n3. CLEAN the color fills everywhere: eliminate the gritty overlapping scribbles, mottled speckled texture, scratchiness and noisy brush layers. Use clean even matte painted color with simple very gentle shading, still the SAME cozy hand-drawn style, not vector, not glossy, not blurred. Simplify hair interior to the existing broad strand shapes without adding intricate strokes. Clothing plaid edges and seams should be clean. Keep garment colors and patterns unchanged.\nKeep all five views of exactly Input1, full bodies, original alignment, framing and scale. Preserve the flat chroma green #00FF00 background, without shadows or text.\n가장 중요: 1번 첨부의 승인된 모습으로 복원. 앞머리 '끝만' 아주 살짝 가볍게. 옆머리/정수리/눈매/얼굴/옷/체형은 1번과 똑같이. 갈색 외곽선과 입의 색 및 자글자글한 채색만 정돈. 다른 어떤 스타일 재해석도 하지 마세요."
+}

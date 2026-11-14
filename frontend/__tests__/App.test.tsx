@@ -1,11 +1,13 @@
-import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, waitFor, within } from '@testing-library/react-native';
 import { PanResponder } from 'react-native';
 import { DirectionalAvatar } from '../src/components/game/DirectionalAvatar';
 import { AVATAR_WALK_CYCLE_DISTANCE } from '../src/game/avatarAnimation';
+import { resetGamePreferencesForTests, updateGamePreferences } from '../src/game/gamePreferences';
 
 import App from '../App';
 import { GamePrototypeScreen } from '../src/screens/GamePrototypeScreen';
 import { MarketSimulationScreen } from '../src/screens/MarketSimulationScreen';
+import { QuestPracticeScreen } from '../src/screens/QuestPracticeScreen';
 import { MARKET_ENVIRONMENT_PLAYER_RADIUS, getMarketWrongWayGate, getNearestMarketStation, isMarketEnvironmentBlocked, type MarketEnvironmentStationId, type MarketEnvironment } from '../src/game/marketEnvironment';
 
 jest.mock('../src/api/quest', () => {
@@ -72,6 +74,7 @@ jest.mock('../src/api/quest', () => {
     startQuestSession: jest.fn(async () => ({ id: 'session-1', status: 'IN_PROGRESS' })),
   };
 });
+beforeEach(() => resetGamePreferencesForTests());
 
 jest.mock('expo-font', () => ({
   isLoaded: () => true,
@@ -138,11 +141,11 @@ it('게임 수첩에서 발견한 퀘스트만 제목과 이미지를 보여준�
   expect(screen.getByLabelText('오늘 0/4 완료')).toBeTruthy();
   expect(screen.getByLabelText(/냉장고 살펴보기, 진행 중/)).toBeTruthy();
   expect(screen.getByLabelText('마을 중앙의 민수를 찾아보세요.')).toBeTruthy();
-  expect(screen.getByLabelText('버스정류장의 기사님을 찾아보세요.')).toBeTruthy();
+  expect(screen.getByLabelText(/목적지 버스 찾기, 진행 중/)).toBeTruthy();
   expect(screen.getByLabelText('하늘마트의 지영을 찾아보세요.')).toBeTruthy();
   expect(screen.getAllByTestId('daily-quest-row')).toHaveLength(4);
   expect(screen.queryByText('안전하게 길 건너기')).toBeNull();
-  expect(screen.queryByText('목적지 버스 찾기')).toBeNull();
+  expect(screen.getByText('목적지 버스 찾기')).toBeTruthy();
   expect(screen.queryByText('장보기 목록 완성하기')).toBeNull();
 
   fireEvent.press(screen.getByRole('button', { name: '가방 열기' }));
@@ -191,6 +194,7 @@ describe('오늘도 앱', () => {
   });
 
   it('민수와 일상 대화 후 의뢰를 받아 추천 대중교통 퀴즈를 완료한다', async () => {
+    updateGamePreferences({ runMode: 'toggle' });
     const screen = render(<App />);
     fireEvent.press(screen.getByRole('button', { name: 'Google로 시작하기' }));
     fireEvent.press(screen.getByRole('tab', { name: '게임 탭' }));
@@ -200,14 +204,14 @@ describe('오늘도 앱', () => {
     expect(screen.getByLabelText('내 캐릭터')).toBeTruthy();
 
     expect(screen.getByLabelText('안내원 민수')).toBeTruthy();
-    expect(screen.getByLabelText('기사님')).toBeTruthy();
+    expect(screen.queryByTestId('village-npc-driver')).toBeNull();
     expect(screen.getByLabelText('지영')).toBeTruthy();
     expect(screen.getByLabelText('수진')).toBeTruthy();
-    expect(screen.getByText('동쪽 버스정류장')).toBeTruthy();
-    expect(screen.getByText('마트 앞 버스정류장')).toBeTruthy();
+    expect(screen.getByTestId('village-east-bus-stop')).toBeTruthy();
+    expect(screen.getByTestId('village-market-bus-stop')).toBeTruthy();
     expect(screen.getByText('주민센터')).toBeTruthy();
-    expect(screen.getByText('마을 공원')).toBeTruthy();
-    ['학교', '식당', '지하철역', '편의점', '노래방', 'PC방', '카페', '은행', '부동산', '도서관'].forEach(
+    expect(screen.getByTestId('village-decoration-park-bench')).toBeTruthy();
+    ['학교', '식당', '지하철역', '편의점', '노래방', 'PC방', '카페', '은행', '부동산', '마을회관'].forEach(
       (landmark) => expect(screen.getByText(landmark)).toBeTruthy(),
     );
     expect(screen.getByTestId('expanded-village-layer')).toBeTruthy();
@@ -378,7 +382,9 @@ describe('오늘도 앱', () => {
   });
 
   it('집 냉장고에서 바나나 요거트 컵을 만들고 마을로 돌아온다', async () => {
+    jest.useFakeTimers();
     const screen = render(<GamePrototypeScreen onExit={jest.fn()} />);
+    try {
     await act(async () => {
       await Promise.resolve();
     });
@@ -387,7 +393,8 @@ describe('오늘도 앱', () => {
     fireEvent.press(screen.getByRole('radio', { name: '터치 이동' }));
     fireEvent.press(screen.getByRole('button', { name: '휴대폰 닫기' }));
     await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 220));
+      jest.advanceTimersByTime(220);
+      await Promise.resolve();
     });
 
     const moveOnMap = (
@@ -400,12 +407,12 @@ describe('오늘도 앱', () => {
       }
     };
 
-    const village = screen.getByLabelText('쿼터뷰 마을');
-    moveOnMap(village, 'moveUp', 3);
-    moveOnMap(village, 'moveRight', 21);
-    moveOnMap(village, 'moveDown', 8);
-    moveOnMap(village, 'moveRight', 4);
+    // Let the real touch route follow the current village layout and crossings.
+    // A fixed series of directional steps becomes stale when the house moves.
     fireEvent.press(screen.getByRole('button', { name: '집으로 이동해 들어가기' }));
+    for (let frame = 0; frame < 80 && !screen.queryByLabelText('집 내부 월드'); frame++) {
+      await act(async () => { jest.advanceTimersByTime(500); await Promise.resolve(); });
+    }
 
     const home = screen.getByLabelText('집 내부 월드');
     expect(screen.getByTestId('home-world-layer')).toBeTruthy();
@@ -520,7 +527,8 @@ describe('오늘도 앱', () => {
     expect(screen.getByLabelText(/냉장고 살펴보기, 진행 중/)).toBeTruthy();
     fireEvent.press(screen.getByRole('button', { name: '수첩 열기' }));
     await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 220));
+      jest.advanceTimersByTime(220);
+      await Promise.resolve();
     });
 
     fireEvent.press(screen.getByRole('button', { name: '냉장고로 이동해 열기' }));
@@ -533,18 +541,23 @@ describe('오늘도 앱', () => {
     expect(screen.getByLabelText(/냉장고 살펴보기, 완료/)).toBeTruthy();
     fireEvent.press(screen.getByRole('button', { name: '수첩 열기' }));
     await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 220));
+      jest.advanceTimersByTime(220);
+      await Promise.resolve();
     });
 
     moveOnMap(home, 'moveDown', 3);
     moveOnMap(home, 'moveRight', 11);
     moveOnMap(home, 'moveDown', 8);
     moveOnMap(home, 'moveLeft', 7);
-    fireEvent.press(screen.getByRole('button', { name: '집에서 마을로 나가기' }));
+    fireEvent.press(within(screen.getByTestId('game-controls')).getByRole('button', { name: '집에서 마을로 나가기' }));
 
     expect(screen.getByLabelText('쿼터뷰 마을')).toBeTruthy();
     fireEvent.press(screen.getByRole('button', { name: '수첩 열기' }));
     expect(screen.getByLabelText('오늘 1/4 완료')).toBeTruthy();
+    } finally {
+      screen.unmount();
+      jest.useRealTimers();
+    }
   });
 
   it('터치 이동 모드에서 바닥을 누르는 동안 해당 방향으로 계속 이동한다', async () => {
@@ -587,18 +600,17 @@ describe('오늘도 앱', () => {
     try {
     fireEvent.press(screen.getByRole('button', { name: 'Google로 시작하기' }));
     fireEvent.press(screen.getByRole('tab', { name: '게임 탭' }));
-    fireEvent.press(screen.getByRole('button', { name: '마을에서 마트 장보기 시작' }));
+    fireEvent.press(screen.getByRole('button', { name: '오늘도 마을 들어가기' }));
 
-    const joystick = screen.getByLabelText('이동 조이스틱');
     expect(screen.queryByTestId('market-proximity-cloud')).toBeNull();
-    for (let step = 0; step < 6; step += 1) {
-      fireEvent(joystick, 'accessibilityAction', { nativeEvent: { actionName: 'moveUp' } });
+    fireEvent.press(screen.getByRole('button', { name: '설정 열기' }));
+    fireEvent.press(screen.getByRole('radio', { name: '터치 이동' }));
+    fireEvent.press(screen.getByRole('button', { name: '휴대폰 닫기' }));
+    await act(async () => { jest.advanceTimersByTime(220); await Promise.resolve(); });
+    fireEvent.press(screen.getByRole('button', { name: '하늘마트로 이동해 들어가기' }));
+    for (let frame = 0; frame < 80 && !screen.queryByText('마트에서 장보기'); frame++) {
+      await act(async () => { jest.advanceTimersByTime(500); await Promise.resolve(); });
     }
-    for (let step = 0; step < 10; step += 1) {
-      fireEvent(joystick, 'accessibilityAction', { nativeEvent: { actionName: 'moveRight' } });
-    }
-    expect(screen.getByTestId('market-proximity-cloud', { includeHiddenElements: true })).toBeTruthy();
-    fireEvent.press(screen.getByRole('button', { name: '하늘마트 들어가기' }));
 
     expect(screen.getByText('마트에서 장보기')).toBeTruthy();
     fireEvent.press(screen.getByRole('button', { name: '연습 환경 설정' }));
@@ -618,6 +630,10 @@ describe('오늘도 앱', () => {
     // Movement remains locked while the briefing's last frame fades out.
     await act(async () => { jest.advanceTimersByTime(300); await Promise.resolve(); });
     await waitFor(() => expect(screen.queryByTestId('market-panel-transition', { includeHiddenElements: true })).toBeNull());
+    fireEvent.press(screen.getByRole('button', { name: '설정 열기' }));
+    fireEvent.press(screen.getByRole('radio', { name: '슬라이드 패드' }));
+    fireEvent.press(screen.getByRole('button', { name: '휴대폰 닫기' }));
+    await act(async () => { jest.advanceTimersByTime(220); await Promise.resolve(); });
     await waitFor(() => expect(screen.getByLabelText('이동 조이스틱')).toBeTruthy());
     expect(screen.getByTestId('game-top-hud')).toBeTruthy();
     expect(screen.getByText('11:45')).toBeTruthy();
@@ -823,6 +839,7 @@ describe('오늘도 앱', () => {
 });
 
 it('마을의 걷기는 실제 이동거리에 맞춰 진행되고 벽에 닿으면 멈춘다', async () => {
+  updateGamePreferences({ runMode: 'toggle' });
   const frames = new Map<number, FrameRequestCallback>();
   let frameId = 0, time = 0;
   const raf = jest.spyOn(globalThis, 'requestAnimationFrame').mockImplementation(callback => {
@@ -831,7 +848,8 @@ it('마을의 걷기는 실제 이동거리에 맞춰 진행되고 벽에 닿으
   const cancel = jest.spyOn(globalThis, 'cancelAnimationFrame').mockImplementation(id => { if (id != null) frames.delete(id); });
   let handlers: Parameters<typeof PanResponder.create>[0] | undefined;
   const responder = jest.spyOn(PanResponder, 'create').mockImplementation(value => {
-    handlers ??= value; return { panHandlers: {} };
+    if (value.onStartShouldSetPanResponder) handlers = value;
+    return { panHandlers: {} };
   });
   const screen = render(<GamePrototypeScreen onExit={jest.fn()} />);
   const advance = (count: number) => {
@@ -842,9 +860,12 @@ it('마을의 걷기는 실제 이동거리에 맞춰 진행되고 벽에 닿으
   const pose = () => screen.UNSAFE_getByType(DirectionalAvatar).props;
   try {
     await act(async () => { await Promise.resolve(); });
+    // The updated karaoke facade is only 8 px south of the initial footprint.
+    // Back up one real control step so both speeds can be measured before contact.
+    fireEvent(screen.getByLabelText('쿼터뷰 마을'), 'accessibilityAction', { nativeEvent: { actionName: 'moveUp' } });
     act(() => {
       handlers!.onPanResponderGrant!({ nativeEvent: { locationX: 76, locationY: 190 } } as never, {} as never);
-      handlers!.onPanResponderMove!({} as never, { dx: 0, dy: 17 } as never);
+      handlers!.onPanResponderMove!({} as never, { dx: 0, dy: 20.16 } as never);
     });
     advance(5);
     expect(pose().motion).toBe('walk');

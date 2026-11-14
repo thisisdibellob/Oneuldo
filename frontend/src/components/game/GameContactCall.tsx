@@ -3,10 +3,11 @@ import { BackHandler, Platform } from 'react-native';
 import { MarketStaffDialogue, MarketStaffDialogueChoice } from './MarketStaffDialogue';
 
 /** Remote conversation has its own close action; it never depends on NPC distance. */
-export function GameContactCall({ contact, inMarket, onClose }: {
+export function GameContactCall({ contact, inMarket, onClose, onOpenErrand }: {
   contact: 'jiyoung' | 'minsu';
   inMarket: boolean;
   onClose: () => void;
+  onOpenErrand?: () => void;
 }) {
   const [response, setResponse] = useState('');
   useEffect(() => {
@@ -28,6 +29,7 @@ export function GameContactCall({ contact, inMarket, onClose }: {
       onPress={() => setResponse(minsu
         ? (inMarket ? '그렇구나! 물건이 없으면 직원에게 물어봐. 지영이 부탁한 물건을 바꾸려면 지영에게 확인하고.' : '마을에서 산책하고 있어. 나중에 만나면 같이 이야기하자.')
         : '하늘마트에서 부탁할게. 마트에 들어가면 사야 할 목록을 확인할 수 있어.')} /> : null}
+    {minsu && onOpenErrand ? <MarketStaffDialogueChoice text="부탁한 장보기 목록 확인하기" onPress={onOpenErrand} /> : null}
     <MarketStaffDialogueChoice text="통화 마치기" onPress={onClose} />
   </MarketStaffDialogue>;
 }

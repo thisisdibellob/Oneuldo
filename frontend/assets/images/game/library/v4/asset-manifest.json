@@ -1,0 +1,369 @@
+{
+  "generator": "built-in image_gen",
+  "covers": [
+    {
+      "id": "knowledge-shelf",
+      "file": "v4/knowledge-shelf.png",
+      "width": 196,
+      "height": 234,
+      "bytes": 127351,
+      "sha256": "703a3f7e0a77b3ef5465dde41ec3e1ba3675f527d9e29bbcccd3f7976bc9f829",
+      "crop": {
+        "left": 63,
+        "top": 12,
+        "width": 170,
+        "height": 204
+      }
+    },
+    {
+      "id": "safe-internet",
+      "file": "v4/safe-internet.png",
+      "width": 196,
+      "height": 237,
+      "bytes": 131955,
+      "sha256": "1669b2dedc0c670ac85b78a2c3859e703382e8fa68fe8ae9f770d04cda40e2c4",
+      "crop": {
+        "left": 279,
+        "top": 12,
+        "width": 168,
+        "height": 204
+      }
+    },
+    {
+      "id": "reading-habit",
+      "file": "v4/reading-habit.png",
+      "width": 196,
+      "height": 239,
+      "bytes": 129389,
+      "sha256": "b88b66bc49b53be3d267da075a8261d22fb9de2eeba62e67126737bb1ca70fc2",
+      "crop": {
+        "left": 492,
+        "top": 12,
+        "width": 167,
+        "height": 204
+      }
+    },
+    {
+      "id": "kind-heart",
+      "file": "v4/kind-heart.png",
+      "width": 196,
+      "height": 234,
+      "bytes": 124428,
+      "sha256": "d275e13a2037290285b67e546486a4baee217db4556f61d98380b628be00a1bc",
+      "crop": {
+        "left": 701,
+        "top": 12,
+        "width": 170,
+        "height": 205
+      }
+    },
+    {
+      "id": "my-choice",
+      "file": "v4/my-choice.png",
+      "width": 196,
+      "height": 236,
+      "bytes": 130186,
+      "sha256": "18ba4f086718a7d8bb5ae7fdf2c64b972b361f1799a67f5b797fada75d21a100",
+      "crop": {
+        "left": 915,
+        "top": 12,
+        "width": 169,
+        "height": 204
+      }
+    },
+    {
+      "id": "thinking-together",
+      "file": "v4/thinking-together.png",
+      "width": 196,
+      "height": 240,
+      "bytes": 122955,
+      "sha256": "fc85f888937f92f7bc2cfb8b357cf4fad67a0b113095d8dfcb5e34717cb6a5c8",
+      "crop": {
+        "left": 63,
+        "top": 229,
+        "width": 171,
+        "height": 209
+      }
+    },
+    {
+      "id": "lotus-story",
+      "file": "v4/lotus-story.png",
+      "width": 196,
+      "height": 243,
+      "bytes": 138111,
+      "sha256": "68767f003db9ec9bd05b7505d24b23237bf1bd3ff99452fd13102a7cbe50e7ed",
+      "crop": {
+        "left": 279,
+        "top": 230,
+        "width": 169,
+        "height": 210
+      }
+    },
+    {
+      "id": "church-bell",
+      "file": "v4/church-bell.png",
+      "width": 196,
+      "height": 243,
+      "bytes": 133767,
+      "sha256": "2c4bfb3207979cb057c253f8ae8c3377b27b58692d4d70e4367cb2ebc7c82705",
+      "crop": {
+        "left": 490,
+        "top": 229,
+        "width": 169,
+        "height": 211
+      }
+    },
+    {
+      "id": "religions-and-peace",
+      "file": "v4/religions-and-peace.png",
+      "width": 196,
+      "height": 240,
+      "bytes": 130143,
+      "sha256": "9d774ee4bd1cc38b30d1b93f763e091f4034930596a34bcb19f776c6ecd2c26a",
+      "crop": {
+        "left": 700,
+        "top": 229,
+        "width": 173,
+        "height": 211
+      }
+    },
+    {
+      "id": "our-community",
+      "file": "v4/our-community.png",
+      "width": 196,
+      "height": 240,
+      "bytes": 138001,
+      "sha256": "59eaad42bc6fe1c15658177ae6796d842f9453b65f2c6c8adfdd179cffbe20d8",
+      "crop": {
+        "left": 913,
+        "top": 229,
+        "width": 171,
+        "height": 210
+      }
+    },
+    {
+      "id": "recycling-city",
+      "file": "v4/recycling-city.png",
+      "width": 196,
+      "height": 240,
+      "bytes": 129369,
+      "sha256": "4ba4395298002bd2685f096a5779afa5e75005af6aeb00de13ae74bf2af30092",
+      "crop": {
+        "left": 63,
+        "top": 451,
+        "width": 172,
+        "height": 211
+      }
+    },
+    {
+      "id": "world-neighbors",
+      "file": "v4/world-neighbors.png",
+      "width": 196,
+      "height": 242,
+      "bytes": 136755,
+      "sha256": "e124fc26db843fe3ee29ac71464f3cc4267422bae696ae1afd2256f6c26eda16",
+      "crop": {
+        "left": 279,
+        "top": 453,
+        "width": 169,
+        "height": 211
+      }
+    },
+    {
+      "id": "moon-observation",
+      "file": "v4/moon-observation.png",
+      "width": 196,
+      "height": 242,
+      "bytes": 126360,
+      "sha256": "e13c5e68146dea98221ffe2ea67b45903de5aaeb954f811b4ff96b4599734f22",
+      "crop": {
+        "left": 489,
+        "top": 452,
+        "width": 170,
+        "height": 211
+      }
+    },
+    {
+      "id": "forest-animals",
+      "file": "v4/forest-animals.png",
+      "width": 196,
+      "height": 237,
+      "bytes": 135299,
+      "sha256": "d15890572e11d7b2f9822f0bec35ee543a857bb82d31373f2317390f6d1b6ab9",
+      "crop": {
+        "left": 699,
+        "top": 454,
+        "width": 173,
+        "height": 209
+      }
+    },
+    {
+      "id": "warm-tea",
+      "file": "v4/warm-tea.png",
+      "width": 196,
+      "height": 240,
+      "bytes": 134732,
+      "sha256": "63421021afaed1d0433c65e54b50c77bba718b006b891457112682d152622c4c",
+      "crop": {
+        "left": 912,
+        "top": 451,
+        "width": 172,
+        "height": 211
+      }
+    },
+    {
+      "id": "herb-garden",
+      "file": "v4/herb-garden.png",
+      "width": 196,
+      "height": 236,
+      "bytes": 133577,
+      "sha256": "38da638fe0251842c59c64f970ea62551451e97d03c1dfd559ddbea1a72908d9",
+      "crop": {
+        "left": 63,
+        "top": 673,
+        "width": 173,
+        "height": 209
+      }
+    },
+    {
+      "id": "dance-step",
+      "file": "v4/dance-step.png",
+      "width": 196,
+      "height": 238,
+      "bytes": 137459,
+      "sha256": "06b000c6caca3a45dc7522f904b91c669124095d32e74d54521773a43e91f491",
+      "crop": {
+        "left": 279,
+        "top": 677,
+        "width": 170,
+        "height": 206
+      }
+    },
+    {
+      "id": "photo-walk",
+      "file": "v4/photo-walk.png",
+      "width": 196,
+      "height": 236,
+      "bytes": 133138,
+      "sha256": "18d69379d4b760ec5d1f138c5575235d6c1670f38ce2f1e5ef2f06f754640079",
+      "crop": {
+        "left": 488,
+        "top": 673,
+        "width": 172,
+        "height": 209
+      }
+    },
+    {
+      "id": "sports-day",
+      "file": "v4/sports-day.png",
+      "width": 196,
+      "height": 234,
+      "bytes": 130045,
+      "sha256": "7aaaaab4d25eb6a7c44278a78dd08a3268fe794252b425af5b3bf5c18708b5d8",
+      "crop": {
+        "left": 696,
+        "top": 674,
+        "width": 175,
+        "height": 208
+      }
+    },
+    {
+      "id": "conversation-words",
+      "file": "v4/conversation-words.png",
+      "width": 196,
+      "height": 235,
+      "bytes": 123803,
+      "sha256": "f42687b0be1eae016bd3460d1f0b348f1c716554e4a70e381b2ce661de15ce01",
+      "crop": {
+        "left": 912,
+        "top": 673,
+        "width": 172,
+        "height": 208
+      }
+    },
+    {
+      "id": "writing-diary",
+      "file": "v4/writing-diary.png",
+      "width": 196,
+      "height": 238,
+      "bytes": 129353,
+      "sha256": "c890d6095632cde44387a1cdd113262d918a054166c936390032a1d6e7603d72",
+      "crop": {
+        "left": 63,
+        "top": 893,
+        "width": 173,
+        "height": 210
+      }
+    },
+    {
+      "id": "travel-english",
+      "file": "v4/travel-english.png",
+      "width": 196,
+      "height": 240,
+      "bytes": 133145,
+      "sha256": "2a1a93b2e6da2236284cc75e7166e5118063a4c3230fe664a26a48315c8a6de1",
+      "crop": {
+        "left": 280,
+        "top": 893,
+        "width": 171,
+        "height": 211
+      }
+    },
+    {
+      "id": "owl-night",
+      "file": "v4/owl-night.png",
+      "width": 196,
+      "height": 240,
+      "bytes": 128832,
+      "sha256": "4574d1a94c0e02f974895d91cd09c7d253a16589ea0b051f73facdb87d360231",
+      "crop": {
+        "left": 487,
+        "top": 891,
+        "width": 172,
+        "height": 212
+      }
+    },
+    {
+      "id": "red-door",
+      "file": "v4/red-door.png",
+      "width": 196,
+      "height": 237,
+      "bytes": 137769,
+      "sha256": "b760c79491320be5398d80b4c55cf5c39fd72cb8f6252a5bbba49fcd6499f2f3",
+      "crop": {
+        "left": 696,
+        "top": 890,
+        "width": 176,
+        "height": 213
+      }
+    },
+    {
+      "id": "old-pottery",
+      "file": "v4/old-pottery.png",
+      "width": 196,
+      "height": 238,
+      "bytes": 136375,
+      "sha256": "9dc3692805bd717fad87c7a068d27573e5a70b898796862f4d2032f180bbccc8",
+      "crop": {
+        "left": 911,
+        "top": 892,
+        "width": 174,
+        "height": 211
+      }
+    },
+    {
+      "id": "mountain-journey",
+      "file": "v4/mountain-journey.png",
+      "width": 196,
+      "height": 250,
+      "bytes": 143764,
+      "sha256": "6b90ce60c9cb085246a1ee4b4c7c79ccf1d33e50158406a02625b98c95963e8b",
+      "crop": {
+        "left": 63,
+        "top": 1115,
+        "width": 172,
+        "height": 220
+      }
+    }
+  ]
+}

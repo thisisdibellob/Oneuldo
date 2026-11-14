@@ -1,0 +1,396 @@
+{
+  "version": 1,
+  "created": "2026-10-01",
+  "covers": [
+    {
+      "id": "moon-mail",
+      "file": "book-01.png",
+      "generated": false,
+      "width": 281,
+      "height": 329,
+      "bytes": 132899,
+      "sha256": "01a35bb127ed2c496cce9540b5b8e3a5c3d6f4da657224921864dee50601578d",
+      "alpha": {
+        "transparent": 2966,
+        "partial": 88995,
+        "opaque": 488,
+        "outerEdgeNonzero": 276
+      }
+    },
+    {
+      "id": "cloud-cat",
+      "file": "book-02.png",
+      "generated": false,
+      "width": 279,
+      "height": 328,
+      "bytes": 152541,
+      "sha256": "ef791924966d109ab8c32399db9a2c79aa72d19e35e59aa28fc4fa572472f862",
+      "alpha": {
+        "transparent": 3201,
+        "partial": 87597,
+        "opaque": 714,
+        "outerEdgeNonzero": 44
+      }
+    },
+    {
+      "id": "little-train",
+      "file": "book-03.png",
+      "generated": false,
+      "width": 280,
+      "height": 328,
+      "bytes": 133652,
+      "sha256": "fe8d34db2c18e5e722593c11bb564fe7818d3bf45f00085198be2166b10d0346",
+      "alpha": {
+        "transparent": 2965,
+        "partial": 88193,
+        "opaque": 682,
+        "outerEdgeNonzero": 97
+      }
+    },
+    {
+      "id": "our-neighbor",
+      "file": "book-04.png",
+      "generated": false,
+      "width": 281,
+      "height": 328,
+      "bytes": 147996,
+      "sha256": "fdcb1a8196d6f00b360bd8b87fba68a2e1ec969f227e56c37a9b2be3a90e0053",
+      "alpha": {
+        "transparent": 2759,
+        "partial": 88895,
+        "opaque": 514,
+        "outerEdgeNonzero": 281
+      }
+    },
+    {
+      "id": "forest-leaves",
+      "file": "book-05.png",
+      "generated": false,
+      "width": 280,
+      "height": 327,
+      "bytes": 132964,
+      "sha256": "621c49f54534d25a082db4fa3a71f3fee680bba4a6b18d48ae766b6aa87ab1c2",
+      "alpha": {
+        "transparent": 2529,
+        "partial": 89007,
+        "opaque": 24,
+        "outerEdgeNonzero": 478
+      }
+    },
+    {
+      "id": "sea-friends",
+      "file": "book-06.png",
+      "generated": false,
+      "width": 281,
+      "height": 327,
+      "bytes": 144694,
+      "sha256": "38c2867004d46b2bc3e90976eb150813a5b334ee35b08a1b70e5339710c725ee",
+      "alpha": {
+        "transparent": 3574,
+        "partial": 88144,
+        "opaque": 169,
+        "outerEdgeNonzero": 101
+      }
+    },
+    {
+      "id": "night-stars",
+      "file": "book-07.png",
+      "generated": false,
+      "width": 280,
+      "height": 327,
+      "bytes": 133450,
+      "sha256": "cea39e735c9817464decd8fd4e55526f7635bf76c4afbef7ee857d6230f1077c",
+      "alpha": {
+        "transparent": 2878,
+        "partial": 88505,
+        "opaque": 177,
+        "outerEdgeNonzero": 318
+      }
+    },
+    {
+      "id": "garden-bugs",
+      "file": "book-08.png",
+      "generated": false,
+      "width": 282,
+      "height": 327,
+      "bytes": 138681,
+      "sha256": "e69376d834a522ebbf0375dfdabb51c61121dc3e1b0528be1457822e63799c0f",
+      "alpha": {
+        "transparent": 2570,
+        "partial": 89504,
+        "opaque": 140,
+        "outerEdgeNonzero": 430
+      }
+    },
+    {
+      "id": "easy-cooking",
+      "file": "book-09.png",
+      "generated": false,
+      "width": 282,
+      "height": 331,
+      "bytes": 150377,
+      "sha256": "59171259c6953646adb6dbf5d5b939a342f66d4243703ce0afd477c23d7f52ef",
+      "alpha": {
+        "transparent": 2494,
+        "partial": 90784,
+        "opaque": 64,
+        "outerEdgeNonzero": 521
+      }
+    },
+    {
+      "id": "balcony-garden",
+      "file": "book-10.png",
+      "generated": false,
+      "width": 279,
+      "height": 332,
+      "bytes": 149476,
+      "sha256": "a7a3867374dfaf690f7cabd7313aa5c00c562a0c07106b911cb80638e56cd72f",
+      "alpha": {
+        "transparent": 3140,
+        "partial": 89346,
+        "opaque": 142,
+        "outerEdgeNonzero": 99
+      }
+    },
+    {
+      "id": "tidy-room",
+      "file": "book-11.png",
+      "generated": false,
+      "width": 280,
+      "height": 332,
+      "bytes": 142426,
+      "sha256": "00f07e26da127565cc558325e0cb939fded530bc229cf382c9014890519cfe90",
+      "alpha": {
+        "transparent": 2614,
+        "partial": 89909,
+        "opaque": 437,
+        "outerEdgeNonzero": 226
+      }
+    },
+    {
+      "id": "healthy-day",
+      "file": "book-12.png",
+      "generated": false,
+      "width": 283,
+      "height": 332,
+      "bytes": 140989,
+      "sha256": "4759291703811c55703f09cf82357c26520480e3d5fe16733ed5d9d936f3bbb7",
+      "alpha": {
+        "transparent": 2704,
+        "partial": 91120,
+        "opaque": 132,
+        "outerEdgeNonzero": 454
+      }
+    },
+    {
+      "id": "computer-first",
+      "file": "books-v3/computer-first.png",
+      "generated": true,
+      "width": 206,
+      "height": 256,
+      "bytes": 102378,
+      "sha256": "0cfed57fcf23d9e482bf8d659fdd098f02a280a4f21c9277aea7da5a29f6abb6",
+      "alpha": {
+        "transparent": 2965,
+        "partial": 48963,
+        "opaque": 808,
+        "outerEdgeNonzero": 0
+      }
+    },
+    {
+      "id": "library-guide",
+      "file": "books-v3/library-guide.png",
+      "generated": true,
+      "width": 198,
+      "height": 256,
+      "bytes": 117604,
+      "sha256": "357c99e6a638f77cbcae8b61bf50c22e3d1f7d8d7939a9ad068a59e92bbdde36",
+      "alpha": {
+        "transparent": 2792,
+        "partial": 47124,
+        "opaque": 772,
+        "outerEdgeNonzero": 0
+      }
+    },
+    {
+      "id": "feeling-colors",
+      "file": "books-v3/feeling-colors.png",
+      "generated": true,
+      "width": 211,
+      "height": 256,
+      "bytes": 100176,
+      "sha256": "747ca2b4dd9e91360ac208e90ecc4bad204c917dd669ae43dc7b9acfd324f353",
+      "alpha": {
+        "transparent": 3015,
+        "partial": 50169,
+        "opaque": 832,
+        "outerEdgeNonzero": 0
+      }
+    },
+    {
+      "id": "question-tree",
+      "file": "books-v3/question-tree.png",
+      "generated": true,
+      "width": 198,
+      "height": 256,
+      "bytes": 118651,
+      "sha256": "85dd306382e7e5b896a6f1dfa6813eadf9009b22f91c9761f26787d8a7f34f55",
+      "alpha": {
+        "transparent": 2957,
+        "partial": 47304,
+        "opaque": 427,
+        "outerEdgeNonzero": 0
+      }
+    },
+    {
+      "id": "world-religions",
+      "file": "books-v3/world-religions.png",
+      "generated": true,
+      "width": 211,
+      "height": 256,
+      "bytes": 114142,
+      "sha256": "19837b1378f6e1d839b4c644841ccfb2f1c140bad71a3401f36080b52362adc5",
+      "alpha": {
+        "transparent": 3109,
+        "partial": 50092,
+        "opaque": 815,
+        "outerEdgeNonzero": 0
+      }
+    },
+    {
+      "id": "temple-bell",
+      "file": "books-v3/temple-bell.png",
+      "generated": true,
+      "width": 188,
+      "height": 256,
+      "bytes": 104320,
+      "sha256": "411d51da756f6d6b1dd23dc3f0e5ce7f779b0c4dd01842d63360e06feab8ad02",
+      "alpha": {
+        "transparent": 2685,
+        "partial": 44712,
+        "opaque": 731,
+        "outerEdgeNonzero": 0
+      }
+    },
+    {
+      "id": "neighborhood-jobs",
+      "file": "books-v3/neighborhood-jobs.png",
+      "generated": true,
+      "width": 206,
+      "height": 256,
+      "bytes": 112927,
+      "sha256": "3d2561a4ede5f56be8fa941f53c7fa4dac6edcaea73c0ca5f91bcdaafe289e65",
+      "alpha": {
+        "transparent": 2981,
+        "partial": 48914,
+        "opaque": 841,
+        "outerEdgeNonzero": 0
+      }
+    },
+    {
+      "id": "money-story",
+      "file": "books-v3/money-story.png",
+      "generated": true,
+      "width": 195,
+      "height": 256,
+      "bytes": 114160,
+      "sha256": "d3464ecb14f3201b85a507022b993b472fa6adff238c857258390d139ed65223",
+      "alpha": {
+        "transparent": 3133,
+        "partial": 46083,
+        "opaque": 704,
+        "outerEdgeNonzero": 0
+      }
+    },
+    {
+      "id": "color-sketchbook",
+      "file": "books-v3/color-sketchbook.png",
+      "generated": true,
+      "width": 201,
+      "height": 256,
+      "bytes": 117889,
+      "sha256": "259f2e7a541f9c9e436f3ee5b736c1e2d6f17811deadc1dcc0e3ff7839c02621",
+      "alpha": {
+        "transparent": 3760,
+        "partial": 46982,
+        "opaque": 714,
+        "outerEdgeNonzero": 0
+      }
+    },
+    {
+      "id": "music-friends",
+      "file": "books-v3/music-friends.png",
+      "generated": true,
+      "width": 201,
+      "height": 256,
+      "bytes": 117000,
+      "sha256": "e4c8a91c675938543dcdfc6c6bda667debd954f57dcb2997aa39dbdb22990bdf",
+      "alpha": {
+        "transparent": 2945,
+        "partial": 47939,
+        "opaque": 572,
+        "outerEdgeNonzero": 0
+      }
+    },
+    {
+      "id": "korean-words",
+      "file": "books-v3/korean-words.png",
+      "generated": true,
+      "width": 207,
+      "height": 256,
+      "bytes": 111214,
+      "sha256": "bd82c7e70fc7248697ab72c8bd3de259163181f608a710d10322de088e43a4e6",
+      "alpha": {
+        "transparent": 2999,
+        "partial": 49233,
+        "opaque": 760,
+        "outerEdgeNonzero": 0
+      }
+    },
+    {
+      "id": "english-hello",
+      "file": "books-v3/english-hello.png",
+      "generated": true,
+      "width": 211,
+      "height": 256,
+      "bytes": 118423,
+      "sha256": "bdb588ecf92cc56fe26ffd478e96dcd214a54cf5891a0ea55fa3134f132796bc",
+      "alpha": {
+        "transparent": 3483,
+        "partial": 49745,
+        "opaque": 788,
+        "outerEdgeNonzero": 0
+      }
+    },
+    {
+      "id": "korea-history",
+      "file": "books-v3/korea-history.png",
+      "generated": true,
+      "width": 206,
+      "height": 256,
+      "bytes": 132415,
+      "sha256": "24c1a9c7dd7c3f8ac708cc51291bd2d3a6f8d7b5f4d99756dba526a2f6664338",
+      "alpha": {
+        "transparent": 3379,
+        "partial": 48675,
+        "opaque": 682,
+        "outerEdgeNonzero": 0
+      }
+    },
+    {
+      "id": "world-map",
+      "file": "books-v3/world-map.png",
+      "generated": true,
+      "width": 199,
+      "height": 256,
+      "bytes": 125595,
+      "sha256": "6481890cecf43b673b58e34c5443442e3f4112e0bda69b3b28893a6beeea3fb5",
+      "alpha": {
+        "transparent": 2966,
+        "partial": 47192,
+        "opaque": 786,
+        "outerEdgeNonzero": 0
+      }
+    }
+  ]
+}

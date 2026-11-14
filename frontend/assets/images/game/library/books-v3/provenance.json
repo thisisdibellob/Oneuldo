@@ -1,0 +1,616 @@
+{
+  "version": 1,
+  "created": "2026-10-01",
+  "tool": "built-in image_gen.imagegen",
+  "records": [
+    {
+      "id": "computer-first",
+      "title": "처음 만나는 컴퓨터",
+      "prompt": "Use case: stylized-concept. Asset type: production transparent PNG inventory sprite for a cozy Korean library life-simulation game. Generate ONE distinct closed upright portrait book, straight front cover facing viewer, only a very thin LEFT spine and cream bottom page edge visible; absolutely no tilt or perspective rotation. Book proportions width to height about 0.84. Match a warm hand-drawn children's picture-book game style: strong consistent clean rounded dark warm-brown outlines, soft matte fills, restrained cel shading, gently rounded corners, delicate small leaf-like corner flourishes. Large simple central subject readable at 100 pixels tall. No glossy 3D, no realism, no busy textures. Isolated entire book centered with transparent padding on all sides. Actual transparent alpha background, NO ground plane, no backdrop, no haze or external drop shadow. No title text, no letters, no labels, no numbers, no watermarks. Cover in muted dusty slate-blue. Central illustration: a friendly simple desktop computer monitor, compact keyboard and small mouse, warm cream casing, small blue screen with a simple star-shaped cursor symbol. Clear everyday computer learning motif, no logos.",
+      "generatedPath": "C:\\Users\\PC\\.codex\\generated_images\\01a0f3be-61f6-73c2-aae2-8c8a791742d6\\exec-bb49ffc0-d61a-4844-a73e-07657a414d9d.png",
+      "sourcePath": "source/computer-first.png",
+      "originalSha256": "435579b1af3c736967ce9c3528fbb8c65be6f10f4203cc5a9d72360d731fbf6d",
+      "crop": {
+        "left": 153,
+        "top": 167,
+        "width": 843,
+        "height": 1054
+      },
+      "tool": "built-in image_gen.imagegen",
+      "transparent_background": true,
+      "source": {
+        "file": "source/computer-first.png",
+        "width": 1149,
+        "height": 1368,
+        "bytes": 1311663,
+        "sha256": "435579b1af3c736967ce9c3528fbb8c65be6f10f4203cc5a9d72360d731fbf6d",
+        "alpha": {
+          "transparent": 710575,
+          "partial": 861198,
+          "opaque": 59,
+          "outerEdgeNonzero": 0
+        }
+      },
+      "runtime": {
+        "file": "computer-first.png",
+        "width": 206,
+        "height": 256,
+        "bytes": 102378,
+        "sha256": "0cfed57fcf23d9e482bf8d659fdd098f02a280a4f21c9277aea7da5a29f6abb6",
+        "alpha": {
+          "transparent": 2965,
+          "partial": 48963,
+          "opaque": 808,
+          "outerEdgeNonzero": 0
+        }
+      },
+      "processing": "A rectangle around alpha>16 silhouette plus 8 original pixels of padding is cropped; all pixel colors and alpha within that rectangle are retained. Uniform Lanczos3 resize to 252px high, then add 2px transparent padding on all sides. No manual illustration, recoloring or alpha thresholding.",
+      "visualQA": "Original and final runtime inspected: complete upright book, correct distinct motif, clean transparent border, no clipping. Korean 가/나/다 and English Hello verified."
+    },
+    {
+      "id": "library-guide",
+      "title": "도서관 사용 설명서",
+      "prompt": "Use case: stylized-concept. Asset type: production transparent PNG inventory sprite for a cozy Korean library life-simulation game. Generate ONE distinct closed upright portrait book, straight front cover facing viewer, only a very thin LEFT spine and cream bottom page edge visible; absolutely no tilt or perspective rotation. Book proportions width to height about 0.84. Match a warm hand-drawn children's picture-book game style: strong consistent clean rounded dark warm-brown outlines, soft matte fills, restrained cel shading, gently rounded corners, delicate small leaf-like corner flourishes. Large simple central subject readable at 100 pixels tall. No glossy 3D, no realism, no busy textures. Isolated entire book centered with transparent padding on all sides. Actual transparent alpha background, NO ground plane, no backdrop, no haze or external drop shadow. No title text, no letters, no labels, no numbers, no watermarks. Cover in muted warm ochre. Central illustration: an open cream book in front of a small friendly library building with a roof, two windows and a simple doorway. A book symbol above the doorway, absolutely no lettering. Clear library guide motif.",
+      "generatedPath": "C:\\Users\\PC\\.codex\\generated_images\\01a0f3be-61f6-73c2-aae2-8c8a791742d6\\exec-b7bbc86e-10e0-4daf-b977-ab021c16a5d3.png",
+      "sourcePath": "source/library-guide.png",
+      "originalSha256": "5860f3f692afbbf59d7eb4d48f7c5f03c4737655e2d47863ca7adcfeb4a7eed8",
+      "crop": {
+        "left": 125,
+        "top": 115,
+        "width": 901,
+        "height": 1168
+      },
+      "tool": "built-in image_gen.imagegen",
+      "transparent_background": true,
+      "source": {
+        "file": "source/library-guide.png",
+        "width": 1145,
+        "height": 1374,
+        "bytes": 1685519,
+        "sha256": "5860f3f692afbbf59d7eb4d48f7c5f03c4737655e2d47863ca7adcfeb4a7eed8",
+        "alpha": {
+          "transparent": 553274,
+          "partial": 1019510,
+          "opaque": 446,
+          "outerEdgeNonzero": 0
+        }
+      },
+      "runtime": {
+        "file": "library-guide.png",
+        "width": 198,
+        "height": 256,
+        "bytes": 117604,
+        "sha256": "357c99e6a638f77cbcae8b61bf50c22e3d1f7d8d7939a9ad068a59e92bbdde36",
+        "alpha": {
+          "transparent": 2792,
+          "partial": 47124,
+          "opaque": 772,
+          "outerEdgeNonzero": 0
+        }
+      },
+      "processing": "A rectangle around alpha>16 silhouette plus 8 original pixels of padding is cropped; all pixel colors and alpha within that rectangle are retained. Uniform Lanczos3 resize to 252px high, then add 2px transparent padding on all sides. No manual illustration, recoloring or alpha thresholding.",
+      "visualQA": "Original and final runtime inspected: complete upright book, correct distinct motif, clean transparent border, no clipping. Korean 가/나/다 and English Hello verified."
+    },
+    {
+      "id": "feeling-colors",
+      "title": "내 마음의 색깔",
+      "prompt": "Use case: stylized-concept. Asset type: production transparent PNG inventory sprite for a cozy Korean library life-simulation game. Generate ONE distinct closed upright portrait book, straight front cover facing viewer, only a very thin LEFT spine and cream bottom page edge visible; absolutely no tilt or perspective rotation. Book proportions width to height about 0.84. Match a warm hand-drawn children's picture-book game style: strong consistent clean rounded dark warm-brown outlines, soft matte fills, restrained cel shading, gently rounded corners, delicate small leaf-like corner flourishes. Large simple central subject readable at 100 pixels tall. No glossy 3D, no realism, no busy textures. Isolated entire book centered with transparent padding on all sides. Actual transparent alpha background, NO ground plane, no backdrop, no haze or external drop shadow. No title text, no letters, no labels, no numbers, no watermarks. Cover in muted dusty lavender. Central illustration: one large heart assembled from soft coral, pale yellow, sage and blue rounded color patches, with three small surrounding emotion color dots. Calm and welcoming visual about feelings and colors, no faces needed.",
+      "generatedPath": "C:\\Users\\PC\\.codex\\generated_images\\01a0f3be-61f6-73c2-aae2-8c8a791742d6\\exec-eafb870c-3be9-4778-893f-e4978431d222.png",
+      "sourcePath": "source/feeling-colors.png",
+      "originalSha256": "ff842f410155de554dbd15dfb637296e39d5e149efe0c878efe8e29062b6f1f0",
+      "crop": {
+        "left": 141,
+        "top": 156,
+        "width": 873,
+        "height": 1062
+      },
+      "tool": "built-in image_gen.imagegen",
+      "transparent_background": true,
+      "source": {
+        "file": "source/feeling-colors.png",
+        "width": 1149,
+        "height": 1368,
+        "bytes": 1266085,
+        "sha256": "ff842f410155de554dbd15dfb637296e39d5e149efe0c878efe8e29062b6f1f0",
+        "alpha": {
+          "transparent": 675358,
+          "partial": 895979,
+          "opaque": 495,
+          "outerEdgeNonzero": 0
+        }
+      },
+      "runtime": {
+        "file": "feeling-colors.png",
+        "width": 211,
+        "height": 256,
+        "bytes": 100176,
+        "sha256": "747ca2b4dd9e91360ac208e90ecc4bad204c917dd669ae43dc7b9acfd324f353",
+        "alpha": {
+          "transparent": 3015,
+          "partial": 50169,
+          "opaque": 832,
+          "outerEdgeNonzero": 0
+        }
+      },
+      "processing": "A rectangle around alpha>16 silhouette plus 8 original pixels of padding is cropped; all pixel colors and alpha within that rectangle are retained. Uniform Lanczos3 resize to 252px high, then add 2px transparent padding on all sides. No manual illustration, recoloring or alpha thresholding.",
+      "visualQA": "Original and final runtime inspected: complete upright book, correct distinct motif, clean transparent border, no clipping. Korean 가/나/다 and English Hello verified."
+    },
+    {
+      "id": "question-tree",
+      "title": "생각이 자라는 질문",
+      "prompt": "Use case: stylized-concept. Asset type: production transparent PNG inventory sprite for a cozy Korean library life-simulation game. Generate ONE distinct closed upright portrait book, straight front cover facing viewer, only a very thin LEFT spine and cream bottom page edge visible; absolutely no tilt or perspective rotation. Book proportions width to height about 0.84. Match a warm hand-drawn children's picture-book game style: strong consistent clean rounded dark warm-brown outlines, soft matte fills, restrained cel shading, gently rounded corners, delicate small leaf-like corner flourishes. Large simple central subject readable at 100 pixels tall. No glossy 3D, no realism, no busy textures. Isolated entire book centered with transparent padding on all sides. Actual transparent alpha background, NO ground plane, no backdrop, no haze or external drop shadow. No title text, no letters, no labels, no numbers, no watermarks. Cover in muted warm parchment gold. Central illustration: a small thoughtful branching tree growing from an open book, with a few sage leaves and small rounded glowing idea buds in muted orange and pale yellow. A clear tree-of-thinking motif. No question marks or lettering.",
+      "generatedPath": "C:\\Users\\PC\\.codex\\generated_images\\01a0f3be-61f6-73c2-aae2-8c8a791742d6\\exec-614ffebb-ff4f-4763-a93c-c2bae5f56448.png",
+      "sourcePath": "source/question-tree.png",
+      "originalSha256": "62842f301012e156a1c04a599b05167de524ddda73a18e1da2c297908aa9e9fb",
+      "crop": {
+        "left": 138,
+        "top": 134,
+        "width": 872,
+        "height": 1130
+      },
+      "tool": "built-in image_gen.imagegen",
+      "transparent_background": true,
+      "source": {
+        "file": "source/question-tree.png",
+        "width": 1145,
+        "height": 1374,
+        "bytes": 1641621,
+        "sha256": "62842f301012e156a1c04a599b05167de524ddda73a18e1da2c297908aa9e9fb",
+        "alpha": {
+          "transparent": 621568,
+          "partial": 950469,
+          "opaque": 1193,
+          "outerEdgeNonzero": 0
+        }
+      },
+      "runtime": {
+        "file": "question-tree.png",
+        "width": 198,
+        "height": 256,
+        "bytes": 118651,
+        "sha256": "85dd306382e7e5b896a6f1dfa6813eadf9009b22f91c9761f26787d8a7f34f55",
+        "alpha": {
+          "transparent": 2957,
+          "partial": 47304,
+          "opaque": 427,
+          "outerEdgeNonzero": 0
+        }
+      },
+      "processing": "A rectangle around alpha>16 silhouette plus 8 original pixels of padding is cropped; all pixel colors and alpha within that rectangle are retained. Uniform Lanczos3 resize to 252px high, then add 2px transparent padding on all sides. No manual illustration, recoloring or alpha thresholding.",
+      "visualQA": "Original and final runtime inspected: complete upright book, correct distinct motif, clean transparent border, no clipping. Korean 가/나/다 and English Hello verified."
+    },
+    {
+      "id": "world-religions",
+      "title": "세계의 종교 이야기",
+      "prompt": "Use case: stylized-concept. Asset type: production transparent PNG inventory sprite for a cozy Korean library life-simulation game. Generate ONE distinct closed upright portrait book, straight front cover facing viewer, only a very thin LEFT spine and cream bottom page edge visible; absolutely no tilt or perspective rotation. Book proportions width to height about 0.84. Match a warm hand-drawn children's picture-book game style: strong consistent clean rounded dark warm-brown outlines, soft matte fills, restrained cel shading, gently rounded corners, delicate small leaf-like corner flourishes. Large simple central subject readable at 100 pixels tall. No glossy 3D, no realism, no busy textures. Isolated entire book centered with transparent padding on all sides. Actual transparent alpha background, NO ground plane, no backdrop, no haze or external drop shadow. No title text, no letters, no labels, no numbers, no watermarks. Cover in muted dusty teal. Central illustration: a small blue and sage globe with a few equally sized tiny silhouettes of different places of worship arranged around it, a domed building, a temple roof and a simple steepled building. Respectful religiously neutral educational motif, balanced equal prominence, no sacred text, no people.",
+      "generatedPath": "C:\\Users\\PC\\.codex\\generated_images\\01a0f3be-61f6-73c2-aae2-8c8a791742d6\\exec-93df2355-af4a-4c07-ba3b-984ebf43de20.png",
+      "sourcePath": "source/world-religions.png",
+      "originalSha256": "8808963abaadd3638db2fba03a19000f9f892d29b40e938b539e70eadab0e7c4",
+      "crop": {
+        "left": 154,
+        "top": 184,
+        "width": 842,
+        "height": 1026
+      },
+      "tool": "built-in image_gen.imagegen",
+      "transparent_background": true,
+      "source": {
+        "file": "source/world-religions.png",
+        "width": 1145,
+        "height": 1374,
+        "bytes": 1397803,
+        "sha256": "8808963abaadd3638db2fba03a19000f9f892d29b40e938b539e70eadab0e7c4",
+        "alpha": {
+          "transparent": 737147,
+          "partial": 835240,
+          "opaque": 843,
+          "outerEdgeNonzero": 0
+        }
+      },
+      "runtime": {
+        "file": "world-religions.png",
+        "width": 211,
+        "height": 256,
+        "bytes": 114142,
+        "sha256": "19837b1378f6e1d839b4c644841ccfb2f1c140bad71a3401f36080b52362adc5",
+        "alpha": {
+          "transparent": 3109,
+          "partial": 50092,
+          "opaque": 815,
+          "outerEdgeNonzero": 0
+        }
+      },
+      "processing": "A rectangle around alpha>16 silhouette plus 8 original pixels of padding is cropped; all pixel colors and alpha within that rectangle are retained. Uniform Lanczos3 resize to 252px high, then add 2px transparent padding on all sides. No manual illustration, recoloring or alpha thresholding.",
+      "visualQA": "Original and final runtime inspected: complete upright book, correct distinct motif, clean transparent border, no clipping. Korean 가/나/다 and English Hello verified."
+    },
+    {
+      "id": "temple-bell",
+      "title": "산사의 풍경 소리",
+      "prompt": "Use case: stylized-concept. Asset type: production transparent PNG inventory sprite for a cozy Korean library life-simulation game. Generate ONE distinct closed upright portrait book, straight front cover facing viewer, only a very thin LEFT spine and cream bottom page edge visible; absolutely no tilt or perspective rotation. Book proportions width to height about 0.84. Match a warm hand-drawn children's picture-book game style: strong consistent clean rounded dark warm-brown outlines, soft matte fills, restrained cel shading, gently rounded corners, delicate small leaf-like corner flourishes. Large simple central subject readable at 100 pixels tall. No glossy 3D, no realism, no busy textures. Isolated entire book centered with transparent padding on all sides. Actual transparent alpha background, NO ground plane, no backdrop, no haze or external drop shadow. No title text, no letters, no labels, no numbers, no watermarks. Cover in muted clay terracotta. Central illustration: a bronze Korean temple wind bell suspended from the curved corner of a dark brown traditional tiled eave, with a small fish-shaped wind catcher beneath and two soft sage pine sprigs. Quiet temple sound motif, no text or people.",
+      "generatedPath": "C:\\Users\\PC\\.codex\\generated_images\\01a0f3be-61f6-73c2-aae2-8c8a791742d6\\exec-f2cb18d0-4fb8-4ad0-82fe-1d461558cc43.png",
+      "sourcePath": "source/temple-bell.png",
+      "originalSha256": "4832b5f6c74802efa44e2a54e18edbad943b6089013097fd19be1d7580ae114c",
+      "crop": {
+        "left": 165,
+        "top": 129,
+        "width": 816,
+        "height": 1116
+      },
+      "tool": "built-in image_gen.imagegen",
+      "transparent_background": true,
+      "source": {
+        "file": "source/temple-bell.png",
+        "width": 1145,
+        "height": 1374,
+        "bytes": 1568161,
+        "sha256": "4832b5f6c74802efa44e2a54e18edbad943b6089013097fd19be1d7580ae114c",
+        "alpha": {
+          "transparent": 685917,
+          "partial": 886005,
+          "opaque": 1308,
+          "outerEdgeNonzero": 0
+        }
+      },
+      "runtime": {
+        "file": "temple-bell.png",
+        "width": 188,
+        "height": 256,
+        "bytes": 104320,
+        "sha256": "411d51da756f6d6b1dd23dc3f0e5ce7f779b0c4dd01842d63360e06feab8ad02",
+        "alpha": {
+          "transparent": 2685,
+          "partial": 44712,
+          "opaque": 731,
+          "outerEdgeNonzero": 0
+        }
+      },
+      "processing": "A rectangle around alpha>16 silhouette plus 8 original pixels of padding is cropped; all pixel colors and alpha within that rectangle are retained. Uniform Lanczos3 resize to 252px high, then add 2px transparent padding on all sides. No manual illustration, recoloring or alpha thresholding.",
+      "visualQA": "Original and final runtime inspected: complete upright book, correct distinct motif, clean transparent border, no clipping. Korean 가/나/다 and English Hello verified."
+    },
+    {
+      "id": "neighborhood-jobs",
+      "title": "우리 동네 일하는 사람들",
+      "prompt": "Use case: stylized-concept. Asset type: production transparent PNG inventory sprite for a cozy Korean library life-simulation game. Generate ONE distinct closed upright portrait book, straight front cover facing viewer, only a very thin LEFT spine and cream bottom page edge visible; absolutely no tilt or perspective rotation. Book proportions width to height about 0.84. Match a warm hand-drawn children's picture-book game style: strong consistent clean rounded dark warm-brown outlines, soft matte fills, restrained cel shading, gently rounded corners, delicate small leaf-like corner flourishes. Large simple central subject readable at 100 pixels tall. No glossy 3D, no realism, no busy textures. Isolated entire book centered with transparent padding on all sides. Actual transparent alpha background, NO ground plane, no backdrop, no haze or external drop shadow. No title text, no letters, no labels, no numbers, no watermarks. Cover in muted sage green. Central illustration: a tidy small grouping of everyday job tools, a postal worker's cream-and-brown satchel with an envelope, a small gardener's hand trowel and a baker's whisk. Warm approachable neighborhood work motif. No logos or text.",
+      "generatedPath": "C:\\Users\\PC\\.codex\\generated_images\\01a0f3be-61f6-73c2-aae2-8c8a791742d6\\exec-34b63e11-016f-4d7e-bb60-659285e2e3ce.png",
+      "sourcePath": "source/neighborhood-jobs.png",
+      "originalSha256": "b3330deaca17c0dde2764fa40b7016c4407bdc8eee8a2ad43168ae464ccab541",
+      "crop": {
+        "left": 125,
+        "top": 108,
+        "width": 914,
+        "height": 1142
+      },
+      "tool": "built-in image_gen.imagegen",
+      "transparent_background": true,
+      "source": {
+        "file": "source/neighborhood-jobs.png",
+        "width": 1161,
+        "height": 1355,
+        "bytes": 1697153,
+        "sha256": "b3330deaca17c0dde2764fa40b7016c4407bdc8eee8a2ad43168ae464ccab541",
+        "alpha": {
+          "transparent": 560982,
+          "partial": 1012062,
+          "opaque": 111,
+          "outerEdgeNonzero": 0
+        }
+      },
+      "runtime": {
+        "file": "neighborhood-jobs.png",
+        "width": 206,
+        "height": 256,
+        "bytes": 112927,
+        "sha256": "3d2561a4ede5f56be8fa941f53c7fa4dac6edcaea73c0ca5f91bcdaafe289e65",
+        "alpha": {
+          "transparent": 2981,
+          "partial": 48914,
+          "opaque": 841,
+          "outerEdgeNonzero": 0
+        }
+      },
+      "processing": "A rectangle around alpha>16 silhouette plus 8 original pixels of padding is cropped; all pixel colors and alpha within that rectangle are retained. Uniform Lanczos3 resize to 252px high, then add 2px transparent padding on all sides. No manual illustration, recoloring or alpha thresholding.",
+      "visualQA": "Original and final runtime inspected: complete upright book, correct distinct motif, clean transparent border, no clipping. Korean 가/나/다 and English Hello verified."
+    },
+    {
+      "id": "money-story",
+      "prompt": "Use case: illustration-story. Asset type: transparent 2D mobile game inventory sprite, one closed upright portrait picture book. Create a brand-new single book isolated on a genuinely transparent background with actual alpha. Style: cozy hand-drawn storybook object art, medium-weight warm dark brown outlines, softly rounded corners, matte cel shading with very subtle paper texture. Composition: the broad flat front cover faces the viewer straight on, with only a thin visible rounded spine on the LEFT and a narrow cream page edge along the BOTTOM; no angled or isometric camera. Full book visible with clear transparent margin, centered, no cast shadow outside the book. Book proportions approximately width 0.82 times height. Cover design: A friendly pink piggy bank with three golden coins, one coin above its slot and two beside it. Warm muted jade green book cover. Absolutely no letters or numbers. Keep motifs bold and simple enough to recognize at 80 pixels high. Small leaf sprigs in cover corners echo a gentle storybook ornament style, no clutter. The spine has two small gold bands and one tiny botanical ornament. Constraints: one book only, no environment, no desk, no extra loose objects outside the book silhouette, no title text, no author text, no logo, no watermark, no artificial checkerboard, no white or colored background.",
+      "generatedPath": "C:\\Users\\PC\\.codex\\generated_images\\01a0f3e1-27c3-7c90-9e5e-aa370d863739\\exec-98e72f40-8354-4ebc-8d92-984c2920ec3b.png",
+      "sourcePath": "source/money-story.png",
+      "originalSha256": "6368196b704019876f5cb1aa72f14daa8b99000afd96946f6542b09eb2366f25",
+      "crop": {
+        "left": 137,
+        "top": 123,
+        "width": 865,
+        "height": 1141
+      },
+      "tool": "built-in image_gen.imagegen",
+      "transparent_background": true,
+      "source": {
+        "file": "source/money-story.png",
+        "width": 1136,
+        "height": 1385,
+        "bytes": 1793529,
+        "sha256": "6368196b704019876f5cb1aa72f14daa8b99000afd96946f6542b09eb2366f25",
+        "alpha": {
+          "transparent": 625489,
+          "partial": 947819,
+          "opaque": 52,
+          "outerEdgeNonzero": 43
+        }
+      },
+      "runtime": {
+        "file": "money-story.png",
+        "width": 195,
+        "height": 256,
+        "bytes": 114160,
+        "sha256": "d3464ecb14f3201b85a507022b993b472fa6adff238c857258390d139ed65223",
+        "alpha": {
+          "transparent": 3133,
+          "partial": 46083,
+          "opaque": 704,
+          "outerEdgeNonzero": 0
+        }
+      },
+      "processing": "A rectangle around alpha>16 silhouette plus 8 original pixels of padding is cropped; all pixel colors and alpha within that rectangle are retained. Uniform Lanczos3 resize to 252px high, then add 2px transparent padding on all sides. No manual illustration, recoloring or alpha thresholding.",
+      "visualQA": "Original and final runtime inspected: complete upright book, correct distinct motif, clean transparent border, no clipping. Korean 가/나/다 and English Hello verified."
+    },
+    {
+      "id": "color-sketchbook",
+      "prompt": "Use case: illustration-story. Asset type: transparent 2D mobile game inventory sprite, one closed upright portrait picture book. Create a brand-new single book isolated on a genuinely transparent background with actual alpha. Style: cozy hand-drawn storybook object art, medium-weight warm dark brown outlines, softly rounded corners, matte cel shading with very subtle paper texture. Composition: the broad flat front cover faces the viewer straight on, with only a thin visible rounded spine on the LEFT and a narrow cream page edge along the BOTTOM; no angled or isometric camera. Full book visible with clear transparent margin, centered, no cast shadow outside the book. Book proportions approximately width 0.82 times height. Cover design: A little white drawing sheet showing a simple sun and flower, with five colored pencils fanning beside it. Muted ochre yellow book cover. Absolutely no letters or numbers. Keep motifs bold and simple enough to recognize at 80 pixels high. Small leaf sprigs in cover corners echo a gentle storybook ornament style, no clutter. The spine has two small gold bands and one tiny botanical ornament. Constraints: one book only, no environment, no desk, no extra loose objects outside the book silhouette, no title text, no author text, no logo, no watermark, no artificial checkerboard, no white or colored background.",
+      "generatedPath": "C:\\Users\\PC\\.codex\\generated_images\\01a0f3e1-27c3-7c90-9e5e-aa370d863739\\exec-115e575b-c58a-4b72-9ee2-1d65d019efd6.png",
+      "sourcePath": "source/color-sketchbook.png",
+      "originalSha256": "10d6a1add7cf0cda3f892c9e83144d12164a9d355f5de24bbc8ac9d5f9acdc35",
+      "crop": {
+        "left": 107,
+        "top": 93,
+        "width": 948,
+        "height": 1214
+      },
+      "tool": "built-in image_gen.imagegen",
+      "transparent_background": true,
+      "source": {
+        "file": "source/color-sketchbook.png",
+        "width": 1136,
+        "height": 1385,
+        "bytes": 2102367,
+        "sha256": "10d6a1add7cf0cda3f892c9e83144d12164a9d355f5de24bbc8ac9d5f9acdc35",
+        "alpha": {
+          "transparent": 480516,
+          "partial": 1092198,
+          "opaque": 646,
+          "outerEdgeNonzero": 6
+        }
+      },
+      "runtime": {
+        "file": "color-sketchbook.png",
+        "width": 201,
+        "height": 256,
+        "bytes": 117889,
+        "sha256": "259f2e7a541f9c9e436f3ee5b736c1e2d6f17811deadc1dcc0e3ff7839c02621",
+        "alpha": {
+          "transparent": 3760,
+          "partial": 46982,
+          "opaque": 714,
+          "outerEdgeNonzero": 0
+        }
+      },
+      "processing": "A rectangle around alpha>16 silhouette plus 8 original pixels of padding is cropped; all pixel colors and alpha within that rectangle are retained. Uniform Lanczos3 resize to 252px high, then add 2px transparent padding on all sides. No manual illustration, recoloring or alpha thresholding.",
+      "visualQA": "Original and final runtime inspected: complete upright book, correct distinct motif, clean transparent border, no clipping. Korean 가/나/다 and English Hello verified."
+    },
+    {
+      "id": "music-friends",
+      "prompt": "Use case: illustration-story. Asset type: transparent 2D mobile game inventory sprite, one closed upright portrait picture book. Create a brand-new single book isolated on a genuinely transparent background with actual alpha. Style: cozy hand-drawn storybook object art, medium-weight warm dark brown outlines, softly rounded corners, matte cel shading with very subtle paper texture. Composition: the broad flat front cover faces the viewer straight on, with only a thin visible rounded spine on the LEFT and a narrow cream page edge along the BOTTOM; no angled or isometric camera. Full book visible with clear transparent margin, centered, no cast shadow outside the book. Book proportions approximately width 0.82 times height. Cover design: A small acoustic guitar, tambourine and tiny hand drum in a compact harmonious arrangement. Muted warm mauve book cover. A few music notes may be drawn as decoration, but absolutely no letters or words. Keep motifs bold and simple enough to recognize at 80 pixels high. Small leaf sprigs in cover corners echo a gentle storybook ornament style, no clutter. The spine has two small gold bands and one tiny botanical ornament. Constraints: one book only, no environment, no desk, no extra loose objects outside the book silhouette, no title text, no author text, no logo, no watermark, no artificial checkerboard, no white or colored background.",
+      "generatedPath": "C:\\Users\\PC\\.codex\\generated_images\\01a0f3e1-27c3-7c90-9e5e-aa370d863739\\exec-2728729f-add3-480d-9ffe-9217749d0f10.png",
+      "sourcePath": "source/music-friends.png",
+      "originalSha256": "6432b9e204ffbd54f9553e0983d799e67c78541b2882a92e62a6ff36fb70b234",
+      "crop": {
+        "left": 82,
+        "top": 69,
+        "width": 977,
+        "height": 1248
+      },
+      "tool": "built-in image_gen.imagegen",
+      "transparent_background": true,
+      "source": {
+        "file": "source/music-friends.png",
+        "width": 1138,
+        "height": 1382,
+        "bytes": 2121508,
+        "sha256": "6432b9e204ffbd54f9553e0983d799e67c78541b2882a92e62a6ff36fb70b234",
+        "alpha": {
+          "transparent": 391512,
+          "partial": 1180244,
+          "opaque": 960,
+          "outerEdgeNonzero": 0
+        }
+      },
+      "runtime": {
+        "file": "music-friends.png",
+        "width": 201,
+        "height": 256,
+        "bytes": 117000,
+        "sha256": "e4c8a91c675938543dcdfc6c6bda667debd954f57dcb2997aa39dbdb22990bdf",
+        "alpha": {
+          "transparent": 2945,
+          "partial": 47939,
+          "opaque": 572,
+          "outerEdgeNonzero": 0
+        }
+      },
+      "processing": "A rectangle around alpha>16 silhouette plus 8 original pixels of padding is cropped; all pixel colors and alpha within that rectangle are retained. Uniform Lanczos3 resize to 252px high, then add 2px transparent padding on all sides. No manual illustration, recoloring or alpha thresholding.",
+      "visualQA": "Original and final runtime inspected: complete upright book, correct distinct motif, clean transparent border, no clipping. Korean 가/나/다 and English Hello verified."
+    },
+    {
+      "id": "korean-words",
+      "prompt": "Use case: illustration-story. Asset type: transparent 2D mobile game inventory sprite, one closed upright portrait picture book. Create a brand-new single book isolated on a genuinely transparent background with actual alpha. Style: cozy hand-drawn storybook object art, medium-weight warm dark brown outlines, softly rounded corners, matte cel shading with very subtle paper texture. Composition: the broad flat front cover faces the viewer straight on, with only a thin visible rounded spine on the LEFT and a narrow cream page edge along the BOTTOM; no angled or isometric camera. Full book visible with clear transparent margin, centered, no cast shadow outside the book. Book proportions approximately width 0.82 times height. Cover design: Three friendly cream speech bubbles, each containing exactly one clearly drawn Korean syllable: '가', '나', '다'. Muted coral pink book cover. These three syllables are the only text. No title or other lettering. Keep motifs bold and simple enough to recognize at 80 pixels high. Small leaf sprigs in cover corners echo a gentle storybook ornament style, no clutter. The spine has two small gold bands and one tiny botanical ornament. Constraints: one book only, no environment, no desk, no extra loose objects outside the book silhouette, no title text, no author text, no logo, no watermark, no artificial checkerboard, no white or colored background.",
+      "generatedPath": "C:\\Users\\PC\\.codex\\generated_images\\01a0f3e1-27c3-7c90-9e5e-aa370d863739\\exec-9d790bd3-9f44-46a1-b691-9490318fc930.png",
+      "sourcePath": "source/korean-words.png",
+      "originalSha256": "a3e712a577649bd1d76a75d5c7cf31ecde81ca93d51f4aaa40daac37fdca654f",
+      "crop": {
+        "left": 85,
+        "top": 96,
+        "width": 969,
+        "height": 1201
+      },
+      "tool": "built-in image_gen.imagegen",
+      "transparent_background": true,
+      "source": {
+        "file": "source/korean-words.png",
+        "width": 1136,
+        "height": 1385,
+        "bytes": 1977936,
+        "sha256": "a3e712a577649bd1d76a75d5c7cf31ecde81ca93d51f4aaa40daac37fdca654f",
+        "alpha": {
+          "transparent": 455564,
+          "partial": 1117660,
+          "opaque": 136,
+          "outerEdgeNonzero": 0
+        }
+      },
+      "runtime": {
+        "file": "korean-words.png",
+        "width": 207,
+        "height": 256,
+        "bytes": 111214,
+        "sha256": "bd82c7e70fc7248697ab72c8bd3de259163181f608a710d10322de088e43a4e6",
+        "alpha": {
+          "transparent": 2999,
+          "partial": 49233,
+          "opaque": 760,
+          "outerEdgeNonzero": 0
+        }
+      },
+      "processing": "A rectangle around alpha>16 silhouette plus 8 original pixels of padding is cropped; all pixel colors and alpha within that rectangle are retained. Uniform Lanczos3 resize to 252px high, then add 2px transparent padding on all sides. No manual illustration, recoloring or alpha thresholding.",
+      "visualQA": "Original and final runtime inspected: complete upright book, correct distinct motif, clean transparent border, no clipping. Korean 가/나/다 and English Hello verified."
+    },
+    {
+      "id": "english-hello",
+      "prompt": "Use case: illustration-story. Asset type: transparent 2D mobile game inventory sprite, one closed upright portrait picture book. Create a brand-new single book isolated on a genuinely transparent background with actual alpha. Style: cozy hand-drawn storybook object art, medium-weight warm dark brown outlines, softly rounded corners, matte cel shading with very subtle paper texture. Composition: the broad flat front cover faces the viewer straight on, with only a thin visible rounded spine on the LEFT and a narrow cream page edge along the BOTTOM; no angled or isometric camera. Full book visible with clear transparent margin, centered, no cast shadow outside the book. Book proportions approximately width 0.82 times height. Cover design: A friendly cream speech bubble containing exactly 'Hello' in simple readable hand lettering, above two small waving hands. Muted periwinkle blue book cover. 'Hello' is the only text. No title or other lettering. Keep motifs bold and simple enough to recognize at 80 pixels high. Small leaf sprigs in cover corners echo a gentle storybook ornament style, no clutter. The spine has two small gold bands and one tiny botanical ornament. Constraints: one book only, no environment, no desk, no extra loose objects outside the book silhouette, no title text, no author text, no logo, no watermark, no artificial checkerboard, no white or colored background.",
+      "generatedPath": "C:\\Users\\PC\\.codex\\generated_images\\01a0f3e1-27c3-7c90-9e5e-aa370d863739\\exec-982fa8f0-f122-4dc3-b19c-a9fc4779bb7c.png",
+      "sourcePath": "source/english-hello.png",
+      "originalSha256": "4488e074d9e633f65148df1f544cd67d59a7e9fc030aea1441a7e6d07508816a",
+      "crop": {
+        "left": 122,
+        "top": 153,
+        "width": 908,
+        "height": 1106
+      },
+      "tool": "built-in image_gen.imagegen",
+      "transparent_background": true,
+      "source": {
+        "file": "source/english-hello.png",
+        "width": 1136,
+        "height": 1385,
+        "bytes": 1747886,
+        "sha256": "4488e074d9e633f65148df1f544cd67d59a7e9fc030aea1441a7e6d07508816a",
+        "alpha": {
+          "transparent": 610830,
+          "partial": 962522,
+          "opaque": 8,
+          "outerEdgeNonzero": 0
+        }
+      },
+      "runtime": {
+        "file": "english-hello.png",
+        "width": 211,
+        "height": 256,
+        "bytes": 118423,
+        "sha256": "bdb588ecf92cc56fe26ffd478e96dcd214a54cf5891a0ea55fa3134f132796bc",
+        "alpha": {
+          "transparent": 3483,
+          "partial": 49745,
+          "opaque": 788,
+          "outerEdgeNonzero": 0
+        }
+      },
+      "processing": "A rectangle around alpha>16 silhouette plus 8 original pixels of padding is cropped; all pixel colors and alpha within that rectangle are retained. Uniform Lanczos3 resize to 252px high, then add 2px transparent padding on all sides. No manual illustration, recoloring or alpha thresholding.",
+      "visualQA": "Original and final runtime inspected: complete upright book, correct distinct motif, clean transparent border, no clipping. Korean 가/나/다 and English Hello verified."
+    },
+    {
+      "id": "korea-history",
+      "prompt": "Use case: illustration-story. Asset type: transparent 2D mobile game inventory sprite, one closed upright portrait picture book. Create a brand-new single book isolated on a genuinely transparent background with actual alpha. Style: cozy hand-drawn storybook object art, medium-weight warm dark brown outlines, softly rounded corners, matte cel shading with very subtle paper texture. Composition: the broad flat front cover faces the viewer straight on, with only a thin visible rounded spine on the LEFT and a narrow cream page edge along the BOTTOM; no angled or isometric camera. Full book visible with clear transparent margin, centered, no cast shadow outside the book. Book proportions approximately width 0.82 times height. Cover design: A Korean traditional royal palace pavilion with curved dark teal tiled roof, restrained red wooden pillars, and cream stone stairs. Simplified Korean dancheong trim. Muted parchment beige book cover. Absolutely no letters, flags, numbers or text. Keep motifs bold and simple enough to recognize at 80 pixels high. Small leaf sprigs in cover corners echo a gentle storybook ornament style, no clutter. The spine has two small gold bands and one tiny botanical ornament. Constraints: one book only, no environment, no desk, no extra loose objects outside the book silhouette, no title text, no author text, no logo, no watermark, no artificial checkerboard, no white or colored background.",
+      "generatedPath": "C:\\Users\\PC\\.codex\\generated_images\\01a0f3e1-27c3-7c90-9e5e-aa370d863739\\exec-ac411928-389b-45bb-99f6-f18826c0955c.png",
+      "sourcePath": "source/korea-history.png",
+      "originalSha256": "1a41d413fe749c22d98d5285c0f4668bc8ae55ea7ffb97610efbba98880b3f46",
+      "crop": {
+        "left": 76,
+        "top": 79,
+        "width": 987,
+        "height": 1233
+      },
+      "tool": "built-in image_gen.imagegen",
+      "transparent_background": true,
+      "source": {
+        "file": "source/korea-history.png",
+        "width": 1136,
+        "height": 1385,
+        "bytes": 2285874,
+        "sha256": "1a41d413fe749c22d98d5285c0f4668bc8ae55ea7ffb97610efbba98880b3f46",
+        "alpha": {
+          "transparent": 405381,
+          "partial": 1167122,
+          "opaque": 857,
+          "outerEdgeNonzero": 10
+        }
+      },
+      "runtime": {
+        "file": "korea-history.png",
+        "width": 206,
+        "height": 256,
+        "bytes": 132415,
+        "sha256": "24c1a9c7dd7c3f8ac708cc51291bd2d3a6f8d7b5f4d99756dba526a2f6664338",
+        "alpha": {
+          "transparent": 3379,
+          "partial": 48675,
+          "opaque": 682,
+          "outerEdgeNonzero": 0
+        }
+      },
+      "processing": "A rectangle around alpha>16 silhouette plus 8 original pixels of padding is cropped; all pixel colors and alpha within that rectangle are retained. Uniform Lanczos3 resize to 252px high, then add 2px transparent padding on all sides. No manual illustration, recoloring or alpha thresholding.",
+      "visualQA": "Original and final runtime inspected: complete upright book, correct distinct motif, clean transparent border, no clipping. Korean 가/나/다 and English Hello verified."
+    },
+    {
+      "id": "world-map",
+      "prompt": "Use case: illustration-story. Asset type: transparent 2D mobile game inventory sprite, one closed upright portrait picture book. Create a brand-new single book isolated on a genuinely transparent background with actual alpha. Style: cozy hand-drawn storybook object art, medium-weight warm dark brown outlines, softly rounded corners, matte cel shading with very subtle paper texture. Composition: the broad flat front cover faces the viewer straight on, with only a thin visible rounded spine on the LEFT and a narrow cream page edge along the BOTTOM; no angled or isometric camera. Full book visible with clear transparent margin, centered, no cast shadow outside the book. Book proportions approximately width 0.82 times height. Cover design: A small illustrated round blue and green globe in a brown wooden stand, with a folded pale map tucked behind it. Muted sea teal book cover. Simplified recognizable continental land masses. Absolutely no letters, labels or numbers. Keep motifs bold and simple enough to recognize at 80 pixels high. Small leaf sprigs in cover corners echo a gentle storybook ornament style, no clutter. The spine has two small gold bands and one tiny botanical ornament. Constraints: one book only, no environment, no desk, no extra loose objects outside the book silhouette, no title text, no author text, no logo, no watermark, no artificial checkerboard, no white or colored background.",
+      "generatedPath": "C:\\Users\\PC\\.codex\\generated_images\\01a0f3e1-27c3-7c90-9e5e-aa370d863739\\exec-1fd145e7-9237-477a-9700-646b59c0f3b9.png",
+      "sourcePath": "source/world-map.png",
+      "originalSha256": "46502825824b670e6dd62115f427db0b020237a25ebd8f16e8f8c38aa038e10e",
+      "crop": {
+        "left": 144,
+        "top": 148,
+        "width": 852,
+        "height": 1101
+      },
+      "tool": "built-in image_gen.imagegen",
+      "transparent_background": true,
+      "source": {
+        "file": "source/world-map.png",
+        "width": 1137,
+        "height": 1383,
+        "bytes": 1716940,
+        "sha256": "46502825824b670e6dd62115f427db0b020237a25ebd8f16e8f8c38aa038e10e",
+        "alpha": {
+          "transparent": 665970,
+          "partial": 906195,
+          "opaque": 306,
+          "outerEdgeNonzero": 67
+        }
+      },
+      "runtime": {
+        "file": "world-map.png",
+        "width": 199,
+        "height": 256,
+        "bytes": 125595,
+        "sha256": "6481890cecf43b673b58e34c5443442e3f4112e0bda69b3b28893a6beeea3fb5",
+        "alpha": {
+          "transparent": 2966,
+          "partial": 47192,
+          "opaque": 786,
+          "outerEdgeNonzero": 0
+        }
+      },
+      "processing": "A rectangle around alpha>16 silhouette plus 8 original pixels of padding is cropped; all pixel colors and alpha within that rectangle are retained. Uniform Lanczos3 resize to 252px high, then add 2px transparent padding on all sides. No manual illustration, recoloring or alpha thresholding.",
+      "visualQA": "Original and final runtime inspected: complete upright book, correct distinct motif, clean transparent border, no clipping. Korean 가/나/다 and English Hello verified."
+    }
+  ]
+}

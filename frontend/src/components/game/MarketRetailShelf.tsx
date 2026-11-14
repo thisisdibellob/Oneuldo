@@ -5,6 +5,8 @@ import { MARKET_RETAIL_PRODUCT_BOUNDS, MARKET_RETAIL_STOCK } from '../../game/ma
 import { MARKET_SHELF_ART_BOTTOM, MARKET_SHELF_ART_HEIGHT, MARKET_SHELF_ART_WIDTH, MARKET_SHELF_SCALE, MARKET_SHELF_UNIT_WIDTH } from '../../game/marketFixtureLayout';
 import type { MarketCategoryId } from '../../game/scenarios';
 import { fonts } from '../../theme';
+import { useGamePreferences } from '../../game/gamePreferences';
+import { cozyMarketArt } from '../../game/marketInteriorThemeArt';
 
 const gondola = require('../../../assets/images/game/market/interior/retail-v4/gondola-empty.png');
 const fridge = require('../../../assets/images/game/market/interior/retail-v4/fridge-empty.png');
@@ -15,6 +17,7 @@ const shelfSize = (value: number) => value * MARKET_SHELF_SCALE;
 
 /** A shared furniture family with category-specific facings; the two fixtures still open one inventory. */
 export const MarketRetailShelf = memo(function MarketRetailShelf({ categoryId, variant }: { categoryId: MarketCategoryId; variant: number }) {
+  const illustrated = useGamePreferences().preferences.marketInteriorTheme === 'cozy';
   const produce = categoryId === 'produce';
   const cold = categoryId === 'fresh';
   const goods = MARKET_RETAIL_STOCK[categoryId][variant];
@@ -23,7 +26,8 @@ export const MarketRetailShelf = memo(function MarketRetailShelf({ categoryId, v
   const frameHeight = produce ? shelfSize(172) : MARKET_SHELF_ART_HEIGHT;
   return <View pointerEvents="none" testID={`market-retail-shelf-${categoryId}-${variant + 1}`} style={styles.frame}>
     <View style={[styles.canvas, { left: (MARKET_SHELF_ART_WIDTH - frameWidth) / 2, bottom: 0, width: frameWidth, height: frameHeight }]}>
-      <Image source={produce ? produceBench : cold ? fridge : gondola} resizeMode="contain" accessible={false}
+      <Image source={illustrated ? produce ? cozyMarketArt.produce : cold ? cozyMarketArt.fridge : cozyMarketArt.gondola
+        : produce ? produceBench : cold ? fridge : gondola} resizeMode="contain" accessible={false}
         testID={`market-shelf-art-${categoryId}-${variant + 1}`} style={[StyleSheet.absoluteFill, { width: frameWidth, height: frameHeight }]} />
       {[0, 1].map(row => columns.map((center, column) => {
         const id = goods[row * 3 + Math.floor(column / 2)];
@@ -43,11 +47,11 @@ export const MarketRetailShelf = memo(function MarketRetailShelf({ categoryId, v
         </View>;
       }))}
       {[0, 1].map(row => [0.25, 0.5, 0.75].map(center => <View key={`tag-${row}-${center}`}
-        style={[styles.priceTag, { left: center * frameWidth - shelfSize(10),
+        style={[styles.priceTag, illustrated && { backgroundColor: '#FFF1D7' }, { left: center * frameWidth - shelfSize(10),
           top: produce ? (row === 0 ? 0.363 : 0.703) * frameHeight : shelfSize(row === 0 ? 78 : 138) }]}>
         <View style={styles.priceInk} /><View style={styles.priceAccent} />
       </View>))}
-      {!produce ? <Text style={[styles.railBrand, cold && styles.coldBrand]}>{cold ? 'FRESH & COOL' : 'HANEUL MARKET'}</Text> : null}
+      {!produce ? <Text style={[styles.railBrand, cold && styles.coldBrand, illustrated && { color: '#755F49' }]}>{cold ? 'FRESH & COOL' : 'HANEUL MARKET'}</Text> : null}
     </View>
   </View>;
 });

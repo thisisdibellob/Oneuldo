@@ -5,6 +5,7 @@ import { MarketSessionConfig, parseMarketSessionConfig } from '../../game/market
 import { DEFAULT_MARKET_ENVIRONMENT_CONFIG, MARKET_LAYOUT_OPTIONS, type MarketCount } from '../../game/marketEnvironment';
 import { DEFAULT_MARKET_LEARNING_CONFIG } from '../../game/marketLearning';
 import { fonts } from '../../theme';
+import { MarketThemeSelector } from './MarketThemeSelector';
 
 export type MarketSetupChanges = { shelfOrderTouched: boolean; changedConfigPaths?: string[]; lockedSettings?: Record<string,unknown> };
 
@@ -105,6 +106,8 @@ export function MarketSetupPanel({ config, onApply, onClose }: {
     >
       <Text style={s.eyebrow}>장보기 시작 전 설정</Text>
       <Text accessibilityRole="header" style={s.title}>연습 환경 설정</Text>
+      <Text style={s.label}>마트 인테리어</Text>
+      <MarketThemeSelector />
       <Text style={s.description}>같은 시드와 같은 설정이면 같은 매장이 만들어져요. 설정을 적용하면 아직 시작하지 않은 게임의 배치가 바뀝니다.</Text>
       <Text style={s.description}>직접 바꾼 게임 조건은 다음 AI 추천에서도 고정돼요. AI는 나머지 조건을 조절해요.</Text>
       <Text style={s.label}>시드 (배치를 다시 만드는 값)</Text>

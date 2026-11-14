@@ -1,0 +1,9 @@
+{
+  "tool": "image_gen",
+  "date": "2026-10-01",
+  "prompt": "Create ONE front-facing full-body game NPC sprite named Sujin, a friendly Korean young adult woman, matching the two supplied game character reference images as closely as possible in rendering style and proportions. Reference 1 (Minsu): primary line-weight, warm brown outline, simple oval eyes, small brown smile, clean flat-color style. Reference 2 (Jiyoung): female face, gentle blush, tiny hands, body-to-head size, overall cozy style. New original character identity, not either existing character in a new outfit.\nSujin has a neat dark espresso-brown chin-length bob with softly curved ends, a light asymmetrical side fringe with small gaps, and one tiny muted gold barrette above the left temple. A soft dusty-rose short cardigan with three simple cream buttons over an ivory crew-neck shirt, slim straight dark warm-gray ankle trousers, ivory low-top sneakers. Clothes fit neatly, not puffy or oversized. Arms relaxed at sides, both feet planted, looking straight forward, small welcoming smile. Same approximately 2.5-head chibi proportions and narrow body as references. Big rounded head, tiny nose absent, simple warm dark oval eyes. No realistic details, no glossy anime eyes, no eyelashes or makeup emphasis.\nClean thick slightly warm dark-brown outer contours and lighter brown mouth; flat soft opaque color fills and only a few broad soft shadow shapes. Smooth consistent strokes, no grain, no speckling, no crosshatching, no photorealism, no 3D rendering. Preserve the exact cozy hand-drawn game aesthetic. Entire head and both shoes fully in frame, single character only centered with generous transparent margin. No backdrop, no text, no logo, no ground shadow. True transparent background.",
+  "references": [
+    "../../chibi-v1/minsu-front-display.png",
+    "../../chibi-v1/jiyoung-front-display.png"
+  ]
+}

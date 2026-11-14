@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { useGamePreferences } from '../../game/gamePreferences';
+import { MarketThemeSelector } from './MarketThemeSelector';
 import { fonts } from '../../theme';
 import { PressScale } from '../PressScale';
 
@@ -33,6 +34,18 @@ export function PhoneSettings({ controlMode, onControlModeChange, reduceMotion }
       </View>
     </View>
     <View style={styles.section}>
+      <Text style={styles.heading}>달리기 방식</Text>
+      <View accessibilityRole="radiogroup" style={styles.runOptions}>
+        {([{ value: 'distance', label: '패드 거리로 걷기·달리기' }, { value: 'toggle', label: '달리기 버튼 켜기·끄기' }] as const).map(({ value, label }) => <PressScale
+          key={value} accessibilityRole="radio" accessibilityLabel={label} accessibilityState={{ checked: preferences.runMode === value }}
+          aria-checked={preferences.runMode === value} onPress={() => updatePreferences({ runMode: value })} scaleTo={pressScale}
+          style={[styles.runOption, preferences.runMode === value && styles.runOptionSelected]}>
+          <Ionicons name={preferences.runMode === value ? 'radio-button-on' : 'radio-button-off'} size={22} color="#617A5E" />
+          <Text style={styles.runOptionText}>{label}</Text>
+        </PressScale>)}
+      </View>
+    </View>
+    <View style={styles.section}>
       <Text style={styles.heading}>배경화면 색상</Text>
       <View accessibilityRole="radiogroup" style={styles.wallpapers}>
         {wallpaperChoices.map(({ color, label }) => <PressScale
@@ -43,6 +56,10 @@ export function PhoneSettings({ controlMode, onControlModeChange, reduceMotion }
           {preferences.wallpaperColor === color ? <Ionicons name="checkmark" color="#3E6149" size={22} /> : null}
         </PressScale>)}
       </View>
+    </View>
+    <View style={styles.section}>
+      <Text style={styles.heading}>마트 인테리어</Text>
+      <MarketThemeSelector reduceMotion={reduceMotion} />
     </View>
     <View style={styles.section}>
       <Text style={styles.heading}>소리</Text>
@@ -91,6 +108,10 @@ const styles = StyleSheet.create({
   control: { alignItems: 'center', justifyContent: 'center', gap: 5, flex: 1, minHeight: 52, borderRadius: 13, borderColor: '#DDDCCD', borderWidth: 1, backgroundColor: '#F5F3EA' },
   controlSelected: { backgroundColor: '#E1E9D9', borderColor: '#7F987B', borderWidth: 2 },
   controlText: { color: '#455C4B', fontFamily: fonts.medium, fontSize: 12 },
+  runOptions: { gap: 5 },
+  runOption: { flexDirection: 'row', alignItems: 'center', gap: 9, minHeight: 44, paddingHorizontal: 9, borderRadius: 12 },
+  runOptionSelected: { backgroundColor: '#E1E9D9' },
+  runOptionText: { fontFamily: fonts.medium, fontSize: 14, color: '#455C4B' },
   wallpapers: { flexDirection: 'row', justifyContent: 'space-between', gap: 3 },
   swatch: { alignItems: 'center', justifyContent: 'center', borderColor: '#D9D8CA', borderWidth: 1, borderRadius: 14, height: 44, flex: 1, maxWidth: 44 },
   swatchSelected: { borderColor: '#6C8B6E', borderWidth: 2 },

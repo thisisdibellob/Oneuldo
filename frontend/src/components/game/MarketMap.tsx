@@ -31,6 +31,7 @@ import { getMarketPersonFrame } from '../../game/marketPersonLayout';
 import { resolveMarketEnvironmentMovement } from '../../game/marketMovement';
 import { getWorldCameraFrame, MARKET_DEFAULT_ZOOM, screenPointToWorld } from '../../game/worldZoom';
 import { marketCategories } from '../../game/scenarios';
+import { RUN_SPEED_MULTIPLIER } from '../../game/movementControls';
 import { fonts } from '../../theme';
 import { MARKET_CHECKOUT_RECT } from '../../game/prototypeWorld';
 import type { MarketStationId } from '../../screens/MarketSimulationScreen';
@@ -86,6 +87,8 @@ export function MarketMap({
   const direction = useRef<MarketPoint>({ x: 0, y: 0 });
   const keyboardDirection = useRef<MarketPoint>({ x: 0, y: 0 });
   const pressedMovementKeys = useRef(new Set<string>());
+  const shiftHeld = useRef(false);
+  const runEnabledRef = useRef(false);
   const speedMultiplier = useRef(1);
   const tapTarget = useRef<MarketPoint | null>(null);
   const tapWaypoints = useRef<MarketPoint[]>([]);
@@ -146,11 +149,17 @@ export function MarketMap({
     setAvatarPose(previous => previous.motion === 'idle' ? previous : { ...previous, motion: 'idle' });
   }, []);
 
+  const syncSpeedMultiplier = useCallback(() => {
+    speedMultiplier.current = runEnabledRef.current || (shiftHeld.current && pressedMovementKeys.current.size > 0)
+      ? RUN_SPEED_MULTIPLIER : 1;
+  }, []);
+
   const stopMovement = useCallback(() => {
     settleAvatar();
     direction.current = { x: 0, y: 0 };
     keyboardDirection.current = { x: 0, y: 0 };
     pressedMovementKeys.current.clear();
+    syncSpeedMultiplier();
     joystickEngaged.current = false;
     tapTarget.current = null;
     tapWaypoints.current = [];
@@ -168,10 +177,15 @@ export function MarketMap({
       toValue: { x: 0, y: 0 },
       useNativeDriver: true,
     }).start();
-  }, [joystickKnob, settleAvatar]);
+  }, [joystickKnob, settleAvatar, syncSpeedMultiplier]);
+
+  const resetKeyboardMovement = useCallback(() => {
+    shiftHeld.current = false;
+    stopMovement();
+  }, [stopMovement]);
 
   const runMovement = useCallback((timestamp: number) => {
-    if (controlsLockedRef.current) { stopMovement(); return; }
+    if (controlsLockedRef.current) { resetKeyboardMovement(); return; }
     const last = previousFrame.current ?? timestamp;
     const elapsedSeconds = Math.min(timestamp - last, 32) / 1000;
     previousFrame.current = timestamp;
@@ -224,7 +238,7 @@ export function MarketMap({
       previousFrame.current = null;
       animationFrame.current = null;
     }
-  }, [movePlayer, settleAvatar, stopMovement]);
+  }, [movePlayer, settleAvatar, resetKeyboardMovement]);
 
   const beginMovement = useCallback(() => {
     if (animationFrame.current === null) animationFrame.current = requestAnimationFrame(runMovement);
@@ -264,8 +278,8 @@ export function MarketMap({
   }, []);
 
   useEffect(() => {
-    if (!interactive) stopMovement();
-  }, [interactive, stopMovement]);
+    if (!interactive) resetKeyboardMovement();
+  }, [interactive, resetKeyboardMovement]);
 
   useEffect(() => {
     if (!controlledPlayerPosition) return;
@@ -305,7 +319,9 @@ export function MarketMap({
       ArrowLeft: { x: -1, y: 0 }, ArrowRight: { x: 1, y: 0 },
       w: { x: 0, y: -1 }, s: { x: 0, y: 1 }, a: { x: -1, y: 0 }, d: { x: 1, y: 0 },
     };
-    const keyName = (event: KeyboardEvent) => event.key.length === 1 ? event.key.toLowerCase() : event.key;
+    const physicalKeys: Record<string, string> = { KeyW: 'w', KeyS: 's', KeyA: 'a', KeyD: 'd' };
+    const keyName = (event: KeyboardEvent) => physicalKeys[event.code]
+      ?? (event.key.length === 1 ? event.key.toLowerCase() : event.key);
     const syncDirection = () => {
       let x = 0, y = 0;
       pressedMovementKeys.current.forEach(key => { x += keys[key].x; y += keys[key].y; });
@@ -315,30 +331,44 @@ export function MarketMap({
     const keydown = (event: KeyboardEvent) => {
       const key = keyName(event);
       const target = event.target as HTMLElement | null;
-      if (!keys[key] || controlsLockedRef.current || event.altKey || event.ctrlKey || event.metaKey ||
+      if (controlsLockedRef.current || event.altKey || event.ctrlKey || event.metaKey ||
         target?.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/i.test(target?.tagName ?? '')) return;
+      if (key === 'Shift') {
+        shiftHeld.current = true;
+        syncSpeedMultiplier();
+        return;
+      }
+      if (!keys[key]) return;
       event.preventDefault();
       if (!pressedMovementKeys.current.size) stopMovement();
+      if (typeof event.shiftKey === 'boolean') shiftHeld.current = event.shiftKey;
       pressedMovementKeys.current.add(key);
       syncDirection();
+      syncSpeedMultiplier();
       beginMovement();
     };
     const keyup = (event: KeyboardEvent) => {
       const key = keyName(event);
+      if (key === 'Shift') {
+        shiftHeld.current = event.shiftKey === true;
+        syncSpeedMultiplier();
+        return;
+      }
       if (!keys[key]) return;
       pressedMovementKeys.current.delete(key);
       syncDirection();
+      syncSpeedMultiplier();
       if (!pressedMovementKeys.current.size && !joystickEngaged.current) stopMovement();
     };
     window.addEventListener('keydown', keydown);
     window.addEventListener('keyup', keyup);
-    window.addEventListener('blur', stopMovement);
+    window.addEventListener('blur', resetKeyboardMovement);
     return () => {
       window.removeEventListener('keydown', keydown);
       window.removeEventListener('keyup', keyup);
-      window.removeEventListener('blur', stopMovement);
+      window.removeEventListener('blur', resetKeyboardMovement);
     };
-  }, [beginMovement, stopMovement]);
+  }, [beginMovement, stopMovement, resetKeyboardMovement, syncSpeedMultiplier]);
 
   const startTapMovement = (desired: MarketPoint) => {
     if (controlsLockedRef.current) return;
@@ -395,7 +425,8 @@ export function MarketMap({
 
   const selectControlMode = (mode: MarketControlMode) => {
     stopMovement();
-    speedMultiplier.current = 1;
+    runEnabledRef.current = false;
+    syncSpeedMultiplier();
     setRunEnabled(false);
     setControlMode(mode);
   };
@@ -570,11 +601,10 @@ export function MarketMap({
             accessibilityState={{ selected: runEnabled }}
             onPress={(event) => {
               event?.stopPropagation?.();
-              setRunEnabled((enabled) => {
-                const next = !enabled;
-                speedMultiplier.current = next ? 1.55 : 1;
-                return next;
-              });
+              const next = !runEnabledRef.current;
+              runEnabledRef.current = next;
+              syncSpeedMultiplier();
+              setRunEnabled(next);
             }}
             style={[styles.marketRunButton, runEnabled && styles.marketRunButtonActive]}
           >

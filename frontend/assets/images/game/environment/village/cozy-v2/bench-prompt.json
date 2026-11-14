@@ -1,0 +1,10 @@
+{
+  "mode": "built-in image_gen",
+  "prompt": "Use case: style-transfer. Make one standalone wooden village bench sprite for a cozy Korean RPG, matched to these reference images.\nImage 1 is a reference for muted warm materials, brown outlines and front-facing horizontal projection. Image 2 is the school's shallow front-facing orthographic camera.\nSubject: a simple well-made public wooden bench, horizontal seat and low backrest made of only 3 broad wooden slats, two short gray-brown supports/legs. Muted medium warm beige-brown timber, no saturated orange. Calm brown clean outlines, matte fills, restrained soft broad shading. Keep the design simple and grounded. Overall width about 2 times height.\nProjection: directly front-facing, vertical legs vertical, all seat/backrest long edges perfectly horizontal. A shallow narrow sliver of seat top is visible. No isometric angle, no diagonal bench, no deep perspective. Same gentle illustration style as reference flowerbed and school, no grain/noise, no photoreal textures.\nFull bench isolated and centered with margin on a genuinely transparent RGBA background. No checkerboard image, no floor or cast shadow, no labels, no text, no flowers, no extra props.",
+  "references": [
+    "flowerbed-full.png",
+    "../../../buildings/village/runtime/bld_school_v1.png"
+  ],
+  "generatedFile": "C:/Users/PC/.codex/generated_images/01a0dc94-4519-78a0-ba19-afe7897b69a1/exec-5960b92f-be81-4f0b-baec-3081d18d61b3.png",
+  "processing": "Preserve alpha; crop empty margins with 2px padding; bicubic resize to320px width."
+}

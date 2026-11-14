@@ -1,6 +1,6 @@
 import { Platform } from 'react-native';
 
-export const DIALOGUE_CHARACTER_DELAY = 34;
+export const DIALOGUE_CHARACTER_DELAY = 17;
 export const DIALOGUE_ENTER_SPRING = { damping: 16, mass: 0.72, stiffness: 175 };
 export const DIALOGUE_CHOICE_DURATION = 200;
 export const DIALOGUE_TONE_VOLUME = 0.30;

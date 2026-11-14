@@ -3,6 +3,7 @@ import { Animated, BackHandler, PanResponder, Platform, StyleSheet } from 'react
 
 import { DirectionalAvatar } from '../src/components/game/DirectionalAvatar';
 import { AVATAR_WALK_CYCLE_DISTANCE } from '../src/game/avatarAnimation';
+import { RUN_SPEED_MULTIPLIER } from '../src/game/movementControls';
 import { MarketMap } from '../src/components/game/MarketMap';
 import { createMarketEnvironment, isMarketEnvironmentBlocked, MARKET_ENVIRONMENT_PLAYER_RADIUS, type MarketCashierAvailability } from '../src/game/marketEnvironment';
 import { MarketSimulationScreen } from '../src/screens/MarketSimulationScreen';
@@ -24,6 +25,128 @@ function cleanEnvironment() {
     employeeSlotIds: ['staff-west-aisle'], customerSlotIds: ['customer-west'],
     cashierCount: 0, pillarCount: 0, chairCount: 0, kioskPresent: false });
 }
+
+function keyboardMarket() {
+  const spring = jest.spyOn(Animated, 'spring').mockImplementation(() => ({ start: jest.fn(), stop: jest.fn(), reset: jest.fn() }));
+  const frames = new Map<number, FrameRequestCallback>();
+  let frameId = 0, time = 0;
+  const raf = jest.spyOn(globalThis, 'requestAnimationFrame').mockImplementation(callback => {
+    frames.set(++frameId, callback); return frameId;
+  });
+  const cancel = jest.spyOn(globalThis, 'cancelAnimationFrame').mockImplementation(id => { if (id != null) frames.delete(id); });
+  const originalOS = Object.getOwnPropertyDescriptor(Platform, 'OS');
+  const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
+  const listeners = new Map<string, Set<(event: KeyboardEvent) => void>>();
+  Object.defineProperty(Platform, 'OS', { configurable: true, value: 'web' });
+  Object.defineProperty(globalThis, 'window', { configurable: true, value: {
+    addEventListener: (name: string, listener: (event: KeyboardEvent) => void) => {
+      if (!listeners.has(name)) listeners.set(name, new Set());
+      listeners.get(name)!.add(listener);
+    },
+    removeEventListener: (name: string, listener: (event: KeyboardEvent) => void) => listeners.get(name)?.delete(listener),
+  } });
+  const environment = cleanEnvironment(), onPositionChange = jest.fn(), onNearbyStationChange = jest.fn();
+  const element = (interactive: boolean) => <MarketMap environment={environment} interactive={interactive} hintedStation={null}
+    nearbyStation={null} onPositionChange={onPositionChange} onNearbyStationChange={onNearbyStationChange} />;
+  const screen = render(element(true));
+  return {
+    screen,
+    onPositionChange,
+    pose: () => screen.UNSAFE_getByType(DirectionalAvatar).props.motion,
+    distance: () => (onPositionChange.mock.calls.at(-1)?.[0].x ?? environment.spawn.x) - environment.spawn.x,
+    interactive: (value: boolean) => screen.rerender(element(value)),
+    key: (name: string, key = '', options: Partial<KeyboardEvent> = {}) => act(() => {
+      const event = { key, target: { tagName: 'DIV' }, preventDefault: jest.fn(), ...options } as unknown as KeyboardEvent;
+      listeners.get(name)?.forEach(listener => listener(event));
+    }),
+    advance: (count = 1) => {
+      for (let i = 0; i < count; i++) act(() => {
+        time += 32; const callbacks = [...frames.values()]; frames.clear(); callbacks.forEach(callback => callback(time));
+      });
+    },
+    cleanup: () => {
+      screen.unmount();
+      if (originalOS) Object.defineProperty(Platform, 'OS', originalOS);
+      if (originalWindow) Object.defineProperty(globalThis, 'window', originalWindow);
+      else Reflect.deleteProperty(globalThis, 'window');
+      spring.mockRestore(); cancel.mockRestore(); raf.mockRestore();
+    },
+  };
+}
+
+it('독립 마트는 Shift를 먼저 누른 채 한글 배열 WASD를 눌러도 달리고 방향키만 뗐다 다시 누르면 달리기를 유지한다', () => {
+  const market = keyboardMarket();
+  const runStep = 190 * 0.032 * RUN_SPEED_MULTIPLIER;
+  try {
+    market.key('keydown', 'Shift', { code: 'ShiftLeft', shiftKey: true });
+    market.advance(2);
+    expect(market.onPositionChange).not.toHaveBeenCalled();
+    expect(market.pose()).toBe('idle');
+    market.key('keydown', 'ㅇ', { code: 'KeyD', shiftKey: true });
+    market.advance(2);
+    expect(market.distance()).toBeCloseTo(runStep);
+    expect(market.pose()).toBe('sprint');
+    market.key('keyup', 'ㅇ', { code: 'KeyD', shiftKey: true });
+    market.advance(2);
+    expect(market.distance()).toBeCloseTo(runStep);
+    expect(market.pose()).toBe('idle');
+    market.key('keydown', 'D', { code: 'KeyD', shiftKey: true });
+    market.advance(2);
+    expect(market.distance()).toBeCloseTo(runStep * 2);
+    expect(market.pose()).toBe('sprint');
+    market.key('keyup', 'Shift', { code: 'ShiftLeft', shiftKey: false });
+    market.advance();
+    expect(market.distance()).toBeCloseTo(runStep * 2 + 190 * 0.032);
+    expect(market.pose()).toBe('walk');
+  } finally { market.cleanup(); }
+});
+
+it('독립 마트는 이동 중 Shift로 속도와 달리기 모션을 바꾸고 기존 달리기 토글도 유지한다', () => {
+  const market = keyboardMarket();
+  const walkStep = 190 * 0.032;
+  try {
+    market.key('keydown', 'd', { code: 'KeyD', shiftKey: false });
+    market.advance(2);
+    expect(market.distance()).toBeCloseTo(walkStep);
+    expect(market.pose()).toBe('walk');
+    market.key('keydown', 'Shift', { code: 'ShiftLeft', shiftKey: true });
+    market.key('keydown', 'Shift', { code: 'ShiftRight', shiftKey: true });
+    market.key('keyup', 'Shift', { code: 'ShiftLeft', shiftKey: true });
+    market.advance();
+    expect(market.distance()).toBeCloseTo(walkStep * (1 + RUN_SPEED_MULTIPLIER));
+    expect(market.pose()).toBe('sprint');
+    fireEvent.press(market.screen.getByRole('button', { name: '마트에서 달리기 켜기' }));
+    market.key('keyup', 'Shift', { code: 'ShiftRight', shiftKey: false });
+    market.advance();
+    expect(market.distance()).toBeCloseTo(walkStep * (1 + RUN_SPEED_MULTIPLIER * 2));
+    expect(market.pose()).toBe('sprint');
+    fireEvent.press(market.screen.getByRole('button', { name: '마트에서 달리기 끄기' }));
+    market.advance();
+    expect(market.distance()).toBeCloseTo(walkStep * (2 + RUN_SPEED_MULTIPLIER * 2));
+    expect(market.pose()).toBe('walk');
+  } finally { market.cleanup(); }
+});
+
+it.each(['blur', 'lock'] as const)('독립 마트는 %s 후 눌린 이동키와 Shift를 초기화한다', reset => {
+  const market = keyboardMarket();
+  try {
+    market.key('keydown', 'Shift', { shiftKey: true });
+    market.key('keydown', 'd', { code: 'KeyD', shiftKey: true });
+    market.advance(2);
+    expect(market.pose()).toBe('sprint');
+    if (reset === 'blur') market.key('blur');
+    else market.interactive(false);
+    const stoppedDistance = market.distance();
+    market.advance(2);
+    expect(market.distance()).toBe(stoppedDistance);
+    expect(market.pose()).toBe('idle');
+    if (reset === 'lock') market.interactive(true);
+    market.key('keydown', 'd', { code: 'KeyD' });
+    market.advance(2);
+    expect(market.distance() - stoppedDistance).toBeCloseTo(190 * 0.032);
+    expect(market.pose()).toBe('walk');
+  } finally { market.cleanup(); }
+});
 
 it('처음 만들어진 조이스틱 핸들러도 호출된 계산원의 새 충돌 영역을 읽는다', () => {
   const frames = new Map<number, FrameRequestCallback>();

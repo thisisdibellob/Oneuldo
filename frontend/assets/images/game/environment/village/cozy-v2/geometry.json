@@ -1,0 +1,112 @@
+[
+  {
+    "id": "tree",
+    "source": [
+      1145,
+      1374
+    ],
+    "sourceBounds": [
+      39,
+      96,
+      1106,
+      1288
+    ],
+    "transparentFraction": 0.5494365096012662,
+    "runtime": [
+      287,
+      320
+    ],
+    "footAnchor": [
+      0.5,
+      1
+    ]
+  },
+  {
+    "id": "flowerbed",
+    "source": [
+      2100,
+      749
+    ],
+    "sourceBounds": [
+      122,
+      278,
+      1977,
+      593
+    ],
+    "transparentFraction": 0.687487443575561,
+    "runtime": [
+      320,
+      55
+    ],
+    "footAnchor": [
+      0.5,
+      1
+    ]
+  },
+  {
+    "id": "shrub",
+    "source": [
+      1774,
+      887
+    ],
+    "sourceBounds": [
+      93,
+      255,
+      1686,
+      759
+    ],
+    "transparentFraction": 0.6510328952970948,
+    "runtime": [
+      256,
+      82
+    ],
+    "footAnchor": [
+      0.5,
+      1
+    ]
+  },
+  {
+    "id": "bench",
+    "source": [
+      1774,
+      887
+    ],
+    "sourceBounds": [
+      258,
+      215,
+      1515,
+      743
+    ],
+    "transparentFraction": 0.7225335517794931,
+    "runtime": [
+      320,
+      135
+    ],
+    "footAnchor": [
+      0.5,
+      1
+    ]
+  },
+  {
+    "id": "streetlamp",
+    "source": [
+      1024,
+      1536
+    ],
+    "sourceBounds": [
+      390,
+      340,
+      633,
+      1216
+    ],
+    "transparentFraction": 0.9336783091227213,
+    "runtime": [
+      72,
+      256
+    ],
+    "footAnchor": [
+      0.5,
+      1
+    ]
+  }
+]

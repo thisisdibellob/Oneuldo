@@ -50,11 +50,10 @@ export const DAILY_QUEST_DEFINITIONS = [
   },
   {
     description: '목적지까지 가는 버스를 확인하고 안전하게 이용해요.',
-    discoveryHint: '버스정류장의 기사님을 찾아보세요.',
+    discoveryHint: '동쪽 정류장에서 버스 이동 연습을 시작할 수 있어요.',
     iconKey: 'bus',
     id: 'bus-route',
-    kind: 'request',
-    providerName: '기사님',
+    kind: 'automatic',
     region: '버스정류장',
     rewardXp: 20,
     title: '목적지 버스 찾기',
@@ -73,7 +72,7 @@ export const DAILY_QUEST_DEFINITIONS = [
 ] as const satisfies readonly DailyQuestDefinition[];
 
 export const INITIAL_DAILY_QUEST_STATUS: DailyQuestStatusMap = {
-  'bus-route': 'available',
+  'bus-route': 'active',
   'home-fridge': 'active',
   'market-shopping': 'available',
   'minsu-safety': 'available',

@@ -2,6 +2,7 @@ import { act, fireEvent, render, waitFor, within } from '@testing-library/react-
 import { BackHandler, StyleSheet } from 'react-native';
 
 import { MarketShelfScene } from '../src/components/game/MarketShelfScene';
+import { MarketKioskCheckout } from '../src/components/game/MarketKioskCheckout';
 import { createMarketEnvironment, getMarketWrongWayRearm, type MarketEnvironmentStationId } from '../src/game/marketEnvironment';
 import { createMarketSession, type MarketSessionConfig } from '../src/game/marketSession';
 import { getMarketProduct } from '../src/game/scenarios';
@@ -79,6 +80,60 @@ function setup(config: Partial<MarketSessionConfig> = {}, cashierCount: 0 | 1 | 
 describe('마트 장보기의 최종 결정과 재시도', () => {
   beforeEach(() => { jest.useFakeTimers(); });
   afterEach(() => { jest.useRealTimers(); });
+  it('민수 부탁의 승인 예산보다 큰 결제를 막고 전화에서 예산을 확인한다', async () => {
+    const onBudgetRequest = jest.fn();
+    const game = setup({}, 2, { requesterName: '민수', spendingLimit: 4000, onBudgetRequest });
+    try {
+      expect(game.screen.queryByRole('button', { name: '연습 환경 설정' })).toBeNull();
+      await game.start();
+      await game.station('fresh'); game.add('milk', 2); await game.closeShelf();
+      await game.station('checkout');
+      fireEvent.press(game.screen.getByRole('button', { name: '이대로 결제하기' }));
+      expect(game.screen.getByText('예산을 다시 확인해요')).toBeTruthy();
+      expect(game.screen.queryByTestId('market-final-score')).toBeNull();
+      expect(game.onEpisodeComplete).not.toHaveBeenCalled();
+      expect(game.onMissionComplete).not.toHaveBeenCalled();
+      fireEvent.press(game.screen.getByRole('button', { name: '민수에게 예산 확인하기' }));
+      finishStaffLine(game.screen);
+      expect(game.screen.getByRole('header', { name: '민수 · 전화' })).toBeTruthy();
+      fireEvent.press(game.screen.getByRole('button', { name: '총 4,400원까지 써도 될까요?' }));
+      expect(onBudgetRequest).toHaveBeenCalledWith(4400);
+    } finally { game.screen.unmount(); }
+  });
+  it('무인 계산대에서도 예산을 넘기면 결제하지 않고 물건을 다시 고를 수 있다', async () => {
+    const game = setup({ environment: { kioskLane: 'checkout' } }, 0, { requesterName: '민수', spendingLimit: 4000, onBudgetRequest: jest.fn() });
+    try {
+      await game.start(); await game.station('fresh'); game.add('milk', 2); await game.closeShelf();
+      const kiosk = game.environment.stationDetails.find(item => item.id.startsWith('kiosk:'))!;
+      await game.station(kiosk.id);
+      act(() => game.screen.UNSAFE_getByType(MarketKioskCheckout).props.onConfirm({ milk: 2 }));
+      expect(game.screen.getByText('예산을 다시 확인해요')).toBeTruthy();
+      expect(game.onMissionComplete).not.toHaveBeenCalled();
+      fireEvent.press(game.screen.getByRole('button', { name: '다시 고르기' })); await finishTransition();
+      expect(game.screen.queryByText('예산을 다시 확인해요')).toBeNull();
+      await game.station(kiosk.id);
+      expect(game.screen.getByTestId('market-kiosk-checkout')).toBeTruthy();
+    } finally { game.screen.unmount(); }
+  });
+  it('더 비싼 대체 우유는 구매 목표를 바꾸기 전에 예산 승인을 따로 받는다', async () => {
+    const onBudgetRequest = jest.fn();
+    const game = setup({ objectives: [{ productId: 'milk', quantity: 1 }], learning: { stockoutEnabled: true, budgetChoiceEnabled: false } }, 2,
+      { requesterName: '민수', spendingLimit: 1000, onBudgetRequest });
+    try {
+      await game.start(); await game.station('fresh'); await game.closeShelf();
+      await game.station(('staff:' + game.environment.employees[0].id) as 'staff:employee-1');
+      fireEvent.press(game.screen.getByRole('button', { name: '재고 있나요?' })); finishStaffLine(game.screen);
+      fireEvent.press(game.screen.getByRole('button', { name: '아니에요, 감사합니다.' })); await finishTransition();
+      await game.contactRequester();
+      fireEvent.press(game.screen.getAllByRole('button', { name: /로 바꿔도 될까요\?/ })[0]); finishStaffLine(game.screen);
+      expect(onBudgetRequest).not.toHaveBeenCalled();
+      expect(game.screen.queryByText(/목록에도 바꿔 적었어/)).toBeNull();
+      fireEvent.press(game.screen.getByRole('button', { name: /총 .*원까지 써도 될까요\?/ })); finishStaffLine(game.screen);
+      expect(onBudgetRequest).toHaveBeenCalledTimes(1);
+      expect(onBudgetRequest.mock.calls[0][0]).toBeGreaterThan(1000);
+      expect(game.screen.getByText(/확인해 줘서 고마워/)).toBeTruthy();
+    } finally { game.screen.unmount(); }
+  });
   it('마트 HUD는 마을 시간·코인 아래 중앙에 있고 외부 메뉴의 입력을 소비하지 않는다', async () => {
     const game = setup({}, 0, { controlMode: 'joystick', onControlModeChange: jest.fn() });
     try {

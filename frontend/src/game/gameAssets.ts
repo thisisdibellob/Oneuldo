@@ -59,14 +59,14 @@ export const villageLandmarkArt = {
 };
 
 export const villageDecorationArt = {
-  bench: require('../../assets/images/game/environment/village/runtime/env_bench_wood_v1.png'),
+  bench: require('../../assets/images/game/environment/village/cozy-v2/bench.png'),
   bicycle: require('../../assets/images/game/environment/village/runtime/env_bicycle_v1.png'),
   fence: require('../../assets/images/game/environment/village/runtime/env_fence_wood_v1.png'),
-  flowerbed: require('../../assets/images/game/environment/village/runtime/env_flowerbed_v1.png'),
-  shrub: require('../../assets/images/game/environment/village/runtime/env_shrub_cluster_v1.png'),
-  streetlamp: require('../../assets/images/game/environment/village/runtime/env_streetlamp_v1.png'),
+  flowerbed: require('../../assets/images/game/environment/village/cozy-v2/flowerbed.png'),
+  shrub: require('../../assets/images/game/environment/village/cozy-v2/shrub.png'),
+  streetlamp: require('../../assets/images/game/environment/village/cozy-v2/streetlamp.png'),
   'trash-bin': require('../../assets/images/game/environment/village/runtime/env_trash_bin_v1.png'),
-  tree: require('../../assets/images/game/environment/village/runtime/env_tree_round_v1.png'),
+  tree: require('../../assets/images/game/environment/village/cozy-v2/tree.png'),
 } satisfies Record<VillageDecorationKind, ImageSourcePropType>;
 
 export const villageSurfaceArt = {

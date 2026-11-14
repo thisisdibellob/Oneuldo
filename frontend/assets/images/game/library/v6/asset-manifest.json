@@ -1,0 +1,77 @@
+{
+  "generator": "built-in image_gen",
+  "assets": [
+    {
+      "name": "wall-left",
+      "file": "wall-left.png",
+      "width": 1200,
+      "height": 368,
+      "bytes": 928392,
+      "crop": {
+        "left": 29,
+        "top": 52,
+        "width": 2117,
+        "height": 635
+      },
+      "alpha": {
+        "transparent": 9975,
+        "outerEdgeNonzero": 0
+      },
+      "sha256": "39a62280c120be533f6781db03de464c589ebfbac6539c0206bfe85309318928"
+    },
+    {
+      "name": "wall-right",
+      "file": "wall-right.png",
+      "width": 1200,
+      "height": 368,
+      "bytes": 899848,
+      "crop": {
+        "left": 28,
+        "top": 54,
+        "width": 2151,
+        "height": 629
+      },
+      "alpha": {
+        "transparent": 10908,
+        "outerEdgeNonzero": 0
+      },
+      "sha256": "8b31b746cb790a9168bbacfa5541213d3c0537c5d6ed395795d0add689140030"
+    },
+    {
+      "name": "island-arts",
+      "file": "island-arts.png",
+      "width": 800,
+      "height": 248,
+      "bytes": 347338,
+      "crop": {
+        "left": 75,
+        "top": 44,
+        "width": 2058,
+        "height": 638
+      },
+      "alpha": {
+        "transparent": 21297,
+        "outerEdgeNonzero": 0
+      },
+      "sha256": "e2a4c303eda17689d85046161590dd81a9ae07aedb649dd49367469e64103eb1"
+    },
+    {
+      "name": "island-story",
+      "file": "island-story.png",
+      "width": 800,
+      "height": 248,
+      "bytes": 356645,
+      "crop": {
+        "left": 51,
+        "top": 41,
+        "width": 2104,
+        "height": 644
+      },
+      "alpha": {
+        "transparent": 15339,
+        "outerEdgeNonzero": 0
+      },
+      "sha256": "22a3e48a113bae6c0524d7c55c9774c06cc7b747054016d4b5efa5ca82362809"
+    }
+  ]
+}

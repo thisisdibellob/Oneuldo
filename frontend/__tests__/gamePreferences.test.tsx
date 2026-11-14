@@ -11,7 +11,7 @@ it('normalizes volumes and colors without accepting invalid saved values', () =>
   const store = createGamePreferencesStore(() => null);
   expect(store.getSnapshot()).toEqual(DEFAULT_GAME_PREFERENCES);
   store.update({ musicVolume: -1, effectsVolume: 2, wallpaperColor: '#abcdef' });
-  expect(store.getSnapshot()).toEqual({ musicVolume: 0, effectsVolume: 1, wallpaperColor: '#ABCDEF' });
+  expect(store.getSnapshot()).toEqual({ ...DEFAULT_GAME_PREFERENCES, musicVolume: 0, effectsVolume: 1, wallpaperColor: '#ABCDEF', runMode: 'distance' });
   const snapshot = store.getSnapshot();
   store.update({ musicVolume: NaN, effectsVolume: Infinity, wallpaperColor: 'red' });
   expect(store.getSnapshot()).toBe(snapshot);
@@ -23,7 +23,7 @@ it('persists updates and reloads the same preferences from browser storage', () 
   const storage = { getItem: jest.fn((key: string) => values.get(key) ?? null),
     setItem: jest.fn((key: string, value: string) => { values.set(key, value); }) };
   const store = createGamePreferencesStore(() => storage);
-  store.update({ musicVolume: 0.25, effectsVolume: 0, wallpaperColor: '#E8F0F8' });
+  store.update({ musicVolume: 0.25, effectsVolume: 0, wallpaperColor: '#E8F0F8', runMode: 'toggle', marketInteriorTheme: 'cozy' });
   expect(storage.setItem).toHaveBeenCalledWith(GAME_PREFERENCES_STORAGE_KEY,
     JSON.stringify({ version: 1, preferences: store.getSnapshot() }));
   const reloaded = createGamePreferencesStore(() => storage);
@@ -81,10 +81,20 @@ it('shares immediate updates across mounted game and phone hooks and preserves u
   expect(game.result.current.preferences.musicVolume).toBe(0.25);
   act(() => updateGamePreferences({ effectsVolume: 0, wallpaperColor: '#E8F0F8' }));
   expect(game.result.current.preferences).toBe(phone.result.current.preferences);
-  expect(getGamePreferences()).toEqual({ musicVolume: 0.25, effectsVolume: 0, wallpaperColor: '#E8F0F8' });
+  expect(getGamePreferences()).toEqual({ ...DEFAULT_GAME_PREFERENCES, musicVolume: 0.25, effectsVolume: 0, wallpaperColor: '#E8F0F8', runMode: 'distance' });
   const snapshot = game.result.current.preferences;
   act(() => updateGamePreferences({ musicVolume: 0.25 }));
   expect(game.result.current.preferences).toBe(snapshot);
   game.unmount();
   phone.unmount();
+});
+
+it('opens old preferences with the original interior and ignores unsupported themes', () => {
+  const store = createGamePreferencesStore(() => ({ getItem: () => JSON.stringify({ version: 1, preferences: { musicVolume: 0.5 } }), setItem: jest.fn() }));
+  expect(store.getSnapshot().marketInteriorTheme).toBe('classic');
+  store.update({ marketInteriorTheme: 'cozy' });
+  const before = store.getSnapshot();
+  store.update({ marketInteriorTheme: 'unknown' as never });
+  expect(store.getSnapshot()).toBe(before);
+  expect(store.getSnapshot().musicVolume).toBe(0.5);
 });

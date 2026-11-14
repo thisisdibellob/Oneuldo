@@ -1,0 +1,60 @@
+{
+  "reviewedAt": "2026-10-03",
+  "theme": "동네 마트",
+  "references": [
+    {
+      "url": "https://www.reddit.com/r/LifeSimulators/comments/1skjlrj/any_2d_life_simish_games_with_a_similar/",
+      "observed": "게시글·댓글에서 Lost and Found Co. 확인. Reddit 원본 이미지 뷰어는 CAPTCHA로 차단. 게임의 공식 Steam 화면을 대신 시각 확인.",
+      "visualSource": "https://store.steampowered.com/app/2101390/Lost_and_Found_Co/",
+      "analysis": "갈색 선과 선명한 실루엣, 일정한 내려다보기 투시. 소품이 바닥·건축선과 연결되고 길은 큰 색 면으로 구획된다.",
+      "application": "기존 이동 좌표계를 유지하고 가구 투시·외곽선·바닥 마감의 시각적 규칙을 통일한다."
+    },
+    {
+      "url": "https://www.google.com/search?q=고양이+스낵바",
+      "observed": "검색 URL은 도구에서 차단되어 공식 App Store 스크린샷 직접 확인.",
+      "visualSource": "https://apps.apple.com/us/app/cat-snack-bar-food-games/id6443895159",
+      "analysis": "굵고 둥근 윤곽, 큰 파스텔 면, 단순한 음영, 여유 있는 동선. 기능별 구역을 색과 가구 덩어리로 읽는다.",
+      "application": "가구의 잡다한 금속 광택·나뭇결을 줄이고 실제 상품과 캐릭터가 돋보이도록 배경 대비를 낮춘다."
+    },
+    {
+      "url": "https://kr.pinterest.com/TheBlackSmurf_off/_created/",
+      "observed": "공개 생성됨 보드의 처음과 아래쪽 화면 직접 확인.",
+      "analysis": "크림·복숭아·연두색 가구, 갈색 윤곽, 밝은 바닥과 낮은 가구. 장식이 가장자리와 가구 위에 모이고 가운데 이동 면적을 남긴다.",
+      "application": "세이지·크림 가구와 단풍나무색 바닥, 복숭아색 포인트를 공통 팔레트로 사용한다."
+    },
+    {
+      "url": "https://kr.pinterest.com/pin/633881716352041964/",
+      "observed": "공개 원본 핀 이미지 전체 시각 확인.",
+      "analysis": "정면 진열대, 넓은 선반 간격, 따뜻한 갈색 선, 물건을 구분하는 여백과 단순한 색 면.",
+      "application": "기존 상품의 좌표·이미지를 보존한 채 빈 선반만 다시 생성해 상품 식별 기능을 유지한다."
+    },
+    {
+      "url": "https://kr.pinterest.com/pin/676525175317628225/",
+      "observed": "공개 원본 핀 이미지 전체 시각 확인.",
+      "analysis": "가구가 동일한 사선 투시를 공유하며 윗면·앞면·옆면을 2~3개 톤으로 구분한다. 복잡한 표면 질감이 없다.",
+      "application": "기존 장보기의 정면 기반 투시를 유지하며 입체감을 단순한 면과 굵은 윤곽으로 표현한다."
+    },
+    {
+      "url": "https://kr.pinterest.com/pin/358106607864495047/",
+      "observed": "공개 원본 핀 이미지 전체 시각 확인.",
+      "analysis": "황토·올리브·갈색·살구색의 제한된 팔레트. 벽에 붙은 수납가구와 가운데 식탁이 공간의 용도를 분명히 만든다.",
+      "application": "바닥·벽·가구를 같은 따뜻한 색 계열로 맞추되 게임의 기존 길찾기와 충돌 배치는 그대로 유지한다."
+    }
+  ],
+  "scope": {
+    "changed": [
+      "바닥과 벽 마감",
+      "빈 진열대 3종",
+      "유인 계산대",
+      "간판·기둥·화분 색"
+    ],
+    "preserved": [
+      "플레이어와 NPC",
+      "상품 이미지와 재고",
+      "상품 좌표",
+      "상호작용과 충돌 영역",
+      "기본 마트 테마"
+    ]
+  },
+  "generation": "새 에셋 4종은 built-in image_gen으로 생성했다. 원작 이미지 자체는 게임에 복사하지 않았다. generation.json에 사용 프롬프트를 보관한다."
+}
