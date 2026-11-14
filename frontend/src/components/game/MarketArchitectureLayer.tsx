@@ -4,7 +4,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { getMarketElevatorFacadeRect, MARKET_FIXED_OBJECTS, MARKET_WALKABLE_AREAS, MARKET_WALLS, type MarketEnvironment } from '../../game/marketEnvironment';
 import { MARKET_WORLD_HEIGHT, MARKET_WORLD_WIDTH, type Rect } from '../../game/prototypeWorld';
 import { fonts } from '../../theme';
-import { useGamePreferences } from '../../game/gamePreferences';
+import { useMarketInteriorTheme } from './MarketThemePreviewContext';
 import { COZY_MARKET_PALETTE as cozy } from '../../game/marketInteriorThemes';
 
 function rectStyle(rect: Rect) {
@@ -26,8 +26,8 @@ function seatingInlay(rects: Rect[]): Rect | null {
 /** Wall finishes and floor graphics never participate in collision or input.
  * Every structural edge is drawn from the same world data used by movement. */
 export const MarketArchitectureLayer = memo(function MarketArchitectureLayer({ environment }: { environment?: MarketEnvironment }) {
-  const { preferences } = useGamePreferences();
-  const illustrated = preferences.marketInteriorTheme === 'cozy';
+  const theme = useMarketInteriorTheme();
+  const illustrated = theme === 'cozy';
   const areas = environment?.walkableAreas ?? MARKET_WALKABLE_AREAS;
   const walls = environment?.walls ?? MARKET_WALLS;
   const width = environment?.world.width ?? MARKET_WORLD_WIDTH;
@@ -45,7 +45,7 @@ export const MarketArchitectureLayer = memo(function MarketArchitectureLayer({ e
   const lobbyBrandLeft = lobby ? Math.max(lobby.x + 22, Math.min((common?.point.x ?? lobby.x + lobby.width / 2) - 80, lobby.x + lobby.width - 182)) : 0;
   const lobbyBrandTop = lobby ? Math.max(lobby.y + 52, Math.min(lobby.y + lobby.height * 0.42, (common?.gate.y ?? lobby.y + lobby.height) - 174)) : 0;
   return <View pointerEvents="none" aria-hidden accessibilityElementsHidden importantForAccessibility="no-hide-descendants"
-    testID={`market-interior-${preferences.marketInteriorTheme}`}
+    testID={`market-interior-${theme}`}
     style={[styles.root, { width, height }, illustrated && { backgroundColor: cozy.background }]}>
     {areas.map(area => <View key={area.id} testID={`market-floor-${area.id}`}
       style={[styles.floor, area.id === 'entrance-lobby' && styles.lobby,

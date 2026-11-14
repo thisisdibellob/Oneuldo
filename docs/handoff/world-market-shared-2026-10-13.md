@@ -2,6 +2,10 @@
 
 확인일: 2026-10-13. 기준 코드: `a02ca8ad3c142f93485d8955a8394ac56f6094f8`, `frontend/`. 이 문서는 현재 코드와 저장소 문서를 확인한 운영 지도다. 이 날짜를 아래 기능 전부의 제작일로 해석하면 안 된다. 대화에 나온 제작·수정 요청의 정확한 날짜는 별도 근거가 없는 한 **미상**이다.
 
+### 2026-10-17 추가: 마트 그리드 배치
+
+장보기 시작 전 환경 설정과 **마트 안 휴대폰 → 설정 → 마트 배치 편집**에 진열대·종업원·손님을 그리드로 직접 배치하는 편집기를 추가했다. 배치 전용 JSON은 `oneuldo.market-layout` 버전 1이며, 전체 장보기 설정에는 `environment.tilemap`으로 함께 저장한다. 기존 세 매장의 벽·출입구·계산대 구조를 유지하고, 좌표·충돌·이동 가능 여부를 검증한 뒤 적용한다. 휴대폰에서 적용하면 장바구니와 진행을 보존하고 입구로 이동하며, 변경은 `layout_changed` 이벤트에 남긴다. 로컬 JSON 가져오기/내보내기가 범위이며 서버/API 연결은 포함하지 않는다. 사용 경로·좌표 규격·검증 범위는 [마트 그리드 배치 인수인계](../../frontend/docs/market-tilemap-editor.md)를 따른다. 아래 본문은 10월 13일 기준 설명을 보존한다.
+
 ## 1. 게임에 들어가는 방법과 연결 구조
 
 앱의 게임 탭에서 **오늘도 마을 들어가기**를 누르면 하나의 마을에서 집·마트·버스 정류장을 이용한다. 실제 진입 버튼은 [GameScreen](../../frontend/src/screens/GameScreen.tsx), 화면 조합은 [AppShell](../../frontend/src/screens/AppShell.tsx), 게임 전체 연결은 [GamePrototypeScreen](../../frontend/src/screens/GamePrototypeScreen.tsx)에 있다. `Prototype`이라는 파일 이름과 달리 현재 플레이 가능한 마을의 중심 화면이다.
@@ -150,6 +154,7 @@ HUD의 **11:45와 30,000원은 현재 고정 표시**다. 실시간 시계·계�
 | 데이터 | 현재 저장 방식 | 다른 PC/앱 재시작의 의미 |
 | --- | --- | --- |
 | 마트 종료 에피소드 | [marketEpisodeStore](../../frontend/src/game/marketEpisodeStore.ts), `oneuldo.market.episodes.v1`, 최대 20개, 5MiB 범위에 맞춰 오래된 영구 항목 축소 | 웹 localStorage가 있으면 브라우저에 유지. native는 메모리 fallback이며 JSON 공유 필요 |
+| 마트 배치 보관함 (2026-10-17 추가) | [marketLayoutStore](../../frontend/src/game/marketLayoutStore.ts), 최대 24개 배치·32자 이름, 웹 localStorage + Web Locks, native Expo FileSystem 문서 파일 | 앱 재시작 후 유지. 다음 방문 자동 적용·서버 동기화 아님. 다른 기기로는 JSON 공유. 저장 실패/손상 시 기존 내용을 초기화하지 않음 |
 | 활동 앨범 | [activityAlbum](../../frontend/src/game/activityAlbum.ts), `oneuldo.activity-album.v1`, 최대 100개 완료 요약 | 웹 localStorage, 없거나 불가하면 실행 중 메모리. 서버 동기화 아님 |
 | 음악/효과음/배경색/달리기 모드/마트 테마 | [gamePreferences](../../frontend/src/game/gamePreferences.ts), `oneuldo.game-preferences.v1` | 웹만 localStorage; native는 메모리. 조이스틱/터치 선택 자체는 이 저장 객체에 없음 |
 | 하루 일정/진행 중 버스·도서관 초안 | `dayJourney.ts`의 공유 메모리 | 같은 실행 안 화면 왕복용. 앱 종료 시 복원 보장 없음 |
@@ -157,6 +162,8 @@ HUD의 **11:45와 30,000원은 현재 고정 표시**다. 실시간 시계·계�
 | 일일 퀘스트·요리·계산 알바 | 화면 로컬 상태 | 화면 재생성·앱 종료를 넘는 영구 저장이 구현되어 있다고 가정하지 않음 |
 
 앨범 UI는 [PhonePhotos](../../frontend/src/components/game/PhonePhotos.tsx)다. 최초에는 빈 상태, 완료하면 날짜별 목록·활동별 앨범·즐겨찾기·검색·상세 기록이 생긴다. 버스/도서관/장보기/물품 전달의 **완료 결과 요약**을 사용하며 이미지들은 활동 일러스트다. 실제 플레이 화면을 자동 촬영한 사진은 아니다. 활동 종류+세션 ID로 중복을 막는다. 요리/계산 알바는 현재 앨범 종류에 없다.
+
+마트 배치 편집기의 **보관함**은 도면 미리보기·이름 변경·복제·명시적 덮어쓰기·삭제를 지원한다. 불러오기는 편집 초안만 바꾸고 **배치 적용**에서 게임에 반영한다. **실제 모습 / 여기서 걸어보기**는 현재 게임의 그림·공통 이동 패드·실제 충돌을 사용하는 별도 미리보기이며, 장바구니·점수·진행·플레이어 위치·실제 테마를 바꾸지 않는다. 편집으로 돌아와도 초안과 실행 취소 이력을 유지한다. 저장 범위와 플랫폼 제약, 관련 파일은 [마트 배치 편집 문서](../../frontend/docs/market-tilemap-editor.md)에 정리했다.
 
 완료 에피소드의 연구용 원시 이벤트, 사용자에게 보여주는 활동 앨범, 서버에 전송하는 결과를 구분한다. 로컬 저장이 있다고 계정 공용 저장이라고 설명하거나, 다른 팀원의 테스트 기록까지 같은 기기 기록이라고 단정하면 안 된다. 사람/AI 장보기 기록은 `provenance.source`로 구별한다. 합성 기록을 실제 당사자의 능력·교육 효과 증거로 사용하지 않는다.
 

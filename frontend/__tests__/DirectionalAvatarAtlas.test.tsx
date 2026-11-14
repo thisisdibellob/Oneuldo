@@ -137,7 +137,7 @@ describe('packed player sprite renderer', () => {
     view.unmount();
   });
 
-  it('freezes the outgoing pose and reveals a changed direction/motion at the current distance phase', () => {
+  it('keeps the outgoing gait moving and reveals a changed direction/motion at the current distance phase', () => {
     const clock = createAvatarWalkCycle();
     const element = (facing: AvatarFacing, motion: 'walk' | 'sprint') => <DirectionalAvatar facing={facing} manifest={manifest} motion={motion} walkCycle={clock} />;
     const view = render(element('front', 'walk')); load(view, 'front-walk.png');
@@ -148,12 +148,38 @@ describe('packed player sprite renderer', () => {
     expect(style(view, 'avatar-atlas-visible').transform).toEqual(previousPose);
     downloaded('backLeft-sprint.png');
     act(() => clock.advance(27)); // Half a cycle: sprint frame 5, regardless of download delay.
-    expect(style(view, 'avatar-atlas-visible').transform).toEqual(previousPose);
+    expect(style(view, 'avatar-atlas-visible').transform).toEqual([{ translateX: 0 }, { translateY: -192 }]);
     fireEvent(view.getByTestId('avatar-atlas-pending'), 'load');
     expect(uri(view.getByTestId('avatar-atlas-visible').props.source)).toBe('file://backLeft-sprint.png');
     expect(style(view, 'avatar-atlas-visible').transform).toEqual([{ translateX: -64 }, { translateY: -96 }]);
     act(() => clock.advance(14.4));
     expect(style(view, 'avatar-atlas-visible').transform).toEqual([{ translateX: -128 }, { translateY: -96 }]);
+    view.unmount();
+  });
+
+  it('returns to a recently decoded pose without another source request or native load event', () => {
+    const clock = createAvatarWalkCycle();
+    const element = (motion: 'idle' | 'walk' | 'sprint') => <DirectionalAvatar facing="front" manifest={manifest} motion={motion} walkCycle={clock} />;
+    const view = render(element('idle')); load(view, 'front-idle.png');
+    const idle = view.getByTestId('avatar-atlas-visible');
+    view.rerender(element('walk')); load(view, 'front-walk.png');
+    view.rerender(element('sprint')); load(view, 'front-sprint.png');
+    const calls = subscribers.length;
+    view.rerender(element('idle'));
+    expect(view.getByTestId('avatar-atlas-visible')).toBe(idle);
+    expect(view.queryByTestId('avatar-atlas-pending')).toBeNull();
+    expect(subscribers).toHaveLength(calls);
+    view.unmount();
+  });
+
+  it('bounds decoded native images while turning through every direction', () => {
+    const element = (facing: AvatarFacing) => <DirectionalAvatar facing={facing} manifest={manifest} motion="walk" />;
+    const view = render(element('front')); load(view, 'front-walk.png');
+    for (const facing of AVATAR_FACINGS.slice(1)) {
+      view.rerender(element(facing)); load(view, `${facing}-walk.png`);
+      expect(view.getAllByTestId('avatar-atlas-retained').length).toBeLessThanOrEqual(3);
+      expect(view.UNSAFE_getAllByType(Image).length).toBeLessThanOrEqual(5);
+    }
     view.unmount();
   });
 

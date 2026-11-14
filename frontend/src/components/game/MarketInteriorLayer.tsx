@@ -23,7 +23,7 @@ import {
 } from '../../game/prototypeWorld';
 import { marketCategories, type MarketCategory, type MarketCategoryId } from '../../game/scenarios';
 import { fonts } from '../../theme';
-import { useGamePreferences } from '../../game/gamePreferences';
+import { useMarketInteriorTheme } from './MarketThemePreviewContext';
 import { COZY_MARKET_PALETTE as cozy } from '../../game/marketInteriorThemes';
 import { cozyMarketArt } from '../../game/marketInteriorThemeArt';
 
@@ -57,7 +57,7 @@ export function MarketCategoryFixture({
 }
 
 function MarketCategoryMarker({ category, active }: { category: MarketCategory; active: boolean }) {
-  const illustrated = useGamePreferences().preferences.marketInteriorTheme === 'cozy';
+  const illustrated = useMarketInteriorTheme() === 'cozy';
   return (<View testID={`market-aisle-marker-${category.id}`} style={[styles.categorySign,
     illustrated && { backgroundColor: cozy.cream, borderColor: '#C2AD8F', borderLeftColor: cozy.peach, borderRadius: 6 }, active && styles.categorySignActive]}>
         <Text numberOfLines={1} style={[styles.categoryName, illustrated && { color: cozy.ink }]}>{category.label}</Text>
@@ -113,7 +113,7 @@ export function MarketShelfTarget({ placement, categoryId, active, highlighted =
 export function MarketCheckoutFixture({ active, cashierPresent = true, counter, index = 0 }: {
   active: boolean; cashierPresent?: boolean; counter?: MarketCheckoutPlacement; index?: number;
 }) {
-  const illustrated = useGamePreferences().preferences.marketInteriorTheme === 'cozy';
+  const illustrated = useMarketInteriorTheme() === 'cozy';
   const rect = counter?.rect ?? MARKET_CHECKOUT_RECT;
   const cashierPoint = counter?.cashierPoint ?? MARKET_CASHIER_POINT;
   const appearance = counter?.cashierAppearance ?? (index === 0 ? 0 : 2);
@@ -190,7 +190,7 @@ export function MarketKioskFixture({ kiosk, active = false }: { kiosk: MarketKio
 
 /** Decorative objects have no action targets. The working kiosks belong to checkout lanes. */
 export function MarketEnvironmentObjects({ environment }: { environment: MarketEnvironment }) {
-  const illustrated = useGamePreferences().preferences.marketInteriorTheme === 'cozy';
+  const illustrated = useMarketInteriorTheme() === 'cozy';
   return <>
     {environment.objects.filter(object => object.kind !== 'kiosk').map((object) => {
       const { rect } = object;

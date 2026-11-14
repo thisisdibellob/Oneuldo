@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import type { CalculatorKey, CalculatorState } from '../../game/calculator';
@@ -12,12 +12,14 @@ import { BusRouteMap, type BusRouteContext } from './BusRouteMap';
 import { PhonePhotos } from './PhonePhotos';
 import { PhoneAppIcon, type PhoneAppIconName } from './PhoneAppIcon';
 import { getShoppingErrandStatus, useShoppingErrand } from '../../game/shoppingErrandStore';
+import { dispatchPhishingAction, usePhishingSession } from '../../game/phishingStore';
+import { PhoneSafety } from './PhoneSafety';
 
-export type PhoneAction = 'calculator' | 'settings' | 'contacts' | 'photos' | 'routes' | 'travel' | 'exit' | 'emergency' | null;
+export type PhoneAction = 'calculator' | 'settings' | 'contacts' | 'photos' | 'messages' | 'routes' | 'travel' | 'exit' | 'emergency' | null;
 export type PhoneContact = 'jiyoung' | 'minsu';
 export type PhoneTravelDestination = 'village' | 'library';
 
-export function GamePhonePanel({ action, calculator, controlMode, onAction, onCalculatorKey, onClose, onCallContact, onControlModeChange, onEmergencyExit, onExit, reduceMotion, onTravel, busRouteContext, onRouteViewed, onOpenErrand }: {
+export function GamePhonePanel({ action, calculator, controlMode, onAction, onCalculatorKey, onClose, onCallContact, onControlModeChange, onEmergencyExit, onExit, reduceMotion, onTravel, busRouteContext, onRouteViewed, onOpenErrand, onEditMarketLayout, onVisitMinsu }: {
   action: PhoneAction;
   calculator: CalculatorState;
   onAction: (action: PhoneAction) => void;
@@ -33,8 +35,30 @@ export function GamePhonePanel({ action, calculator, controlMode, onAction, onCa
   busRouteContext?: BusRouteContext;
   onRouteViewed?: () => void;
   onOpenErrand?: () => void;
+  onEditMarketLayout?: () => void;
+  onVisitMinsu?: () => void;
 }) {
   const errand = useShoppingErrand();
+  const safetySession = usePhishingSession();
+  const [safetyHelpRequested, setSafetyHelpRequested] = useState(false);
+  useEffect(() => { if (action !== 'messages') setSafetyHelpRequested(false); }, [action]);
+  const callSavedContact = (contact: PhoneContact) => {
+    if (safetySession?.status === 'active') {
+      if (contact === 'minsu' && safetySession.scenarioId.startsWith('friend-')) {
+        dispatchPhishingAction({ type: 'STOP' });
+        dispatchPhishingAction({ type: 'VERIFY', method: 'saved-contact' });
+        onAction('messages');
+        return;
+      }
+      if (contact === 'jiyoung') {
+        dispatchPhishingAction({ type: 'ASK_HELP' });
+        setSafetyHelpRequested(true);
+        onAction('messages');
+        return;
+      }
+    }
+    onCallContact(contact);
+  };
   const progress = useRef(new Animated.Value(1)).current;
   const { preferences } = useGamePreferences();
   useEffect(() => {
@@ -56,14 +80,15 @@ export function GamePhonePanel({ action, calculator, controlMode, onAction, onCa
       </View>
       <View style={[styles.appHeader, !action && styles.homeHeader]}>
         {action ? <PressScale accessibilityLabel="휴대폰 홈으로" accessibilityRole="button" onPress={() => onAction(null)} scaleTo={reduceMotion ? 1 : 0.96} style={styles.headerButton}><Ionicons color="#455C4B" name="chevron-back" size={23} /></PressScale> : <View style={styles.headerButton} />}
-        {action ? <Text style={styles.headerTitle}>{action === 'calculator' ? '계산기' : action === 'settings' ? '설정' : action === 'contacts' ? '전화' : action === 'photos' ? '사진' : action === 'routes' ? '버스 노선' : action === 'travel' ? '바로 이동' : ''}</Text> : null}
+        {action ? <Text style={styles.headerTitle}>{action === 'calculator' ? '계산기' : action === 'settings' ? '설정' : action === 'contacts' ? '전화' : action === 'photos' ? '사진' : action === 'messages' ? '연락 확인' : action === 'routes' ? '버스 노선' : action === 'travel' ? '바로 이동' : ''}</Text> : null}
         <PressScale accessibilityLabel="휴대폰 닫기" accessibilityRole="button" onPress={() => onClose()} scaleTo={reduceMotion ? 1 : 0.96} style={styles.headerButton}><Ionicons color="#455C4B" name="close" size={23} /></PressScale>
       </View>
       <ScrollView bounces={false} showsVerticalScrollIndicator={false} style={styles.scroll} contentContainerStyle={styles.scrollContent} testID="phone-content-scroll">
         <Animated.View style={{ flexGrow: 1, opacity: progress, transform: [{ translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [7, 0] }) }] }}>
           {action === 'calculator' ? <PhoneCalculator state={calculator} onKey={onCalculatorKey} reduceMotion={reduceMotion} />
-            : action === 'settings' ? <PhoneSettings controlMode={controlMode} onControlModeChange={onControlModeChange} reduceMotion={reduceMotion} />
+            : action === 'settings' ? <PhoneSettings controlMode={controlMode} onControlModeChange={onControlModeChange} reduceMotion={reduceMotion} onEditMarketLayout={onEditMarketLayout} />
             : action === 'photos' ? <PhonePhotos />
+            : action === 'messages' ? <PhoneSafety reduceMotion={reduceMotion} onVisitMinsu={onVisitMinsu} initialHelp={safetyHelpRequested} />
             : action === 'routes' ? <View style={styles.routeApp}><BusRouteMap {...busRouteContext} compact /></View>
             : action === 'travel' ? <View style={styles.travel} testID="phone-travel">
               <Text style={styles.travelTitle}>특정 마을로 바로 이동하기</Text>
@@ -74,10 +99,11 @@ export function GamePhonePanel({ action, calculator, controlMode, onAction, onCa
               <Text style={styles.travelNote}>연습 중인 이동·업무를 마치지 않고 이동해요.</Text>
             </View>
             : action === 'contacts' ? <View style={styles.contacts} testID="phone-contacts">
+              <Text style={styles.travelTitle}>저장된 연락처</Text>
               {errand ? <View style={{ padding: 17, borderRadius: 18, backgroundColor: '#FDF9EE', gap: 8 }}><Text style={styles.travelName}>민수의 장보기 부탁</Text><Text style={styles.travelTitle}>우유 1개 · 사과 2개</Text><Text style={styles.travelDetail}>{getShoppingErrandStatus(errand)}</Text>{onOpenErrand ? <PressScale accessibilityRole="button" accessibilityLabel="민수의 장보기 목록 열기" onPress={onOpenErrand} style={{ backgroundColor: '#E2E9D9', borderRadius: 12, padding: 12 }}><Text style={{ color: '#587662', fontFamily: fonts.semibold, fontSize: 16, textAlign: 'center' }}>목록 확인</Text></PressScale> : null}</View> : null}
               {([{ id: 'jiyoung', name: '지영', color: '#DDE7D5' }, { id: 'minsu', name: '민수', color: '#E6DFD2' }] as const).map(contact => <PressScale
                 key={contact.id} accessibilityLabel={`${contact.name}에게 전화`} accessibilityRole="button"
-                onPress={() => onCallContact(contact.id)} scaleTo={reduceMotion ? 1 : 0.98} style={styles.contact}>
+                onPress={() => callSavedContact(contact.id)} scaleTo={reduceMotion ? 1 : 0.98} style={styles.contact}>
                 <View style={[styles.contactAvatar, { backgroundColor: contact.color }]}><Text style={styles.contactInitial}>{contact.name[0]}</Text></View>
                 <Text style={styles.contactName}>{contact.name}</Text><Ionicons name="call-outline" color="#5F7E64" size={24} />
               </PressScale>)}
@@ -97,7 +123,7 @@ export function GamePhonePanel({ action, calculator, controlMode, onAction, onCa
                 <PhoneApp icon="photos" label="사진" onPress={() => onAction('photos')} reduceMotion={reduceMotion} />
                 <PhoneApp icon="bus" label="버스 노선" onPress={() => { onRouteViewed?.(); onAction('routes'); }} reduceMotion={reduceMotion} />
                 <PhoneApp icon="calculator" label="계산기" onPress={() => onAction('calculator')} reduceMotion={reduceMotion} />
-                <PhoneApp icon="wallet" label="금융" disabled reduceMotion={reduceMotion} />
+                <PhoneApp icon="messages" label="메시지" onPress={() => onAction('messages')} reduceMotion={reduceMotion} />
                 <PhoneApp icon="settings" label="설정" onPress={() => onAction('settings')} reduceMotion={reduceMotion} />
                 <PhoneApp icon="travel" label="바로 이동" onPress={() => onAction('travel')} disabled={!onTravel} reduceMotion={reduceMotion} />
                 <PhoneApp icon="emergency" label="비상 탈출" onPress={() => onAction('emergency')} reduceMotion={reduceMotion} />

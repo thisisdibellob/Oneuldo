@@ -1,0 +1,114 @@
+{
+  "seed": "market-grid-example-20261017",
+  "difficulty": "family",
+  "objectives": [
+    {
+      "productId": "milk",
+      "quantity": 1
+    },
+    {
+      "productId": "apple",
+      "quantity": 2
+    },
+    {
+      "productId": "curry",
+      "quantity": 1
+    }
+  ],
+  "learning": {
+    "stockoutEnabled": false,
+    "allowSubstitution": true,
+    "budgetChoiceEnabled": false,
+    "choiceBudget": 3000,
+    "checkoutReviewMode": "normal"
+  },
+  "stockPerProduct": 6,
+  "alarmPenaltyPoints": 10,
+  "cashierRequestPenaltyPoints": 10,
+  "wrongWayPenaltyPoints": 10,
+  "stockOverrides": {},
+  "environment": {
+    "layoutId": "classic",
+    "entranceConstruction": false,
+    "seed": "market-grid-example-20261017",
+    "employeeCount": 2,
+    "customerCount": 1,
+    "pillarCount": 0,
+    "chairCount": 0,
+    "cashierCount": 2,
+    "kioskPresent": false,
+    "shelfOrder": [
+      "produce",
+      "fresh",
+      "household",
+      "meal",
+      "drink"
+    ],
+    "kioskLane": "none",
+    "tilemap": {
+      "format": "oneuldo.market-layout",
+      "version": 1,
+      "layoutId": "classic",
+      "cellSize": 20,
+      "shelves": [
+        {
+          "categoryId": "produce",
+          "col": 43,
+          "row": 11,
+          "orientation": "horizontal"
+        },
+        {
+          "categoryId": "fresh",
+          "col": 25,
+          "row": 11,
+          "orientation": "horizontal"
+        },
+        {
+          "categoryId": "household",
+          "col": 20,
+          "row": 25,
+          "orientation": "vertical"
+        },
+        {
+          "categoryId": "meal",
+          "col": 32,
+          "row": 25,
+          "orientation": "vertical"
+        },
+        {
+          "categoryId": "drink",
+          "col": 45,
+          "row": 25,
+          "orientation": "vertical"
+        }
+      ],
+      "people": [
+        {
+          "id": "staff-help",
+          "kind": "employee",
+          "col": 39,
+          "row": 36,
+          "appearance": 3
+        },
+        {
+          "id": "staff-north",
+          "kind": "employee",
+          "col": 50,
+          "row": 17,
+          "appearance": 1
+        },
+        {
+          "id": "customer-1",
+          "kind": "customer",
+          "col": 10,
+          "row": 40,
+          "appearance": 5
+        }
+      ]
+    }
+  },
+  "provenance": {
+    "source": "human"
+  },
+  "startedAt": "1970-01-01T00:00:00.000Z"
+}

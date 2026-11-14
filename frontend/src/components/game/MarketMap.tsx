@@ -1,4 +1,5 @@
 import { getMarketNavigationPath } from '../../game/marketNavigation';
+import { cameraBoundActorTransform } from '../../game/cameraBoundActor';
 import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -73,8 +74,10 @@ export function MarketMap({
     return isMarketBlocked(point) ? current : point;
   };
   const viewportNode = useRef<View | null>(null);
-  const camera = useRef(new Animated.ValueXY()).current;
-  const playerWorldPosition = useRef(new Animated.ValueXY(environment.spawn)).current;
+  const camera = useRef(new Animated.ValueXY(undefined, { useNativeDriver: Platform.OS !== 'web' })).current;
+  const viewportCenterAnimation = useRef(new Animated.ValueXY()).current;
+  const playerOffsetAnimation = useRef(new Animated.ValueXY()).current;
+  const [actorTransform] = useState(() => cameraBoundActorTransform(camera, viewportCenterAnimation, playerOffsetAnimation));
   const playerDepth = useRef(new Animated.Value(getMarketRenderDepth(environment.spawn.y))).current;
   const cameraCenter = useRef<MarketPoint>({ ...environment.spawn });
   const joystickKnob = useRef(new Animated.ValueXY()).current;
@@ -113,9 +116,9 @@ export function MarketMap({
       geometryRef.current.environment.world);
     cameraCenter.current = frame.center;
     camera.setValue(frame.translation);
-    playerWorldPosition.setValue(point);
+    playerOffsetAnimation.setValue(frame.playerOffset);
     playerDepth.setValue(getMarketRenderDepth(point.y));
-  }, [camera, playerDepth, playerWorldPosition]);
+  }, [camera, playerDepth, playerOffsetAnimation]);
 
   const updateStationProximity = useCallback((point: MarketPoint) => {
     const closest = getNearestMarketStation(geometryRef.current.environment, point, geometryRef.current.cashierCalled)?.id ?? null;
@@ -286,6 +289,7 @@ export function MarketMap({
 
   const handleViewportLayout = (event: LayoutChangeEvent) => {
     viewport.current = event.nativeEvent.layout;
+    viewportCenterAnimation.setValue({ x: viewport.current.width / 2, y: viewport.current.height / 2 });
     viewportNode.current?.measureInWindow((x, y) => {
       viewportOrigin.current = { x, y };
     });
@@ -551,7 +555,7 @@ export function MarketMap({
         </PressScale> : null}
         <Animated.View testID="market-player-world"
           accessibilityLabel="마트 안 내 캐릭터" pointerEvents="none"
-          style={[styles.marketPlayerFixed, { transform: playerWorldPosition.getTranslateTransform(), zIndex: playerDepth }]}>
+          style={[styles.marketPlayerFixed, { transform: actorTransform, zIndex: playerDepth }]}>
           <DirectionalAvatar facing={avatarPose.facing} manifest={freshPlayerAvatar} motion={avatarPose.motion}
             walkCycle={playerWalkCycle} reduceMotion={reduceMotion} scale={0.5} />
         </Animated.View>

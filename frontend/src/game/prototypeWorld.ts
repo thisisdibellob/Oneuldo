@@ -95,6 +95,13 @@ export const INITIAL_PLAYER_POINT: Point = { x: 650, y: 920 };
 export const NPC_POINT: Point = { x: 800, y: 920 };
 export const MARKET_ENTRANCE_POINT: Point = { x: 1265, y: 600 };
 export const MARKET_RETURN_POINT: Point = { x: 1265, y: 640 };
+// The cafe's right-hand doorway opens onto the pavement between the storefront
+// and bank. Keep the whole approach clear, not only the final spawn point.
+export const CAFE_ENTRANCE_POINT: Point = { x: 1455, y: 1168 };
+export const CAFE_RETURN_POINT: Point = { x: 1420, y: 1168 };
+export const LAUNDRY_ENTRANCE_POINT: Point = { x: 225, y: 1105 };
+export const LAUNDRY_RETURN_POINT: Point = { x: 285, y: 1105 };
+export const HOME_LAUNDRY_POINT: Point = { x: 650, y: 835 };
 export const MARKET_FRONT_WALL_Y = 1020;
 export const MARKET_PLAYER_POINT: Point = { x: 710, y: 1350 };
 export const MARKET_INTERIOR_ENTRANCE_POINT: Point = { x: 480, y: MARKET_FRONT_WALL_Y + 10 };
@@ -294,8 +301,8 @@ export const VILLAGE_BUILDINGS: readonly VillageBuildingDefinition[] = [
     color: '#C2AD8E',
     entranceHeight: 91,
     height: 163,
-    id: 'estate',
-    label: '부동산',
+    id: 'laundry',
+    label: '동네 빨래방',
     outlineWidth: 1.38,
     width: 230,
     x: 45,
@@ -359,7 +366,7 @@ export const VILLAGE_DECORATIONS: readonly VillageDecorationDefinition[] = [
   villageProp('shops-bench-west', 'bench', 711, 1370, 100, 42, true),
   villageProp('cafe-bench', 'bench', 1540, 1138, 102, 43, true),
   villageProp('cafe-bicycle', 'bicycle', 1560, 1194, 72, 46),
-  villageProp('bank-flowerbed', 'flowerbed', 1340, 1160, 136, 23, true),
+  villageProp('bank-flowerbed', 'flowerbed', 1340, 1398, 136, 23, true),
   villageProp('home-shrub-west', 'shrub', 1968, 1170, 77, 25, true),
   villageProp('home-shrub-east', 'shrub', 2120, 1170, 77, 25, true),
   villageProp('home-flowerbed', 'flowerbed', 2010, 1470, 150, 26, true),
@@ -395,6 +402,7 @@ export const villageObstacles: readonly Rect[] = [
 ];
 
 export const homeObstacles: readonly Rect[] = [
+  { height: 25, width: 100, x: 690, y: 845 },
   { height: 170, width: 150, x: 95, y: 90 },
   { height: 105, width: 530, x: 270, y: 90 },
   { height: 125, width: 250, x: 300, y: 330 },

@@ -12,11 +12,13 @@ import { MarketStaffDialogue, MarketStaffDialogueChoice } from '../components/ga
 import { MarketPanelTransition } from '../components/game/MarketPanelTransition';
 import { MarketShelfScene } from '../components/game/MarketShelfScene';
 import { MarketSetupPanel } from '../components/game/MarketSetupPanel';
+import { MarketEntryScreen } from '../components/game/MarketEntryScreen';
 import { getMarketWrongWayRearm, MarketEnvironment, MarketEnvironmentStationId, MarketCashierAvailability } from '../game/marketEnvironment';
 import {
   applyMarketAction,
   createMarketSession,
   exportMarketEpisode,
+  replaceMarketSessionTilemap,
   MarketAction,
   MarketSessionConfig
 } from '../game/marketSession';
@@ -29,7 +31,7 @@ import { listMarketEpisodes, saveMarketEpisode, MarketStoredEpisode } from '../g
 export type MarketStationId = MarketEnvironmentStationId;
 export type MarketInteractionRequest = {
   id: number;
-  station: MarketStationId | 'give-up' | 'contact-requester';
+  station: MarketStationId | 'give-up' | 'contact-requester' | 'edit-layout';
 };
 export type MarketProductDropDecision = {
   accepted: boolean;
@@ -100,11 +102,11 @@ export function MarketSimulationScreen({
   const localPosition = useRef(session.environment.spawn);
   const checkoutBackHandler = useRef<(() => boolean) | null>(null);
   const setCheckoutBackHandler = useCallback((handler: (() => boolean) | null) => { checkoutBackHandler.current = handler; }, []);
-  const [briefing, setBriefing] = useState(true),
-    [briefingStep, setBriefingStep] = useState(0);
+  const [briefing, setBriefing] = useState(true);
   const [settings, setSettings] = useState(false),
     [cartOpen, setCartOpen] = useState(false),
     [helpOpen, setHelpOpen] = useState(false);
+  const [layoutEditing, setLayoutEditing] = useState(false);
   const [nearby, setNearby] = useState<MarketStationId | null>(null);
   const [difficultyRating, setDifficultyRating] = useState(0),
     [interestRating, setInterestRating] = useState(0);
@@ -133,7 +135,7 @@ export function MarketSimulationScreen({
   const shelf = marketCategories.find(category => category.id === session.activeStation);
   const requesterOpen = session.view === 'requester';
   const [budgetReviewTotal, setBudgetReviewTotal] = useState<number | null>(null);
-  const panelVisible = requesterOpen || briefing || settings || historyOpen || session.phase !== 'shopping' || cartOpen || helpOpen || staffMessage;
+  const panelVisible = layoutEditing || requesterOpen || briefing || settings || historyOpen || session.phase !== 'shopping' || cartOpen || helpOpen || staffMessage;
   const locked = panelVisible || panelPresent || !!shelf;
   const dispatch = useCallback((action: MarketAction, sync = false) => {
     let current = live.current;
@@ -183,6 +185,7 @@ export function MarketSimulationScreen({
   const giveUp = useCallback(() => {
     setBriefing(false);
     setSettings(false);
+    setLayoutEditing(false);
     setHistoryOpen(false);
     setCartOpen(false);
     setHelpOpen(false);
@@ -206,15 +209,22 @@ export function MarketSimulationScreen({
   useEffect(() => {
     if (!interactionRequest || handled.current === interactionRequest.id || session.phase === 'finished') return;
     if (externalMenuOpen && interactionRequest.station !== 'give-up') {
+      // The settings panel finishes closing before the editor takes over input.
+      if (interactionRequest.station === 'edit-layout') return;
       handled.current = interactionRequest.id;
       return;
     }
     if (interactionRequest.station !== 'give-up' && (briefing || session.phase !== 'shopping')) return;
     handled.current = interactionRequest.id;
     if (interactionRequest.station === 'give-up') giveUp();
+    else if (interactionRequest.station === 'edit-layout') {
+      if (session.view === 'world' && session.activeStation === null && !session.paid) {
+        setLayoutEditing(true);
+      }
+    }
     else if (interactionRequest.station === 'contact-requester') contactRequester();
     else interact(interactionRequest.station);
-  }, [briefing, interactionRequest, interact, giveUp, contactRequester, session.phase, externalMenuOpen]);
+  }, [briefing, interactionRequest, interact, giveUp, contactRequester, session.phase, session.view, session.activeStation, session.paid, externalMenuOpen]);
   useEffect(() => {
     onLockChange?.(locked);
   }, [locked, onLockChange]);
@@ -262,6 +272,7 @@ export function MarketSimulationScreen({
   useEffect(() => {
     const back = BackHandler.addEventListener('hardwareBackPress', () => {
       if (externalMenuOpen) return false;
+      if (layoutEditing) { setLayoutEditing(false); return true; }
       if (panelPresent && !panelVisible) return true;
       if (live.current.phase === 'checkout' && checkoutBackHandler.current?.()) return true;
       if (historyOpen) {
@@ -287,13 +298,14 @@ export function MarketSimulationScreen({
           setStaffReturnHelp(false);
         }
       }
+      else if (briefing) onExit();
       else if (session.phase === 'checkout') { setBudgetReviewTotal(null); dispatch({ type: 'closeStation' }); }
       else if (session.phase !== 'finished') giveUp();
       else return false;
       return true;
     });
     return () => back.remove();
-  }, [shelf, settings, historyOpen, cartOpen, helpOpen, staffMessage, staffReturnHelp, staffLocationHelp, requesterOpen, session.phase, giveUp, dispatch, resetStaffReply, panelPresent, panelVisible, externalMenuOpen]);
+  }, [shelf, settings, layoutEditing, historyOpen, cartOpen, helpOpen, staffMessage, staffReturnHelp, staffLocationHelp, requesterOpen, session.phase, giveUp, dispatch, resetStaffReply, panelPresent, panelVisible, externalMenuOpen, briefing, onExit]);
   const configure = (config: Partial<MarketSessionConfig>) => {
     const next = createMarketSession({ ...config, startedAt: new Date().toISOString() });
     live.current = next;
@@ -301,7 +313,6 @@ export function MarketSimulationScreen({
     localPosition.current = next.environment.spawn;
     onEnvironmentChange?.(next.environment);
     setSettings(false);
-    setBriefingStep(0);
   };
   const selectDifficulty = (difficulty: 'family' | 'exact') => configure({
     ...session.config,
@@ -406,7 +417,7 @@ export function MarketSimulationScreen({
   const wrongWayPenaltyTotal = isFinished ? session.events.reduce((total, event) =>
     total + (event.type === 'wrong_way_entry' ? Math.abs(Number(event.payload.delta ?? 0)) : 0), 0) : 0;
   const constructionActive = !!session.environment.constructionZones?.length;
-  const panelKey = settings ? 'settings' : historyOpen ? 'history' : briefing ? 'briefing-' + briefingStep
+  const panelKey = layoutEditing ? 'layout-editor' : settings ? 'settings' : historyOpen ? 'history' : briefing ? 'briefing'
     : requesterOpen ? 'requester' : cartOpen ? 'cart' : helpOpen ? 'help' : staffMessage ? 'staff-' + staffReturnHelp + '-' + staffLocationHelp
       : isFinished ? 'finished-' + ratingDone : session.phase + '-' + session.attempts;
   const modal = (
@@ -446,7 +457,7 @@ export function MarketSimulationScreen({
         }}
       />
       : null}
-    {!externalMenuOpen && !briefing && session.phase === 'shopping' && !shelf && !cartOpen && !helpOpen && !staffMessage && !requesterOpen
+    {!externalMenuOpen && !layoutEditing && !briefing && session.phase === 'shopping' && !shelf && !cartOpen && !helpOpen && !staffMessage && !requesterOpen
       ? <MarketHud
         objectives={shoppingObjectives}
         onContactRequester={!embedded ? contactRequester : undefined}
@@ -489,60 +500,34 @@ export function MarketSimulationScreen({
       />
       : null}
     <MarketPanelTransition visible={panelVisible} transitionKey={panelKey} onPresenceChange={setPanelPresent}>
+    {layoutEditing ? <MarketSetupPanel
+      layoutOnly
+      config={session.config}
+      onClose={() => setLayoutEditing(false)}
+      onApply={config => {
+        if (!config.environment.tilemap) { setLayoutEditing(false); return; }
+        const next = replaceMarketSessionTilemap(live.current, config.environment.tilemap, new Date().toISOString());
+        live.current = next;
+        setSession(next);
+        localPosition.current = { ...next.playerPosition };
+        position.current = { ...next.playerPosition };
+        setNearby(null);
+        onEnvironmentChange?.(next.environment);
+        // Rebuilding the world clears its temporary cashier cache; restore called staff.
+        onCashierCalled?.({ ...next.cashierAvailability });
+        setLayoutEditing(false);
+      }}
+    /> : null}
     {briefing && !settings && !historyOpen
-      ? modal('마트에서 장보기', <>
-        <Text style={s.body}>
-          {briefingStep === 0
-            ? '목록을 보고 필요한 물건을 골라 보세요. 물건의 이름과 종류를 천천히 살펴봐요.'
-            : `다 골랐다면 출구 옆 계산대로 가요. 계산하지 않은 물건을 담고 입구·출구·측면 출입문의 빨간 경보기를 지나 매장 밖으로 나가면 ${session.config.alarmPenaltyPoints}점이 줄어요. 원하면 다시 해보거나 언제든 그만둘 수 있어요.`}
-        </Text>
-        {spendingLimit === undefined ? <View style={s.choices}>
-          <Button
-            text="연습 모드"
-            selected={session.config.difficulty === 'family'}
-            quiet
-            onPress={() => selectDifficulty('family')}
-          />
-          <Button
-            text="도전 모드"
-            selected={session.config.difficulty === 'exact'}
-            quiet
-            onPress={() => selectDifficulty('exact')}
-          />
-        </View> : <Text style={s.body}>{requesterName}의 부탁 · 예산 {price(spendingLimit)}</Text>}
-        <Text style={s.small}>
-          {session.config.difficulty === 'family'
-            ? (session.learning.stockout ? `같은 종류의 상품을 골라도 돼요. 다만 이름을 정확히 부탁한 상품은 바꾸기 전에 ${requesterName}에게 물어봐요.` : '종류가 같으면 괜찮아요. 예: 우유는 맛과 지방 함량에 관계없이 골라요.')
-            : '목록에 적힌 상품을 정확히 골라요. 예: 저지방 우유는 저지방 우유만 골라요.'}
-        </Text>
-        <View style={s.requirements}>
-          {shoppingObjectives.map(o => <View key={o.id} style={s.row}>
-            <Text style={s.body}>
-              {o.label}
-            </Text>
-            <Text style={s.quantity}>{o.quantity}개</Text>
-          </View>)}
-        </View>
-        {session.learning.choiceTask ? <Text style={s.small}>음료는 가격표를 보고 원하는 것으로 골라요. 필요하면 휴대폰의 계산기를 이용해요.</Text> : null}
-        {constructionActive ? <Text style={s.small}>바깥 입구는 공사 중이에요. 안쪽 입구를 이용해 주세요.</Text> : null}
-        <Text style={s.small}>출구로 들어가면 {session.config.wrongWayPenaltyPoints}점이 줄어요. 들어갈 때는 입구를 이용해요.</Text>
-        {session.learning.stockout ? <Text style={s.small}>물건이 없으면 직원에게 물어보고, 부탁을 바꾸려면 휴대폰에서 {requesterName}에게 전화해요.</Text> : null}
-        <Button
-          text={briefingStep === 0 ? '다음' : '장보기 시작'}
-          onPress={() => briefingStep === 0 ? setBriefingStep(1) : start()}
-        />
-        {spendingLimit === undefined ? <Button
-          text="연습 환경 설정"
-          quiet
-          onPress={() => setSettings(true)}
-        /> : null}
-        <Button
-          text="이전 게임 기록"
-          quiet
-          onPress={() => setHistoryOpen(true)}
-        />
-        {quit}
-      </>, '오늘도 · 생활 연습')
+      ? <MarketEntryScreen
+        difficulty={session.config.difficulty}
+        requester={spendingLimit === undefined ? undefined : `${requesterName}의 부탁 · 예산 ${price(spendingLimit)}`}
+        onDifficultyChange={selectDifficulty}
+        onStart={start}
+        onHistory={() => setHistoryOpen(true)}
+        onSettings={spendingLimit === undefined ? () => setSettings(true) : undefined}
+        onExit={onExit}
+      />
       : null}
     {settings
       ? <MarketSetupPanel
@@ -592,6 +577,9 @@ export function MarketSimulationScreen({
       : null}
     {helpOpen
       ? modal('이렇게 이용해요', <>
+        <Text style={s.body}>{session.config.difficulty === 'family'
+          ? (session.learning.stockout ? `같은 종류의 상품을 골라도 돼요. 이름을 정확히 부탁한 상품은 바꾸기 전에 ${requesterName}에게 물어봐요.` : '종류가 같으면 괜찮아요. 예: 우유는 맛과 지방 함량에 관계없이 골라요.')
+          : '목록에 적힌 상품을 정확히 골라요. 예: 저지방 우유는 저지방 우유만 골라요.'}</Text>
         <Text style={s.body}>1. 사야 할 물품과 개수를 읽어요.{'\n\n'}2. 진열대 가까이 가서 물건을 살펴봐요.{'\n\n'}3. 장바구니를 눌러 담은 물건을 확인해요.{'\n\n'}4. 내려놓을 물건은 그 물건의 진열대로 돌아가 장바구니를 펼쳐 내려놓아요. 어렵다면 종업원에게 제자리에 놓아 달라고 부탁해요.{'\n\n'}5. 유인 계산대에서 구매를 확정하거나, 무인 계산대에 물건을 끌어 스캔한 뒤 화면 확인 → 결제로 마무리해요. 유인 계산대가 모두 비어 있으면 매장 직원에게 부탁해요. 계산원이 있는 상태에서 없다고 요청하면 {session.config.cashierRequestPenaltyPoints}점이 줄어요.{'\n\n'}6. 계산하지 않은 물건을 담고 입구·출구·측면 출입문의 빨간 경보기를 지나 매장 밖으로 나가면 {session.config.alarmPenaltyPoints}점이 줄어요. 입구와 출구는 공용 복도로 이어져요. 복도 끝 공동 출입문에서 마을로 나갈 수 있어요.</Text>
         <Text style={s.body}>출구로 들어가면 {session.config.wrongWayPenaltyPoints}점이 줄어요. {constructionActive ? '바깥 입구는 공사 중이에요. 안쪽 입구를 이용해 주세요.' : '들어갈 때는 입구를 이용해요.'}</Text>
         <Text style={s.body}>상품 위치는 직원에게 물어볼 수 있어요. 품절을 확인하면 재고를 물어보고 휴대폰에서 {requesterName}에게 전화해요. 계산기는 휴대폰 메뉴에 있어요.</Text>

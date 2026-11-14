@@ -268,7 +268,7 @@ it('이전 기록을 보다가 Android 뒤로 가기를 누르면 게임을 포�
     fireEvent.press(screen.getByRole('button', { name: '이전 게임 기록' }));
     expect(screen.getByRole('header', { name: '이전 게임 기록' })).toBeTruthy();
     act(() => { expect(back!({ type: 'hardwareBackPress', timeStamp: 1 })).toBe(true); });
-    expect(screen.getByRole('header', { name: '마트에서 장보기' })).toBeTruthy();
+    expect(screen.getByRole('header', { name: '장 보기' })).toBeTruthy();
     expect(screen.queryByRole('header', { name: '이전 게임 기록' })).toBeNull();
     expect(screen.queryByText('실패 (포기)')).toBeNull();
   } finally { screen.unmount(); listener.mockRestore(); }

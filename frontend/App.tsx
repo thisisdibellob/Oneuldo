@@ -27,6 +27,9 @@ export default function App() {
   const marketLab = __DEV__ && Platform.OS === 'web' && typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('marketLab') === '1';
   const libraryPreview = __DEV__ && Platform.OS === 'web' && typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('libraryPreview') === '1';
   const busPreview = __DEV__ && Platform.OS === 'web' && typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('busPreview') === '1';
+  const phishingPreview = __DEV__ && Platform.OS === 'web' && typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('phishingPreview') === '1';
+  const cafePreview = __DEV__ && Platform.OS === 'web' && typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('cafePreview') === '1';
+  const laundryPreview = __DEV__ && Platform.OS === 'web' && typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('laundryPreview') === '1';
   const [activityPreviewOpen, setActivityPreviewOpen] = useState(true);
   const [entered, setEntered] = useState(false);
 
@@ -36,7 +39,7 @@ export default function App() {
   const [questsError, setQuestsError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (marketLab || libraryPreview || busPreview) { setQuestsLoading(false); return; }
+    if (marketLab || libraryPreview || busPreview || phishingPreview || cafePreview || laundryPreview) { setQuestsLoading(false); return; }
     const loadQuests = async () => {
       try {
         const data = await getQuests();
@@ -79,14 +82,14 @@ export default function App() {
     }).start(() => setShowOnboarding(false));
   };
 
-  const fontsReady = entered || marketLab || libraryPreview || busPreview ? allReady : startupReady;
+  const fontsReady = entered || marketLab || libraryPreview || busPreview || phishingPreview || cafePreview || laundryPreview ? allReady : startupReady;
   if (!fontsReady) {
     return (
       <View style={styles.loading}>
         {!error && <ActivityIndicator color={colors.mint} size="large" />}
         <Text accessibilityRole={error ? 'alert' : undefined} style={styles.loadingText}>
           {error ? '글꼴을 불러오지 못했어요. 연결을 확인하고 다시 시도해 주세요.'
-            : entered || marketLab || libraryPreview || busPreview ? '화면을 준비하고 있어요'
+            : entered || marketLab || libraryPreview || busPreview || phishingPreview || cafePreview || laundryPreview ? '화면을 준비하고 있어요'
             : '오늘도를 준비하고 있어요'}
         </Text>
         {error && (
@@ -102,8 +105,9 @@ export default function App() {
     <SafeAreaProvider>
       <StatusBar style="dark" />
       {marketLab ? <MarketSimulationScreen key={marketLabVisit} onExit={() => setMarketLabVisit(visit => visit + 1)} /> :
-      (libraryPreview || busPreview) && activityPreviewOpen ? <GamePrototypeScreen
-        previewLocation={busPreview ? 'village-stop' : 'library'}
+      (libraryPreview || busPreview || phishingPreview || cafePreview || laundryPreview) && activityPreviewOpen ? <GamePrototypeScreen
+        initialActivity={laundryPreview ? 'laundry' : cafePreview ? 'cafe' : phishingPreview ? 'phishing' : undefined}
+        previewLocation={busPreview ? 'village-stop' : libraryPreview ? 'library' : undefined}
         onExit={() => { setActivityPreviewOpen(false); setEntered(true); }} /> :
       entered ? (
         <AppShell

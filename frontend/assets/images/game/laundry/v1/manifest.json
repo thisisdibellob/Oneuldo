@@ -1,0 +1,115 @@
+{
+  "tool": "built-in image_gen",
+  "transparent_background": true,
+  "processing": "Alpha trim and downsample only; originals retained.",
+  "assets": [
+    {
+      "name": "washer",
+      "source": "source/washer.png",
+      "prompt": "Use case: stylized-concept. Game sprite for a polished cozy Korean town life simulation. Hand-painted 2D illustration, clean warm dark brown medium-thick outlines, restrained flat soft shading, warm cream/sage/oak palette, no noisy texture, no photorealism, no plastic 3D. Slightly elevated straight-on orthographic camera showing front and a shallow top surface; no isometric side skew. Single isolated complete object, generous transparent margins, no ground/background, true transparent alpha, no text, letters, logos or watermarks. Readable at small game scale. A single compact commercial front-loading washing machine. Warm ivory body, muted sage control panel with one small dark blank display and simple knob. Big circular dark blue-grey empty drum window, solid closed glass door, simple tan rim. Four small feet. Front symmetric. No laundry or bubbles in the drum; game overlays rotating clothes. Approx 1:1.15 width:height.",
+      "runtime": "washer.png",
+      "width": 393,
+      "height": 512,
+      "bytes": 320970
+    },
+    {
+      "name": "dryer",
+      "source": "source/dryer.png",
+      "prompt": "Use case: stylized-concept. Game sprite for a polished cozy Korean town life simulation. Hand-painted 2D illustration, clean warm dark brown medium-thick outlines, restrained flat soft shading, warm cream/sage/oak palette, no noisy texture, no photorealism, no plastic 3D. Slightly elevated straight-on orthographic camera showing front and a shallow top surface; no isometric side skew. Single isolated complete object, generous transparent margins, no ground/background, true transparent alpha, no text, letters, logos or watermarks. Readable at small game scale. A single compact commercial tumble dryer matching an ivory and sage washer. Warm ivory body, muted terracotta control strip with dark blank display, simple knob. Big circular dark grey empty drum window, tan rim, closed glass door. Four small feet. Front symmetric. No clothes in drum. Approx 1:1.15 width:height.",
+      "runtime": "dryer.png",
+      "width": 379,
+      "height": 512,
+      "bytes": 319799
+    },
+    {
+      "name": "folding-table",
+      "source": "source/folding-table.png",
+      "prompt": "Use case: stylized-concept. Game sprite for a polished cozy Korean town life simulation. Hand-painted 2D illustration, clean warm dark brown medium-thick outlines, restrained flat soft shading, warm cream/sage/oak palette, no noisy texture, no photorealism, no plastic 3D. Slightly elevated straight-on orthographic camera showing front and a shallow top surface; no isometric side skew. Single isolated complete object, generous transparent margins, no ground/background, true transparent alpha, no text, letters, logos or watermarks. Readable at small game scale. A light honey oak laundromat folding table with thin sturdy legs and a clean spacious rectangular tabletop. A small low wicker basket at far left on top and two neatly folded cream towels at far right, most tabletop empty. Shallow visible top, straight on elevated view, approx 2:1width:height. No chairs.",
+      "runtime": "folding-table.png",
+      "width": 512,
+      "height": 189,
+      "bytes": 97357
+    },
+    {
+      "name": "drying-rack",
+      "source": "source/drying-rack.png",
+      "prompt": "Use case: stylized-concept. Game sprite for a polished cozy Korean town life simulation. Hand-painted 2D illustration, clean warm dark brown medium-thick outlines, restrained flat soft shading, warm cream/sage/oak palette, no noisy texture, no photorealism, no plastic 3D. Slightly elevated straight-on orthographic camera showing front and a shallow top surface; no isometric side skew. Single isolated complete object, generous transparent margins, no ground/background, true transparent alpha, no text, letters, logos or watermarks. Readable at small game scale. A freestanding compact laundry drying rack in natural oak, two A-frame legs and a horizontal rail with four simple pale hangers. One pair of blue jeans hanging neatly by its waistband at right, left half of rail open. Clean empty below. Small cozy game prop. Wide rectangular silhouette, approx1.3:1width:height.",
+      "runtime": "drying-rack.png",
+      "width": 512,
+      "height": 345,
+      "bytes": 220787
+    },
+    {
+      "name": "basket",
+      "source": "source/basket.png",
+      "prompt": "Use case: stylized-concept. Game sprite for a polished cozy Korean town life simulation. Hand-painted 2D illustration, clean warm dark brown medium-thick outlines, restrained flat soft shading, warm cream/sage/oak palette, no noisy texture, no photorealism, no plastic 3D. Slightly elevated straight-on orthographic camera showing front and a shallow top surface; no isometric side skew. Single isolated complete object, generous transparent margins, no ground/background, true transparent alpha, no text, letters, logos or watermarks. Readable at small game scale. A single low oval woven laundry basket in pale honey wicker, filled with neatly folded cream tee, muted coral towel and sage towel. Two short side handles. Compact cosy game inventory illustration, approx1.4:1width:height.",
+      "runtime": "basket.png",
+      "width": 512,
+      "height": 247,
+      "bytes": 241265
+    },
+    {
+      "name": "wardrobe",
+      "source": "source/wardrobe.png",
+      "prompt": "Use case: stylized-concept. Game sprite for a polished cozy Korean town life simulation. Hand-painted 2D illustration, clean warm dark brown medium-thick outlines, restrained flat soft shading, warm cream/sage/oak palette, no noisy texture, no photorealism, no plastic 3D. Slightly elevated straight-on orthographic camera showing front and a shallow top surface; no isometric side skew. Single isolated complete object, generous transparent margins, no ground/background, true transparent alpha, no text, letters, logos or watermarks. Readable at small game scale. A compact freestanding narrow honey oak wardrobe, open double doors, inside visible three shelves with neatly folded cream, sage, muted coral clothes and a lower drawer. No hanging clothes. Simple sturdy shape, no elaborate carvings, approx0.8:1width:height.",
+      "runtime": "wardrobe.png",
+      "width": 368,
+      "height": 512,
+      "bytes": 373766
+    },
+    {
+      "name": "tee",
+      "source": "source/tee.png",
+      "prompt": "Use case: stylized-concept. Game sprite for a polished cozy Korean town life simulation. Hand-painted 2D illustration, clean warm dark brown medium-thick outlines, restrained flat soft shading, warm cream/sage/oak palette, no noisy texture, no photorealism, no plastic 3D. Slightly elevated straight-on orthographic camera showing front and a shallow top surface; no isometric side skew. Single isolated complete object, generous transparent margins, no ground/background, true transparent alpha, no text, letters, logos or watermarks. Readable at small game scale. One plain cream short sleeved cotton T-shirt laid flat, front facing, sleeves slightly spread, full unfolded garment, small collar, no pattern, no hanger. Inventory sprite, square.",
+      "runtime": "tee.png",
+      "width": 320,
+      "height": 263,
+      "bytes": 95062
+    },
+    {
+      "name": "jeans",
+      "source": "source/jeans.png",
+      "prompt": "Use case: stylized-concept. Game sprite for a polished cozy Korean town life simulation. Hand-painted 2D illustration, clean warm dark brown medium-thick outlines, restrained flat soft shading, warm cream/sage/oak palette, no noisy texture, no photorealism, no plastic 3D. Slightly elevated straight-on orthographic camera showing front and a shallow top surface; no isometric side skew. Single isolated complete object, generous transparent margins, no ground/background, true transparent alpha, no text, letters, logos or watermarks. Readable at small game scale. One pair of muted medium-blue jeans laid flat, front facing, straight narrow legs, visible two front pockets, no belt, no hanger, full unfolded garment. Inventory sprite portrait.",
+      "runtime": "jeans.png",
+      "width": 158,
+      "height": 320,
+      "bytes": 93227
+    },
+    {
+      "name": "coral-towel",
+      "source": "source/coral-towel.png",
+      "prompt": "Use case: stylized-concept. Game sprite for a polished cozy Korean town life simulation. Hand-painted 2D illustration, clean warm dark brown medium-thick outlines, restrained flat soft shading, warm cream/sage/oak palette, no noisy texture, no photorealism, no plastic 3D. Slightly elevated straight-on orthographic camera showing front and a shallow top surface; no isometric side skew. Single isolated complete object, generous transparent margins, no ground/background, true transparent alpha, no text, letters, logos or watermarks. Readable at small game scale. One single muted coral rectangular bath towel laid flat with a tiny folded corner and two simple hem stripes at its short ends. Full unfolded rectangle, inventory sprite portrait.",
+      "runtime": "coral-towel.png",
+      "width": 320,
+      "height": 140,
+      "bytes": 81811
+    },
+    {
+      "name": "sage-towel",
+      "source": "source/sage-towel.png",
+      "prompt": "Use case: stylized-concept. Game sprite for a polished cozy Korean town life simulation. Hand-painted 2D illustration, clean warm dark brown medium-thick outlines, restrained flat soft shading, warm cream/sage/oak palette, no noisy texture, no photorealism, no plastic 3D. Slightly elevated straight-on orthographic camera showing front and a shallow top surface; no isometric side skew. Single isolated complete object, generous transparent margins, no ground/background, true transparent alpha, no text, letters, logos or watermarks. Readable at small game scale. One single muted sage green rectangular bath towel laid flat with a tiny folded corner and two simple hem stripes at its short ends. Full unfolded rectangle, inventory sprite portrait.",
+      "runtime": "sage-towel.png",
+      "width": 193,
+      "height": 320,
+      "bytes": 97669
+    },
+    {
+      "name": "sock",
+      "source": "source/sock.png",
+      "prompt": "Use case: stylized-concept. Game sprite for a polished cozy Korean town life simulation. Hand-painted 2D illustration, clean warm dark brown medium-thick outlines, restrained flat soft shading, warm cream/sage/oak palette, no noisy texture, no photorealism, no plastic 3D. Slightly elevated straight-on orthographic camera showing front and a shallow top surface; no isometric side skew. Single isolated complete object, generous transparent margins, no ground/background, true transparent alpha, no text, letters, logos or watermarks. Readable at small game scale. One single soft cream ankle sock with a muted sage band, heel pointing right. Laid flat, full sock, no pair, no hanger. Inventory sprite.",
+      "runtime": "sock.png",
+      "width": 320,
+      "height": 266,
+      "bytes": 97618
+    },
+    {
+      "name": "storefront",
+      "source": "source/storefront.png",
+      "prompt": "Use case: stylized-concept. Game sprite for a polished cozy Korean town life simulation. Hand-painted 2D illustration, clean warm dark brown medium-thick outlines, restrained flat soft shading, warm cream/sage/oak palette, no noisy texture, no photorealism, no plastic 3D. Slightly elevated straight-on orthographic camera showing front and a shallow top surface; no isometric side skew. Single isolated complete object, generous transparent margins, no ground/background, true transparent alpha, no text, letters, logos or watermarks. Readable at small game scale. Small cozy Korean neighborhood self-service laundromat storefront building for topdown RPG town. Single story, wide 1.5:1 aspect. Muted sage low rounded roof, warm cream plaster facade, honey oak trim, big glass window on left showing two simple circular washer doors inside, single glass door on right. One empty small rectangular sign over window (NO TEXT), small tiny planter left. Exact orthographic front view slightly above showing roof, no side walls skew, no ground. Building only.",
+      "runtime": "storefront.png",
+      "width": 768,
+      "height": 425,
+      "bytes": 653033
+    }
+  ]
+}

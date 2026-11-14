@@ -111,6 +111,30 @@ it('툴바 설정도 휴대폰의 한 페이지에서 조작·배경·소리를 
   } finally { screen.unmount(); }
 });
 
+it('마트 설정은 설정에서 휴대폰을 닫은 뒤 편집기로 넘긴다', async () => {
+  const callbacks = props();
+  const onEditMarketLayout = jest.fn();
+  const screen = render(<GameHud {...callbacks} onEditMarketLayout={onEditMarketLayout} />);
+  try {
+    fireEvent.press(screen.getByRole('button', { name: '설정 열기' }));
+    fireEvent.press(screen.getByRole('button', { name: '마트 설정' }));
+    expect(onEditMarketLayout).not.toHaveBeenCalled();
+    await finishMenuAnimation();
+    expect(onEditMarketLayout).toHaveBeenCalledTimes(1);
+    expect(callbacks.onMenuVisibilityChange).toHaveBeenLastCalledWith(false);
+    expect(screen.queryByTestId('phone-settings')).toBeNull();
+    expect(callbacks.onExit).not.toHaveBeenCalled();
+  } finally { screen.unmount(); }
+});
+
+it('마트 설정 동작이 없는 화면에서는 설정에 빈 버튼을 만들지 않는다', () => {
+  const screen = render(<GameHud {...props()} />);
+  try {
+    fireEvent.press(screen.getByRole('button', { name: '설정 열기' }));
+    expect(screen.queryByRole('button', { name: '마트 설정' })).toBeNull();
+  } finally { screen.unmount(); }
+});
+
 it('휴대폰 계산기는 수동 계산 결과를 닫았다 열어도 유지한다', async () => {
   const callbacks = props();
   const screen = render(<GameHud {...callbacks} />);
@@ -172,9 +196,11 @@ it('휴대폰 홈은 사진과 버스 노선을 포함한 9개 앱이며 앱을 
     expect(screen.getAllByTestId('phone-home-app')).toHaveLength(9);
     expect(screen.queryByText('내 휴대폰')).toBeNull();
     expect(screen.queryByText('오늘도, 내 속도로')).toBeNull();
-    const finance = screen.getByRole('button', { name: '금융' });
-    expect(finance.props.accessibilityState.disabled).toBe(true);
-    fireEvent.press(finance);
+    const messages = screen.getByRole('button', { name: '메시지' });
+    expect(messages.props.accessibilityState.disabled).toBe(false);
+    fireEvent.press(messages);
+    expect(screen.getByTestId('phone-safety')).toBeTruthy();
+    fireEvent.press(screen.getAllByRole('button', { name: '휴대폰 홈으로' })[0]);
     expect(screen.getAllByTestId('phone-home-app')).toHaveLength(9);
     const initial = StyleSheet.flatten(screen.getByTestId('phone-case').props.style);
     expect(initial.height).toBeGreaterThan(0);
@@ -183,7 +209,7 @@ it('휴대폰 홈은 사진과 버스 노선을 포함한 9개 앱이며 앱을 
     expect(screenClip.borderRadius + initial.padding + initial.borderWidth).toBeCloseTo(initial.borderRadius);
     expect(screenClip.overflow).toBe('hidden');
     expect(StyleSheet.flatten(screen.getByTestId('phone-screen').props.style).borderRadius).toBeUndefined();
-    for (const app of ['사진', '계산기', '전화', '설정', '버스 노선', '바로 이동', '비상 탈출', '게임 나가기']) {
+    for (const app of ['사진', '계산기', '전화', '메시지', '설정', '버스 노선', '바로 이동', '비상 탈출', '게임 나가기']) {
       fireEvent.press(screen.getByRole('button', { name: app }));
       const next = StyleSheet.flatten(screen.getByTestId('phone-case').props.style);
       expect([next.height, next.width, next.maxHeight, next.maxWidth]).toEqual([initial.height, initial.width, initial.maxHeight, initial.maxWidth]);

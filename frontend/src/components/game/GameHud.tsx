@@ -17,6 +17,13 @@ import type { BusRouteContext } from './BusRouteMap';
 import { getGamePhoneLayout, PHONE_CASE_BORDER, PHONE_SCREEN_INSET } from '../../game/phoneLayout';
 import { useDayJourney, dayJourneyStep } from '../../game/dayJourney';
 import { getShoppingErrandStatus, useShoppingErrand } from '../../game/shoppingErrandStore';
+import { usePhishingSession } from '../../game/phishingStore';
+import { getPhishingGoal } from '../../game/phishingSession';
+import { recordCompletedPhishingActivity } from '../../game/activityAlbum';
+import { useCafeDraft } from '../../game/cafeStore';
+import { getCafeObjective } from '../../game/cafeSession';
+import { useLaundryDraft } from '../../game/laundryStore';
+import { getLaundryObjective } from '../../game/laundrySession';
 
 export type { DailyQuestItem } from '../../game/dailyQuests';
 
@@ -91,6 +98,12 @@ export function GameHud({
   onRouteViewed,
   onOpenJourney,
   onOpenErrand,
+  onOpenCafe,
+  onOpenLaundry,
+  onEditMarketLayout,
+  phoneRequest,
+  onPhoneRequestHandled,
+  onVisitMinsu,
 }: {
   controlMode: ControlMode;
   dailyQuests: readonly DailyQuestItem[];
@@ -109,6 +122,12 @@ export function GameHud({
   onRouteViewed?: () => void;
   onOpenJourney?: () => void;
   onOpenErrand?: () => void;
+  onOpenCafe?: () => void;
+  onOpenLaundry?: () => void;
+  onEditMarketLayout?: () => void;
+  phoneRequest?: { key: number; action: PhoneAction } | null;
+  onPhoneRequestHandled?: () => void;
+  onVisitMinsu?: () => void;
 }) {
   const [menu, setMenu] = useState<MenuKey | null>(null);
   const [phoneAction, setPhoneAction] = useState<PhoneAction>(null);
@@ -118,6 +137,12 @@ export function GameHud({
   const panelProgress = useRef(new Animated.Value(0)).current;
   const viewport = useWindowDimensions();
   const phoneLayout = getGamePhoneLayout(viewport.width, viewport.height);
+  const safetySession = usePhishingSession();
+  const handledPhoneRequest = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (safetySession?.status === 'completed') recordCompletedPhishingActivity(safetySession);
+  }, [safetySession]);
 
   useEffect(() => {
     let mounted = true;
@@ -144,7 +169,7 @@ export function GameHud({
     return () => clearTimeout(timer);
   }, [notice]);
 
-  const openMenu = (next: MenuKey) => {
+  const openMenu = useCallback((next: MenuKey) => {
     setPhoneAction(next === 'settings' ? 'settings' : null);
     setMenu(next === 'settings' ? 'phone' : next);
     onMenuVisibilityChange(true);
@@ -161,7 +186,15 @@ export function GameHud({
       toValue: 1,
       useNativeDriver: true,
     }).start();
-  };
+  }, [onMenuVisibilityChange, panelProgress, reduceMotionEnabled]);
+
+  useEffect(() => {
+    if (!phoneRequest || handledPhoneRequest.current === phoneRequest.key) return;
+    handledPhoneRequest.current = phoneRequest.key;
+    openMenu('phone');
+    setPhoneAction(phoneRequest.action);
+    onPhoneRequestHandled?.();
+  }, [phoneRequest, openMenu, onPhoneRequestHandled]);
 
   const closeMenu = useCallback((afterClose?: () => void) => {
     // Press events must never become an after-close callback, even at an untyped UI boundary.
@@ -290,7 +323,7 @@ export function GameHud({
             ]}
           >
             {menu === 'bag' ? <BagPanel /> : null}
-            {menu === 'diary' ? <DiaryPanel quests={dailyQuests} onOpenJourney={onOpenJourney ? () => closeMenu(onOpenJourney) : undefined} onOpenErrand={onOpenErrand ? () => closeMenu(onOpenErrand) : undefined} /> : null}
+            {menu === 'diary' ? <DiaryPanel quests={dailyQuests} onOpenSafety={() => { openMenu('phone'); setPhoneAction('messages'); }} onOpenJourney={onOpenJourney ? () => closeMenu(onOpenJourney) : undefined} onOpenErrand={onOpenErrand ? () => closeMenu(onOpenErrand) : undefined} onOpenCafe={onOpenCafe ? () => closeMenu(onOpenCafe) : undefined} onOpenLaundry={onOpenLaundry ? () => closeMenu(onOpenLaundry) : undefined} /> : null}
             {menu === 'phone' ? (
               <View testID="phone-screen-clip" style={{ flex: 1, minHeight: 0, overflow: 'hidden', borderRadius: phoneLayout.screenRadius }}>
                 <View style={{ position: 'absolute', width: phoneLayout.contentWidth, height: phoneLayout.contentHeight,
@@ -302,6 +335,8 @@ export function GameHud({
                 busRouteContext={busRouteContext}
                 onRouteViewed={onRouteViewed}
                 onOpenErrand={onOpenErrand ? () => closeMenu(onOpenErrand) : undefined}
+                onEditMarketLayout={onEditMarketLayout ? () => closeMenu(onEditMarketLayout) : undefined}
+                onVisitMinsu={onVisitMinsu ? () => closeMenu(onVisitMinsu) : undefined}
                 onTravel={onTravel ? destination => closeMenu(() => onTravel(destination)) : undefined}
                 onCalculatorKey={(key) => setCalculator((current) => pressCalculatorKey(current, key))}
                 onClose={() => closeMenu()}
@@ -431,9 +466,12 @@ function getQuestDetail(quest: DailyQuestItem) {
   return `${quest.region} · ${quest.description}`;
 }
 
-function DiaryPanel({ quests, onOpenJourney, onOpenErrand }: { quests: readonly DailyQuestItem[]; onOpenJourney?: () => void; onOpenErrand?: () => void }) {
+function DiaryPanel({ quests, onOpenJourney, onOpenErrand, onOpenSafety, onOpenCafe, onOpenLaundry }: { quests: readonly DailyQuestItem[]; onOpenJourney?: () => void; onOpenErrand?: () => void; onOpenSafety: () => void; onOpenCafe?: () => void; onOpenLaundry?: () => void }) {
   const journey = useDayJourney();
   const errand = useShoppingErrand();
+  const safetySession = usePhishingSession();
+  const cafeSession = useCafeDraft();
+  const laundrySession = useLaundryDraft();
   const completedCount = quests.filter(({ status }) => status === 'completed').length;
   const questCount = quests.length;
 
@@ -456,7 +494,16 @@ function DiaryPanel({ quests, onOpenJourney, onOpenErrand }: { quests: readonly 
           <Ionicons name="book" size={24} color="#627D64" /><Text style={{ flex: 1, color: '#4E6352', fontFamily: fonts.bold, fontSize: 17 }}>도서관 다녀오기</Text><Text style={{ color: '#78826F', fontFamily: fonts.semibold, fontSize: 14 }}>{journey.stage === 'available' ? '새 부탁' : `${dayJourneyStep(journey.stage)}/4`}</Text><Ionicons name="chevron-forward" size={18} color="#7B8C73" />
         </PressScale> : null}
         <View pointerEvents="none" style={styles.questDashedOutline} />
-        <ScrollView style={[styles.questList, { top: onOpenJourney ? 65 : 8, height: onOpenJourney ? 198 : 264 }]} contentContainerStyle={{ gap: 2 }} showsVerticalScrollIndicator={!!onOpenJourney}>
+        <ScrollView style={[styles.questList, { top: onOpenJourney ? 65 : 8, height: onOpenJourney ? 198 : 264 }]} contentContainerStyle={{ gap: 2 }} showsVerticalScrollIndicator={!!onOpenJourney || !!onOpenCafe || !!onOpenLaundry}>
+          {onOpenLaundry ? <PressScale accessibilityRole="button" accessibilityLabel="동네 빨래방 열기" onPress={onOpenLaundry} style={{ minHeight: 76, padding: 12, borderRadius: 15, backgroundColor: '#E3EBDD', marginBottom: 7, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <Ionicons name="shirt-outline" size={26} color="#789383" /><View style={{ flex: 1 }}><Text style={{ color: '#4F6658', fontFamily: fonts.bold, fontSize: 17 }}>동네 빨래방</Text><Text style={{ color: '#718475', fontFamily: fonts.medium, fontSize: 14, lineHeight: 21 }}>{laundrySession ? getLaundryObjective(laundrySession) : '빨래 챙기기 · 세탁하기 · 옷장 정리'}</Text></View><Ionicons name={laundrySession?.phase === 'finished' ? 'checkmark-circle' : 'chevron-forward'} size={20} color="#789383" />
+          </PressScale> : null}
+          {onOpenCafe ? <PressScale accessibilityRole="button" accessibilityLabel="카페 첫 근무 열기" onPress={onOpenCafe} style={{ minHeight: 76, padding: 12, borderRadius: 15, backgroundColor: '#EEE4D3', marginBottom: 7, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <Ionicons name="cafe-outline" size={26} color="#977456" /><View style={{ flex: 1 }}><Text style={{ color: '#625345', fontFamily: fonts.bold, fontSize: 17 }}>카페 첫 근무</Text><Text style={{ color: '#817260', fontFamily: fonts.medium, fontSize: 14, lineHeight: 21 }}>{cafeSession ? getCafeObjective(cafeSession) : '주문받기 · 음료 만들기 · 자리 정리'}</Text></View><Ionicons name={cafeSession?.phase === 'finished' ? 'checkmark-circle' : 'chevron-forward'} size={20} color="#977456" />
+          </PressScale> : null}
+          <PressScale accessibilityRole="button" accessibilityLabel="수상한 연락 확인하기" onPress={onOpenSafety} style={{ minHeight: 76, padding: 12, borderRadius: 15, backgroundColor: '#E3EADD', marginBottom: 7, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <Ionicons name="chatbubbles-outline" size={25} color="#617B67" /><View style={{ flex: 1 }}><Text style={{ color: '#4E6352', fontFamily: fonts.bold, fontSize: 17 }}>수상한 연락 확인하기</Text><Text style={{ color: '#677660', fontFamily: fonts.medium, fontSize: 14, lineHeight: 21 }}>{safetySession ? getPhishingGoal(safetySession) : '민수에게 온 연락 · 3–5분'}</Text></View><Ionicons name={safetySession?.status === 'completed' ? 'checkmark-circle' : 'chevron-forward'} size={20} color="#6C846D" />
+          </PressScale>
           {errand && onOpenErrand ? <PressScale accessibilityRole="button" accessibilityLabel="퇴근길 장보기 부탁 확인" onPress={onOpenErrand} style={{ minHeight: 72, padding: 12, borderRadius: 15, backgroundColor: '#E8E7D5', marginBottom: 7, flexDirection: 'row', alignItems: 'center', gap: 10 }}><Ionicons name="basket-outline" size={25} color="#6C8064" /><View style={{ flex: 1 }}><Text style={{ color: '#4E6352', fontFamily: fonts.bold, fontSize: 17 }}>퇴근길 장보기</Text><Text style={{ color: '#78826F', fontFamily: fonts.medium, fontSize: 14, lineHeight: 21 }}>{getShoppingErrandStatus(errand)}</Text></View><Ionicons name="chevron-forward" size={18} color="#7B8C73" /></PressScale> : null}
           {quests.slice(0, 4).map((quest) => {
             const source = questIconById[quest.id];

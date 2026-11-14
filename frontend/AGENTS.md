@@ -3,7 +3,7 @@
 이 디렉터리는 `thisisdibellob/Oneuldo`의 Expo React Native 프론트엔드다. 작업을 시작할 때 [최신 인수인계 목차](../docs/handoff/README.md)와 담당 기능 문서를 먼저 읽는다. 주차별 활동 일지 요청이면 활동 근거와 작성 규칙도 읽는다.
 
 - Git 상태·브랜치·원격을 확인하고, 깨끗할 때만 `git pull --ff-only`로 최신화한다. 기존 변경을 임의로 되돌리지 않는다.
-- 현재 게임 작업 기준은 `feat/8-시뮬레이션-게임-ui-제작`이다. 신규 작업은 팀의 Issue 연결 `feat/... → develop PR` 흐름을 따른다. `main`, `release`, `develop` 직접 커밋/푸시, force push, `git reset --hard`를 금지한다. 커밋·푸시는 사용자 요청 범위에서 한다.
+- 현재 게임 작업 기준은 사용자 요청으로 2026-11-14에 분기한 `feat/8-시뮬레이션-게임-장보기-구현`이다. 이전 작업 브랜치는 `feat/8-시뮬레이션-게임-ui-제작`이며 기존 이력을 보존한다. 신규 작업은 팀의 Issue 연결 `feat/... → develop PR` 흐름을 따른다. `main`, `release`, `develop` 직접 커밋/푸시, force push, `git reset --hard`를 금지한다. 커밋·푸시는 사용자 요청 범위에서 한다.
 - `backend/`, `docs/collaboration.md`, 다른 사람의 브랜치, 이전 개인 저장소는 요청 없이 변경·삭제하지 않는다.
 - Expo SDK와 의존성은 현재 `package.json`·`pnpm-lock.yaml`을 따른다. 과거 SDK 54 문서로 다운그레이드하지 않는다. Flutter나 새 게임 엔진을 임의로 도입하지 않는다.
 - 모바일 우선, 공통 이동/상호작용 UI, 기존 폰트, 모션 감소, 하나의 마을 안에서 연결되는 생활 게임 흐름을 유지한다. UI/아트 변경은 최신 사용자 지시와 현재 스타일을 따른다.

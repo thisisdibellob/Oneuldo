@@ -1,7 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useMemo, useState } from 'react';
-import { Image, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Image, ScrollView, StyleSheet, Text, TextInput, View, type StyleProp, type ViewStyle } from 'react-native';
 import { filterActivityRecords, toggleActivityFavorite, useActivityAlbum, type ActivityKind, type ActivityRecord } from '../../game/activityAlbum';
+import { cafeArt } from '../../game/cafeArt';
+import { laundryArt } from '../../game/laundryArt';
 import { fonts } from '../../theme';
 import { PressScale } from '../PressScale';
 
@@ -16,6 +18,9 @@ const ART = {
 const KINDS: { id: ActivityKind; name: string; icon: React.ComponentProps<typeof Ionicons>['name'] }[] = [
   { id: 'library', name: '도서관', icon: 'book-outline' }, { id: 'bus', name: '버스 타기', icon: 'bus-outline' },
   { id: 'shopping', name: '장보기', icon: 'basket-outline' }, { id: 'delivery', name: '물품 전달', icon: 'gift-outline' },
+  { id: 'safety', name: '연락 확인', icon: 'chatbubbles-outline' },
+  { id: 'cafe', name: '카페 근무', icon: 'cafe-outline' },
+  { id: 'laundry', name: '빨래하는 날', icon: 'shirt-outline' },
 ];
 const dateLabel = (time: number) => { const date = new Date(time); return `${date.getFullYear()}년 ${date.getMonth() + 1}월 ${date.getDate()}일`; };
 const timeLabel = (time: number) => { const date = new Date(time); return `${date.getHours() < 12 ? '오전' : '오후'} ${date.getHours() % 12 || 12}:${String(date.getMinutes()).padStart(2, '0')}`; };
@@ -49,7 +54,7 @@ export function PhonePhotos() {
       </PressScale> : null}
       <View style={s.heading}><Text accessibilityRole="header" style={s.title}>{title}</Text>{!selected && tab === 'library' && records.length > 0 ? <Text style={s.total}>{records.length}개 기록</Text> : null}</View>
       {selected ? <ScrollView style={s.scroller} contentContainerStyle={s.detail} nestedScrollEnabled showsVerticalScrollIndicator={false} testID="activity-record-detail">
-        <Image source={ART[selected.kind]} style={s.detailArt} resizeMode="cover" accessibilityLabel={`${selected.title} 활동 일러스트`} />
+        <ActivityArt kind={selected.kind} style={s.detailArt} label={`${selected.title} 활동 일러스트`} />
         <View style={s.detailTitleRow}><Text style={s.detailTitle}>{selected.title}</Text><FavoriteButton record={selected} /></View>
         <Text style={s.detailPlace}>{selected.place}</Text>
         <Text style={s.detailDate}>{dateLabel(selected.completedAt)} · {timeLabel(selected.completedAt)}</Text>
@@ -59,11 +64,11 @@ export function PhonePhotos() {
         {tab === 'search' ? <View style={s.search}><Ionicons name="search" color="#7D897A" size={19} /><TextInput accessibilityLabel="사진 검색어" value={query} onChangeText={setQuery} placeholder="활동, 날짜, 장소" placeholderTextColor="#8E9587" style={s.input} returnKeyType="search" />{query ? <PressScale accessibilityRole="button" accessibilityLabel="사진 검색어 지우기" onPress={() => setQuery('')} style={s.clear}><Ionicons name="close-circle" size={21} color="#85927F" /></PressScale> : null}</View> : null}
         {tab === 'albums' && !album ? <ScrollView style={s.scroller} contentContainerStyle={s.albums} nestedScrollEnabled showsVerticalScrollIndicator={false}>
           <AlbumRow title="즐겨찾기" count={favorites} icon="heart" onPress={() => setAlbum('favorites')} />
-          {KINDS.map(kind => <AlbumRow key={kind.id} title={kind.name} count={records.filter(record => record.kind === kind.id).length} icon={kind.icon} art={ART[kind.id]} onPress={() => setAlbum(kind.id)} />)}
+          {KINDS.map(kind => <AlbumRow key={kind.id} title={kind.name} count={records.filter(record => record.kind === kind.id).length} icon={kind.icon} kind={kind.id} onPress={() => setAlbum(kind.id)} />)}
         </ScrollView> : visible.length ? <ScrollView style={s.scroller} contentContainerStyle={s.recordList} nestedScrollEnabled showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" testID="activity-record-list">
           {groups.map(group => <View key={group.date}><Text style={s.date}>{group.date}</Text><View style={s.grid}>{group.records.map(record => <View key={record.id} style={s.cardWrap}>
             <PressScale accessibilityRole="button" accessibilityLabel={`${record.title} 기록 열기`} onPress={() => setSelectedId(record.id)} style={s.card}>
-              <Image source={ART[record.kind]} style={s.cardArt} resizeMode="cover" />
+              <ActivityArt kind={record.kind} style={s.cardArt} />
               <View style={s.cardCopy}><Text style={s.cardTitle} numberOfLines={2}>{record.title}</Text><Text style={s.cardSummary} numberOfLines={2}>{record.summary}</Text><Text style={s.cardTime}>{timeLabel(record.completedAt)}</Text></View>
             </PressScale>
             {record.favorite ? <View pointerEvents="none" style={s.savedBadge}><Ionicons name="heart" size={15} color="#A96560" /></View> : null}
@@ -88,9 +93,27 @@ function FavoriteButton({ record }: { record: ActivityRecord }) {
     <Ionicons name={record.favorite ? 'heart' : 'heart-outline'} size={25} color={record.favorite ? '#AC6D68' : '#798C77'} />
   </PressScale>;
 }
-function AlbumRow({ title, count, icon, art, onPress }: { title: string; count: number; icon: React.ComponentProps<typeof Ionicons>['name']; art?: number; onPress: () => void }) {
+function ActivityArt({ kind, style, label }: { kind: ActivityKind; style: StyleProp<ViewStyle>; label?: string }) {
+  if (kind === 'laundry') return <View style={[style, s.laundryArt]} accessibilityRole={label ? 'image' : undefined} accessibilityLabel={label} testID="laundry-activity-illustration">
+    <View style={s.laundryHalo} />
+    <Image source={laundryArt.basket} style={s.laundryBasket} resizeMode="contain" testID="laundry-activity-basket" />
+  </View>;
+  if (kind === 'cafe') return <View style={[style, s.cafeArt]} accessibilityRole={label ? 'image' : undefined} accessibilityLabel={label} testID="cafe-activity-illustration">
+    <View style={s.cafeHalo} />
+    <Image source={cafeArt.drinks['iced-latte']} style={s.cafeDrink} resizeMode="contain" testID="cafe-activity-drink" />
+  </View>;
+  if (kind !== 'safety') return <View style={[style, s.artClip]} accessibilityRole={label ? 'image' : undefined} accessibilityLabel={label}>
+    <Image source={ART[kind]} style={StyleSheet.absoluteFill} resizeMode="cover" />
+  </View>;
+  return <View style={[style, s.safetyArt]} accessibilityRole={label ? 'image' : undefined} accessibilityLabel={label} testID="safety-activity-illustration">
+    <View style={s.safetyHalo} />
+    <Image source={require('../../../assets/images/game/G_phone.png')} style={s.safetyPhone} resizeMode="contain" />
+    <View style={s.safetyBubble}><Ionicons name="chatbubble-ellipses" size={23} color="#78947E" /></View>
+  </View>;
+}
+function AlbumRow({ title, count, icon, kind, onPress }: { title: string; count: number; icon: React.ComponentProps<typeof Ionicons>['name']; kind?: ActivityKind; onPress: () => void }) {
   return <PressScale accessibilityRole="button" accessibilityLabel={title} onPress={onPress} style={s.album}>
-    <View style={s.albumThumbnail}>{art ? <Image source={art} style={s.albumArt} /> : <Ionicons name={icon} size={29} color="#AB7770" />}</View><View style={{ flex: 1 }}><Text style={s.albumTitle}>{title}</Text><Text style={s.count}>{count}개</Text></View><Ionicons name="chevron-forward" size={18} color="#A6AE9F" />
+    <View style={s.albumThumbnail}>{kind ? <ActivityArt kind={kind} style={s.albumArt} /> : <Ionicons name={icon} size={29} color="#AB7770" />}</View><View style={{ flex: 1 }}><Text style={s.albumTitle}>{title}</Text><Text style={s.count}>{count}개</Text></View><Ionicons name="chevron-forward" size={18} color="#A6AE9F" />
   </PressScale>;
 }
 
@@ -107,6 +130,17 @@ const s = StyleSheet.create({
   cardWrap: { width: '48%' },
   card: { borderRadius: 14, backgroundColor: '#F0EEE5', overflow: 'hidden' },
   cardArt: { width: '100%', aspectRatio: 1.1 },
+  artClip: { overflow: 'hidden' },
+  laundryArt: { backgroundColor: '#E4EBDD', overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
+  laundryHalo: { position: 'absolute', width: '76%', aspectRatio: 1, borderRadius: 160, backgroundColor: '#F7F3E7' },
+  laundryBasket: { width: '85%', height: '84%' },
+  cafeArt: { backgroundColor: '#EEE0CA', overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
+  cafeHalo: { position: 'absolute', width: '76%', aspectRatio: 1, borderRadius: 160, backgroundColor: '#FAF3E5' },
+  cafeDrink: { width: '80%', height: '86%' },
+  safetyArt: { backgroundColor: '#E8E9DC', overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
+  safetyHalo: { position: 'absolute', width: '77%', aspectRatio: 1, borderRadius: 150, backgroundColor: '#F5F0E3', transform: [{ translateX: -12 }] },
+  safetyPhone: { width: '74%', height: '82%', maxWidth: 128, maxHeight: 150 },
+  safetyBubble: { position: 'absolute', top: '17%', right: '12%', backgroundColor: '#FCFAF2', borderRadius: 14, padding: 5 },
   cardCopy: { paddingHorizontal: 10, paddingTop: 9, paddingBottom: 11, gap: 5 },
   cardTitle: { fontFamily: fonts.semibold, fontSize: 15, lineHeight: 21, color: '#425244' },
   cardSummary: { fontFamily: fonts.regular, fontSize: 13, lineHeight: 19, color: '#6D7C67' },

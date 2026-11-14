@@ -65,7 +65,7 @@ async function main() {
     "const backFallback = require('../../assets/images/game/characters/player/chibi-user-v3/chr_player_chibi_back_idle_f00.png');", "",
     "const sheets = {"];
   for (const [id, sheet] of Object.entries(audit.sheets)) lines.push(`  ${id}: { id: '${id}', source: require('../../assets/images/game/characters/player/chibi-atlas-v1/${id}.png'), highResolutionSource: require('../../assets/images/game/characters/player/chibi-atlas-v1/${id}_hd.png'), columns: ${sheet.columns}, rows: ${sheet.rows}, frameCount: ${sheet.frameCount}, frameWidth: 128, frameHeight: 192 },`);
-  lines.push('} satisfies Record<string, AvatarAtlasSheet>;', '', 'export const chibiPlayerAvatar: AvatarAnimationManifest = {');
+  lines.push('} satisfies Record<string, AvatarAtlasSheet>;', '', 'export const chibiPlayerAvatar: AvatarAnimationManifest = {', '  preloadAdjacentMotions: true,');
   for (const facing of directions) {
     const idle = facing.startsWith('back') ? 'back' : 'front';
     lines.push(`  ${facing}: { idle: [${idle}Fallback], walk: [${idle}Fallback], sprint: [${idle}Fallback] },`);

@@ -1,5 +1,5 @@
 import {
-  BUS_STOP_POINT, HOUSE_ENTRANCE_POINT, HOUSE_RETURN_POINT, INITIAL_PLAYER_POINT,
+  BUS_STOP_POINT, CAFE_ENTRANCE_POINT, CAFE_RETURN_POINT, HOUSE_ENTRANCE_POINT, HOUSE_RETURN_POINT, INITIAL_PLAYER_POINT,
   MARKET_BUS_STOP_POINT, MARKET_ENTRANCE_POINT, MARKET_RETURN_POINT,
   VILLAGE_BUILDINGS, VILLAGE_NPCS, villageObstacles, VILLAGE_ROADS, WORLD_BOUNDS, type Point,
 } from '../src/game/prototypeWorld';
@@ -94,6 +94,7 @@ it('도로가 이어지는 정확한 경계선을 눌러도 고립된 보도로 
 it.each([
   ['market entrance', MARKET_ENTRANCE_POINT], ['market return', MARKET_RETURN_POINT],
   ['home entrance', HOUSE_ENTRANCE_POINT], ['home return', HOUSE_RETURN_POINT],
+  ['cafe entrance', CAFE_ENTRANCE_POINT], ['cafe return', CAFE_RETURN_POINT],
   ['market bus waiting point', MARKET_BUS_STOP_POINT], ['east bus waiting point', BUS_STOP_POINT],
 ] as const)('시작점에서 %s까지 플레이어 발 크기를 고려한 경로를 만든다', (_name, point) => {
   expect(verifyRoute(INITIAL_PLAYER_POINT, point).at(-1)).toEqual(point);

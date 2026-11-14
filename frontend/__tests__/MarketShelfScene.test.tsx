@@ -56,11 +56,10 @@ function renderEmbeddedMarket() {
   );
   const screen = render(renderScreen());
   const start = async () => {
-    fireEvent.press(screen.getByText('다음'));
-    fireEvent.press(screen.getByText('장보기 시작'));
+    fireEvent.press(screen.getByRole('button', { name: '장보기 시작' }));
     await advanceTransition();
   };
-  const open = async (nextRequest: MarketInteractionRequest & { station: Exclude<MarketInteractionRequest['station'], 'give-up' | 'contact-requester'> }) => {
+  const open = async (nextRequest: MarketInteractionRequest & { station: Exclude<MarketInteractionRequest['station'], 'give-up' | 'contact-requester' | 'edit-layout'> }) => {
     playerPositionRef.current = fixture.environment.stations[nextRequest.station];
     request = nextRequest;
     screen.rerender(renderScreen());

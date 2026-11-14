@@ -35,7 +35,7 @@ export function AppShell({
   const [tab, setTab] = useState(0);
   const [practice, setPractice] = useState(false);
   const [gamePlaying, setGamePlaying] = useState(false);
-  const [gameActivity, setGameActivity] = useState<'day' | 'bus' | 'market' | 'errand' | undefined>();
+  const [gameActivity, setGameActivity] = useState<'day' | 'bus' | 'market' | 'errand' | 'phishing' | 'cafe' | 'laundry' | undefined>();
   const [reduceMotion, setReduceMotion] = useState(false);
   const screenProgress = useRef(new Animated.Value(0)).current;
   const firstAppearance = useRef(true);
@@ -96,7 +96,7 @@ export function AppShell({
     }
   };
 
-  const openGame = (activity?: 'day' | 'bus' | 'market' | 'errand') => {
+  const openGame = (activity?: 'day' | 'bus' | 'market' | 'errand' | 'phishing' | 'cafe' | 'laundry') => {
     beginTransition();
     setGameActivity(activity);
     setGamePlaying(true);

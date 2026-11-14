@@ -38,6 +38,8 @@ export type AvatarAtlasManifest = Readonly<Record<AvatarFacing, Readonly<{
 export type AvatarAnimationManifest = Readonly<Record<AvatarFacing, AvatarFrameSet>> & Readonly<{
   /** Packed animations keep a single native Image source stable through the entire cycle. */
   atlases?: AvatarAtlasManifest;
+  /** Warm only the likely next motion, with lower priority than visible artwork. */
+  preloadAdjacentMotions?: boolean;
 }>;
 
 export function resolveAvatarAtlas(manifest: AvatarAnimationManifest, facing: AvatarFacing, motion: AvatarMotion): AvatarAtlasSheet | undefined {

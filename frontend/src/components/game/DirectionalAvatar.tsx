@@ -63,7 +63,14 @@ export function DirectionalAvatar(props: DirectionalAvatarProps) {
   return sheet ? <AtlasDirectionalAvatar {...props} sheet={sheet} /> : <BufferedDirectionalAvatar {...props} />;
 }
 
-type AtlasLayer = { key: string; settled: boolean; sheet: AvatarAtlasSheet; source: ImageSourcePropType; onLoad: () => void; onError: () => void };
+type AtlasLayer = { key: string; settled: boolean; sheet: AvatarAtlasSheet; motion: AvatarMotion; source: ImageSourcePropType; onLoad: () => void; onError: () => void };
+type AtlasLayers = { visible: AtlasLayer | null; pending: AtlasLayer | null; retained: AtlasLayer[] };
+const RETAINED_ATLAS_LIMIT = 3;
+function showAtlasLayer(current: AtlasLayers, incoming: AtlasLayer): AtlasLayers {
+  const retained = [...current.retained, ...(current.visible ? [current.visible] : [])]
+    .filter(layer => layer.key !== incoming.key).slice(-RETAINED_ATLAS_LIMIT);
+  return { visible: incoming, pending: null, retained };
+}
 
 function AtlasSprite({ layer, current, visible, hidden, motion, walkCycle, reduceMotion, scale }: {
   layer: AtlasLayer; current: boolean; visible: boolean; hidden: boolean; motion: AvatarMotion;
@@ -97,8 +104,9 @@ function AtlasSprite({ layer, current, visible, hidden, motion, walkCycle, reduc
   }, [layer]);
 
   useLayoutEffect(() => {
-    // A previous direction keeps the exact pose it displayed while its replacement loads.
-    if (!current || !visible || hidden) { updateFrame(frame.current); return; }
+    // Continue the outgoing gait until its replacement is decoded. Freezing it made
+    // even a short local decode look like a stalled animation during every turn.
+    if (!visible || hidden) { updateFrame(frame.current); return; }
     if (reduceMotion || layer.sheet.frameCount <= 1) { updateFrame(0); return; }
     if (motion !== 'idle' && walkCycle) {
       updateFrame(walkCycle.frameIndex(layer.sheet.frameCount));
@@ -112,9 +120,9 @@ function AtlasSprite({ layer, current, visible, hidden, motion, walkCycle, reduc
     updateFrame(0);
     const timer = setInterval(() => updateFrame((frame.current + 1) % layer.sheet.frameCount), FRAME_INTERVAL_MS[motion]);
     return () => clearInterval(timer);
-  }, [current, visible, hidden, layer.sheet.frameCount, motion, walkCycle, reduceMotion, updateFrame]);
+  }, [visible, hidden, layer.sheet.frameCount, motion, walkCycle, reduceMotion, updateFrame]);
 
-  return <Animated.Image accessibilityIgnoresInvertColors testID={visible ? 'avatar-atlas-visible' : 'avatar-atlas-pending'}
+  return <Animated.Image accessibilityIgnoresInvertColors testID={visible ? 'avatar-atlas-visible' : current && !layer.settled ? 'avatar-atlas-pending' : 'avatar-atlas-retained'}
     source={layer.source} resizeMode="stretch" fadeDuration={0} onLoad={onLoad} onError={layer.onError}
     style={{ position: 'absolute', left: 0, top: 0,
       width: layer.sheet.columns * MODULAR_CHARACTER_CANVAS.width * scale,
@@ -128,24 +136,34 @@ function AtlasDirectionalAvatar({
   const source = selectAvatarAtlasSource(sheet, scale, PixelRatio.get());
   const key = JSON.stringify(source);
   const latestKey = useRef(key); latestKey.current = key;
-  const [layers, setLayers] = useState<{ visible: AtlasLayer | null; pending: AtlasLayer | null }>({ visible: null, pending: null });
+  const [layers, setLayers] = useState<AtlasLayers>({ visible: null, pending: null, retained: [] });
+  const latestLayers = useRef(layers); latestLayers.current = layers;
   const [failedKey, setFailedKey] = useState<string | null>(null);
+
+  useLayoutEffect(() => {
+    // Reuse the same decoded native Image on common idle/walk/sprint switches.
+    setLayers(current => {
+      const resident = current.retained.find(layer => layer.key === key);
+      return resident ? showAtlasLayer(current, resident) : current;
+    });
+  }, [key]);
 
   useEffect(() => {
     let active = true;
     setFailedKey(null);
+    if (latestLayers.current.visible?.key === key || latestLayers.current.retained.some(layer => layer.key === key)) return;
     // A downloaded atlas is shared by every map, and no individual frame is prefetched.
     const unsubscribe = avatarAtlasCache.subscribe(source, result => {
       if (!active || latestKey.current !== key) return;
       if (result.status !== 'ready') { setFailedKey(key); return; }
       setFailedKey(null);
       const next: AtlasLayer = {
-        key, settled: false, sheet, source: result.source,
+        key, settled: false, sheet, motion, source: result.source,
         onLoad: () => {
           if (!active || latestKey.current !== key || next.settled) return;
           next.settled = true;
           setFailedKey(null);
-          setLayers(current => current.pending === next ? { visible: current.pending, pending: null } : current);
+          setLayers(current => current.pending === next ? showAtlasLayer(current, next) : current);
         },
         onError: () => {
           if (!active || latestKey.current !== key || next.settled) return;
@@ -171,6 +189,24 @@ function AtlasDirectionalAvatar({
     return () => clearTimeout(timer);
   }, [layers.pending]);
 
+  useEffect(() => {
+    if (!manifest.preloadAdjacentMotions || layers.visible?.key !== key) return;
+    const direction = manifest.atlases?.[facing];
+    const nextSheet = motion === 'idle' ? direction?.walk : motion === 'walk' ? direction?.sprint : direction?.walk;
+    if (!nextSheet) return;
+    const nextSource = selectAvatarAtlasSource(nextSheet, scale, PixelRatio.get());
+    if (JSON.stringify(nextSource) === key) return;
+    let leave: (() => void) | undefined;
+    const timer = setTimeout(() => {
+      leave = avatarAtlasCache.subscribe(nextSource, result => {
+        if (result.status !== 'ready') return;
+        const uri = assetUri(result.source);
+        if (uri) void Image.prefetch(uri).catch(() => {});
+      }, 'background');
+    }, 500);
+    return () => { clearTimeout(timer); leave?.(); };
+  }, [manifest, facing, motion, scale, key, layers.visible?.key]);
+
   const width = MODULAR_CHARACTER_CANVAS.width * scale, height = MODULAR_CHARACTER_CANVAS.height * scale;
   const showAtlas = layers.visible !== null && failedKey !== key;
   const fallback = manifest[facing].idle[0] ?? manifest.front.idle[0];
@@ -181,9 +217,9 @@ function AtlasDirectionalAvatar({
     <View style={{ width, height, overflow: 'hidden' }}>
       <Image testID="avatar-atlas-fallback" source={fallback} resizeMode="contain" fadeDuration={0}
         style={{ width, height, opacity: showAtlas ? 0 : 1, position: 'absolute', left: 0, top: 0 }} />
-      {[layers.visible, layers.pending].filter((layer): layer is AtlasLayer => Boolean(layer)).map(layer =>
+      {[...layers.retained, layers.visible, layers.pending].filter((layer): layer is AtlasLayer => Boolean(layer)).map(layer =>
         <AtlasSprite key={layer.key} layer={layer} current={layer.key === key}
-          visible={layer === layers.visible} hidden={!showAtlas} motion={motion} walkCycle={walkCycle} reduceMotion={reduceMotion} scale={scale} />)}
+          visible={layer === layers.visible} hidden={!showAtlas} motion={layer.key === key ? motion : layer.motion} walkCycle={walkCycle} reduceMotion={reduceMotion} scale={scale} />)}
     </View>
   </View>;
 }

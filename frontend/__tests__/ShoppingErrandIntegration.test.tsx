@@ -72,7 +72,7 @@ it('starts the real shared market with the errand receipt id and matching world 
   fireEvent.press(screen.getByRole('button', { name: '하늘마트 들어가기' }));
   expect(getShoppingErrand()?.boundSessionId).toMatch(/^minsu-new-shift-visit-/);
   expect(screen.getByText(/민수의 부탁 · 예산/)).toBeTruthy();
-  expect(screen.queryByText('연습 환경 설정')).toBeNull();
+  expect(screen.queryByText('마트 설정')).toBeNull();
   expect(getShoppingErrand()?.phase).toBe('accepted');
   expect(getActivityAlbum()).toHaveLength(0);
   await act(async () => { await Promise.resolve(); });

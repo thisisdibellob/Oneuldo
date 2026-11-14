@@ -8,6 +8,7 @@ import { StickyBrandHeader } from '../components/ui';
 import { colors, fonts } from '../theme';
 import { DAY_JOURNEY_GUIDANCE, dayJourneyStep, useDayJourney } from '../game/dayJourney';
 import { getShoppingErrandStatus, useShoppingErrand } from '../game/shoppingErrandStore';
+import { laundryArt } from '../game/laundryArt';
 
 type CalendarCell = {
   day: string;
@@ -32,12 +33,13 @@ const weeks: CalendarCell[][] = [
 const categories = ['전체', '대중교통', '생활 훈련', '경제생활', '안전'];
 const quests = [
   { category: '대중교통', color: '#57ABD8', icon: icons.bus, title: '혼자 버스 타기', description: '목적지까지 가는 버스를 찾고,\n안전하게 이용해봐요!' },
-  { category: '일상생활', color: '#EFAC2B', icon: icons.cashier, title: '카페에서 주문하기', description: '원하는 메뉴를 고르고,\n직원에게 또박또박 말해봐요.' },
+  { category: '일상생활', color: '#B58A63', icon: icons.cashier, title: '카페 첫 근무', description: '주문을 받고 음료를 만들어요.\n손님 세 명과 함께하는 작은 카페' },
+  { category: '일상생활', color: '#7A9B86', icon: laundryArt.basket, title: '동네 빨래방', description: '빨래를 나누고 세탁한 뒤,\n집 옷장에 차곡차곡 정리해요.' },
   { category: '경제생활', color: '#33BB5B', icon: icons.money, title: '마트에서 장보기', description: '예산 안에서 필요한 물건을\n직접 골라 계산해요.' },
-  { category: '안전', color: '#E04173', icon: icons.sos, title: '도움을 요청하는 법', description: '곤란한 상황에서 믿을 수 있는\n사람들에게 도움을 요청해요.' },
+  { category: '안전', color: '#779383', icon: icons.gamePhone, title: '수상한 연락 확인하기', description: '민수에게 온 연락, 직접 확인해요.\n한 이야기 3~5분' },
 ];
 
-export function QuestScreen({ onPractice, onGameQuest }: { onPractice: () => void; onGameQuest?: (activity: 'day' | 'bus' | 'market' | 'errand') => void }) {
+export function QuestScreen({ onPractice, onGameQuest }: { onPractice: () => void; onGameQuest?: (activity: 'day' | 'bus' | 'market' | 'errand' | 'phishing' | 'cafe' | 'laundry') => void }) {
   const journey = useDayJourney();
   const errand = useShoppingErrand();
   const [selected, setSelected] = useState('전체');
@@ -105,9 +107,12 @@ export function QuestScreen({ onPractice, onGameQuest }: { onPractice: () => voi
       </ScrollView>
 
       <View style={styles.questList}>
-        {visible.map((quest) => <QuestCard key={quest.title} {...quest} inGame={!!onGameQuest && ['혼자 버스 타기', '마트에서 장보기'].includes(quest.title)} onPress={() => {
+        {visible.map((quest) => <QuestCard key={quest.title} {...quest} inGame={!!onGameQuest && ['혼자 버스 타기', '마트에서 장보기', '수상한 연락 확인하기', '카페 첫 근무', '동네 빨래방'].includes(quest.title)} onPress={() => {
           if (onGameQuest && quest.title === '혼자 버스 타기') onGameQuest('bus');
           else if (onGameQuest && quest.title === '마트에서 장보기') onGameQuest('market');
+          else if (onGameQuest && quest.title === '수상한 연락 확인하기') onGameQuest('phishing');
+          else if (onGameQuest && quest.title === '카페 첫 근무') onGameQuest('cafe');
+          else if (onGameQuest && quest.title === '동네 빨래방') onGameQuest('laundry');
           else onPractice();
         }} />)}
       </View>
@@ -128,7 +133,7 @@ function Stat({ background, color, icon, label, value }: { background: string; c
 
 function QuestCard({ category, color, icon, title, description, onPress, inGame = false }: { category: string; color: string; icon: ImageSourcePropType; title: string; description: string; onPress: () => void; inGame?: boolean }) {
   return (
-    <PressScale onPress={onPress} style={styles.questCard}>
+    <PressScale accessibilityRole="button" accessibilityLabel={`${title} 퀘스트 열기`} onPress={onPress} style={styles.questCard}>
       <Image resizeMode="contain" source={icon} style={styles.questIcon} />
       <View style={styles.questCopy}>
         <Text style={[styles.questCategory, { color }]}>{category}</Text>

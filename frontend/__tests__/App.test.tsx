@@ -532,14 +532,14 @@ describe('오늘도 앱', () => {
     fireEvent.press(screen.getByRole('button', { name: '휴대폰 닫기' }));
     await act(async () => { jest.advanceTimersByTime(220); await Promise.resolve(); });
     fireEvent.press(screen.getByRole('button', { name: '하늘마트로 이동해 들어가기' }));
-    for (let frame = 0; frame < 80 && !screen.queryByText('마트에서 장보기'); frame++) {
+    for (let frame = 0; frame < 80 && !screen.queryByRole('header', { name: '장 보기' }); frame++) {
       await act(async () => { jest.advanceTimersByTime(500); await Promise.resolve(); });
     }
 
-    expect(screen.getByText('마트에서 장보기')).toBeTruthy();
-    fireEvent.press(screen.getByRole('button', { name: '연습 환경 설정' }));
-    fireEvent.press(screen.getByRole('button', { name: '연구용 상세 설정 · JSON 가져오기' }));
-    fireEvent.changeText(screen.getByLabelText('장보기 설정 JSON'), JSON.stringify({
+    expect(screen.getByRole('header', { name: '장 보기' })).toBeTruthy();
+    fireEvent.press(screen.getByRole('button', { name: '마트 설정' }));
+    fireEvent.press(screen.getByRole('button', { name: '세이브 · 로드' }));
+    fireEvent.changeText(screen.getByLabelText('마트 설정 가져오기 JSON'), JSON.stringify({
       seed: 'app-smoke-fixed-layout',
       learning: { stockoutEnabled: false, budgetChoiceEnabled: false },
       environment: {
@@ -548,9 +548,9 @@ describe('오늘도 앱', () => {
         cashierCount: 2, pillarCount: 0, chairCount: 0, kioskPresent: false,
       },
     }));
+    fireEvent.press(screen.getByRole('button', { name: '붙여 넣은 설정 불러오기' }));
     fireEvent.press(screen.getByRole('button', { name: '설정 적용' }));
-    fireEvent.press(screen.getByText('다음'));
-    fireEvent.press(screen.getByText('장보기 시작'));
+    fireEvent.press(screen.getByRole('button', { name: '장보기 시작' }));
     // Movement remains locked while the briefing's last frame fades out.
     await act(async () => { jest.advanceTimersByTime(300); await Promise.resolve(); });
     await waitFor(() => expect(screen.queryByTestId('market-panel-transition', { includeHiddenElements: true })).toBeNull());

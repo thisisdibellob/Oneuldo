@@ -26,6 +26,7 @@ const sheets = {
 } satisfies Record<string, AvatarAtlasSheet>;
 
 export const chibiPlayerAvatar: AvatarAnimationManifest = {
+  preloadAdjacentMotions: true,
   front: { idle: [frontFallback], walk: [frontFallback], sprint: [frontFallback] },
   frontLeft: { idle: [frontFallback], walk: [frontFallback], sprint: [frontFallback] },
   left: { idle: [frontFallback], walk: [frontFallback], sprint: [frontFallback] },

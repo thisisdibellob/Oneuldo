@@ -4,6 +4,7 @@ import { Point } from './prototypeWorld';
 import { normalizeMarketLearningConfig, type MarketLearningConfig, type MarketLearningState, type MarketStockoutState, type MarketUnavailableReason } from './marketLearning';
 import { createMarketCheckoutReview, correctMarketCheckoutReview, evaluateMarketCheckoutReview, getMarketCartFingerprint,
   getMarketCheckoutReview, isStaffedCheckoutReviewReady, type MarketCheckoutReviewState } from './marketCheckoutReview';
+import { applyMarketTilemapToConfig, type MarketTilemapV1 } from './marketTilemap';
 
 export type MarketMatchRule = 'family' | 'exact';
 export type MarketTaskObjectiveInput = { productId: string; quantity: number; match?: MarketMatchRule };
@@ -258,6 +259,42 @@ export function createMarketSession(input: Partial<MarketSessionConfig> = {}, en
     ratings: null, ratingSkipped: false, lastActionError: null, events: [],
   };
   record(session, 'session_started', { config: clone(config), environment: clone(environment), objectives: clone(objectives), shelfSlots: clone(shelfSlots), initialStock: clone(initialStock), learning: clone(learning) });
+  return session;
+}
+
+/** Authoring is an explicit local UI operation, not an agent action or a new shopping attempt. */
+export function replaceMarketSessionTilemap(current: MarketSession, tilemap: MarketTilemapV1, at?: string): MarketSession {
+  if (current.phase !== 'shopping' || current.view !== 'world' || current.activeStation !== null || current.paid) {
+    throw new Error('대화와 계산 화면을 닫고 장보는 중에 배치를 바꿀 수 있어요.');
+  }
+  // Validate the full replacement before changing any progress or adding an event.
+  const environment = createMarketEnvironment(applyMarketTilemapToConfig(current.environment.config, tilemap));
+  const originalCashierRects = environment.checkouts.filter(counter => counter.cashierPresent).map(counter => counter.cashierCollider);
+  const sameRect = (a: typeof originalCashierRects[number], b: typeof originalCashierRects[number]) => a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height;
+  const cashierAvailability = Object.fromEntries(environment.checkouts.map(counter => [counter.id,
+    counter.kind !== 'kiosk' && current.cashierAvailability[counter.id]])) as MarketCashierAvailability;
+  // Called cashiers stay at their counter. Changed people counts must not reroll this progress.
+  environment.checkouts = environment.checkouts.map(counter => ({ ...counter, cashierPresent: cashierAvailability[counter.id] }));
+  environment.checkout = environment.checkouts[0];
+  environment.obstacles = [...environment.obstacles.filter(rect => !originalCashierRects.some(cashier => sameRect(rect, cashier))),
+    ...environment.checkouts.filter(counter => counter.cashierPresent).map(counter => counter.cashierCollider)];
+  const session = clone(current);
+  const previousTilemap = clone(current.environment.config.tilemap ?? null);
+  session.environment = environment;
+  session.config.environment = clone(environment.config);
+  session.playerPosition = { ...environment.spawn };
+  session.activeStation = null;
+  session.selectedCheckoutId = null;
+  session.selectedKioskId = null;
+  session.checkoutReview = null;
+  session.cashierAvailability = cashierAvailability;
+  session.cashierAvailable = cashierAvailability.checkout;
+  session.lastActionError = null;
+  // Relocation is not a gate crossing; score, alarms and prior task progress are retained.
+  record(session, 'layout_changed', { previousLayoutId: current.environment.config.layoutId ?? 'classic',
+    previousTilemap, tilemap: clone(environment.config.tilemap), environment: clone(environment),
+    previousPosition: clone(current.playerPosition), playerPosition: clone(session.playerPosition),
+    cashierAvailability: clone(cashierAvailability) }, at);
   return session;
 }
 
