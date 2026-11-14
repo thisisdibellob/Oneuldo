@@ -25,6 +25,11 @@ public class AdaptiveQuestContract {
         if(!raw.isObject()) throw problem("/","OBJECT_REQUIRED");
         var old=(ObjectNode)raw.deepCopy();old.remove(List.of("runtimePlan","observationPlan"));
         legacy.validateGeneratedShapeJson(old);legacy.validateGeneratedNumericJson(old);legacy.validateGeneratedTextJson(old);
+        var specificationIssues=ProductSpecificationChecks.inspectMission(raw);
+        if(!specificationIssues.isEmpty())throw new MarketQuestValidationException("상품 규격 불일치",Map.of(
+            "code","PRODUCT_SPECIFICATION_MISMATCH","path",specificationIssues.getFirst().path(),"conflicts",specificationIssues));
+        var explanationIssues=retainedBudgetIssues(raw);
+        if(!explanationIssues.isEmpty())throw new MarketQuestValidationException("예산 설명 불일치",explanationIssues.getFirst());
         shape(raw.path("runtimePlan"),"/runtimePlan",List.of("environment","learning","matchRule","stockPerProduct","stockOverrides","alarmPenaltyPoints","wrongWayPenaltyPoints","cashierRequestPenaltyPoints"));
         var runtime=raw.path("runtimePlan"); var environment=runtime.path("environment");var learning=runtime.path("learning");
         shape(environment,"/runtimePlan/environment",List.of("layoutId","employeeCount","customerCount","pillarCount","chairCount","cashierCount","kioskLane","entranceConstruction"));
@@ -45,6 +50,19 @@ public class AdaptiveQuestContract {
             MarketQuestCatalog.require(id);integer(runtime.path("stockOverrides").path(id),0,20,"/runtimePlan/stockOverrides/"+id);
         }
         if(!(learning.path("stockoutProductId").isNull() || learning.path("stockoutProductId").isString()))throw problem("/runtimePlan/learning/stockoutProductId","STRING_OR_NULL_REQUIRED");
+        // Validate nested raw shapes before deserialization so repair gets the actual field.
+        {
+        var p=raw.path("observationPlan");
+        shape(p,"/observationPlan",List.of("purpose","behaviorObservation","movementObservation","behaviorEvidenceIds","movementEvidenceIds","alternativeExplanations","unknowns","changeReasons","evaluationFocus"));
+        if(!p.path("changeReasons").isArray()||p.path("changeReasons").isEmpty()||p.path("changeReasons").size()>12)throw problem("/observationPlan/changeReasons","ONE_TO_TWELVE_REASONS_REQUIRED");
+        for(var c:p.path("changeReasons")) {shape(c,"/observationPlan/changeReasons",List.of("path","reason"));String path=c.path("path").asString();if(!path.startsWith("/")||raw.at(path).isMissingNode()||path.startsWith("/observationPlan"))throw problem(path,"CHANGE_PATH_NOT_IN_QUEST");text(c.path("reason"),200,path);}
+        choice(p,"purpose",List.of("GUIDED_PRACTICE","INDEPENDENT_CHECK","TRANSFER","EXPLORATION"),"/observationPlan");
+        for(String f:List.of("behaviorObservation","movementObservation","evaluationFocus"))text(p.path(f),360,"/observationPlan/"+f);
+        citations(p.path("behaviorEvidenceIds"),AdaptiveQuestEvidence.ids(evidence,false),"/observationPlan/behaviorEvidenceIds",true);
+        citations(p.path("movementEvidenceIds"),AdaptiveQuestEvidence.ids(evidence,false),"/observationPlan/movementEvidenceIds",!AdaptiveQuestEvidence.ids(evidence,true).isEmpty());
+        if(!AdaptiveQuestEvidence.ids(evidence,true).isEmpty() && p.path("movementEvidenceIds").valueStream().noneMatch(id->AdaptiveQuestEvidence.ids(evidence,true).contains(id.asString())))throw problem("/observationPlan/movementEvidenceIds","NAVIGATION_OR_GEOMETRY_SOURCE_REQUIRED");
+        for(String f:List.of("alternativeExplanations","unknowns")) {if(!p.path(f).isArray()||(f.equals("unknowns")&&p.path(f).isEmpty())||p.path(f).size()>4)throw problem("/observationPlan/"+f,"ONE_TO_FOUR_ITEMS_REQUIRED");for(var s:p.path(f))text(s,200,"/observationPlan/"+f);}
+        }
         var draft=mapper.treeToValue(raw,MarketAiQuestDraft.class);
         legacy.validateGenerated(draft,difficulty,context);
         if(draft.objectives().size()!=count)throw problem("/objectives","PROFILE_ITEM_COUNT_MISMATCH");
@@ -72,16 +90,6 @@ public class AdaptiveQuestContract {
                 if(!raw.at(path).equals(context.runtimeContext().path("lockedSettings").get(path)))throw problem(path,"MANUAL_SETTING_LOCKED");
             }
         }
-        var p=raw.path("observationPlan");
-        shape(p,"/observationPlan",List.of("purpose","behaviorObservation","movementObservation","behaviorEvidenceIds","movementEvidenceIds","alternativeExplanations","unknowns","changeReasons","evaluationFocus"));
-        choice(p,"purpose",List.of("GUIDED_PRACTICE","INDEPENDENT_CHECK","TRANSFER","EXPLORATION"),"/observationPlan");
-        for(String f:List.of("behaviorObservation","movementObservation","evaluationFocus"))text(p.path(f),360,"/observationPlan/"+f);
-        citations(p.path("behaviorEvidenceIds"),AdaptiveQuestEvidence.ids(evidence,false),"/observationPlan/behaviorEvidenceIds",true);
-        citations(p.path("movementEvidenceIds"),AdaptiveQuestEvidence.ids(evidence,false),"/observationPlan/movementEvidenceIds",!AdaptiveQuestEvidence.ids(evidence,true).isEmpty());
-        if(!AdaptiveQuestEvidence.ids(evidence,true).isEmpty() && p.path("movementEvidenceIds").valueStream().noneMatch(id->AdaptiveQuestEvidence.ids(evidence,true).contains(id.asString())))throw problem("/observationPlan/movementEvidenceIds","NAVIGATION_OR_GEOMETRY_SOURCE_REQUIRED");
-        for(String f:List.of("alternativeExplanations","unknowns")) {if(!p.path(f).isArray()||(f.equals("unknowns")&&p.path(f).isEmpty())||p.path(f).size()>4)throw problem("/observationPlan/"+f,"ONE_TO_FOUR_ITEMS_REQUIRED");for(var s:p.path(f))text(s,200,"/observationPlan/"+f);}
-        if(!p.path("changeReasons").isArray()||p.path("changeReasons").isEmpty()||p.path("changeReasons").size()>12)throw problem("/observationPlan/changeReasons","ONE_TO_TWELVE_REASONS_REQUIRED");
-        for(var c:p.path("changeReasons")) {shape(c,"/observationPlan/changeReasons",List.of("path","reason"));String path=c.path("path").asString();if(!path.startsWith("/")||raw.at(path).isMissingNode()||path.startsWith("/observationPlan"))throw problem(path,"CHANGE_PATH_NOT_IN_QUEST");text(c.path("reason"),200,path);}
         return draft;
     }
     private void citations(JsonNode values,Set<String> allowed,String path,boolean required){if(!values.isArray()||values.size()>12||(required&&values.isEmpty()))throw problem(path,"CITATION_COUNT:"+(required?"1":"0")+"..12");for(var v:values)if(!v.isString()||!allowed.contains(v.asString()))throw problem(path,"UNKNOWN_EVENT_CITATION");}
@@ -89,6 +97,8 @@ public class AdaptiveQuestContract {
     /** Collect independent existing constraints so a single repair can fix coexisting errors. */
     public List<Map<String,Object>> independentSettingIssues(JsonNode raw){
         var issues=new ArrayList<Map<String,Object>>();if(!raw.isObject())return issues;
+        for(var conflict:ProductSpecificationChecks.inspectMission(raw))issues.add(Map.of("code","PRODUCT_SPECIFICATION_MISMATCH","path",conflict.path(),"productId",conflict.productId(),"expectedDetail",conflict.expectedDetail()));
+        issues.addAll(retainedBudgetIssues(raw));
         for(var field:Map.of("title",40,"description",120,"successMessage",80,"adaptationSummary",MarketAiQuestValidator.ADAPTATION_SUMMARY_MAX_LENGTH).entrySet())
             collect(issues,()->text(raw.path(field.getKey()),field.getValue(),"/"+field.getKey()));
         if(raw.path("environmentPlan").isObject())collect(issues,()->text(raw.path("environmentPlan").path("rationale"),160,"/environmentPlan/rationale"));
@@ -103,6 +113,18 @@ public class AdaptiveQuestContract {
         }
         if(raw.path("objectives").isArray())for(int i=0;i<raw.path("objectives").size();i++){int index=i;collect(issues,()->integer(raw.path("objectives").get(index).path("quantity"),1,3,"/objectives/"+index+"/quantity"));}
         return List.copyOf(issues);
+    }
+    private List<Map<String,Object>> retainedBudgetIssues(JsonNode raw) {
+        if(!raw.path("budget").isIntegralNumber())return List.of();
+        var result=new ArrayList<Map<String,Object>>();
+        for(var reason:raw.path("observationPlan").path("changeReasons"))if(reason.path("path").asString().equals("/budget")) {
+            var matcher=java.util.regex.Pattern.compile("([0-9][0-9,]*)\\s*원(?:으로|을|은|는|의)?\\s*유지(?!하지\\s*않|하지\\s*말)").matcher(reason.path("reason").asString());
+            while(matcher.find())try {
+                if(Long.parseLong(matcher.group(1).replace(",",""))!=raw.path("budget").asLong())
+                    result.add(Map.of("code","BUDGET_EXPLANATION_MISMATCH","path","/observationPlan","actualBudget",raw.path("budget").asLong(),"explanation","유지한다고 설명한 금액을 실제 budget과 일치시킨다. 이전 금액→새 금액 변경 설명은 허용한다."));
+            }catch(NumberFormatException ignored){/* Nonrepresentable quoted amounts are not used as facts. */}
+        }
+        return List.copyOf(result);
     }
     private void collect(List<Map<String,Object>> issues,Runnable check){try{check.run();}catch(MarketQuestValidationException error){issues.add(error.details());}}
     private void range(JsonNode n,String k,JsonNode bounds,String p){integer(n.path(k),bounds.path(0).asInt(),bounds.path(1).asInt(),p+"/"+k);}

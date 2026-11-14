@@ -11,6 +11,10 @@ final class AdaptiveObservationRequests {
     static final int REPAIR_CALLS = 2;
     static final int REPAIR_RESERVE_TOKENS = 192;
     interface Transport { GroqChatResult call(String system, String prompt, int output); }
+    interface SourceTransport extends Transport {
+        GroqChatResult call(String system,String prompt,int output,Set<String> allowed);
+        default GroqChatResult call(String system,String prompt,int output){return call(system,prompt,output,Set.of());}
+    }
     private final ObjectMapper mapper;
     private final Transport transport;
     private final AnalysisCheckpoints checkpoints;
@@ -35,7 +39,7 @@ final class AdaptiveObservationRequests {
         }
         String submittedSystem=system;
         while(true) {
-            var response=transport.call(submittedSystem,prompt,output);
+            var response=transport instanceof SourceTransport scoped?scoped.call(submittedSystem,prompt,output,allowed):transport.call(submittedSystem,prompt,output);
             try {
                 var result=validate(response,allowed);
                 record(response,submittedSystem,prompt,stage,context,null,"LIVE");

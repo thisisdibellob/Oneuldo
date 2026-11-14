@@ -24,7 +24,7 @@ class ProfileContractRegressionTest {
                 List.of(new AiBehaviorAnalysis.Finding("F1","상품 선택","바나나 1송이를 담았다(R8, R9)",
                         "규격이 목표와 일치한다",List.of(),evidence,"목록 단위와 상품 단위 비교")),
                 List.of(new AiBehaviorAnalysis.SessionAssessment(session,"SUCCESS","목표와 제출 비교",evidence)),
-                List.of(),new AiBehaviorAnalysis.PracticePlan(List.of("F1"),"같은 규격 선택","관찰 연습",2,2,
+                List.of(),new AiBehaviorAnalysis.PracticePlan(List.of("F1"),"같은 규격 선택","변경: 안내에 규격 비교 문장을 추가. 확인: 선택 규격의 일치 여부.",2,2,
                         "LOW","LOW","SIMPLIFIED",List.of("OBSERVATION_PRACTICE")));
     }
     AiUserProfile previous() {
@@ -280,6 +280,26 @@ class ProfileContractRegressionTest {
         assertThat(attempts.getFirst().validationFailure().code()).isEqualTo("PROFILE_EVIDENCE_COUNT_EXCEEDS_LIMIT");
         assertThat(attempts.get(1).inputPrompt()).contains("/findings/0/evidenceEventIds","최대 30개","그 관찰을 실제로 지지하는 근거만 선택");
     }
+    @Test void actual_card_alias_and_array_support_failure_has_specific_feedback_and_preserves_both_responses() {
+        var repository=mock(AiUserProfileRepository.class);
+        when(repository.findFirstByMemberIdAndStatusOrderByCreatedAtDesc(member,"READY")).thenReturn(Optional.of(previous()));
+        when(repository.save(any())).thenAnswer(invocation->invocation.getArgument(0));
+        var broken=draft();broken.putArray("usedEvidenceCardIds").add("R11").add("R12").add("R13");
+        ((ObjectNode)broken.path("findings").get(0)).putArray("suggestedSupport").add("TEXT_GUIDANCE");
+        String original=broken.toString();var client=mock(GroqChatClient.class);
+        when(client.complete(anyString(),anyString(),anyInt(),anyDouble())).thenReturn(
+                new GroqChatClient.GroqChatResult(original,"model","stop",100,100,1L),
+                new GroqChatClient.GroqChatResult(draft().toString(),"model","stop",100,100,1L));
+        var budget=new AnalysisTokenBudget();ReflectionTestUtils.setField(budget,"requestTokens",18000);
+        var service=new AiUserProfileService(repository,new AiUserProfilePromptFactory(mapper),new AiUserProfileValidator(new MarketAiDifficultyValidator()),client,mapper,budget,mock(oneuldo.behaviorlog.personalization.service.PracticeHistoryService.class));
+        assertThat(service.updateFromSession(member,session,current()).status()).isEqualTo("READY");
+        var saved=org.mockito.ArgumentCaptor.forClass(AiUserProfile.class);verify(repository).save(saved.capture());var attempts=saved.getValue().getAttempts();
+        assertThat(attempts).hasSize(2);assertThat(attempts.getFirst().rawOutput()).isEqualTo(original);
+        assertThat(attempts.getFirst().validationFailure().code()).isEqualTo("PROFILE_EVIDENCE_CARD_REFERENCE");
+        assertThat(attempts.get(1).inputPrompt()).contains("/usedEvidenceCardIds","허용 문헌 카드 ID","각각 문자열 하나");
+        verify(client,times(2)).complete(anyString(),anyString(),anyInt(),anyDouble());
+    }
+
     @Test void input_overflow_is_preflight_failure_not_connection_unavailability() {
         var repository=mock(AiUserProfileRepository.class);var current=current();var old=previous();
         when(repository.findFirstByMemberIdAndStatusOrderByCreatedAtDesc(member,"READY")).thenReturn(Optional.of(old));
@@ -294,4 +314,44 @@ class ProfileContractRegressionTest {
         assertThat(saved.getValue().getAttempts().getFirst().source()).isEqualTo("PREFLIGHT");
     }
 
+    @Test void unsupported_profile_cause_repairs_only_prose_without_regenerating_facts_or_plan() {
+        var repository=mock(AiUserProfileRepository.class);var old=previous();var now=current();
+        when(repository.findFirstByMemberIdAndStatusOrderByCreatedAtDesc(member,"READY")).thenReturn(Optional.of(old));
+        when(repository.save(any())).thenAnswer(inv->inv.getArgument(0));
+        var broken=draft();((ObjectNode)broken.path("findings").get(0)).put("interpretation","입력 지연 가능성이 있다");
+        ((ObjectNode)broken.path("findings").get(0)).putArray("alternativeExplanations").add("장바구니 열기가 단순 화면 확인이었을 수 있음");
+        var client=mock(GroqChatClient.class);when(client.supportsGroundedTextPatchSchemas()).thenReturn(true);
+        when(client.complete(anyString(),anyString(),anyInt(),anyDouble())).thenReturn(
+            new GroqChatClient.GroqChatResult(broken.toString(),"model"));
+        when(client.completeStructured(anyString(),anyString(),anyInt(),anyDouble(),any())).thenReturn(new GroqChatClient.GroqChatResult("{\"patches\":{\"/findings/0/interpretation\":\"원인은 기록으로 확인할 수 없다\",\"/findings/0/alternativeExplanations/0\":\"장바구니 조작 목적의 직접 기록은 없다\"}}","model"));
+        var budget=new AnalysisTokenBudget();ReflectionTestUtils.setField(budget,"requestTokens",18000);
+        var service=new AiUserProfileService(repository,new AiUserProfilePromptFactory(mapper),new AiUserProfileValidator(new MarketAiDifficultyValidator()),client,mapper,budget,mock(oneuldo.behaviorlog.personalization.service.PracticeHistoryService.class));
+        var result=service.updateFromSession(member,session,now);assertThat(result.status()).isEqualTo("READY");
+        assertThat(result.profile().practicePlan()).isEqualTo(analysis().practicePlan());
+        assertThat(result.profile().findings().getFirst().evidenceEventIds()).containsExactlyElementsOf(evidence);
+        assertThat(result.profile().findings().getFirst().observation()).isEqualTo("바나나 1송이를 담았다"); // Existing alias normalization strips inline R tags.
+        var saved=org.mockito.ArgumentCaptor.forClass(AiUserProfile.class);verify(repository).save(saved.capture());
+        assertThat(saved.getValue().getAttempts()).hasSize(2);
+        verify(client,times(1)).complete(anyString(),anyString(),anyInt(),anyDouble());
+        verify(client,times(1)).completeStructured(anyString(),anyString(),anyInt(),anyDouble(),any());
+        assertThat(saved.getValue().getAttempts().getLast().source()).isEqualTo("PROFILE_GROUNDED_TEXT_PATCH");
+        assertThat(saved.getValue().getAttempts().getLast().systemPrompt()).isEqualTo(GroundedTextPatch.SYSTEM);
+    }
+
+    @Test void numeric_patch_rejection_retries_prose_and_never_regenerates_the_profile() {
+        var repository=mock(AiUserProfileRepository.class);var old=previous();var now=current();
+        when(repository.findFirstByMemberIdAndStatusOrderByCreatedAtDesc(member,"READY")).thenReturn(Optional.of(old));when(repository.save(any())).thenAnswer(inv->inv.getArgument(0));
+        var broken=draft();((ObjectNode)broken.path("findings").get(0)).put("interpretation","입력 지연 가능성이 있다");
+        var client=mock(GroqChatClient.class);when(client.supportsGroundedTextPatchSchemas()).thenReturn(true);
+        when(client.complete(anyString(),anyString(),anyInt(),anyDouble())).thenReturn(new GroqChatClient.GroqChatResult(broken.toString(),"model"));
+        when(client.completeStructured(anyString(),anyString(),anyInt(),anyDouble(),any())).thenReturn(
+            new GroqChatClient.GroqChatResult("{\"patches\":{\"/findings/0/interpretation\":\"4개 목표 미달성\"}}","model"),
+            new GroqChatClient.GroqChatResult("{\"patches\":{\"/findings/0/interpretation\":\"원인은 기록으로 확인할 수 없다\"}}","model"));
+        var budget=new AnalysisTokenBudget();ReflectionTestUtils.setField(budget,"requestTokens",18000);
+        var service=new AiUserProfileService(repository,new AiUserProfilePromptFactory(mapper),new AiUserProfileValidator(new MarketAiDifficultyValidator()),client,mapper,budget,mock(oneuldo.behaviorlog.personalization.service.PracticeHistoryService.class));
+        var result=service.updateFromSession(member,session,now);assertThat(result.status()).isEqualTo("READY");assertThat(result.profile().practicePlan()).isEqualTo(analysis().practicePlan());
+        var saved=org.mockito.ArgumentCaptor.forClass(AiUserProfile.class);verify(repository).save(saved.capture());assertThat(saved.getValue().getAttempts()).hasSize(3);
+        assertThat(saved.getValue().getAttempts().getLast().inputPrompt()).contains("/findings/0/interpretation","Expected exactly []");
+        verify(client,times(1)).complete(anyString(),anyString(),anyInt(),anyDouble());verify(client,times(2)).completeStructured(anyString(),anyString(),anyInt(),anyDouble(),any());
+    }
 }

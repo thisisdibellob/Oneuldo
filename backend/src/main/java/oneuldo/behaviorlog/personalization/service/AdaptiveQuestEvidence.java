@@ -31,7 +31,10 @@ public final class AdaptiveQuestEvidence {
             // Preserve changing support/input provenance independently of event labels.
             for(String field:List.of("support","error","safety","validity"))if(node.hasNonNull(field))payload.set("recorded_"+field,prune(mapper,node.get(field)));
             var mission=original.path("marketContent").path("sceneSnapshot").path("mission");
-            if(mission.isObject())tasks.addObject().put("sourceEventId",event.behaviorLogId().toString()).set("mission",mission);
+            if(mission.isObject()) {
+                var task=tasks.addObject().put("sourceEventId",event.behaviorLogId().toString());task.set("mission",mission);
+                task.set("actualConditions",actualConditions(mapper,original.path("marketContent").path("sceneSnapshot")));
+            }
             index++;
             if(code.equals("SHOP.MOVEMENT_SAMPLED") || !payload.isEmpty())events.addArray().add("E"+index).add(session.sessionId().toString()).add(event.behaviorLogId().toString())
                 .add(event.elapsedFromSessionStartMs()).add(code).add(payload);
@@ -39,7 +42,36 @@ public final class AdaptiveQuestEvidence {
         root.put("eventCount",index);
         AnalysisSourceContext.addMissionPlanProvenance(mapper,root);
         var refs=new AnalysisReferences(mapper,response);
-        return (ObjectNode)mapper.readTree(refs.encode(mapper.writeValueAsString(root),false));
+        // Use the same prior-AI boundary as analysis/profile generation. Delivered
+        // goals, guidance, mechanics and every original action/position stay intact.
+        var grounded=PriorAiPlanText.withhold(mapper,root);
+        return (ObjectNode)mapper.readTree(refs.encode(mapper.writeValueAsString(grounded),false));
+    }
+    /** Separate literal projection; never rewrite the authored mission or invent missing settings. */
+    static ObjectNode actualConditions(ObjectMapper mapper,JsonNode scene) {
+        var out=mapper.createObjectNode();var starting=scene.path("startingConditions");var runtime=starting.path("runtimeConfig");
+        var geometry=starting.path("geometry");
+        if(geometry.isString())try{geometry=mapper.readTree(geometry.asString());}catch(RuntimeException ignored){geometry=mapper.nullNode();}
+        var settings=geometry.path("config");var plan=out.putObject("runtimePlan");
+        if(settings.isObject()) {
+            var environment=plan.putObject("environment");
+            for(String field:List.of("layoutId","employeeCount","customerCount","pillarCount","chairCount","cashierCount","kioskLane","entranceConstruction"))
+                if(settings.has(field))environment.set(field,settings.get(field).deepCopy());
+            if(settings.path("shelfOrder").isArray())out.putObject("environmentPlan").set("shelfOrder",settings.get("shelfOrder").deepCopy());
+        }
+        for(String field:List.of("stockPerProduct","alarmPenaltyPoints","wrongWayPenaltyPoints","cashierRequestPenaltyPoints"))
+            if(runtime.has(field))plan.set(field,runtime.get(field).deepCopy());
+        if(runtime.path("difficulty").isString())plan.set("matchRule",runtime.get("difficulty").deepCopy());
+        if(runtime.path("learning").isObject()) {
+            var learning=plan.putObject("learning");
+            for(String field:List.of("stockoutProductId","allowSubstitution","budgetChoiceEnabled","choiceBudget","checkoutReviewMode"))
+                if(runtime.path("learning").has(field))learning.set(field,runtime.path("learning").get(field).deepCopy());
+        }
+        if(runtime.path("initialStock").isObject()&&runtime.path("stockPerProduct").isIntegralNumber()) {
+            var overrides=plan.putObject("stockOverrides");
+            for(String id:runtime.path("initialStock").propertyNames())if(!runtime.path("initialStock").get(id).equals(runtime.get("stockPerProduct")))overrides.set(id,runtime.path("initialStock").get(id));
+        }
+        return out;
     }
     public static ObjectNode encode(ObjectMapper mapper,ObjectNode source) {
         var codec=new FinalSourceEncoding(mapper,true);var plain=codec.encode(source);
@@ -48,6 +80,11 @@ public final class AdaptiveQuestEvidence {
         alternative.put("eventColumnEncoding","events.count/data expands original event rows in order: same=common literal, values=per-row, fields=field columns plus rest, dictionary/refs=zero-based original values, groups/positions=original row positions, items=array-position columns, prefix/suffixes=exact string concatenation. Every number, row and order is unchanged.");
         var packed=codec.encode(alternative);
         return QwenTokenCounter.count(packed.toString())<QwenTokenCounter.count(plain.toString())?packed:plain;
+    }
+    public static ObjectNode decodeObservation(ObjectMapper mapper,JsonNode source) {
+        var decoded=source.has("adaptiveTransportVersion")?AdaptiveQuestTransport.decode(mapper,source):new FinalSourceEncoding(mapper).decode(source);
+        if(decoded.has("eventColumnEncoding"))decoded.set("events",new LosslessEventColumns(mapper).decodeValues(decoded.path("events")));
+        return decoded;
     }
     private static JsonNode prune(ObjectMapper mapper,JsonNode source) {
         if(source.isObject()) {

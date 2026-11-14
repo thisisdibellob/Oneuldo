@@ -49,6 +49,10 @@ final class AiUserProfileReferences {
         for (var id : sessions) add(id.toString(), "S" + (++number));
     }
 
+    Object outputSchema() {
+        return oneuldo.ai.client.SourceOutputSchemas.userProfile(originals.keySet().stream().filter(x->x.startsWith("R")).toList(),
+            oneuldo.behaviorlog.analysis.service.EvidenceIndex.retrieve("interface").stream().map(c->c.path("card_id").asString()).toList());
+    }
     String encode(String json) {
         ObjectNode root = (ObjectNode) replace(cleanProse(mapper.readTree(json), ""));
         root.set("allowedEvidenceEventIds", mapper.valueToTree(originals.keySet().stream()
@@ -62,11 +66,31 @@ final class AiUserProfileReferences {
 
     AiUserProfileDraft read(String raw) {
         JsonNode root = mapper.reader().with(DeserializationFeature.FAIL_ON_TRAILING_TOKENS).readTree(raw);
+        if(root.isObject())root=oneuldo.behaviorlog.analysis.service.ConcretePracticeSections.profile(mapper,root);
         if (root instanceof ObjectNode object) {
             // Diagnostic field names only; the complete model output remains in the immutable attempt audit.
             var unknown = object.propertyNames().stream().filter(name -> !OUTPUT_FIELDS.contains(name)).limit(6)
                     .map(AiUserProfileReferences::boundedFieldName).toList();
             if (!unknown.isEmpty()) throw new ReviewEvidenceException("PROFILE_FIELD_NOT_ALLOWED", "/" + unknown.getFirst(), unknown);
+        }
+        if(root.path("usedEvidenceCardIds").isArray()) {
+            var cards=root.path("usedEvidenceCardIds");
+            var allowed=oneuldo.behaviorlog.analysis.service.EvidenceIndex.retrieve("interface").stream()
+                    .map(card->card.path("card_id").asString()).toList();
+            var seen=new java.util.HashSet<String>();
+            for(var card:cards) if(!card.isString() || !allowed.contains(card.asString()) || !seen.add(card.asString()))
+                throw new ReviewEvidenceException("PROFILE_EVIDENCE_CARD_REFERENCE","/usedEvidenceCardIds",List.of());
+            if(cards.size()>8) throw new ReviewEvidenceException("PROFILE_EVIDENCE_CARD_REFERENCE","/usedEvidenceCardIds",List.of());
+        }
+        int fieldIndex = 0;
+        for (var finding : root.path("findings")) {
+            for (String field : List.of("id", "skill", "observation", "interpretation", "suggestedSupport")) {
+                var value = finding.path(field);
+                if (!value.isString() || value.asString().isBlank() || value.asString().length() > 2000)
+                    throw new ReviewEvidenceException("PROFILE_FINDING_TEXT_INVALID",
+                            "/findings/" + fieldIndex + "/" + field, List.of());
+            }
+            fieldIndex++;
         }
         int index = 0;
         for (var finding : root.path("findings")) restoreEvidence(finding, index++);
@@ -98,7 +122,7 @@ final class AiUserProfileReferences {
 
     private JsonNode cleanProse(JsonNode node, String field) {
         if (node.isString() && PROSE.contains(field))
-            return mapper.valueToTree(INLINE_CITATIONS.matcher(node.asString()).replaceAll("").strip());
+            return mapper.valueToTree(INLINE_CITATIONS.matcher(node.asString()).replaceAll("").replaceAll("[（(]\\s*~T[0-9]+\\s*[）)]", "").strip());
         if (node instanceof ObjectNode object) {
             for (String name : new ArrayList<>(object.propertyNames())) object.set(name, cleanProse(object.get(name), name));
         } else if (node instanceof ArrayNode array) {

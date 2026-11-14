@@ -17,6 +17,7 @@ public class MarketAiQuestValidator {
     public static final List<String> SHELF_CATEGORY_IDS = List.of("produce", "fresh", "household", "meal", "drink");
     public static final List<String> SHELF_SLOT_IDS = List.of("northwest", "northeast", "middle-west", "middle-center", "middle-east");
     public static final int ADAPTATION_SUMMARY_MAX_LENGTH = 240;
+    public static final int ADAPTIVE_BRIEFING_MAX_LINES = 5;
 
     public MarketAiQuestDraft validate(MarketAiQuestDraft draft) {
         if (draft == null) throw invalid("빈 결과");
@@ -76,7 +77,7 @@ public class MarketAiQuestValidator {
                         && o.quantity() == objective.quantity())) throw invalid("시나리오 목표");
             }
         }
-        sentences(draft.briefing(), 1, 3, "안내");
+        sentences(draft.briefing(), 1, draft.runtimePlan() == null ? 3 : ADAPTIVE_BRIEFING_MAX_LINES, "안내");
         sentences(draft.checkoutDialogue(), 2, 2, "계산대 대화");
         if (draft.reasonCodes() == null || draft.reasonCodes().isEmpty()
                 || draft.reasonCodes().size() > 8) throw invalid("사유 코드");

@@ -86,7 +86,10 @@ class PracticeHistoryChronologyTest {
         assertThat(profile).hasSize(2);
         assertThat(sessionIds(update)).containsExactly(sessionA.toString(), sessionB.toString());
         assertThat(sessionIds(profile)).containsExactlyElementsOf(sessionIds(update));
-        assertThat(update.get(0).path("recordedPractice")).isEqualTo(profile.get(0).path("recordedPractice"));
+        var currentPractice=(tools.jackson.databind.node.ObjectNode)update.get(0).path("recordedPractice").deepCopy();
+        assertThat(currentPractice.path("sessionSourceLedger").path("sessionId").asString()).isEqualTo(sessionA.toString());
+        currentPractice.remove("sessionSourceLedger");
+        assertThat(currentPractice).isEqualTo(profile.get(0).path("recordedPractice"));
         assertThat(update.get(0).path("sourceDatasetId").asString()).isEqualTo(currentDatasetA.toString());
         assertThat(profile.get(0).path("sourceDatasetId").asString()).isEqualTo(profileDatasetA.toString());
         assertThat(update.toString()).doesNotContain(originalDatasetA.toString());

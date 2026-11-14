@@ -13,6 +13,8 @@ final class AdaptiveQuestTransport {
     private static final String VERSION_FIELD="adaptiveTransportVersion";
     private static final String VERSION="shared-environment-v5";
     private static final String GENERATION_VERSION="shared-environment-v6-original-objects";
+    private static final String GENERATION_COMPACT_VERSION="shared-environment-v7-exact-templates";
+    private static final String GENERATION_BASE_VERSION="adaptiveGenerationBaseVersion";
     private static final String ACTION_ENCODING="readableActionEncoding";
     private static final String ID_REFERENCES="allowedIdReferences";
     private static final List<String> V1_LITERAL_FIELDS = List.of(
@@ -31,7 +33,7 @@ final class AdaptiveQuestTransport {
         var best=encode(mapper,source);int bestTokens=QwenTokenCounter.count(best.toString());
         var numerical=new AdaptiveNumericColumnText(mapper).encode(best);int numericalTokens=QwenTokenCounter.count(numerical.toString());
         if(numericalTokens<bestTokens){best=numerical;bestTokens=numericalTokens;}
-        for(int minimum:List.of(24,48,72,128)){
+        for(int minimum:List.of(8,12,16,20,24,48,72,128)){
             var originals=new AdaptiveOriginalObjectSharing(mapper,minimum).encode(source);
             if(!originals.has(AdaptiveOriginalObjectSharing.DICTIONARY))continue;
             var candidate=encode(mapper,originals);
@@ -42,7 +44,41 @@ final class AdaptiveQuestTransport {
             if(tokens<bestTokens){best=candidate;bestTokens=tokens;}
             if(numericalTokens<bestTokens){best=numerical;bestTokens=numericalTokens;}
         }
+        if(List.of(GENERATION_BASE_VERSION,AdaptiveNumericFragments.FIELD,AdaptiveNumericFragments.RULE_FIELD,AdaptiveNumericFragments.SUFFIX_FIELD,
+                AdaptiveObjectTuples.FIELD,AdaptiveObjectTuples.RULE_FIELD).stream().anyMatch(source::has))return best;
+        var numbersSource=best.has(AdaptiveNumericColumnText.RULE_FIELD)?AdaptiveNumericColumnText.decode(mapper,best):best;
+        var tuples=compactEnvelope(new AdaptiveObjectTuples(mapper).encode(best));
+        int tupleTokens=QwenTokenCounter.count(tuples.toString());if(tupleTokens<bestTokens){best=tuples;bestTokens=tupleTokens;}
+        for(boolean suffixes:List.of(false,true)){
+            var fragments=new AdaptiveNumericFragments(mapper,suffixes).encode(numbersSource);
+            fragments=compactEnvelope(new AdaptiveNumericColumnText(mapper).encode(fragments));
+            int fragmentTokens=QwenTokenCounter.count(fragments.toString());
+            if(fragmentTokens<bestTokens){best=fragments;bestTokens=fragmentTokens;}
+            tuples=compactEnvelope(new AdaptiveObjectTuples(mapper).encode(fragments));tupleTokens=QwenTokenCounter.count(tuples.toString());
+            if(tupleTokens<bestTokens){best=tuples;bestTokens=tupleTokens;}
+        }
         return best;
+    }
+
+    /** Bounded observation transport search: no source selection and no numeric rounding. */
+    static ObjectNode encodeObservation(ObjectMapper mapper,ObjectNode source) {
+        var best=encode(mapper,source);int tokens=QwenTokenCounter.count(best.toString());
+        var candidate=new AdaptiveNumericColumnText(mapper).encode(best);int required=QwenTokenCounter.count(candidate.toString());
+        if(required<tokens){best=candidate;tokens=required;}
+        var numbers=best.has(AdaptiveNumericColumnText.RULE_FIELD)?AdaptiveNumericColumnText.decode(mapper,best):best;
+        for(boolean suffixes:List.of(false,true)) {
+            candidate=compactEnvelope(new AdaptiveNumericColumnText(mapper).encode(new AdaptiveNumericFragments(mapper,suffixes).encode(numbers)));
+            required=QwenTokenCounter.count(candidate.toString());if(required<tokens){best=candidate;tokens=required;}
+        }
+        return best;
+    }
+
+    private static ObjectNode compactEnvelope(ObjectNode value){
+        if(!GENERATION_COMPACT_VERSION.equals(value.path(VERSION_FIELD).asString())&&
+                (value.has(AdaptiveNumericFragments.RULE_FIELD)||value.has(AdaptiveObjectTuples.RULE_FIELD))){
+            value.put(GENERATION_BASE_VERSION,value.path(VERSION_FIELD).asString());value.put(VERSION_FIELD,GENERATION_COMPACT_VERSION);
+        }
+        return value;
     }
 
     static ObjectNode encode(ObjectMapper mapper, ObjectNode source) {
@@ -77,7 +113,17 @@ final class AdaptiveQuestTransport {
     }
 
     static ObjectNode decode(ObjectMapper mapper, JsonNode source) {
+        boolean compactGeneration=GENERATION_COMPACT_VERSION.equals(source.path(VERSION_FIELD).asString());
+        if(compactGeneration){
+            if(!List.of(VERSION,GENERATION_VERSION).contains(source.path(GENERATION_BASE_VERSION).asString())||
+                    !source.has(AdaptiveObjectTuples.RULE_FIELD)&&!source.has(AdaptiveNumericFragments.RULE_FIELD))throw new IllegalArgumentException("INVALID_ADAPTIVE_GENERATION_TEMPLATES");
+            if(source.has(AdaptiveObjectTuples.RULE_FIELD))source=AdaptiveObjectTuples.decode(mapper,(ObjectNode)source);
+        }
         if(source.has(AdaptiveNumericColumnText.RULE_FIELD))source=AdaptiveNumericColumnText.decode(mapper,(ObjectNode)source);
+        if(compactGeneration){
+            if(source.has(AdaptiveNumericFragments.RULE_FIELD))source=AdaptiveNumericFragments.decode(mapper,(ObjectNode)source);
+            var normalized=(ObjectNode)source.deepCopy();normalized.put(VERSION_FIELD,normalized.path(GENERATION_BASE_VERSION).asString());normalized.remove(GENERATION_BASE_VERSION);source=normalized;
+        }
         boolean sharedOriginals=GENERATION_VERSION.equals(source.path(VERSION_FIELD).asString());
         if(sharedOriginals){
             if(!AdaptiveOriginalObjectSharing.RULE.equals(source.path(AdaptiveOriginalObjectSharing.RULE_FIELD).asString()))throw new IllegalArgumentException("INVALID_ADAPTIVE_ORIGINAL_OBJECT_RULE");

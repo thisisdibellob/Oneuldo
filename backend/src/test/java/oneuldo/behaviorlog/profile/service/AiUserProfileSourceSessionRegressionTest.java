@@ -261,7 +261,7 @@ class AiUserProfileSourceSessionRegressionTest {
         return new AiBehaviorAnalysis("프로필 관찰", List.of(new AiBehaviorAnalysis.Finding("F1", "상품 선택",
                 observation, "원본 제출의 관찰이다", List.of(), List.of(event), "목표와 상품 표기를 비교한다")),
                 List.of(new AiBehaviorAnalysis.SessionAssessment(session, "SUCCESS", "원본 제출의 관찰", List.of(event))),
-                List.of(), new AiBehaviorAnalysis.PracticePlan(List.of("F1"), "상품 선택 확인", "실제 제출을 관찰한다", 1, 1,
+                List.of(), new AiBehaviorAnalysis.PracticePlan(List.of("F1"), "흰 우유(milk) 1개 선택 확인", "변경: 제출 안내 문장을 추가한다. 안내: 냉장 매대를 열고 우유 1개를 담아 장바구니를 확인해 주세요. 달성: 우유 1개를 제출한다. 확인: 실제 제출을 관찰한다.", 1, 1,
                         "LOW", "LOW", "SIMPLIFIED", List.of("OBSERVATION_PRACTICE")));
     }
 }

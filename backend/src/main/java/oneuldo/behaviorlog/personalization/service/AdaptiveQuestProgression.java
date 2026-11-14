@@ -15,13 +15,21 @@ final class AdaptiveQuestProgression {
     static JsonNode latestMission(JsonNode evidence) {
         var tasks = evidence.path("recordedTasks");
         for (int n = tasks.size() - 1; n >= 0; n--)
-            if (tasks.get(n).path("mission").isObject()) return tasks.get(n).get("mission");
+            if (tasks.get(n).path("mission") instanceof ObjectNode mission) {
+                var effective=mission.deepCopy();var actual=tasks.get(n).path("actualConditions");
+                for(String field:List.of("runtimePlan","environmentPlan"))if(actual.path(field).isObject()&&!actual.path(field).isEmpty()) {
+                    var merged=effective.path(field) instanceof ObjectNode old?old.deepCopy():new ObjectMapper().createObjectNode();
+                    for(String key:actual.path(field).propertyNames())merged.set(key,actual.path(field).get(key).deepCopy());
+                    effective.set(field,merged);
+                }
+                return effective;
+            }
         return null;
     }
 
     static ObjectNode context(ObjectMapper mapper, JsonNode evidence) {
         var result = mapper.createObjectNode();
-        result.put("scope", "Compare the latest actually played task, not old AI changeReasons. A meaningful new observation must change goals, playable conditions or actual support. Rephrasing, title, rationale and penalty values alone are not progress. Same supported success never proves mastery. Do not raise difficulty automatically.");
+        result.put("scope", "Compare the latest actually played task, not old AI changeReasons. A meaningful new observation must change goals, playable conditions or actual support. Rephrasing, title, rationale, penalty values or budget headroom alone are not progress. Same supported success never proves mastery. Do not raise difficulty automatically.");
         var previous = latestMission(evidence);
         if (previous != null) {
             var task = result.putObject("latestPlayedConditions");
@@ -47,6 +55,9 @@ final class AdaptiveQuestProgression {
             if (!oldValue.equals(newValue)) changes.add("/" + field);
         }
         result.put("sameMechanics", allKnown && changes.isEmpty());
+        // Price headroom alone does not change what is practised. Keep the ordinary
+        // sameMechanics value for audit/backward-compatible review envelopes.
+        result.put("budgetOnlyChange", allKnown && changes.size()==1 && changes.get(0).asString().equals("/budget"));
         result.put("sameInstructionText", previous != null && instructionText(previous).equals(instructionText(candidate)));
         if (previous != null) result.set("previousBriefing", previous.path("briefing").deepCopy());
         result.put("supportScope", "Compare actual instruction meaning. Sentence splits/paraphrases are unchanged support. A concrete cue added or removed may be a meaningful supported practice/check; it does not establish independence or mastery.");
@@ -55,7 +66,7 @@ final class AdaptiveQuestProgression {
 
     static void rejectExactRepeat(ObjectMapper mapper, JsonNode evidence, JsonNode candidate) {
         var compared = comparison(mapper, evidence, candidate);
-        if (compared.path("sameMechanics").asBoolean() && compared.path("sameInstructionText").asBoolean())
+        if ((compared.path("sameMechanics").asBoolean()||compared.path("budgetOnlyChange").asBoolean()) && compared.path("sameInstructionText").asBoolean())
             throw AdaptiveQuestContract.problem("/objectives", "UNCHANGED_RECOMMENDATION");
     }
 
@@ -86,9 +97,11 @@ final class AdaptiveQuestProgression {
                 || !check.path("explanation").isString() || check.path("explanation").asString().isBlank()
                 || check.path("explanation").asString().length() > 500)
             throw AdaptiveQuestContract.problem("/adaptationSummary", "INVALID_PROGRESSION_REVIEW");
-        if (!check.path("questionImplemented").asBoolean()
-                || (compared.path("sameMechanics").asBoolean() && !Set.of("INCREASED", "REDUCED").contains(check.path("supportChange").asString())))
-            return List.of(Map.of("path", "/objectives", "explanation", "직전 과제와 실질적으로 같은 반복이거나 평가 목적이 실제 조건에 구현되지 않았습니다. 목표·조건 또는 실제 지원을 변경하고 관련 설명을 다시 맞추세요.", "sourceEvidenceIds", List.of()));
+        boolean repeatedConditions=(compared.path("sameMechanics").asBoolean()||compared.path("budgetOnlyChange").asBoolean())
+                && !Set.of("INCREASED", "REDUCED").contains(check.path("supportChange").asString());
+        if (!check.path("questionImplemented").asBoolean() || repeatedConditions)
+            return List.of(Map.of("path", "/objectives", "code", repeatedConditions?"UNCHANGED_RECOMMENDATION":"PRACTICE_CONDITIONS_NOT_IMPLEMENTED",
+                    "explanation", "직전 과제와 실질적으로 같은 반복이거나 평가 목적이 실제 조건에 구현되지 않았습니다. 목표·조건 또는 실제 지원을 변경하고 관련 설명을 다시 맞추세요.", "sourceEvidenceIds", List.of()));
         return List.of();
     }
 

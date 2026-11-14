@@ -6,13 +6,13 @@ import tools.jackson.databind.*;
 import tools.jackson.databind.node.*;
 
 /** Concatenates exact JSON number text only; no arithmetic, rounding, deltas or ID aliases. */
-final class AdaptiveNumericColumnText {
-    static final String RULE_FIELD="adaptiveNumericColumnRule";
-    static final String RULE="$nc:[길이,숫자원문]은 정확한 JSON number 배열이다. 길이가 정수면 모든 원문 길이, 문자열이면 각 문자 A=1..Z=26이다. 숫자원문을 그 길이로 순서대로 잘라 JSON number로 복원한다(공백·구분자만 공유). 부호·소수·지수·0·값·타입·순서는 그대로다. $ncl:{...}는 원래 예약키 객체. E사건ID는 숫자행 위치가 아닌 원래 리터럴이며 새 ID를 만들지 않는다.";
+public final class AdaptiveNumericColumnText {
+    public static final String RULE_FIELD="adaptiveNumericColumnRule";
+    public static final String RULE="$nc:[길이,숫자원문]은 정확한 JSON number 배열이다. 길이가 정수면 모든 원문 길이, 문자열이면 각 문자 A=1..Z=26이다. 숫자원문을 그 길이로 순서대로 잘라 JSON number로 복원한다(공백·구분자만 공유). 부호·소수·지수·0·값·타입·순서는 그대로다. $ncl:{...}는 원래 예약키 객체. E사건ID는 숫자행 위치가 아닌 원래 리터럴이며 새 ID를 만들지 않는다.";
     private final ObjectMapper mapper;
     private boolean used;
-    AdaptiveNumericColumnText(ObjectMapper mapper){this.mapper=mapper;}
-    ObjectNode encode(ObjectNode source){
+    public AdaptiveNumericColumnText(ObjectMapper mapper){this.mapper=mapper;}
+    public ObjectNode encode(ObjectNode source){
         if(source.has(RULE_FIELD))throw invalid();
         var result=(ObjectNode)encodeValue(source);
         if(used)result.put(RULE_FIELD,RULE);
@@ -43,7 +43,7 @@ final class AdaptiveNumericColumnText {
         }
         return node.deepCopy();
     }
-    static ObjectNode decode(ObjectMapper mapper,ObjectNode source){
+    public static ObjectNode decode(ObjectMapper mapper,ObjectNode source){
         if(!RULE.equals(source.path(RULE_FIELD).asString()))throw invalid();
         var copy=source.deepCopy();copy.remove(RULE_FIELD);return (ObjectNode)decodeValue(mapper,copy);
     }

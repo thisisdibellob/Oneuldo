@@ -33,15 +33,22 @@ class ActualAdaptiveReviewBudgetTest {
         for(var row:mapper.readTree(Files.readString(Path.of("../output/persona45-mcp-20261013/auditor/input-snapshots.json"))))
             if("bc93a88d-e42c-47ba-b38f-de0881262da1".equals(row.path("id").asString()))input=mapper.treeToValue(row.path("input_data"),BehaviorAnalysisInput.class);
         assertThat(input).isNotNull();var evidence=AdaptiveQuestEvidence.build(mapper,input);
+        // Rebuild the current lossless source projection from the saved immutable input;
+        // old request fixtures predate actualConditions provenance.
+        ((ObjectNode)source.path("recordedEvidence")).set("recordedTasks",evidence.path("recordedTasks"));
+        packed=AdaptiveQuestTransport.encodeGeneration(mapper,source).toString();
         var service=new AdaptiveMarketQuestService(null,null,null,null,null,null,null,null,mapper);
         String review=service.reviewPrompt(source,evidence,candidate,draft,packed);
-        int required=QwenTokenCounter.inputTokens(AdaptiveMarketQuestService.REVIEW_SYSTEM,review)+1000+32;
-        var decoded=AdaptiveQuestTransport.decode(mapper,mapper.readTree(review));
+        int required=QwenTokenCounter.inputTokens(AdaptiveMarketQuestService.reviewSystem(),review)+AdaptiveMarketQuestService.REVIEW_OUTPUT_TOKENS+32;
+        var envelope=mapper.readTree(review);
+        assertThat(envelope.path("literalDeliveryFacts").path("scope").asString()).contains("FUTURE");
+        var decoded=AdaptiveQuestTransport.decode(mapper,envelope.path("sourceAndCandidate"));
         assertThat(decoded.path("candidate")).isEqualTo(candidate);
         assertThat(decoded.path("citedOriginalRecords")).isEqualTo(service.citedOriginalRecords(evidence,candidate));
         for(String field:List.of("sourceEventDetails","navigationContext","recordedTasks"))
             assertThat(decoded.path("originalSource").path("recordedEvidence").path(field)).isEqualTo(evidence.path(field));
-        Files.writeString(Path.of("../output/persona45-mcp-20261013/actual-adaptive-review-budget.json"),mapper.writerWithDefaultPrettyPrinter().writeValueAsString(Map.of("previousActualRequiredTokens",25889,"requiredTokens",required,"limit",24000,"allOriginalSourcesAndCandidatePreserved",true,"noModelCallOrNewPlay",true)));
+        var out=Path.of("build/test-records");Files.createDirectories(out);
+        Files.writeString(out.resolve("actual-adaptive-review-budget.json"),mapper.writerWithDefaultPrettyPrinter().writeValueAsString(Map.of("previousActualRequiredTokens",25889,"requiredTokens",required,"limit",24000,"allOriginalSourcesAndCandidatePreserved",true,"noModelCallOrNewPlay",true)));
         assertThat(required).isLessThanOrEqualTo(24000);
     }
 }

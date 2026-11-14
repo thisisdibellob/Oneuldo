@@ -64,7 +64,7 @@ class EmbeddedMissionPlanProvenanceTest {
         assertThat(AdaptiveQuestTransport.decode(mapper,AdaptiveQuestTransport.encode(mapper,outer))).isEqualTo(outer);
     }
 
-    @Test void every_analysis_source_builder_keeps_the_original_plan_and_marks_its_present_paths() {
+    @Test void builders_preserve_the_snapshot_and_mechanics_with_explicit_prior_ai_text_exclusions() {
         var input = synthetic(true); var prompts = new AiBehaviorAnalysisPromptFactory(mapper);
         var tables = new LosslessTables(mapper);
         for (String prompt : List.of(prompts.userPrompt(input),prompts.observationPrompt(input,input),prompts.wholeSourcePrompt(input))) {
@@ -72,12 +72,17 @@ class EmbeddedMissionPlanProvenanceTest {
             assertPresentPaths(source);
             var expanded = new CompactBehaviorTimeline(mapper).decodeExpanded(source.path("behaviorTimeline"));
             var expected = mapper.valueToTree(input.input()).at("/sessions/0/events/0/payload/marketContent/sceneSnapshot/mission/observationPlan");
-            assertThat(expanded.at("/sessions/0/events/0/payload/marketContent/sceneSnapshot/mission/observationPlan")).isEqualTo(expected);
+            if(source.has(PriorAiPlanText.FIELD)) {
+                var copy=expected.deepCopy();((ObjectNode)copy).remove("behaviorObservation");
+                assertThat(expanded.at("/sessions/0/events/0/payload/marketContent/sceneSnapshot/mission/observationPlan")).isEqualTo(copy);
+            } else assertThat(expanded.at("/sessions/0/events/0/payload/marketContent/sceneSnapshot/mission/observationPlan")).isEqualTo(expected);
         }
         var refs = new AnalysisReferences(mapper,input);
         String synthesis = AnalysisSynthesisPrompt.build(mapper,prompts,input,List.of(),refs,false);
         String review = AnalysisReviewPrompt.build(mapper,synthesis,null,refs);
         var expected = refs.reviewSource().at("/sessions/0/events/0/payload/marketContent/sceneSnapshot/mission/observationPlan");
+        assertThat(expected.path("behaviorObservation").asString()).contains("이전 즉석밥");
+        expected=expected.deepCopy();((ObjectNode)expected).remove("behaviorObservation");
         for (String prompt : List.of(synthesis,review)) {
             var source = new FinalSourceEncoding(mapper).decode(mapper.readTree(prompt));
             assertPresentPaths(source);
@@ -125,7 +130,7 @@ class EmbeddedMissionPlanProvenanceTest {
         for (var part : parts) {
             positions += part.source().path("events").size();
             assertThat(part.requiredTokens()).isLessThanOrEqualTo(24000);
-            var decoded = new FinalSourceEncoding(mapper).decode(mapper.readTree(part.prompt()));
+            var decoded = AdaptiveQuestEvidence.decodeObservation(mapper,mapper.readTree(part.prompt()));
             assertThat(decoded.path(FIELD)).isEqualTo(evidence.path(FIELD));
             assertThat(decoded.at("/recordedTasks/0/mission/observationPlan")).isEqualTo(plan);
             rows.addObject().put("part",part.source().path("movementObservationScope").path("part").asInt()).put("requiredTokens",part.requiredTokens())

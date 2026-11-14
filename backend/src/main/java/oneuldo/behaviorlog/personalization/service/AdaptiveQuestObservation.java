@@ -31,7 +31,7 @@ final class AdaptiveQuestObservation {
                 // Include this exact ID/action table in the same reversible columns/dictionary,
                 // rather than appending a second unencoded copy after the source is packed.
                 source.set("readableActions", readableActions);
-                var wire = AdaptiveQuestEvidence.encode(mapper, source);
+                var wire = AdaptiveQuestTransport.encodeObservation(mapper, source);
                 String prompt = mapper.writeValueAsString(wire);
                 int required = QwenTokenCounter.inputTokens(AdaptiveMarketQuestService.OBSERVATION_SYSTEM, prompt) + OUTPUT_TOKENS + 32 + AdaptiveObservationRequests.REPAIR_RESERVE_TOKENS;
                 largest = Math.max(largest, required);

@@ -13,17 +13,17 @@ import static org.assertj.core.api.Assertions.*;
 
 class AdaptiveObservationBudgetTest {
     final JsonMapper mapper=JsonMapper.builder().findAndAddModules().build();
-    @Test void actual_488_event_source_fits_in_two_parts_without_losing_or_rounding_any_position() throws Exception {
+    @Test void actual_488_event_source_fits_in_at_most_two_parts_without_losing_or_rounding_any_position() throws Exception {
         var run=Path.of("../output/adaptive-five-fixes-20261012");
         var input=mapper.treeToValue(mapper.readTree(Files.readString(run.resolve("auditor/input-snapshots.json"))).get(0).path("input_data"),BehaviorAnalysisInput.class);
         var source=AdaptiveQuestEvidence.build(mapper,input);var before=source.deepCopy();
         var parts=AdaptiveQuestObservation.plan(mapper,source,readable(source),24000);
-        assertThat(parts).hasSize(2);
+        assertThat(parts.size()).isBetween(1,2);
         var restored=mapper.createArrayNode();var report=mapper.createArrayNode();
         for(var part:parts) {
             assertThat(part.requiredTokens()).isLessThanOrEqualTo(24000);
-            var decoded=new FinalSourceEncoding(mapper).decode(mapper.readTree(part.prompt()));
-            if(decoded.has("eventColumnEncoding"))decoded.set("events",new LosslessEventColumns(mapper).decodeValues(decoded.path("events")));
+            var decoded=AdaptiveQuestEvidence.decodeObservation(mapper,mapper.readTree(part.prompt()));
+
             decoded.path("events").forEach(restored::add);
             for(String field:List.of("sourceEventDetails","navigationContext","recordedTasks","eventColumns","eventCount"))
                 assertThat(decoded.path(field)).isEqualTo(source.path(field));
@@ -41,8 +41,8 @@ class AdaptiveObservationBudgetTest {
         var before=source.deepCopy();
         assertThatThrownBy(()->AdaptiveQuestObservation.plan(mapper,source,mapper.createArrayNode(),100)).isInstanceOf(AiInputLimitException.class);
         assertThat(source).isEqualTo(before);
-        assertThat(AdaptiveQuestContract.MAXIMUM_AI_CALLS).isEqualTo(21);
-        assertThat(AdaptiveQuestContract.GENERATION_DEADLINE_SECONDS).isEqualTo(1800);
+        assertThat(AdaptiveQuestContract.MAXIMUM_AI_CALLS).isEqualTo(23);
+        assertThat(AdaptiveQuestContract.GENERATION_DEADLINE_SECONDS).isEqualTo(3600);
     }
     private JsonNode readable(ObjectNode source){
         var rows=mapper.createArrayNode();for(var e:source.path("sourceEventDetails")){

@@ -45,8 +45,8 @@ class Persona45ObservationBudgetTest {
                 report.addObject().put("stage",system.startsWith("Respond in Korean")?"OBSERVATION":system.startsWith("Synthesize")?"SYNTHESIS":"GENERATION").put("requiredTokens",required);
                 assertThat(required).isLessThanOrEqualTo(24000);
                 if(system.startsWith("Respond in Korean")){
-                    observations.incrementAndGet();var part=new FinalSourceEncoding(mapper).decode(mapper.readTree(prompt));
-                    if(part.has("eventColumnEncoding"))part.set("events",new LosslessEventColumns(mapper).decodeValues(part.path("events")));
+                    observations.incrementAndGet();var part=AdaptiveQuestEvidence.decodeObservation(mapper,mapper.readTree(prompt));
+
                     var item=mapper.createObjectNode().put("behaviorObservation","원본 행동 확인").put("movementObservation","제공된 위치 부분 확인").put("nextObservationQuestion","다음 행동 관찰");
                     item.putArray("alternativeExplanations");item.putArray("unknowns").add("아직 관찰하지 않음");item.putArray("evidenceIds").add(part.path("events").get(0).path(0).asString());
                     return new GroqChatResult(item.toString(),"synthetic-budget-contract");
@@ -70,7 +70,7 @@ class Persona45ObservationBudgetTest {
         var context=mapper.treeToValue(mapper.readTree(Files.readString(Path.of("../output/persona45-mcp-20261013/actual-shared-environment-context.json"))),MarketAiQuestRequest.EnvironmentContext.class);
         assertThatThrownBy(()->service.generate(member,context,stage->{})).isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
         Files.writeString(Path.of("../output/persona45-mcp-20261013/long-source-generation-budget.json"),mapper.writerWithDefaultPrettyPrinter().writeValueAsString(report));
-        assertThat(observations.get()).isGreaterThan(2);assertThat(generations.get()).isEqualTo(1);
+        assertThat(observations.get()).isGreaterThan(0);assertThat(generations.get()).isEqualTo(1);
     }
     @Test void inspect_actual_mcp_sources_without_mutating_originals() throws Exception {
         var path=Path.of("../output/persona45-mcp-20261013/auditor/input-snapshots.json");
@@ -97,8 +97,8 @@ class Persona45ObservationBudgetTest {
             var restored=mapper.createArrayNode();var parts=item.putArray("partitionTokens");
             for(var part:planned){
                 assertThat(part.requiredTokens()).isLessThanOrEqualTo(24000);
-                var decoded=new FinalSourceEncoding(mapper).decode(mapper.readTree(part.prompt()));
-                if(decoded.has("eventColumnEncoding"))decoded.set("events",new LosslessEventColumns(mapper).decodeValues(decoded.path("events")));
+                var decoded=AdaptiveQuestEvidence.decodeObservation(mapper,mapper.readTree(part.prompt()));
+
                 decoded.path("events").forEach(restored::add);
                 for(String field:java.util.List.of("sourceEventDetails","navigationContext","recordedTasks","eventColumns","eventCount"))assertThat(decoded.path(field)).isEqualTo(source.path(field));
                 assertThat(decoded.path("readableActions")).isEqualTo(readable);

@@ -11,7 +11,7 @@ import tools.jackson.databind.ObjectMapper;
 
 @Component
 public class AiUserProfilePromptFactory {
-    public static final String VERSION = "incremental-user-profile-v21-compact-rules";
+    public static final String VERSION = "incremental-user-profile-v54-source-consistency";
     private final ObjectMapper mapper;
 
     public AiUserProfilePromptFactory(ObjectMapper mapper) { this.mapper = mapper; }
@@ -20,10 +20,13 @@ public class AiUserProfilePromptFactory {
         var original = (tools.jackson.databind.node.ObjectNode)mapper.readTree(prompt);
         var root = mapper.createObjectNode();
         root.set("promptVersion", original.path("promptVersion"));
-        root.put("sourcePriority", "먼저 실제 과제·제출·지원 원본을 확인한다. currentAnalysis도 AI 해석이며 원본과 충돌하면 정정한다. "
+        root.put("sourcePriority", "먼저 실제 과제·제출·지원 원본을 확인한다. historyOutcomeSources의 장바구니와 목표별 실제 수량은 과거 결과의 직접 원본이다. 빈 장바구니·선택 수량 없음인데 과거 목표를 정확히 구매·완료·성공했다고 쓰지 않는다. 제출이나 FLOW_FINISHED는 목표 성공이 아니다. ~T숫자는 전송 인코딩 표기이며 세션 이름으로 복사하지 않는다. currentAnalysis도 AI 해석이며 원본과 충돌하면 정정한다. "
                 + "previousProfile은 과거 AI가 작성한 관찰 요약의 간접 보고이며 원본 행동 기록이 아니다. 재분석·과거 동일 출처의 재해석 이력·출처 이력 미확인 갱신에서는 이전 관찰 문장도 제외했다. "
                 + "이전 요약·인지 해석·대안 설명·불확실성·연습 계획·지원 제안은 입력에서 제외했다. 실제 적용된 지원은 recordedPractice에서 확인한다.");
+        root.put("groundedPracticeContractVersion", "v1");
+        root.set("implementedSupportCapabilities", oneuldo.behaviorlog.analysis.service.SourceBoundReviewChecks.promptCapabilities(mapper));
         root.set("currentTaskComparisonSource", currentTaskComparisonSource(history));
+        root.put("sessionSourceLedgerRule", oneuldo.behaviorlog.analysis.service.SessionSourceLedger.RULE);
         root.put("currentTaskComparisonScope", "이번 분석 대상 실제 플레이의 목표별 허용 상품·규격·수량, 제출, 제공된 문장을 나란히 복사한 원본 자료다. "
                 + "성패나 일치 여부를 계산한 표가 아니다. 허용 목록에 없는 ID를 과거 AI 설명 때문에 포함됐다고 추가하지 않는다. "
                 + "판매 중인 상품이나 제출 가능한 상품이라는 사실과 목표의 허용 상품이라는 조건을 구분한다. 근거 인용 권한을 추가하는 자료가 아니다.");
@@ -44,6 +47,8 @@ public class AiUserProfilePromptFactory {
                 + "orderingScope=PROFILE_LINK_ORDER_SOURCE_TIME_MISSING이면 원본 시작 시각 일부가 없어 프로필 연결 순서만 유지했다. 이 순서를 실제 플레이 발생 순서나 전후 학습 변화로 단정하지 않는다. "
                 + "playOrder는 자료 배열의 순번이며 새 플레이·추가 성공·숙달 횟수가 아니다. 이번 분석 대상 플레이와 다른 실제 플레이를 구분하고 원본 시각이 있을 때만 실제 이전·이후로 설명한다. "
                 + "본문에 세션 UUID나 S/R 번호, 번호 범위를 나열하지 않는다. 장바구니 열기는 열었다고만 적는다. 내용을 확인했다/식별하지 못했다는 인지 과정으로 바꾸지 않는다. 실제 제출 상품이 목표와 달랐다는 관측 결과를 설명한다. 한 품목을 먼저 연습하더라도 다른 품목 오류가 해결된 것으로 지우지 않는다. 연습 효과는 아직 검증되지 않은 가설로 남긴다.");
+        root.set("retrievedKnowledge", oneuldo.behaviorlog.analysis.service.KnowledgeRetrieval.retrieve(root.path("practiceHistory")));
+        oneuldo.behaviorlog.analysis.service.PracticeDesignContract.attach(mapper,root,root.path("currentTaskComparisonSource"));
         return mapper.writeValueAsString(oneuldo.behaviorlog.analysis.service.LosslessHistoryEncoding.encode(mapper, root));
     }
 
@@ -55,13 +60,16 @@ public class AiUserProfilePromptFactory {
             var practice = play.path("recordedPractice");
             if (!practice.isObject()) continue;
             var row = result.addObject();
+            if (play.has("sessionId")) row.set("sessionId", play.get("sessionId"));
+            if (practice.has(oneuldo.behaviorlog.analysis.service.SessionSourceLedger.FIELD))
+                row.set(oneuldo.behaviorlog.analysis.service.SessionSourceLedger.FIELD, practice.get(oneuldo.behaviorlog.analysis.service.SessionSourceLedger.FIELD));
             if (play.has("playOrder")) row.set("playOrder", play.get("playOrder").deepCopy());
             var requirements = row.putArray("requirements");
             var instructions = row.putArray("providedText");
             for (var task : practice.path("tasks")) {
                 var mission = task.path("mission");
                 var requirement = mapper.createObjectNode();
-                for (String field : java.util.List.of("objectives", "budget", "timeLimitSeconds"))
+                for (String field : java.util.List.of("objectives", "budget", "timeLimitSeconds", "catalogVersion", "briefing"))
                     if (mission.has(field)) requirement.set(field, mission.get(field).deepCopy());
                 if (!requirement.isEmpty()) requirements.add(requirement);
                 var text = mapper.createObjectNode();
@@ -85,8 +93,9 @@ public class AiUserProfilePromptFactory {
     }
 
     public String systemPrompt() {
-        return "출력은 summary, findings, uncertainties, practicePlan, usedEvidenceCardIds라는 최상위 필드 5개만 가진 JSON 객체다. "
+        return oneuldo.behaviorlog.analysis.service.GroundedPracticeContract.RULE + "ONE-LINE JSON. 출력은 summary, findings, uncertainties, practicePlan, usedEvidenceCardIds라는 최상위 필드 5개만 가진 JSON 객체다. "
                 + "sessionAssessments는 currentAnalysis의 입력 분석값이며 프로필 출력에 포함하지 않는다. 별도 analysis/result 같은 외부 감싸기 필드도 만들지 않는다. "
+                + "각 finding의 필수 필드는 id, skill, observation, interpretation, alternativeExplanations, evidenceEventIds, suggestedSupport입니다. id/skill/observation/interpretation/suggestedSupport는 각각 비어 있지 않은 문자열이며 suggestedSupport를 생략하지 마세요. alternativeExplanations와 evidenceEventIds만 배열입니다. "
                 + "출력 계약: 각 finding의 evidenceEventIds 배열은 실제로 인용할 R 번호 1~30개다. "
                 + "allowedEvidenceEventIds는 선택 가능한 목록이지 모두 출력해야 하는 목록이 아니다. "
                 + "한 관찰에 목록 전체를 붙이지 말고 해당 관찰을 지지하는 근거를 선택한다. "
@@ -101,7 +110,7 @@ public class AiUserProfilePromptFactory {
                 + "프로필 버전·분석 ID·데이터셋 ID 변경은 추가 플레이가 아니며 이전 해석과 현재 해석을 반복 성공·재현·안정적 유지·새 학습·숙달 근거로 합치지 않는다. "
                 + "근거는 allowedEvidenceEventIds의 R 번호만 인용한다. 문장 속 옛 E/R 번호는 인용하지 않는다. 본문에 번호를 반복하지 말고 evidenceEventIds에만 쓴다. "
                 + oneuldo.behaviorlog.analysis.service.AnalysisSourceContext.TIMING
-                + "기존 또는 새 분석의 심리적 추측을 사실로 누적하지 않는다. 해석은 원본 행동과 과제 목표의 관계를 설명하고 직접 근거 없는 이해·동기는 uncertainties에 남긴다. 사용자의 개인정보를 출력하지 않는다. 한국어 JSON 객체 하나만 출력한다.";
+                + "기존 또는 새 분석의 심리적 추측을 사실로 누적하지 않는다. 해석은 원본 행동과 과제 목표의 관계를 설명하고 직접 근거 없는 이해·동기 후보는 만들지 않고 원인 미확인만 적는다. 사용자의 개인정보를 출력하지 않는다. 한국어 JSON 객체 하나만 출력한다.";
     }
 
     public String userPrompt(AiUserProfile previous, AiBehaviorAnalysisResponse current) {
@@ -197,7 +206,7 @@ public class AiUserProfilePromptFactory {
                 "summary", "누적 관찰 요약",
                 "findings", new Object[]{Map.of(
                         "id", "F1", "skill", "관찰된 생활기술", "observation", "누적 관찰 사실",
-                        "interpretation", "확인이 필요한 가설", "alternativeExplanations", new String[]{},
+                        "interpretation", "관찰 행동과 과제 요구의 관계", "alternativeExplanations", new String[]{},
                         "evidenceEventIds", new String[]{"R1"}, "suggestedSupport", "지원 제안")},
                 "uncertainties", new String[]{"자료 한계"},
                 "practicePlan", Map.of(

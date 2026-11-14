@@ -28,7 +28,7 @@ public class PracticeHistoryService {
         for (var assessment : current.analysis().sessionAssessments()) {
             if (entries.size() == MAX_DISTINCT_SESSIONS) break;
             if (seen.add(assessment.sessionId()))
-                entries.add(entry(member, current.datasetId(), assessment.sessionId(), current.analysis()));
+                entries.add(entry(member, current.datasetId(), assessment.sessionId(), current.analysis(), true));
         }
         collect(member, previous, seen, entries);
         return chronological(entries, current.analysis().sessionAssessments().stream().map(a -> a.sessionId()).collect(java.util.stream.Collectors.toSet()));
@@ -42,19 +42,54 @@ public class PracticeHistoryService {
         return chronological(entries, Set.of(current.sourceSessionId()));
     }
 
+    /** Literal outcome source values, not SUCCESS/FAILURE decisions or new citation grants. */
+    @Transactional(readOnly = true)
+    public ArrayNode outcomeSources(UUID member, tools.jackson.databind.JsonNode historyRows) {
+        var result=mapper.createArrayNode();
+        if(historyRows==null)return result;
+        for(var row:historyRows) {
+            UUID dataset=UUID.fromString(row.path("sourceDatasetId").asString());
+            String session=row.path("sessionId").asString();
+            var snapshot=snapshots.findByIdAndMemberId(dataset,member);
+            if(snapshot.isEmpty())continue;
+            for(var ledger:SessionSourceLedger.build(mapper,BehaviorAnalysisInputResponse.from(snapshot.get()))) {
+                if(!session.equals(ledger.path("sessionId").asString()))continue;
+                var facts=result.addObject().put("sessionId",session).put("sourceDatasetId",dataset.toString());
+                var terminals=facts.putArray("terminalEvents");
+                for(var original:ledger.path("terminalRecords")) {
+                    var event=terminals.addObject();
+                    for(String field:List.of("sourceEventId","eventCode","recordedOwner","cart","objectiveProgress"))
+                        if(original.hasNonNull(field))event.set(field,original.path(field).deepCopy());
+                }
+            }
+        }
+        return result;
+    }
+
+    /** Current-session literal SKU conditions, without extra behavioral citation permissions. */
+    @Transactional(readOnly = true)
+    public ArrayNode currentProductSources(UUID member,UUID dataset,UUID session) {
+        var snapshot=snapshots.findByIdAndMemberId(dataset,member);if(snapshot.isEmpty())return mapper.createArrayNode();
+        var raw=mapper.valueToTree(BehaviorAnalysisInputResponse.from(snapshot.get()).input());
+        var selected=mapper.createObjectNode();var sessions=selected.putArray("sessions");
+        for(var row:raw.path("sessions"))if(session.toString().equals(row.path("sessionId").asString()))sessions.add(row);
+        var view=mapper.createObjectNode();oneuldo.behaviorlog.analysis.service.PracticeDesignContract.attach(mapper,view,selected);
+        return view.path("practiceProductSources").isArray()?(ArrayNode)view.path("practiceProductSources"):mapper.createArrayNode();
+    }
+
     private void collect(UUID member, AiUserProfile profile, Set<UUID> seen, List<ObjectNode> entries) {
         var visited = new HashSet<UUID>();
         // Reanalysis versions of one session must not masquerade as repeated plays.
         for (int depth = 0; profile != null && entries.size() < MAX_DISTINCT_SESSIONS && depth < 100; depth++) {
             if (!member.equals(profile.getMemberId()) || !visited.add(profile.getId())) break;
             if (seen.add(profile.getSourceSessionId()))
-                entries.add(entry(member, profile.getSourceDatasetId(), profile.getSourceSessionId(), profile.getProfile()));
+                entries.add(entry(member, profile.getSourceDatasetId(), profile.getSourceSessionId(), profile.getProfile(), false));
             var previousId = profile.getPreviousProfileId();
             profile = previousId == null ? null : profiles.findByIdAndMemberIdAndStatus(previousId, member, "READY").orElse(null);
         }
     }
 
-    private ObjectNode entry(UUID member, UUID dataset, UUID session, AiBehaviorAnalysis analysis) {
+    private ObjectNode entry(UUID member, UUID dataset, UUID session, AiBehaviorAnalysis analysis, boolean includeLedger) {
         var row = mapper.createObjectNode();
         row.put("sessionId", session.toString());
         row.put("sourceDatasetId", dataset.toString());
@@ -66,7 +101,10 @@ public class PracticeHistoryService {
         row.put("sourceAvailable", snapshot.isPresent());
         if (snapshot.isPresent()) {
             var input = BehaviorAnalysisInputResponse.from(snapshot.get());
-            row.set("recordedPractice", project(mapper, input, session));
+            var practice=project(mapper, input, session);
+            if(includeLedger) for(var facts:SessionSourceLedger.build(mapper,input))
+                if(session.toString().equals(facts.path("sessionId").asString())) { practice.set(SessionSourceLedger.FIELD,facts); break; }
+            row.set("recordedPractice", practice);
             input.input().sessions().stream().filter(s -> session.equals(s.sessionId())).findFirst().ifPresent(s -> {
                 if (s.startedAt() != null) row.put("recordedSessionStartedAt", s.startedAt().toString());
                 if (s.endedAt() != null) row.put("recordedSessionEndedAt", s.endedAt().toString());

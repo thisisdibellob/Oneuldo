@@ -26,6 +26,14 @@ class AdaptiveQuestProgressionTest {
         assertThat(AdaptiveQuestProgression.latestMission(source)).isEqualTo(current);
         assertThatThrownBy(()->AdaptiveQuestProgression.rejectExactRepeat(mapper,source,current)).isInstanceOf(MarketQuestValidationException.class);
     }
+    @Test void budget_only_repeat_is_rejected_even_with_more_headroom(){
+        var previous=task();var next=task();next.put("budget",previous.path("budget").asInt()+4000);
+        assertThat(AdaptiveQuestProgression.comparison(mapper,evidence(previous),next).path("budgetOnlyChange").asBoolean()).isTrue();
+        assertThatThrownBy(()->AdaptiveQuestProgression.rejectExactRepeat(mapper,evidence(previous),next)).isInstanceOf(MarketQuestValidationException.class);
+        next.putArray("briefing").add("동일한 안내를 바꾸어 말해요");
+        assertThat(AdaptiveQuestProgression.reviewIssues(mapper,evidence(previous),next,review(false,"UNCHANGED",true))).hasSize(1);
+        assertThat(AdaptiveQuestProgression.reviewIssues(mapper,evidence(previous),next,review(false,"INCREASED",true))).isEmpty();
+    }
     @Test void real_product_or_environment_change_is_visible_in_literal_comparison(){
         var previous=task();var next=task();((ObjectNode)next.path("objectives").get(1)).put("productId","water");
         var result=AdaptiveQuestProgression.comparison(mapper,evidence(previous),next);
@@ -41,6 +49,13 @@ class AdaptiveQuestProgressionTest {
         var previous=task();var next=task();next.putArray("briefing").add("목표 상품과 수량만 확인해요");
         assertThat(AdaptiveQuestProgression.reviewIssues(mapper,evidence(previous),next,review(true,"REDUCED",true))).isEmpty();
         assertThat(AdaptiveQuestProgression.reviewIssues(mapper,evidence(previous),next,review(true,"INCREASED",true))).isEmpty();
+    }
+    @Test void an_unimplemented_question_identifies_the_condition_repair_scope() {
+        var previous=task();((ObjectNode)previous.at("/runtimePlan/environment")).put("employeeCount",1);
+        var next=previous.deepCopy();((ObjectNode)next.at("/runtimePlan/environment")).put("employeeCount",2);
+        var issues=AdaptiveQuestProgression.reviewIssues(mapper,evidence(previous),next,review(false,"UNCHANGED",false));
+        assertThat(issues).hasSize(1);
+        assertThat(issues.get(0).get("code")).isEqualTo("PRACTICE_CONDITIONS_NOT_IMPLEMENTED");
     }
     @Test void changed_task_still_must_implement_the_observation_question(){
         var previous=task();var next=task();next.put("budget",8000);
