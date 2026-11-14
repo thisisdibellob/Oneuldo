@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "date": "2026-10-24",
+  "files": {
+    "briefing.md": "11e865953ea63a1ab3a70c182c4410fcda73b452feb6995dacdfdd50dfe98448",
+    "existing-source-cards.json": "7c67b159e7841ae66dba6736c97d67d3a759325fa7f66f508268042c5ad1d0d9"
+  },
+  "source_audit": "docs/ai/research/intellectual-disability/reading-audit.json",
+  "purpose": "reference context, not weight training"
+}
