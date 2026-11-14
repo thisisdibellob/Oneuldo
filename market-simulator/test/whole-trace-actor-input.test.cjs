@@ -75,7 +75,7 @@ test('actor input CLI writes input and fixed instructions and never overwrites',
   assert.equal(summary.requestId, response.requestId);
   assert.deepEqual(summary.omittedBundleKeys, ['worldReference', 'choiceCatalog', 'sourceFiles']);
   assert.equal(JSON.parse(fs.readFileSync(output, 'utf8')).bundle.worldReference, undefined);
-  assert.equal(summary.actorInstructions.templateId, 'authoring-v1');
+  assert.equal(summary.actorInstructions.templateId, 'authoring-v3');
   const instructions = fs.readFileSync(path.join(directory, 'actor-instructions.txt'), 'utf8');
   assert.equal(summary.actorInstructions.sha256, crypto.createHash('sha256').update(instructions).digest('hex'));
   assert.ok(instructions.startsWith(`Your slot directory is ${directory}.`));
@@ -113,4 +113,31 @@ test('authoring-v1 template reproduces the instruction S used in past experiment
     '48eafa534f2ff71abc2db43a5ae9c8e3e9c2f5611e23d281f8988d38ef633d94');
   assert.throws(() => renderActorInstructions('authoring-v0', '/tmp/x'), /Unknown/);
   assert.throws(() => renderActorInstructions('authoring-v1', 'relative/slot'), /absolute/);
+});
+
+test('authoring-v2 is v1 plus only the continuation and limited-view paragraph', () => {
+  const v1 = fs.readFileSync(INSTRUCTION_TEMPLATES['authoring-v1'], 'utf8');
+  const v2 = fs.readFileSync(INSTRUCTION_TEMPLATES['authoring-v2'], 'utf8');
+  const anchor = 'For final delivery call finish_and_submit_whole_trace';
+  const [before, after] = v2.split(anchor);
+  assert.ok(before.startsWith(v1.split(anchor)[0]));
+  assert.equal(after, v1.split(anchor)[1]);
+  const added = before.slice(v1.split(anchor)[0].length);
+  assert.match(added, /Do not shorten it to a trivial valid trace/);
+  assert.match(added, /not by itself a reason to stop/);
+  assert.match(added, /voluntary giveUp remains allowed/);
+  assert.match(added, /no minimum number of actions/);
+});
+
+test('authoring-v3 is v2 plus only the relative-direction sentences', () => {
+  const v2 = fs.readFileSync(INSTRUCTION_TEMPLATES['authoring-v2'], 'utf8');
+  const v3 = fs.readFileSync(INSTRUCTION_TEMPLATES['authoring-v3'], 'utf8');
+  const anchor = 'A voluntary giveUp remains allowed';
+  const [before, after] = v3.split(anchor);
+  assert.ok(before.startsWith(v2.split(anchor)[0]));
+  assert.equal(after, v2.split(anchor)[1]);
+  const added = before.slice(v2.split(anchor)[0].length);
+  assert.match(added, /relative to where the person stands now/);
+  assert.match(added, /may lie in a different direction or be out of view/);
+  assert.doesNotMatch(added, /checkout|south|exit/i);
 });

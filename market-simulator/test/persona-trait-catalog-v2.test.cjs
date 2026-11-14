@@ -42,7 +42,7 @@ test('v2 legacy mapping keeps original five values and explicit individual first
 
 test('v1 authored hashes remain exact and schema version selects the matching validation catalog', () => {
   const versions = {
-    'mild-intellectual-disability-adult':'traits-2-a32fe2aeb633',
+    'mild-intellectual-disability-adult':'traits-2-80fbd739bd14',
     'careful-checker':'traits-2-8899934fa60e',
     'quick-decider':'traits-2-e8893d3d7947',
     'neutral-adult-control':'traits-2-d39e506b180d',

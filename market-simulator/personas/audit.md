@@ -9,8 +9,8 @@
 | 원자료1: 사용자가 제공한 역할 요청 | [persona-role-request.ko.md](references/persona-role-request.ko.md) | 설명·요청사항·8개 원칙을 그대로 저장. 출처 설명은 원문 밖의 메타데이터에 기록 |
 | 원자료2: 행동 이해 자료 | [intellectual-disability-behavior-analysis.ko.md](references/intellectual-disability-behavior-analysis.ko.md) | 원본 `/Users/mymacbookair/Desktop/Project/오늘도/intellectual-disability-behavior-analysis.ko.md`를 바이트 그대로 복사. 11개 절·참고문헌·자료의 한계 모두 포함 |
 | 실행 정의 | [지민](mild-intellectual-disability-adult.json), [서연](careful-checker.json), [민수](quick-decider.json) | 각 `character`, `parameters`, `attention`, `shoppingStyle`, 전체 `prompt`의 단일 실행 원본 |
-| 읽기용 프롬프트 | [지민 v5](persona-mild-intellectual-disability-adult-v5.md), [서연 v3](persona-careful-checker-v3.md), [민수 v3](persona-quick-decider-v3.md) | 각각 JSON `prompt`와 동일. 게임 지침 뒤에 원자료1·원자료2 전문을 수정 없이 포함 |
-| 이전 정의 | [지민 v4](history/persona-mild-intellectual-disability-adult-v4.md), [서연 v2](history/persona-careful-checker-v2.md), [민수 v2](history/persona-quick-decider-v2.md)와 그 이전 사본([history/](history/)) | 당시 설정을 역사 자료로 보존. 활성 프로필은 위 JSON과 현재 사본 |
+| 읽기용 프롬프트 | [지민 v6](persona-mild-intellectual-disability-adult-v6.md), [서연 v3](persona-careful-checker-v3.md), [민수 v3](persona-quick-decider-v3.md) | 각각 JSON `prompt`와 동일. 게임 지침 뒤에 원자료1·원자료2 전문을 수정 없이 포함 |
+| 이전 정의 | [지민 v5](history/persona-mild-intellectual-disability-adult-v5.md), [서연 v2](history/persona-careful-checker-v2.md), [민수 v2](history/persona-quick-decider-v2.md)와 그 이전 사본([history/](history/)) | 당시 설정을 역사 자료로 보존. 활성 프로필은 위 JSON과 현재 사본 |
 | 구조 계약 | [persona.schema.json](persona.schema.json) | 선택적 attention·shoppingStyle 설정의 타입·범위. 최대 관심 단계가 최소보다 작은 조건은 런타임에서 추가 검사 |
 | 무결성 메타데이터 | [sources.json](references/sources.json) | 원문 파일별 출처·SHA-256·바이트 수·문자 수·참고 링크 목록 |
 
@@ -24,7 +24,7 @@
 
 | 인물 | 선택한 특성과 보완 전략 | 원자료 대응 | 실제 설정·상황 → 행동 |
 | --- | --- | --- | --- |
-| 지민 v5 | 구체적인 현재 항목에 집중한다. 여러 목표와 관심 전환 뒤의 기억 부담을 한 단계씩 확인하고 지원을 활용하는 방식으로 보완한다. 카레 관심과 자발적 목표 복귀를 함께 유지한다 | 원자료1 #2·#4·#6, 원자료2 §2 작업기억/실행기능·§7·§8·§9 | 목표 슬롯 2, `switchMemoryDecay` .08, 선택 후 목록 확인 .48. `memoryLoad`·목표 confidence·관심 상태에 따라 `readList`·`viewCart`·도움·기억한 목표 복귀가 달라진다. 카레 관심은 개인 가중치이며 장애 일반 특성이 아님 |
+| 지민 v6 | 구체적인 현재 항목에 집중한다. 여러 목표와 관심 전환 뒤의 기억 부담을 한 단계씩 확인하고 지원을 활용하는 방식으로 보완한다. 카레 관심과 자발적 목표 복귀를 함께 유지한다 | 원자료1 #2·#4·#6, 원자료2 §2 작업기억/실행기능·§7·§8·§9 | 목표 슬롯 2, `switchMemoryDecay` .08, 선택 후 목록 확인 .48. `memoryLoad`·목표 confidence·관심 상태에 따라 `readList`·`viewCart`·도움·기억한 목표 복귀가 달라진다. 카레 관심은 개인 가중치이며 장애 일반 특성이 아님. v6는 화면 밖 매대를 찾기 위해 여러 방향으로 걸어 보고 도움을 찾는 탐색 전략을 추가했다(v5 조기 포기 85% 대응). 걸음 수·시간 하한은 없다 |
 | 서연 v3 | 신중하고 절약을 중시한다. 연습한 확인 절차가 강점이며, 낯선 조작과 여러 조건을 처리할 때 시간을 갖고 보이는 상품과 목록을 차근차근 대조한다 | 원자료1 #3·#5·#6, 원자료2 §2 처리 시간·§3 루틴/일반화·§8·§9 | 판단 기준 2900ms, 망설임 .26, 목표 슬롯 3, 초회 방향 살피기 3단계. 보이는 후보 비교 .90(최대 2페이지), 선택 후 목록 .88, 결제 전 장바구니 .93. 낯섦·부담·지원으로 대기와 확인이 달라지고 관찰한 오류만 수정한다 |
 | 민수 v3 | 익숙한 단서에서 빠르게 선택하는 개인 성격이 있다. 상품명·규격·수량 등 여러 조건을 동시에 기억·점검하는 부담이 커질 때 일부를 놓칠 수 있다. 직접 확인한 차이와 지원으로 다시 살핀다 | 원자료1 #2·#4·#7·#8, 원자료2 §2 다중 조건/작업기억·§5 선택·§8·§9 | 판단 기준 950ms, 목표 슬롯 2, 기억 변화 .06, 친숙한 후보 우선 .65. `confusionProbability` .20/`quantitySlipProbability` .18은 유사 상품·복수 수량·부담·낯섦 조건에서만 적용된다. 확인 .16·도움 .32·피드백 계수 .86으로 발견한 차이를 수정할 수 있으며 무조건 오답을 만들지 않음 |
 

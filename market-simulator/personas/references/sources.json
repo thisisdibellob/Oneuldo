@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "personaId": "mild-intellectual-disability-adult",
-  "personaVersion": "5",
+  "personaVersion": "6",
   "runtimeProfile": "../mild-intellectual-disability-adult.json",
-  "promptMirror": "../persona-mild-intellectual-disability-adult-v5.md",
+  "promptMirror": "../persona-mild-intellectual-disability-adult-v6.md",
   "promptAssembly": "Game-specific guidance, then complete source1, then complete source2; source bodies are included without edits.",
   "sources": [
     {
@@ -40,9 +40,9 @@
   "profiles": [
     {
       "personaId": "mild-intellectual-disability-adult",
-      "personaVersion": "5",
+      "personaVersion": "6",
       "runtimeProfile": "../mild-intellectual-disability-adult.json",
-      "promptMirror": "../persona-mild-intellectual-disability-adult-v5.md",
+      "promptMirror": "../persona-mild-intellectual-disability-adult-v6.md",
       "sourceIds": [
         "source1",
         "source2"

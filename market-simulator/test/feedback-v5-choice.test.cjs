@@ -66,13 +66,13 @@ test('v7 is the default while explicit v1-v6 retain every legacy instruction byt
 
 test('representative v4 frames match frozen bytes, while v5 and v6 differ only in policy and instructions', () => {
   const probes = [
-    [observation(), 'dd5a4a9a6b69e4b03e59fbbeb0cce2574dcb872f1a097c81b9d3d928d475e9cb'],
-    [shelf(), '868a934f202341f3bc5e598e6a2e5650030c85d6e324476e5197ca2046504aed'],
+    [observation(), '940fe36237895b8b0da85b5dd0539a6d904b7b7e031333674a0f76b222d3e4c6'],
+    [shelf(), '27f100e37754667bf3cb630da368718a50c4ddafcdb30aa8178f3f7bc13130fc'],
     [observation({ view: 'cart', activeStation: 'meal', listAvailable: false, cart: { curry: 4, milk: 2 },
       removableProductIds: ['curry'], cartItems: [{ id: 'curry', name: '순한 카레', quantity: 4 },
-        { id: 'milk', name: '우유', quantity: 2 }] }), '65da02f38c88b103e99f407f50227e37527544e35fe0c51fb445840c800d578a'],
+        { id: 'milk', name: '우유', quantity: 2 }] }), '3e3a4425be7a1434581aec0f40764a4bb0a6960666a5daf45cdf41fb7baed6bf'],
     [observation({ phase: 'checkout', activeStation: 'checkout', listAvailable: false, cart: {}, cartItems: [],
-      cashiers: { checkout: true } }), '48dbdeda5f66c7a4705ca271104c52aa2760fcdf1deaa5337b2b672b033a6ca1'],
+      cashiers: { checkout: true } }), 'db362265ced5269484b4d26217a8555993f45bfc28290327b76a20d7743e20b0'],
   ];
   for (const [o, frozenHash] of probes) {
     assert.equal(createHash('sha256').update(JSON.stringify(frame(o, 'feedback-choice-v4'))).digest('hex'), frozenHash);

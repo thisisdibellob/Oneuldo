@@ -5,8 +5,8 @@
     "output/trait-v3-pilot-session-20261112-011227-r5/trait-v3-pilot-smoke-20261112-r5/traces/high/0001-477f086d083f/operation-high.json.snapshot.json": "7e810c674eb7af8ac0b012a779761856cd81bada5490b43eaa8e23afe65e1a43",
     "output/trait-v3-pilot-session-20261112-011227-r5/trait-v3-pilot-smoke-20261112-r5/traces/high/0001-477f086d083f/operation-high.json.whole-trace/attempt-1.candidate.json": "ffb120023a366dedb585a37f8a36a0df0e60c059a1ea881d58236a9e36c13551"
   },
-  "stepsSha256": "b3a830edfac8ed7dd8a017aa9bec8a572e5fcfe41ccf5a8c029a4cb95e751334",
-  "personaVersion": "traits-2-13572f988abf",
+  "stepsSha256": "d42f3fa3b55f6df8238ae9d030c3ac49a4e3450193f12b930714b4f2241c4117",
+  "personaVersion": "traits-2-3b11e12cd67f",
   "profileDefinition": {
     "id": "operation-high",
     "basePersonaId": "mild-intellectual-disability-adult",

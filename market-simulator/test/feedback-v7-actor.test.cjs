@@ -58,12 +58,12 @@ test('v7 is default and explicit v1-v6 complete frames preserve frozen bytes', (
   assert.equal(isStructuredFeedbackPolicy(v7), true);
   assert.equal(isFeedbackActorPolicy('feedback-choice-v14'), false);
   const hashes = [
-    '3a7d745023f9ffcc7a038bdd079171b1bb309fbd83d32acf1a3b63f7fac34e66',
-    '5979250eef39e3b26864371fd98a492fecc196cbb7190e6bc449e545fffd0c1d',
-    '29ce697d4a3b551a06aedc9e4bdf7f08b68940b6e2cdb83aadb3959775d3c045',
-    'dd5a4a9a6b69e4b03e59fbbeb0cce2574dcb872f1a097c81b9d3d928d475e9cb',
-    '0cdf04bc45d4359c4eed0a2989a4609be3a810400e0a060ab6daf97972f51aea',
-    '4cfcdb987fa08fe0f342aaabf2102b3861ff9149cd2b9706609bf3daafe26625',
+    '3b5eebdfb5b5b4142bdc1a870d9d494f18077733148e6d51c92c9fc7a3ef82b1',
+    '28d0d7ec391cd860836aa84b5932aac8a95277bd256859270f7dd211fd231add',
+    '4b22fb6270d2139107204a46de5578f25d59b59f01a55f2d594fd5f25301a4e8',
+    '940fe36237895b8b0da85b5dd0539a6d904b7b7e031333674a0f76b222d3e4c6',
+    '2ea5f2e196adb3d0c82833ee6bf1e09eb15928eeccaf7399991a7e45e7072bb6',
+    'aa96070174525abc87a3df34dbc8d60defa914e26b34060407e8e91c5c109613',
   ];
   for (let v = 1; v <= 6; v++) assert.equal(createHash('sha256')
     .update(JSON.stringify(frame(observation(), `feedback-choice-v${v}`))).digest('hex'), hashes[v - 1], `v${v}`);

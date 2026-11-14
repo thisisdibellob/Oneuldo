@@ -106,9 +106,11 @@ const sha256 = text => crypto.createHash('sha256').update(text).digest('hex');
 // Fixed actor instruction templates. A new wording is a new file and id; an
 // existing template is never edited, so recorded SHAs keep identifying it.
 const INSTRUCTION_TEMPLATES = Object.freeze({
-  'authoring-v1': path.join(__dirname, 'actor-instructions', 'authoring-v1.txt'),
+  'authoring-v1': path.join(__dirname, 'actor-instructions', 'legacy', 'authoring-v1.txt'),
+  'authoring-v2': path.join(__dirname, 'actor-instructions', 'legacy', 'authoring-v2.txt'),
+  'authoring-v3': path.join(__dirname, 'actor-instructions', 'authoring-v3.txt'),
 });
-const DEFAULT_INSTRUCTION_TEMPLATE = 'authoring-v1';
+const DEFAULT_INSTRUCTION_TEMPLATE = 'authoring-v3';
 const MAILBOX_CLI = path.join(__dirname, 'whole-trace-mailbox.cjs');
 
 function renderActorInstructions(templateId, slotDirectory) {
@@ -175,7 +177,7 @@ if (require.main === module) {
   }
   const [input, output] = positional;
   if (!input || !output) {
-    process.stderr.write('Usage: node market-simulator/whole-trace-actor-input.cjs <slot>/owner/prepare-response.json <slot>/actor-input.json [--template authoring-v1] [--no-instructions]\nWrites <slot>/actor-input.json and <slot>/actor-instructions.txt (never overwrites) and prints a provenance summary.\n');
+    process.stderr.write('Usage: node market-simulator/whole-trace-actor-input.cjs <slot>/owner/prepare-response.json <slot>/actor-input.json [--template authoring-v3] [--no-instructions]\nWrites <slot>/actor-input.json and <slot>/actor-instructions.txt (never overwrites) and prints a provenance summary.\n');
     process.exitCode = 2;
   } else {
     try { process.stdout.write(JSON.stringify(writeActorInput(input, output, options), null, 2) + '\n'); }
