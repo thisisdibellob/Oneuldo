@@ -16,6 +16,7 @@ import {
   marketCategories, marketProducts,
 } from '../../game/scenarios';
 import { fonts } from '../../theme';
+import { MARKET_GOAL_REMINDER_TITLE } from '../../game/marketGoalReminder';
 import type { ReplayShelfPort, ReplayBounds } from '../../replay/ports';
 
 type Point = { x: number; y: number };
@@ -24,6 +25,8 @@ export type MarketShelfSceneProps = {
   slots?: string[];
   stock?: Record<string, number>;
   onGiveUp?: () => void;
+  /** goal-reminder-v1 lines shown in the open basket; null before the listed items are in the cart. */
+  goalReminder?: string[] | null;
   onCartVisibilityChange?: (open: boolean) => void;
   cart: MarketCart;
   category: MarketCategory;
@@ -48,7 +51,7 @@ function ProductArt({ product, size }: { product: MarketProduct; size: number })
 
 /** A camera-like close-up over the existing map. Closing never changes world position. */
 export function MarketShelfScene({ slots, stock, onCartVisibilityChange, cart, category, onChangeQuantity,
-  onClose, onDropProduct, replayPortRef }: MarketShelfSceneProps) {
+  onClose, onDropProduct, replayPortRef, goalReminder }: MarketShelfSceneProps) {
   const viewport = useWindowDimensions();
   const insets = useContext(SafeAreaInsetsContext);
   const [size, setSize] = useState({ width: viewport.width, height: viewport.height });
@@ -354,6 +357,10 @@ export function MarketShelfScene({ slots, stock, onCartVisibilityChange, cart, c
               </View>
               <ScrollView testID="market-shelf-cart-body" style={s.cartBody} bounces={false} nestedScrollEnabled>
                 <Text style={s.basketHelp}>물건은 해당 진열대에서 한 개씩 내려놓아요. 종업원에게 도움을 요청해도 돼요.</Text>
+                {goalReminder ? <View testID="market-shelf-goal-reminder">
+                  <Text style={s.basketHelp}>{MARKET_GOAL_REMINDER_TITLE}</Text>
+                  {goalReminder.map((line, index) => <Text key={'goal-reminder-' + index} style={s.basketHelp}>{line}</Text>)}
+                </View> : null}
                 <ScrollView horizontal testID="market-shelf-cart-items" style={s.basketItems}
                   contentContainerStyle={s.basketItemList} showsHorizontalScrollIndicator nestedScrollEnabled
                   directionalLockEnabled bounces={false}>
@@ -367,7 +374,7 @@ export function MarketShelfScene({ slots, stock, onCartVisibilityChange, cart, c
                       <Text style={s.basketItemName}>{product.name}</Text>
                       <Text style={s.basketItemPrice}>개당 {price(product.price)}</Text>
                       <Text style={s.basketItemCount}>담은 수량 {quantity}개</Text>
-                      {canReturnHere ? <PressScale accessibilityLabel={product.name + ' ' + category.label + ' 진열대에 1개 내려놓기'}
+                      {canReturnHere ? <PressScale accessibilityLabel={product.name + ' ' + product.detail + ' ' + price(product.price) + ' ' + category.label + ' 진열대에 1개 내려놓기'}
                         accessibilityRole="button" onPress={() => onChangeQuantity(id, -1)} style={s.basketRemove}>
                         <Ionicons color="#405D50" name="remove" size={15} />
                         <Text style={s.basketRemoveText}>1개 내려놓기</Text>
@@ -526,8 +533,8 @@ function ShelfProduct({ product, quantity, width, artworkSize, surfaceY, tagHeig
       <Text style={s.price}>{price(product.price)}</Text>
     </View>
     {unavailable ? <View accessibilityLabel={product.name + ' 품절'} style={[s.soldOut, { minHeight: buttonHeight }, compactRows && s.addCompact]}><Text style={s.soldOutText}>품절</Text></View>
-      : <PressScale accessibilityLabel={quantity === 0 ? product.name + ' 담기' : product.name + ' 한 개 더 담기'}
-        accessibilityHint="상품을 0.35초 동안 누른 다음 장바구니로 끌어 담을 수도 있어요"
+      : <PressScale accessibilityLabel={product.name + ' ' + product.detail + ' ' + price(product.price) + ' 담기'}
+        accessibilityHint={'현재 담은 수량 ' + quantity + '개. 상품을 0.35초 동안 누른 다음 장바구니로 끌어 담을 수도 있어요'}
         accessibilityRole="button" onPress={onAdd} style={[s.add, { minHeight: buttonHeight }, compactRows && s.addCompact]}>
         <Ionicons color="#456A55" name="add" size={17}/>{!compactRows ? <Text style={s.addText}>담기</Text> : null}
       </PressScale>}

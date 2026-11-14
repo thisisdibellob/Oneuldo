@@ -48,12 +48,12 @@ class SourceEventDetailsTest {
         var input=fixture();var refs=new AnalysisReferences(mapper,input);var first=input.input().sessions().getFirst().events().getFirst().behaviorLogId();
         var digest=new AiObservationDigest("상품 선택 기록 없음",List.of(new AiObservationDigest.Observation(
                 "사과를 담지 않음","선택 어려움 가능성",List.of("기록 누락 가능성"),List.of(first))),List.of("부분 기록"));
-        var wire=mapper.readTree(AnalysisSynthesisPrompt.build(mapper,new AiBehaviorAnalysisPromptFactory(mapper),input,List.of(digest),refs,false));
+        var wire=new FinalSourceEncoding(mapper).decode(mapper.readTree(AnalysisSynthesisPrompt.build(mapper,new AiBehaviorAnalysisPromptFactory(mapper),input,List.of(digest),refs,false)));
         assertThat(wire.path(SourceEventDetails.FIELD).get(1).path("quantityAfter").asInt()).isEqualTo(2);
-        var expanded=new LosslessTables(mapper).decode(wire);
+        var expanded=wire;
         assertThat(expanded.path("evidenceReferences").toString()).contains("E4","E5","E9");
         assertThat(expanded.path("chunkAnalyses").get(0).path("summary").asString()).isEqualTo("상품 선택 기록 없음");
-        assertThat(expanded.path("stage").asString()).contains("원본을 우선");
+        assertThat(expanded.path("stage").asString()).isEqualTo(AnalysisSynthesisPrompt.FINAL_STAGE);
     }
 
     @Test void scope_and_lifecycle_values_survive_final_transport_without_changing_old_records() {
@@ -71,15 +71,15 @@ class SourceEventDetailsTest {
                         input.input().anonymousSubjectId(),1,6,List.of(new BehaviorAnalysisInput.SessionTimeline(
                         full.sessionId(),full.startedAt(),full.endedAt(),full.integrity(),events))));
         var digest=new AiObservationDigest("부분 관찰",List.of(),List.of("이 구간의 한계"));
-        var wire=mapper.readTree(AnalysisSynthesisPrompt.build(mapper,new AiBehaviorAnalysisPromptFactory(mapper),input,
-                List.of(digest),new AnalysisReferences(mapper,input),false,List.of(part)));
-        var expanded=new LosslessTables(mapper).decode(wire);
+        var wire=new FinalSourceEncoding(mapper).decode(mapper.readTree(AnalysisSynthesisPrompt.build(mapper,new AiBehaviorAnalysisPromptFactory(mapper),input,
+                List.of(digest),new AnalysisReferences(mapper,input),false,List.of(part))));
+        var expanded=wire;
         assertThat(expanded.path("sourceCoverage").path("providedEventCount").asInt()).isEqualTo(12);
         assertThat(expanded.path("chunkScopes").get(0).path("providedEventCount").asInt()).isEqualTo(6);
         assertThat(expanded.path("chunkScopes").get(0).path("partial").asBoolean()).isTrue();
         var endings=wire.path(SourceEventDetails.FIELD).findValues("sessionEnd");
         assertThat(endings).hasSize(1);assertThat(endings.getFirst().path("reason").asString()).isEqualTo("USER_ABORTED");
-        assertThat(expanded.path("eventDefinitions").toString()).contains("market-micro-behavior-v2-content");
+        assertThat(expanded.path(SourceEventDetails.FIELD).toString()).contains("market-micro-behavior-v2-content");
         assertThat(mapper.writeValueAsString(input)).isEqualTo(original);
     }
 

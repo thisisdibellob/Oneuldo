@@ -17,9 +17,16 @@ const hash = value => createHash('sha256').update(JSON.stringify(value)).digest(
 const need = (value,message) => {if (!value) throw new Error(message);};
 const allowedKeys = (value,keys) => value && typeof value==='object' && !Array.isArray(value) && Object.keys(value).every(k=>keys.includes(k));
 function auditOptions(options={}) {
-  need(allowedKeys(options,['allowNonMonotonicMovementTimestamps'])
-    && (options.allowNonMonotonicMovementTimestamps===undefined || typeof options.allowNonMonotonicMovementTimestamps==='boolean'), 'Invalid learner audit options');
-  return options.allowNonMonotonicMovementTimestamps ? {allowNonMonotonicMovementTimestamps:true} : {};
+  need(allowedKeys(options,['allowNonMonotonicMovementTimestamps','outcomeFeedback','routineMemory','recallMove'])
+    && (options.allowNonMonotonicMovementTimestamps===undefined || typeof options.allowNonMonotonicMovementTimestamps==='boolean')
+    && (options.outcomeFeedback===undefined || options.outcomeFeedback==='episode-outcome-v1')
+    && (options.routineMemory===undefined || options.routineMemory==='procedural-routine-v1')
+    && (options.recallMove===undefined || options.recallMove==='remembered-route-v1'), 'Invalid learner audit options');
+  // outcomeFeedback is an explicit experimental condition bound into each round's evidence hash.
+  return {...(options.allowNonMonotonicMovementTimestamps ? {allowNonMonotonicMovementTimestamps:true} : {}),
+    ...(options.outcomeFeedback ? {outcomeFeedback:options.outcomeFeedback} : {}),
+    ...(options.routineMemory ? {routineMemory:options.routineMemory} : {}),
+    ...(options.recallMove ? {recallMove:options.recallMove} : {})};
 }
 function sourceRecord(trace,snapshot,replay,receipt,options) {
   const evidence={trace,snapshot,replay,receipt,options:auditOptions(options)};
@@ -92,7 +99,8 @@ function readLearner(learnerFile) {
   need(typeof learnerFile==='string' && learnerFile.length>0, 'Learner file is required');
   const file=path.resolve(learnerFile);
   need(fs.lstatSync(file).isFile(), 'Learner archive must be a regular file');
-  const state=JSON.parse(fs.readFileSync(file,'utf8'));
+  const serialized=fs.readFileSync(file,'utf8');
+  const state=JSON.parse(serialized);
   need(allowedKeys(state,['version','identity','rounds','integrity']) && state.version==='1' && Array.isArray(state.rounds), 'Invalid learner archive');
   validateLearnerIdentity(state.identity);
   need(state.integrity===hash({version:state.version,identity:state.identity,rounds:state.rounds}), 'Learner archive integrity mismatch');
@@ -108,7 +116,7 @@ function readLearner(learnerFile) {
     experience=confirmedExperience(trace,snapshot,replay,receipt,experience,{...options,identity:state.identity});
     replays.add(replay.replayId);sessions.add(replay.sessionId);
   }
-  experienceCache.set(state,{value:experience});
+  experienceCache.set(state,{value:experience,source:{path:file,sha256:createHash('sha256').update(serialized).digest('hex'),bytes:Buffer.byteLength(serialized)}});
   return state;
 }
 
@@ -126,6 +134,19 @@ function getLearnerExperience(learnerFile,expectedIdentity) {
   if(expectedIdentity) assertLearnerIdentity(state.identity,expectedIdentity);
   if(state.identity.arm==='C') return undefined;
   return reconstructExperience(state);
+}
+
+/** Internal begin context: one fresh complete read, then derive from that same verified state.
+ * This is not a cache across requests and never accepts caller-authored verified state. */
+function readVerifiedLearnerContext(learnerFile) {
+  need(typeof learnerFile==='string' && learnerFile.length>0, 'Learner file is required');
+  const file=path.resolve(learnerFile),before=fs.lstatSync(file);
+  const state=readLearner(file),verified=experienceCache.get(state),after=fs.lstatSync(file);
+  need(after.isFile() && ['dev','ino','size','mtimeMs'].every(field=>before[field]===after[field])
+    && verified.source.bytes===after.size, 'Learner archive changed during verification');
+  return {identity:structuredClone(state.identity),experience:state.identity.arm==='C'?undefined:reconstructExperience(state),
+    integrity:state.integrity,roundCount:state.rounds.length,
+    source:{path:file,sha256:verified.source.sha256,dev:after.dev,ino:after.ino,size:after.size,mtimeMs:after.mtimeMs}};
 }
 
 /** Append a verified execution atomically. Repeating an identical receipt is idempotent. */
@@ -153,4 +174,4 @@ function recordLearnerRound({learnerFile,trace,snapshot,replay,receipt,options={
   }
 }
 
-module.exports={createLearner,readLearner,recordLearnerRound,getLearnerExperience,assertExperienceLineage};
+module.exports={createLearner,readLearner,recordLearnerRound,getLearnerExperience,assertExperienceLineage,readVerifiedLearnerContext};

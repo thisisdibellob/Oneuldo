@@ -82,6 +82,12 @@ async function exercise(Tracker: typeof MarketBehaviorTracker, ending: Ending, s
     acknowledged: jest.mocked(queue.assertBehaviorEventsAcknowledged).mock.calls, timers: jest.getTimerCount() }));
 }
 
+function normalizeOnlyTaskVersion(result: Awaited<ReturnType<typeof exercise>>) {
+  const copy = JSON.parse(JSON.stringify(result));
+  for (const entry of copy.events) entry.event.task.taskVersion = 'collector-version-for-parity';
+  return copy;
+}
+
 beforeEach(() => jest.useFakeTimers());
 afterEach(() => { jest.clearAllTimers(); jest.useRealTimers(); });
 
@@ -118,7 +124,14 @@ test.each([
 ] as const)('f124a95 lifecycle, timings, movement and queue parity: %s / scene=%s', async (ending, scene) => {
   const original = await exercise(baselineTracker(), ending, scene);
   const restored = await exercise(MarketBehaviorTracker, ending, scene);
-  expect(restored).toEqual(original);
+  expect(original.events.length).toBeGreaterThan(0);
+  expect(restored.events.length).toBeGreaterThan(0);
+  expect([...new Set(original.events.map((entry: { event: any }) => entry.event.task.taskVersion))])
+    .toEqual(['market-micro-behavior-v3-lifecycle']);
+  expect([...new Set(restored.events.map((entry: { event: any }) => entry.event.task.taskVersion))])
+    .toEqual(['market-micro-behavior-v4-timing-help']);
+  // The collector contract version intentionally changed; every other recorded value must retain parity.
+  expect(normalizeOnlyTaskVersion(restored)).toEqual(normalizeOnlyTaskVersion(original));
   const events = restored.events.map((entry: { event: any }) => entry.event);
   expect(events.map((event: any) => event.action.eventCode)).toEqual(expect.arrayContaining([
     'SHOP.SESSION_STARTED', 'SHOP.MISSION_PRESENTED', 'SHOP.MOVEMENT_SAMPLED',

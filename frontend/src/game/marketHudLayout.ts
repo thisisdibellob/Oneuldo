@@ -21,6 +21,8 @@ export const MARKET_HUD_LAYOUT = {
   cartGap: 2,
   cartLabelFontSize: 11,
   cartLabelLineHeight: 15,
+  /** Longest note-row button label: "전체 목록" (5 incl. space) beside "장바구니" (4). */
+  cartLabelMaxCharacters: 5,
 } as const;
 
 export type MarketHudRect = { left: number; top: number; right: number; bottom: number };
@@ -36,7 +38,7 @@ export function getMarketHudTopInset(safeAreaTop = 0, embedded = true): number {
  * Names can occupy two lines; ReplayPresentation has no measured text layout,
  * so reserve that full height even when every name fits on one line. At scale 1
  * this bounds the actual 108..115px card with a 115px rectangle. At larger font
- * scales also reserve wrapping for the four-character cart label and production
+ * scales also reserve wrapping for the longest note-row button label and production
  * quantities (1..99 plus at most two unit characters). Pretendard's digits and
  * Korean glyphs fit within one em; use that upper bound, not estimated text
  * measurements. Arbitrary component-only text is outside the replay contract.
@@ -59,7 +61,7 @@ export function getMarketHudOcclusionRect(presentation: {
   const itemHeight = (layout.itemNameLines * layout.itemNameLineHeight
     + quantityLines * layout.itemQuantityLineHeight) * fontScale + layout.itemGap;
   const cartHeight = Math.max(layout.cartMinHeight, layout.cartIconSize + layout.cartGap
-    + wrappedLines(4, layout.cartWidth, layout.cartLabelFontSize) * layout.cartLabelLineHeight * fontScale);
+    + wrappedLines(layout.cartLabelMaxCharacters, layout.cartWidth, layout.cartLabelFontSize) * layout.cartLabelLineHeight * fontScale);
   const noteHeight = Math.max(layout.noteMinHeight,
     Math.max(itemHeight, cartHeight) + layout.notePaddingBottom);
   return { left, top, right: left + width, bottom: top + 2 * layout.borderWidth + headerHeight + noteHeight };

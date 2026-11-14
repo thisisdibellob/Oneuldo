@@ -1,5 +1,8 @@
+import sharedProductFamilies from '../../../shared/market/product-families.json';
 import { enabledMarketScenarios, marketCatalogProducts, getEnabledMarketScenario, MARKET_CATALOG_VERSION, MARKET_SCENARIO_VERSION } from './marketContent';
 import { supplementalMarketProducts } from './marketCatalog';
+import { resolveMarketEnvironmentPlan, type MarketEnvironmentPlan } from './marketEnvironmentPlan';
+import { MARKET_QUEST_TIME_POLICY, resolveMarketTimeLimitSeconds } from './marketQuestTime';
 
 export type SimulationId = 'market' | 'laundry' | 'cooking' | 'transit';
 export type SimulationStatus = 'playable' | 'planned';
@@ -187,14 +190,17 @@ export const marketProducts: MarketProduct[] = [
     const family = originalProductFamilies[product.id];
     const art = supplementalMarketProducts.find(item => item.id === product.id);
     return { ...product, ...(productAppearance[product.id] ?? { icon: 'cube-outline' as const, color: '#527461', packageColor: '#EAF4ED' }),
-      familyId: family?.[0] ?? art?.familyId ?? String(product.attributes.kind ?? product.id), familyLabel: family?.[1] ?? art?.familyLabel ?? product.name, variantLabel: family?.[2] ?? art?.variantLabel ?? product.detail };
+      familyId: (sharedProductFamilies as Record<string,string>)[product.id] ?? family?.[0] ?? art?.familyId ?? String(product.attributes.kind ?? product.id), familyLabel: family?.[1] ?? art?.familyLabel ?? product.name, variantLabel: family?.[2] ?? art?.variantLabel ?? product.detail };
   }),
   ...supplementalMarketProducts.filter(product => !marketCatalogProducts.some(existing => existing.id === product.id)),
 ];
 export type MarketObjective = { productId: string; quantity: number; label?: string; acceptedProductIds?: string[] };
 
 export type MarketMission = {
+  runtimePlan?: import('./marketAdaptivePlan').MarketRuntimePlan;
+  observationPlan?: import('./marketAdaptivePlan').MarketObservationPlan;
   scene?: import('./marketScene').MarketScene;
+  environmentPlan?: MarketEnvironmentPlan;
   id: string;
   scenarioId?: string;
   catalogVersion?: string;
@@ -202,6 +208,8 @@ export type MarketMission = {
   title: string;
   description: string;
   budget: number;
+  /** Optional only for legacy saved missions; new AI quests supply a validated limit. */
+  timeLimitSeconds?: number;
   objectives: MarketObjective[];
   briefing: string[];
   checkoutDialogue: string[];
@@ -213,6 +221,7 @@ export const marketMission: MarketMission = {
   title: '저녁 장보기',
   description: '목록에 있는 물건을 필요한 개수만큼 골라요.',
   budget: 10000,
+  timeLimitSeconds: MARKET_QUEST_TIME_POLICY.defaultSeconds,
   objectives: [
     { productId: 'milk', quantity: 1 },
     { productId: 'apple', quantity: 2 },
@@ -258,20 +267,24 @@ export function buildRandomMarketScenarioMission(random: () => number = Math.ran
 
 /** 서버와 앱 콘텐츠 버전이 다르면 현재 가격으로 몰래 바꿔 실행하지 않는다. */
 export function resolveMarketAiMission(mission: MarketMission): MarketMission {
+  const timeLimitSeconds = resolveMarketTimeLimitSeconds(mission.timeLimitSeconds);
+  const environmentPlan = resolveMarketEnvironmentPlan(mission.environmentPlan);
   if (mission.catalogVersion !== MARKET_CATALOG_VERSION || mission.scenarioVersion !== MARKET_SCENARIO_VERSION) {
     throw new Error('장보기 콘텐츠 버전이 달라요. 서버와 앱을 함께 업데이트해 주세요.');
   }
   for (const objective of mission.objectives) {
     if (!getMarketProduct(objective.productId)) throw new Error('앱에 없는 상품이 포함되어 있어요.');
   }
-  if (mission.scenarioId === 'CUSTOM') return mission;
+  if (mission.scenarioId === 'CUSTOM') return { ...mission, environmentPlan, timeLimitSeconds,
+    objectives: mission.runtimePlan?.matchRule === 'family' ? mission.objectives.map(o=>o.productId===mission.runtimePlan?.learning.stockoutProductId?o:{...o,
+      acceptedProductIds:marketProducts.filter(p=>(p.familyId??p.id)===(getMarketProduct(o.productId)!.familyId??o.productId)).map(p=>p.id)}) : mission.objectives };
   const scenario = getEnabledMarketScenario(mission.scenarioId ?? '');
   if (mission.budget !== scenario.budget || mission.objectives.length !== scenario.objectives.length
     || scenario.objectives.some((expected) => !mission.objectives.some(
       (actual) => actual.productId === expected.productId && actual.quantity === expected.quantity))) {
     throw new Error('시나리오 콘텐츠가 앱과 일치하지 않아요.');
   }
-  return { ...mission, objectives: scenario.objectives };
+  return { ...mission, environmentPlan, timeLimitSeconds, objectives: scenario.objectives };
 }
 
 export function getObjectiveProductIds(objective: MarketObjective) {

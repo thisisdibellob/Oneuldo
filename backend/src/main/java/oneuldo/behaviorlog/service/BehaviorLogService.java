@@ -48,6 +48,10 @@ public class BehaviorLogService {
 
     private BehaviorLogResponse record(Member member, UUID batchId, BehaviorLogRequest request) {
         validateSchemaVersion(request);
+        String timingIssue = oneuldo.behaviorlog.domain.payload.ShoppingTimingContract.invalidReason(
+                request.action().eventCode(), request.payload());
+        if (timingIssue != null) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "장보기 시간 로그가 일관되지 않습니다: " + timingIssue);
         UUID memberId = member.getId();
         UUID clientEventId = request.metadata().clientEventId();
 

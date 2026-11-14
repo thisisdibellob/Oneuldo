@@ -6,6 +6,7 @@ export type Observation = ReturnType<ReturnType<typeof createMarketAgentAdapter>
 /** Policy intent; primitive movement exists only inside offline guard validation. */
 export type PolicyAction = Exclude<MarketAgentAction, { type: 'move' | 'moveInput' | 'viewCart' | 'viewHelp' }> | { type: 'walkTo'; station: MarketEnvironmentStationId }
   | { type: 'viewCart' | 'viewHelp'; durationMs?: number }
+  | { type: 'openLocationHelp' } | { type: 'backToStaff' }
   | { type: 'walkToAnchor'; anchorId: string }
   | { type: 'moveDirection'; direction: ActorDirection; durationMs: number }
   | { type: 'readList'; durationMs: number }
@@ -13,6 +14,7 @@ export type PolicyAction = Exclude<MarketAgentAction, { type: 'move' | 'moveInpu
   | { type: 'lookAround'; durationMs: number }
   | { type: 'browse'; durationMs: number; scrollFraction: number };
 export type Decision = { action: PolicyAction; delayMs: number; reason: string; currentTask?: string; attentionTag?: string; cueRefs?: string[];
+  cognition?: import('./incrementalCognition').IncrementalCognitionDeclaration;
   feedbackMemory?: import('./feedbackActor').FeedbackBeliefMemory;
   /** Controller-selected movement mode; never an actor-authored claim or hidden route. */
   movementPolicy?: import('../../frontend/src/game/marketReplayTrace').MarketReplayMovementPolicyDecision;
@@ -72,6 +74,17 @@ export type Persona = {
   };
 };
 
+/** Direct MCP research actors carry only their canonical individual description.
+ * They have no synthetic probability, timing or motor settings and must not be
+ * passed to numeric trace-generation policies.
+ */
+export type ResearchPersona = {
+  id: string; version: string; name: string; scope: string;
+  strengths: string[]; initialSupportNeeds: string[]; preferences: string[];
+  learningInstructions: string[]; researchSourceIds: string[]; engineeringAssumptions: string[];
+};
+export type ActorPersona = Persona | ResearchPersona;
+
 export type ShoppingStyle = {
   comparisonProbability: number; maxComparisonPages: number;
   listCheckAfterSelectionProbability: number; preCheckoutCheckProbability: number;
@@ -81,7 +94,7 @@ export type ShoppingStyle = {
 export type ActorDirection = 'north' | 'northeast' | 'east' | 'southeast' | 'south' | 'southwest' | 'west' | 'northwest';
 export type ActorDistanceBand = 'near' | 'medium' | 'far';
 export type ActorStation = { id: MarketEnvironmentStationId; kind: string; label: string;
-  direction: ActorDirection; distanceBand: ActorDistanceBand; near: boolean };
+  direction: ActorDirection; distanceBand: ActorDistanceBand; near: boolean; approachable?: boolean };
 export type ActorAnchor = { id: string; label: string; direction: ActorDirection; distanceBand: ActorDistanceBand };
 export type ActorObjective = { id: string; label: string; quantity: number; match: 'exact' | 'family' };
 export type ActorProduct = { id: string; categoryId: string; name: string; detail?: string; price: number; stock: number;
@@ -93,6 +106,8 @@ export type ActorObservation = {
   sequence?: number; elapsedMs?: number;
   phase: Observation['phase']; view: Observation['view']; activeStation: MarketEnvironmentStationId | null;
   visibleStations: ActorStation[]; anchors: ActorAnchor[]; products: ActorProduct[];
+  /** Explicit v11 capability; only currently visible clear-segment destinations can be approached. */
+  visibleApproachEnabled?: true;
   /** Visible shelf bodies whose signs cannot be read; no category IDs or hidden products. */
   visibleStructures?: { kind: 'shelf'; label: '진열대'; direction: ActorDirection; distanceBand: ActorDistanceBand }[];
   shelf: { page: number; pageCount: number; scrollFraction: number; pageFractions?: number[] } | null;
@@ -103,6 +118,10 @@ export type ActorObservation = {
   instructions?: { phase: 'entry' | 'checkout'; lines: string[] };
   /** Exact shared UI help content, present only while that support view is open. */
   supportText?: string[];
+  /** goal-reminder-v1 (v11): the quest's own entry text the open cart re-shows once the listed items are in it. */
+  goalReminder?: { contract: 'goal-reminder-v1'; title: string; lines: string[] };
+  staffLocationHelp?: boolean;
+  locationChoices?: { id: string; label: string }[];
   cart: Record<string, number> | null;
   /** v5+: product text in the currently displayed basket, never a hidden goal comparison. */
   cartItems?: { id: string; name: string; detail?: string; quantity: number }[];
@@ -141,7 +160,7 @@ export type AttentionExperience = {
 export type TraceOptions = {
   personaId: string; seed: string | number; snapshot: MarketReplaySnapshot;
   mode?: 'stochastic' | 'llm'; maxActions?: number; timeBudgetMs?: number;
-  tracePolicyVersion?: '5' | '6'; actorPolicyVersion?: 'episodic-choice-v9' | 'episodic-choice-v10' | 'feedback-choice-v1' | 'feedback-choice-v2' | 'feedback-choice-v3' | 'feedback-choice-v4' | 'feedback-choice-v5' | 'feedback-choice-v6' | 'feedback-choice-v7' | 'feedback-choice-v8' | 'feedback-choice-v9' | 'feedback-choice-v10' | 'feedback-choice-v11' | 'feedback-choice-v12' | 'feedback-choice-v13' | 'whole-trace-v1' | 'whole-trace-v2' | 'whole-trace-v3'; reasoningEffort?: 'low';
+  tracePolicyVersion?: '5' | '6'; actorPolicyVersion?: 'episodic-choice-v9' | 'episodic-choice-v10' | 'episodic-choice-v11' | 'feedback-choice-v1' | 'feedback-choice-v2' | 'feedback-choice-v3' | 'feedback-choice-v4' | 'feedback-choice-v5' | 'feedback-choice-v6' | 'feedback-choice-v7' | 'feedback-choice-v8' | 'feedback-choice-v9' | 'feedback-choice-v10' | 'feedback-choice-v11' | 'feedback-choice-v12' | 'feedback-choice-v13' | 'whole-trace-v1' | 'whole-trace-v2' | 'whole-trace-v3'; reasoningEffort?: 'low';
   feedbackMovement?: import('./feedbackMovementPolicy').FeedbackMovementPolicyOptions;
   /** Explicit whole-trace opt-in; absence preserves the original anchor-only contract. */
   wholeTraceMovementVersion?: 'directional-v1' | 'directional-v2';
@@ -158,7 +177,7 @@ export type TraceOptions = {
   attentionExperience?: AttentionExperience;
   learnerIdentity?: import('./actorLearning').LearnerIdentity;
   trialBinding?: { trialId: string; arm: 'A' | 'B' | 'C'; roundId: string; requestHash: string };
-  actorDecisionProvider?: (observation: ActorObservation, history: TraceEntry[], persona: Persona,
+  actorDecisionProvider?: (observation: ActorObservation, history: TraceEntry[], persona: ActorPersona,
     activity: import('./actorActivity').ActorActivityState, state?: unknown) => Promise<Decision>;
   /** The feedback actor boundary never receives archived observations or the full snapshot. */
   feedbackDecisionProvider?: (frame: import('./feedbackActor').FeedbackActorFrame) => Promise<Decision>;
@@ -171,7 +190,8 @@ export type TraceOptions = {
 /** Trusted local execution state. Never part of actor observations or checkpoints. */
 export type ActorAppliedState = { position: Observation['playerPosition']; cashierAvailability: Observation['cashierAvailability'] };
 export type GenerationCheckpoint = { kind: 'decision'; index: number; before: ActorObservation;
-  decision: Omit<Decision, 'exchange'>; after: ActorObservation; activity: import('./actorActivity').ActorActivityState }
+  decision: Omit<Decision, 'exchange'>; after: ActorObservation; activity: import('./actorActivity').ActorActivityState;
+  cognition?: import('./incrementalCognition').IncrementalCognitionAuditEntry }
   | { kind: 'controlled-stop' | 'system-completion'; index: number; activity: import('./actorActivity').ActorActivityState };
 export type TraceSummary = { personaId: string; steps: number; walkingIntentions: number; cartChecks: number;
   helpRequests: number; productsDragged: number; plannedReactionMs: number; ending: 'review-requested' | 'gave-up' | 'controlled-stop' | 'action-limit-incomplete' | 'assisted-review-requested' };

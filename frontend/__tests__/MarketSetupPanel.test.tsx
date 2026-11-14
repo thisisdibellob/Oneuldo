@@ -100,3 +100,34 @@ it.each([
   expect(applied.learning).toMatchObject({ checkoutReviewMode: mode, stockoutEnabled: false, budgetChoiceEnabled: false });
   expect(applied.seed).toBe(config.seed);
 });
+
+it('AI 매대 순서를 기본 위치로 표시하지 않고 계산원 변경과 명시 매대 선택을 구분한다', () => {
+  const order = ['drink', 'meal', 'fresh', 'produce', 'household'] as const;
+  const config = createMarketSession({ seed: 'ai-shelf-setup', environment: { shelfOrder: order } }).config;
+  const onApply = jest.fn();
+  const screen = render(<MarketSetupPanel config={config} onApply={onApply} onClose={jest.fn()} />);
+  expect(screen.getByRole('button', { name: '기본 위치' }).props.accessibilityState.selected).toBe(false);
+  expect(screen.getByRole('button', { name: '매번 섞기' }).props.accessibilityState.selected).toBe(false);
+  fireEvent.press(screen.getByRole('button', { name: '0명' }));
+  fireEvent.press(screen.getByRole('button', { name: '설정 적용' }));
+  expect(onApply.mock.calls[0][0].environment).toMatchObject({ shelfOrder: order, cashierCount: 0 });
+  expect(onApply.mock.calls[0][1]).toEqual(expect.objectContaining({ shelfOrderTouched: false, changedConfigPaths: expect.any(Array) }));
+  fireEvent.press(screen.getByRole('button', { name: '기본 위치' }));
+  fireEvent.press(screen.getByRole('button', { name: '설정 적용' }));
+  expect(screen.getByRole('button', { name: '기본 위치' }).props.accessibilityState.selected).toBe(true);
+  expect(onApply.mock.calls[1][1]).toEqual(expect.objectContaining({ shelfOrderTouched: true, changedConfigPaths: expect.arrayContaining(["environment.shelfOrder"]) }));
+});
+
+it('JSON에서 다른 환경만 고친 경우와 매대 순서를 고친 경우를 구분한다', () => {
+  const order = ['drink', 'meal', 'fresh', 'produce', 'household'] as const;
+  const config = createMarketSession({ environment: { shelfOrder: order } }).config;
+  const onApply = jest.fn();
+  const screen = render(<MarketSetupPanel config={config} onApply={onApply} onClose={jest.fn()} />);
+  fireEvent.press(screen.getByRole('button', { name: '연구용 상세 설정 · JSON 가져오기' }));
+  fireEvent.changeText(screen.getByLabelText('장보기 설정 JSON'), JSON.stringify({ ...config, environment: { ...config.environment, cashierCount: 0 } }));
+  fireEvent.press(screen.getByRole('button', { name: '설정 적용' }));
+  expect(onApply.mock.calls[0][1]).toEqual(expect.objectContaining({ shelfOrderTouched: false, changedConfigPaths: expect.any(Array) }));
+  fireEvent.changeText(screen.getByLabelText('장보기 설정 JSON'), JSON.stringify({ ...config, environment: { ...config.environment, shelfOrder: 'random' } }));
+  fireEvent.press(screen.getByRole('button', { name: '설정 적용' }));
+  expect(onApply.mock.calls[1][1]).toEqual(expect.objectContaining({ shelfOrderTouched: true, changedConfigPaths: expect.arrayContaining(["environment.shelfOrder"]) }));
+});

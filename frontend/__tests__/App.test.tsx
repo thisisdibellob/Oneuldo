@@ -672,8 +672,8 @@ describe('오늘도 앱', () => {
 
     moveInsideMarket('fresh');
     fireEvent.press(await screen.findByRole('button', { name: '냉장 식품 살펴보기' }));
-    fireEvent.press(screen.getAllByRole('button', { name: '흰 우유 담기' })[0]);
-    fireEvent.press(screen.getAllByLabelText('흰 우유 한 개 더 담기')[0]);
+    fireEvent.press(screen.getAllByRole('button', { name: /^흰 우유 900mL [0-9,]+원 담기$/ })[0]);
+    fireEvent.press(screen.getAllByLabelText(/^흰 우유 900mL [0-9,]+원 담기$/)[0]);
     fireEvent.press(screen.getAllByRole('button', { name: '진열대 닫기' })[0]);
     await waitFor(() => expect(screen.queryAllByRole('button', { name: '진열대 닫기' })).toHaveLength(0));
 
@@ -682,7 +682,7 @@ describe('오늘도 앱', () => {
     const produceButton = screen.getAllByRole('button', { name: / 담기$/ })[0];
     const produceName = produceButton.props.accessibilityLabel.replace(/ 담기$/, '');
     fireEvent.press(produceButton);
-    fireEvent.press(screen.getAllByLabelText(produceName + ' 한 개 더 담기')[0]);
+    fireEvent.press(screen.getAllByLabelText(produceName + ' 담기')[0]);
     fireEvent.press(screen.getAllByRole('button', { name: '진열대 닫기' })[0]);
     await waitFor(() => expect(screen.queryAllByRole('button', { name: '진열대 닫기' })).toHaveLength(0));
 

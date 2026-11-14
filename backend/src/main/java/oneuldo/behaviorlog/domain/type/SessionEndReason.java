@@ -9,6 +9,7 @@ public enum SessionEndReason {
     APP_TERMINATED,
     NETWORK_ERROR,
     TECHNICAL_ERROR,
+    TIME_LIMIT_EXPIRED,
     TIMEOUT,
     OTHER
 }

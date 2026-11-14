@@ -1,0 +1,160 @@
+{
+  "version": "actual-layout-slots-v1",
+  "scope": "shelfOrder indexes map to these exact game slots. Index 0 is NOT the entrance. Coordinates increase downward. Route lengths use referenceSettings; actual obstacles may change them. They are not measured learner travel or evidence of improvement.",
+  "referenceSettings": {
+    "seed": "layout-reference",
+    "employeeCount": 1,
+    "customerCount": 1,
+    "pillarCount": 0,
+    "chairCount": 0,
+    "cashierCount": 2,
+    "kioskLane": "none",
+    "entranceConstruction": false
+  },
+  "layouts": {
+    "classic": {
+      "spawn": {
+        "x": 710,
+        "y": 1350
+      },
+      "slots": [
+        {
+          "index": 0,
+          "point": {
+            "x": 500,
+            "y": 308
+          },
+          "referenceRoutePx": 1100
+        },
+        {
+          "index": 1,
+          "point": {
+            "x": 860,
+            "y": 308
+          },
+          "referenceRoutePx": 1176
+        },
+        {
+          "index": 2,
+          "point": {
+            "x": 500,
+            "y": 536
+          },
+          "referenceRoutePx": 772
+        },
+        {
+          "index": 3,
+          "point": {
+            "x": 550,
+            "y": 536
+          },
+          "referenceRoutePx": 812
+        },
+        {
+          "index": 4,
+          "point": {
+            "x": 800,
+            "y": 536
+          },
+          "referenceRoutePx": 904
+        }
+      ]
+    },
+    "aisles": {
+      "spawn": {
+        "x": 710,
+        "y": 1350
+      },
+      "slots": [
+        {
+          "index": 0,
+          "point": {
+            "x": 500,
+            "y": 308
+          },
+          "referenceRoutePx": 1234
+        },
+        {
+          "index": 1,
+          "point": {
+            "x": 860,
+            "y": 308
+          },
+          "referenceRoutePx": 1272
+        },
+        {
+          "index": 2,
+          "point": {
+            "x": 500,
+            "y": 542
+          },
+          "referenceRoutePx": 936
+        },
+        {
+          "index": 3,
+          "point": {
+            "x": 860,
+            "y": 542
+          },
+          "referenceRoutePx": 1066
+        },
+        {
+          "index": 4,
+          "point": {
+            "x": 680,
+            "y": 752
+          },
+          "referenceRoutePx": 717
+        }
+      ]
+    },
+    "corner": {
+      "spawn": {
+        "x": 1060,
+        "y": 1210
+      },
+      "slots": [
+        {
+          "index": 0,
+          "point": {
+            "x": 311,
+            "y": 442
+          },
+          "referenceRoutePx": 1062
+        },
+        {
+          "index": 1,
+          "point": {
+            "x": 671,
+            "y": 442
+          },
+          "referenceRoutePx": 871
+        },
+        {
+          "index": 2,
+          "point": {
+            "x": 325,
+            "y": 650
+          },
+          "referenceRoutePx": 968
+        },
+        {
+          "index": 3,
+          "point": {
+            "x": 595,
+            "y": 650
+          },
+          "referenceRoutePx": 710
+        },
+        {
+          "index": 4,
+          "point": {
+            "x": 771,
+            "y": 702
+          },
+          "referenceRoutePx": 793
+        }
+      ]
+    }
+  }
+}

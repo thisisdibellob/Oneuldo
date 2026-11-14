@@ -74,7 +74,7 @@ class RestOllamaChatClientTest {
         var server = MockRestServiceServer.bindTo(builder).build();
         var client = new RestOllamaChatClient(builder.build(), properties(0, Duration.ZERO));
         assertThatThrownBy(() -> client.complete("s", "word ".repeat(10000), 900, 0.2))
-                .isInstanceOf(IllegalArgumentException.class).hasMessage("OLLAMA_CONTEXT_LIMIT_EXCEEDED");
+                .isInstanceOf(oneuldo.ai.exception.AiInputLimitException.class).hasMessageStartingWith("OLLAMA_CONTEXT_LIMIT_EXCEEDED: required=").hasMessageContaining("limit=7936");
         server.expect(requestTo("http://localhost:11435/api/chat"))
                 .andRespond(withSuccess(RESPONSE, MediaType.APPLICATION_JSON));
         assertThat(client.complete("s", "u").text()).isEqualTo("결과");

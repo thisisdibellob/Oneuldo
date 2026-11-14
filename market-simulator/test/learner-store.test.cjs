@@ -195,3 +195,45 @@ test('system completion cart or reported boundary tampering cannot enter a learn
   // Older evidence collectors may omit the optional observed boundary; the actual submitted cart is still required.
   assert.equal(record(replay).experience.provenance.learningScope,'actor-prefix');
 });
+test('episode-outcome-v1 adds one factual ending per round only when the condition option is recorded',async t=>{
+  const plain=await fixture(t);
+  const without=recordLearnerRound(plain);
+  assert.equal(without.experience.learning.episodes.some(e=>e.action==='episode-outcome'),false);
+  const f=await fixture(t);
+  const withOutcome=recordLearnerRound({...f,options:{outcomeFeedback:'episode-outcome-v1'}});
+  const episodes=withOutcome.experience.learning.episodes,outcome=episodes.at(-1);
+  assert.equal(episodes.length,f.trace.steps.length+1);
+  assert.equal(outcome.action,'episode-outcome');
+  assert.equal(outcome.result,'지난 장보기 결과: 이번 장보기 그만하기로 끝났어요. 끝날 때 장바구니: 비어 있음. 구매 확정: 안 함.');
+  assert.equal(outcome.evidence.sessionId,f.replay.sessionId);
+  // The condition is part of the immutable evidence; an unknown mode is rejected.
+  assert.throws(()=>recordLearnerRound({...f,options:{outcomeFeedback:'advice-v1'}}),/Invalid learner audit options/);
+  assert.equal(readLearner(f.learnerFile).rounds[0].options.outcomeFeedback,'episode-outcome-v1');
+});
+test('retrieval keeps the latest round endings in view and is unchanged for learners without them',()=>{
+  const ev=i=>({sessionId:'s',replayId:'r',traceId:'t',stepId:'step-'+i,stepIndex:i});
+  const walk=i=>({action:'walkToAnchor',source:'executed-app-action',evidence:ev(i)});
+  const plain=Array.from({length:30},(_,i)=>walk(i));
+  assert.deepEqual(retrieveLearningEpisodes(plain,[]).map(e=>e.evidence.stepIndex),retrieveLearningEpisodes(plain,[]).map(e=>e.evidence.stepIndex));
+  const withOutcomes=[...plain.slice(0,10),{action:'episode-outcome',result:'a',source:'executed-app-action',evidence:ev(100)},
+    ...plain.slice(10,20),{action:'episode-outcome',result:'b',source:'executed-app-action',evidence:ev(101)},...plain.slice(20)];
+  const picked=retrieveLearningEpisodes(withOutcomes,[]);
+  assert.equal(picked.length,12);
+  assert.deepEqual(picked.filter(e=>e.action==='episode-outcome').map(e=>e.result),['a','b']);
+});
+test('procedural-routine-v1 records the executed order once per round and counts repeated transitions only',async t=>{
+  const plain=await fixture(t);
+  assert.equal(recordLearnerRound(plain).experience.learning.episodes.some(e=>e.action==='episode-routine'),false);
+  const f=await fixture(t);
+  const rec=recordLearnerRound({...f,options:{routineMemory:'procedural-routine-v1'}});
+  const routine=rec.experience.learning.episodes.at(-1);
+  assert.equal(routine.action,'episode-routine');
+  assert.match(routine.result,/^지난 장보기에서 실제로 한 순서: .*그만하기 \(끝날 때 장바구니: 비어 있음\)$/);
+  assert.ok(routine.result.length<=500);
+  assert.throws(()=>recordLearnerRound({...f,options:{routineMemory:'answer-key'}}),/Invalid learner audit options/);
+  const {routineFamiliarity}=require('../src/actorLearning.ts');
+  const r=s=>({action:'episode-routine',source:'executed-app-action',result:'지난 장보기에서 실제로 한 순서: '+s+' (끝날 때 장바구니: 비어 있음)'});
+  const fam=routineFamiliarity([r('둘러보기(통로 걷기 3) → 냉장 식품 진열대 열기 → 흰 우유 900mL 1개 담기 → 그만하기'),
+    r('냉장 식품 진열대 열기 → 흰 우유 900mL 1개 담기×2 → 구매 확정'),r('둘러보기(목록 읽기 1) → 그만하기')]);
+  assert.deepEqual(fam,[{from:'냉장 식품 진열대 열기',to:'흰 우유 900mL 1개 담기',rounds:2},{from:'둘러보기',to:'그만하기',rounds:1}].filter(x=>x.rounds>=2));
+});

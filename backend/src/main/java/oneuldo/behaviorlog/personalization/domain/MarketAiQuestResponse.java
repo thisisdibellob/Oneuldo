@@ -28,7 +28,11 @@ public record MarketAiQuestResponse(
             List<MarketAiQuestDraft.Objective> objectives,
             List<String> briefing,
             List<String> checkoutDialogue,
-            String successMessage
+            String successMessage,
+            MarketAiQuestDraft.EnvironmentPlan environmentPlan,
+            Integer timeLimitSeconds,
+            MarketRuntimePlan runtimePlan,
+            MarketObservationPlan observationPlan
     ) {}
 
     public static MarketAiQuestResponse from(UUID generationId, UUID analysisId, UUID profileId, String source, String model,
@@ -43,7 +47,9 @@ public record MarketAiQuestResponse(
                         oneuldo.behaviorlog.personalization.service.MarketQuestCatalog.SCENARIO_VERSION,
                         draft.difficulty(), draft.title(), draft.description(), draft.budget(),
                         List.copyOf(draft.objectives()), List.copyOf(draft.briefing()),
-                        List.copyOf(draft.checkoutDialogue()), draft.successMessage()),
+                        List.copyOf(draft.checkoutDialogue()), draft.successMessage(), draft.environmentPlan(),
+                        oneuldo.behaviorlog.personalization.service.MarketQuestTimePolicy.responseLimit(draft.timeLimitSeconds(), promptVersion),
+                        draft.runtimePlan(), draft.observationPlan()),
                 draft.adaptationSummary(), List.copyOf(draft.reasonCodes()));
     }
 }

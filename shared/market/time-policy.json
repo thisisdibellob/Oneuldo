@@ -1,0 +1,6 @@
+{
+  "policyVersion": "market-quest-time-v1",
+  "minimumSeconds": 180,
+  "maximumSeconds": 600,
+  "defaultSeconds": 300
+}

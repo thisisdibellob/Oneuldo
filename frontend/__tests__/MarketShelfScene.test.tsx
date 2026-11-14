@@ -32,6 +32,16 @@ import {
   MarketSimulationScreen,
 } from '../src/screens/MarketSimulationScreen';
 
+function addLabel(id: string) {
+  const p = marketProducts.find(product => product.id === id)!;
+  return `${p.name} ${p.detail} ${p.price.toLocaleString()}원 담기`;
+}
+function removeLabel(id: string) {
+  const p = marketProducts.find(product => product.id === id)!;
+  const category = marketCategories.find(c => c.id === p.categoryId)!;
+  return `${p.name} ${p.detail} ${p.price.toLocaleString()}원 ${category.label} 진열대에 1개 내려놓기`;
+}
+
 async function advanceTransition(milliseconds = 500) {
   await act(async () => {
     jest.advanceTimersByTime(milliseconds);
@@ -83,6 +93,24 @@ describe('몰입형 진열대 진입과 매장 복귀', () => {
     jest.useRealTimers();
   });
 
+  it('같은 담기 이름으로 세 번 누르면 세 개만 담기고 동명 상품의 규격은 구분된다', async () => {
+    const market = renderEmbeddedMarket();
+    try {
+      await market.start();
+      await market.open({ id: 1, station: 'fresh' });
+      const milkLabel = addLabel('milk');
+      for (let i = 0; i < 3; i++) fireEvent.press(market.screen.getByRole('button', { name: milkLabel }));
+      expect(market.screen.getByRole('button', { name: milkLabel }).props.accessibilityHint).toContain('현재 담은 수량 3개');
+      const eggs = marketProducts.filter(p => p.name === '해뜰 특란');
+      expect(eggs.length).toBeGreaterThanOrEqual(2);
+      expect(new Set(eggs.map(p => addLabel(p.id))).size).toBe(eggs.length);
+      market.close();
+      await advanceTransition();
+      fireEvent.press(market.screen.getByRole('button', { name: '장바구니 열기' }));
+      expect(market.screen.getByText(/담은 물건 3개/)).toBeTruthy();
+    } finally { market.screen.unmount(); }
+  });
+
   it('진열대 퇴장 애니메이션이 끝날 때까지 이동을 잠그고 매장 안에 남는다', async () => {
     const market = renderEmbeddedMarket();
     try {
@@ -91,14 +119,14 @@ describe('몰입형 진열대 진입과 매장 복귀', () => {
 
       await market.open({ id: 1, station: 'fresh' });
       expect(market.onLockChange).toHaveBeenLastCalledWith(true);
-      expect(market.screen.getByRole('button', { name: '흰 우유 담기' })).toBeTruthy();
+      expect(market.screen.getByRole('button', { name: addLabel('milk') })).toBeTruthy();
 
       market.close();
       expect(market.onLockChange).toHaveBeenLastCalledWith(true);
       await advanceTransition();
 
       expect(market.onLockChange).toHaveBeenLastCalledWith(false);
-      expect(market.screen.queryByRole('button', { name: '흰 우유 담기' })).toBeNull();
+      expect(market.screen.queryByRole('button', { name: addLabel('milk') })).toBeNull();
       expect(market.onExit).not.toHaveBeenCalled();
     } finally {
       market.screen.unmount();
@@ -110,7 +138,7 @@ describe('몰입형 진열대 진입과 매장 복귀', () => {
     try {
       await market.start();
       await market.open({ id: 1, station: 'fresh' });
-      fireEvent.press(market.screen.getByRole('button', { name: '흰 우유 담기' }));
+      fireEvent.press(market.screen.getByRole('button', { name: addLabel('milk') }));
       market.close();
       await advanceTransition();
 
@@ -120,14 +148,14 @@ describe('몰입형 진열대 진입과 매장 복귀', () => {
       expect(market.onLockChange).toHaveBeenLastCalledWith(false);
 
       await market.open({ id: 2, station: 'fresh' });
-      expect(market.screen.getAllByLabelText('흰 우유 한 개 더 담기').length).toBeGreaterThan(0);
-      expect(market.screen.queryByRole('button', { name: '흰 우유 담기' })).toBeNull();
+      expect(market.screen.getAllByLabelText(addLabel('milk')).length).toBeGreaterThan(0);
+      expect(market.screen.getByRole('button', { name: addLabel('milk') }).props.accessibilityHint).toContain('현재 담은 수량 1개');
       market.close();
       await advanceTransition();
 
       await market.open({ id: 3, station: 'produce' });
-      expect(market.screen.getByRole('button', { name: '사과 담기' })).toBeTruthy();
-      fireEvent.press(market.screen.getByRole('button', { name: '사과 담기' }));
+      expect(market.screen.getByRole('button', { name: addLabel('apple') })).toBeTruthy();
+      fireEvent.press(market.screen.getByRole('button', { name: addLabel('apple') }));
       market.close();
       await advanceTransition();
 
@@ -153,7 +181,7 @@ describe('몰입형 진열대 진입과 매장 복귀', () => {
       expect(market.onLockChange.mock.calls.filter(([locked]) => locked === false)).toHaveLength(1);
       await market.open({ id: 2, station: 'produce' });
       expect(market.onLockChange).toHaveBeenLastCalledWith(true);
-      expect(market.screen.getByRole('button', { name: '사과 담기' })).toBeTruthy();
+      expect(market.screen.getByRole('button', { name: addLabel('apple') })).toBeTruthy();
       expect(market.onExit).not.toHaveBeenCalled();
     } finally {
       market.screen.unmount();
@@ -211,15 +239,15 @@ describe('진열대 전체 화면 구성과 뒤로가기', () => {
       await advanceTransition();
       const rowsBefore = screen.getAllByTestId(/^market-shelf-row-/).map(row => StyleSheet.flatten(row.props.style));
       const dockBefore = StyleSheet.flatten(screen.getByTestId('market-shelf-basket-dock').props.style);
-      expect(screen.queryByRole('button', { name: '흰 우유 냉장 식품 진열대에 1개 내려놓기' })).toBeNull();
+      expect(screen.queryByRole('button', { name: removeLabel('milk') })).toBeNull();
       fireEvent.press(screen.getByRole('button', { name: '진열대 장바구니 보기' }));
       await advanceTransition();
       expect(screen.getByText('담은 수량 2개')).toBeTruthy();
       expect(screen.getByText('개당 2,200원')).toBeTruthy();
       expect(screen.queryByText('4,400원')).toBeNull();
       expect(screen.getByTestId('market-shelf-cart-items').props.horizontal).toBe(true);
-      expect(screen.getByRole('button', { name: '흰 우유 냉장 식품 진열대에 1개 내려놓기' })).toBeTruthy();
-      expect(screen.queryByRole('button', { name: '흰 우유 한 개 더 담기' })).toBeNull();
+      expect(screen.getByRole('button', { name: removeLabel('milk') })).toBeTruthy();
+      expect(screen.queryByRole('button', { name: addLabel('milk') })).toBeNull();
       expect(screen.getAllByTestId(/^market-shelf-row-/, { includeHiddenElements: true }).map(row => StyleSheet.flatten(row.props.style))).toEqual(rowsBefore);
       expect(StyleSheet.flatten(screen.getByTestId('market-shelf-basket-dock', { includeHiddenElements: true }).props.style)).toEqual(dockBefore);
       expect(screen.getAllByTestId(/^market-product-drag-/, { includeHiddenElements: true })).toHaveLength(12);
@@ -228,10 +256,10 @@ describe('진열대 전체 화면 구성과 뒤로가기', () => {
       fireEvent.press(screen.getByRole('button', { name: '진열대 장바구니 닫기' }));
       expect(screen.getByTestId('market-shelf-cart-popup', { includeHiddenElements: true }).props.pointerEvents).toBe('none');
       expect(screen.getByTestId('market-shelf-surface', { includeHiddenElements: true }).props.pointerEvents).toBe('none');
-      expect(screen.queryByRole('button', { name: '흰 우유 냉장 식품 진열대에 1개 내려놓기' })).toBeNull();
+      expect(screen.queryByRole('button', { name: removeLabel('milk') })).toBeNull();
       await advanceTransition();
       expect(screen.queryByTestId('market-shelf-cart-popup')).toBeNull();
-      expect(screen.getByRole('button', { name: '흰 우유 한 개 더 담기' })).toBeTruthy();
+      expect(screen.getByRole('button', { name: addLabel('milk') })).toBeTruthy();
       fireEvent.press(screen.getByRole('button', { name: '진열대 장바구니 보기' }));
       await advanceTransition();
       expect(screen.getByText('담은 수량 2개')).toBeTruthy();
@@ -254,7 +282,7 @@ describe('진열대 전체 화면 구성과 뒤로가기', () => {
       else fireEvent(screen.getByTestId('market-shelf-cart-popup'), 'accessibilityEscape');
       await advanceTransition();
       expect(screen.queryByTestId('market-shelf-cart-popup')).toBeNull();
-      expect(screen.getByRole('button', { name: '흰 우유 담기' })).toBeTruthy();
+      expect(screen.getByRole('button', { name: addLabel('milk') })).toBeTruthy();
       expect(onCartVisibilityChange.mock.calls).toEqual([[true], [false]]);
       expect(onClose).not.toHaveBeenCalled();
     } finally { screen.unmount(); }
@@ -299,14 +327,14 @@ describe('진열대 전체 화면 구성과 뒤로가기', () => {
       expect(screen.getAllByRole('button', { name: /진열대에 1개 내려놓기$/ })).toHaveLength(1);
       expect(screen.queryByRole('button', { name: /사과.*내려놓기/ })).toBeNull();
       expect(screen.queryByRole('button', { name: /AA 건전지.*내려놓기/ })).toBeNull();
-      fireEvent.press(screen.getByRole('button', { name: '흰 우유 냉장 식품 진열대에 1개 내려놓기' }));
+      fireEvent.press(screen.getByRole('button', { name: removeLabel('milk') }));
       expect(onChangeQuantity.mock.calls).toEqual([['milk', -1]]);
 
       screen.rerender(<MarketShelfScene {...props} category={marketCategories.find(item => item.id === 'household')!} slots={['aa-batteries']} />);
       expect(screen.getByText('냉장 식품 진열대에서 내려놓기')).toBeTruthy();
       expect(screen.queryByRole('button', { name: /흰 우유.*내려놓기/ })).toBeNull();
       expect(screen.getAllByRole('button', { name: /진열대에 1개 내려놓기$/ })).toHaveLength(1);
-      fireEvent.press(screen.getByRole('button', { name: 'AA 건전지 4개입 생활용품 진열대에 1개 내려놓기' }));
+      fireEvent.press(screen.getByRole('button', { name: removeLabel('aa-batteries') }));
       expect(onChangeQuantity.mock.calls).toEqual([['milk', -1], ['aa-batteries', -1]]);
       expect(screen.getByText('담은 수량 3개')).toBeTruthy();
     } finally { screen.unmount(); }
@@ -361,7 +389,7 @@ describe('진열대 전체 화면 구성과 뒤로가기', () => {
 
 
         for (const product of marketProducts.filter(item => slots.includes(item.id))) {
-          expect(screen.getAllByRole('button', { name: `${product.name} 담기` }).length).toBeGreaterThan(0);
+          expect(screen.getAllByRole('button', { name: addLabel(product.id) }).length).toBeGreaterThan(0);
           expect(screen.getAllByLabelText(`${product.name} 상품`).length).toBeGreaterThan(0);
           visibleProducts.add(product.id);
         }

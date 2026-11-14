@@ -53,6 +53,7 @@ class AiAnalysisChainIntegrationTest {
     @Autowired private MockMvc mvc;
     @MockitoBean private GroqChatClient client;
     @MockitoBean private oneuldo.behaviorlog.analysis.service.AnalysisCallPacer pacer;
+    @MockitoBean private oneuldo.behaviorlog.analysis.service.AnalysisJobService jobs;
 
     @Test
     void 원본에서_AI분석과_연습목표를_거쳐_퀘스트까지_연결하고_영속화한다() throws Exception {
@@ -89,7 +90,7 @@ class AiAnalysisChainIntegrationTest {
         assertThat(quest.personalizationMode()).isEqualTo("AI_PROFILE");
         assertThat(normalized.count()).isEqualTo(normalizedBefore);
         assertThat(context.getBeansOfType(BehaviorNormalizationListener.class)).isEmpty();
-        verify(client).complete(anyString(), contains("목록과 수량 비교 연습"), eq(900), anyDouble());
+        verify(client).complete(anyString(), contains("목록과 수량 비교 연습"), eq(MarketAiQuestService.OUTPUT_MAX_TOKENS), anyDouble());
         mvc.perform(get("/api/behavior-analyses/" + run.getId()).header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.analysisId").value(run.getId().toString()))
                 .andExpect(jsonPath("$.analysis.practicePlan.goal").value("목록과 수량 비교 연습"))
@@ -113,6 +114,51 @@ class AiAnalysisChainIntegrationTest {
         assertThat(analyses.latest(member.getId()).status()).isEqualTo("READY");
     }
 
+    @Test void 퀘스트_API는_현재원본매장을_받고_같은배치만_재사용하며_본문없는_요청도_지원한다() throws Exception {
+        var owner = member();
+        var session = UUID.randomUUID();
+        log(owner, session, 1);
+        stubAnalysisAndQuest(false);
+        analyses.analyzeSession(owner.getId(), session);
+        var token = tokens.createAccessToken(owner);
+        var legacyRequest = mvc.perform(post("/api/market-personalization/quest").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.quest.environmentPlan.shelfOrder.length()").value(5))
+                .andReturn();
+        var withoutContext = mapper.readTree(legacyRequest.getResponse().getContentAsString()).path("generationId").asString();
+        var body = """
+                {"environmentContext":{"layoutId":"classic","world":{"width":1280,"height":1400},"spawn":{"x":700,"y":1200},
+                 "shelfSlots":[{"slotId":"northwest","categoryId":"produce","x":100,"y":200,"orientation":"horizontal"},
+                  {"slotId":"northeast","categoryId":"fresh","x":200,"y":200,"orientation":"horizontal"},
+                  {"slotId":"middle-west","categoryId":"household","x":300,"y":400,"orientation":"vertical"},
+                  {"slotId":"middle-center","categoryId":"meal","x":400,"y":400,"orientation":"vertical"},
+                  {"slotId":"middle-east","categoryId":"drink","x":500,"y":400,"orientation":"vertical"}]}}
+                """;
+        clearInvocations(client);
+        var currentRequest = mvc.perform(post("/api/market-personalization/quest").header("Authorization", "Bearer " + token)
+                        .contentType("application/json").content(body))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.quest.environmentPlan.rationale").exists()).andReturn();
+        var current = mapper.readTree(currentRequest.getResponse().getContentAsString()).path("generationId").asString();
+        assertThat(current).isNotEqualTo(withoutContext);
+        verify(client).complete(anyString(), contains("currentEnvironmentContext"), eq(MarketAiQuestService.OUTPUT_MAX_TOKENS), anyDouble());
+        clearInvocations(client);
+        mvc.perform(post("/api/market-personalization/quest").header("Authorization", "Bearer " + token)
+                        .contentType("application/json").content(body))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.generationId").value(current));
+        verifyNoInteractions(client);
+        var preservedRequest = mvc.perform(post("/api/market-personalization/quest").header("Authorization", "Bearer " + token)
+                        .contentType("application/json").content(body.replace("\"layoutId\":\"classic\"", "\"layoutId\":\"classic\",\"preserveShelfOrder\":true")))
+                .andExpect(status().isOk()).andReturn();
+        assertThat(mapper.readTree(preservedRequest.getResponse().getContentAsString()).path("generationId").asString()).isNotEqualTo(current);
+        verify(client).complete(anyString(), contains("preserveShelfOrder"), eq(MarketAiQuestService.OUTPUT_MAX_TOKENS), anyDouble());
+        clearInvocations(client);
+        mvc.perform(post("/api/market-personalization/quest").header("Authorization", "Bearer " + token)
+                        .contentType("application/json").content(body.replace("\"width\":1280", "\"width\":5000")))
+                .andExpect(status().isBadRequest());
+        mvc.perform(post("/api/market-personalization/quest").contentType("application/json").content(body))
+                .andExpect(status().isUnauthorized());
+        verifyNoInteractions(client);
+    }
+
     @Test
     void 기록없는_사용자와_미인증요청을_별도처리한다() throws Exception {
         var member = member(); var token = tokens.createAccessToken(member);
@@ -123,8 +169,40 @@ class AiAnalysisChainIntegrationTest {
         mvc.perform(get("/api/user-profiles/current").header("Authorization", "Bearer " + token))
                 .andExpect(status().isNoContent());
         mvc.perform(get("/api/user-profiles/current")).andExpect(status().isUnauthorized());
-        assertThatThrownBy(() -> quests.generate(member.getId())).isInstanceOf(ResponseStatusException.class);
+        assertThatThrownBy(() -> quests.generate(member.getId())).isInstanceOf(oneuldo.behaviorlog.personalization.service.MarketBaselineRequiredException.class);
+        mvc.perform(post("/api/market-personalization/quest").header("Authorization", "Bearer " + token))
+                .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("MARKET_BASELINE_REQUIRED"))
+                .andExpect(jsonPath("$.stage").value("FIRST_PLAY"))
+                .andExpect(jsonPath("$.source").value("STATIC"))
+                .andExpect(jsonPath("$.availability.readyProfileAvailable").value(false));
+        mvc.perform(post("/api/market-personalization/quest"))
+                .andExpect(status().isUnauthorized());
+        var absentMember = mock(Member.class);
+        when(absentMember.getId()).thenReturn(UUID.randomUUID());
+        when(absentMember.getRole()).thenReturn(MemberRole.CHILD);
+        var foreignToken = tokens.createAccessToken(absentMember);
+        var unknown = mvc.perform(post("/api/market-personalization/quest").header("Authorization", "Bearer " + foreignToken))
+                .andExpect(status().isNotFound()).andReturn();
+        assertThat(unknown.getResponse().getContentAsString()).doesNotContain("MARKET_BASELINE_REQUIRED");
         assertThat(profiles.current(member.getId())).isEmpty();
+        verifyNoInteractions(client);
+    }
+
+    @Test void 첫제출이_없어도_분석실패와_진행상태를_첫관찰과제로_바꾸지_않는다() throws Exception {
+        var owner = member();
+        var token = tokens.createAccessToken(owner);
+        var session = UUID.randomUUID();
+        var now = Instant.now();
+        when(jobs.current(owner.getId())).thenReturn(new oneuldo.behaviorlog.analysis.service.AnalysisJobService.Job(
+                UUID.randomUUID(), session, UUID.randomUUID(), "FAILED", "FAILED", 0, 0,
+                null, null, "AI_UNAVAILABLE", now, now));
+        mvc.perform(post("/api/market-personalization/quest").header("Authorization", "Bearer " + token))
+                .andExpect(status().isServiceUnavailable()).andExpect(jsonPath("$.code").value("LATEST_PLAY_PROFILE_FAILED"));
+        when(jobs.current(owner.getId())).thenReturn(new oneuldo.behaviorlog.analysis.service.AnalysisJobService.Job(
+                UUID.randomUUID(), session, UUID.randomUUID(), "RUNNING", "PROFILE", 0, 0,
+                null, null, null, now, now));
+        mvc.perform(post("/api/market-personalization/quest").header("Authorization", "Bearer " + token))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("LATEST_PLAY_PROFILE_PENDING"));
         verifyNoInteractions(client);
     }
 
@@ -154,13 +232,16 @@ class AiAnalysisChainIntegrationTest {
         when(client.complete(anyString(), anyString(), anyInt(), anyDouble())).thenAnswer(invocation -> {
             String system=(String)invocation.getArgument(0);
             String prompt=(String)invocation.getArgument(1);
+            if (prompt.contains("\"reviewPurpose\":\"DELIVERED_QUEST_CONSISTENCY\""))
+                return oneuldo.behaviorlog.personalization.service.MarketQuestReviewFixtures.valid(mapper, prompt);
             if (system.contains("퀘스트 설계자")) {
                 if (questFails) throw new IllegalStateException("test provider error");
                 return new GroqChatClient.GroqChatResult("""
-                        {"difficulty":1,"scenarioId":"CUSTOM","title":"수량 비교 연습","description":"목록을 보고 물건을 담아요.","budget":4000,
+                        {"difficulty":1,"scenarioId":"CUSTOM","title":"수량 비교 연습","description":"목록을 보고 물건을 담아요.","budget":4000,"timeLimitSeconds":300,
                          "objectives":[{"productId":"milk","quantity":1},{"productId":"apple","quantity":1}],
                          "briefing":["목록과 수량을 비교해요."],"checkoutDialogue":["수량을 확인해요.","계산을 진행해요."],
-                         "successMessage":"연습을 마쳤어요.","adaptationSummary":"수량 비교 관찰에 따른 연습","reasonCodes":["QUANTITY_PRACTICE"]}
+                         "successMessage":"연습을 마쳤어요.","adaptationSummary":"수량 비교 관찰에 따른 연습","reasonCodes":["QUANTITY_PRACTICE"],
+                         "environmentPlan":{"shelfOrder":["produce","fresh","household","meal","drink"],"rationale":"수량 비교에 집중하도록 상품군 배정을 유지해요."}}
                         """, "mock-qwen");
             }
             if (system.contains("사용자 프로필을 갱신")) {
@@ -168,9 +249,9 @@ class AiAnalysisChainIntegrationTest {
                 String evidence=input.path("currentAnalysis").path("findings").get(0).path("evidenceEventIds").get(0).asString();
                 return new GroqChatClient.GroqChatResult("""
                         {"summary":"목록 확인 행동이 누적 관찰되었습니다.","findings":[{"id":"F1","skill":"수량 확인","observation":"목록을 열었습니다.",
-                        "interpretation":"수량을 확인했을 가능성이 있습니다.","alternativeExplanations":["단순 탐색일 수도 있습니다."],
+                        "interpretation":"목록 열기는 기록되었고 수량 조절은 확인되지 않았습니다.","alternativeExplanations":["조작 목적은 기록으로 확인되지 않습니다."],
                         "evidenceEventIds":["%s"],"suggestedSupport":"목록을 함께 읽습니다."}],"uncertainties":["실생활 수행은 알 수 없습니다."],
-                        "practicePlan":{"targetFindingIds":["F1"],"goal":"목록과 수량 비교 연습","rationale":"누적 관찰과 연결",
+                        "practicePlan":{"targetFindingIds":["F1"],"goal":"목록과 수량 비교 연습","rationale":"변경: 수량 비교 안내를 추가. 확인: 목록과 수량 비교 조작.",
                         "recommendedDifficulty":1,"itemCount":2,"quantityComplexity":"LOW","budgetPressure":"LOW","textSupport":"SIMPLIFIED",
                         "reasonCodes":["QUANTITY_PRACTICE"]},"usedEvidenceCardIds":[]}
                         """.formatted(evidence),"mock-qwen");
@@ -183,13 +264,14 @@ class AiAnalysisChainIntegrationTest {
             var sessionId = UUID.randomUUID();
             var analysis = new AiBehaviorAnalysis("목록을 열었습니다.",
                     List.of(new AiBehaviorAnalysis.Finding("F1", "수량 확인", "목록을 열었습니다.", "수량을 확인했을 가능성이 있습니다.",
-                            List.of("단순 탐색일 수도 있습니다."), List.of(eventId), "목록을 함께 읽습니다.")),
+                            List.of("조작 목적은 기록으로 확인되지 않습니다."), List.of(eventId), "목록을 함께 읽습니다.")),
                     List.of(new AiBehaviorAnalysis.SessionAssessment(sessionId, "UNDETERMINED", "장면이 끝나지 않았습니다.", List.of(eventId))),
                     List.of("실생활 수행은 알 수 없습니다."),
                     new AiBehaviorAnalysis.PracticePlan(List.of("F1"), "목록과 수량 비교 연습", "목록 열람 행동과 연결", 1, 2,
                             "LOW", "LOW", "SIMPLIFIED", List.of("QUANTITY_PRACTICE")));
-            return new GroqChatClient.GroqChatResult(mapper.writeValueAsString(analysis)
-                    .replace(eventId.toString(), eventAlias).replace(sessionId.toString(), sessionAlias), "mock-qwen");
+            String raw = mapper.writeValueAsString(analysis).replace(eventId.toString(), eventAlias).replace(sessionId.toString(), sessionAlias);
+            return new GroqChatClient.GroqChatResult(system.equals(oneuldo.behaviorlog.analysis.service.AnalysisReviewPrompt.system())
+                    ? CurrentReviewFixtures.fromPlain(mapper, raw) : raw, "mock-qwen");
         });
     }
 
@@ -267,7 +349,7 @@ class AiAnalysisChainIntegrationTest {
         assertThat(second.get(10,java.util.concurrent.TimeUnit.SECONDS).generationId()).isEqualTo(result.generationId());
         assertThat(third.get(10,java.util.concurrent.TimeUnit.SECONDS).generationId()).isEqualTo(result.generationId());
         assertThat(calls).hasValue(1);
-        verify(client,times(1)).complete(anyString(),anyString(),anyInt(),anyDouble());
+        verify(client,times(2)).complete(anyString(),anyString(),anyInt(),anyDouble());
         clearInvocations(client);
         // A separate service object has no in-flight state: completed reuse must come from the database.
         var replay=quests.generate(owner.getId());
@@ -282,7 +364,7 @@ class AiAnalysisChainIntegrationTest {
         assertThat(analyses.find(owner.getId(),updated.analysisId()).eventCount()).isEqualTo(2);
         assertThat(profiles.requireCurrent(owner.getId()).profileVersion()).isEqualTo(2);
         assertThat(updated.profileId()).isEqualTo(profiles.requireCurrent(owner.getId()).profileId());
-        verify(client,times(3)).complete(anyString(),anyString(),anyInt(),anyDouble());
+        verify(client,times(4)).complete(anyString(),anyString(),anyInt(),anyDouble());
     }
 
     @Test void 실패한_분석도_동일스냅샷으로_재시도하며_READY만_재사용한다() {

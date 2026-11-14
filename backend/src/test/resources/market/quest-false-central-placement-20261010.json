@@ -1,0 +1,164 @@
+{
+  "provenance": {
+    "source": "Actual v26 generation 473aa43e-6f9d-4aa4-8252-4b9be35b97cb and preserved VALID review",
+    "newGamePlays": 0,
+    "reviewHasV27Claims": false,
+    "operatorExpectedOutcomeNotSentToModel": true
+  },
+  "input": {
+    "deliveredQuest": {
+      "title": "흰 우유 1개 담기",
+      "budget": 3000,
+      "briefing": [
+        "흰 우유 900mL 1개를 구매합니다.",
+        "진열대에서 '900mL'라고 적힌 흰 우유를 찾아요.",
+        "장바구니에 1개 추가합니다."
+      ],
+      "difficulty": 1,
+      "objectives": [
+        {
+          "quantity": 1,
+          "productId": "milk"
+        }
+      ],
+      "scenarioId": "CUSTOM",
+      "description": "흰 우유 900mL 1개를 장바구니에 추가하는 연습입니다.",
+      "reasonCodes": [
+        "NO_SELECTION_RECORD",
+        "TIME_EXPIRED_EMPTY_CART"
+      ],
+      "successMessage": "흰 우유 900mL 1개를 성공적으로 담았어요!",
+      "environmentPlan": {
+        "rationale": "목표 상품인 흰 우유가 속한 fresh 상품군을 첫 번째 슬롯에 배치해 탐색 부담을 줄이고 조작 연습에 집중합니다.",
+        "shelfOrder": [
+          "fresh",
+          "produce",
+          "meal",
+          "drink",
+          "household"
+        ]
+      },
+      "checkoutDialogue": [
+        "장바구니에 담긴 흰 우유의 용량 표시를 확인해요.",
+        "900mL가 아니라면 다시 고르기로 돌아가 수량을 0으로 줄이고 900mL 제품을 담아요."
+      ],
+      "timeLimitSeconds": 300,
+      "adaptationSummary": "이전 세션에서 상품 선택 및 추가 행동이 기록되지 않았습니다. 단일 품목과 낮은 수량 부담으로 조작 방법을 구체적으로 안내하며 연습합니다. fresh 매대를 중앙에 배치해 접근성을 고려합니다."
+    },
+    "candidateFacts": {
+      "budget": 3000,
+      "lineItems": [
+        {
+          "name": "흰 우유",
+          "detail": "900mL",
+          "quantity": 1,
+          "subtotal": 2200,
+          "productId": "milk",
+          "salesUnit": "개",
+          "unitPrice": 2200,
+          "categoryId": "fresh"
+        }
+      ],
+      "budgetSlack": 800,
+      "quantityScope": "상품 구매 단위 수의 합이다. 포장 안 낱개 수·용량·개념 숙달·난이도 점수가 아니다.",
+      "objectiveCount": 1,
+      "timeLimitSeconds": 300,
+      "plannedShelfOrder": [
+        "fresh",
+        "produce",
+        "meal",
+        "drink",
+        "household"
+      ],
+      "objectiveCostTotal": 2200,
+      "shelfAssignmentScope": "이번 출력의 요청 배정과 현재 원본 자리의 문자 비교다. 실제 적용·이동 거리·동선 효과를 확정하지 않는다. 원본 없는 위치는 채우지 않는다.",
+      "objectiveQuantityTotal": 1,
+      "plannedSlotAssignments": [
+        {
+          "x": 354.52500000000003,
+          "y": 191.2,
+          "slotId": "northwest",
+          "categoryId": "fresh",
+          "orientation": "horizontal"
+        },
+        {
+          "x": 714.5250000000001,
+          "y": 191.2,
+          "slotId": "northeast",
+          "categoryId": "produce",
+          "orientation": "horizontal"
+        },
+        {
+          "x": 338.425,
+          "y": 422.4,
+          "slotId": "middle-west",
+          "categoryId": "meal",
+          "orientation": "vertical"
+        },
+        {
+          "x": 580.425,
+          "y": 422.4,
+          "slotId": "middle-center",
+          "categoryId": "drink",
+          "orientation": "vertical"
+        },
+        {
+          "x": 830.425,
+          "y": 422.4,
+          "slotId": "middle-east",
+          "categoryId": "household",
+          "orientation": "vertical"
+        }
+      ],
+      "sameCategoryOrderAsCurrentEnvironment": false
+    },
+    "practiceHistoryFacts": [
+      {
+        "recordedTasks": [
+          {
+            "mission": {
+              "budget": 26000
+            }
+          }
+        ]
+      }
+    ],
+    "budgetComparisonSource": {
+      "sourcePath": "/practiceHistoryFacts/0/recordedTasks/0/mission/budget",
+      "sourceBudget": 26000
+    }
+  },
+  "actualV26Review": {
+    "checkedDimensions": [
+      "OBJECTIVES",
+      "BUDGET",
+      "TIME",
+      "SUPPORT",
+      "SHELVES",
+      "HISTORY",
+      "PURPOSE"
+    ],
+    "objectiveCostTotal": 2200,
+    "issues": [],
+    "adaptationPlan": {
+      "observationPurpose": "이전 세션에서 상품 선택 및 추가 행동이 전혀 기록되지 않았으므로, 단일 품목(흰 우유 1개)과 낮은 예산 부담으로 조작 방법(장바구니 추가)의 숙달 여부를 확인합니다. fresh 매대 배치를 중앙으로 변경하여 탐색 부담을 줄이고 조작 성공 가능성을 높입니다.",
+      "deliveredChanges": [
+        "목표 품목 수를 4종에서 1종(흰 우유)으로 감소",
+        "구매 수량을 총 9개에서 1개로 감소",
+        "예산을 26,000원에서 3,000원으로 감소",
+        "제한 시간을 600초에서 300초로 감소",
+        "fresh 매대 배치를 middle-center(중앙)으로 변경하여 접근성 지원",
+        "briefing 및 checkoutDialogue를 단일 품목 조작 연습에 특화하여 단순화"
+      ]
+    },
+    "objectiveQuantityTotal": 1,
+    "budgetClaim": {
+      "proposedBudget": 3000,
+      "sourceBudget": 26000,
+      "relation": "DECREASED",
+      "sourcePath": "/practiceHistoryFacts/0/recordedTasks/0/mission/budget",
+      "quote": "이전 세션에서 상품 선택 및 추가 행동이 기록되지 않았습니다. 단일 품목과 낮은 수량 부담으로 조작 방법을 구체적으로 안내하며 연습합니다. fresh 매대를 중앙에 배치해 접근성을 고려합니다."
+    },
+    "verdict": "VALID"
+  }
+}

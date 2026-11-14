@@ -2,7 +2,7 @@
 // Experimental measurements only; no changes to production AI judgments or actor error rates.
 const { createHash } = require('node:crypto');
 require('./runtime.cjs');
-const { marketReplayTraceId, validateMarketReplayTrace, canonicalMarketReplayJson } = require('../frontend/src/game/marketReplayTrace.ts');
+const { marketReplayTraceId, validateMarketReplayTrace, canonicalMarketReplayJson, marketReplayFingerprint } = require('../frontend/src/game/marketReplayTrace.ts');
 const { validateAttentionMemory } = require('./src/attentionPolicy.ts');
 const {validateLearning,validateLearnerIdentity,assertLearnerIdentity,assertPersonaLearningEligible,LEARNER_IDENTITY_KEYS,learnerIdentityFrom} = require('./src/actorLearning.ts');
 const {TraceGuard} = require('./src/traceValidation.ts');
@@ -73,10 +73,79 @@ function bindLearningIdentity(identity, trace, replay) {
     need(identity[key] === value, `Learner identity mismatch: ${key}`);
 }
 
+/** Experimental condition episode-outcome-v1: what the actor's own executed ending left on screen
+ * (how it ended, the final basket, whether purchase was confirmed). No list comparison, score or next-step advice.
+ */
+function episodeOutcome(trace, replay, guard) {
+  // Lifecycle steps (skipRating, leave) follow the actor's own ending; locate the ending itself.
+  const steps = actorSteps(trace), final = guard.observe();
+  const endIndex = steps.findLastIndex(s => ['giveUp', 'submitForReview'].includes(s.type)), last = steps[endIndex >= 0 ? endIndex : steps.length - 1];
+  const items = Object.entries(final.cart ?? {}).filter(([, q]) => q > 0).map(([id, q]) => {
+    const p = marketProducts.find(p => p.id === id); return `${p ? `${p.name} ${p.detail ?? ''}`.trim() : id} ${q}개`;
+  });
+  const submitted = last.type === 'submitForReview';
+  const ending = submitted ? '구매 확정을 눌러 끝났어요' : last.type === 'giveUp' ? '이번 장보기 그만하기로 끝났어요' : '장보기가 끝났어요';
+  const result = `지난 장보기 결과: ${ending}. ${submitted ? '확정한' : '끝날 때'} 장바구니: ${items.length ? items.join(', ') : '비어 있음'}. 구매 확정: ${submitted ? '함' : '안 함'}.`;
+  return { action: 'episode-outcome', result, source: 'executed-app-action',
+    evidence: { sessionId: replay.sessionId, replayId: replay.replayId, traceId: trace.traceId, stepId: last.id, stepIndex: steps.indexOf(last) } };
+}
+
+/** Condition procedural-routine-v1: the actor's own executed step order, compressed. Waiting, closing views and
+ * lifecycle steps are omitted; no step is added, reordered or judged. */
+function routineToken(step, before) {
+  const product = id => { const p = marketProducts.find(p => p.id === id); return p ? `${p.name} ${p.detail ?? ''}`.trim() : id; };
+  switch (step.type) {
+    case 'walkToAnchor': return '통로 걷기';
+    case 'walkTo': return `${before.visibleStations.find(s => s.id === step.target.stationId)?.label ?? step.target.stationId} 쪽으로 걷기`;
+    case 'openShelf': return `${before.visibleStations.find(s => s.id === step.stationId)?.label ?? step.stationId} 진열대 열기`;
+    case 'dragProduct': return `${product(step.productId)} ${step.quantity}개 담기`;
+    case 'removeProduct': return `${product(step.productId)} ${step.quantity}개 내려놓기`;
+    case 'closeStation': return before.phase === 'checkout' ? '계산 화면에서 다시 고르기' : before.shelf ? '다 골랐어요(진열대 닫기)' : '대화 닫기';
+    case 'checkout': return `${step.checkoutId === 'checkout-2' ? 2 : 1}번 계산대 이용하기`;
+    case 'submitForReview': return '구매 확정';
+    case 'giveUp': return '그만하기';
+    case 'viewCart': return '장바구니 보기';
+    case 'readList': return '목록 읽기';
+    case 'viewHelp': return '이용 방법 보기';
+    case 'talkToStaff': return '직원과 대화';
+    default: return null;
+  }
+}
+const EXPLORATION = new Set(['통로 걷기', '목록 읽기', '장바구니 보기', '이용 방법 보기']);
+/** Task-analysis style chunking: a run of only exploration controls becomes one counted segment,
+ *  so the executed milestones (shelf, add, close, checkout, confirm, stop) keep their order and stay visible. */
+function compressRoutine(tokens) {
+  const out = [];
+  for (const t of tokens) {
+    const last = out.at(-1);
+    if (EXPLORATION.has(t) && last?.explore) { last.counts[t] = (last.counts[t] ?? 0) + 1; continue; }
+    if (EXPLORATION.has(t)) { out.push({ explore: true, counts: { [t]: 1 } }); continue; }
+    if (last && !last.explore && last.t === t) last.n++; else out.push({ t, n: 1 });
+  }
+  return out.map(x => x.explore
+    ? (Object.keys(x.counts).length === 1 && Object.values(x.counts)[0] === 1 ? Object.keys(x.counts)[0]
+      : `둘러보기(${Object.entries(x.counts).map(([k, n]) => `${k} ${n}`).join('·')})`)
+    : x.n > 1 ? `${x.t}×${x.n}` : x.t);
+}
+function episodeRoutine(trace, replay, tokens, guard) {
+  const steps = actorSteps(trace), last = steps.at(-1), final = guard.observe();
+  const items = Object.entries(final.cart ?? {}).filter(([, q]) => q > 0).map(([id, q]) => {
+    const p = marketProducts.find(p => p.id === id); return `${p ? `${p.name} ${p.detail ?? ''}`.trim() : id} ${q}개`;
+  });
+  const tail = ` (끝날 때 장바구니: ${items.length ? items.join(', ') : '비어 있음'})`;
+  const full = compressRoutine(tokens);
+  const text = c => '지난 장보기에서 실제로 한 순서: ' + c.join(' → ') + tail;
+  // Bounded to 500 chars: keep the first 3 steps and as many final steps as fit, marking the omitted middle.
+  let chain = full;
+  for (let keep = full.length - 4; text(chain).length > 500 && keep >= 1; keep--) chain = [...full.slice(0, 3), '…', ...full.slice(-keep)];
+  return { action: 'episode-routine', result: text(chain).slice(0, 500), source: 'executed-app-action',
+    evidence: { sessionId: replay.sessionId, replayId: replay.replayId, traceId: trace.traceId, stepId: last.id, stepIndex: steps.length - 1 } };
+}
+
 /** Reconstruct only content tied to executed controls, never AI analysis or task correctness.
  * Text comes from the shared app/guard presentation, not a claim of measured comprehension.
  */
-function executedLearning(trace, snapshot, replay, prior, identity) {
+function executedLearning(trace, snapshot, replay, prior, identity, options = {}) {
   if (prior) {
     validateLearning(prior); need(prior.memberId === replay.memberId, 'Learning cannot cross test accounts');
     if (identity) {
@@ -86,10 +155,26 @@ function executedLearning(trace, snapshot, replay, prior, identity) {
   }
   if (identity) bindLearningIdentity(identity,trace,replay);
   const episodes = [...(prior?.episodes ?? [])];
-  const guard = new TraceGuard(snapshot,trace.personaId,trace.personaVersion,'confirmed-experience',true,Boolean(identity));
+  const spatialEnabled=identity?.policyVersion==='episodic-choice-v11';
+  if(spatialEnabled)need(trace.attentionExperience?.layoutKey===marketReplayFingerprint(snapshot.environment),'Spatial memory layout must match actual replay geometry');
+  const spatialModule=spatialEnabled?require('./src/confirmedSpatialMemory.ts'):null;
+  const spatialRecorder=spatialEnabled?new spatialModule.ConfirmedSpatialRecorder(trace.attentionExperience.layoutKey,prior?.spatial,
+    prior?{sessionId:prior.sessionId,replayId:prior.replayId}:undefined,spatialModule.navigationGeometryKey(snapshot.environment)):null;
+  const guard = new TraceGuard(snapshot,trace.personaId,trace.personaVersion,'confirmed-experience',true,Boolean(identity),false,false,false,false,true,false,undefined,spatialEnabled);
+  const routineTokens=[];
   for(const [stepIndex,step] of actorSteps(trace).entries()) {
-    const before=guard.observeActor(); guard.execute(step); const after=guard.observeActor();
+    const before=guard.observeActor(); const applied=guard.execute(step); const after=guard.observeActor();
+    const token=routineToken(step,before);if(token)routineTokens.push(token);
     const e={action:step.type,source:'executed-app-action'};
+    if(spatialRecorder){
+      spatialRecorder.record(step,before,after,{sessionId:replay.sessionId,replayId:replay.replayId,traceId:trace.traceId,stepId:step.id,stepIndex},
+        spatialModule.navigationGeometryKey(applied.before.environment,applied.before.cashierAvailability));
+      if(step.type==='walkToAnchor'||step.type==='walkTo'){
+        const target=step.type==='walkToAnchor'?before.anchors.find(a=>a.id===step.target.anchorId):before.visibleStations.find(s=>s.id===step.target.stationId);
+        e.target=target.label;e.seenStations=after.visibleStations.slice(0,20).map(s=>s.label);
+        e.result=`Walked toward observed ${target.label} (${target.direction}, ${target.distanceBand}); arrived using ordinary app controls. Directions describe that historical observation only.`;
+      }
+    }
     if(step.type==='start' && before.instructions) e.instructions=before.instructions.lines;
     if(step.type==='readList' && after.readObjectives) e.readList=after.readObjectives.map(x=>({label:x.label,quantity:x.quantity}));
     if(['openShelf','browse'].includes(step.type) && after.products.length) {
@@ -107,7 +192,7 @@ function executedLearning(trace, snapshot, replay, prior, identity) {
       if(after.supportText?.length) e.supportText=[...after.supportText];
       e.result=after.supportText?.length ? 'Help text displayed; comprehension unknown.' : 'Help opened; help text not captured; comprehension unknown.';
     }
-    if(step.type==='talkToStaff' && ['requestCashier','returnProduct'].includes(step.choice) && after.result?.message) {
+    if(step.type==='talkToStaff' && ['requestCashier','returnProduct','askLocation'].includes(step.choice) && after.result?.message) {
       e.target=step.stationId;e.result=after.result.message;
       if(step.choice==='returnProduct') {
         const p=marketProducts.find(p=>p.id===step.productId);e.product=p?`${p.name} ${p.detail??''}`.trim():step.productId;e.quantity=step.quantity;
@@ -119,14 +204,22 @@ function executedLearning(trace, snapshot, replay, prior, identity) {
       episodes.push(e);
     } else if(Object.keys(e).length>2) episodes.push(e);
   }
+  if (identity && options.outcomeFeedback === 'episode-outcome-v1') episodes.push(episodeOutcome(trace, replay, guard));
+  if (identity && options.routineMemory === 'procedural-routine-v1') episodes.push(episodeRoutine(trace, replay, routineTokens, guard));
+  // remembered-route-v1: a contract marker (not an experience) that lets later rounds annotate passages from spatial memory.
+  if (identity && spatialEnabled && options.recallMove === 'remembered-route-v1') {
+    const steps = actorSteps(trace), last = steps.at(-1);
+    episodes.push({ action: 'episode-route-recall', result: 'remembered-route-v1', source: 'executed-app-action',
+      evidence: { sessionId: replay.sessionId, replayId: replay.replayId, traceId: trace.traceId, stepId: last.id, stepIndex: steps.length - 1 } });
+  }
   const artifact={version:identity?'2':'1',source:'confirmed-app-replay',...(identity??{}),memberId:replay.memberId,
-    sessionId:replay.sessionId,replayId:replay.replayId,episodes:identity?episodes:episodes.slice(-24)};
+    sessionId:replay.sessionId,replayId:replay.replayId,episodes:identity?episodes:episodes.slice(-24),...(spatialRecorder?{spatial:spatialRecorder.snapshot()}:{})};
   validateLearning(artifact);return artifact;
 }
 
-/** Conservative memory: retain only controls actually completed and products actually dragged.
- * Deliberately does not import planned-trace memory, goals, analysis, or the next quest's answer.
- * Spatial/visual discoveries and comprehension are unmeasured, so are not invented here.
+/** Legacy memory retains executed controls and products; explicit v11 also reconstructs
+ * bounded observed passages/landmarks from the actor prefix under the shared guard.
+ * Planned-trace memory, analysis, next-quest answers and comprehension are never imported.
  */
 function confirmedExperience(trace, snapshot, replay, receipt, prior, options = {}) {
   verifyExecution(trace, snapshot, replay, receipt, options);
@@ -146,6 +239,7 @@ function confirmedExperience(trace, snapshot, replay, receipt, prior, options = 
     giveUp:'giveUp', skipRating:'skipRating' };
   for (const step of actorSteps(trace)) {
     if (mapping[step.type]) controls.add(mapping[step.type]);
+    if (step.type === 'talkToStaff' && ['openLocationHelp','askLocation','backToStaff'].includes(step.choice)) controls.add(step.choice);
     if (step.type === 'dragProduct') {
       const p = marketProducts.find(p => p.id === step.productId);
       need(p, 'Unknown executed product');
@@ -153,12 +247,13 @@ function confirmedExperience(trace, snapshot, replay, receipt, prior, options = 
       products.set(p.id, { id:p.id, categoryId:p.categoryId, name:p.name, ...(p.detail ? { detail:p.detail } : {}), price:p.price, stock:0 });
     }
   }
-  const memory = { version:'1', stations:[], anchors:[], knownProducts:[...products.values()], controlsPracticed:[...controls] };
+  const learning=trace.generationPolicy==='llm'?executedLearning(trace,snapshot,replay,prior?.learning,identity,options):undefined;
+  const memory = { version:'1', stations:learning?.spatial?.stations??[], anchors:learning?.spatial?.anchors??[], knownProducts:[...products.values()], controlsPracticed:[...controls] };
   validateAttentionMemory(memory);
   return { visit:'revisit', previousLayoutKey:trace.attentionExperience.layoutKey, memory,
-    ...(trace.generationPolicy==='llm' ? {learning:executedLearning(trace,snapshot,replay,prior?.learning,identity)} : {}),
+    ...(learning ? {learning} : {}),
     provenance:{ source:'confirmed-app-replay', replayId:replay.replayId, sessionId:replay.sessionId, memberId:replay.memberId,
-      traceHash:hash(trace), databaseReceiptHash:hash(receipt), ...(identity ? {identity:{...identity}} : {}), comprehensionMeasured:false, spatialMemoryRetained:false,
+      traceHash:hash(trace), databaseReceiptHash:hash(receipt), ...(identity ? {identity:{...identity}} : {}), comprehensionMeasured:false, spatialMemoryRetained:!!learning?.spatial,
       ...(trace.generation?.systemCompletion ? {learningScope:'actor-prefix',
         systemCompletionFirstStepId:trace.generation.systemCompletion.firstStepId} : {}),
       ...(receipt.timeReversals ? { temporalWarning:'NON_MONOTONIC_MOVEMENT_TIMESTAMPS', timeReversals:receipt.timeReversals } : {}) } };

@@ -4,16 +4,20 @@ import { getMarketContrastProductIds } from './marketAlternatives';
 import { enabledMarketScenarios } from './marketContent';
 import { getMarketProduct, marketCategories, marketProducts, type MarketMission } from './scenarios';
 import { marketObjectiveLabel } from './marketObjectiveLabel';
+import { getMarketMissionEnvironmentConfig } from './marketEnvironmentPlan';
+import { resolveMarketRuntimePlan, runtimeSessionConfig } from './marketAdaptivePlan';
 
 /** Preserve task targets, accepted variants, and packaging contrasts in the rendered shelf. */
-export function createMissionSession(config: Partial<MarketSessionConfig>, mission?: MarketMission, environment?: MarketEnvironment) {
+export function createMissionSession(config: Partial<MarketSessionConfig>, mission?: MarketMission, environment?: MarketEnvironment, manualOverride=false) {
   if (!mission) return createMarketSession(config, environment);
-  const missionConfig = { ...config, difficulty: 'exact' as const,
-    // The AI mission contract contains its purchase requirements, not optional
-    // stockout, requester, drink-choice or receipt-error training objectives.
-    learning: { ...config.learning, stockoutEnabled: false, budgetChoiceEnabled: false, checkoutReviewMode: 'normal' as const },
-    environment: { ...config.environment, kioskLane: config.environment?.kioskLane ?? 'none' as const },
-    objectives: mission.objectives.map(({ productId, quantity }) => ({ productId, quantity, match: 'exact' as const })) };
+  const runtime=resolveMarketRuntimePlan(mission.runtimePlan);
+  const adaptive=runtime?runtimeSessionConfig(runtime):{};
+  const selected=manualOverride?{...adaptive,...config}:{...config,...adaptive};
+  const missionConfig = { ...selected, difficulty: (runtime||manualOverride?selected.difficulty:undefined) ?? 'exact' as const,
+    // Adaptive plans carry executable practice conditions; legacy quests retain their original semantics.
+    learning: runtime||manualOverride?selected.learning:{ ...config.learning, stockoutEnabled: false, budgetChoiceEnabled: false, checkoutReviewMode: 'normal' as const },
+    environment: { ...getMarketMissionEnvironmentConfig(mission.environmentPlan, selected.environment), kioskLane: selected.environment?.kioskLane ?? 'none' as const },
+    objectives: mission.objectives.map(({ productId, quantity }) => ({ productId, quantity, match: (runtime||manualOverride?selected.difficulty:undefined) ?? 'exact' as const })) };
   const draft = createMarketSession(missionConfig, environment);
   const preset = enabledMarketScenarios.find(candidate => candidate.id === mission.scenarioId);
   const required = new Set([

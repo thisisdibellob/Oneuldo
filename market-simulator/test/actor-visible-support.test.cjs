@@ -74,3 +74,27 @@ test('existing movement labels and visit annotations leave every observed choice
   }
   assert.deepEqual(actorChoices(o, { anchors: o.anchors.map(a => ({ id: a.id, visits: 10, neighbors: [] })), currentAnchor: null }).map(c => c.action), choices.map(c => c.action));
 });
+
+test('location question uses only the opened staff menu and returns the actual app response', () => {
+  const { assertDecision } = require('../src/llmPolicy.ts');
+  const { marketLocationResponse } = require('../../frontend/src/game/marketHelp.ts');
+  const g = guard({environment:{employeeCount:1}});
+  assert.equal(g.observeActor().locationChoices, undefined);
+  const stationId = g.observe().environment.stationDetails.find(s=>s.kind==='employee').id;
+  g.execute(walk(stationId));g.execute(step('talkToStaff',{stationId,choice:'open'}));
+  assert.equal(actorChoices(g.observeActor()).some(x=>x.action.type==='askLocation'),false);
+  assert.equal(actorChoices(g.observeActor()).some(x=>x.action.type==='openLocationHelp'),true);
+  assert.throws(()=>g.execute(step('talkToStaff',{stationId,choice:'askLocation',objectiveId:'objective-1'})),/menu first/);
+  g.execute(step('talkToStaff',{stationId,choice:'openLocationHelp'}));
+  const observed=g.observeActor();assert.equal(observed.locationChoices.length,g.observe().objectives.length);
+  const choice=actorChoices(observed).find(x=>x.action.type==='askLocation');
+  assertDecision({action:choice.action,delayMs:100,reason:'직원에게 표시된 물건 위치 묻기'});
+  g.execute(step('talkToStaff',{stationId,choice:'askLocation',objectiveId:choice.action.objectiveId}));
+  assert.equal(g.observeActor().result.message,g.observe().staffLearningFeedback.message);
+  assert.equal(g.observeActor().result.message,marketLocationResponse(g.observe().environment,'fresh'));
+  assert.equal(g.observeActor().readObjectives,undefined);
+  assert.equal(g.observeActor().visibleStations.length,0);
+  g.execute(step('talkToStaff',{stationId,choice:'backToStaff'}));
+  assert.equal(g.observeActor().locationChoices,undefined);
+  assert.equal(actorChoices(g.observeActor()).some(x=>x.action.type==='askLocation'),false);
+});

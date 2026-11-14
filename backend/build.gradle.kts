@@ -37,6 +37,8 @@ dependencies {
 }
 
 tasks.withType<Test> {
+	// Recorded full-source regression fixtures require more than the 512MiB default.
+	maxHeapSize = "2g"
 	useJUnitPlatform()
 }
 

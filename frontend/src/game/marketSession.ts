@@ -1,6 +1,8 @@
+import { marketLocationResponse } from './marketHelp';
 import { MARKET_ENVIRONMENT_PLAYER_RADIUS, getMarketWrongWayGate, getMarketWrongWayRearm, createMarketEnvironment, isMarketEnvironmentBlocked, isNearMarketStation, MarketEnvironment, MarketEnvironmentConfig, MarketEnvironmentStationId, MarketCashierAvailability, MarketCheckoutId, MarketKioskId } from './marketEnvironment';
 import { MarketCategoryId, marketCategories, marketProducts, MarketProduct, getMarketProduct } from './scenarios';
 import { Point } from './prototypeWorld';
+import type { MarketQuestTiming } from './marketQuestTime';
 import { resolveMarketEnvironmentMovement } from './marketMovement';
 import { normalizeMarketLearningConfig, type MarketLearningConfig, type MarketLearningState, type MarketStockoutState, type MarketUnavailableReason } from './marketLearning';
 import { createMarketCheckoutReview, correctMarketCheckoutReview, evaluateMarketCheckoutReview, getMarketCartFingerprint,
@@ -46,6 +48,7 @@ export type MarketAction = (
   | { type: 'requestSubstitution'; productId: string }
   | { type: 'reportUnavailable'; reason: MarketUnavailableReason }
   | { type: 'submitKiosk'; scannedCart: Record<string, number> }
+  | { type: 'expireTimeLimit'; timing: MarketQuestTiming }
   | { type: 'requestCheckoutCorrection'; productId: string; quantity: number }
   | { type: 'submit' | 'viewRequester' | 'retry' | 'giveUp' | 'skipRating' | 'closeStation' | 'viewCart' | 'viewCheckoutCart' | 'viewHelp' | 'closeView' }
   | { type: 'rate'; difficulty: number; interest: number }
@@ -82,7 +85,7 @@ export type MarketSession = {
   view: 'world' | 'cart' | 'help' | 'requester';
   attempts: number;
   feedback: MarketFeedback | null;
-  outcome: 'success' | 'gave-up' | null;
+  outcome: 'success' | 'gave-up' | 'time-limit-expired' | null;
   ratings: MarketRating | null;
   ratingSkipped: boolean;
   lastActionError: string | null;
@@ -178,7 +181,9 @@ export function createMarketSession(input: Partial<MarketSessionConfig> = {}, en
     }
   }
   const learningConfig = normalizeMarketLearningConfig(config.learning);
-  const stockoutObjective = learningConfig.stockoutEnabled ? objectives[0] : undefined;
+  const stockoutObjective = learningConfig.stockoutEnabled ? (learningConfig.stockoutProductId
+    ? objectives.find(o => o.productId === learningConfig.stockoutProductId) : objectives[0]) : undefined;
+  if(learningConfig.stockoutEnabled && !stockoutObjective) throw new Error('품절 대상이 구매 목표에 없어요.');
   if (stockoutObjective) {
     // A generic family match must not silently bypass the need to ask the requester.
     stockoutObjective.match = 'exact';
@@ -404,6 +409,14 @@ export function applyMarketAction(current: MarketSession, action: MarketAction):
   session.lastActionError = null;
   if (!action || typeof action.type !== 'string') return reject(session, action, '알 수 없는 행동이에요.');
   if (session.phase === 'finished' && !['rate', 'skipRating'].includes(action.type)) return reject(session, action, '이미 종료된 게임이에요.');
+  if (action.type === 'expireTimeLimit') {
+    session.phase = 'finished'; session.outcome = 'time-limit-expired'; session.activeStation = null; session.view = 'world';
+    record(session, 'time_limit_expired', { timing: action.timing, cart: clone(session.cart), objectives: clone(session.objectives) }, action.at);
+    record(session, 'session_finished', { outcome: session.outcome, attempts: session.attempts, cart: clone(session.cart),
+      reason: 'time_limit_expired', timing: action.timing, score: session.score, penaltyPoints: session.penaltyPoints,
+      alarmCount: session.alarmCount, wrongWayEntryCount: session.wrongWayEntryCount, paid: session.paid }, action.at);
+    return session;
+  }
   if (action.type === 'giveUp') {
     session.phase = 'finished'; session.outcome = 'gave-up'; session.activeStation = null; session.view = 'world';
     record(session, 'session_finished', { outcome: session.outcome, attempts: session.attempts, cart: clone(session.cart), reason: 'player_gave_up', score: session.score, penaltyPoints: session.penaltyPoints, alarmCount: session.alarmCount, wrongWayEntryCount: session.wrongWayEntryCount, paid: session.paid }, action.at);
@@ -530,7 +543,7 @@ export function applyMarketAction(current: MarketSession, action: MarketAction):
       const categoryId = objective ? productOrThrow(objective.productId).categoryId : choice!.categoryId;
       const category = marketCategories.find(item => item.id === categoryId)!;
       record(session, 'product_location_requested', { staffStation: station, objectiveId: action.objectiveId,
-        categoryId, message: (objective?.label ?? choice!.label) + '는 ' + category.label + ' 진열대에서 살펴볼 수 있어요.' }, action.at);
+        categoryId, message: marketLocationResponse(session.environment, categoryId) }, action.at);
       return session;
     }
     const task = session.learning.stockout;

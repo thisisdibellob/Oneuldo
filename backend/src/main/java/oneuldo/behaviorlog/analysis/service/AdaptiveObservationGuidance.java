@@ -1,0 +1,6 @@
+package oneuldo.behaviorlog.analysis.service;
+
+public final class AdaptiveObservationGuidance {
+    private AdaptiveObservationGuidance() {}
+    public static final String RULE="Deeply connect original goals, stock, guidance and geometry to ordered list/product comparison, selection, staff/requester inquiry, correction and intervening movements/blocking/revisits. Samples are not collisions. Distinguish returns, inquiries, exploration and control causes without inferring gaze/cognition/motives. For stockout compare staffChecked, requester approval/unavailability report, effectiveObjectives and actual submission; purchase before/after authorization differs. Evaluate extra drink and receipt correction only when enabled. Assisted performance is not independent performance; unobserved ability stays uncertain. Ground what to retain/change and next observation in practicePlan. Supported mechanics: classic/aisles/corner layouts, category shelf slots, staff/customer/pillar/cashier counts, kiosk, entrance construction, stock, stockout/substitution/extra drink/receipt error. displayedRuntimePreview records actual prior disclosure: announced stockouts/errors are not surprise independent discovery. Plans and actual delivery differ. Compare actual settings/geometry/help before claiming learning, independence or reduced movement burden.";
+}

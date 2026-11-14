@@ -9,18 +9,21 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ResponseStatusException;
 
-/** One shared upstream call, bounded waiting, at most one outstanding call per team key. */
+/** Configurable bounded upstream work and per-key admission; defaults retain single-call fairness. */
 @Component
 public class InferenceGate {
     private final GatewaySettings settings;
     private final Semaphore admission;
-    private final Semaphore execution = new Semaphore(1, true);
-    private final Set<String> pending = ConcurrentHashMap.newKeySet();
+    private final Semaphore execution;
+    private final java.util.Map<String,Integer> pending = new ConcurrentHashMap<>();
     public InferenceGate(GatewaySettings settings) {
-        this.settings = settings; admission = new Semaphore(settings.maxQueued() + 1);
+        this.settings = settings; execution=new Semaphore(settings.parallelism(),true);admission = new Semaphore(settings.maxQueued() + settings.parallelism());
     }
     public <T> T run(String identity, Supplier<T> action) {
-        if (!pending.add(identity)) throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "KEY_BUSY");
+        if (pending.merge(identity,1,Integer::sum)>settings.maxPerKey()) {
+            pending.compute(identity,(k,n)->n==null||n<=1?null:n-1);
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,"KEY_BUSY");
+        }
         boolean admitted = false, acquired = false;
         try {
             admitted = admission.tryAcquire();
@@ -34,7 +37,7 @@ public class InferenceGate {
         } finally {
             if (acquired) execution.release();
             if (admitted) admission.release();
-            pending.remove(identity);
+            pending.compute(identity,(k,n)->n==null||n<=1?null:n-1);
         }
     }
 }

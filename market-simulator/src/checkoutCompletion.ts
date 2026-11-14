@@ -10,8 +10,9 @@ type Intent = MarketReplayStep extends infer S ? S extends MarketReplayStep ? Om
 
 /** Controller-owned ending only. Never selects, removes or corrects a product. */
 export function appendCheckoutCompletion(guard: TraceGuard, firstStepId: string, seed: string | number,
-  append: (intent: Intent, reason: string, timeoutMs?: number) => void): MarketReplaySystemCompletion {
-  const reason = '시스템 마무리: 100회 행동 이후 현재 장바구니를 그대로 계산한다. 페르소나의 자발적 선택이 아니다.';
+  append: (intent: Intent, reason: string, timeoutMs?: number) => void, actionLimit: 100 | 200 = 100): MarketReplaySystemCompletion {
+  if (![100,200].includes(actionLimit)) throw new Error('Unsupported system-completion action limit');
+  const reason = `시스템 마무리: ${actionLimit}회 행동 이후 현재 장바구니를 그대로 계산한다. 페르소나의 자발적 선택이 아니다.`;
   if (guard.observe().view !== 'world') append({ type: 'closeView' }, `${reason} 열린 보기 화면을 닫는다.`);
   if (guard.observe().activeStation) append({ type: 'closeStation' }, `${reason} 열린 대화를 닫는다.`);
   // Read through the existing adapter instead of reconstructing inventory rules.
@@ -68,5 +69,5 @@ export function appendCheckoutCompletion(guard: TraceGuard, firstStepId: string,
   append({ type: 'submitForReview' }, `${reason} 빈 장바구니도 포함해 현재 담긴 물건만 구매 확정·분석 요청한다.`);
   append({ type: 'awaitReviewAccepted' }, `${reason} 실제 앱의 로그 저장·분석 접수를 기다린다.`, 180000);
   append({ type: 'leave' }, `${reason} 접수 확인 후 정상적으로 게임을 나간다.`);
-  return { reason: 'action-limit', afterDecisions: 100, actionLimit: 100, firstStepId, checkoutId: checkout.id, cartAtStart };
+  return { reason: 'action-limit', afterDecisions: actionLimit, actionLimit, firstStepId, checkoutId: checkout.id, cartAtStart };
 }

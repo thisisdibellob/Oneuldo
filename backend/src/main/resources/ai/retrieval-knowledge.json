@@ -1,0 +1,149 @@
+{
+  "version": "dual-knowledge-20261024-v1",
+  "cards": [
+    {
+      "id": "G-CART",
+      "kind": "GAME",
+      "title": "장바구니 열기와 수량 변경",
+      "source": "frontend/src/behavior/marketBehaviorTracker.ts",
+      "section": "cartOpened, quantityChanged",
+      "topics": [
+        "cart",
+        "quantity"
+      ],
+      "summary": "CART_OPENED는 현재 장바구니를 연 사건이다. QUANTITY_CHANGED는 상품 ID와 quantityBefore/quantityAfter를 기록한다. 열기 횟수와 상품 수량 변경은 별도 행동이다. 중간 목표 수량 도달과 최종 수량은 다를 수 있다.",
+      "limitations": "열기만으로 읽기·대조·이해를 입증하지 않는다. 상품 추가가 없어도 열기 기록을 조작 없음으로 지우지 않는다.",
+      "verifiedAt": "2026-10-24",
+      "review": "source-checked project summary; not clinical validation",
+      "sourceSha256": "18510406ba251311080456f35f90cf2d12b5c31b1f1bdfcba33932d089284942"
+    },
+    {
+      "id": "G-END",
+      "kind": "GAME",
+      "title": "종료·타이머·제출 구분",
+      "source": "backend/src/main/java/oneuldo/behaviorlog/analysis/service/SessionSourceLedger.java",
+      "section": "literal source ledger; project interpretation boundary",
+      "topics": [
+        "terminal",
+        "timing"
+      ],
+      "summary": "종료 상태, timing의 expired·remainingMs, 제출 사건, 최종 cart/objectiveProgress/paid는 별도 원본 값이다. executionContext의 owner와 변경 이후 행동을 함께 읽어 사용자 행동과 시스템 보조를 구분한다.",
+      "limitations": "USER_ABORTED 또는 COMPLETED만으로 시간 만료·목표 달성·사용자 제출 의도를 추론하지 않는다. 최신 설명보다 당시 기록된 과제·상태를 우선한다.",
+      "verifiedAt": "2026-10-24",
+      "review": "source-checked project summary; not clinical validation",
+      "sourceSha256": "73fc4e73b61f690a10c54a6beac50c2f6c22816543e38406de842eb02c29245b"
+    },
+    {
+      "id": "G-HELP",
+      "kind": "GAME",
+      "title": "도움말 및 직원 지원",
+      "source": "frontend/src/screens/MarketSimulationScreen.tsx",
+      "section": "viewHelp logging",
+      "topics": [
+        "help",
+        "staff"
+      ],
+      "summary": "viewHelp 행동은 GENERAL_HELP_OPENED로 기록된다. 도움말 열기, 직원과의 상호작용, 실제 선택·수량·제출 결과를 구분해 설명한다.",
+      "limitations": "도움말을 열었다는 사실은 읽기·이해·효과를 증명하지 않는다. 구현에 없는 음성·강조 버튼을 제공된 기능으로 약속하지 않는다.",
+      "verifiedAt": "2026-10-24",
+      "review": "source-checked project summary; not clinical validation",
+      "sourceSha256": "1857e2435f3e0d3d30cda7f1ebb28aaf7056d601c7a4a117ce282e02c0c9d31f"
+    },
+    {
+      "id": "G-WORLD",
+      "kind": "GAME",
+      "title": "조절 가능한 환경",
+      "source": "shared/market/adaptive-policy.json",
+      "section": "adaptive world ranges",
+      "topics": [
+        "movement",
+        "stock",
+        "staff"
+      ],
+      "summary": "배치는 classic/aisles/corner, 직원 수 1~3, 손님 수 1~5, 기둥 수 0~4, 계산 직원 수 0~2 범위다. 품절·재고·매대 순서 등은 실제 과제 스키마와 검증기를 따라 설정한다.",
+      "limitations": "이동량만으로 배치가 원인이라고 확정하지 않는다. 당시 snapshot과 실제 blocked·상호작용을 대조하고 변경은 관찰 가설로 제안한다.",
+      "verifiedAt": "2026-10-24",
+      "review": "source-checked project summary; not clinical validation",
+      "sourceSha256": "47014aa50a0d4f69f45284acefc41c64add529f5b2141b55b9c478a70ea02828"
+    },
+    {
+      "id": "G-PLAN",
+      "kind": "GAME",
+      "title": "지원 계획의 실행 범위",
+      "source": "backend/src/main/java/oneuldo/behaviorlog/analysis/service/AdaptiveObservationGuidance.java",
+      "section": "supported mechanics",
+      "topics": [
+        "goals",
+        "movement",
+        "stock"
+      ],
+      "summary": "실제 목표·재고·안내·배치와 선택/수정/이동을 연결한다. 계획된 지원과 실제 제공된 지원은 다르다. 도움을 받은 수행과 독립 수행을 구분한다.",
+      "limitations": "지원 변경의 효과와 이동 효율은 실행 전 확정할 수 없다. 당시 과제 조건이 우선이며 자료가 부족하면 미확인으로 남긴다.",
+      "verifiedAt": "2026-10-24",
+      "review": "source-checked project summary; not clinical validation",
+      "sourceSha256": "c885630232a4041d649074a1c317d7ee9ff820a56a2c84b1ab4937c80252ee97"
+    },
+    {
+      "id": "O-ADAPT",
+      "kind": "OFFICIAL",
+      "title": "AAIDD 적응행동",
+      "source": "https://www.aaidd.org/intellectual-disability/definition/adaptive-behavior",
+      "section": "What is Adaptive Behavior?",
+      "topics": [
+        "core"
+      ],
+      "summary": "적응행동은 일상생활에 필요한 개념적·사회적·실제적 기술이며 지능과 구별된다. 환경이 달라지면 필요한 기술도 달라진다.",
+      "limitations": "전문학회 설명이며 게임 전용 평가도구가 아니다. 클릭으로 지능·장애 정도·일반 생활 능력을 판정할 수 없다.",
+      "verifiedAt": "2026-10-24",
+      "review": "source-checked project summary; not clinical validation"
+    },
+    {
+      "id": "O-SUPPORT",
+      "kind": "OFFICIAL",
+      "title": "AAIDD·The Arc 개별 지원",
+      "source": "https://www.aaidd.org/news-policy/policy/position-statements-2/individual-supports",
+      "section": "Statement / Position",
+      "topics": [
+        "core",
+        "help",
+        "staff"
+      ],
+      "summary": "개별 지원은 생활 참여를 돕고, 진단명보다 기능적 필요를 바탕으로 제공되어야 한다. 의사소통 지원과 보조기술·개인 지원을 포함한다.",
+      "limitations": "공동 입장문이며 이 게임 지원의 효과시험은 아니다. 지원 사용을 능력 부재로 단정하거나 자동 벌점화하지 않는다.",
+      "verifiedAt": "2026-10-24",
+      "review": "source-checked project summary; not clinical validation"
+    },
+    {
+      "id": "O-STEPS",
+      "kind": "OFFICIAL",
+      "title": "W3C 명확한 단계와 안내",
+      "source": "https://www.w3.org/TR/coga-usable/",
+      "section": "Provide Step-by-Step Instructions / Use Clear Words",
+      "topics": [
+        "goals",
+        "quantity",
+        "cart"
+      ],
+      "summary": "필요한 과정을 명확한 단계로 안내하고 간결하고 이해하기 쉬운 내용을 제공하는 접근성 설계를 권고한다. 다음 행동이 드러나는 짧은 안내를 검토할 수 있다.",
+      "limitations": "Working Group Note이며 WCAG 필수 적합성 기준이나 지적장애 전용 치료 지침이 아니다. 어떤 안내가 이 사용자에게 효과적인지는 다음 수행에서 확인해야 한다.",
+      "verifiedAt": "2026-10-24",
+      "review": "source-checked project summary; not clinical validation"
+    },
+    {
+      "id": "O-HELP",
+      "kind": "OFFICIAL",
+      "title": "W3C 도움과 사용자 참여",
+      "source": "https://www.w3.org/TR/coga-usable/",
+      "section": "Help Users / Involve Users",
+      "topics": [
+        "help",
+        "movement",
+        "staff"
+      ],
+      "summary": "사용 가능한 도움을 제공하고 인지·학습장애가 있는 사용자를 설계와 시험에 참여시키도록 권고한다.",
+      "limitations": "일반 접근성 지침이다. 도움말 열기만으로 지원 효과를 확인할 수 없으며 실제 사용자 검증을 가상 페르소나 성공으로 대신할 수 없다.",
+      "verifiedAt": "2026-10-24",
+      "review": "source-checked project summary; not clinical validation"
+    }
+  ]
+}

@@ -8,22 +8,26 @@ import tools.jackson.databind.ObjectMapper;
 public final class FinalAnalysisBudget {
     private FinalAnalysisBudget() {}
 
-    public record Estimate(int draftRequest, int reviewRequest) {
+    public record Estimate(int draftRequest, int reviewRequest, String preparedReview) {
+        public Estimate(int draftRequest, int reviewRequest) { this(draftRequest, reviewRequest, null); }
         public int required() { return Math.max(draftRequest, reviewRequest); }
     }
 
     public static Estimate estimate(ObjectMapper mapper, AnalysisTokenBudget budget, String system,
             String source, AnalysisReferences refs, boolean review, String retry) {
+        return estimate(mapper,budget,system,source,refs,review,false,retry);
+    }
+    public static Estimate estimate(ObjectMapper mapper, AnalysisTokenBudget budget, String system,
+            String source, AnalysisReferences refs, boolean review, boolean directReview, String retry) {
         int output = budget.finalOutputTokens();
-        int draftCost = budget.total(system, source + retry, output);
+        int draftCost = review && directReview ? 0 : budget.total(system, source + retry, output);
         if (!review) return new Estimate(draftCost, 0);
         // Count the current review instructions/source instead of an arbitrary 1,500-token constant.
-        // The draft does not exist yet. Reserve its output limit plus framing for draftToReview.
-        // This is a planning estimate, not a proof that every possible draft will fit.
+        // The independent review never receives draftToReview; do not reserve a second copy of its output.
+        // Keep the actual review output reservation and a separate framing margin.
         var empty = new AiBehaviorAnalysis("", List.of(), List.of(), List.of(), null, List.of());
         String reviewSource = AnalysisReviewPrompt.build(mapper, source, empty, refs);
-        int reviewCost = budget.total(AnalysisReviewPrompt.system(), reviewSource + retry, output)
-                + output + 256;
-        return new Estimate(draftCost, reviewCost);
+        int reviewCost = budget.total(AnalysisReviewPrompt.system(), reviewSource + retry, output) + 256;
+        return new Estimate(draftCost, reviewCost, directReview ? reviewSource : null);
     }
 }

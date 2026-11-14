@@ -48,7 +48,7 @@ class CompactPipelineTest {
         alternate.putArray("p").add(plan);
         assertThat(validator.validate(refs.read(alternate.toString()),input)).isEqualTo(normal);
         ((tools.jackson.databind.node.ArrayNode)alternate.path("p")).add(plan);
-        assertThatThrownBy(()->refs.read(alternate.toString())).hasMessage("INVALID_COMPACT_ROW");
+        assertThatThrownBy(()->refs.read(alternate.toString())).hasMessageStartingWith("INVALID_COMPACT_ROW:EXPECTED=9 ACTUAL=");
     }
 
     @Test void wrapped_plan_does_not_accept_unknown_finding_or_invalid_value_types() {
@@ -61,9 +61,42 @@ class CompactPipelineTest {
         assertThatThrownBy(()->refs.read(root.toString())).isInstanceOf(RuntimeException.class);
     }
 
+    @Test void compact_row_retry_reports_actual_columns_without_inserting_a_model_judgment() {
+        var input=fixture.input(fixture.fixture());
+        var malformed=(tools.jackson.databind.node.ObjectNode)mapper.readTree(finalJson);
+        ((tools.jackson.databind.node.ArrayNode)malformed.path("f").get(0)).remove(1);
+        var client=mock(GroqChatClient.class);
+        when(client.complete(anyString(),anyString(),anyInt(),anyDouble()))
+                .thenReturn(new GroqChatClient.GroqChatResult(malformed.toString(),"test"))
+                .thenReturn(new GroqChatClient.GroqChatResult(finalJson,"test"));
+        var budget=new AnalysisTokenBudget();
+        org.springframework.test.util.ReflectionTestUtils.setField(budget,"requestTokens",18000);
+        org.springframework.test.util.ReflectionTestUtils.setField(budget,"finalOutputTokens",1800);
+        var audit=new ArrayList<AiBehaviorAnalysisRun.Attempt>();
+        var result=new TimelineAnalysisPipeline(prompts,validator,client,mapper,64,budget,new AnalysisCallPacer()).analyze(input,18000,audit);
+        assertThat(audit).hasSize(2);
+        assertThat(audit.get(0).rawOutput()).isEqualTo(malformed.toString());
+        assertThat(audit.get(0).errorCode()).isEqualTo("INVALID_AI_ANALYSIS");
+        assertThat(audit.get(1).inputPrompt()).contains("EXPECTED=7 ACTUAL=6","[id,skill,observation,interpretation,alternativeExplanations,evidenceEventIds,suggestedSupport]");
+        assertThat(result).isEqualTo(validator.validate(new AnalysisReferences(mapper,input).read(finalJson),input));
+    }
+
+    @Test void recorded_current_failure_remains_rejected_with_exact_shape_diagnostic() throws Exception {
+        var dir=java.nio.file.Path.of("../output/adaptive-five-fixes-20261012/auditor");
+        org.junit.jupiter.api.Assumptions.assumeTrue(java.nio.file.Files.exists(dir.resolve("analyses.json")));
+        var rows=mapper.readTree(java.nio.file.Files.readString(dir.resolve("analyses.json")));
+        var failed=rows.valueStream().filter(x->x.path("id").asString().equals("615404d8-5d59-49bd-8e99-ae2ff42288a7")).findFirst().orElseThrow();
+        var inputs=mapper.readTree(java.nio.file.Files.readString(dir.resolve("input-snapshots.json")));
+        var source=inputs.valueStream().filter(x->x.path("id").equals(failed.path("dataset_id"))).findFirst().orElseThrow();
+        var input=mapper.treeToValue(source.path("input_data"),BehaviorAnalysisInput.class);
+        var refs=new AnalysisReferences(mapper,new BehaviorAnalysisInputResponse(input.datasetId(),input.schemaVersion(),input.generatedAt(),input.sessionCount(),input.eventCount(),input));
+        for(var attempt:failed.path("attempts"))if(attempt.path("errorCode").asString("").equals("INVALID_AI_ANALYSIS"))
+            assertThatThrownBy(()->refs.read(attempt.path("rawOutput").asString())).hasMessage("INVALID_COMPACT_ROW:EXPECTED=7 ACTUAL=6");
+    }
+
     @Test void review_retry_receives_exact_unknown_reference_and_audit_keeps_both_failures() {
         var input=fixture.input(fixture.fixture());
-        var review=new ReviewedClaimOutputTest().envelope();
+        var review=CurrentReviewFixtures.envelope(mapper, (tools.jackson.databind.node.ObjectNode)new ReviewedClaimOutputTest().envelope().path("analysis"));
         ((tools.jackson.databind.node.ObjectNode)review.path("analysis").path("findings").get(0)
                 .path("observation").get(1)).putArray("evidenceEventIds").add("E999");
         var client=mock(GroqChatClient.class);
@@ -76,8 +109,8 @@ class CompactPipelineTest {
         var audit=new ArrayList<AiBehaviorAnalysisRun.Attempt>();
         assertThatThrownBy(()->new TimelineAnalysisPipeline(prompts,validator,client,mapper,64,budget,new AnalysisCallPacer())
                 .withQualityReview(true).analyze(input,18000,audit)).hasMessage("INVALID_AI_ANALYSIS");
-        assertThat(audit).hasSize(3);
-        for(var attempt:audit.subList(1,3)) {
+        assertThat(audit).hasSize(4);
+        for(var attempt:audit.subList(1,4)) {
             assertThat(attempt.validationFailure().code()).isEqualTo("UNKNOWN_REVIEW_EVIDENCE");
             assertThat(attempt.validationFailure().path()).isEqualTo("/findings/0/observation/1");
             assertThat(attempt.validationFailure().offendingIds()).containsExactly("E999");

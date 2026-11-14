@@ -10,8 +10,10 @@ public final class AnalysisReferences {
     private final ObjectMapper mapper;
     private final Map<String, String> aliases = new LinkedHashMap<>();
     private final Map<String, String> originals = new LinkedHashMap<>();
+    private final BehaviorAnalysisInputResponse input;
     public AnalysisReferences(ObjectMapper mapper, BehaviorAnalysisInputResponse input) {
         this.mapper = mapper;
+        this.input = input;
         int sessionNumber = 0, eventNumber = 0;
         for (var session : input.input().sessions()) {
             add(session.sessionId().toString(), "S" + (++sessionNumber));
@@ -31,9 +33,38 @@ public final class AnalysisReferences {
         originals.put(alias, uuid);
     }
     /** Source events eligible for a summary's independent evidence list. */
+    public String eventAlias(UUID id) { String alias=aliases.get(id.toString());if(alias==null||!alias.startsWith("E"))throw new IllegalArgumentException("UNKNOWN_SOURCE_EVENT");return alias; }
     public Set<String> eventIds() {
         return originals.keySet().stream().filter(id -> id.startsWith("E"))
                 .collect(java.util.stream.Collectors.toUnmodifiableSet());
+    }
+
+    /** Read-only source values for current review contracts; no goal matching or learner scoring. */
+    public JsonNode reviewSource() { return replace(mapper.valueToTree(input.input())); }
+    /** A supplied task definition is background for later comparisons, not a new action at citation time. */
+    public Set<String> taskDefinitionEventIds() {
+        var result = new HashSet<String>();
+        for (var session : input.input().sessions()) for (var event : session.events()) {
+            if (event.action() == null || !"SHOP.SESSION_STARTED".equals(event.action().eventCode())) continue;
+            var payload = mapper.valueToTree(event.payload());
+            if (payload.path("marketContent").path("sceneSnapshot").path("mission").isObject())
+                result.add(aliases.get(event.behaviorLogId().toString()));
+        }
+        return Set.copyOf(result);
+    }
+    /** Terminal snapshots delimit evidence coverage; they are not new user actions. */
+    public Set<String> comparisonAnchorEventIds() {
+        var result=new HashSet<String>(taskDefinitionEventIds());
+        for(var session:input.input().sessions())for(var event:session.events())
+            if(event.action()!=null && Set.of("SHOP.TIME_LIMIT_EXPIRED","SHOP.SESSION_ENDED").contains(event.action().eventCode()))
+                result.add(aliases.get(event.behaviorLogId().toString()));
+        return Set.copyOf(result);
+    }
+    public Map<String, ObjectNode> recordedStations() {
+        var result = new LinkedHashMap<String, ObjectNode>();
+        RecordedStationIdentity.byEvent(mapper, input).forEach((id, value) ->
+                result.put(aliases.get(id), (ObjectNode)replace(value.deepCopy())));
+        return Map.copyOf(result);
     }
 
     /** Dataset order only. Does not evaluate the meaning of a claim or of an event. */
@@ -53,13 +84,20 @@ public final class AnalysisReferences {
     /** Baseline mode is for offline comparisons of identical aliases and prompt content. */
     public String encode(String json,boolean compactMovement) {
         ObjectNode root = (ObjectNode) replace(mapper.readTree(json));
-        // Keep the readable source copy as objects after all token-oriented encoders.
+        // Keep source objects through alias/movement encoding; the observation wire remains fully reversible.
         JsonNode details = new LosslessTables(mapper).decode(root).path(SourceEventDetails.FIELD).deepCopy();
+        boolean observation = AiBehaviorAnalysisPromptFactory.OBSERVATION_VERSION.equals(root.path("promptVersion").asString());
+        var literalIndex = observation ? LiteralEventIndex.build(mapper, new LosslessTables(mapper).decode(root)) : null;
         // Alias complete IDs before factoring strings into prefixes/columns.
         if(compactMovement) root = new MovementInputEncoder(mapper).encode(root);
         if (details.isArray()) root.set(SourceEventDetails.FIELD, details);
         root.put("referenceEncoding", "E숫자는 사건, S숫자는 세션, U숫자는 기타 원본 UUID의 고정 별칭입니다. 구간 사이에도 같은 ID는 같은 대상입니다. "
                 + "출력의 evidenceEventIds/sessionId에 제공된 짧은 ID를 그대로 쓰세요. UUID를 만들지 마세요.");
+        if(compactMovement && AiBehaviorAnalysisPromptFactory.OBSERVATION_VERSION.equals(root.path("promptVersion").asString()) && root.has("behaviorTimeline"))
+            root=ObservationWireEncoding.encode(mapper,root);
+        // Keep this small lookup outside numeric/column factoring so the model cannot mistake
+        // an interaction row's position for its original event ID or chronological position.
+        if (literalIndex != null) root.set(LiteralEventIndex.FIELD, literalIndex);
         return mapper.writeValueAsString(root);
     }
     private JsonNode replace(JsonNode node) {
@@ -131,7 +169,7 @@ public final class AnalysisReferences {
             }
         }
     }
-    private void requireRow(JsonNode row,int length) {if(!row.isArray()||row.size()!=length)throw new IllegalArgumentException("INVALID_COMPACT_ROW");}
+    private void requireRow(JsonNode row,int length) {if(!row.isArray()||row.size()!=length)throw new IllegalArgumentException("INVALID_COMPACT_ROW:EXPECTED="+length+" ACTUAL="+(row.isArray()?row.size():0));}
     private ObjectNode expandFinal(ObjectNode source) {
         if(!Set.of("s","f","a","u","p","c").equals(source.propertyNames())||!source.path("f").isArray()||!source.path("a").isArray()) throw new IllegalArgumentException("INVALID_COMPACT_FINAL");
         var root=mapper.createObjectNode();root.set("summary",source.get("s"));root.set("uncertainties",source.get("u"));root.set("usedEvidenceCardIds",source.get("c"));

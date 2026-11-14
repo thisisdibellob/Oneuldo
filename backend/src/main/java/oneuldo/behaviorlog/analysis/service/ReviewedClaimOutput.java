@@ -17,12 +17,16 @@ public final class ReviewedClaimOutput {
     private ReviewedClaimOutput(ObjectMapper mapper, AnalysisReferences refs) { this.mapper=mapper; this.refs=refs; }
 
     public static String read(ObjectMapper mapper, JsonNode envelope, AnalysisReferences refs) {
-        return new ReviewedClaimOutput(mapper,refs).normalize(envelope).toString();
+        return new ReviewedClaimOutput(mapper,refs).normalize(AnalysisReviewWire.expand(envelope,refs)).toString();
     }
 
     private ObjectNode normalize(JsonNode envelope) {
-        keys(envelope,Set.of("reviewFormat","reviewNotes","analysis"),"/");
-        if(!FORMAT.equals(envelope.path("reviewFormat").asString())) fail("INVALID_REVIEW_FORMAT","/reviewFormat",List.of());
+        boolean current = AnalysisReviewConsistency.FORMAT.equals(envelope.path("reviewFormat").asString());
+        boolean previous = "claim-evidence-v3".equals(envelope.path("reviewFormat").asString());
+        keys(envelope,current || previous ? Set.of("reviewFormat","reviewNotes","analysis","taskChecks","stationClaims")
+                : Set.of("reviewFormat","reviewNotes","analysis"),"/");
+        if(current) AnalysisReviewConsistency.validate(envelope, refs);
+        else if(!previous && !FORMAT.equals(envelope.path("reviewFormat").asString())) fail("INVALID_REVIEW_FORMAT","/reviewFormat",List.of());
         array(envelope.path("reviewNotes"),"/reviewNotes",0,20);
         for(var note:envelope.path("reviewNotes")) text(note,"/reviewNotes");
         var analysis=envelope.path("analysis");
@@ -31,6 +35,7 @@ public final class ReviewedClaimOutput {
         out.put("summary",sentences(analysis.path("summary"),"/summary",true,new LinkedHashSet<>()));
         array(analysis.path("findings"),"/findings",0,12);
         var findings=out.putArray("findings");
+        var background = refs.comparisonAnchorEventIds();
         int i=0;
         for(var finding:analysis.path("findings")) {
             String path="/findings/"+i++;
@@ -38,20 +43,23 @@ public final class ReviewedClaimOutput {
             var item=(ObjectNode)finding.deepCopy();
             var all=new LinkedHashSet<String>();
             String previousEvent=null;
+            var alreadyCited = new HashSet<String>();
             var clauses=new ArrayList<String>();
             array(finding.path("observation"),path+"/observation",1,30);
             int j=0;
             for(var value:finding.path("observation")) {
                 String clausePath=path+"/observation/"+j++;
                 var clause=claim(value,clausePath,true);
-                // Each claim is strictly ordered, but the next claim may elaborate on
-                // the same last event. Returning to an earlier event is still invalid.
-                if(previousEvent!=null && Integer.parseInt(clause.ids().getFirst().substring(1))
+                // Reusing a terminal snapshot or supplied task definition is not a new event.
+                // Reject only newly introduced action evidence that goes backwards.
+                var newActions = clause.ids().stream().filter(id -> !alreadyCited.contains(id) && !background.contains(id)).toList();
+                if(previousEvent!=null && !newActions.isEmpty() && Integer.parseInt(newActions.getFirst().substring(1))
                         < Integer.parseInt(previousEvent.substring(1))) {
                     var boundary=new ArrayList<String>();boundary.add(previousEvent);boundary.addAll(clause.ids());
                     fail("REVIEW_EVIDENCE_OUT_OF_ORDER",clausePath,boundary);
                 }
-                previousEvent=clause.ids().getLast();
+                if (!newActions.isEmpty()) previousEvent=newActions.getLast();
+                alreadyCited.addAll(clause.ids());
                 all.addAll(clause.ids());
                 clauses.add("("+String.join(", ",clause.ids())+") "+clause.text());
             }
@@ -79,6 +87,32 @@ public final class ReviewedClaimOutput {
             var item=(ObjectNode)value.deepCopy();item.put("explanation",explanation);
             item.set("evidenceEventIds",mapper.valueToTree(evidence.stream().sorted(Comparator.comparingInt(id->Integer.parseInt(id.substring(1)))).toList()));
             assessments.add(item);
+        }
+        if (current || previous) {
+            var basis = analysis.path("practicePlan").path("rationale");
+            String observed;
+            var unknown = new ArrayList<String>();
+            if (current) {
+                var claims = mapper.createArrayNode();
+                for (var reference : basis.path("observed")) {
+                    if (AnalysisReviewConsistency.SUMMARY_BASIS_ID.equals(reference.path("findingId").asString()))
+                        claims.add(analysis.path("summary").get(reference.path("observationIndex").asInt()));
+                    else for (var finding : analysis.path("findings"))
+                        if (finding.path("id").equals(reference.path("findingId"))) claims.add(finding.path("observation").get(reference.path("observationIndex").asInt()));
+                }
+                observed = sentences(claims, "/practicePlan/rationale/observed", true, new LinkedHashSet<>());
+                basis.path("unknownCauseIndexes").forEach(index -> unknown.add(analysis.path("uncertainties").get(index.asInt()).asString()));
+            } else {
+                observed = sentences(basis.path("observed"), "/practicePlan/rationale/observed", true, new LinkedHashSet<>());
+                basis.path("unknownCauses").forEach(value -> unknown.add(value.asString()));
+            }
+            var clauses = new ArrayList<String>(); clauses.add("관찰: " + observed);
+            if (!unknown.isEmpty()) {
+                clauses.add("미확인: " + String.join(" ", unknown));
+            }
+            clauses.add("다음 연습: " + basis.path("proposedPractice").asString());
+            // Render only model-authored prose into the existing public string; retain structured source checks in audit.
+            ((ObjectNode)out.path("practicePlan")).put("rationale", String.join(" ", clauses));
         }
         return out;
     }

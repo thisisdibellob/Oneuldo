@@ -14,14 +14,14 @@ import org.springframework.web.server.ResponseStatusException;
 @RequiredArgsConstructor
 public class MarketDifficultyRecommendationService {
     private final MemberRepository memberRepository;
-    private final oneuldo.behaviorlog.profile.service.AiUserProfileService profileService;
     private final BehaviorAnalysisInputSnapshotRepository analysisInputRepository;
     private final MarketDifficultyRecommendationPersistenceService persistenceService;
+    private final MarketProfileFreshnessService freshness;
 
     public MarketDifficultyRecommendationResponse recommend(UUID memberId) {
         var member = memberRepository.findById(memberId).orElseThrow(() ->
                 new ResponseStatusException(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."));
-        var profile = profileService.requireCurrent(memberId);
+        var profile = freshness.requireCurrent(memberId);
         var snapshot = analysisInputRepository.findByIdAndMemberId(profile.sourceDatasetId(), memberId).orElseThrow();
         var plan = profile.profile().practicePlan();
         var decision = new MarketPersonalizationDecision(plan.recommendedDifficulty(), "AI_PROFILE",

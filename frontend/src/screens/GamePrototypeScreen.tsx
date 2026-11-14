@@ -5,6 +5,7 @@ import { getMarketNavigationPath } from '../game/marketNavigation';
 import { getMarketRecoveryPoint } from '../game/marketRecovery';
 import { Ionicons } from '@expo/vector-icons';
 import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
+import { randomUUID } from 'expo-crypto';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
@@ -27,11 +28,13 @@ import {
 
 import { icons } from '../assets';
 import type { BehaviorSimulationContext } from '../api/behaviorLog';
-import { getMarketAiQuest } from '../api/marketPersonalization';
+import { FirstPlayRequiredError, getMarketAiQuest, MarketQuestReadinessError, marketQuestProgressText } from '../api/marketPersonalization';
+import { getMarketRuntimeContext, applyAdaptiveMarketEnvironment } from '../game/marketAdaptivePlan';
 import { DirectionalAvatar } from '../components/game/DirectionalAvatar';
 import { GameHud } from '../components/game/GameHud';
 import { GameContactCall } from '../components/game/GameContactCall';
 import { MarketPanelTransition } from '../components/game/MarketPanelTransition';
+import type { MarketSetupChanges } from '../components/game/MarketSetupPanel';
 import { MinsuDialoguePortrait } from '../components/game/MinsuDialoguePortrait';
 import {
   MarketShelfTarget,
@@ -67,7 +70,8 @@ import {
   type AvatarMotion,
 } from '../game/avatarAnimation';
 import { chibiPlayerAvatar as freshPlayerAvatar } from '../game/chibiPlayerAvatar';
-import { getMarketRenderDepth, getNearestMarketStation, getMarketStationApproachPoint, MARKET_ENVIRONMENT_PLAYER_RADIUS, createMarketEnvironment, isMarketEnvironmentBlocked, type MarketEnvironment, type MarketEnvironmentStationId, type MarketCashierAvailability } from '../game/marketEnvironment';
+import { getMarketRenderDepth, getNearestMarketStation, getMarketStationApproachPoint, MARKET_ENVIRONMENT_PLAYER_RADIUS, createMarketEnvironment, isMarketEnvironmentBlocked, type MarketEnvironment, type MarketEnvironmentConfig, type MarketEnvironmentStationId, type MarketCashierAvailability } from '../game/marketEnvironment';
+import { applyMarketEnvironmentPlan, getMarketEnvironmentContext } from '../game/marketEnvironmentPlan';
 import {
   BUS_STOP_POINT,
   HOME_EXIT_POINT,
@@ -97,6 +101,7 @@ import {
   marketCategories,
   marketMission,
   buildRandomMarketScenarioMission,
+  buildMarketScenarioMission,
 } from '../game/scenarios';
 import {
   clampWorldZoom,
@@ -119,9 +124,10 @@ import {
 import { CashierSimulationScreen } from './CashierSimulationScreen';
 import { CookingSimulationScreen } from './CookingSimulationScreen';
 import type { ReplayMotionPort, ReplayUiPort } from '../replay/ports';
+import { isPilotBaselineScenario, pilotScenario } from '../replay/pilotScenario';
+import { pilotEnvironment, pilotSessionConfig } from '../replay/pilotEnvironment';
 import { resolveMarketMovement } from '../game/marketMovement';
 import { MARKET_DIRECTIONAL_MOVE_SPEED, type ReplayDirectionalInput } from '../game/marketDirectionalInput';
-import { pilotScenario } from '../replay/pilotScenario';
 import type { ReplayPresentation } from '../game/marketReplayPerception';
 
 // Add ?muteAudio=1 to developer preview URLs for silent interaction checks.
@@ -481,9 +487,10 @@ function MarketWorldLayer({
 type GamePrototypeScreenProps = {
   accessToken?: string | null;
   onExit: () => void;
+  onOpenAnalysis?: () => void;
 };
 
-export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototypeScreenProps) {
+export function GamePrototypeScreen({ accessToken = null, onExit, onOpenAnalysis }: GamePrototypeScreenProps) {
   const replayWindow = useWindowDimensions();
   const replayInsets = useContext(SafeAreaInsetsContext);
   const marketCameraMetrics = useRef({ fontScale: Math.max(1, replayWindow.fontScale),
@@ -571,14 +578,23 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
   const [busStopNearby, setBusStopNearby] = useState(false);
   const [marketScenarioLocked, setMarketScenarioLocked] = useState(false);
   const [personalizedMarketMission, setPersonalizedMarketMission] = useState(marketMission);
-  const [marketAiStatus, setMarketAiStatus] = useState<'loading' | 'ready' | 'baseline'>('loading');
+  const [marketAiStatus, setMarketAiStatus] = useState<'loading' | 'waiting' | 'error' | 'ready' | 'baseline'>('loading');
+  const [marketAiNotice, setMarketAiNotice] = useState<string | null>(null);
+  const [marketAiRetry, setMarketAiRetry] = useState(0);
   const [marketAiRequestToken, setMarketAiRequestToken] = useState<string | null | undefined>(undefined);
+  const marketAiRequestSequence = useRef(0);
+  const marketAccountToken = useRef(accessToken);
+  marketAccountToken.current = accessToken;
   const [marketDifficulty, setMarketDifficulty] = useState(2);
   const [marketSimulation, setMarketSimulation] = useState<
     Omit<BehaviorSimulationContext, 'simulationStarted'> | undefined
   >(undefined);
   const [marketEnvironment, setMarketEnvironment] = useState(() => createMarketEnvironment());
   const marketEnvironmentRef = useRef(marketEnvironment);
+  const applyMarketEnvironment = useRef<(environment: MarketEnvironment) => void>(() => undefined);
+  const marketSetupEnvironment = useRef<Partial<MarketEnvironmentConfig>>({});
+  const marketLockedSettings = useRef<Record<string,unknown>>({});
+  useEffect(()=>{marketLockedSettings.current={};marketSetupEnvironment.current={};},[accessToken]);
   const [marketCashierCalled, setMarketCashierCalled] = useState<Partial<MarketCashierAvailability>>({});
   const marketCashierCalledRef = useRef<Partial<MarketCashierAvailability>>({});
   const marketVisitNumber = useRef(0);
@@ -687,6 +703,10 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
 
   useEffect(() => {
     let active = true;
+    let readinessTimer: ReturnType<typeof setTimeout> | undefined;
+    const requestSequence = ++marketAiRequestSequence.current;
+    const isCurrentRequest = () => active && requestSequence === marketAiRequestSequence.current
+      && worldMapRef.current === 'market' && marketAccountToken.current === accessToken;
 
     if (worldMap !== 'market') {
       return () => {
@@ -694,15 +714,16 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
       };
     }
 
-    const fixedPilotMission = pilotScenario(__DEV__ && MARKET_REPLAY_ENABLED,
-      __DEV__ && MARKET_REPLAY_ENABLED && typeof window !== 'undefined' && window.location
-        ? new URLSearchParams(window.location.search).get('marketPilotScenario') ?? undefined : undefined);
+    const pilotScenarioId = __DEV__ && MARKET_REPLAY_ENABLED && typeof window !== 'undefined' && window.location
+      ? new URLSearchParams(window.location.search).get('marketPilotScenario') ?? undefined : undefined;
+    const fixedPilotMission = pilotScenario(__DEV__ && MARKET_REPLAY_ENABLED, pilotScenarioId);
     if (fixedPilotMission) {
       setMarketAiRequestToken(accessToken);
       setMarketAiStatus('baseline');
       setPersonalizedMarketMission(fixedPilotMission);
       setMarketDifficulty(2);
-      setMarketSimulation(undefined);
+      setMarketSimulation(isPilotBaselineScenario(pilotScenarioId)
+        ? { contentSource: 'STATIC', questInstanceId: randomUUID() } : undefined);
       return () => { active = false; };
     }
 
@@ -725,17 +746,26 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
     }
 
     setMarketAiStatus('loading');
+    setMarketAiNotice(null);
     setMarketAiRequestToken(accessToken);
-    getMarketAiQuest(accessToken)
+    const environmentContext = getMarketEnvironmentContext(marketEnvironmentRef.current, marketSetupEnvironment.current.shelfOrder !== undefined);
+    environmentContext.runtimeContext=getMarketRuntimeContext(marketEnvironmentRef.current,marketLockedSettings.current);
+    const requestQuest = () => {
+      if (!isCurrentRequest()) return;
+      void getMarketAiQuest(accessToken, environmentContext,progress=>{if(isCurrentRequest())setMarketAiNotice(marketQuestProgressText(progress));})
       .then((generation) => {
-        if (!active) return;
-        setMarketAiStatus('ready');
+        if (!isCurrentRequest()) return;
+        const environment = generation.quest.runtimePlan ? applyAdaptiveMarketEnvironment(marketEnvironmentRef.current,generation.quest) : marketSetupEnvironment.current.shelfOrder !== undefined
+          ? marketEnvironmentRef.current
+          : applyMarketEnvironmentPlan(marketEnvironmentRef.current, generation.quest.environmentPlan);
+        applyMarketEnvironment.current(environment);
         setPersonalizedMarketMission(generation.quest);
         setMarketDifficulty(generation.quest.difficulty);
         setMarketSimulation({
           contentSource: 'GENERATED',
           questInstanceId: generation.generationId,
         });
+        setMarketAiStatus('ready');
         if (__DEV__) {
           console.info('[market-personalization] AI quest applied', {
             generationId: generation.generationId,
@@ -746,29 +776,47 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
             mode: generation.personalizationMode,
             summary: generation.adaptationSummary,
             reasons: generation.reasonCodes,
+            requestedShelfOrder: generation.quest.environmentPlan?.shelfOrder,
+            actualShelfOrder: getMarketEnvironmentContext(environment).shelfSlots.map(slot => slot.categoryId),
+            placementSource: marketSetupEnvironment.current.shelfOrder !== undefined ? 'USER_OVERRIDE'
+              : generation.quest.environmentPlan ? 'AI' : 'LEGACY',
           });
         }
       })
       .catch((error: unknown) => {
-        if (!active) return;
-        const randomMission = buildRandomMarketScenarioMission();
-        setPersonalizedMarketMission(randomMission);
-        setMarketDifficulty(2);
-        setMarketSimulation(undefined);
-        setMarketAiStatus('baseline');
-        if (__DEV__) {
-          console.warn('[market-personalization] AI unavailable; random baseline applied', {
-            error,
-            contentSource: 'STATIC',
-            scenarioId: randomMission.scenarioId,
+        if (!isCurrentRequest()) return;
+        if (error instanceof FirstPlayRequiredError) {
+          const firstMission = buildMarketScenarioMission('S01');
+          setPersonalizedMarketMission(firstMission);
+          setMarketDifficulty(2);
+          setMarketSimulation({ contentSource: 'STATIC', questInstanceId: randomUUID() });
+          setMarketAiNotice(null);
+          setMarketAiStatus('baseline');
+          if (__DEV__) console.info('[market-personalization] first-play baseline applied', {
+            code: error.code, stage: error.stage, contentSource: 'STATIC', scenarioId: firstMission.scenarioId,
           });
+          return;
         }
-      });
+        if (error instanceof MarketQuestReadinessError) {
+          setMarketAiStatus(error.pending ? 'waiting' : 'error');
+          setMarketAiNotice(error.message);
+          // Pending jobs progress automatically; an unrequested/failed analysis needs the analysis screen.
+          if (error.pending && error.stage !== 'NOT_REQUESTED') readinessTimer = setTimeout(requestQuest, 5000);
+          return;
+        }
+        setMarketAiStatus('error');
+        setMarketAiNotice(error instanceof Error ? error.message : 'AI 맞춤 장보기를 준비하지 못했어요. 다시 확인해 주세요.');
+        if (__DEV__) {
+          console.warn('[market-personalization] AI quest unavailable', { error });
+        }
+      }); };
+    requestQuest();
 
     return () => {
       active = false;
+      clearTimeout(readinessTimer);
     };
-  }, [accessToken, worldMap]);
+  }, [accessToken, worldMap, marketAiRetry]);
 
   useEffect(() => {
     let active = true;
@@ -1024,11 +1072,17 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
   const handleEnterMarket = useCallback(() => {
     if (nearbyPortalIdRef.current !== 'market') return;
     prepareMapTransition();
+    marketAiRequestSequence.current += 1;
     setMarketAiStatus('loading');
     marketVisitNumber.current += 1;
-    const pilotLayout = __DEV__ && MARKET_REPLAY_ENABLED && typeof window !== 'undefined' && window.location
-      ? new URLSearchParams(window.location.search).get('marketPilotLayout') : null;
-    const environment = createMarketEnvironment({ seed: pilotLayout || `market-${Date.now()}-${marketVisitNumber.current}` });
+    const pilotQuery = __DEV__ && MARKET_REPLAY_ENABLED && typeof window !== 'undefined' && window.location
+      ? new URLSearchParams(window.location.search) : null;
+    const fixedPilotEnvironment = pilotEnvironment(__DEV__ && MARKET_REPLAY_ENABLED,
+      pilotQuery?.get('marketPilotEnvironment') ?? undefined);
+    // This fixture is a starting condition, not a user's manual shelf selection.
+    // Keep it out of marketSetupEnvironment so AI rounds may apply their shelf plan.
+    const environment = createMarketEnvironment({ ...fixedPilotEnvironment, ...marketSetupEnvironment.current,
+      seed: fixedPilotEnvironment?.seed ?? (pilotQuery?.get('marketPilotLayout') || `market-${Date.now()}-${marketVisitNumber.current}`) });
     marketEnvironmentRef.current = environment;
     setMarketEnvironment(environment);
     marketCashierCalledRef.current = {};
@@ -1041,7 +1095,7 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
     updateNpcProximity(playerPoint.current);
   }, [prepareMapTransition, updateCamera, updateNpcProximity]);
 
-  const handleMarketEnvironmentChange = useCallback((environment: MarketEnvironment) => {
+  const publishMarketEnvironment = useCallback((environment: MarketEnvironment) => {
     marketEnvironmentRef.current = environment;
     setMarketEnvironment(environment);
     marketCashierCalledRef.current = {};
@@ -1050,6 +1104,30 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
     updateCamera(playerPoint.current);
     updateNpcProximity(playerPoint.current);
   }, [updateCamera, updateNpcProximity]);
+  applyMarketEnvironment.current = publishMarketEnvironment;
+  const handleMarketEnvironmentChange = useCallback((environment: MarketEnvironment, changes?: MarketSetupChanges) => {
+    if(changes?.lockedSettings)marketLockedSettings.current={...marketLockedSettings.current,...changes.lockedSettings};
+    const categoryPlacementChanged = JSON.stringify(getMarketEnvironmentContext(environment))
+      !== JSON.stringify(getMarketEnvironmentContext(marketEnvironmentRef.current));
+    const shelfOrderTouched = changes?.shelfOrderTouched
+      ?? JSON.stringify(environment.config.shelfOrder) !== JSON.stringify(marketEnvironmentRef.current.config.shelfOrder);
+    const { seed: ignoredSeed, shelfOrder: ignoredOrder, ...preferences } = environment.config;
+    const previousShelfOrder = marketSetupEnvironment.current.shelfOrder;
+    marketSetupEnvironment.current = { ...preferences,
+      ...(previousShelfOrder !== undefined ? { shelfOrder: previousShelfOrder } : {}),
+      ...(shelfOrderTouched ? { shelfOrder: environment.config.shelfOrder } : {}),
+    };
+    publishMarketEnvironment(environment);
+    if ((categoryPlacementChanged || Object.keys(changes?.lockedSettings??{}).length>0) && accessToken && worldMapRef.current === 'market') {
+      stopMovement();
+      marketAiRequestSequence.current += 1;
+      setMarketAiStatus('loading');
+      setMarketAiNotice(null);
+      setMarketScenarioLocked(true);
+      setMarketInteractionRequest(null);
+      setMarketAiRetry(value => value + 1);
+    }
+  }, [accessToken, publishMarketEnvironment, stopMovement]);
 
   const handleMarketCashierCalled = useCallback((availability: MarketCashierAvailability) => {
     marketCashierCalledRef.current = availability;
@@ -1057,6 +1135,7 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
   }, []);
 
   const handleLeaveMarket = useCallback(() => {
+    marketAiRequestSequence.current += 1;
     prepareMapTransition();
     setMarketScenarioLocked(false);
     setMarketInteractionRequest(null);
@@ -2694,11 +2773,17 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
         />
       ) : null}
 
-      {worldMap === 'market' && (marketAiRequestToken !== accessToken || marketAiStatus === 'loading') ? (
+      {worldMap === 'market' && (marketAiRequestToken !== accessToken || ['loading', 'waiting', 'error'].includes(marketAiStatus)) ? (
         <View style={styles.interactionOverlay}>
           <View style={styles.fridgeMenuSheet}>
-            <Text style={styles.fridgeMenuTitle}>행동을 분석하고 연습을 준비하고 있어요</Text>
-            <ActivityIndicator />
+            <Text style={styles.fridgeMenuTitle}>{marketAiStatus === 'error' ? '맞춤 장보기를 준비하지 못했어요' : '행동을 분석하고 연습을 준비하고 있어요'}</Text>
+            {marketAiNotice ? <Text>{marketAiNotice}</Text> : null}
+            {marketAiStatus !== 'error' ? <ActivityIndicator /> : null}
+            {marketAiStatus === 'waiting' || marketAiStatus === 'error' ? (
+              <Pressable accessibilityRole="button" onPress={() => { marketAiRequestSequence.current += 1; setMarketAiRetry(value => value + 1); }}>
+                <Text style={styles.fridgeMenuTitle}>다시 확인</Text>
+              </Pressable>
+            ) : null}
             <Pressable accessibilityRole="button" onPress={handleLeaveMarket}>
               <Text style={styles.fridgeMenuTitle}>마을로 돌아가기</Text>
             </Pressable>
@@ -2716,6 +2801,9 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
           controlMode={controlMode}
           onControlModeChange={selectControlMode}
           environment={marketEnvironment}
+          initialConfig={pilotSessionConfig(__DEV__ && MARKET_REPLAY_ENABLED,
+            __DEV__ && MARKET_REPLAY_ENABLED && typeof window !== 'undefined' && window.location
+              ? new URLSearchParams(window.location.search).get('marketPilotEnvironment') ?? undefined : undefined)}
           onEnvironmentChange={handleMarketEnvironmentChange}
           onCashierCalled={handleMarketCashierCalled}
           playerPositionRef={playerPoint}
@@ -2725,6 +2813,13 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
           key={`${personalizedMarketMission.id}-${marketDifficulty}-${marketSimulation?.questInstanceId ?? 'static'}`}
           mission={personalizedMarketMission}
           onExit={handleLeaveMarket}
+          onOpenAnalysis={onOpenAnalysis ? () => {
+            stopMovement();
+            if (backgroundMusicStatus.isLoaded) {
+              try { backgroundMusic.pause(); } catch { /* The audio player may already be released. */ }
+            }
+            onOpenAnalysis();
+          } : undefined}
           onLockChange={setMarketScenarioLocked}
           onMissionComplete={() => completeDailyQuest('market-shopping')}
           simulation={marketSimulation}
@@ -2736,7 +2831,11 @@ export function GamePrototypeScreen({ accessToken = null, onExit }: GamePrototyp
         backgroundColor: '#f4fff3', borderColor: '#3b6b3b', borderWidth: 1, borderRadius: 8, padding: 8, zIndex: 10000 }}>
         <Text accessibilityLiveRegion="polite" testID="market-replay-status" style={{ fontSize: 12, color: '#234b23' }}>{replayStatus}</Text>
         {worldMap === 'village' ? <Pressable accessibilityRole="button" accessibilityLabel="실험용 매장 입구로 이동"
-          onPress={event => handlePortalPress(event, 'market')}><Text>실험용 매장 입구로 이동</Text></Pressable> : null}
+          onPress={event => {
+            event?.stopPropagation?.();
+            if (nearbyPortalIdRef.current === 'market') handleEnterMarket();
+            else handlePortalPress(event, 'market');
+          }}><Text>실험용 매장 입구로 이동</Text></Pressable> : null}
       </View> : null}
 
       {fridgeMenuOpen ? (

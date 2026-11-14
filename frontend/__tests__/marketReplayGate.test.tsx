@@ -83,8 +83,8 @@ test.each([false, true])('normal market inputs keep working and no shelf replay 
     await transition();
     expect(screen.UNSAFE_getByType(MarketShelfScene).props.replayPortRef).toBeUndefined();
     expect(replayUiRef.current).toBeNull();
-    fireEvent.press(screen.getByRole('button', { name: '흰 우유 담기' }));
-    expect(screen.getByRole('button', { name: '흰 우유 한 개 더 담기' })).toBeTruthy();
+    fireEvent.press(screen.getByRole('button', { name: /^흰 우유 900mL [0-9,]+원 담기$/ }));
+    expect(screen.getByRole('button', { name: /^흰 우유 900mL [0-9,]+원 담기$/ })).toBeTruthy();
     fireEvent.press(screen.getAllByRole('button', { name: '진열대 닫기' })[0]);
     await transition();
     fireEvent.press(screen.getByRole('button', { name: '장바구니 열기' }));

@@ -5,6 +5,7 @@
 ## 문서 지도
 
 - [Luna 전체 계획 상세](docs/whole-trace.md): 결정별 작성, 후보 작성·제출 계약, 방향 이동 옵션, 이동 그래프 진단
+- [Luna 증분 actor plan 상세](docs/actor-plan.md): v10 재현 계약, v11 작업기억·기억한 경로·선언 오류 복구
 - [페르소나 성향 검증 상세](docs/persona-validation.md): 성향 v2/v3 프로필 요청 예시와 공통 절차
 - [변경 이력과 레거시 경로](docs/history.md): feedback-choice v1~v13, 2026-09 경험·학습 실험 기록
 - [페르소나 정의와 출처](personas/audit.md): 실행 JSON, 읽기용 프롬프트, 이전 버전(`personas/history/`)
@@ -36,7 +37,7 @@ const validation = validateTrace(trace, snapshot);
 | 층 | 위치 | 역할 |
 | --- | --- | --- |
 | 입구 | `server.cjs`(MCP STDIO), `cli.cjs`, `whole-trace-host.cjs`, `whole-trace-mailbox.cjs` | 요청을 받아 같은 도구 목록으로 전달 |
-| 도구 등록 | `tools/wholeTrace.cjs`, `tools/validation.cjs`, `tools/replay.cjs`, `tools/trace.cjs`, `tools/personas.cjs` | 영역별 도구 정의와 처리. `tools/legacy/`는 feedback·actor plan·provider 생성·학습 실험으로, 동결된 재현용이다 |
+| 도구 등록 | `tools/wholeTrace.cjs`, `tools/actorPlan.cjs`, `tools/validation.cjs`, `tools/replay.cjs`, `tools/trace.cjs`, `tools/personas.cjs` | 영역별 도구 정의와 처리. `tools/legacy/`는 feedback·provider 생성·학습 실험으로, 동결된 재현용이다 |
 | 엔진 | `src/`(관측·규칙·선택지·공용 정책), `src/wholeTrace/`, `src/validation/`, `src/legacy/` | 계산. feedback 엔진 파일은 whole-trace가 함께 쓰므로 `src/`에 남아 있다 |
 
 MCP 서버는 `MARKET_SIM_PROFILE` 환경변수(또는 `createService({profile})`)로 노출할 도구를 고른다. 생략하면 `all`이며 기존 공개 목록 35개와 같다(작성 보조 도구 4개는 호출 가능하지만 목록에 없다). `generation`은 whole-trace 생성·작성 보조·`list_personas`·`validate_trace` 10개, `validation`은 여기에 페르소나 검증 도구를 더하고, `replay`는 재생 도구만 연다. 프로필 밖 도구는 호출도 거절된다.

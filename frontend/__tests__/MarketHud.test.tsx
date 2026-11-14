@@ -64,3 +64,24 @@ it('공통 HUD에서도 터치·조이스틱 이동을 왕복 전환하고 안�
     expect(StyleSheet.flatten(screen.getByTestId('market-hud').props.style).top).toBe(47);
   } finally { screen.unmount(); }
 });
+
+it('전체 목록에서 뒤쪽 네 번째 목표의 긴 규격과 구매 단위를 줄임 없이 확인하고 닫는다', () => {
+  const onListVisibilityChange = jest.fn();
+  const onOpenHelp = jest.fn();
+  const screen = render(<MarketHud {...props({ onListVisibilityChange, onOpenHelp, objectives: [
+    ...objectives, { id: 'water', label: '생수 · 500mL 페트병', quantity: 3, quantityUnit: '병' },
+  ] })} />);
+  try {
+    expect(screen.queryByTestId('market-shopping-list-expanded')).toBeNull();
+    fireEvent.press(screen.getByRole('button', { name: '구매 목록 전체 보기' }));
+    const list = within(screen.getByTestId('market-shopping-list-expanded'));
+    expect(list.getByText('사야 할 물품 4종')).toBeTruthy();
+    expect(list.getByText('생수 · 500mL 페트병').props.numberOfLines).toBeUndefined();
+    expect(list.getByText('3병')).toBeTruthy();
+    expect(onListVisibilityChange).toHaveBeenLastCalledWith(true);
+    expect(onOpenHelp).not.toHaveBeenCalled();
+    fireEvent.press(list.getByRole('button', { name: '구매 목록 닫기' }));
+    expect(screen.queryByTestId('market-shopping-list-expanded')).toBeNull();
+    expect(onListVisibilityChange).toHaveBeenLastCalledWith(false);
+  } finally { screen.unmount(); }
+});

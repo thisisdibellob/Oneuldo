@@ -5,11 +5,15 @@ import tools.jackson.databind.ObjectMapper;
 
 /** Synthesizes observations whose source IDs have been checked, without replaying raw scene blobs. */
 public final class AnalysisSynthesisPrompt {
-    public static final String VERSION="synthesis-v8-support-evidence";
+    public static final String FINAL_STAGE="FINAL: compare original events with chunk observations. Originals take priority; no unrecorded actions. IDs alone prove no claim.";
+    public static final String VERSION="synthesis-v18-grounded-practice";
     public static final String CONTRACT="""
         짧은 JSON 객체: {"s":"요약","f":[["F1","기술","사실","가설",[],["E1"],"지원"]],
         "a":[["S1","SUCCESS|FAILURE|UNDETERMINED","이유",["E1"]]],"u":["한계"],
         "p":[["F1"],"목표","근거와 목표 연결",1,2,"LOW","LOW","SIMPLIFIED",["OBSERVATION_PRACTICE"]],"c":[]}
+        f의 각 행은 정확히7칸이며 순서는 [id,skill,observation,interpretation,alternativeExplanations,evidenceEventIds,suggestedSupport]다.
+        skill은 '상품 규격 선택' 같은 관찰 영역 이름인 문자열이며 observation 문장과 별도 칸이다. skill을 생략하거나 사실 설명을 두 칸으로 나누지 않는다.
+        0=id문자열,1=skill문자열,2=관찰문자열,3=해석문자열,4=대안문자열배열(없으면[]),5=근거ID배열,6=지원문자열이다. 모든 행에 빈 대안 배열도 반드시 넣는다.
         f는 서로 다른 근거가 있으면 2~3개 작성하며 근거가 적으면 적게 쓴다. 구간에서 관찰되지 않은 행동으로 개수를 채우지 않는다. a는 모든 제공 세션을 한번씩 포함. 모든 근거는 evidenceReferences의 해당 세션 ID만.
         p의 순서: findingID목록,목표,이유,난이도1~3,품목1~4,수량복잡도LOW|MEDIUM|HIGH,예산압박LOW|MEDIUM|HIGH,문자지원SIMPLIFIED|STANDARD|REDUCED,영문대문자사유목록.
         사실은 무엇을 어떻게 했는지, 가설은 그렇게 해석한 이유, 지원은 다음에 할 수 있는 행동을 각각 완결된 문장으로 설명한다. 고정 글자 수로 자르지 말고 중복 표현을 줄여 출력 상한 안에서 JSON을 완성한다. 대안 설명은 원본 근거가 있는 경우에만 쓴다. 없으면 alternativeExplanations는 []이며, 동기·이해도 미확인은 uncertainties에 쓴다. 대안의 개수를 채우지 않는다. f가 비면 p첫칸도 빈배열, 관찰용 과제임을 명시.
@@ -22,15 +26,14 @@ public final class AnalysisSynthesisPrompt {
     public static String build(ObjectMapper mapper,AiBehaviorAnalysisPromptFactory prompts,BehaviorAnalysisInputResponse input,
             List<AiObservationDigest> digests,AnalysisReferences refs,boolean limited,List<BehaviorAnalysisInputResponse> scopes) {
         var root=mapper.createObjectNode();root.put("synthesisVersion",VERSION);
-        root.put("stage","FINAL: AI 구간 해석과 원본 사건 값 사본을 함께 제공한다. 참조 ID 검증은 해석의 진실성을 보장하지 않는다. "
-                + "먼저 sourceEventDetails에서 실제 상품·수량·장바구니를 읽고 각 구간 요약과 대조한 뒤 최종 판단하라. "
-                + "기록 존재 여부나 값이 상충하면 원본을 우선하고 잘못된 구간 해석을 사실로 계승하지 말라. "
-                + "사본에 없는 이동 세부를 다시 읽었다고 주장하지 말 것. 사건 이름이나 다수결로 성패를 정하지 않는다.");
+        root.put("stage",FINAL_STAGE);root.put("groundedPracticeContractVersion","v1");
+        root.set("implementedSupportCapabilities",SourceBoundReviewChecks.promptCapabilities(mapper));
+        root.set("retrievedKnowledge",KnowledgeRetrieval.retrieve(mapper.valueToTree(input.input())));
         var details=SourceEventDetails.build(mapper,input);
         root.set(SourceEventDetails.FIELD,details);
-        root.put("sourceEventDetailsRule",SourceEventDetails.RULE);
-        root.put("eventSemantics",prompts.marketEventSemantics());
-        root.set("eventDefinitions",AnalysisSourceContext.definitions(mapper));
+        var movementContext=MovementSourceContext.build(mapper,input);
+        root.set(MovementSourceContext.FIELD,movementContext);
+        root.put("categoryMeaning","produce=과일/채소, fresh=냉장 식품, drink=음료, meal=간편 식품. 원래 categoryId로 위치를 확인한다.");
         root.set("sourceCoverage",AnalysisSourceContext.coverage(mapper,input));
         var scopeNodes=root.putArray("chunkScopes");
         for(int i=0;i<scopes.size();i++) {
@@ -38,16 +41,22 @@ public final class AnalysisSynthesisPrompt {
             scope.put("chunkAnalysisIndex",i);scope.put("fullEventCount",input.eventCount());
             scope.put("partial",scopes.get(i).eventCount()<input.eventCount());scopeNodes.add(scope);
         }
-        root.put("sourceReview",AnalysisSourceContext.REVIEW);
-        root.put("interpretationRule","대안 설명의 개수를 채우려고 자동 결제·자동 팝업·시스템 수량 변경 등 입력에 없는 기능을 가정하지 않는다. "
-                + "대안 설명은 원본 근거가 있는 경우에만 쓴다. 없으면 alternativeExplanations는 []이며, 동기·이해도 미확인은 uncertainties에 쓴다. 대안의 개수를 채우지 않는다. "
-                + "skill에는 기술 이름을, observation에는 실제 행동을 쓴다. 지원은 다음 플레이에서 할 수 있는 구체적인 행동으로 제안한다.");
+        // FinalAnalysisPromptCompactor.systemPrompt() already supplies the complete review guidance.
+        // Keep the immutable source values here without repeating the same instruction block.
         root.set("taskContext",prompts.tasks(input));
+        root.set(SessionSourceLedger.FIELD,SessionSourceLedger.build(mapper,input));
+        root.put("sessionSourceLedgerRule",SessionSourceLedger.RULE);
+        root.set("catalogProductCategories",ProductLocationSource.build(mapper,new AnalysisContentScope(mapper).catalog(input)));
+        PracticeDesignContract.attach(mapper,root,mapper.valueToTree(input.input()));
         root.set("chunkAnalyses",mapper.valueToTree(digests));
         root.put("movementDetailLimited",limited);
-        root.put("practiceCapabilities","장보기 품목1~4개/수량/예산/문자 지원 조정만 가능. 품절·예약·음성·실제 결제 지시 불가.");
         var evidence=new HashSet<UUID>();digests.forEach(d->d.observations().forEach(o->evidence.addAll(o.evidenceEventIds())));
         details.forEach(e->evidence.add(UUID.fromString(e.path("id").asString())));
+        for(var session:movementContext.path("sessions")) {
+            for(var event:session.path("movementEventDetails")) evidence.add(UUID.fromString(event.path("id").asString()));
+            for(String field:List.of("sceneSources","collectorContexts"))
+                for(var source:session.path(field)) evidence.add(UUID.fromString(source.path("sourceEventId").asString()));
+        }
         var citations=root.putArray("evidenceReferences");
         var coverage=root.putArray("coverage");
         for(var session:input.input().sessions()) {
@@ -59,7 +68,11 @@ public final class AnalysisSynthesisPrompt {
                 r.put("timeMs",event.elapsedFromSessionStartMs());if(event.action()!=null)r.put("eventCode",event.action().eventCode());
             }
         }
-        root.put("outputContract",CONTRACT);
-        return refs.encode(prompts.pack(root));
+        root.put("outputContract",COMPACT_CONTRACT);
+        AnalysisSourceContext.addMissionPlanProvenance(mapper,root);
+        String source = refs.encode(prompts.pack(PriorAiPlanText.withhold(mapper,root)));
+        var decoded = (tools.jackson.databind.node.ObjectNode) new LosslessTables(mapper).decode(mapper.readTree(source));
+        return mapper.writeValueAsString(new FinalSourceEncoding(mapper).encodeReadable(decoded));
     }
+    public static final String COMPACT_CONTRACT="Korean JSON example (replace placeholders with source facts): {\"s\":\"요약\",\"f\":[[\"F1\",\"기술 영역\",\"관찰\",\"해석\",[],[\"E1\"],\"지원 제안\"]],\"a\":[[\"S1\",\"UNDETERMINED\",\"근거와 한계\",[\"E1\"]]],\"u\":[\"한계\"],\"p\":[[\"F1\"],\"목표\",\"관찰과 연습 연결\",1,2,\"LOW\",\"LOW\",\"SIMPLIFIED\",[\"OBSERVATION_PRACTICE\"]],\"c\":[]}. f rows exactly7 columns [id,skill,observation,interpretation,alternativeExplanations,evidenceEventIds,suggestedSupport], including alternatives[]. skill is separate from observation. a rows exactly4 columns, every session once, SUCCESS|FAILURE|UNDETERMINED by originals. p is ONE9-column array:0 findingIds array,1 goal,2 rationale,3 difficulty1..3,4 itemCount1..4,5 quantityComplexity LOW|MEDIUM|HIGH,6 budgetPressure LOW|MEDIUM|HIGH,7 textSupport SIMPLIFIED|STANDARD|REDUCED,8 uppercase reasonCodes array. Never put GUIDED_PRACTICE/SUPPORT_FADING/INDEPENDENT_PROBE in p[7]; those are purposes, not textSupport values. Use1..3 supported findings without quotas; cite only supplied session IDs in original order. Complete concise source-grounded clauses; grounded alternatives or[], unknown causes/comprehension and counterevidence remain explicit. If no findings use[] and observation-only rationale. c=[]: no literature cards supplied.";
 }

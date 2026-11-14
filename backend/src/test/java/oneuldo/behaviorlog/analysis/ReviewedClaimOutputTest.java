@@ -137,13 +137,31 @@ class ReviewedClaimOutputTest {
         assertThat(normalized.path("observation").asString()).startsWith("(E2, E4) 장바구니를 열었습니다.");
         assertThat(normalized.path("evidenceEventIds").toString()).isEqualTo("[\"E2\",\"E4\"]");
     }
-    @Test void rejects_returning_to_earlier_events_even_when_the_event_was_already_cited() {
-        for(var ids:List.of(List.of("E1"),List.of("E2"),List.of("E3"),List.of("E2","E4"))) {
+    @Test void rejects_new_earlier_action_evidence_but_preserves_reused_source_details() {
+        for(var ids:List.of(List.of("E3"),List.of("E3","E4"))) {
             var source=envelope();
             observation(source,0).putArray("evidenceEventIds").add("E2").add("E4");
             observation(source,1).set("evidenceEventIds",fixture.mapper.valueToTree(ids));
             assertThatThrownBy(()->read(source)).hasMessage("REVIEW_EVIDENCE_OUT_OF_ORDER");
         }
+        for (var ids:List.of(List.of("E2"),List.of("E2","E4"))) {
+            var source=envelope();observation(source,0).putArray("evidenceEventIds").add("E2").add("E4");
+            observation(source,1).set("evidenceEventIds",fixture.mapper.valueToTree(ids));
+            String before=source.toString();
+            assertThatCode(()->read(source)).doesNotThrowAnyException();
+            assertThat(source.toString()).isEqualTo(before);
+        }
+    }
+    @Test void terminal_coverage_citations_do_not_move_the_user_action_frontier() {
+        var raw=fixture.fixture();var events=raw.path("input").path("sessions").get(0).path("events");
+        ((ObjectNode)events.get(2).path("action")).put("eventCode","SHOP.TIME_LIMIT_EXPIRED");
+        ((ObjectNode)events.get(3).path("action")).put("eventCode","SHOP.SESSION_ENDED");
+        var currentRefs=new AnalysisReferences(fixture.mapper,fixture.input(raw));var source=envelope();
+        observation(source,0).put("text","종료 범위에 장바구니 열기 기록이 있습니다.").putArray("evidenceEventIds").add("E2").add("E4");
+        observation(source,1).put("text","시간 만료와 종료는 기록 범위를 표시합니다.").putArray("evidenceEventIds").add("E3").add("E4");
+        String before=source.toString();
+        assertThatCode(()->AnalysisReviewPrompt.reviewedAnalysis(fixture.mapper,source.toString(),currentRefs)).doesNotThrowAnyException();
+        assertThat(source.toString()).isEqualTo(before);assertThat(currentRefs.comparisonAnchorEventIds()).contains("E3","E4");
     }
     @Test void rejects_duplicate_contract_sources_instead_of_silently_choosing_one() {
         var checks=envelope();checks.putArray("claimChecks");

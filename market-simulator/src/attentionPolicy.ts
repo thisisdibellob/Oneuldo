@@ -120,7 +120,7 @@ export function validateAttentionMemory(value: unknown): asserts value is Attent
   }
   unique(productIds, 'memory.knownProducts');
   const controls = array(memory.controlsPracticed, 'memory.controlsPracticed', 32);
-  const controlTypes: PolicyAction['type'][] = ['interact', 'add', 'remove', 'requestReturn', 'checkout', 'requestCashier',
+  const controlTypes: PolicyAction['type'][] = ['openLocationHelp','backToStaff','askLocation','interact', 'add', 'remove', 'requestReturn', 'checkout', 'requestCashier',
     'submit', 'retry', 'giveUp', 'skipRating', 'closeStation', 'viewCart', 'viewHelp', 'closeView', 'rate',
     'walkTo', 'walkToAnchor', 'readList', 'pause', 'lookAround', 'browse'];
   controls.forEach((control, i) => { if (!controlTypes.includes(control as PolicyAction['type'])) fail(`memory.controlsPracticed[${i}]`); });

@@ -1,0 +1,52 @@
+{
+  "version": "market-adaptive-world-v1",
+  "layouts": [
+    "classic",
+    "aisles",
+    "corner"
+  ],
+  "employeeCount": [
+    1,
+    3
+  ],
+  "customerCount": [
+    1,
+    5
+  ],
+  "pillarCount": [
+    0,
+    4
+  ],
+  "chairCount": [
+    0,
+    4
+  ],
+  "cashierCount": [
+    0,
+    2
+  ],
+  "kioskLanes": [
+    "none",
+    "checkout",
+    "checkout-2"
+  ],
+  "checkoutReviewModes": [
+    "normal",
+    "overcharge",
+    "random"
+  ],
+  "stockPerProduct": [
+    1,
+    20
+  ],
+  "penaltyPoints": [
+    0,
+    100
+  ],
+  "choiceBudget": [
+    1000,
+    10000
+  ],
+  "generationDeadlineSeconds": 3600,
+  "maximumAiCalls": 23
+}

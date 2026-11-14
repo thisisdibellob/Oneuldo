@@ -33,6 +33,9 @@ class AnalysisJobPersistenceTest {
         var inputs=mock(BehaviorAnalysisInputService.class);var snapshot=mock(BehaviorAnalysisInputResponse.class);
         when(snapshot.id()).thenReturn(dataset);when(inputs.createForSession(member,null,session)).thenReturn(snapshot);
         var profileService=mock(AiUserProfileService.class);var profile=mock(AiUserProfileResponse.class);when(profile.status()).thenReturn("READY");
+        when(profile.promptVersion()).thenReturn(oneuldo.behaviorlog.profile.service.AiUserProfilePromptFactory.VERSION);
+        when(profile.sourceSessionId()).thenReturn(session);when(profile.sourceDatasetId()).thenReturn(dataset);when(profile.sourceAnalysisId()).thenReturn(analysis);
+        when(profileService.current(member)).thenReturn(Optional.of(profile));
         when(profileService.updateFromSession(eq(member),eq(session),any())).thenReturn(profile);
         var response=mock(AiBehaviorAnalysisResponse.class);when(response.status()).thenReturn("READY");when(response.analysisId()).thenReturn(analysis);
         when(analyses.analyzeSnapshot(member,dataset)).thenAnswer(inv->{AnalysisProgress.stage("OBSERVING",1,2);AnalysisProgress.waiting(System.currentTimeMillis()+5000);return response;});

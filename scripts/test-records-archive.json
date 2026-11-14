@@ -1,0 +1,9 @@
+{
+  "host": "duream@117.16.44.110",
+  "port": 22022,
+  "control_socket": "~/.ssh/oneuldo-school.sock",
+  "mountpoint": "/mnt/wd_hdd",
+  "expected_device": "/dev/sda1",
+  "expected_uuid": "B4E0414DE04116D0",
+  "remote_root": "/mnt/wd_hdd/oneuldo/tests"
+}

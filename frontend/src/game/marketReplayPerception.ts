@@ -1,6 +1,6 @@
 import { MARKET_DEFAULT_ZOOM } from './worldZoom';
 import { getMarketWorldCameraFrame } from './marketWorldCamera';
-import { getNearestMarketStation, isMarketEnvironmentBlocked, isNearMarketStation, type MarketEnvironment, type MarketCashierAvailability,
+import { getNearestMarketStation, getMarketStationApproachPoint, isMarketEnvironmentBlocked, isNearMarketStation, type MarketEnvironment, type MarketCashierAvailability,
   type MarketEnvironmentStationId } from './marketEnvironment';
 import { isMarketNavigationSegmentClear } from './marketNavigation';
 import { getMarketShelfLayout } from './marketShelfLayout';
@@ -84,6 +84,18 @@ export function visibleStations(environment: MarketEnvironment, position: Point,
       return { id: station.id, kind: station.kind, label, ...relative(position, marker(environment, station)),
         near: positions.every(point => isNearMarketStation(environment, station.id, point, undefined, cashiers)) };
     });
+}
+
+/** An opt-in visible target approach: one unobstructed on-screen segment, never a hidden-map route. */
+export const REPLAY_VISIBLE_APPROACH_MAX_DISTANCE = 600;
+export function canApproachVisibleStation(environment: MarketEnvironment, position: Point, stationId: MarketEnvironmentStationId,
+  presentation: ReplayPresentation, cashiers: Partial<MarketCashierAvailability> = {}, arrivalMargin = REPLAY_ARRIVAL_MARGIN): boolean {
+  if (!visibleStations(environment, position, presentation, cashiers, arrivalMargin).some(s => s.id === stationId)) return false;
+  return arrivalPositions(position, arrivalMargin).every(from => {
+    const target = getMarketStationApproachPoint(environment, stationId, from, cashiers);
+    return !!target && Math.hypot(target.x - from.x, target.y - from.y) <= REPLAY_VISIBLE_APPROACH_MAX_DISTANCE
+      && isMarketNavigationSegmentClear(environment, from, target, cashiers);
+  });
 }
 
 type ScreenRect = MarketHudRect;

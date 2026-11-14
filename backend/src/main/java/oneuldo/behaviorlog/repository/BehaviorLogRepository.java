@@ -16,6 +16,13 @@ public interface BehaviorLogRepository extends JpaRepository<BehaviorLog, UUID> 
 
     Optional<BehaviorLog> findByMemberIdAndClientEventId(UUID memberId, UUID clientEventId);
 
+    /** A submission is eligible for analysis before the player leaves the market. */
+    Optional<BehaviorLog> findFirstByMemberIdAndEventCodeOrderByReceivedAtDesc(UUID memberId, String eventCode);
+
+    /** Newest actual market result, including deadline snapshots before session exit. */
+    Optional<BehaviorLog> findFirstByMemberIdAndEventCodeInOrderByReceivedAtDescEventSequenceDesc(
+            UUID memberId, List<String> eventCodes);
+
     Optional<BehaviorLog> findByMemberIdAndSessionIdAndEventSequence(
             UUID memberId,
             UUID sessionId,
@@ -63,7 +70,8 @@ public interface BehaviorLogRepository extends JpaRepository<BehaviorLog, UUID> 
             select log.sessionId
             from BehaviorLog log
             where log.member.id = :memberId
-              and log.sessionEndContext is not null
+              and (log.sessionEndContext is not null
+                   or log.eventCode in ('SHOP.CHECKOUT_SUBMITTED', 'SHOP.TIME_LIMIT_EXPIRED'))
             group by log.sessionId
             order by max(log.receivedAt) desc
             """)

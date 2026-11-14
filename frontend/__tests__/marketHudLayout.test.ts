@@ -22,8 +22,8 @@ test('top safe area offsets the whole card while viewport height and bottom inse
 
 test('font scaling reserves line height and large-font wrapping without clipping text in the renderer', () => {
   expect(getMarketHudOcclusionRect({ ...presentation, fontScale: 2 })).toEqual({ left: 12, right: 378, top: 112, bottom: 287 });
-  // Four cart glyphs may wrap to four lines, and a quantity/unit to two.
-  // Two name lines (144) + two quantity lines (160) + gap (3) dominate.
+  // The five-glyph "전체 목록" button label wraps to five lines (icon 24 + gap 2 + 5×60 = 326),
+  // which now exceeds the item column (two name lines 144 + two quantity lines 160 + gap 3 = 307).
   expect(getMarketHudOcclusionRect({ ...presentation, fontScale: 4, safeArea: { top: 200, bottom: 0 } }))
-    .toEqual({ left: 12, right: 378, top: 264, bottom: 679 });
+    .toEqual({ left: 12, right: 378, top: 264, bottom: 698 });
 });

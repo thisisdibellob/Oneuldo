@@ -26,22 +26,33 @@ final class AiUserProfileReferences {
             "[（(\\[]\\s*[ER][0-9]+(?:\\s*[,，;·]\\s*[ER][0-9]+)*\\s*[）)\\]]");
     private static final Set<String> PROSE = Set.of("summary", "observation", "interpretation",
             "suggestedSupport", "explanation", "uncertainties", "alternativeExplanations", "goal", "rationale");
+    private static final Set<String> OUTPUT_FIELDS = Set.of("summary", "findings", "uncertainties", "practicePlan", "usedEvidenceCardIds");
     private final ObjectMapper mapper;
     private final Map<String, String> aliases = new LinkedHashMap<>();
     private final Map<String, String> originals = new LinkedHashMap<>();
 
     AiUserProfileReferences(ObjectMapper mapper, AiUserProfile previous, AiBehaviorAnalysisResponse current) {
+        this(mapper, previous, current, List.of());
+    }
+
+    AiUserProfileReferences(ObjectMapper mapper, AiUserProfile previous, AiBehaviorAnalysisResponse current,
+            List<UUID> sourceSessions) {
         this.mapper = mapper;
         var events = new LinkedHashSet<UUID>();
         var sessions = new LinkedHashSet<UUID>();
         collect(previous.getProfile(), events, sessions);
         collect(current.analysis(), events, sessions);
+        sourceSessions.stream().filter(java.util.Objects::nonNull).forEach(sessions::add);
         int number = 0;
         for (var id : events) add(id.toString(), "R" + (++number));
         number = 0;
         for (var id : sessions) add(id.toString(), "S" + (++number));
     }
 
+    Object outputSchema() {
+        return oneuldo.ai.client.SourceOutputSchemas.userProfile(originals.keySet().stream().filter(x->x.startsWith("R")).toList(),
+            oneuldo.behaviorlog.analysis.service.EvidenceIndex.retrieve("interface").stream().map(c->c.path("card_id").asString()).toList());
+    }
     String encode(String json) {
         ObjectNode root = (ObjectNode) replace(cleanProse(mapper.readTree(json), ""));
         root.set("allowedEvidenceEventIds", mapper.valueToTree(originals.keySet().stream()
@@ -49,18 +60,49 @@ final class AiUserProfileReferences {
         root.put("referenceEncoding", "R숫자는 이번 요청의 근거 사건, S숫자는 세션의 별칭이다. "
                 + "evidenceEventIds에는 allowedEvidenceEventIds에 있는 R 별칭만 사용한다. "
                 + "본문의 옛 E/R 번호는 이번 인용 번호와 다르다. 본문에 번호를 다시 쓰거나 복사하지 말고 "
-                + "해당 finding/sessionAssessment의 evidenceEventIds 배열에 있는 R 번호에서 선택한다. UUID나 새 번호를 만들지 않는다.");
+                + "입력 finding 또는 sessionAssessment의 evidenceEventIds에 있는 R 번호에서 선택해 출력 finding의 evidenceEventIds에 넣는다. UUID나 새 번호를 만들지 않는다.");
         return mapper.writeValueAsString(root);
     }
 
     AiUserProfileDraft read(String raw) {
         JsonNode root = mapper.reader().with(DeserializationFeature.FAIL_ON_TRAILING_TOKENS).readTree(raw);
+        if(root.isObject())root=oneuldo.behaviorlog.analysis.service.ConcretePracticeSections.profile(mapper,root);
+        if (root instanceof ObjectNode object) {
+            // Diagnostic field names only; the complete model output remains in the immutable attempt audit.
+            var unknown = object.propertyNames().stream().filter(name -> !OUTPUT_FIELDS.contains(name)).limit(6)
+                    .map(AiUserProfileReferences::boundedFieldName).toList();
+            if (!unknown.isEmpty()) throw new ReviewEvidenceException("PROFILE_FIELD_NOT_ALLOWED", "/" + unknown.getFirst(), unknown);
+        }
+        if(root.path("usedEvidenceCardIds").isArray()) {
+            var cards=root.path("usedEvidenceCardIds");
+            var allowed=oneuldo.behaviorlog.analysis.service.EvidenceIndex.retrieve("interface").stream()
+                    .map(card->card.path("card_id").asString()).toList();
+            var seen=new java.util.HashSet<String>();
+            for(var card:cards) if(!card.isString() || !allowed.contains(card.asString()) || !seen.add(card.asString()))
+                throw new ReviewEvidenceException("PROFILE_EVIDENCE_CARD_REFERENCE","/usedEvidenceCardIds",List.of());
+            if(cards.size()>8) throw new ReviewEvidenceException("PROFILE_EVIDENCE_CARD_REFERENCE","/usedEvidenceCardIds",List.of());
+        }
+        int fieldIndex = 0;
+        for (var finding : root.path("findings")) {
+            for (String field : List.of("id", "skill", "observation", "interpretation", "suggestedSupport")) {
+                var value = finding.path(field);
+                if (!value.isString() || value.asString().isBlank() || value.asString().length() > 2000)
+                    throw new ReviewEvidenceException("PROFILE_FINDING_TEXT_INVALID",
+                            "/findings/" + fieldIndex + "/" + field, List.of());
+            }
+            fieldIndex++;
+        }
         int index = 0;
         for (var finding : root.path("findings")) restoreEvidence(finding, index++);
         cleanProse(root, "");
         return mapper.readerFor(AiUserProfileDraft.class)
                 .with(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
                 .readValue(root);
+    }
+
+    /** Never return arbitrary property text, values, control characters or long names to the retry prompt. */
+    private static String boundedFieldName(String supplied) {
+        return supplied.matches("[A-Za-z][A-Za-z0-9_]{0,63}") ? supplied : "<untrusted-field>";
     }
 
     private void restoreEvidence(JsonNode node, int findingIndex) {
@@ -80,7 +122,7 @@ final class AiUserProfileReferences {
 
     private JsonNode cleanProse(JsonNode node, String field) {
         if (node.isString() && PROSE.contains(field))
-            return mapper.valueToTree(INLINE_CITATIONS.matcher(node.asString()).replaceAll("").strip());
+            return mapper.valueToTree(INLINE_CITATIONS.matcher(node.asString()).replaceAll("").replaceAll("[（(]\\s*~T[0-9]+\\s*[）)]", "").strip());
         if (node instanceof ObjectNode object) {
             for (String name : new ArrayList<>(object.propertyNames())) object.set(name, cleanProse(object.get(name), name));
         } else if (node instanceof ArrayNode array) {

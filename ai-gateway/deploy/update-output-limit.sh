@@ -16,7 +16,8 @@ try:
     key=pathlib.Path('/etc/oneuldo-ai/issued/admin-mac.key').read_text().strip()
     req=urllib.request.Request('http://127.0.0.1:8081/api/limits',headers={'Authorization':'Bearer '+key})
     with urllib.request.urlopen(req,timeout=2) as response:
-        assert json.load(response)['maxOutputTokens']==2400
+        limits=json.load(response)
+        assert limits['maxOutputTokens']==3200 and 24576 in limits['contextLengths']
 except Exception:
     raise SystemExit(1)
 CHECK

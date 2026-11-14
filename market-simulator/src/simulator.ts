@@ -7,7 +7,7 @@ import { StochasticPolicy } from './stochasticPolicy';
 import { assertDecision, createLlmPolicy } from './llmPolicy';
 import { Random } from './random';
 import { TraceGuard, validateTrace } from './traceValidation';
-import type { Decision, TraceOptions, TraceEntry, TraceSummary, Observation, Persona } from './types';
+import type { ActorPersona, Decision, TraceOptions, TraceEntry, TraceSummary, Observation } from './types';
 import { generateAttentionTrace } from './attentionSimulator';
 import { compactTraceTiming } from './traceTiming';
 import { wholeTraceHasAnchorMovementFeedback } from './wholeTrace/wholeTraceMovementFeedback';
@@ -57,7 +57,7 @@ async function generateOriginalTrace(options: TraceOptions): Promise<MarketRepla
   if (options.wholeTraceMovementVersion !== undefined && options.trialBinding)
     throw new Error('Whole-trace trial movementVersion is frozen; directional movement requires a separate unbound request');
   const persona = wholeTraceCompiler ? getWholeTracePersona(options.personaId) : getPersona(options.personaId);
-  if (options.feedbackMovement !== undefined && (!persona.attention || !['feedback-choice-v3', 'feedback-choice-v4', 'feedback-choice-v5', 'feedback-choice-v6', 'feedback-choice-v7', 'feedback-choice-v8', 'feedback-choice-v9', 'feedback-choice-v10', 'feedback-choice-v11', 'feedback-choice-v12', 'feedback-choice-v13'].includes(options.actorPolicyVersion ?? '')))
+  if (options.feedbackMovement !== undefined && ('scope' in persona || !persona.attention || !['feedback-choice-v3', 'feedback-choice-v4', 'feedback-choice-v5', 'feedback-choice-v6', 'feedback-choice-v7', 'feedback-choice-v8', 'feedback-choice-v9', 'feedback-choice-v10', 'feedback-choice-v11', 'feedback-choice-v12', 'feedback-choice-v13'].includes(options.actorPolicyVersion ?? '')))
     throw new Error('feedbackMovement requires an attention persona with feedback-choice-v3 or feedback-choice-v4');
   const mode = options.mode ?? 'llm';
   if (!['stochastic', 'llm'].includes(mode)) throw new Error('mode must be stochastic or llm.');
@@ -68,7 +68,7 @@ async function generateOriginalTrace(options: TraceOptions): Promise<MarketRepla
   if (!Number.isInteger(maxCalls) || maxCalls < 1 || maxCalls > 2000) throw new Error('llm.maxCalls must be 1..2000.');
   const model = mode === 'stochastic' ? 'stochastic-policy/3' : options.llm?.model ?? process.env.MARKET_LLM_MODEL;
   if (!model) throw new Error('LLM mode requires an explicit model identifier.');
-  if (persona.attention) return generateAttentionTrace(options, persona, mode === 'stochastic' ? 'stochastic-policy/5' : model);
+  if ('scope' in persona || persona.attention) return generateAttentionTrace(options, persona, mode === 'stochastic' ? 'stochastic-policy/5' : model);
   const guard = new TraceGuard(options.snapshot, persona.id, persona.version, model);
   const policy = mode === 'stochastic' ? new StochasticPolicy(persona, options.seed) : null;
   const provider = mode === 'llm' ? options.decisionProvider ?? createLlmPolicy(options.llm ?? {}, options.timeBudgetMs) : null;
@@ -159,27 +159,32 @@ async function generateOriginalTrace(options: TraceOptions): Promise<MarketRepla
   return trace;
 }
 
-export function projectDecision(d: Decision, o: Observation, persona: Persona, snapshot: MarketReplaySnapshot,
+export function projectDecision(d: Decision, o: Observation, persona: ActorPersona, snapshot: MarketReplaySnapshot,
   seed: string | number, stepIndex: number, motor: Random): StepIntent {
   const a = d.action;
   const rawMotorSeed = `${seed}:motor:${persona.id}:${persona.version}:${stepIndex}`;
   const motorSeed = rawMotorSeed.length <= 200 ? rawMotorSeed : `motor-${marketReplayFingerprint(rawMotorSeed)}`;
+  const research = 'scope' in persona;
+  // Research actors have no motor or probability profile. Use the existing engine
+  // base speed (190), system-walking acceleration (220), and minimum drag duration
+  // (450) as mechanical transport values; the actor still chooses action and delay.
+  const walkSpeed = research ? 190 : persona.parameters.walkSpeed;
   switch (a.type) {
     case 'moveDirection': return { type: 'moveDirection', direction: a.direction, durationMs: a.durationMs, movement: {
-      speedMultiplier: Math.round(Math.max(.4, Math.min(1, persona.parameters.walkSpeed / 190)) * 1000) / 1000,
-      accelerationMs: Math.round(motor.between(160, 280)),
+      speedMultiplier: Math.round(Math.max(.4, Math.min(1, walkSpeed / 190)) * 1000) / 1000,
+      accelerationMs: research ? 220 : Math.round(motor.between(160, 280)),
     } };
     case 'walkToAnchor': return { type: 'walkToAnchor', target: { anchorId: a.anchorId }, movement: {
-      style: persona.parameters.walkSpeed < 110 ? 'careful' : persona.parameters.walkSpeed < 140 ? 'steady' : 'brisk',
-      speedMultiplier: Math.round(Math.max(.4, Math.min(1, persona.parameters.walkSpeed / 190)) * 1000) / 1000,
-      running: false, motorSeed, accelerationMs: Math.round(motor.between(160, 280)),
+      style: walkSpeed < 110 ? 'careful' : walkSpeed < 140 ? 'steady' : 'brisk',
+      speedMultiplier: Math.round(Math.max(.4, Math.min(1, walkSpeed / 190)) * 1000) / 1000,
+      running: false, motorSeed, accelerationMs: research ? 220 : Math.round(motor.between(160, 280)),
     } };
     case 'readList': case 'pause': case 'lookAround': return { type: a.type, durationMs: a.durationMs };
     case 'browse': return { type: 'browse', durationMs: a.durationMs, scrollFraction: a.scrollFraction };
     case 'walkTo': return { type: 'walkTo', target: { stationId: a.station }, movement: {
-      style: persona.parameters.walkSpeed < 110 ? 'careful' : persona.parameters.walkSpeed < 140 ? 'steady' : 'brisk',
-      speedMultiplier: Math.round(Math.max(.4, Math.min(1, persona.parameters.walkSpeed / 190)) * 1000) / 1000,
-      running: false, motorSeed, accelerationMs: Math.round(motor.between(160, 280)),
+      style: walkSpeed < 110 ? 'careful' : walkSpeed < 140 ? 'steady' : 'brisk',
+      speedMultiplier: Math.round(Math.max(.4, Math.min(1, walkSpeed / 190)) * 1000) / 1000,
+      running: false, motorSeed, accelerationMs: research ? 220 : Math.round(motor.between(160, 280)),
     } };
     case 'interact': {
       const station = snapshot.environment.stationDetails.find(s => s.id === a.station);
@@ -190,11 +195,13 @@ export function projectDecision(d: Decision, o: Observation, persona: Persona, s
     }
     case 'checkout': return { type: 'checkout', checkoutId: a.checkoutId ?? 'checkout' };
     case 'add': return { type: 'dragProduct', productId: a.productId, quantity: a.quantity ?? 1, gesture: {
-      durationMs: Math.round(Math.max(450, Math.min(2400, persona.parameters.reactionMedianMs * motor.between(.35, .55)))),
-      hesitationMs: d.feedbackMemory === undefined && d.reason.includes('pause-before-next-step') ? Math.round(motor.between(150, 700)) : 0,
+      durationMs: research ? 450 : Math.round(Math.max(450, Math.min(2400, persona.parameters.reactionMedianMs * motor.between(.35, .55)))),
+      hesitationMs: !research && d.feedbackMemory === undefined && d.reason.includes('pause-before-next-step') ? Math.round(motor.between(150, 700)) : 0,
       outcome: d.dragOutcome ?? 'drop', motorSeed,
     } };
     case 'remove': return { type: 'removeProduct', productId: a.productId, quantity: a.quantity ?? 1 };
+    case 'openLocationHelp': case 'backToStaff': return { type: 'talkToStaff', stationId: requireStaff(o), choice: a.type };
+    case 'askLocation': return { type: 'talkToStaff', stationId: requireStaff(o), choice: 'askLocation', objectiveId: a.objectiveId };
     case 'requestReturn': return { type: 'talkToStaff', stationId: requireStaff(o), choice: 'returnProduct', productId: a.productId, quantity: a.quantity ?? 1 };
     case 'requestCashier': {
       // The real dialogue has one button per empty counter, so resolve the choice

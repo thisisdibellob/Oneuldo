@@ -1,3 +1,4 @@
+import { marketLocationResponse } from '../game/marketHelp';
 import { randomUUID } from 'expo-crypto';
 import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
@@ -13,7 +14,8 @@ import { getMarketHudTopInset } from '../game/marketHudLayout';
 import { MarketStaffDialogue, MarketStaffDialogueChoice } from '../components/game/MarketStaffDialogue';
 import { MarketPanelTransition } from '../components/game/MarketPanelTransition';
 import { MarketShelfScene } from '../components/game/MarketShelfScene';
-import { MarketSetupPanel } from '../components/game/MarketSetupPanel';
+import { MarketSetupPanel, type MarketSetupChanges } from '../components/game/MarketSetupPanel';
+import { runtimeSettingLocks } from '../game/marketAdaptivePlan';
 import { getMarketWrongWayRearm, MarketEnvironment, MarketEnvironmentStationId, MarketCashierAvailability } from '../game/marketEnvironment';
 import {
   applyMarketAction,
@@ -38,6 +40,9 @@ import type { ReplayUiPort, ReplayShelfPort } from '../replay/ports';
 import type { ReplayPresentation } from '../game/marketReplayPerception';
 import type { MarketReplaySnapshot } from '../game/marketReplayTrace';
 import { createMissionSession } from '../game/marketMissionSession';
+import { MARKET_GOAL_REMINDER_TITLE, marketGoalReminderLines } from '../game/marketGoalReminder';
+import { getMarketEnvironmentContext } from '../game/marketEnvironmentPlan';
+import { MarketQuestClock, formatMarketTime, resolveMarketTimeLimitSeconds, type MarketQuestTiming } from '../game/marketQuestTime';
 import { buildMarketAgentObservation, type MarketAgentUiState } from '../game/marketAgentObservation';
 import type { MarketAgentAction, MarketAgentActionInput, MarketAgentController } from '../agent/marketAgentProtocol';
 
@@ -78,10 +83,11 @@ export type MarketSimulationScreenProps = {
   initialConfig?: Partial<MarketSessionConfig>;
   playerPositionRef?: { current: Point; };
   playerMovementListenerRef?: { current: ((previous: Point, next: Point) => void) | null; };
-  onEnvironmentChange?: (environment: MarketEnvironment) => void;
+  onEnvironmentChange?: (environment: MarketEnvironment, changes?: MarketSetupChanges) => void;
   onCashierCalled?: (availability: MarketCashierAvailability) => void;
   onEpisodeComplete?: (episode: ReturnType<typeof exportMarketEpisode>) => void;
   onExit: () => void;
+  onOpenAnalysis?: () => void;
   onLockChange?: (locked: boolean) => void;
   onMissionComplete?: () => void;
   /** Only supplied by the development web replay gate. */
@@ -113,6 +119,7 @@ export function MarketSimulationScreen({
   onCashierCalled,
   onEpisodeComplete,
   onExit,
+  onOpenAnalysis,
   onLockChange,
   onMissionComplete, replayUiRef, replayPresentation, agentControl,
 }: MarketSimulationScreenProps) {
@@ -127,9 +134,15 @@ export function MarketSimulationScreen({
   // Missions from the application always use AI assessment. The standalone marketLab
   // keeps the incoming deterministic research preview, never used as an AI verdict.
   const aiAssessment = !!mission;
+  const adaptiveAssessment = aiAssessment && !!mission.runtimePlan;
   const briefingPages = mission?.briefing.length ? mission.briefing : null;
   const lastBriefingStep = (briefingPages?.length ?? 2) - 1;
   const [review, setReview] = useState<string | null>(null);
+  const questClock = useRef(new MarketQuestClock(resolveMarketTimeLimitSeconds(mission?.timeLimitSeconds)));
+  const [timing, setTiming] = useState<MarketQuestTiming>(() => questClock.current.snapshot());
+  const [expiredTiming, setExpiredTiming] = useState<MarketQuestTiming | null>(null);
+  const expireRef = useRef<(() => void) | null>(null);
+  const timeGuard = useRef<() => boolean>(() => false);
   const reviewing = useRef(false);
   const reviewAccepted = useRef(false);
   const reviewError = useRef<string | null>(null);
@@ -141,6 +154,7 @@ export function MarketSimulationScreen({
   const tracker = useRef<MarketBehaviorTracker | null>(null);
   const trackerFinalized = useRef(false);
   const finalization = useRef<Promise<void> | null>(null);
+  const analysisRequest = useRef<Promise<void> | null>(null);
   const shelfOpenedAt = useRef(Date.now());
   const cartOpenedAt = useRef(Date.now());
   const briefingShownAt = useRef(Date.now());
@@ -148,38 +162,60 @@ export function MarketSimulationScreen({
   live.current = session;
   const trackedMission = useMemo<MarketMission>(() => {
     const original = mission ?? marketMission;
-    const { scene: ignored, ...base } = original;
+    const { scene: ignored, ...originalBase } = original;
+    const base = { ...originalBase, timeLimitSeconds: resolveMarketTimeLimitSeconds(originalBase.timeLimitSeconds) };
     const products = Object.values(session.shelfSlots).flat().map(id => ({ ...getMarketProduct(id)!, initialStock: session.initialStock[id] }));
+    const actualShelfOrder = getMarketEnvironmentContext(session.environment).shelfSlots.map(slot => slot.categoryId);
     return { ...base, objectives: mission?.objectives ?? session.config.objectives, scene: {
       schemaVersion: 'market-scene-v1', questInstanceId: simulation?.questInstanceId ?? mission?.scene?.questInstanceId ?? randomUUID(),
       seed: session.config.seed,
       layoutVersion: 'market-retail-layout-v3', catalogVersion: base.catalogVersion ?? MARKET_CATALOG_VERSION,
+      ...(base.environmentPlan ? { environmentPlanApplication: {
+        requestedShelfOrder: [...base.environmentPlan.shelfOrder], actualShelfOrder,
+        applied: actualShelfOrder.every((categoryId, index) => categoryId === base.environmentPlan!.shelfOrder[index]),
+      } } : {}),
       scenarioVersion: base.scenarioVersion ?? MARKET_SCENARIO_VERSION, mission: { ...base, objectives: mission?.objectives ?? session.config.objectives }, products,
       slots: Object.entries(session.shelfSlots).flatMap(([stationId, ids]) => ids.map((productId, index) => ({ slotId: stationId+'-'+index, stationId, productId, storage: getMarketProduct(productId)!.storage }))),
       startingConditions: { cart: {}, player: session.environment.spawn, supportOptions: ['목록 다시 보기','직원 도움','거절/중단'],
+        ...(mission?.runtimePlan?{displayedRuntimePreview:{stockoutAnnounced:!!session.learning.stockout,substitutionAnnounced:!!session.config.learning?.allowSubstitution,checkoutReviewAnnounced:session.config.learning?.checkoutReviewMode,layoutAnnounced:session.environment.config.layoutId,staffCountAnnounced:session.environment.employees.length}}:{}),
+        runtimeConfig: {difficulty:session.config.difficulty,learning:session.config.learning,provenance:session.config.provenance,stockPerProduct:session.config.stockPerProduct,initialStock:session.initialStock,
+          alarmPenaltyPoints:session.config.alarmPenaltyPoints,wrongWayPenaltyPoints:session.config.wrongWayPenaltyPoints,cashierRequestPenaltyPoints:session.config.cashierRequestPenaltyPoints},
         geometry: JSON.stringify(session.environment), exposureMeaning: '진열 목록과 실제 배치이며 열람·이해를 뜻하지 않는다.' },
     } };
   }, [session.id, mission, simulation?.questInstanceId]);
   useEffect(() => {
     if (!accessToken) return;
+    const activeClock = questClock.current;
     const current = new MarketBehaviorTracker(accessToken, trackedMission, difficulty, simulation, session.environment.stations,
-      agentControl ? {
+      {
+        timingSnapshot: () => activeClock.snapshot(),
+        ...(agentControl ? {
         sessionId: agentControl.sessionId,
         initialControlMode: 'agent',
         agentContext: agentControl.provenance,
-      } : undefined);
+        } : session.config.provenance.source === 'synthetic' ? {
+          agentContext: {agentModel:session.config.provenance.agentModel!,personaId:session.config.provenance.personaId!,personaVersion:session.config.provenance.personaVersion},
+        } : {}),
+      });
     trackerFinalized.current = false;
     finalization.current = null;
     tracker.current = current;
+    const initialTiming = activeClock.snapshot();
+    if (initialTiming.startedAt) current.startTimeLimit({ ...initialTiming, elapsedMs: 0,
+      remainingMs: initialTiming.timeLimitSeconds * 1000, expired: false });
     void current.flushNow().catch(() => undefined);
     return () => { void current.abort(live.current.cart).catch(() => undefined); tracker.current = null; };
-  }, [accessToken, trackedMission, difficulty, simulation, agentControl?.sessionId]);
+  }, [accessToken, trackedMission, difficulty, simulation?.questInstanceId, simulation?.contentSource, agentControl?.sessionId]);
   useEffect(() => {
-    const subscription = AppState.addEventListener('change', state => state === 'active' ? tracker.current?.appForegrounded() : tracker.current?.appBackgrounded());
+    const subscription = AppState.addEventListener('change', state => {
+      if (state === 'active') { tracker.current?.appForegrounded(); timeGuard.current(); }
+      else tracker.current?.appBackgrounded();
+    });
     return () => subscription.remove();
   }, []);
   useEffect(() => {
-    onTelemetryReady?.({ movementStopped: mode => tracker.current?.movementStopped(mode), observeMovement: (point, mode, blocked) => tracker.current?.observeMovement({ point, controlMode: mode, blocked, targetZoneIds: new Set() }) });
+    onTelemetryReady?.({ movementStopped: mode => { if (!timeGuard.current()) tracker.current?.movementStopped(mode); },
+      observeMovement: (point, mode, blocked) => { if (!timeGuard.current()) tracker.current?.observeMovement({ point, controlMode: mode, blocked, targetZoneIds: new Set() }); } });
     return () => onTelemetryReady?.(null);
   }, [onTelemetryReady]);
   const localPosition = useRef(session.environment.spawn);
@@ -190,6 +226,7 @@ export function MarketSimulationScreen({
   const [settings, setSettings] = useState(false),
     [cartOpen, setCartOpen] = useState(false),
     [helpOpen, setHelpOpen] = useState(false);
+  const [shoppingListOpen, setShoppingListOpen] = useState(false);
   const [nearby, setNearby] = useState<MarketStationId | null>(null);
   const [difficultyRating, setDifficultyRating] = useState(0),
     [interestRating, setInterestRating] = useState(0);
@@ -220,8 +257,8 @@ export function MarketSimulationScreen({
   const position = playerPositionRef ?? localPosition;
   const shelf = marketCategories.find(category => category.id === session.activeStation);
   const requesterOpen = session.view === 'requester';
-  const panelVisible = review !== null || requesterOpen || briefing || settings || historyOpen || session.phase !== 'shopping' || cartOpen || helpOpen || staffMessage;
-  const locked = panelVisible || panelPresent || !!shelf;
+  const panelVisible = expiredTiming !== null || review !== null || requesterOpen || briefing || settings || historyOpen || session.phase !== 'shopping' || cartOpen || helpOpen || staffMessage;
+  const locked = panelVisible || panelPresent || !!shelf || shoppingListOpen;
   const briefingText = briefingPages ? briefingPages[briefingStep] : briefingStep === 0
     ? mission?.description ?? '목록을 보고 필요한 물건을 골라 보세요. 물건의 이름과 종류를 천천히 살펴봐요.'
     : aiAssessment ? '다 골랐다면 계산대로 가서 AI 검토를 요청해 주세요. 언제든 그만둘 수 있어요.'
@@ -231,13 +268,76 @@ export function MarketSimulationScreen({
     briefing, briefingStep, briefingText: briefing ? briefingText : null, cartOpen, helpOpen, staffMessage,
     staffReturnHelp, staffResponse, settingsOpen: settings, historyOpen, reviewMessage: review,
   };
+  const requestExpiredAnalysis = useCallback(async () => {
+    if (reviewing.current || reviewAccepted.current) return;
+    const current = tracker.current;
+    const activeClock = questClock.current;
+    if (!current || !accessToken) {
+      setReview('기록은 이 기기에 저장했어요. AI 분석은 로그인 후 사용할 수 있어요.');
+      return;
+    }
+    reviewing.current = true;
+    reviewError.current = null;
+    setReview('시간 종료 기록을 전송하고 분석을 접수하고 있어요.');
+    try {
+      await finalization.current?.catch(() => undefined);
+      await current.flushConfirmed();
+      await startSessionAnalysisJob(accessToken, current.sessionId);
+      if (questClock.current !== activeClock) return;
+      reviewAccepted.current = true;
+      if (mounted.current) setReview('분석을 접수했어요. 분석 탭에서 진행 상태와 결과를 확인해 주세요.');
+    } catch (error) {
+      if (questClock.current !== activeClock) return;
+      reviewError.current = error instanceof Error ? error.message : '분석을 접수하지 못했어요.';
+      if (mounted.current) setReview(reviewError.current);
+    } finally { if (questClock.current === activeClock) reviewing.current = false; }
+  }, [accessToken]);
+  const expireTimeLimit = useCallback(() => {
+    if (live.current.phase === 'finished' || trackerFinalized.current || !questClock.current.snapshot().expired) return;
+    const snapshot = questClock.current.freeze();
+    const next = applyMarketAction(live.current, { type: 'expireTimeLimit', timing: snapshot, at: new Date().toISOString() });
+    live.current = next;
+    setSession(next);
+    setTiming(snapshot);
+    setExpiredTiming(snapshot);
+    setBriefing(false); setSettings(false); setHistoryOpen(false); setCartOpen(false); setHelpOpen(false);
+    setStaffMessage(false); setStaffReturnHelp(false); setStaffLocationHelp(false);
+    trackerFinalized.current = true;
+    if (tracker.current) finalization.current = tracker.current.expireTimeLimit(next.cart, snapshot);
+    if (aiAssessment) analysisRequest.current = requestExpiredAnalysis();
+  }, [aiAssessment, requestExpiredAnalysis]);
+  expireRef.current = expireTimeLimit;
+  timeGuard.current = () => {
+    if (!questClock.current.snapshot().expired) return false;
+    expireRef.current?.();
+    return true;
+  };
+  useEffect(() => {
+    if (briefing || expiredTiming || session.phase === 'finished' || trackerFinalized.current) return;
+    const update = () => {
+      const snapshot = questClock.current.snapshot();
+      setTiming(snapshot);
+      if (snapshot.expired) expireRef.current?.();
+    };
+    update();
+    const timer = setInterval(update, 250);
+    return () => clearInterval(timer);
+  }, [briefing, expiredTiming, session.phase, review]);
   const dispatch = useCallback((action: MarketAction, sync = false) => {
+    if (!['rate', 'skipRating'].includes(action.type) && timeGuard.current()) {
+      return { ...live.current, lastActionError: '장보기 시간이 종료됐어요.' };
+    }
     let current = live.current;
     const at = new Date().toISOString();
     if (sync) current = applyMarketAction(current, { type: 'setPosition', point: { ...position.current }, at });
     const next = applyMarketAction(current, { ...action, at });
     if (!next.lastActionError) {
       const logger = tracker.current;
+      if(mission?.runtimePlan)logger?.runtimeState({effectiveObjectives:next.objectives,learning:next.learning,checkoutReview:next.checkoutReview,paid:next.paid});
+      if(['askLocation','checkStock','viewRequester','requestSubstitution','reportUnavailable','requestCheckoutCorrection','submitKiosk'].includes(action.type))
+        logger?.track({eventCode:'SHOP.RUNTIME_ACTION_RECORDED',microActionId:action.type.toUpperCase(),priority:'high',payload:{marketContent:{action,
+          runtimeState:{effectiveObjectives:next.objectives,learning:next.learning,checkoutReview:next.checkoutReview,paid:next.paid},
+          outcomeEvents:next.events.slice(current.events.length)}}});
       if (action.type === 'add' || action.type === 'remove' || action.type === 'requestReturn') {
         logger?.updateCart(next.cart);
         logger?.quantityChanged(action.productId, current.cart[action.productId] ?? 0, next.cart[action.productId] ?? 0, next.cart);
@@ -250,12 +350,14 @@ export function MarketSimulationScreen({
       if (action.type === 'viewCart') { cartOpenedAt.current=Date.now(); logger?.cartOpened(next.cart); }
       if (action.type === 'closeView' && current.view === 'cart') logger?.cartClosed(next.cart, Date.now()-cartOpenedAt.current);
       if (action.type === 'retry') logger?.correctionStarted(next.cart);
-      if (action.type === 'viewHelp' || action.type === 'requestReturn' || action.type === 'requestCashier' || (action.type === 'interact' && action.station.startsWith('staff:'))) logger?.track({ eventCode:'SHOP.STAFF_HELP_REQUESTED', microActionId:action.type.toUpperCase(), payload:{marketContent:{action}} });
+      if (action.type === 'viewHelp') logger?.track({ eventCode:'SHOP.GENERAL_HELP_OPENED', microActionId:'VIEWHELP', payload:{marketContent:{action}} });
+      else if (action.type === 'requestReturn' || action.type === 'requestCashier' || (action.type === 'interact' && action.station.startsWith('staff:'))) logger?.track({ eventCode:'SHOP.STAFF_HELP_REQUESTED', microActionId:action.type.toUpperCase(), payload:{marketContent:{action}} });
     }
     live.current = next;
+    if (next.phase === 'finished') { setTiming(questClock.current.freeze()); }
     setSession(next);
     return next;
-  }, [position]);
+  }, [position,mission?.runtimePlan]);
   const contactRequester = useCallback(() => {
     const next = dispatch({ type: 'viewRequester' }, true);
     if (next.lastActionError) return;
@@ -411,17 +513,27 @@ export function MarketSimulationScreen({
     });
     return () => back.remove();
   }, [shelf, settings, historyOpen, cartOpen, helpOpen, staffMessage, staffReturnHelp, staffLocationHelp, requesterOpen, session.phase, giveUp, dispatch, resetStaffReply, panelPresent, panelVisible, externalMenuOpen]);
-  const configure = (config: Partial<MarketSessionConfig>) => {
+  const configure = (config: Partial<MarketSessionConfig>, changes?: MarketSetupChanges) => {
     replaySnapshot.current = null;
-    const next = createMissionSession({ ...config, startedAt: new Date().toISOString() }, mission);
+    questClock.current.freeze();
+    questClock.current = new MarketQuestClock(resolveMarketTimeLimitSeconds(mission?.timeLimitSeconds));
+    setTiming(questClock.current.snapshot());
+    setExpiredTiming(null); setReview(null); reviewing.current = false; reviewAccepted.current = false; reviewError.current = null;
+    completed.current = false; emitted.current = false; trackerFinalized.current = false; finalization.current = null;
+    analysisRequest.current = null;
+    const next = createMissionSession({ ...config, startedAt: new Date().toISOString() }, mission,undefined,true);
+    const shelfOrderTouched = changes?.shelfOrderTouched
+      ?? JSON.stringify(next.environment.config.shelfOrder) !== JSON.stringify(live.current.environment.config.shelfOrder);
     live.current = next;
     setSession(next);
     localPosition.current = next.environment.spawn;
-    onEnvironmentChange?.(next.environment);
+    onEnvironmentChange?.(next.environment, { shelfOrderTouched, lockedSettings:runtimeSettingLocks(next.config,next.environment,changes?.changedConfigPaths??[]) });
     setSettings(false);
+    setBriefing(true);
     setBriefingStep(0);
   };
-  const submitForReview = async () => {
+  const submitForReview = async (scannedCart?: Record<string,number>) => {
+    if (timeGuard.current()) return;
     if (!aiAssessment) { dispatch({ type: 'submit' }); return; }
     if (reviewing.current) return;
     reviewing.current = true;
@@ -431,7 +543,17 @@ export function MarketSimulationScreen({
     try {
       const current = tracker.current;
       if (!current || !accessToken) throw new Error('로그인 후 AI 검토를 사용할 수 있어요.');
+      const snapshot = questClock.current.freeze();
+      setTiming(snapshot);
+      if(adaptiveAssessment){
+        const runtimeState={effectiveObjectives:live.current.objectives,learning:live.current.learning,checkoutReview:live.current.checkoutReview,paid:live.current.paid};
+        current.runtimeState(runtimeState);
+        current.track({eventCode:'SHOP.RUNTIME_ACTION_RECORDED',microActionId:scannedCart?'CONFIRM_KIOSK':'CONFIRM_STAFFED_CHECKOUT',priority:'high',payload:{marketContent:{action:{type:scannedCart?'confirmKiosk':'confirmStaffedCheckout',...(scannedCart?{scannedCart}: {})},runtimeState}}});
+      }
       current.checkoutSubmitted(live.current.cart);
+      trackerFinalized.current = true;
+      finalization.current = current.complete(live.current.cart);
+      await finalization.current;
       await current.flushConfirmed();
       await startSessionAnalysisJob(accessToken, current.sessionId);
       reviewAccepted.current = true;
@@ -439,17 +561,40 @@ export function MarketSimulationScreen({
     } catch (error) { reviewError.current = error instanceof Error ? error.message : '검토를 접수하지 못했어요.'; if (mounted.current) setReview(reviewError.current); }
     finally { reviewing.current = false; }
   };
-  const leave = () => { if (!tracker.current) { onExit(); return Promise.resolve(); } return tracker.current.abort(live.current.cart).catch(() => undefined).finally(onExit); };
+  const leave = () => {
+    timeGuard.current();
+    questClock.current.freeze();
+    if (!tracker.current) { onExit(); return Promise.resolve(); }
+    return tracker.current.abort(live.current.cart).then(() => finalization.current)
+      .then(() => analysisRequest.current).catch(() => undefined).finally(onExit);
+  };
+  const restartExpiredQuest = async () => {
+    if (reviewing.current) return;
+    reviewing.current = true;
+    try {
+      await tracker.current?.persistLocal();
+      configure({ ...live.current.config, sessionId: undefined });
+    } catch (error) {
+      reviewError.current = error instanceof Error ? error.message : '종료 기록을 저장하지 못했어요.';
+      if (mounted.current) setReview('종료 기록을 저장하지 못했어요. 다시 시도해 주세요.');
+    } finally { reviewing.current = false; }
+  };
   const selectDifficulty = (difficulty: 'family' | 'exact') => configure({
     ...session.config,
     difficulty,
     objectives: session.config.objectives.map(({ productId, quantity }) => ({ productId, quantity }))
   });
   const start = () => {
-    if (aiAssessment) { setBriefing(false); return; }
+    if (aiAssessment) {
+      const snapshot = questClock.current.start();
+      setTiming(snapshot); tracker.current?.startTimeLimit(snapshot);
+      setBriefing(false); return;
+    }
     const next = createMarketSession({ ...session.config, startedAt: new Date().toISOString() }, session.environment);
     live.current = next;
     setSession(next);
+    const snapshot = questClock.current.start();
+    setTiming(snapshot);
     setBriefing(false);
   };
   const advanceBriefing = () => {
@@ -523,18 +668,20 @@ export function MarketSimulationScreen({
     if (!next.lastActionError) setStaffResponse(`${getMarketProduct(productId)?.name} ${quantity}개를 제자리에 놓아드렸어요.`);
   };
   // These handlers are shared by the visible buttons and the development input port.
-  const openCart = () => { dispatch({ type: 'viewCart' }); setCartOpen(true); };
-  const openHelp = () => { dispatch({ type: 'viewHelp' }); setHelpOpen(true); };
+  const openCart = () => { if (!dispatch({ type: 'viewCart' }).lastActionError) setCartOpen(true); };
+  const openHelp = () => { if (!dispatch({ type: 'viewHelp' }).lastActionError) setHelpOpen(true); };
   const closeCart = () => { dispatch({ type: 'closeView' }); setCartOpen(false); };
   const closeHelp = () => { dispatch({ type: 'closeView' }); setHelpOpen(false); };
   const requestSpecificCashier = (checkoutId: 'checkout' | 'checkout-2') => {
     const next = dispatch({ type: 'requestCashier', checkoutId }, true);
     if (!next.lastActionError) setStaffResponse(String(next.events.at(-1)?.payload.message ?? '계산대 상태를 다시 확인해 주세요.'));
   };
-  const openReturnHelp = () => { setStaffReturnHelp(true); setStaffResponse(''); };
-  const backToStaff = () => { setStaffReturnHelp(false); setStaffResponse(''); };
+  const openReturnHelp = () => { if (timeGuard.current()) return; setStaffReturnHelp(true); setStaffResponse(''); };
+  const backToStaff = () => { setStaffReturnHelp(false); setStaffLocationHelp(false); resetStaffReply(); };
+  const openLocationHelp = () => { if (timeGuard.current()) return; setStaffLocationHelp(true); setStaffReturnHelp(false); resetStaffReply(); };
   if (__DEV__ && replayUiRef && aiAssessment) {
     replayUiRef.current = {
+      recordExecutionContext:context=>tracker.current?.recordReplayExecutionContext(context),
       snapshot: () => {
         const presentation = replayPresentation?.();
         if (briefing && briefingStep === 0 && JSON.stringify(replaySnapshot.current?.presentation) !== JSON.stringify(presentation)) replaySnapshot.current = null;
@@ -551,14 +698,14 @@ export function MarketSimulationScreen({
       },
       sessionId: () => tracker.current?.sessionId ?? null,
       read: () => ({ briefing, briefingStep, phase: live.current.phase, shelf: shelf?.id ?? null,
-        cartOpen, helpOpen, staffOpen: staffMessage, staffReturnHelp, panelTransition: panelPresent && !panelVisible,
+        cartOpen, helpOpen, staffOpen: staffMessage, staffReturnHelp, staffLocationHelp, panelTransition: panelPresent && !panelVisible,
         reviewing: reviewing.current, reviewAccepted: reviewAccepted.current, reviewError: reviewError.current,
         cart: { ...live.current.cart } }),
       shelf: () => replayShelf.current,
       advanceBriefing, interact, viewCart: openCart, viewHelp: openHelp,
       closeView: () => { if (helpOpen) closeHelp(); else if (cartOpen) closeCart(); else if (replayShelf.current) replayShelf.current.viewCart(false); },
       closeStation: () => replayShelf.current ? replayShelf.current.close() : closeStation(),
-      requestCashier: requestSpecificCashier, requestReturn: requestProductReturn, openReturnHelp, backToStaff, submit: submitForReview, giveUp,
+      openLocationHelp, askLocation, requestCashier: requestSpecificCashier, requestReturn: requestProductReturn, openReturnHelp, backToStaff, submit: submitForReview, giveUp,
       skipRating: () => finishRating(false),
       leave: async () => { const current = tracker.current; await leave(); await current?.flushConfirmed(); },
     };
@@ -582,6 +729,9 @@ export function MarketSimulationScreen({
       'giveUp', 'skipRating', 'closeStation', 'viewCart', 'viewHelp', 'closeView', 'rate', 'continueBriefing']);
     if (!action || !allowed.has(action.type) || (action as { type: string }).type === 'setPosition') {
       throw Object.assign(new Error('AI에게 허용되지 않은 행동입니다.'), { code: 'ACTION_NOT_ALLOWED' });
+    }
+    if (!['rate', 'skipRating'].includes(action.type) && timeGuard.current()) {
+      throw Object.assign(new Error('장보기 시간이 종료됐어요.'), { code: 'TIME_LIMIT_EXPIRED' });
     }
     let next = live.current;
     if (action.type === 'continueBriefing') {
@@ -658,20 +808,14 @@ export function MarketSimulationScreen({
     agentControl.onReady(controller);
     return () => agentControl.onReady(null);
   }, [agentControl, dispatch, executeAgentAction, observeForAgent]);
-  const askLocation = (objectiveId: string) => {
+  function askLocation(objectiveId: string) {
     const next = dispatch({ type: 'askLocation', objectiveId }, true);
     if (next.lastActionError) return;
     const event = next.events[next.events.length - 1];
     const categoryId = String(event?.payload.categoryId ?? '');
     const category = marketCategories.find(item => item.id === categoryId);
     if (!category) return;
-    const shelves = Object.values(next.environment.shelves);
-    const target = next.environment.shelves[category.id];
-    const row = shelves.filter(item => Math.abs(item.point.y - target.point.y) < 70).sort((a, b) => a.point.x - b.point.x);
-    const index = row.indexOf(target);
-    const side = row.length === 1 ? '가운데' : index === 0 ? '왼편' : index === row.length - 1 ? '오른편' : '가운데';
-    const depth = target.point.y <= Math.min(...shelves.map(item => item.point.y)) + 70 ? '안쪽' : '중앙';
-    setStaffResponse(`${category.label} 진열대에 있어요. 매장 ${depth} ${side}에서 찾아보세요.`);
+    setStaffResponse(marketLocationResponse(next.environment, category.id));
   };
   const checkStock = () => {
     const stockout = live.current.learning.stockout;
@@ -679,7 +823,7 @@ export function MarketSimulationScreen({
     const next = dispatch({ type: 'checkStock', productId: stockout.requestedProductId }, true);
     if (!next.lastActionError) setStaffResponse(`${getMarketProduct(stockout.requestedProductId)?.name}는 창고에도 남아 있지 않아요.`);
   };
-  const shoppingObjectives = aiAssessment ? session.objectives : [...session.objectives, ...(session.learning.choiceTask ? [{
+  const shoppingObjectives = [...session.objectives, ...(session.learning.choiceTask ? [{
     id: session.learning.choiceTask.id,
     label: `${session.learning.choiceTask.label} · ${price(session.learning.choiceTask.budget)} 이내`,
     quantity: session.learning.choiceTask.quantity,
@@ -694,7 +838,7 @@ export function MarketSimulationScreen({
   const wrongWayPenaltyTotal = isFinished ? session.events.reduce((total, event) =>
     total + (event.type === 'wrong_way_entry' ? Math.abs(Number(event.payload.delta ?? 0)) : 0), 0) : 0;
   const constructionActive = !!session.environment.constructionZones?.length;
-  const panelKey = review !== null ? 'ai-review' : settings ? 'settings' : historyOpen ? 'history' : briefing ? 'briefing-' + briefingStep
+  const panelKey = expiredTiming ? 'time-limit-expired' : review !== null ? 'ai-review' : settings ? 'settings' : historyOpen ? 'history' : briefing ? 'briefing-' + briefingStep
     : requesterOpen ? 'requester' : cartOpen ? 'cart' : helpOpen ? 'help' : staffMessage ? 'staff-' + staffReturnHelp + '-' + staffLocationHelp
       : isFinished ? 'finished-' + ratingDone : session.phase + '-' + session.attempts;
   const modal = (
@@ -710,6 +854,8 @@ export function MarketSimulationScreen({
     >
       {children}
     </ModalCard>;
+  // goal-reminder-v1: the open cart repeats the quest's own text once the listed items are in it.
+  const goalReminder = session.phase === 'shopping' ? marketGoalReminderLines(session.cart, mission) : null;
   const quit = <Button
     text="그만두기"
     label="장보기 포기"
@@ -738,6 +884,13 @@ export function MarketSimulationScreen({
     {!externalMenuOpen && !briefing && session.phase === 'shopping' && !shelf && !cartOpen && !helpOpen && !staffMessage && !requesterOpen
       ? <MarketHud
         replayListRef={__DEV__ && replayUiRef ? replayList : undefined}
+        onListVisibilityChange={open => {
+          setShoppingListOpen(open);
+          tracker.current?.track({ eventCode: open ? 'SHOP.SHOPPING_LIST_OPENED' : 'SHOP.SHOPPING_LIST_CLOSED',
+            microActionId: open ? 'VIEW_SHOPPING_LIST' : 'CLOSE_SHOPPING_LIST',
+            payload: { marketContent: { action: { type: open ? 'viewShoppingList' : 'closeShoppingList' },
+              displayedObjectives: shoppingObjectives, exposureMeaning: '목록 표시·닫기 기록이며 읽기·이해·도움 의존 판정이 아니다.' } } });
+        }}
         objectives={shoppingObjectives}
         budget={mission?.budget}
         onContactRequester={!embedded ? contactRequester : undefined}
@@ -750,6 +903,13 @@ export function MarketSimulationScreen({
         onOpenCart={openCart}
       />
       : null}
+    {!briefing && timing.startedAt && !isFinished && review === null ? <View pointerEvents="none"
+      testID="market-time-limit" style={[s.timeLimit, { top: Math.max(12, hudTopInset ?? (embedded ? Math.max(112, (insets?.top ?? 0) + 64) : insets?.top ?? 0)) + 116 }]}>
+      <Ionicons name="timer-outline" size={18} color="#4E6658" />
+      <Text accessibilityLabel={`남은 장보기 시간 ${Math.ceil(timing.remainingMs / 1000)}초`} style={s.timeLimitText}>
+        남은 시간 {formatMarketTime(timing.remainingMs)}
+      </Text>
+    </View> : null}
     {!embedded && !externalMenuOpen && !locked && nearby
       ? <View style={s.stationAction}>
         <Button
@@ -762,6 +922,7 @@ export function MarketSimulationScreen({
       : null}
     {shelf && !briefing && session.phase === 'shopping'
       ? <MarketShelfScene
+        goalReminder={goalReminder}
         replayPortRef={__DEV__ && replayUiRef ? replayShelf : undefined}
         category={shelf}
         cart={session.cart}
@@ -775,7 +936,21 @@ export function MarketSimulationScreen({
       />
       : null}
     <MarketPanelTransition visible={panelVisible} transitionKey={panelKey} onPresenceChange={setPanelPresent}>
-    {review !== null ? modal('AI 수행 검토', <><Text style={s.body}>{review}</Text><Button text="마을로 돌아가기" onPress={leave} /></>) : null}
+    {expiredTiming ? modal('장보기 시간이 종료됐어요', <>
+      <Text testID="market-time-expired-message" accessibilityRole="alert" style={s.body}>이번 장보기의 제한 시간이 끝났어요. 종료 시점의 장바구니와 진행 상태를 기록했어요.</Text>
+      <Text style={s.body}>제한 시간 {formatMarketTime(expiredTiming.timeLimitSeconds * 1000)} · 남은 시간 0:00</Text>
+      <CartContents cart={session.cart} />
+      <Text style={s.small}>합계 {price(getMarketCartTotal(session.cart))} · 예산 {price(mission?.budget ?? trackedMission.budget)}</Text>
+      {review ? <Text accessibilityLiveRegion="polite" style={s.body}>{review}</Text> : null}
+      {aiAssessment && reviewError.current ? <Button text="분석 접수 다시 시도" disabled={reviewing.current} onPress={() => { analysisRequest.current = requestExpiredAnalysis(); }} /> : null}
+      {onOpenAnalysis ? <Button text="분석 탭에서 확인" onPress={() => { void leave().then(onOpenAnalysis); }} /> : null}
+      <Button text="다시 연습하기" disabled={reviewing.current} onPress={() => { void restartExpiredQuest(); }} />
+      <Button text="마트 나가기" quiet onPress={leave} />
+    </>, '시간 종료') : null}
+    {!expiredTiming && review !== null ? modal('AI 수행 검토', <><Text style={s.body}>{review}</Text>
+      {reviewError.current ? <Button text="분석 접수 다시 시도" disabled={reviewing.current} onPress={() => { void submitForReview(); }} /> : null}
+      {onOpenAnalysis ? <Button text="분석 탭에서 확인" onPress={() => { void leave().then(onOpenAnalysis); }} /> : null}
+      <Button text="마을로 돌아가기" onPress={leave} /></>) : null}
     {review === null && briefing && !settings && !historyOpen
       ? modal('마트에서 장보기', <>
         <Text style={s.body}>
@@ -797,11 +972,19 @@ export function MarketSimulationScreen({
           />
         </View>}
         <Text style={s.small}>
-          {aiAssessment ? '아래는 이번 장보기 목록이에요. 언제든 그만둘 수 있어요.' : session.config.difficulty === 'family'
+          {aiAssessment && !adaptiveAssessment ? '아래는 이번 장보기 목록이에요. 언제든 그만둘 수 있어요.' : session.config.difficulty === 'family'
             ? (session.learning.stockout ? '같은 종류의 상품을 골라도 돼요. 다만 이름을 정확히 부탁한 상품은 바꾸기 전에 지영에게 물어봐요.' : '종류가 같으면 괜찮아요. 예: 우유는 맛과 지방 함량에 관계없이 골라요.')
             : '목록에 적힌 상품을 정확히 골라요. 예: 저지방 우유는 저지방 우유만 골라요.'}
         </Text>
         {mission && <Text style={s.body}>예산 {mission.budget.toLocaleString('ko-KR')}원</Text>}
+        {mission?.runtimePlan && <View testID="adaptive-world-preview" style={s.requirements}>
+          <Text style={s.body}>이번 연습 환경</Text>
+          <Text style={s.small}>{({classic:'기본 배치',aisles:'가로 통로 배치',corner:'모퉁이 배치'})[session.environment.config.layoutId ?? 'classic']} · 직원 {session.environment.employees.length}명 · 손님 {session.environment.customers.length}명</Text>
+          <Text style={s.small}>품절 상황 {session.learning.stockout?'있음':'없음'} · 대체 구매 {session.config.learning?.allowSubstitution?'허용':'미허용'} · 계산 확인 {session.config.learning?.checkoutReviewMode==='normal'?'정상 계산':'계산 오류 연습'}</Text>
+          <Text style={s.small}>진열 순서: {getMarketEnvironmentContext(session.environment).shelfSlots.map(slot=>marketCategories.find(c=>c.id===slot.categoryId)?.label).join(' → ')}</Text>
+          <Text style={s.small}>환경 조건은 장보기 시작 전에 설정창에서 확인하거나 수정할 수 있어요.</Text>
+        </View>}
+        <Text testID="market-time-limit-briefing" style={s.body}>장보기 제한 시간 {formatMarketTime(timing.timeLimitSeconds * 1000)}. 장보기 시작을 누르면 시간이 흐르고, 앱을 잠시 벗어나도 계속 계산해요.</Text>
         <View style={s.requirements}>
           {shoppingObjectives.map(o => <View key={o.id} style={s.row}>
             <Text style={s.body}>
@@ -867,13 +1050,19 @@ export function MarketSimulationScreen({
       ? modal('장바구니', <>
         <CartContents cart={session.cart} showReturnLocation />
         <Text style={s.body}>담은 물건 {cartCount}개</Text>
+        {goalReminder ? <View testID="market-goal-reminder">
+          <Text style={s.body}>{MARKET_GOAL_REMINDER_TITLE}</Text>
+          {goalReminder.map((line, index) => <Text key={'goal-reminder-' + index} style={s.small}>{line}</Text>)}
+        </View> : null}
         <Text style={s.small}>물건을 내려놓으려면 그 물건의 진열대로 돌아가요. 어렵다면 매장 종업원에게 도움을 청할 수 있어요.</Text>
         <Button text="계속 고르기" onPress={closeCart} />
       </>, '내가 담은 물품', closeCart)
       : null}
     {helpOpen
       ? modal('이렇게 이용해요', <>
-        {aiAssessment ? (
+        {mission?.briefing.map((line, index) => <Text key={'mission-help-' + index} style={s.body}>{line}</Text>)}
+        <Text style={s.body}>상품 위치는 직원에게 물어볼 수 있어요.</Text>
+        {aiAssessment && !adaptiveAssessment ? (
         <Text style={s.body}>1. 사야 할 물품과 개수를 읽어요.{'\n\n'}2. 진열대 가까이 가서 물건을 살펴봐요.{'\n\n'}3. 장바구니를 눌러 담은 물건을 확인해요.{'\n\n'}4. 내려놓을 물건은 그 물건의 진열대로 돌아가 장바구니를 펼쳐 내려놓아요. 어렵다면 종업원에게 제자리에 놓아 달라고 부탁해요.{'\n\n'}5. 출구 옆 두 계산대 중 하나에서 구매를 확정해요. 계산원이 없으면 매장 직원을 찾아 말을 걸어요.{'\n\n'}6. 계산하지 않은 물건을 담고 입구·출구·측면 출입문의 빨간 경보기를 지나 매장 밖으로 나가면 {session.config.alarmPenaltyPoints}점이 줄어요. 입구와 출구는 공용 복도로 이어져요. 복도 끝 공동 출입문에서 마을로 나갈 수 있어요.</Text>
         ) : <>
         <Text style={s.body}>1. 사야 할 물품과 개수를 읽어요.{'\n\n'}2. 진열대 가까이 가서 물건을 살펴봐요.{'\n\n'}3. 장바구니를 눌러 담은 물건을 확인해요.{'\n\n'}4. 내려놓을 물건은 그 물건의 진열대로 돌아가 장바구니를 펼쳐 내려놓아요. 어렵다면 종업원에게 제자리에 놓아 달라고 부탁해요.{'\n\n'}5. 유인 계산대에서 구매를 확정하거나, 무인 계산대에 물건을 끌어 스캔한 뒤 화면 확인 → 결제로 마무리해요. 유인 계산대가 모두 비어 있으면 매장 직원에게 부탁해요. 계산원이 있는 상태에서 없다고 요청하면 {session.config.cashierRequestPenaltyPoints}점이 줄어요.{'\n\n'}6. 계산하지 않은 물건을 담고 입구·출구·측면 출입문의 빨간 경보기를 지나 매장 밖으로 나가면 {session.config.alarmPenaltyPoints}점이 줄어요. 입구와 출구는 공용 복도로 이어져요. 복도 끝 공동 출입문에서 마을로 나갈 수 있어요.</Text>
@@ -892,12 +1081,12 @@ export function MarketSimulationScreen({
       >
         {staffLocationHelp ? <>
           {shoppingObjectives.map(objective => <MarketStaffDialogueChoice key={objective.id} text={objective.label} onPress={() => askLocation(objective.id)} />)}
-          <MarketStaffDialogueChoice text="뒤로가기" onPress={() => { setStaffLocationHelp(false); resetStaffReply(); }} />
+          <MarketStaffDialogueChoice text="뒤로가기" onPress={backToStaff} />
         </> : staffReturnHelp ? <>
           <CartContents cart={session.cart} onRequestReturn={requestProductReturn} dialogue />
           <MarketStaffDialogueChoice text="직원 대화로 돌아가기" onPress={() => { setStaffReturnHelp(false); resetStaffReply(); }} />
         </> : <>
-          <MarketStaffDialogueChoice text="이 물건은 어디에 있나요?" onPress={() => { setStaffLocationHelp(true); resetStaffReply(); }} />
+          <MarketStaffDialogueChoice text="이 물건은 어디에 있나요?" onPress={openLocationHelp} />
           {session.learning.stockout?.shelfVisited && session.learning.stockout.status === 'unresolved' ? <MarketStaffDialogueChoice text="재고 있나요?" onPress={checkStock} /> : null}
           {aiAssessment && session.environment.checkouts.filter(counter => !session.cashierAvailability[counter.id]).map(counter =>
             <MarketStaffDialogueChoice key={counter.id} text={`${counter.id === 'checkout' ? 1 : 2}번 계산대 계산을 부탁드려요`}
@@ -912,7 +1101,7 @@ export function MarketSimulationScreen({
         {!staffLocationHelp ? <MarketStaffDialogueChoice text="아니에요, 감사합니다." onPress={closeStation} /> : null}
       </MarketStaffDialogue>
       : null}
-    {aiAssessment && review === null && !briefing && session.phase === 'checkout'
+    {aiAssessment && !adaptiveAssessment && review === null && !briefing && session.phase === 'checkout'
       ? modal((session.cashierAvailable || session.selectedKioskId) ? '이대로 구매할까요?' : '계산원이 자리를 비웠어요', <>
         <CartContents cart={session.cart} />
         <Text style={s.body}>합계 {price(getMarketCartTotal(session.cart))}</Text>
@@ -932,12 +1121,12 @@ export function MarketSimulationScreen({
       : null}
     {requesterOpen ? <MarketRequesterCall session={session} onAction={dispatch} onClose={() => dispatch({ type: 'closeView' })}
       bottomInset={embedded ? Math.max(132, (insets?.bottom ?? 0) + 112) : Math.max(24, insets?.bottom ?? 0)} /> : null}
-    {!aiAssessment && !briefing && session.phase === 'checkout' && session.selectedKioskId ? <MarketKioskCheckout
+    {(!aiAssessment || adaptiveAssessment) && review === null && !briefing && session.phase === 'checkout' && session.selectedKioskId ? <MarketKioskCheckout
       key={session.selectedKioskId + '-' + session.attempts}
       cart={session.cart} kioskLabel="무인 계산대"
-      onConfirm={scannedCart => dispatch({ type: 'submitKiosk', scannedCart })}
+      onConfirm={scannedCart => {if(adaptiveAssessment){void submitForReview(scannedCart);}else dispatch({ type:'submitKiosk',scannedCart });}}
       onCancel={closeStation} /> : null}
-    {!aiAssessment && !briefing && session.phase === 'checkout' && !session.selectedKioskId && checkoutReview
+    {(!aiAssessment || adaptiveAssessment) && review === null && !briefing && session.phase === 'checkout' && !session.selectedKioskId && checkoutReview
       ? <MarketStaffedCheckout key={`${session.selectedCheckoutId}-${session.attempts}`}
         review={checkoutReview} cart={session.cart} counterNumber={session.selectedCheckoutId === 'checkout-2' ? 2 : 1}
         dialogueBottomInset={Math.max(24, insets?.bottom ?? 0)}
@@ -945,10 +1134,10 @@ export function MarketSimulationScreen({
           const next = dispatch({ type: 'requestCheckoutCorrection', productId, quantity });
           return next.lastActionError ?? getMarketCheckoutReview(next)?.response ?? '계산 내역을 다시 확인해 주세요.';
         }}
-        onSubmit={() => dispatch({ type: 'submit' })} onCancel={closeStation}
+        onSubmit={() => {if(adaptiveAssessment){void submitForReview();}else dispatch({type:'submit'});}} onCancel={closeStation}
         onInspectCart={() => dispatch({ type: 'viewCheckoutCart' })}
         onBackHandlerChange={setCheckoutBackHandler} /> : null}
-    {!aiAssessment && !briefing && session.phase === 'checkout' && !session.selectedKioskId && !session.cashierAvailable
+    {(!aiAssessment || adaptiveAssessment) && review === null && !briefing && session.phase === 'checkout' && !session.selectedKioskId && !session.cashierAvailable
       ? modal('계산원이 자리를 비웠어요', <>
             <Text style={s.body}>계산원이 있는 계산대나 무인 계산대를 이용해 주세요. 유인 계산대가 모두 비어 있으면 직원에게 부탁해요.</Text>
             <Button text="계산대 다시 살펴보기" onPress={closeStation} />
@@ -974,7 +1163,7 @@ export function MarketSimulationScreen({
         {quit}
       </>, session.attempts + '번째 시도 결과')
       : null}
-    {isFinished
+    {isFinished && !expiredTiming
       ? modal(aiAssessment ? '장보기를 마쳤어요' : session.outcome === 'success' ? '장보기에 성공했어요!' : '장보기를 마쳤어요', <>
         <View style={s.resultBadge}>
           <Ionicons
@@ -1211,6 +1400,9 @@ function Stars({ title, hint, value, onChange }: {
   </View>;
 }
 const s = StyleSheet.create({
+  timeLimit: { position: 'absolute', right: 16, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 7,
+    flexDirection: 'row', gap: 6, alignItems: 'center', backgroundColor: '#F9F7F0', borderColor: '#DFE2D7', borderWidth: 1, zIndex: 38 },
+  timeLimitText: { color: '#4E6658', fontFamily: fonts.semibold, fontSize: 13, fontVariant: ['tabular-nums'] },
   root: { flex: 1, backgroundColor: '#F7F4EC' },
   embeddedRoot: { ...StyleSheet.absoluteFill, zIndex: 28 },
   stationAction: {

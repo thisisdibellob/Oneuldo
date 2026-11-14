@@ -1,6 +1,6 @@
 import { extendedActorChoices, presentActorChoices, type ExtendedActorChoice } from './actorChoices';
 import { ACTOR_PERSONA_INSTRUCTIONS } from './actorInstructions';
-import type { ActorObservation, Decision, Persona, PolicyAction } from './types';
+import type { ActorObservation, ActorPersona, Decision, PolicyAction } from './types';
 import { buildWholeTracePersonaInput } from './wholeTrace/wholeTracePersona';
 import type { MarketReplayMovementPolicyDecision } from '../../frontend/src/game/marketReplayTrace';
 import type { FeedbackExperienceSnapshot } from './feedbackExperience';
@@ -379,7 +379,12 @@ function currentChoices(observation: ActorObservation, seed: string | number, de
     ? grouped.map((choice, index) => ({ ...choice, id: `c${String(index + 1).padStart(2, '0')}` })) : grouped;
 }
 
-function stablePersona(persona: Persona) {
+function stablePersona(persona: ActorPersona) {
+  if ('scope' in persona) return {
+    ...structuredClone(persona), description: persona.scope,
+    individualInstructions: [persona.scope, ...persona.strengths, ...persona.initialSupportNeeds,
+      ...persona.preferences, ...persona.learningInstructions].join('\n'),
+  };
   const personal = buildWholeTracePersonaInput(persona);
   const character = persona.character;
   return {
@@ -572,7 +577,7 @@ export type FeedbackActorFrame = {
 };
 
 export function buildFeedbackActorFrame(args: {
-  observation: ActorObservation; persona: Persona; memory: FeedbackBeliefMemory;
+  observation: ActorObservation; persona: ActorPersona; memory: FeedbackBeliefMemory;
   seed: string | number; decisionIndex: number;
   policyVersion?: FeedbackActorPolicyVersion;
   movementPolicy?: MarketReplayMovementPolicyDecision;

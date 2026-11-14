@@ -6,6 +6,11 @@ import org.springframework.stereotype.Component;
 /** Technical transport limits only; never interprets behavior or changes observations. */
 @Component
 public class AnalysisTokenBudget {
+    private int transportLimit = Integer.MAX_VALUE;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void constrainTransport(oneuldo.ai.config.OllamaProperties properties) {
+        transportLimit = properties.contextLength() - 256;
+    }
     @Value("${ai.behavior-analysis.request-token-budget:7000}")
     private int requestTokens = 7000;
     @Value("${ai.behavior-analysis.chunk-output-tokens:900}")
@@ -14,7 +19,7 @@ public class AnalysisTokenBudget {
     private int finalOutputTokens = 900;
     @Value("${ai.model:${ai.groq.model:qwen/qwen3.6-27b}}")
     private String model = "qwen/qwen3.6-27b";
-    public int requestTokens() { return requestTokens; }
+    public int requestTokens() { return Math.min(requestTokens, transportLimit); }
     public int chunkOutputTokens() { return chunkOutputTokens; }
     public int finalOutputTokens() { return finalOutputTokens; }
     public int total(String system, String user) {
@@ -27,10 +32,12 @@ public class AnalysisTokenBudget {
     }
     public void requireFits(String system, String user, int limit, String reason) {
         int total = total(system, user);
-        if (total > limit) throw new IllegalArgumentException(reason + ": required=" + total + ", limit=" + limit);
+        int effective = Math.min(limit, transportLimit);
+        if (total > effective) throw new oneuldo.ai.exception.AiInputLimitException(reason, total, effective);
     }
     public void requireFits(String system, String user, int output, int limit, String reason) {
         int total = total(system, user, output);
-        if (total > limit) throw new IllegalArgumentException(reason + ": required=" + total + ", limit=" + limit);
+        int effective = Math.min(limit, transportLimit);
+        if (total > effective) throw new oneuldo.ai.exception.AiInputLimitException(reason, total, effective);
     }
 }

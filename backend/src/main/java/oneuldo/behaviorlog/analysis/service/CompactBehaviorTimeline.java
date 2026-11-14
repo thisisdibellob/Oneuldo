@@ -8,6 +8,7 @@ import tools.jackson.databind.node.ObjectNode;
 
 /** Reversible wire encoding only. Never samples, scores, sorts or drops events. */
 public final class CompactBehaviorTimeline {
+    public static final String ENCODER_REVISION = "context-sharing-v2";
     public static final String FORMAT = "behavior-timeline-compact-v1";
     private static final List<String> CONTEXT_FIELDS = List.of("eventSchemaVersion", "appVersion", "contentVersion",
             "offlineQueued", "devicePerformanceClass", "task", "accessibility", "simulation");
@@ -44,7 +45,7 @@ public final class CompactBehaviorTimeline {
                 extractSection(event, context, "payload", PAYLOAD_CONTEXT);
                 if (event.path("payload") instanceof ObjectNode payload && payload.path("marketContent") instanceof ObjectNode content) {
                     ObjectNode shared = mapper.createObjectNode();
-                    moveFields(content, shared, List.of("sceneRef", "layoutVersion", "seed", "movementContext"));
+                    moveFields(content, shared, List.of("sceneRef", "layoutVersion", "seed", "movementContext", "agentContext", "controlSource", "replayExecutionContext"));
                     if (!shared.isEmpty()) object(context, "payload").set("marketContent", shared);
                 }
                 String ref = contextIds.get(context);

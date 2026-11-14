@@ -31,6 +31,7 @@ public class AiBehaviorAnalysisService {
     @Value("${ai.cache-identity:${ai.groq.model:qwen/qwen3.6-27b}}") private String configuredModel="qwen/qwen3.6-27b";
     private final oneuldo.ai.service.SingleFlight<String,AiBehaviorAnalysisResponse> requests=new oneuldo.ai.service.SingleFlight<>();
     private final oneuldo.ai.service.SingleFlight<String,AiBehaviorAnalysisResponse> datasets=new oneuldo.ai.service.SingleFlight<>();
+    @Value("${ai.behavior-analysis.observation-parallelism:1}") private int observationParallelism=1;
     private AnalysisCheckpointStore checkpointStore;
     @org.springframework.beans.factory.annotation.Autowired
     public void setCheckpointStore(AnalysisCheckpointStore store) {checkpointStore=store;}
@@ -63,6 +64,10 @@ public class AiBehaviorAnalysisService {
 
     @org.springframework.beans.factory.annotation.Value("${ai.behavior-analysis.quality-review:false}")
     private boolean qualityReview;
+    @org.springframework.beans.factory.annotation.Value("${ai.behavior-analysis.plan-source-review:true}")
+    private boolean planSourceReview;
+    @org.springframework.beans.factory.annotation.Value("${ai.behavior-analysis.direct-source-review:true}")
+    private boolean directSourceReview;
 
     private AiBehaviorAnalysisResponse analyzeShared(UUID memberId, BehaviorAnalysisInputResponse input) {
         return datasets.run(memberId+":"+input.id(),()->analyzeInput(memberId,input));
@@ -73,10 +78,11 @@ public class AiBehaviorAnalysisService {
         var references = new AnalysisReferences(mapper, input);
         String prompt = references.encode(prompts.userPrompt(input));
         String requestKey=oneuldo.ai.service.AiRequestFingerprint.of(mapper,memberId,input.id(),configuredModel,
-                system,mapper.readTree(prompt),prompts.observationSystem(),prompts.digestContract(),prompts.reductionContract(),
-                FinalAnalysisPromptCompactor.systemPrompt(),FinalAnalysisPromptCompactor.VERSION,
+                system,mapper.readTree(prompt),AiBehaviorAnalysisPromptFactory.OBSERVATION_VERSION,prompts.observationSystem(),prompts.digestContract(),prompts.reductionContract(),
+                FinalAnalysisPromptCompactor.systemPrompt(),FinalAnalysisPromptCompactor.VERSION,FinalSourceEncoding.VERSION,FinalSourceEncoding.ENCODER_REVISION,AnalysisSynthesisPrompt.VERSION,
                 budget.requestTokens(),budget.chunkOutputTokens(),budget.finalOutputTokens(),maxChunks,0.2,
-                MovementProjection.VERSION,prompts.movementMaxError(),MovementInputEncoder.VERSION,"analysis-reuse-v4-reviewed", qualityReview, AnalysisReviewPrompt.VERSION, AnalysisReviewPrompt.system());
+                MovementProjection.VERSION,prompts.movementMaxError(),MovementInputEncoder.VERSION,CompactBehaviorTimeline.ENCODER_REVISION,SharedSourceObservations.VERSION,observationParallelism,"analysis-reuse-v5-plan-source-reviewed", qualityReview, AnalysisReviewPrompt.VERSION, AnalysisReviewPrompt.system(),
+                planSourceReview, directSourceReview, ObservationWireEncoding.VERSION, AnalysisPlanSemanticReview.VERSION, AnalysisPlanSemanticReview.system());
         var reusable=repository.findFirstByMemberIdAndDatasetIdAndRequestKeyAndStatusOrderByCreatedAtDesc(memberId,input.id(),requestKey,"READY");
         if(reusable.isPresent()) {
             try {
@@ -90,18 +96,18 @@ public class AiBehaviorAnalysisService {
         if (input.eventCount() == 0) {
             status = "NO_HISTORY";
         } else {
-            var pipeline = new TimelineAnalysisPipeline(prompts, validator, client, mapper, maxChunks, budget, pacer).withQualityReview(qualityReview);
-            if(checkpointStore!=null) pipeline.withCheckpoints(checkpointStore.scope(memberId,input.id()));
+            var pipeline = new TimelineAnalysisPipeline(prompts, validator, client, mapper, maxChunks, budget, pacer)
+                    .withQualityReview(qualityReview).withPlanSemanticReview(qualityReview && planSourceReview).withObservationParallelism(observationParallelism).withDirectSourceReview(directSourceReview);
+            if(checkpointStore!=null) {
+                var scope=checkpointStore.scope(memberId,input.id());pipeline.withCheckpoints(scope);
+                pipeline.withSharedObservations(new SharedSourceObservations(mapper,scope,input,prompts,validator,budget.chunkOutputTokens()));
+            }
             try {
                 analysis = pipeline.analyze(input, budget.requestTokens(), attempts, references, prompt);
                 model = pipeline.model(); status = "READY";
-            } catch (IllegalArgumentException tooLarge) {
-                status = "INPUT_TOO_LARGE"; error = tooLarge.getMessage();
             } catch (RuntimeException failure) {
-                status = "FAILED";
-                error = (failure.getMessage()!=null && List.of("AI_RATE_LIMITED", "AI_UNAVAILABLE", "INVALID_AI_ANALYSIS").contains(failure.getMessage()))
-                        || oneuldo.ai.exception.AiTransportException.isCode(failure.getMessage())
-                        ? failure.getMessage() : "CHUNK_ANALYSIS_FAILED";
+                status = failureStatus(failure);
+                error = failureCode(failure);
             }
             model = pipeline.model();
         }
@@ -110,6 +116,21 @@ public class AiBehaviorAnalysisService {
                 model, system, prompt, attempts, analysis, error,
                 (System.nanoTime() - start) / 1_000_000L, input.eventCount(),requestKey));
         return AiBehaviorAnalysisResponse.from(saved);
+    }
+
+    static String failureStatus(RuntimeException failure) {
+        return failure instanceof oneuldo.ai.exception.AiInputLimitException ? "INPUT_TOO_LARGE" : "FAILED";
+    }
+    static String failureCode(RuntimeException failure) {
+        if (failure instanceof oneuldo.ai.exception.AiInputLimitException) return failure.getMessage();
+        String code=failure.getMessage();
+        return code!=null && (List.of("AI_RATE_LIMITED", "AI_UNAVAILABLE", "INVALID_AI_ANALYSIS",
+                "INVALID_REVIEW_STATION_PATCH", "INVALID_REVIEW_CLAIM_TEXT_PATCH", "INVALID_REVIEW_METADATA_PATCH",
+                "INVALID_REVIEW_SEMANTIC_TEXT_PATCH",
+                "INVALID_REVIEW_ALTERNATIVE_PATCH",
+                "INVALID_REVIEW_TECHNICAL_PATCH", "CHUNK_CALL_BUDGET_EXCEEDED", "TOTAL_CALL_BUDGET_EXCEEDED",
+                "TOKENIZER_MODEL_MISMATCH", "INVALID_TOKEN_BUDGET").contains(code)
+                || oneuldo.ai.exception.AiTransportException.isCode(code)) ? code : "CHUNK_ANALYSIS_FAILED";
     }
 
     public AiBehaviorAnalysisResponse latest(UUID memberId) {

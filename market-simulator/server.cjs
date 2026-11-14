@@ -8,10 +8,11 @@ require('./runtime.cjs').register();
 const { ReplayBridge, loadReplayConfig } = require('./replay-bridge.cjs');
 const { beginGeneration, withDiagnostics } = require('./generation-journal.cjs');
 const { checkArguments, readJson, saveTrace } = require('./tools/common.cjs');
+const { LearnerContextLoader } = require('./learner-context-loader.cjs');
 // Tool modules in public catalog order. Legacy modules are frozen and kept for reproduction.
 const modules = {
   feedback: require('./tools/legacy/feedback.cjs'),
-  actorPlan: require('./tools/legacy/actorPlan.cjs'),
+  actorPlan: require('./tools/actorPlan.cjs'),
   wholeTrace: require('./tools/wholeTrace.cjs'),
   personas: require('./tools/personas.cjs'),
   validation: require('./tools/validation.cjs'),
@@ -42,7 +43,8 @@ function resolveProfile(name = process.env.MARKET_SIM_PROFILE ?? 'all') {
 }
 function createService(options = {}) {
   const profile = resolveProfile(options.profile);
-  let bridge = options.bridge ?? null, starting = null;
+  let bridge = options.bridge ?? null, starting = null, closing = false;
+  const learnerContexts = new LearnerContextLoader();
   const planSessions = new Map();
   const feedbackSessions = new Map(), feedbackBegins = new Map();
   const wholeTraceSessions = new Map();
@@ -81,13 +83,32 @@ function createService(options = {}) {
     if ([args.tabId, args.snapshot, args.snapshotFilePath].filter(Boolean).length !== 1) throw new Error('Provide exactly one of tabId, snapshot, or snapshotFilePath.');
     return args.tabId ? (await getBridge()).snapshot(args.tabId) : args.snapshot ?? readJson(args.snapshotFilePath);
   }
+  // Binds a learner archive read to the exact snapshot and app tab it was verified against.
+  const actorBindingFields=['tabId','epoch','appOrigin','backendOrigin','memberId','targetEnv','connectedAt','ready','visible','snapshotId','questInstanceId','sessionId','replayId'];
+  async function captureLearnerBinding(args,snapshot) {
+    const canonical=require('../frontend/src/game/marketReplayTrace.ts').canonicalMarketReplayJson;
+    let app=null;
+    if(args.tabId){const tab=(await getBridge()).list().sessions.find(item=>item.tabId===args.tabId);
+      if(!tab||!tab.ready||tab.replayId)throw new Error('Actor app is not ready for learner verification');
+      app=Object.fromEntries(actorBindingFields.map(field=>[field,tab[field]]));}
+    return {snapshot:canonical(snapshot),app};
+  }
+  async function assertLearnerBinding(args,binding,context) {
+    await learnerContexts.assertCurrent(context);
+    const canonical=require('../frontend/src/game/marketReplayTrace.ts').canonicalMarketReplayJson;
+    if(canonical(await getSnapshot(args))!==binding.snapshot)throw new Error('Actor snapshot changed during learner verification');
+    if(args.tabId){const tab=(await getBridge()).list().sessions.find(item=>item.tabId===args.tabId);
+      if(!tab||!tab.ready||tab.replayId||JSON.stringify(Object.fromEntries(actorBindingFields.map(field=>[field,tab[field]])))!==JSON.stringify(binding.app))
+        throw new Error('Actor app binding changed during learner verification');}
+    if(closing)throw new Error('Actor planning service is closing');
+  }
   async function invokeTool(name, args = {}) {
     const owner = owners.get(name);
     if (!owner) throw new Error(`Unknown tool: ${name}`);
     if (!profile.keys.has(owner.key)) throw new Error(`Tool ${name} is not available in the ${profile.name} profile`);
     checkArguments(args, owner.tool.inputSchema);
     return owner.module.invoke(name, args, { getSnapshot, getBridge, validate, generate, generateAndSave, ownerId,
-      planSessions, feedbackSessions, feedbackBegins, wholeTraceSessions });
+      planSessions, feedbackSessions, feedbackBegins, wholeTraceSessions, learnerContexts, captureLearnerBinding, assertLearnerBinding });
   }
   async function dispatch(message) {
     if (!message || message.jsonrpc !== '2.0' || typeof message.method !== 'string') return { jsonrpc: '2.0', id: message?.id ?? null, error: { code: -32600, message: 'Invalid Request' } };
@@ -103,6 +124,7 @@ function createService(options = {}) {
     return { jsonrpc: '2.0', id: message.id, result };
   }
   return { invokeTool, dispatch, close: async () => {
+    closing=true;await learnerContexts.close();
     for (const record of feedbackSessions.values()) if (!record.session.status.complete) record.session.close();
     await Promise.allSettled([...feedbackSessions.values()].map(record=>record.done));
     if (bridge) await bridge.close();

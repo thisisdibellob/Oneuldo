@@ -3,10 +3,10 @@
 // Handler bodies were moved verbatim from server.cjs.
 const { string, object, llm, schema } = require('../schema.cjs');
 const { readJson } = require('../common.cjs');
-const { ACTOR_PLAN_MODEL } = require('../../src/legacy/actorPlanSession.ts');
+const { ACTOR_PLAN_MODEL } = require('../../src/actorPlanSession.ts');
 const definitions = [
   { name: 'create_learner', description: 'Create a separate, persistent fictional learner for one isolated account and trial arm. Character/model/policy identity is frozen; no automatic improvement.', inputSchema: schema({ directory: string, learnerId: string, memberId: string, personaId: string, experimentId: string, arm: { enum: ['A', 'B', 'C'] }, model: string }, ['directory', 'learnerId', 'memberId', 'personaId', 'experimentId', 'arm', 'model']) },
-  { name: 'create_luna_learner', description: 'Create a new, separate learner archive bound to this session model gpt-6-luna, low reasoning and episodic-choice-v10. Earlier provider archives are not changed.', inputSchema: schema({directory:string,learnerId:string,memberId:string,personaId:string,experimentId:string,arm:{enum:['A','B','C']}}, ['directory','learnerId','memberId','personaId','experimentId','arm']) },
+  { name: 'create_luna_learner', description: 'Create a separate Luna low-reasoning learner. Defaults to legacy episodic-choice-v10; explicit v11 connects working cognition and confirmed spatial experience. Existing archives cannot switch policies.', inputSchema: schema({directory:string,learnerId:string,memberId:string,personaId:string,experimentId:string,arm:{enum:['A','B','C']},actorPolicyVersion:{enum:['episodic-choice-v10','episodic-choice-v11']}}, ['directory','learnerId','memberId','personaId','experimentId','arm']) },
   { name: 'create_whole_trace_learner', description: 'Create a separate learner bound to native gpt-6-luna low reasoning and whole-trace-v3 complete-world planning. Earlier per-action learners are not reused or changed.', inputSchema: schema({directory:string,learnerId:string,memberId:string,personaId:string,experimentId:string,arm:{enum:['A','B','C']}},['directory','learnerId','memberId','personaId','experimentId','arm']) },
   { name: 'create_learning_trial', description: 'Create an A/B/C comparison from a local JSON configuration with learner files, baseline, ordinary training and common probe snapshots.', inputSchema: schema({ optionsFilePath: string }, ['optionsFilePath']) },
   { name: 'prepare_learning_round', description: 'Prepare the next bound round and its generation options. Personalized rounds require READY analysis and its matching AI quest. No app input is sent.', inputSchema: schema({ trialFile: string, arm: { enum: ['A', 'B', 'C'] }, tabId: string, snapshot: object, snapshotFilePath: string, jobFilePath: string, generationFilePath: string }, ['trialFile', 'arm']) },
@@ -26,8 +26,9 @@ async function invoke(name, args, ctx) {
   }
   if (name === 'create_luna_learner') {
     const persona=require('../../src/personas.ts').getPersona(args.personaId);
-    const {directory,...actor}=args;
-    const identity={...actor,personaVersion:persona.version,model:ACTOR_PLAN_MODEL,policyVersion:'episodic-choice-v10',reasoningEffort:'low'};
+    const {directory,actorPolicyVersion='episodic-choice-v10',...actor}=args;
+    if(!['episodic-choice-v10','episodic-choice-v11'].includes(actorPolicyVersion))throw new Error('Unsupported Luna learner policy');
+    const identity={...actor,personaVersion:persona.version,model:ACTOR_PLAN_MODEL,policyVersion:actorPolicyVersion,reasoningEffort:'low'};
     const result=require('../../learner-store.cjs').createLearner({directory:args.directory,identity});
     return {learnerFile:result.learnerFile,identity:result.state.identity};
   }

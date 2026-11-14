@@ -52,6 +52,10 @@ public class BehaviorEventRegistry {
         var p = BehaviorPayloadType.SHOPPING;
         addContext(map, p, BehaviorDomain.SHOPPING, START, NEUTRAL, NONE,
                 "EXECUTIVE_FUNCTION", "SHOP.SESSION_STARTED");
+        addContext(map, p, BehaviorDomain.SHOPPING, START, NEUTRAL, NONE,
+                "EXECUTIVE_FUNCTION", "SHOP.TIME_LIMIT_STARTED");
+        addContext(map, p, BehaviorDomain.SHOPPING, COMPLETE_TASK, INCOMPLETE, NONE,
+                "EXECUTIVE_FUNCTION", "SHOP.TIME_LIMIT_EXPIRED");
         addContext(map, p, BehaviorDomain.SHOPPING, VIEW_INSTRUCTION, NEUTRAL, NONE,
                 "EXECUTIVE_FUNCTION", "SHOP.MISSION_PRESENTED", "SHOP.BRIEFING_ADVANCED");
         add(map, p, BehaviorDomain.SHOPPING, VIEW_INSTRUCTION, NEUTRAL, NONE, false, "EXECUTIVE_FUNCTION", "SHOP.LIST_OPENED");
@@ -100,6 +104,10 @@ public class BehaviorEventRegistry {
         add(map, p, BehaviorDomain.SHOPPING, CHECK, SUCCESS, NONE, false, "PROBLEM_SOLVING", "SHOP.OUT_OF_STOCK_DETECTED");
         add(map, p, BehaviorDomain.SHOPPING, SELECT, SUCCESS, NONE, false, "PROBLEM_SOLVING", "SHOP.SUBSTITUTE_SELECTED");
         add(map, p, BehaviorDomain.SHOPPING, REQUEST_HELP, NEUTRAL, NONE, false, "HELP_SEEKING", "SHOP.STAFF_HELP_REQUESTED");
+        addContext(map, p, BehaviorDomain.SHOPPING, VIEW_INSTRUCTION, NEUTRAL, NONE, "EXECUTIVE_FUNCTION", "SHOP.GENERAL_HELP_OPENED");
+        addContext(map, p, BehaviorDomain.SHOPPING, VIEW_INSTRUCTION, NEUTRAL, NONE, "EXECUTIVE_FUNCTION",
+                "SHOP.SHOPPING_LIST_OPENED", "SHOP.SHOPPING_LIST_CLOSED");
+        addContext(map, p, BehaviorDomain.SHOPPING, CHECK, NEUTRAL, NONE, "PROBLEM_SOLVING", "SHOP.RUNTIME_ACTION_RECORDED");
         add(map, p, BehaviorDomain.SHOPPING, SELECT, null, NONE, true, "MONEY_MANAGEMENT", "PAYMENT.METHOD_SELECTED");
         add(map, p, BehaviorDomain.SHOPPING, COMPLETE_TASK, FAILURE, UNKNOWN, true, "MONEY_MANAGEMENT", "PAYMENT.ERROR");
         add(map, p, BehaviorDomain.SHOPPING, COMPLETE_TASK, SUCCESS, NONE, true, "MONEY_MANAGEMENT", "PAYMENT.COMPLETED");
@@ -253,6 +261,8 @@ public class BehaviorEventRegistry {
     }
 
     private void requiredFields(Map<String, BehaviorEventDefinition> map) {
+        require(map, "SHOP.TIME_LIMIT_STARTED", "timing");
+        require(map, "SHOP.TIME_LIMIT_EXPIRED", "timing");
         require(map, "SHOP.MOVEMENT_SEGMENT_SUMMARIZED", "controlMode", "durationMs",
                 "pathDistance", "straightDistance", "travelDistance");
         require(map, "SHOP.MOVEMENT_STOPPED", "controlMode", "durationMs", "travelDistance");
@@ -320,6 +330,23 @@ public class BehaviorEventRegistry {
     }
 
     private void measurementRules(Map<String, BehaviorEventDefinition> map) {
+        // Optional source fields produce no measurements for historical untimed plays.
+        for (var definition : List.copyOf(map.values())) {
+            if (definition.requiredPayloadType() != BehaviorPayloadType.SHOPPING) continue;
+            measure(map, definition.eventCode(),
+                    value("timeLimitSeconds", "timing.timeLimitSeconds", SECONDS, TARGET),
+                    value("timePolicyVersion", "timing.policyVersion", CODE, OBSERVATION),
+                    value("timeStartedAt", "timing.startedAt", CODE, OBSERVATION),
+                    value("timeElapsedMs", "timing.elapsedMs", MILLISECONDS, DURATION),
+                    value("timeRemainingMs", "timing.remainingMs", MILLISECONDS, SNAPSHOT),
+                    value("timeExpired", "timing.expired", CODE, OBSERVATION),
+                    value("timeClockBasis", "timing.clockBasis", CODE, OBSERVATION));
+        }
+        measure(map, "SHOP.TIME_LIMIT_EXPIRED",
+                value("cartItemCount", "cartItemCount", COUNT, SNAPSHOT),
+                value("cartTotalAmount", "cartTotalAmount", KRW, SNAPSHOT),
+                value("remainingObjectiveCount", "remainingObjectiveCount", COUNT, SNAPSHOT),
+                value("overBudgetAmount", "overBudgetAmount", KRW, OBSERVATION));
         measure(map, "SHOP.SESSION_STARTED",
                 value("objectiveCount", "objectiveCount", COUNT, TARGET),
                 value("budgetAmount", "budgetAmount", KRW, TARGET));
@@ -523,12 +550,26 @@ public class BehaviorEventRegistry {
             case "action" -> oneuldo.behaviorlog.domain.BehaviorLog.class;
             default -> null;
         };
-        boolean exists = sourceClass != null && (parts[0].equals("action")
-                ? hasGetter(sourceClass, parts[1]) : hasRecordComponent(sourceClass, parts[1]));
+        boolean exists = hasAccessorPath(sourceClass, parts[1], parts[0].equals("action"));
         if (!exists) {
             throw new IllegalStateException("존재하지 않는 측정 경로: "
                     + definition.eventCode() + "/" + path);
         }
+    }
+
+    private boolean hasAccessorPath(Class<?> sourceClass, String path, boolean firstGetter) {
+        for (String field : path.split("\\.")) {
+            if (sourceClass == null) return false;
+            String accessor = firstGetter
+                    ? "get" + Character.toUpperCase(field.charAt(0)) + field.substring(1) : field;
+            try {
+                sourceClass = sourceClass.getMethod(accessor).getReturnType();
+            } catch (NoSuchMethodException exception) {
+                return false;
+            }
+            firstGetter = false;
+        }
+        return true;
     }
 
     private boolean hasGetter(Class<?> type, String field) {
