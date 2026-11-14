@@ -1,0 +1,1206 @@
+{
+  "snapshotSchemaVersion": "1",
+  "config": {
+    "seed": "tailored-shared-v1",
+    "difficulty": "exact",
+    "objectives": [
+      {
+        "productId": "milk",
+        "quantity": 1,
+        "match": "exact"
+      }
+    ],
+    "learning": {
+      "stockoutProductId": null,
+      "stockoutEnabled": false,
+      "allowSubstitution": true,
+      "budgetChoiceEnabled": false,
+      "choiceBudget": 3000,
+      "checkoutReviewMode": "normal"
+    },
+    "stockPerProduct": 6,
+    "alarmPenaltyPoints": 10,
+    "cashierRequestPenaltyPoints": 10,
+    "wrongWayPenaltyPoints": 10,
+    "stockOverrides": {
+      "milk": 6,
+      "milk-small": 6,
+      "milk-large": 6,
+      "tofu": 6,
+      "blueberry-yogurt": 6,
+      "tofu-silken": 6,
+      "strawberry-yogurt": 6,
+      "brand-sausage": 6,
+      "chicken-breast": 6,
+      "plain-yogurt": 6,
+      "premium-eggs": 6,
+      "salted-butter": 6,
+      "cherry-tomato": 6,
+      "blueberry": 6,
+      "broccoli": 6,
+      "melon": 6,
+      "tangerine": 6,
+      "banana": 6,
+      "watermelon": 6,
+      "green-apple": 6,
+      "green-grape": 6,
+      "carrot": 6,
+      "banana-single": 6,
+      "mandarin": 6,
+      "vegetable-dumpling": 6,
+      "cheese-pizza": 6,
+      "tteokbokki": 6,
+      "frozen-fried-rice": 6,
+      "brand-curry": 6,
+      "udon": 6,
+      "seaweed": 6,
+      "spicy-curry": 6,
+      "ramen-cheese": 6,
+      "cup-ramen": 6,
+      "mild-ramen": 6,
+      "curry-spicy": 6,
+      "peach-juice": 6,
+      "black-soy-milk": 6,
+      "corn-tea": 6,
+      "barley-tea": 6,
+      "iced-coffee": 6,
+      "grape-soda": 6,
+      "zero-cola": 6,
+      "orange-juice-small": 6,
+      "lemon-soda": 6,
+      "peach-tea": 6,
+      "grape-juice": 6,
+      "apple-juice": 6,
+      "aaa-batteries": 6,
+      "bathroom-slippers-pink": 6,
+      "dish-soap-refill": 6,
+      "aaa-batteries-8": 6,
+      "blue-ballpoint": 6,
+      "sticky-notes-pastel": 6,
+      "dish-soap": 6,
+      "aa-batteries-8": 6,
+      "usb-c-charger-long": 6,
+      "adhesive-bandages": 6,
+      "lightning-charger": 6,
+      "striped-slippers": 6
+    },
+    "environment": {
+      "layoutId": "classic",
+      "entranceConstruction": false,
+      "seed": "tailored-shared-v1",
+      "employeeCount": 1,
+      "customerCount": 1,
+      "pillarCount": 0,
+      "chairCount": 0,
+      "cashierCount": 2,
+      "kioskPresent": "random",
+      "shelfOrder": [
+        "drink",
+        "meal",
+        "fresh",
+        "household",
+        "produce"
+      ],
+      "kioskLane": "none"
+    },
+    "provenance": {
+      "source": "human"
+    },
+    "startedAt": "2000-01-01T00:00:00.000Z",
+    "inventoryProductIds": {
+      "fresh": [
+        "milk",
+        "milk-small",
+        "milk-large",
+        "tofu",
+        "blueberry-yogurt",
+        "tofu-silken",
+        "strawberry-yogurt",
+        "brand-sausage",
+        "chicken-breast",
+        "plain-yogurt",
+        "premium-eggs",
+        "salted-butter"
+      ],
+      "produce": [
+        "cherry-tomato",
+        "blueberry",
+        "broccoli",
+        "melon",
+        "tangerine",
+        "banana",
+        "watermelon",
+        "green-apple",
+        "green-grape",
+        "carrot",
+        "banana-single",
+        "mandarin"
+      ],
+      "meal": [
+        "vegetable-dumpling",
+        "cheese-pizza",
+        "tteokbokki",
+        "frozen-fried-rice",
+        "brand-curry",
+        "udon",
+        "seaweed",
+        "spicy-curry",
+        "ramen-cheese",
+        "cup-ramen",
+        "mild-ramen",
+        "curry-spicy"
+      ],
+      "drink": [
+        "peach-juice",
+        "black-soy-milk",
+        "corn-tea",
+        "barley-tea",
+        "iced-coffee",
+        "grape-soda",
+        "zero-cola",
+        "orange-juice-small",
+        "lemon-soda",
+        "peach-tea",
+        "grape-juice",
+        "apple-juice"
+      ],
+      "household": [
+        "aaa-batteries",
+        "bathroom-slippers-pink",
+        "dish-soap-refill",
+        "aaa-batteries-8",
+        "blue-ballpoint",
+        "sticky-notes-pastel",
+        "dish-soap",
+        "aa-batteries-8",
+        "usb-c-charger-long",
+        "adhesive-bandages",
+        "lightning-charger",
+        "striped-slippers"
+      ]
+    }
+  },
+  "environment": {
+    "schemaVersion": 1,
+    "layoutVersion": 3,
+    "seed": "tailored-shared-v1",
+    "config": {
+      "layoutId": "classic",
+      "entranceConstruction": false,
+      "seed": "tailored-shared-v1",
+      "employeeCount": 1,
+      "customerCount": 1,
+      "pillarCount": 0,
+      "chairCount": 0,
+      "cashierCount": 2,
+      "kioskPresent": "random",
+      "shelfOrder": [
+        "drink",
+        "meal",
+        "fresh",
+        "household",
+        "produce"
+      ],
+      "kioskLane": "none"
+    },
+    "shelves": {
+      "drink": {
+        "slotId": "northwest",
+        "orientation": "horizontal",
+        "x": 354.52500000000003,
+        "y": 191.2,
+        "width": 290.94999999999993,
+        "height": 73.6,
+        "point": {
+          "x": 500,
+          "y": 308
+        }
+      },
+      "meal": {
+        "slotId": "northeast",
+        "orientation": "horizontal",
+        "x": 714.5250000000001,
+        "y": 191.2,
+        "width": 290.94999999999993,
+        "height": 73.6,
+        "point": {
+          "x": 860,
+          "y": 308
+        }
+      },
+      "fresh": {
+        "slotId": "middle-west",
+        "orientation": "vertical",
+        "x": 338.425,
+        "y": 422.4,
+        "width": 139.14999999999998,
+        "height": 187.2,
+        "point": {
+          "x": 500,
+          "y": 536
+        }
+      },
+      "household": {
+        "slotId": "middle-center",
+        "orientation": "vertical",
+        "x": 580.425,
+        "y": 422.4,
+        "width": 139.14999999999998,
+        "height": 187.2,
+        "point": {
+          "x": 550,
+          "y": 536
+        }
+      },
+      "produce": {
+        "slotId": "middle-east",
+        "orientation": "vertical",
+        "x": 830.425,
+        "y": 422.4,
+        "width": 139.14999999999998,
+        "height": 187.2,
+        "point": {
+          "x": 800,
+          "y": 536
+        }
+      }
+    },
+    "stationDetails": [
+      {
+        "id": "produce",
+        "kind": "shelf",
+        "categoryId": "produce",
+        "point": {
+          "x": 800,
+          "y": 536
+        }
+      },
+      {
+        "id": "fresh",
+        "kind": "shelf",
+        "categoryId": "fresh",
+        "point": {
+          "x": 500,
+          "y": 536
+        }
+      },
+      {
+        "id": "household",
+        "kind": "shelf",
+        "categoryId": "household",
+        "point": {
+          "x": 550,
+          "y": 536
+        }
+      },
+      {
+        "id": "meal",
+        "kind": "shelf",
+        "categoryId": "meal",
+        "point": {
+          "x": 860,
+          "y": 308
+        }
+      },
+      {
+        "id": "drink",
+        "kind": "shelf",
+        "categoryId": "drink",
+        "point": {
+          "x": 500,
+          "y": 308
+        }
+      },
+      {
+        "id": "checkout",
+        "kind": "checkout",
+        "point": {
+          "x": 807,
+          "y": 880.45
+        }
+      },
+      {
+        "id": "checkout-2",
+        "kind": "checkout",
+        "point": {
+          "x": 1012,
+          "y": 880.45
+        }
+      },
+      {
+        "id": "entrance",
+        "kind": "entrance",
+        "point": {
+          "x": 480,
+          "y": 1030
+        },
+        "available": true
+      },
+      {
+        "id": "exit",
+        "kind": "exit",
+        "point": {
+          "x": 930,
+          "y": 1030
+        }
+      },
+      {
+        "id": "common-door",
+        "kind": "common-door",
+        "point": {
+          "x": 710,
+          "y": 1430
+        }
+      },
+      {
+        "id": "staff:employee-1",
+        "kind": "employee",
+        "point": {
+          "x": 840,
+          "y": 776
+        }
+      }
+    ],
+    "stations": {
+      "produce": {
+        "x": 800,
+        "y": 536
+      },
+      "fresh": {
+        "x": 500,
+        "y": 536
+      },
+      "household": {
+        "x": 550,
+        "y": 536
+      },
+      "meal": {
+        "x": 860,
+        "y": 308
+      },
+      "drink": {
+        "x": 500,
+        "y": 308
+      },
+      "checkout": {
+        "x": 807,
+        "y": 880.45
+      },
+      "checkout-2": {
+        "x": 1012,
+        "y": 880.45
+      },
+      "entrance": {
+        "x": 480,
+        "y": 1030
+      },
+      "exit": {
+        "x": 930,
+        "y": 1030
+      },
+      "common-door": {
+        "x": 710,
+        "y": 1430
+      },
+      "staff:employee-1": {
+        "x": 840,
+        "y": 776
+      }
+    },
+    "employees": [
+      {
+        "id": "employee-1",
+        "kind": "employee",
+        "label": "종업원 1",
+        "slotId": "staff-southeast",
+        "point": {
+          "x": 840,
+          "y": 720
+        },
+        "appearance": 3,
+        "appearanceId": "employee-female-02",
+        "collider": {
+          "x": 829.2698412698413,
+          "y": 709.9714285714285,
+          "width": 22.285714285714285,
+          "height": 13.37142857142857
+        }
+      }
+    ],
+    "customers": [
+      {
+        "id": "customer-1",
+        "kind": "customer",
+        "label": "손님 1",
+        "slotId": "customer-southwest",
+        "point": {
+          "x": 590,
+          "y": 935
+        },
+        "appearance": 6,
+        "appearanceId": "customer-senior-female-01",
+        "collider": {
+          "x": 578.4444444444443,
+          "y": 924.4142857142857,
+          "width": 23.523809523809522,
+          "height": 14.114285714285712
+        }
+      }
+    ],
+    "objects": [
+      {
+        "id": "rest-set-1",
+        "kind": "restSet",
+        "slotId": "rest-west-one",
+        "rect": {
+          "x": 350,
+          "y": 738,
+          "width": 100,
+          "height": 64
+        }
+      },
+      {
+        "id": "rest-set-2",
+        "kind": "restSet",
+        "slotId": "rest-west-two",
+        "rect": {
+          "x": 350,
+          "y": 838,
+          "width": 100,
+          "height": 64
+        }
+      },
+      {
+        "id": "rest-set-lobby-1",
+        "kind": "restSet",
+        "slotId": "rest-lobby-west",
+        "rect": {
+          "x": 165,
+          "y": 1192,
+          "width": 100,
+          "height": 64
+        }
+      },
+      {
+        "id": "rest-set-lobby-2",
+        "kind": "restSet",
+        "slotId": "rest-lobby-east",
+        "rect": {
+          "x": 330,
+          "y": 1192,
+          "width": 100,
+          "height": 64
+        }
+      },
+      {
+        "id": "planter-lobby-1",
+        "kind": "planter",
+        "slotId": "planter-lobby-west",
+        "rect": {
+          "x": 150,
+          "y": 1320,
+          "width": 28,
+          "height": 30
+        }
+      },
+      {
+        "id": "atm-1",
+        "kind": "atm",
+        "slotId": "atm-west",
+        "rect": {
+          "x": 130,
+          "y": 880,
+          "width": 60,
+          "height": 70
+        }
+      },
+      {
+        "id": "elevator-1",
+        "kind": "elevator",
+        "slotId": "elevator-west",
+        "rect": {
+          "x": 60,
+          "y": 194,
+          "width": 80,
+          "height": 50
+        }
+      },
+      {
+        "id": "elevator-2",
+        "kind": "elevator",
+        "slotId": "elevator-east",
+        "rect": {
+          "x": 190,
+          "y": 194,
+          "width": 80,
+          "height": 50
+        }
+      }
+    ],
+    "checkout": {
+      "id": "checkout",
+      "rect": {
+        "x": 712.95,
+        "y": 811.45,
+        "width": 62.099999999999994,
+        "height": 134.54999999999998
+      },
+      "point": {
+        "x": 807,
+        "y": 880.45
+      },
+      "cashierPoint": {
+        "x": 684,
+        "y": 880.45
+      },
+      "kind": "staffed",
+      "cashierCollider": {
+        "x": 672.031746031746,
+        "y": 869.5857142857143,
+        "width": 24.142857142857142,
+        "height": 14.485714285714284
+      },
+      "cashierPresent": true,
+      "cashierAppearance": 0
+    },
+    "checkouts": [
+      {
+        "id": "checkout",
+        "rect": {
+          "x": 712.95,
+          "y": 811.45,
+          "width": 62.099999999999994,
+          "height": 134.54999999999998
+        },
+        "point": {
+          "x": 807,
+          "y": 880.45
+        },
+        "cashierPoint": {
+          "x": 684,
+          "y": 880.45
+        },
+        "kind": "staffed",
+        "cashierCollider": {
+          "x": 672.031746031746,
+          "y": 869.5857142857143,
+          "width": 24.142857142857142,
+          "height": 14.485714285714284
+        },
+        "cashierPresent": true,
+        "cashierAppearance": 0
+      },
+      {
+        "id": "checkout-2",
+        "rect": {
+          "x": 917.95,
+          "y": 811.45,
+          "width": 62.099999999999994,
+          "height": 134.54999999999998
+        },
+        "point": {
+          "x": 1012,
+          "y": 880.45
+        },
+        "cashierPoint": {
+          "x": 889,
+          "y": 880.45
+        },
+        "kind": "staffed",
+        "cashierCollider": {
+          "x": 878.4761904761905,
+          "y": 870.5142857142857,
+          "width": 22.07936507936508,
+          "height": 13.247619047619047
+        },
+        "cashierPresent": true,
+        "cashierAppearance": 2
+      }
+    ],
+    "kiosks": [],
+    "world": {
+      "width": 1100,
+      "height": 1500
+    },
+    "walkableAreas": [
+      {
+        "id": "main-sales-floor",
+        "x": 310,
+        "y": 80,
+        "width": 740,
+        "height": 960
+      },
+      {
+        "id": "elevator-room",
+        "x": 50,
+        "y": 80,
+        "width": 260,
+        "height": 300
+      },
+      {
+        "id": "west-corridor",
+        "x": 120,
+        "y": 340,
+        "width": 190,
+        "height": 700
+      },
+      {
+        "id": "entrance-lobby",
+        "x": 120,
+        "y": 1020,
+        "width": 930,
+        "height": 424
+      },
+      {
+        "id": "common-door-threshold",
+        "x": 620,
+        "y": 1420,
+        "width": 180,
+        "height": 60
+      }
+    ],
+    "walls": [
+      {
+        "x": 26,
+        "y": 56,
+        "width": 1048,
+        "height": 24
+      },
+      {
+        "x": 1050,
+        "y": 80,
+        "width": 24,
+        "height": 1364
+      },
+      {
+        "x": 26,
+        "y": 80,
+        "width": 24,
+        "height": 300
+      },
+      {
+        "x": 26,
+        "y": 380,
+        "width": 94,
+        "height": 24
+      },
+      {
+        "x": 96,
+        "y": 404,
+        "width": 24,
+        "height": 1040
+      },
+      {
+        "x": 120,
+        "y": 1420,
+        "width": 500,
+        "height": 24
+      },
+      {
+        "x": 800,
+        "y": 1420,
+        "width": 250,
+        "height": 24
+      },
+      {
+        "x": 286,
+        "y": 80,
+        "width": 24,
+        "height": 170
+      },
+      {
+        "x": 286,
+        "y": 380,
+        "width": 24,
+        "height": 640
+      },
+      {
+        "x": 630,
+        "y": 780,
+        "width": 18,
+        "height": 240
+      },
+      {
+        "x": 310,
+        "y": 1020,
+        "width": 100,
+        "height": 20
+      },
+      {
+        "x": 550,
+        "y": 1020,
+        "width": 300,
+        "height": 20
+      },
+      {
+        "x": 1010,
+        "y": 1020,
+        "width": 40,
+        "height": 20
+      },
+      {
+        "x": 50,
+        "y": 170,
+        "width": 236,
+        "height": 24
+      }
+    ],
+    "entrance": {
+      "point": {
+        "x": 480,
+        "y": 1030
+      },
+      "gate": {
+        "x": 410,
+        "y": 1010,
+        "width": 140,
+        "height": 40
+      },
+      "alarmBoundaryY": 1030,
+      "rearmY": 970
+    },
+    "alarmGates": [
+      {
+        "id": "entrance",
+        "gate": {
+          "x": 410,
+          "y": 1010,
+          "width": 140,
+          "height": 40
+        },
+        "axis": "y",
+        "boundary": 1030,
+        "rearm": 970,
+        "outward": 1
+      },
+      {
+        "id": "west-door",
+        "gate": {
+          "x": 278,
+          "y": 250,
+          "width": 40,
+          "height": 130
+        },
+        "axis": "x",
+        "boundary": 298,
+        "rearm": 355,
+        "outward": -1
+      },
+      {
+        "id": "exit",
+        "gate": {
+          "x": 850,
+          "y": 1010,
+          "width": 160,
+          "height": 40
+        },
+        "axis": "y",
+        "boundary": 1030,
+        "rearm": 970,
+        "outward": 1
+      }
+    ],
+    "constructionZones": [],
+    "commonDoor": {
+      "point": {
+        "x": 710,
+        "y": 1430
+      },
+      "gate": {
+        "x": 620,
+        "y": 1420,
+        "width": 180,
+        "height": 24
+      }
+    },
+    "obstacles": [
+      {
+        "x": 26,
+        "y": 56,
+        "width": 1048,
+        "height": 24
+      },
+      {
+        "x": 1050,
+        "y": 80,
+        "width": 24,
+        "height": 1364
+      },
+      {
+        "x": 26,
+        "y": 80,
+        "width": 24,
+        "height": 300
+      },
+      {
+        "x": 26,
+        "y": 380,
+        "width": 94,
+        "height": 24
+      },
+      {
+        "x": 96,
+        "y": 404,
+        "width": 24,
+        "height": 1040
+      },
+      {
+        "x": 120,
+        "y": 1420,
+        "width": 500,
+        "height": 24
+      },
+      {
+        "x": 800,
+        "y": 1420,
+        "width": 250,
+        "height": 24
+      },
+      {
+        "x": 286,
+        "y": 80,
+        "width": 24,
+        "height": 170
+      },
+      {
+        "x": 286,
+        "y": 380,
+        "width": 24,
+        "height": 640
+      },
+      {
+        "x": 630,
+        "y": 780,
+        "width": 18,
+        "height": 240
+      },
+      {
+        "x": 310,
+        "y": 1020,
+        "width": 100,
+        "height": 20
+      },
+      {
+        "x": 550,
+        "y": 1020,
+        "width": 300,
+        "height": 20
+      },
+      {
+        "x": 1010,
+        "y": 1020,
+        "width": 40,
+        "height": 20
+      },
+      {
+        "x": 50,
+        "y": 96,
+        "width": 236,
+        "height": 148
+      },
+      {
+        "x": 712.95,
+        "y": 811.45,
+        "width": 62.099999999999994,
+        "height": 134.54999999999998
+      },
+      {
+        "x": 917.95,
+        "y": 811.45,
+        "width": 62.099999999999994,
+        "height": 134.54999999999998
+      },
+      {
+        "x": 354.52500000000003,
+        "y": 191.2,
+        "width": 139.14999999999998,
+        "height": 73.6
+      },
+      {
+        "x": 506.32500000000005,
+        "y": 191.2,
+        "width": 139.14999999999998,
+        "height": 73.6
+      },
+      {
+        "x": 714.5250000000001,
+        "y": 191.2,
+        "width": 139.14999999999998,
+        "height": 73.6
+      },
+      {
+        "x": 866.325,
+        "y": 191.2,
+        "width": 139.14999999999998,
+        "height": 73.6
+      },
+      {
+        "x": 338.425,
+        "y": 422.4,
+        "width": 139.14999999999998,
+        "height": 73.6
+      },
+      {
+        "x": 338.425,
+        "y": 536,
+        "width": 139.14999999999998,
+        "height": 73.6
+      },
+      {
+        "x": 580.425,
+        "y": 422.4,
+        "width": 139.14999999999998,
+        "height": 73.6
+      },
+      {
+        "x": 580.425,
+        "y": 536,
+        "width": 139.14999999999998,
+        "height": 73.6
+      },
+      {
+        "x": 830.425,
+        "y": 422.4,
+        "width": 139.14999999999998,
+        "height": 73.6
+      },
+      {
+        "x": 830.425,
+        "y": 536,
+        "width": 139.14999999999998,
+        "height": 73.6
+      },
+      {
+        "x": 829.2698412698413,
+        "y": 709.9714285714285,
+        "width": 22.285714285714285,
+        "height": 13.37142857142857
+      },
+      {
+        "x": 578.4444444444443,
+        "y": 924.4142857142857,
+        "width": 23.523809523809522,
+        "height": 14.114285714285712
+      },
+      {
+        "x": 350,
+        "y": 738,
+        "width": 100,
+        "height": 64
+      },
+      {
+        "x": 350,
+        "y": 838,
+        "width": 100,
+        "height": 64
+      },
+      {
+        "x": 165,
+        "y": 1192,
+        "width": 100,
+        "height": 64
+      },
+      {
+        "x": 330,
+        "y": 1192,
+        "width": 100,
+        "height": 64
+      },
+      {
+        "x": 150,
+        "y": 1320,
+        "width": 28,
+        "height": 30
+      },
+      {
+        "x": 130,
+        "y": 880,
+        "width": 60,
+        "height": 70
+      },
+      {
+        "x": 672.031746031746,
+        "y": 869.5857142857143,
+        "width": 24.142857142857142,
+        "height": 14.485714285714284
+      },
+      {
+        "x": 878.4761904761905,
+        "y": 870.5142857142857,
+        "width": 22.07936507936508,
+        "height": 13.247619047619047
+      }
+    ],
+    "spawn": {
+      "x": 710,
+      "y": 1350
+    },
+    "exit": {
+      "x": 710,
+      "y": 1430
+    }
+  },
+  "mission": {
+    "difficulty": 1,
+    "scenarioId": "CUSTOM",
+    "title": "흰 우유 1개 장보기",
+    "description": "흰 우유 900mL 1개를 장바구니에 담고 구매해요.",
+    "budget": 5200,
+    "objectives": [
+      {
+        "productId": "milk",
+        "quantity": 1
+      }
+    ],
+    "briefing": [
+      "흰 우유 900mL 1개를 구매합니다.",
+      "예산은 5,200원이에요."
+    ],
+    "checkoutDialogue": [
+      "목록과 장바구니를 확인하고 최종 구매를 결정해요.",
+      "필요하면 일반 도움말이나 직원 도움을 이용할 수 있어요."
+    ],
+    "successMessage": "장보기 연습을 마쳤어요!",
+    "environmentPlan": {
+      "shelfOrder": [
+        "drink",
+        "meal",
+        "fresh",
+        "household",
+        "produce"
+      ],
+      "rationale": "사전·사후·추천 다섯 회차에 같은 매대 순서를 고정해요."
+    },
+    "timeLimitSeconds": 600,
+    "runtimePlan": {
+      "environment": {
+        "employeeCount": 1,
+        "customerCount": 1,
+        "pillarCount": 0,
+        "chairCount": 0,
+        "cashierCount": 2,
+        "layoutId": "classic",
+        "kioskLane": "none",
+        "entranceConstruction": false
+      },
+      "learning": {
+        "stockoutProductId": null,
+        "allowSubstitution": true,
+        "budgetChoiceEnabled": false,
+        "choiceBudget": 3000,
+        "checkoutReviewMode": "normal"
+      },
+      "matchRule": "exact",
+      "stockPerProduct": 6,
+      "stockOverrides": {},
+      "alarmPenaltyPoints": 10,
+      "wrongWayPenaltyPoints": 10,
+      "cashierRequestPenaltyPoints": 10
+    },
+    "observationPlan": {
+      "purpose": "INDEPENDENT_CHECK",
+      "behaviorObservation": "사전·사후 고정 기초 과제예요. 이전 개인 수행 근거 없이 미리 정한 과제예용.",
+      "movementObservation": "사전·사후 고정 기초 과제예요. 매대 접근·담기·계산 연결을 같은 조건에서 관찰해요.",
+      "behaviorEvidenceIds": [
+        "PREDECLARED_BASELINE"
+      ],
+      "movementEvidenceIds": [],
+      "alternativeExplanations": [],
+      "unknowns": [
+        "실제 seed 기하에서의 매대 노출과 도달은 기술 점검과 실제 snapshot으로 확인해요."
+      ],
+      "changeReasons": [
+        {
+          "path": "/objectives",
+          "reason": "기존 4종 기초가 복잡해서 한 종·한 개로 줄인 사전 고정 과제예용."
+        }
+      ],
+      "evaluationFocus": "흰 우유 900mL 정확히 1개·5,200원 이내 cart를 배우가 스스로 최종 제출했는지, 매대 열기·담기·계산창 열기·제출을 따로 기록해요."
+    },
+    "id": "market-expert-f416ac3f-93fc-43a8-9447-a9b1061066c0",
+    "catalogVersion": "oneuldo-shopping-content-2026-09-04-v2",
+    "scenarioVersion": "market-runtime-phase2-v1"
+  },
+  "initialStock": {
+    "milk": 6,
+    "milk-small": 6,
+    "milk-large": 6,
+    "tofu": 6,
+    "blueberry-yogurt": 6,
+    "tofu-silken": 6,
+    "strawberry-yogurt": 6,
+    "brand-sausage": 6,
+    "chicken-breast": 6,
+    "plain-yogurt": 6,
+    "premium-eggs": 6,
+    "salted-butter": 6,
+    "cherry-tomato": 6,
+    "blueberry": 6,
+    "broccoli": 6,
+    "melon": 6,
+    "tangerine": 6,
+    "banana": 6,
+    "watermelon": 6,
+    "green-apple": 6,
+    "green-grape": 6,
+    "carrot": 6,
+    "banana-single": 6,
+    "mandarin": 6,
+    "vegetable-dumpling": 6,
+    "cheese-pizza": 6,
+    "tteokbokki": 6,
+    "frozen-fried-rice": 6,
+    "brand-curry": 6,
+    "udon": 6,
+    "seaweed": 6,
+    "spicy-curry": 6,
+    "ramen-cheese": 6,
+    "cup-ramen": 6,
+    "mild-ramen": 6,
+    "curry-spicy": 6,
+    "peach-juice": 6,
+    "black-soy-milk": 6,
+    "corn-tea": 6,
+    "barley-tea": 6,
+    "iced-coffee": 6,
+    "grape-soda": 6,
+    "zero-cola": 6,
+    "orange-juice-small": 6,
+    "lemon-soda": 6,
+    "peach-tea": 6,
+    "grape-juice": 6,
+    "apple-juice": 6,
+    "aaa-batteries": 6,
+    "bathroom-slippers-pink": 6,
+    "dish-soap-refill": 6,
+    "aaa-batteries-8": 6,
+    "blue-ballpoint": 6,
+    "sticky-notes-pastel": 6,
+    "dish-soap": 6,
+    "aa-batteries-8": 6,
+    "usb-c-charger-long": 6,
+    "adhesive-bandages": 6,
+    "lightning-charger": 6,
+    "striped-slippers": 6
+  },
+  "cashierAvailability": {
+    "checkout": true,
+    "checkout-2": true
+  },
+  "catalogVersion": "oneuldo-shopping-content-2026-09-04-v2",
+  "scenarioVersion": "market-runtime-phase2-v1",
+  "completionMode": "ai-review",
+  "presentation": {
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "zoom": 1.3,
+    "fontScale": 1,
+    "safeArea": {
+      "top": 0,
+      "bottom": 0
+    }
+  },
+  "snapshotId": "snapshot-4cf32a09beedaf6b724847ffaaaf0291"
+}

@@ -9,6 +9,7 @@ const { ReplayBridge, loadReplayConfig } = require('./replay-bridge.cjs');
 const { beginGeneration, withDiagnostics } = require('./generation-journal.cjs');
 const { ActorPlanSession, ACTOR_PLAN_MODEL } = require('./src/actorPlanSession.ts');
 const { FeedbackPlanSession } = require('./src/feedbackPlanSession.ts');
+const { LearnerContextLoader } = require('./learner-context-loader.cjs');
 const string = { type: 'string', minLength: 1 };
 const seed = { anyOf: [string, { type: 'number' }] };
 const object = { type: 'object' };
@@ -25,9 +26,9 @@ const definitions = [
   { name: 'step_feedback_plan', description: 'Choose exactly one current choice and replace the actor belief memory. v5/v6 grouped add/remove choices require choiceParameters matching the current catalog; omit parameters for other choices. In v4/v5/v6, optional memory.ongoingIntent persists when omitted, updates when a string is supplied and clears when null is supplied. Apply it offline and return its visible outcome and next frame or completion in one response. Same requestId and payload retries never execute twice. moveDirection holds a direction for 100..2000 ms even without a visible target; durationMs is 0 for other ordinary actions; pause/lookAround/readList/browse require 100..120000 ms during the activity, and viewCart/viewHelp allow 0..120000 ms after opening. No pre-action wait. Incorrect beliefs, cart contents and early stopping are preserved.', inputSchema: schema({sessionId:string,requestId:string,revision:{type:'integer',minimum:1},choiceId:string,choiceParameters:schema({productId:string,quantity:{type:'integer',minimum:1,maximum:99},dragOutcome:{enum:['drop','miss','cancel']}}, ['productId','quantity']),durationMs:{type:'integer',minimum:0,maximum:120000},reason:string,memory:object}, ['sessionId','requestId','revision','choiceId','durationMs','reason','memory']) },
   { name: 'observe_feedback_plan', description: 'Recover the current actor frame after a connection timeout. Does not reapply an action. A pending step must be retried with its original requestId.', inputSchema: schema({sessionId:string}, ['sessionId']), annotations:{readOnlyHint:true} },
   { name: 'finalize_feedback_plan', description: 'Return the complete saved versioned feedback trace and counts. Generation is offline; validate and explicitly replay the saved trace separately.', inputSchema: schema({sessionId:string}, ['sessionId']), annotations:{readOnlyHint:true} },
-  { name: 'begin_actor_plan', description: 'Begin a private Luna low-reasoning actor trace session. Returns a session ID; use observe_actor_plan then append_actor_plan. Each plan is 1..3 choice IDs and is discarded when the actor observation changes. Supports a prepared v10 learning round and sends no app input.', inputSchema: schema({ personaId:string, seed, tabId:string, snapshot:object, snapshotFilePath:string, outputPath:string, learnerFile:string, trialFile:string, arm:{enum:['A','B','C']}, jobFilePath:string, generationFilePath:string, timingProfile:{enum:['original','compact']}, attentionExperience:object, maxActions:{type:'integer',minimum:1,maximum:2000} }) },
+  { name: 'begin_actor_plan', description: 'Begin a private Luna low-reasoning actor trace session. Returns a session ID; use observe_actor_plan then append_actor_plan. Each plan is 1..3 choice IDs and is discarded when the actor observation changes. Supports a prepared v10 learning round and sends no app input.', inputSchema: schema({ personaId:string, seed, tabId:string, snapshot:object, snapshotFilePath:string, outputPath:string, learnerFile:string, trialFile:string, arm:{enum:['A','B','C']}, jobFilePath:string, generationFilePath:string, timingProfile:{enum:['original','compact']}, actorPolicyVersion:{enum:['episodic-choice-v10','episodic-choice-v11']}, attentionExperience:object, maxActions:{type:'integer',minimum:1,maximum:2000} }) },
   { name: 'observe_actor_plan', description: 'Read the current actor-only observation, stable identity, observed experience and available choice IDs for an active plan session.', inputSchema: schema({sessionId:string}, ['sessionId']), annotations:{readOnlyHint:true} },
-  { name: 'append_actor_plan', description: 'Append 1..3 choice IDs for the exact current revision, each with its own delay and brief reason. Stale or unavailable choices are rejected; meaningful observation changes cancel the remainder.', inputSchema: schema({sessionId:string,revision:{type:'integer',minimum:1},choiceIds:{type:'array',minItems:1,maxItems:3,items:string},delayMs:{type:'array',minItems:1,maxItems:3,items:{type:'integer',minimum:1,maximum:120000}},reasons:{type:'array',minItems:1,maxItems:3,items:string},currentTasks:{type:'array',minItems:1,maxItems:3,items:{anyOf:[string,{type:'null'}]}}}, ['sessionId','revision','choiceIds','delayMs','reasons']) },
+  { name: 'append_actor_plan', description: 'Append 1..3 choice IDs for the exact current revision, each with its own delay and brief reason. Stale or unavailable choices are rejected; meaningful observation changes cancel the remainder.', inputSchema: schema({sessionId:string,revision:{type:'integer',minimum:1},choiceIds:{type:'array',minItems:1,maxItems:3,items:string},delayMs:{type:'array',minItems:1,maxItems:3,items:{type:'integer',minimum:1,maximum:120000}},reasons:{type:'array',minItems:1,maxItems:3,items:string},currentTasks:{type:'array',minItems:1,maxItems:3,items:{anyOf:[string,{type:'null'}]}},cognition:object}, ['sessionId','revision','choiceIds','delayMs','reasons']) },
   { name: 'finalize_actor_plan', description: 'Return the completed whole trace file and generation counts after the normal actor loop finishes.', inputSchema: schema({sessionId:string}, ['sessionId']), annotations:{readOnlyHint:true} },
   { name: 'prepare_whole_trace', description: 'Prepare bundle 8 with whole-world reference, persistent pending goals, capacity-bounded working memory, and exact source-bound choices for native Codex Luna low reasoning. Default candidate 7 binds goal-directed decisions independently of focus and retains pending-goal memory through interest/exploration. Separate expression coverage reports whether cognition was exercised. Legacy candidates 6/5/4/3 keep existing strict guards. Cognition is independently checked after the complete plan is submitted; actions are never replaced. Original actor timing is preserved. No per-action observation calls, provider requests or app input are sent. Optional suffix repair retains accepted behavior and does not automatically choose actions. Supports separate whole-trace-v3 learners and trials.', inputSchema: schema({personaId:string,seed,tabId:string,snapshot:object,snapshotFilePath:string,outputPath:string,learnerFile:string,trialFile:string,arm:{enum:['A','B','C']},jobFilePath:string,generationFilePath:string,timingProfile:{enum:['original']},attentionExperience:object,maxActions:{type:'integer',minimum:1,maximum:100},timeBudgetMs:{type:'integer',minimum:1000,maximum:3600000},maxRepairs:{type:'integer',minimum:0,maximum:1}}) },
   { name: 'submit_whole_trace', description: 'Submit the complete candidate for a prepared request. Candidate 4 selects a source-bound exact action and derived observed target cues; legacy 3 remains explicitly supported under strict existing guards. Saves trace, knowledge audit and independent persona review. Warnings never rewrite behavior. Does not call a model or app; use repair_whole_trace for a suffix-only technical repair when allowed.', inputSchema: schema({requestId:string,candidate:object,candidateFilePath:string},['requestId']) },
@@ -47,7 +48,7 @@ const definitions = [
   { name: 'replay_status', description: 'Read progress and smoothness measurements for a replay.', inputSchema: schema({ replayId: string, tabId: string }), annotations: { readOnlyHint: true } },
   { name: 'stop_replay', description: 'Stop replay on the selected tab and release its virtual input through the app.', inputSchema: schema({ tabId: string }, ['tabId']) },
   { name: 'create_learner', description: 'Create a separate, persistent fictional learner for one isolated account and trial arm. Character/model/policy identity is frozen; no automatic improvement.', inputSchema: schema({ directory: string, learnerId: string, memberId: string, personaId: string, experimentId: string, arm: { enum: ['A', 'B', 'C'] }, model: string }, ['directory', 'learnerId', 'memberId', 'personaId', 'experimentId', 'arm', 'model']) },
-  { name: 'create_luna_learner', description: 'Create a new, separate learner archive bound to this session model gpt-6-luna, low reasoning and episodic-choice-v10. Earlier provider archives are not changed.', inputSchema: schema({directory:string,learnerId:string,memberId:string,personaId:string,experimentId:string,arm:{enum:['A','B','C']}}, ['directory','learnerId','memberId','personaId','experimentId','arm']) },
+  { name: 'create_luna_learner', description: 'Create a separate Luna low-reasoning learner. Defaults to legacy episodic-choice-v10; explicit v11 connects working cognition and confirmed spatial experience. Existing archives cannot switch policies.', inputSchema: schema({directory:string,learnerId:string,memberId:string,personaId:string,experimentId:string,arm:{enum:['A','B','C']},actorPolicyVersion:{enum:['episodic-choice-v10','episodic-choice-v11']}}, ['directory','learnerId','memberId','personaId','experimentId','arm']) },
   { name: 'create_whole_trace_learner', description: 'Create a separate learner bound to native gpt-6-luna low reasoning and whole-trace-v3 complete-world planning. Earlier per-action learners are not reused or changed.', inputSchema: schema({directory:string,learnerId:string,memberId:string,personaId:string,experimentId:string,arm:{enum:['A','B','C']}},['directory','learnerId','memberId','personaId','experimentId','arm']) },
   { name: 'create_learning_trial', description: 'Create an A/B/C comparison from a local JSON configuration with learner files, baseline, ordinary training and common probe snapshots.', inputSchema: schema({ optionsFilePath: string }, ['optionsFilePath']) },
   { name: 'prepare_learning_round', description: 'Prepare the next bound round and its generation options. Personalized rounds require READY analysis and its matching AI quest. No app input is sent.', inputSchema: schema({ trialFile: string, arm: { enum: ['A', 'B', 'C'] }, tabId: string, snapshot: object, snapshotFilePath: string, jobFilePath: string, generationFilePath: string }, ['trialFile', 'arm']) },
@@ -94,7 +95,8 @@ function saveTrace(trace, snapshot, outputPath) {
     systemCompletion: trace.generation?.systemCompletion ?? null };
 }
 function createService(options = {}) {
-  let bridge = options.bridge ?? null, starting = null;
+  let bridge = options.bridge ?? null, starting = null, closing = false;
+  const learnerContexts=new LearnerContextLoader();
   const planSessions = new Map();
   const feedbackSessions = new Map(), feedbackBegins = new Map();
   const wholeTraceSessions = new Map();
@@ -132,6 +134,24 @@ function createService(options = {}) {
   async function getSnapshot(args) {
     if ([args.tabId, args.snapshot, args.snapshotFilePath].filter(Boolean).length !== 1) throw new Error('Provide exactly one of tabId, snapshot, or snapshotFilePath.');
     return args.tabId ? (await getBridge()).snapshot(args.tabId) : args.snapshot ?? readJson(args.snapshotFilePath);
+  }
+  const actorBindingFields=['tabId','epoch','appOrigin','backendOrigin','memberId','targetEnv','connectedAt','ready','visible','snapshotId','questInstanceId','sessionId','replayId'];
+  async function captureLearnerBinding(args,snapshot) {
+    const canonical=require('../frontend/src/game/marketReplayTrace.ts').canonicalMarketReplayJson;
+    let app=null;
+    if(args.tabId){const tab=(await getBridge()).list().sessions.find(item=>item.tabId===args.tabId);
+      if(!tab||!tab.ready||tab.replayId)throw new Error('Actor app is not ready for learner verification');
+      app=Object.fromEntries(actorBindingFields.map(field=>[field,tab[field]]));}
+    return {snapshot:canonical(snapshot),app};
+  }
+  async function assertLearnerBinding(args,binding,context) {
+    await learnerContexts.assertCurrent(context);
+    const canonical=require('../frontend/src/game/marketReplayTrace.ts').canonicalMarketReplayJson;
+    if(canonical(await getSnapshot(args))!==binding.snapshot)throw new Error('Actor snapshot changed during learner verification');
+    if(args.tabId){const tab=(await getBridge()).list().sessions.find(item=>item.tabId===args.tabId);
+      if(!tab||!tab.ready||tab.replayId||JSON.stringify(Object.fromEntries(actorBindingFields.map(field=>[field,tab[field]])))!==JSON.stringify(binding.app))
+        throw new Error('Actor app binding changed during learner verification');}
+    if(closing)throw new Error('Actor planning service is closing');
   }
   async function invokeTool(name, args = {}) {
     const tool = definitions.find(item => item.name === name);
@@ -190,7 +210,9 @@ function createService(options = {}) {
     }
     if (name === 'begin_actor_plan') {
       const snapshot=await getSnapshot(args), coordinator=args.trialFile?require('./learning-trial.cjs'):null;
-      let trialRound=null, settings, learnerIdentity, attentionExperience=args.attentionExperience;
+      let trialRound=null, settings, learnerIdentity, verifiedLearner, learnerBinding, attentionExperience=args.attentionExperience;
+      let actorPolicyVersion=args.actorPolicyVersion??'episodic-choice-v10';
+      if(!['episodic-choice-v10','episodic-choice-v11'].includes(actorPolicyVersion))throw new Error('Unsupported direct Luna actor policy');
       if(coordinator){
         if(!args.arm) throw new Error('A prepared trial plan requires arm');
         if(args.learnerFile||attentionExperience) throw new Error('A trial supplies its own verified learner memory');
@@ -199,8 +221,9 @@ function createService(options = {}) {
         if(result.complete) return result;
         trialRound={trialFile:args.trialFile,arm:result.arm,roundId:result.roundId,phase:result.phase,expectedMemberId:result.expectedMemberId,experiencePolicy:result.experiencePolicy};
         settings=result.generationOptions;learnerIdentity=settings.learnerIdentity;attentionExperience=settings.attentionExperience;
-        if(settings.llm?.model!==ACTOR_PLAN_MODEL || learnerIdentity?.policyVersion!=='episodic-choice-v10' || learnerIdentity?.reasoningEffort!=='low')
-          throw new Error('Prepared learning round is not bound to the current Luna v10 identity');
+        actorPolicyVersion=args.actorPolicyVersion??learnerIdentity?.policyVersion;
+        if(settings.llm?.model!==ACTOR_PLAN_MODEL || !['episodic-choice-v10','episodic-choice-v11'].includes(actorPolicyVersion) || learnerIdentity?.policyVersion!==actorPolicyVersion || learnerIdentity?.reasoningEffort!=='low')
+          throw new Error('Prepared learning round is not bound to the selected Luna identity');
         if(args.seed!==undefined && args.seed!==settings.seed) throw new Error('Trial seed is frozen');
         if(args.personaId!==undefined && args.personaId!==settings.personaId) throw new Error('Trial persona is frozen');
         if(args.tabId){const member=(await getBridge()).list().sessions.find(s=>s.tabId===args.tabId)?.memberId;
@@ -208,17 +231,19 @@ function createService(options = {}) {
       } else {
         if(!args.personaId||args.seed===undefined) throw new Error('Provide personaId and seed, or a prepared trialFile and arm');
         settings={personaId:args.personaId,seed:args.seed,mode:'llm',llm:{model:ACTOR_PLAN_MODEL,maxCalls:2000},timingProfile:args.timingProfile??'compact',
-          maxActions:args.maxActions??100,tracePolicyVersion:'6',actorPolicyVersion:'episodic-choice-v10',reasoningEffort:'low'};
+          maxActions:args.maxActions??(actorPolicyVersion==='episodic-choice-v11'?200:100),tracePolicyVersion:'6',actorPolicyVersion,reasoningEffort:'low'};
       }
       const persona=require('./src/personas.ts').getPersona(settings.personaId);
       if(args.learnerFile){
         if(attentionExperience) throw new Error('learnerFile cannot be combined with manual experience');
-        const store=require('./learner-store.cjs'), learner=store.readLearner(args.learnerFile); learnerIdentity=learner.identity;
+        learnerBinding=await captureLearnerBinding(args,snapshot);
+        verifiedLearner=await learnerContexts.read(args.learnerFile);learnerIdentity=verifiedLearner.identity;
+        actorPolicyVersion=args.actorPolicyVersion??learnerIdentity.policyVersion;
         if(learnerIdentity.personaId!==persona.id || learnerIdentity.personaVersion!==persona.version || learnerIdentity.model!==ACTOR_PLAN_MODEL
-          || learnerIdentity.policyVersion!=='episodic-choice-v10' || learnerIdentity.reasoningEffort!=='low') throw new Error('Luna learner identity changed; create a new v10 learner');
+          || !['episodic-choice-v10','episodic-choice-v11'].includes(actorPolicyVersion) || learnerIdentity.policyVersion!==actorPolicyVersion || learnerIdentity.reasoningEffort!=='low') throw new Error('Luna learner identity changed; create a new learner for this policy');
         if(args.tabId){const member=(await getBridge()).list().sessions.find(s=>s.tabId===args.tabId)?.memberId;
           if(member!==learnerIdentity.memberId) throw new Error('Luna learner cannot cross test accounts');}
-        attentionExperience=store.getLearnerExperience(args.learnerFile,learnerIdentity);
+        attentionExperience=verifiedLearner.experience;
       }
       if(attentionExperience){
         if(!['first-play','revisit'].includes(attentionExperience.visit)) throw new Error('Manual attentionExperience.visit must be first-play or revisit');
@@ -234,11 +259,15 @@ function createService(options = {}) {
         settings.attentionExperience=attentionExperience;
       }
       if(learnerIdentity) settings.learnerIdentity=learnerIdentity;
+      if(!trialRound)settings.maxActions=args.maxActions??(actorPolicyVersion==='episodic-choice-v11'?200:100);
+      if(actorPolicyVersion==='episodic-choice-v11'&&settings.maxActions!==200)throw new Error('v11 action observation limit is fixed at 200');
       if(args.maxActions!==undefined && args.maxActions!==settings.maxActions) throw new Error('Generation maxActions is frozen or outside the prepared plan');
-      if(!trialRound) Object.assign(settings,{tracePolicyVersion:'6',actorPolicyVersion:'episodic-choice-v10',reasoningEffort:'low'});
-      const session=new ActorPlanSession(), outputPath=path.resolve(args.outputPath ?? path.join(__dirname,'output',`luna-${session.id}.json`));
-      settings={...settings,mode:'llm',llm:{...settings.llm,model:ACTOR_PLAN_MODEL},tracePolicyVersion:'6',actorPolicyVersion:'episodic-choice-v10',reasoningEffort:'low',
-        actorDecisionProvider:(o,h,p,a,state)=>session.decide(o,h,p,a,state),onActorDecisionAccepted:()=>session.recordAccepted()};
+      if(!trialRound) Object.assign(settings,{tracePolicyVersion:'6',actorPolicyVersion,reasoningEffort:'low'});
+      if(verifiedLearner)await assertLearnerBinding(args,learnerBinding,verifiedLearner);
+      const session=new ActorPlanSession({policyVersion:actorPolicyVersion}), outputPath=path.resolve(args.outputPath ?? path.join(__dirname,'output',`luna-${session.id}.json`));
+      settings={...settings,mode:'llm',llm:{...settings.llm,model:ACTOR_PLAN_MODEL},tracePolicyVersion:'6',actorPolicyVersion,reasoningEffort:'low',
+        actorDecisionProvider:(o,h,p,a,state)=>session.decide(o,h,p,a,state),onActorDecisionAccepted:()=>session.recordAccepted(),
+        ...(actorPolicyVersion==='episodic-choice-v11'?{onActorDecisionApplied:after=>session.recordApplied(after)}:{})};
       const record={session,outputPath,done:null,error:null,trialRound};
       const onFailure=trialRound?stage=>coordinator.recordTrialFailure({trialFile:trialRound.trialFile,arm:trialRound.arm,roundId:trialRound.roundId,
         stage,code:stage==='generation'?'TRACE_GENERATION_FAILED':'TRACE_FILE_SAVE_FAILED'}):undefined;
@@ -261,7 +290,8 @@ function createService(options = {}) {
       if(record.error) throw record.error;
       if(!record.session.status.complete) throw new Error('Actor trace is still running; observe and append the current plan first');
       const result=await record.done; record.session.close();
-      return {...result,...(record.trialRound??{}),model:ACTOR_PLAN_MODEL,reasoningEffort:'low',policyVersion:'6',acceptedActions:record.session.status.acceptedActions};
+      return {...result,...(record.trialRound??{}),model:ACTOR_PLAN_MODEL,reasoningEffort:'low',policyVersion:'6',acceptedActions:record.session.status.acceptedActions,
+        ...(record.session.policyVersion==='episodic-choice-v11'?{cognitionProof:record.session.cognitionProof}:{})};
     }
     if (name === 'prepare_whole_trace') {
       if(args.timingProfile!==undefined && args.timingProfile!=='original') throw new Error('Whole-trace-v3 preserves actor judgment timing; use original');
@@ -377,8 +407,9 @@ function createService(options = {}) {
     }
     if (name === 'create_luna_learner') {
       const persona=require('./src/personas.ts').getPersona(args.personaId);
-      const {directory,...actor}=args;
-      const identity={...actor,personaVersion:persona.version,model:ACTOR_PLAN_MODEL,policyVersion:'episodic-choice-v10',reasoningEffort:'low'};
+      const {directory,actorPolicyVersion='episodic-choice-v10',...actor}=args;
+      if(!['episodic-choice-v10','episodic-choice-v11'].includes(actorPolicyVersion))throw new Error('Unsupported Luna learner policy');
+      const identity={...actor,personaVersion:persona.version,model:ACTOR_PLAN_MODEL,policyVersion:actorPolicyVersion,reasoningEffort:'low'};
       const result=require('./learner-store.cjs').createLearner({directory:args.directory,identity});
       return {learnerFile:result.learnerFile,identity:result.state.identity};
     }
@@ -465,6 +496,7 @@ function createService(options = {}) {
     return { jsonrpc: '2.0', id: message.id, result };
   }
   return { invokeTool, dispatch, close: async () => {
+    closing=true;await learnerContexts.close();
     for (const record of feedbackSessions.values()) if (!record.session.status.complete) record.session.close();
     await Promise.allSettled([...feedbackSessions.values()].map(record=>record.done));
     if (bridge) await bridge.close();

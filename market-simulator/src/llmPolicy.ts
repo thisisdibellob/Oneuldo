@@ -8,6 +8,7 @@ import { PersonaContext } from './personaContext';
 const actionFields: Record<string, string[]> = {
   walkTo: ['station'], interact: ['station'], add: ['productId', 'quantity'], remove: ['productId', 'quantity'],
   requestReturn: ['productId', 'quantity'], checkout: ['checkoutId'], requestCashier: ['checkoutId'],
+  openLocationHelp: [], backToStaff: [], askLocation: ['objectiveId'],
   submit: [], giveUp: [], closeStation: [], viewCart: [], viewHelp: [], closeView: [],
   walkToAnchor: ['anchorId'], readList: ['durationMs'], browse: ['durationMs', 'scrollFraction'],
   pause: ['durationMs'], lookAround: ['durationMs'],
@@ -17,6 +18,7 @@ const legacyActionFields = Object.fromEntries(Object.entries(actionFields).filte
 export function assertDecision(value: unknown, feedbackTiming = false): asserts value is Decision {
   const d = value as Decision;
   if (!d || typeof d !== 'object' || !d.action || !Object.prototype.hasOwnProperty.call(actionFields, d.action.type)) throw new Error('Decision contains an unsupported agent action.');
+  if (d.action.type === 'askLocation' && (typeof d.action.objectiveId !== 'string' || !d.action.objectiveId)) throw new Error('Location question requires a displayed objectiveId');
   const action = d.action as unknown as Record<string, unknown>;
   const panelTiming = feedbackTiming && ['viewCart', 'viewHelp'].includes(d.action.type);
   for (const key of Object.keys(action)) if (!['type', ...actionFields[d.action.type], ...(panelTiming ? ['durationMs'] : [])].includes(key)) throw new Error(`Unexpected action field: ${key}`);
@@ -46,7 +48,7 @@ export function assertDecision(value: unknown, feedbackTiming = false): asserts 
 /** Same HTTP contract as the legacy provider, with actor-only input and externally owned memory. */
 export const LEGACY_ACTOR_POLICY_VERSION = 'episodic-choice-v4' as const;
 export function isExtendedActorPolicy(policy?: string): boolean {
-  return ['episodic-choice-v9', 'episodic-choice-v10', 'feedback-choice-v1', 'feedback-choice-v2', 'feedback-choice-v3', 'feedback-choice-v4', 'feedback-choice-v5', 'feedback-choice-v6', 'feedback-choice-v7', 'whole-trace-v3'].includes(policy ?? '');
+  return ['episodic-choice-v9', 'episodic-choice-v10', 'episodic-choice-v11', 'feedback-choice-v1', 'feedback-choice-v2', 'feedback-choice-v3', 'feedback-choice-v4', 'feedback-choice-v5', 'feedback-choice-v6', 'feedback-choice-v7', 'whole-trace-v3'].includes(policy ?? '');
 }
 export function attentionActorPolicyVersion(options: Pick<TraceOptions, 'actorPolicyVersion' | 'learnerIdentity' | 'attentionExperience'>) {
   return options.actorPolicyVersion ?? options.learnerIdentity?.policyVersion
@@ -126,7 +128,7 @@ export function createLlmPolicy(options: NonNullable<TraceOptions['llm']>, timeB
     if (previous && history.length > historyLength) {
       const action = history.at(-1)!.action;
       if (action.type !== 'walkTo' && action.type !== 'walkToAnchor' && action.type !== 'readList'
-        && action.type !== 'moveDirection' && action.type !== 'browse' && action.type !== 'pause' && action.type !== 'lookAround') context.record(action, previous, observation);
+        && action.type !== 'openLocationHelp' && action.type !== 'backToStaff' && action.type !== 'moveDirection' && action.type !== 'browse' && action.type !== 'pause' && action.type !== 'lookAround') context.record(action, previous, observation);
     }
     previous = observation; historyLength = history.length;
     const remainingMs = timeBudgetMs === undefined ? undefined : timeBudgetMs - history.reduce((sum, step) => sum + step.delayMs, 0);

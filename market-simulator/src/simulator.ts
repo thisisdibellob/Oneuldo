@@ -182,6 +182,8 @@ export function projectDecision(d: Decision, o: Observation, persona: ActorPerso
       outcome: d.dragOutcome ?? 'drop', motorSeed,
     } };
     case 'remove': return { type: 'removeProduct', productId: a.productId, quantity: a.quantity ?? 1 };
+    case 'openLocationHelp': case 'backToStaff': return { type: 'talkToStaff', stationId: requireStaff(o), choice: a.type };
+    case 'askLocation': return { type: 'talkToStaff', stationId: requireStaff(o), choice: 'askLocation', objectiveId: a.objectiveId };
     case 'requestReturn': return { type: 'talkToStaff', stationId: requireStaff(o), choice: 'returnProduct', productId: a.productId, quantity: a.quantity ?? 1 };
     case 'requestCashier': {
       // The real dialogue has one button per empty counter, so resolve the choice

@@ -1,13 +1,14 @@
+import { MARKET_GOAL_REMINDER_CONTRACT, MARKET_GOAL_REMINDER_TITLE, marketGoalReminderLines } from '../../frontend/src/game/marketGoalReminder';
 import { createMarketAgentAdapter, type MarketAgentAction } from '../../frontend/src/game/marketSession';
 import { canonicalMarketReplayJson, isMarketReplaySystemCompletionStep, validateMarketReplaySnapshot, validateMarketReplayTrace, type MarketReplaySnapshot,
   type MarketReplayStep, type MarketReplayTrace } from '../../frontend/src/game/marketReplayTrace';
 import { planWalk } from './navigation';
 import { Random } from './random';
 import { FeedbackMovementPolicy } from './feedbackMovementPolicy';
-import { DEFAULT_REPLAY_PRESENTATION, visibleStations, visibleAnchors, visibleUnlabelledShelfBodies, resolveReplayAnchor, getReplayShelfPage, replayShelfPageFractions } from '../../frontend/src/game/marketReplayPerception';
+import { DEFAULT_REPLAY_PRESENTATION, visibleStations, visibleAnchors, visibleUnlabelledShelfBodies, resolveReplayAnchor, getReplayShelfPage, replayShelfPageFractions, canApproachVisibleStation } from '../../frontend/src/game/marketReplayPerception';
 import { directionalInputSlices, MARKET_DIRECTIONAL_MOVE_SPEED } from '../../frontend/src/game/marketDirectionalInput';
 import { getMarketStationApproachPoint } from '../../frontend/src/game/marketEnvironment';
-import { isMarketNavigationSegmentClear } from '../../frontend/src/game/marketNavigation';
+import { getMarketNavigationPath, isMarketNavigationSegmentClear } from '../../frontend/src/game/marketNavigation';
 import { getMarketHelpLines, marketCashierResponse, marketReturnResponse } from '../../frontend/src/game/marketHelp';
 import { getMarketProduct } from '../../frontend/src/game/scenarios';
 import type { ActorObservation, Observation } from './types';
@@ -20,11 +21,12 @@ export class TraceGuard {
   private submitted = false;
   private scrollFraction = 0;
   private sequence = 0;
+  private staffLocationHelp = false;
   private lastResult?: ActorObservation['result'];
   private readonly presentation;
   private readonly mission;
   private readonly helpLines;
-  constructor(snapshot: MarketReplaySnapshot, personaId = 'trace-validator', personaVersion = '1', model = 'trace-validation/1', private readonly attentionMode = false, private readonly extendedActor = false, private readonly feedbackMode = false, private readonly directionalMovement = false, private readonly richFeedbackObservation = false) {
+  constructor(snapshot: MarketReplaySnapshot, personaId = 'trace-validator', personaVersion = '1', model = 'trace-validation/1', private readonly attentionMode = false, private readonly extendedActor = false, private readonly feedbackMode = false, private readonly directionalMovement = false, private readonly richFeedbackObservation = false, private readonly incrementalSpatial = false) {
     const valid = validateMarketReplaySnapshot(snapshot);
     if (!valid.valid) throw new Error(valid.errors.join('; '));
     this.adapter = createMarketAgentAdapter({ ...snapshot.config,
@@ -39,7 +41,8 @@ export class TraceGuard {
   observeActor(): ActorObservation {
     const o = this.observe();
     const world = o.phase === 'shopping' && o.view === 'world' && !o.activeStation;
-    const stations = world ? visibleStations(o.environment, o.playerPosition, this.presentation, o.cashierAvailability) : [];
+    const stations = world ? visibleStations(o.environment, o.playerPosition, this.presentation, o.cashierAvailability).map(station =>
+      this.incrementalSpatial ? { ...station, approachable: canApproachVisibleStation(o.environment, o.playerPosition, station.id, this.presentation, o.cashierAvailability) } : station) : [];
     const shelfOpen = o.phase === 'shopping' && o.view === 'world' && o.products.length > 0;
     const page = shelfOpen ? getReplayShelfPage(o.products.map(p => p.id), this.presentation, this.scrollFraction) : null;
     const visible = new Set(page?.visibleProductIds ?? []);
@@ -54,6 +57,7 @@ export class TraceGuard {
     const result: ActorObservation = {
       schemaVersion: 'attention-observation-v1', phase: o.phase, view: o.view, activeStation: o.activeStation,
       visibleStations: stations, anchors: world ? visibleAnchors(o.environment, o.playerPosition, this.presentation, o.cashierAvailability) : [],
+      ...(this.incrementalSpatial ? { visibleApproachEnabled: true as const } : {}),
       ...(this.directionalMovement ? { visibleStructures: world
         ? visibleUnlabelledShelfBodies(o.environment, o.playerPosition, this.presentation, o.cashierAvailability) : [] } : {}),
       products: shelfOpen ? o.products.filter(p => visible.has(p.id)).map(p => ({ ...p, stock: o.stock[p.id] })) : [],
@@ -73,9 +77,16 @@ export class TraceGuard {
             }] : [];
           }),
         } : {}),
-      ...(this.extendedActor && o.view === 'help' ? { supportText: [...this.helpLines] } : {}),
+      ...(this.extendedActor && o.view === 'help' ? { supportText: [...(this.mission?.briefing ?? []), ...this.helpLines] } : {}),
+      // Same shared rule the app's cart panels render (frontend/src/game/marketGoalReminder.ts).
+      ...(this.incrementalSpatial && o.phase === 'shopping' && o.view === 'cart' && marketGoalReminderLines(o.cart, this.mission) ? {
+        goalReminder: { contract: MARKET_GOAL_REMINDER_CONTRACT, title: MARKET_GOAL_REMINDER_TITLE, lines: marketGoalReminderLines(o.cart, this.mission)! } } : {}),
       ...(this.extendedActor && o.view === 'cart' ? { removableProductIds: Object.keys(o.cart ?? {}).filter(id =>
         o.products.some(product => product.id === id && product.categoryId === o.activeStation)) } : {}),
+      ...(this.extendedActor && o.activeStation?.startsWith('staff:') ? {
+        staffLocationHelp: this.staffLocationHelp,
+        ...(this.staffLocationHelp ? { locationChoices: o.objectives.map(({id, label}) => ({id, label})) } : {}),
+      } : {}),
       cashiers,
       sequence: this.sequence, elapsedMs: this.time - Date.parse('2000-01-01T00:00:00.000Z'),
       ...(this.lastResult ? { result: { ...this.lastResult } } : {}),
@@ -147,10 +158,25 @@ export class TraceGuard {
         if (!this.attentionMode || !this.observeActor().listAvailable) throw new Error(`${step.id}: the mission list is not visible`);
         this.time += step.durationMs; break;
       case 'walkTo': {
-        if (this.attentionMode && !systemCompletion && !this.observeActor().visibleStations.some(s => s.id === step.target.stationId && s.near)) throw new Error(`${step.id}: station approach requires a visible nearby station; explore with anchors first`);
+        const seen = this.observeActor().visibleStations.find(s => s.id === step.target.stationId);
+        // visible-travel-v1: a visible but not locally approachable target is walked along the app's floor path (motor walkToVisibleTarget).
+        if (this.attentionMode && !systemCompletion && this.incrementalSpatial && seen && seen.approachable === false) {
+          const target = getMarketStationApproachPoint(before.environment, step.target.stationId, before.playerPosition, before.cashierAvailability);
+          const path = target && getMarketNavigationPath(before.environment, before.playerPosition, target, before.cashierAvailability);
+          if (!path) throw new Error(`${step.id}: no floor path to the visible ${step.target.stationId}`);
+          let at = { ...before.playerPosition };
+          for (const point of path) {
+            const dx = point.x - at.x, dy = point.y - at.y, distance = Math.hypot(dx, dy), count = Math.max(1, Math.ceil(distance / 24));
+            const delay = Math.max(1, Math.ceil(distance / count / (190 * step.movement.speedMultiplier) * 1000));
+            for (let i = 0; i < count; i++) { apply({ type: 'move', dx: dx / count, dy: dy / count }, delay); movementMs += delay; }
+            at = { x: point.x, y: point.y };
+          }
+          break;
+        }
+        if (this.attentionMode && !systemCompletion && !this.observeActor().visibleStations.some(s => s.id === step.target.stationId && (this.incrementalSpatial ? s.approachable : s.near))) throw new Error(`${step.id}: station approach requires a currently visible reachable station`);
         if (this.attentionMode && !systemCompletion) {
           const target = getMarketStationApproachPoint(before.environment, step.target.stationId, before.playerPosition, before.cashierAvailability);
-          if (!target || Math.hypot(target.x - before.playerPosition.x, target.y - before.playerPosition.y) > 180
+          if (!target || Math.hypot(target.x - before.playerPosition.x, target.y - before.playerPosition.y) > (this.incrementalSpatial ? 600 : 180)
             || !isMarketNavigationSegmentClear(before.environment, before.playerPosition, target, before.cashierAvailability)) throw new Error(`${step.id}: station approach is not a local clear segment`);
           const dx = target.x - before.playerPosition.x, dy = target.y - before.playerPosition.y;
           const distance = Math.hypot(dx, dy), count = Math.max(1, Math.ceil(distance / 24));
@@ -173,8 +199,14 @@ export class TraceGuard {
         if (step.choice === 'open') apply({ type: 'interact', station: step.stationId });
         else {
           if (before.activeStation !== step.stationId) throw new Error(`${step.id}: employee conversation is not open`);
-          if (step.choice === 'requestCashier') apply({ type: 'requestCashier', checkoutId: step.checkoutId });
-          else apply({ type: 'requestReturn', productId: step.productId!, quantity: step.quantity! });
+          if (step.choice === 'openLocationHelp') this.staffLocationHelp = true;
+          else if (step.choice === 'backToStaff') this.staffLocationHelp = false;
+          else if (step.choice === 'askLocation') {
+            if (!this.staffLocationHelp) throw new Error('Open the location menu first');
+            apply({ type: 'askLocation', objectiveId: step.objectiveId });
+          }
+          else if (step.choice === 'requestCashier') apply({ type: 'requestCashier', checkoutId: step.checkoutId });
+          else if (step.choice === 'returnProduct') apply({ type: 'requestReturn', productId: step.productId!, quantity: step.quantity! });
         }
         break;
       }
@@ -212,10 +244,11 @@ export class TraceGuard {
       case 'awaitReviewAccepted': if (!this.submitted) throw new Error(`${step.id}: no review request to await`); break;
       case 'leave': break;
     }
+    if (step.type === 'closeStation' || step.type === 'talkToStaff' && step.choice === 'open') this.staffLocationHelp = false;
     if (step.type === 'openShelf' || step.type === 'closeStation') this.scrollFraction = 0;
     this.sequence++;
     const actionType = step.type === 'talkToStaff'
-      ? step.choice === 'open' ? 'interact' : step.choice === 'requestCashier' ? 'requestCashier' : 'requestReturn'
+      ? step.choice === 'open' ? 'interact' : step.choice === 'returnProduct' ? 'requestReturn' : step.choice
       : ({ openShelf: 'interact', dragProduct: 'add', removeProduct: 'remove', submitForReview: 'submit' } as Record<string, string>)[step.type] ?? step.type;
     const after = this.observe();
     const cashierMessage = step.type === 'talkToStaff' && step.choice === 'requestCashier'
@@ -230,6 +263,9 @@ export class TraceGuard {
       ...(step.type === 'walkTo' ? { stationId: step.target.stationId } : {}),
       ...(step.type === 'walkToAnchor' ? { anchorId: step.target.anchorId } : {}),
       ...(movementResult ? { movement: movementResult } : {}),
+      ...(step.type === 'talkToStaff' && step.choice === 'askLocation' ? {
+        message: after.staffLearningFeedback?.message,
+      } : {}),
       ...(this.extendedActor && cashierMessage !== undefined ? { message: cashierMessage } : {}),
       ...(this.extendedActor && step.type === 'talkToStaff' && step.choice === 'returnProduct'
         ? { message: marketReturnResponse(getMarketProduct(step.productId!)!.name, step.quantity!) } : {}),
@@ -252,10 +288,10 @@ export function validateTrace(value: unknown, snapshot?: MarketReplaySnapshot) {
   try {
     const trace = value as MarketReplayTrace;
     const guard = new TraceGuard(snapshot, trace.personaId, trace.personaVersion, trace.generation?.model, trace.traceSchemaVersion === '2',
-      ['episodic-choice-v9', 'episodic-choice-v10', 'feedback-choice-v1', 'feedback-choice-v2', 'feedback-choice-v3', 'feedback-choice-v4', 'feedback-choice-v5', 'feedback-choice-v6', 'feedback-choice-v7', 'whole-trace-v3'].includes(trace.generation?.actorPolicyVersion ?? ''),
+      ['episodic-choice-v9', 'episodic-choice-v10', 'episodic-choice-v11', 'feedback-choice-v1', 'feedback-choice-v2', 'feedback-choice-v3', 'feedback-choice-v4', 'feedback-choice-v5', 'feedback-choice-v6', 'feedback-choice-v7', 'whole-trace-v3'].includes(trace.generation?.actorPolicyVersion ?? ''),
       ['feedback-choice-v1', 'feedback-choice-v2', 'feedback-choice-v3', 'feedback-choice-v4', 'feedback-choice-v5', 'feedback-choice-v6', 'feedback-choice-v7'].includes(trace.generation?.actorPolicyVersion ?? ''),
       ['feedback-choice-v2', 'feedback-choice-v3', 'feedback-choice-v4', 'feedback-choice-v5', 'feedback-choice-v6', 'feedback-choice-v7'].includes(trace.generation?.actorPolicyVersion ?? ''),
-      ['feedback-choice-v5', 'feedback-choice-v6', 'feedback-choice-v7'].includes(trace.generation?.actorPolicyVersion ?? ''));
+      ['feedback-choice-v5', 'feedback-choice-v6', 'feedback-choice-v7'].includes(trace.generation?.actorPolicyVersion ?? ''), trace.generation?.actorPolicyVersion === 'episodic-choice-v11');
     const completion = trace.generation?.systemCompletion;
     const movementPolicy = ['feedback-choice-v3', 'feedback-choice-v4', 'feedback-choice-v5', 'feedback-choice-v6', 'feedback-choice-v7'].includes(trace.generation?.actorPolicyVersion ?? '')
       ? new FeedbackMovementPolicy(trace.seed, { wanderProbability: trace.generation!.movementPolicy!.wanderProbability },

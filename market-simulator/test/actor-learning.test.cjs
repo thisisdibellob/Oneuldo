@@ -165,3 +165,13 @@ test('choice annotations expose recorded arrivals without removing or ranking re
  assert.equal(choice.observedContext.recordedArrivals,3);assert.equal(choice.observedContext.direction,anchor.direction);
  assert.equal(choice.observedContext.currentLocation,true);
 });
+
+test('confirmed v10 memory retains all five visible briefing lines plus shared help without accepting hidden fields',()=>{
+ const {getMarketHelpLines}=require('../../frontend/src/game/marketHelp.ts');
+ const supportText=[...Array.from({length:5},(_,i)=>`실제 추천 안내 ${i+1}`),...getMarketHelpLines(10)];
+ const episode={source:'executed-app-action',action:'viewHelp',supportText,evidence:{sessionId:'session',replayId:'replay',traceId:'trace',stepId:'step',stepIndex:1}};
+ const current={version:'2',source:'confirmed-app-replay',memberId:'member',sessionId:'session',replayId:'replay',learnerId:'person',personaId:'adult-minjae-unit-support-research-v2',personaVersion:'research-learning-v2',experimentId:'test',arm:'A',model:'gpt-6-luna',policyVersion:'episodic-choice-v10',reasoningEffort:'low',episodes:[episode]};
+ assert.equal(supportText.length,12);validateLearning(current);assert.deepEqual(current.episodes[0].supportText,supportText);
+ assert.throws(()=>validateLearning({...current,episodes:[{...episode,analysis:'hidden interpretation'}]}));
+ assert.throws(()=>validateLearning({...current,episodes:[{...episode,supportText:[...supportText,'not in the supported display'] }]}));
+});

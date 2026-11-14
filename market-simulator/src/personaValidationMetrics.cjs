@@ -42,6 +42,8 @@ function matchesAction(step, action) {
       && step.stationId === action.station || step.type === 'checkout' && step.checkoutId === action.station;
     case 'add': return step.type === 'dragProduct' && step.productId === action.productId && step.quantity === (action.quantity ?? 1);
     case 'remove': return step.type === 'removeProduct' && step.productId === action.productId && step.quantity === (action.quantity ?? 1);
+    case 'openLocationHelp': case 'backToStaff': return step.type === 'talkToStaff' && step.choice === action.type;
+    case 'askLocation': return step.type === 'talkToStaff' && step.choice === 'askLocation' && step.objectiveId === action.objectiveId;
     case 'requestReturn': return step.type === 'talkToStaff' && step.choice === 'returnProduct'
       && step.productId === action.productId && step.quantity === (action.quantity ?? 1);
     case 'requestCashier': return step.type === 'talkToStaff' && step.choice === 'requestCashier'

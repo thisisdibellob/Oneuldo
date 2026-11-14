@@ -12,24 +12,32 @@ import { createFeedbackLlmPolicy } from './feedbackLlmPolicy';
 import { buildFeedbackActorFrame, feedbackChoiceMatchesDecision, emptyFeedbackBeliefMemory, validateFeedbackBeliefMemory, carryFeedbackBeliefMemory, isFeedbackActorPolicy, isExperienceFeedbackPolicy, isStructuredFeedbackPolicy, projectFeedbackObservation } from './feedbackActor';
 import { FeedbackMovementPolicy } from './feedbackMovementPolicy';
 import { FeedbackExperience } from './feedbackExperience';
+import { IncrementalCognition } from './incrementalCognition';
+import { navigationGeometryKey } from './confirmedSpatialMemory';
 import type { ActorObservation, ActorPersona, AttentionExperience, Decision, TraceEntry, TraceOptions } from './types';
 
 type StepIntent = MarketReplayStep extends infer S ? S extends MarketReplayStep ? Omit<S, 'id' | 'reactionDelayMs' | 'reason' | 'timeoutMs'> : never : never;
 
 /** Observation horizon, counted in accepted model decisions, not UI or motor steps. */
 export const ACTOR_ACTION_LIMIT = 100;
+export const INCREMENTAL_ACTOR_ACTION_LIMIT = 200;
 
 /** Executes bounded actor observations; whole-trace reference context is built separately. */
 export async function generateAttentionTrace(options: TraceOptions, persona: ActorPersona, model: string): Promise<MarketReplayTrace> {
   const mode = options.mode ?? 'llm';
   const numericPersona = 'scope' in persona ? undefined : persona;
-  if (!numericPersona && (mode !== 'llm' || options.actorPolicyVersion !== 'episodic-choice-v10'
+  if (!numericPersona && (mode !== 'llm' || !['episodic-choice-v10','episodic-choice-v11'].includes(options.actorPolicyVersion??'')
     || model !== 'gpt-6-luna' || options.reasoningEffort !== 'low' || options.tracePolicyVersion !== '6'
     || !options.actorDecisionProvider || options.planningMode || options.decisionProvider || options.feedbackDecisionProvider))
-    throw new Error(`Research persona ${persona.id} requires direct MCP actor control with the local Luna v10 provider`);
+    throw new Error(`Research persona ${persona.id} requires direct MCP actor control with the local Luna v10/v11 provider`);
   if (options.actorDecisionProvider && mode !== 'llm') throw new Error('actorDecisionProvider requires llm mode; stochastic traces must be seed-reproducible');
   const wholeTrace = options.planningMode === 'whole-trace';
   const actorPolicyVersion = attentionActorPolicyVersion(options);
+  const incrementalActor=actorPolicyVersion==='episodic-choice-v11';
+  const actionHorizon=incrementalActor?INCREMENTAL_ACTOR_ACTION_LIMIT:ACTOR_ACTION_LIMIT;
+  if(incrementalActor && options.maxActions!==undefined && options.maxActions!==INCREMENTAL_ACTOR_ACTION_LIMIT)
+    throw new Error('v11 uses the explicit 200-action observation horizon');
+  const cognition=incrementalActor?new IncrementalCognition(persona):null;
   const feedbackActor = isFeedbackActorPolicy(actorPolicyVersion);
   const directionalMovement = feedbackActor && actorPolicyVersion !== 'feedback-choice-v1';
   const exploration = actorPolicyVersion === 'feedback-choice-v3' || isExperienceFeedbackPolicy(actorPolicyVersion);
@@ -67,7 +75,7 @@ export async function generateAttentionTrace(options: TraceOptions, persona: Act
     validateLearnerIdentity(identity);
     if (mode !== 'llm' || identity.personaId !== persona.id || identity.personaVersion !== persona.version
       || identity.model !== model || (identity.policyVersion !== ACTOR_POLICY_VERSION
-        && !(identity.policyVersion === 'episodic-choice-v10' && model === 'gpt-6-luna' && identity.reasoningEffort === 'low')
+        && !(['episodic-choice-v10','episodic-choice-v11'].includes(identity.policyVersion) && model === 'gpt-6-luna' && identity.reasoningEffort === 'low')
         && !(identity.policyVersion === 'whole-trace-v3' && wholeTrace && model === 'gpt-6-luna' && identity.reasoningEffort === 'low'))
       || identity.policyVersion !== actorPolicyVersion || wholeTrace && identity.policyVersion !== 'whole-trace-v3')
       throw new Error('Learner actor identity changed');
@@ -94,7 +102,8 @@ export async function generateAttentionTrace(options: TraceOptions, persona: Act
   if (supplied?.visit === 'revisit' && (!supplied.memory || !supplied.previousLayoutKey)) throw new Error('Revisit requires memory and previousLayoutKey from a previous trace');
   const experience: AttentionExperience = { ...supplied, visit: supplied?.visit ?? 'first-play', layoutKey };
   if (supplied?.learning && (mode !== 'llm' || experience.visit !== 'revisit')) throw new Error('Learning experience requires an AI revisit');
-  const policy = mode === 'stochastic' ? new AttentionPolicy(numericPersona!, options.seed, experience) : new ActorLearningMemory(supplied?.learning, extendedActor);
+  const policy = mode === 'stochastic' ? new AttentionPolicy(numericPersona!, options.seed, experience)
+    : new ActorLearningMemory(supplied?.learning, extendedActor,incrementalActor?{layoutKey,navigationKey:navigationGeometryKey(options.snapshot.environment),spatialEnabled:true}:undefined);
   const needsProvider = mode === 'llm' && !options.actorDecisionProvider && !options.decisionProvider && !options.feedbackDecisionProvider;
   const feedbackProvider = needsProvider && feedbackActor
     ? createFeedbackLlmPolicy(options.llm ?? {}, options.seed, actorPolicyVersion as import('./feedbackActor').FeedbackActorPolicyVersion, options.feedbackMovement) : null;
@@ -102,7 +111,7 @@ export async function generateAttentionTrace(options: TraceOptions, persona: Act
   const activity = new ActorActivityMonitor();
   let systemCompletion: NonNullable<MarketReplayTrace['generation']>['systemCompletion'];
   if (options.decisionProvider && !options.actorDecisionProvider) throw new Error('Attention personas require actorDecisionProvider; raw game observations are not exposed');
-  const guard = new TraceGuard(options.snapshot, persona.id, persona.version, model, true, extendedActor, feedbackActor, directionalMovement, isStructuredFeedbackPolicy(actorPolicyVersion));
+  const guard = new TraceGuard(options.snapshot, persona.id, persona.version, model, true, extendedActor, feedbackActor, directionalMovement, isStructuredFeedbackPolicy(actorPolicyVersion),incrementalActor);
   const motor = new Random(`${options.seed}:presentation:${persona.id}:${persona.version}`);
   const history: TraceEntry[] = [], steps: MarketReplayStep[] = [];
   let plannedMs = 0;
@@ -125,7 +134,7 @@ export async function generateAttentionTrace(options: TraceOptions, persona: Act
   for (;;) {
     // Keep the app bridge's heartbeat responsive while constructing long plans.
     if (history.length && history.length % 20 === 0) await new Promise<void>(resolve => setImmediate(resolve));
-    const limit = history.length >= (options.maxActions ?? 1000) ? 'action-limit'
+    const limit = history.length >= (options.maxActions ?? (incrementalActor?INCREMENTAL_ACTOR_ACTION_LIMIT:1000)) ? 'action-limit'
       : mode === 'llm' && !wholeTrace && history.length >= (options.llm?.maxCalls ?? 300) ? 'model-call-limit'
       : options.timeBudgetMs !== undefined && plannedMs >= options.timeBudgetMs ? 'planned-time-budget' : null;
     const before = guard.observeActor();
@@ -135,12 +144,12 @@ export async function generateAttentionTrace(options: TraceOptions, persona: Act
     if (feedbackActor && history.length >= ACTOR_ACTION_LIMIT) {
       throw new Error('ATTENTION_GENERATION_LIMIT: action-limit; no system checkout or completed persona outcome was fabricated');
     }
-    if (extendedActor && history.length >= ACTOR_ACTION_LIMIT) {
+    if (extendedActor && history.length >= actionHorizon) {
       // Natural submit/giveUp below already ended the loop, including decision 100.
       // Repetition is diagnostic only. This fixed observation horizon is not failure.
       options.onCheckpoint?.({ kind: 'system-completion', index: history.length, activity: feedback });
       systemCompletion = appendCheckoutCompletion(guard, `step-${String(steps.length + 1).padStart(4, '0')}`, options.seed,
-        (intent, reason, timeoutMs) => append(intent, 300, reason, {}, timeoutMs, true));
+        (intent, reason, timeoutMs) => append(intent, 300, reason, {}, timeoutMs, true),actionHorizon);
       break;
     }
     if (limit) throw new Error(`ATTENTION_GENERATION_LIMIT: ${limit}; incomplete plan was not exported as a persona outcome`);
@@ -149,11 +158,14 @@ export async function generateAttentionTrace(options: TraceOptions, persona: Act
       ...(movementPolicy ? { movementPolicy: movementPolicy.prepare(projectFeedbackObservation(before, feedbackActor ? actorPolicyVersion : undefined), history.length) } : {}),
       ...(recentExperience ? { experience: recentExperience.snapshot(projectFeedbackObservation(before, feedbackActor ? actorPolicyVersion : undefined)) } : {}) }) : null;
     const decision = options.feedbackDecisionProvider ? await options.feedbackDecisionProvider(structuredClone(actorFrame!)) : options.actorDecisionProvider ? extendedActor
-      ? await options.actorDecisionProvider(before, history, persona, feedback, policy.getState())
+      ? await options.actorDecisionProvider(before, history, persona, feedback,
+        cognition?{...policy.getState(),cognition:cognition.frame(before)}:policy.getState())
       : await (options.actorDecisionProvider as (o: ActorObservation, h: TraceEntry[], p: ActorPersona) => Promise<Decision>)(before, history, persona)
       : feedbackProvider ? await feedbackProvider(before, history, numericPersona!, undefined, undefined, actorFrame!)
       : provider ? await provider(before, history, numericPersona!, policy.getState(), feedback) : (policy as AttentionPolicy).next(before);
     assertDecision(decision, feedbackActor);
+    if(cognition)cognition.preview(before,decision.cognition,decision.action,decision.delayMs);
+    else if(decision.cognition!==undefined)throw new Error('Cognition declarations require the explicit v11 actor policy');
     if (feedbackActor) {
       const checked = validateFeedbackBeliefMemory(decision.feedbackMemory, actorPolicyVersion);
       if (!checked.valid) throw new Error(`Invalid feedback belief memory: ${checked.errors.join('; ')}`);
@@ -182,13 +194,15 @@ export async function generateAttentionTrace(options: TraceOptions, persona: Act
     });
     history.push(decision);
     const after = guard.observeActor();
+    const cognitionApplied=cognition?.applied(after);
     recentExperience?.record(decision, projectFeedbackObservation(before, feedbackActor ? actorPolicyVersion : undefined), projectFeedbackObservation(after, feedbackActor ? actorPolicyVersion : undefined));
     policy.record(decision, before, after);
     activity.record(decision, before, after);
     options.onActorDecisionAccepted?.();
     options.onActorDecisionApplied?.(after);
     const { exchange: _exchange, ...recordedDecision } = decision;
-    options.onCheckpoint?.({ kind: 'decision', index: history.length, before, decision: recordedDecision, after, activity: activity.getState() });
+    options.onCheckpoint?.({ kind: 'decision', index: history.length, before, decision: recordedDecision, after, activity: activity.getState(),
+      ...(cognitionApplied?{cognition:cognitionApplied}:{}) });
     if (feedbackActor && options.timeBudgetMs !== undefined && plannedMs > options.timeBudgetMs) {
       throw new Error('ATTENTION_GENERATION_LIMIT: planned-time-budget; applied attempt was recorded but incomplete plan was not exported');
     }
@@ -256,7 +270,9 @@ function assertActorDecision(d: Decision, o: ActorObservation) {
   const a = d.action;
   if (a.type === 'moveDirection' && (o.phase !== 'shopping' || o.view !== 'world' || o.activeStation)) throw new Error('Close the panel before directional movement');
   if (a.type === 'walkToAnchor' && !o.anchors.some(x => x.id === a.anchorId)) throw new Error('Unobserved anchor is not an available movement intention');
-  if ((a.type === 'walkTo' || a.type === 'interact') && !o.visibleStations.some(x => x.id === a.station && x.near)) throw new Error('The station is not a visible nearby interaction');
+  if (a.type === 'walkTo' && !o.visibleStations.some(x => x.id === a.station
+    && (x.near || o.visibleApproachEnabled===true))) throw new Error('The station is not a visible approach or nearby interaction');
+  if (a.type === 'interact' && !o.visibleStations.some(x => x.id === a.station && x.near)) throw new Error('The station is not a visible nearby interaction');
   if (a.type === 'add' && !o.products.some(x => x.id === a.productId)) throw new Error('The product must be observed by browsing before selection');
   if (a.type === 'checkout' && o.phase !== 'checkout' && !o.visibleStations.some(x => x.kind === 'checkout' && x.near && (!a.checkoutId || x.id === a.checkoutId))) throw new Error('Checkout is not a visible nearby choice');
   if (a.type === 'readList' && !o.listAvailable) throw new Error('Close the panel before attending to the mission list');
