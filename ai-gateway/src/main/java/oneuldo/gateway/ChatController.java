@@ -23,13 +23,15 @@ import tools.jackson.databind.ObjectMapper;
 public class ChatController {
     static final String MODEL = "qwen3.6:27b-q4_K_M";
     static final int MAX_OUTPUT_TOKENS = 3200;
-    static final List<Integer> CONTEXT_LENGTHS = List.of(8192, 18432, 24576);
+    static final List<Integer> CONTEXT_LENGTHS = List.of(8192, 18432, 24576, 32768);
     static final int MAX_BYTES = 131072;
     private final ObjectMapper mapper;
     private final InferenceGate gate;
     private final RestClient upstream;
-    public ChatController(ObjectMapper mapper, InferenceGate gate, GatewaySettings settings) {
-        this.mapper = mapper; this.gate = gate;
+    private final GatewaySettings settings;
+    private final GatewayTokenCounter tokenizer;
+    public ChatController(ObjectMapper mapper, InferenceGate gate, GatewaySettings settings,GatewayTokenCounter tokenizer) {
+        this.mapper = mapper; this.gate = gate;this.settings=settings;this.tokenizer=tokenizer;
         var factory = new JdkClientHttpRequestFactory(HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build());
         factory.setReadTimeout(settings.timeout());
         upstream = RestClient.builder().baseUrl(settings.upstream().toString()).requestFactory(factory).build();
@@ -38,8 +40,9 @@ public class ChatController {
     @GetMapping("/api/tags") public Object tags() { return Map.of("models", List.of(Map.of("name", MODEL, "model", MODEL))); }
 
     @GetMapping("/api/limits") public Object limits() {
-        return Map.of("model", MODEL, "maxOutputTokens", MAX_OUTPUT_TOKENS,
-                "contextLengths", CONTEXT_LENGTHS);
+        var limits=new HashMap<String,Object>(Map.of("model", MODEL, "maxOutputTokens", MAX_OUTPUT_TOKENS,
+                "contextLengths", CONTEXT_LENGTHS,"sourceBoundSchemas",true,"compactSourceSchemas",true,"citationPoolSchemas",true,"groundedTextPatchSchemas",true,"parallelism",settings.parallelism(),"maxPerKey",settings.maxPerKey(),"prefillBatchSize",settings.prefillBatchSize()));
+        limits.put("groundedTextPatchSchemaVersion",3);limits.put("concretePracticeSchemas",true);limits.put("concretePracticeSchemaVersion",2);return limits;
     }
 
     // Read a bounded body explicitly; callers cannot reach Ollama management endpoints or select URLs.
@@ -55,12 +58,13 @@ public class ChatController {
         int context = options.has("num_ctx") ? options.path("num_ctx").asInt() : 8192;
         int output = options.has("num_predict") ? options.path("num_predict").asInt() : 1800;
         long tokens = 64 + output;
-        for (var message : body.path("messages")) tokens += QwenTokenCounter.count(message.path("content").asString()) + 16L;
+        var text=new java.util.ArrayList<String>();body.path("messages").forEach(m->text.add(m.path("content").asString()));
+        for(int count:tokenizer.count(text))tokens+=count+16L;
         if (tokens > context - 256) throw error(HttpStatus.BAD_REQUEST, "CONTEXT_LIMIT_EXCEEDED");
         double temperature = options.has("temperature") ? options.path("temperature").asDouble() : 0.2;
         // Rebuild from allowlisted fields. No client-supplied tools, images, templates, URLs or model-loading options.
         var wire = new HashMap<String,Object>(Map.of("model", MODEL, "messages", body.path("messages"), "think", false, "stream", false,
-                "keep_alive", "10m", "options", Map.of("num_ctx", context, "num_predict", output, "temperature", temperature, "top_p", 0.8)));
+                "keep_alive", "10m", "options", Map.of("num_ctx", context, "num_predict", output, "temperature", temperature, "top_p", 0.8,"num_batch",settings.prefillBatchSize())));
         if (body.has("format")) wire.put("format", body.get("format"));
         return gate.run((String)request.getAttribute(ApiKeyFilter.IDENTITY), () -> {
             try {
@@ -74,8 +78,7 @@ public class ChatController {
         if (body == null || !body.isObject() || !MODEL.equals(body.path("model").asString())
                 || (body.has("stream") && (!body.path("stream").isBoolean() || body.path("stream").asBoolean()))
                 || (body.has("think") && (!body.path("think").isBoolean() || body.path("think").asBoolean()))) throw error(HttpStatus.BAD_REQUEST, "UNSUPPORTED_REQUEST");
-        if (body.has("format") && !body.path("format").equals(mapper.valueToTree(ObservationOutputSchema.VALUE))
-                && !body.path("format").equals(mapper.valueToTree(ObservationOutputSchema.LEGACY_VALUE)))
+        if (body.has("format") && !oneuldo.ai.client.SourceOutputSchemas.allowed(body.path("format")))
             throw error(HttpStatus.BAD_REQUEST, "UNSUPPORTED_OUTPUT_SCHEMA");
         var messages = body.path("messages");
         if (!messages.isArray() || messages.isEmpty() || messages.size() > 32) throw error(HttpStatus.BAD_REQUEST, "INVALID_MESSAGES");

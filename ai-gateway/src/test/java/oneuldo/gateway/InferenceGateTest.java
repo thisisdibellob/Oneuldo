@@ -48,4 +48,20 @@ class InferenceGateTest {
         assertThatThrownBy(() -> new GatewaySettings(URI.create("http://127.0.0.1:11434"), Duration.ofSeconds(5), Duration.ZERO, 1, Map.of()))
                 .isInstanceOf(IllegalArgumentException.class);
     }
+    @Test void rejectsUnboundedBatchSizesWithoutChangingDefaultConcurrency() {
+        assertThat(settings(1,Duration.ofSeconds(5)).prefillBatchSize()).isEqualTo(512);
+        assertThatThrownBy(()->new GatewaySettings(URI.create("http://127.0.0.1:11434"),Duration.ofMinutes(15),Duration.ZERO,1,
+                Map.of("team","a".repeat(64)),1,1,null,999999)).isInstanceOf(IllegalArgumentException.class);
+    }
+    @Test void explicit_two_slots_allow_two_calls_for_one_key_but_bound_a_third() throws Exception {
+        var settings=new GatewaySettings(URI.create("http://127.0.0.1:11434"),Duration.ofMinutes(15),Duration.ofSeconds(3),2,Map.of("team","a".repeat(64)),2,2);
+        var gate=new InferenceGate(settings);var both=new CountDownLatch(2);var release=new CountDownLatch(1);
+        try(var pool=Executors.newFixedThreadPool(2)) {
+            java.util.function.Supplier<String> work=()->{both.countDown();try{release.await(3,TimeUnit.SECONDS);}catch(InterruptedException e){throw new RuntimeException(e);}return "done";};
+            var a=pool.submit(()->gate.run("team",work));var b=pool.submit(()->gate.run("team",work));
+            try {assertThat(both.await(3,TimeUnit.SECONDS)).isTrue();assertThatThrownBy(()->gate.run("team",()->"bad")).hasMessageContaining("KEY_BUSY");}
+            finally{release.countDown();}
+            assertThat(a.get()).isEqualTo("done");assertThat(b.get()).isEqualTo("done");assertThat(gate.run("team",()->"recovered")).isEqualTo("recovered");
+        }
+    }
 }

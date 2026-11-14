@@ -46,6 +46,7 @@ class GatewayHttpTest {
     @DynamicPropertySource static void settings(DynamicPropertyRegistry registry) {
         registry.add("gateway.upstream", () -> "http://127.0.0.1:" + upstream.getAddress().getPort());
         registry.add("gateway.api-key-hashes.team1", () -> HexFormat.of().formatHex(ApiKeyFilter.hash(KEY)));
+        registry.add("gateway.prefill-batch-size", () -> 1024);
     }
     @Autowired MockMvc mvc;
     static final String BODY = """
@@ -73,6 +74,25 @@ class GatewayHttpTest {
         mvc.perform(post("/api/chat").header("Authorization","Bearer "+KEY).contentType(MediaType.APPLICATION_JSON)
                 .content(BODY.replace("8192","18432").replace("한국어 테스트","token ".repeat(18500)))).andExpect(status().isBadRequest());
         assertThat(count.get()).isZero();
+    }
+    @Test void prefillBatchIsHostControlledAndCompactSchemasAreExplicit() throws Exception {
+        mvc.perform(get("/api/limits").header("Authorization","Bearer "+KEY))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.compactSourceSchemas").value(true))
+                .andExpect(jsonPath("$.prefillBatchSize").value(1024)).andExpect(jsonPath("$.contextLengths[3]").value(32768));
+        mvc.perform(post("/api/chat").header("Authorization","Bearer "+KEY).contentType(MediaType.APPLICATION_JSON)
+                .content(BODY.replace("\"num_gpu\":0","\"num_gpu\":0,\"num_batch\":999999"))).andExpect(status().isOk());
+        assertThat(received.at("/options/num_batch").asInt()).isEqualTo(1024);
+        var mapper=JsonMapper.builder().build();var body=(tools.jackson.databind.node.ObjectNode)mapper.readTree(BODY);
+        for(var schema:java.util.List.of(
+                oneuldo.ai.client.SourceOutputSchemas.compactAnalysisReview(java.util.List.of("E1"),java.util.List.of("S1"),mapper.createArrayNode(),java.util.List.of(1)),
+                oneuldo.ai.client.SourceOutputSchemas.userProfile(java.util.List.of("R1"),java.util.List.of("K13-C1")),
+                oneuldo.ai.client.SourceOutputSchemas.groundedTextPatch(java.util.List.of("/summary","/uncertainties/0","/findings/0/alternativeExplanations/0")))) {
+            body.set("format",schema);
+            mvc.perform(post("/api/chat").header("Authorization","Bearer "+KEY).contentType(MediaType.APPLICATION_JSON).content(body.toString())).andExpect(status().isOk());
+            assertThat(received.path("format")).isEqualTo(schema);
+            schema.put("additionalProperties",true);
+            mvc.perform(post("/api/chat").header("Authorization","Bearer "+KEY).contentType(MediaType.APPLICATION_JSON).content(body.toString())).andExpect(status().isBadRequest());
+        }
     }
     @Test void largerOutputStillRequiresAuthenticationAndFitsTheSameContextBudget() throws Exception {
         mvc.perform(get("/api/limits")).andExpect(status().isUnauthorized());
@@ -103,7 +123,7 @@ class GatewayHttpTest {
                 .contentType(MediaType.APPLICATION_JSON).content(request.replace("한국어 테스트","token ".repeat(21500))))
                 .andExpect(status().isBadRequest());
         mvc.perform(post("/api/chat").header("Authorization","Bearer "+KEY)
-                .contentType(MediaType.APPLICATION_JSON).content(request.replace("24576","32768")))
+                .contentType(MediaType.APPLICATION_JSON).content(request.replace("24576","65536")))
                 .andExpect(status().isBadRequest());
         assertThat(count.get()).isZero();
     }
@@ -111,7 +131,9 @@ class GatewayHttpTest {
         var mapper=JsonMapper.builder().build();
         var body=(tools.jackson.databind.node.ObjectNode)mapper.readTree(BODY);
         for (var schema : java.util.List.of(oneuldo.ai.client.ObservationOutputSchema.LEGACY_VALUE,
-                oneuldo.ai.client.ObservationOutputSchema.VALUE)) {
+                oneuldo.ai.client.ObservationOutputSchema.VALUE,
+                oneuldo.ai.client.SourceOutputSchemas.questReview(java.util.List.of("E1","E2336")),
+                oneuldo.ai.client.SourceOutputSchemas.analysisReview(java.util.List.of("E1"),java.util.List.of("S1"),mapper.createArrayNode(),java.util.List.of()))) {
             body.set("format",mapper.valueToTree(schema));
             mvc.perform(post("/api/chat").header("Authorization", "Bearer " + KEY)
                     .contentType(MediaType.APPLICATION_JSON).content(body.toString())).andExpect(status().isOk());
@@ -154,5 +176,13 @@ class GatewayHttpTest {
         status.set(200);
         mvc.perform(post("/api/chat").header("Authorization", "Bearer " + KEY).contentType(MediaType.APPLICATION_JSON).content(BODY))
                 .andExpect(status().isOk());
+    }
+    @Test void allows_only_the_source_constrained_schema_templates() throws Exception {
+        var mapper=JsonMapper.builder().build();var body=(tools.jackson.databind.node.ObjectNode)mapper.readTree(BODY);
+        for(var schema:java.util.List.of(oneuldo.ai.client.SourceOutputSchemas.digest(java.util.Set.of("E1","E2")),oneuldo.ai.client.SourceOutputSchemas.adaptive(java.util.Set.of("E1","E55")))) {
+            body.set("format",schema);mvc.perform(post("/api/chat").header("Authorization","Bearer "+KEY).contentType(MediaType.APPLICATION_JSON).content(body.toString())).andExpect(status().isOk());
+        }
+        count.set(0);((tools.jackson.databind.node.ObjectNode)body.path("format")).put("$ref","https://untrusted.invalid/schema");
+        mvc.perform(post("/api/chat").header("Authorization","Bearer "+KEY).contentType(MediaType.APPLICATION_JSON).content(body.toString())).andExpect(status().isBadRequest());assertThat(count.get()).isZero();
     }
 }
