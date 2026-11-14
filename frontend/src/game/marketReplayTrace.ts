@@ -28,7 +28,7 @@ export type MarketReplayControlledStop =
   | { reason: 'action-limit'; afterDecisions: 100; actionLimit: 100 };
 /** Complete checkout with the actor's unchanged basket after the bounded observation. */
 export type MarketReplaySystemCompletion = {
-  reason: 'action-limit'; afterDecisions: 100; actionLimit: 100; firstStepId: string;
+  reason: 'action-limit'; afterDecisions: 100 | 200; actionLimit: 100 | 200; firstStepId: string;
   checkoutId: MarketCheckoutId; cartAtStart: Record<string, number>;
 };
 export type MarketReplayExecutionContext = {
@@ -51,7 +51,8 @@ export type MarketReplayStep = StepBase & (
       durationMs: number; hesitationMs: number; outcome: 'drop' | 'cancel' | 'miss'; motorSeed: string;
     } }
   | { type: 'removeProduct'; productId: string; quantity: number }
-  | { type: 'talkToStaff'; stationId: MarketEnvironmentStationId; choice: 'open' }
+  | { type: 'talkToStaff'; stationId: MarketEnvironmentStationId; choice: 'open' | 'openLocationHelp' | 'backToStaff' }
+  | { type: 'talkToStaff'; stationId: MarketEnvironmentStationId; choice: 'askLocation'; objectiveId: string }
   | { type: 'talkToStaff'; stationId: MarketEnvironmentStationId; choice: 'requestCashier'; checkoutId: MarketCheckoutId }
   | { type: 'talkToStaff'; stationId: MarketEnvironmentStationId; choice: 'returnProduct'; productId: string; quantity: number }
   | { type: 'checkout'; checkoutId: MarketCheckoutId }
@@ -63,7 +64,7 @@ export type MarketReplayTrace = {
   attentionExperience?: { layoutKey: string; memory: Record<string, unknown>; source: 'planned-trace' };
   /** Fresh LLM requests are not seed deterministic. A captured trace is replayable. */
   generation?: { model: string; reproducibility: 'seed-and-snapshot' | 'captured-trace'; requestId?: string;
-    timingProfile?: 'compact-v1' | 'actor-preserved-v1' | 'activity-duration-v1' | 'activity-duration-v2'; sourceTraceId?: string; actorPolicyVersion?: 'episodic-choice-v1' | 'episodic-choice-v2' | 'episodic-choice-v3' | 'episodic-choice-v4' | 'episodic-choice-v5' | 'episodic-choice-v6' | 'episodic-choice-v7' | 'episodic-choice-v8' | 'episodic-choice-v9' | 'episodic-choice-v10' | 'feedback-choice-v1' | 'feedback-choice-v2' | 'feedback-choice-v3' | 'feedback-choice-v4' | 'feedback-choice-v5' | 'feedback-choice-v6' | 'feedback-choice-v7' | 'whole-trace-v1' | 'whole-trace-v2' | 'whole-trace-v3';
+    timingProfile?: 'compact-v1' | 'actor-preserved-v1' | 'activity-duration-v1' | 'activity-duration-v2'; sourceTraceId?: string; actorPolicyVersion?: 'episodic-choice-v1' | 'episodic-choice-v2' | 'episodic-choice-v3' | 'episodic-choice-v4' | 'episodic-choice-v5' | 'episodic-choice-v6' | 'episodic-choice-v7' | 'episodic-choice-v8' | 'episodic-choice-v9' | 'episodic-choice-v10' | 'episodic-choice-v11' | 'feedback-choice-v1' | 'feedback-choice-v2' | 'feedback-choice-v3' | 'feedback-choice-v4' | 'feedback-choice-v5' | 'feedback-choice-v6' | 'feedback-choice-v7' | 'whole-trace-v1' | 'whole-trace-v2' | 'whole-trace-v3';
     movementContract?: 'joystick-direction-v1';
     movementPolicy?: MarketReplayMovementPolicy;
     reasoningEffort?: 'low';
@@ -324,9 +325,11 @@ export function validateMarketReplayTrace(value: unknown, snapshot?: MarketRepla
     const completion = trace.generation.systemCompletion;
     if (trace.generation.controlledStop) errors.push('System completion and controlled stop are mutually exclusive.');
     if (trace.generationPolicy !== 'llm' || trace.traceSchemaVersion !== '2' || !['5','6'].includes(trace.policyVersion)
-      || !['episodic-choice-v9','episodic-choice-v10','whole-trace-v1','whole-trace-v2','whole-trace-v3'].includes(trace.generation.actorPolicyVersion ?? '')) errors.push('System completion requires an episodic-choice-v9, v10 or whole-trace-v1/v2/v3 LLM trace with schema 2 and policy 5 or 6.');
+      || !['episodic-choice-v9','episodic-choice-v10','episodic-choice-v11','whole-trace-v1','whole-trace-v2','whole-trace-v3'].includes(trace.generation.actorPolicyVersion ?? '')) errors.push('System completion requires an episodic-choice-v9, v10, v11 or whole-trace-v1/v2/v3 LLM trace with schema 2 and policy 5 or 6.');
+    const limit = trace.generation.actorPolicyVersion === 'episodic-choice-v11' ? 200 : 100;
+    if(completion.actionLimit !== limit || completion.afterDecisions !== limit) errors.push(`System completion requires the explicit ${limit}-decision bound for this actor policy.`);
     const first = trace.steps.findIndex(step => step.id === completion.firstStepId);
-    if (first < 101 || first > submit) errors.push('System completion must begin after at least 100 actor steps and no later than submission.');
+    if (first < limit + 1 || first > submit) errors.push(`System completion must begin after at least ${limit} actor steps and no later than submission.`);
     if (quit >= 0 || submit < 0) errors.push('System completion must submit for review, await acceptance and leave; it cannot give up.');
     if (Object.entries(completion.cartAtStart).some(([id, quantity]) => !id.trim() || id.length > 100
       || !Number.isSafeInteger(quantity) || quantity <= 0)) errors.push('System completion cart must contain positive integer product quantities.');

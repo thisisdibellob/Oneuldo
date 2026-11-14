@@ -23,7 +23,7 @@ export interface ReplayShelfPort {
 }
 export interface ReplayUiState {
   briefing: boolean; briefingStep: number; phase: string; shelf: string | null;
-  cartOpen: boolean; helpOpen: boolean; staffOpen: boolean; staffReturnHelp: boolean; panelTransition: boolean;
+  cartOpen: boolean; helpOpen: boolean; staffOpen: boolean; staffReturnHelp: boolean; staffLocationHelp?: boolean; panelTransition: boolean;
   reviewing: boolean; reviewAccepted: boolean; reviewError: string | null;
   cart: Record<string, number>;
 }
@@ -41,6 +41,8 @@ export interface ReplayUiPort {
   viewHelp(): void;
   closeView(): void;
   closeStation(): void;
+  openLocationHelp?(): void;
+  askLocation?(objectiveId: string): void;
   requestCashier(checkoutId: 'checkout' | 'checkout-2'): void;
   requestReturn(productId: string, quantity: number): void;
   openReturnHelp(): void;

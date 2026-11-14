@@ -1,6 +1,6 @@
 import { isMarketReplaySystemCompletionStep, validateMarketReplayTrace, type MarketReplayStep, type MarketReplayTrace } from '../game/marketReplayTrace';
 import { assertReplayActive, replayAwait, replayDelay, replayStep, replayUntil, type ReplayMotionPort, type ReplayUiPort } from './ports';
-import { createMotionReport, dragProduct, moveDirection, walkToAnchor, walkToStation, walkToVisibleStation } from './motor';
+import { createMotionReport, dragProduct, moveDirection, walkToAnchor, walkToStation, walkToVisibleStation, walkToVisibleTarget } from './motor';
 import { replayPresentationKey, validateReplayPresentation } from '../game/marketReplayPerception';
 
 export type ReplayProgress = {
@@ -52,7 +52,9 @@ export async function playMarketTrace(trace: MarketReplayTrace, getUi: () => Rep
         await replayUntil(() => !motion.read().locked, signal); return;
       }
       case 'walkTo':
-        if (strict && !isMarketReplaySystemCompletionStep(trace, step.id)) await walkToVisibleStation(motion, step.target.stationId, presentation!, step.movement, signal, report, step.timeoutMs);
+        if (strict && !isMarketReplaySystemCompletionStep(trace, step.id) && trace.generation?.actorPolicyVersion === 'episodic-choice-v11')
+          await walkToVisibleTarget(motion, step.target.stationId, presentation!, step.movement, signal, report, step.timeoutMs);
+        else if (strict && !isMarketReplaySystemCompletionStep(trace, step.id)) await walkToVisibleStation(motion, step.target.stationId, presentation!, step.movement, signal, report, step.timeoutMs);
         else await walkToStation(motion, step.target.stationId, step.movement, signal, report, step.timeoutMs);
         return;
       case 'walkToAnchor': await walkToAnchor(motion, step.target.anchorId, presentation!, step.movement, signal, report, step.timeoutMs); return;
@@ -108,6 +110,17 @@ export async function playMarketTrace(trace: MarketReplayTrace, getUi: () => Rep
       case 'talkToStaff':
         if (!ui().read().staffOpen) await interact(step.stationId, signal);
         await replayUntil(() => ui().read().staffOpen, signal);
+        if (step.choice === 'openLocationHelp') {
+          if (!ui().openLocationHelp) throw new Error('Location menu is unavailable');
+          ui().openLocationHelp!();
+          await replayUntil(() => !!ui().read().staffLocationHelp, signal);
+        }
+        if (step.choice === 'backToStaff') { ui().backToStaff(); await replayDelay(250, signal); }
+        if (step.choice === 'askLocation') {
+          if (!ui().read().staffLocationHelp || !ui().askLocation) throw new Error('Open the location menu first');
+          ui().askLocation!(step.objectiveId);
+          await replayDelay(250, signal);
+        }
         if (step.choice === 'requestCashier') {
           if (!step.checkoutId) throw new Error('A cashier request must select a visible checkout choice');
           if (ui().read().staffReturnHelp) { ui().backToStaff(); await replayDelay(250, signal); }
@@ -151,7 +164,15 @@ export async function playMarketTrace(trace: MarketReplayTrace, getUi: () => Rep
         ui().skipRating(); await replayDelay(80, signal); return;
       case 'leave':
         if (!ui().read().reviewAccepted && ui().read().phase !== 'finished') throw new Error('The exit button is not available');
-        await replayAwait(() => ui().leave(), signal); report.acknowledged = true; return;
+        // Lifecycle only: queued behavior events may still be uploading after the actor's own end.
+        // Retry the same exit (which re-flushes the queue) instead of failing an already-ended episode.
+        for (let attempt = 0; ; attempt++) {
+          try { await replayAwait(() => ui().leave(), signal); break; } catch (error) {
+            if (attempt >= 5 || !String((error as Error)?.message).includes('전송 대기')) throw error;
+            await replayDelay(3000, signal);
+          }
+        }
+        report.acknowledged = true; return;
       default: throw new Error(`Unsupported replay step: ${(step as { type: string }).type}`);
     }
   }

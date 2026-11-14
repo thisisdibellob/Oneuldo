@@ -16,6 +16,7 @@ import {
   marketCategories, marketProducts,
 } from '../../game/scenarios';
 import { fonts } from '../../theme';
+import { MARKET_GOAL_REMINDER_TITLE } from '../../game/marketGoalReminder';
 import type { ReplayShelfPort, ReplayBounds } from '../../replay/ports';
 
 type Point = { x: number; y: number };
@@ -24,6 +25,8 @@ export type MarketShelfSceneProps = {
   slots?: string[];
   stock?: Record<string, number>;
   onGiveUp?: () => void;
+  /** goal-reminder-v1 lines shown in the open basket; null before the listed items are in the cart. */
+  goalReminder?: string[] | null;
   onCartVisibilityChange?: (open: boolean) => void;
   cart: MarketCart;
   category: MarketCategory;
@@ -48,7 +51,7 @@ function ProductArt({ product, size }: { product: MarketProduct; size: number })
 
 /** A camera-like close-up over the existing map. Closing never changes world position. */
 export function MarketShelfScene({ slots, stock, onCartVisibilityChange, cart, category, onChangeQuantity,
-  onClose, onDropProduct, replayPortRef }: MarketShelfSceneProps) {
+  onClose, onDropProduct, replayPortRef, goalReminder }: MarketShelfSceneProps) {
   const viewport = useWindowDimensions();
   const insets = useContext(SafeAreaInsetsContext);
   const [size, setSize] = useState({ width: viewport.width, height: viewport.height });
@@ -354,6 +357,10 @@ export function MarketShelfScene({ slots, stock, onCartVisibilityChange, cart, c
               </View>
               <ScrollView testID="market-shelf-cart-body" style={s.cartBody} bounces={false} nestedScrollEnabled>
                 <Text style={s.basketHelp}>물건은 해당 진열대에서 한 개씩 내려놓아요. 종업원에게 도움을 요청해도 돼요.</Text>
+                {goalReminder ? <View testID="market-shelf-goal-reminder">
+                  <Text style={s.basketHelp}>{MARKET_GOAL_REMINDER_TITLE}</Text>
+                  {goalReminder.map((line, index) => <Text key={'goal-reminder-' + index} style={s.basketHelp}>{line}</Text>)}
+                </View> : null}
                 <ScrollView horizontal testID="market-shelf-cart-items" style={s.basketItems}
                   contentContainerStyle={s.basketItemList} showsHorizontalScrollIndicator nestedScrollEnabled
                   directionalLockEnabled bounces={false}>

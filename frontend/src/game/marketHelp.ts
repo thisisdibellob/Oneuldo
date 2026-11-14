@@ -1,6 +1,9 @@
+import type { MarketEnvironment } from './marketEnvironment';
+import { marketCategories } from './scenarios';
 /** Shared presentation text. Recording these lines does not imply comprehension or mastery. */
 export function getMarketHelpLines(alarmPenaltyPoints: number): string[] {
   return [
+    '상품 위치는 직원에게 물어볼 수 있어요.',
     '1. 사야 할 물품과 개수를 읽어요.',
     '2. 진열대 가까이 가서 물건을 살펴봐요.',
     '3. 장바구니를 눌러 담은 물건을 확인해요.',
@@ -16,4 +19,16 @@ export function marketCashierResponse(checkoutId: 'checkout' | 'checkout-2'): st
 
 export function marketReturnResponse(productName: string, quantity: number): string {
   return `${productName} ${quantity}개를 제자리에 놓아드렸어요.`;
+}
+
+/** Same shelf geometry and wording for the visible dialogue, event and replay observation. */
+export function marketLocationResponse(environment: MarketEnvironment, categoryId: string): string {
+  const category = marketCategories.find(item => item.id === categoryId);
+  if (!category) throw new Error('Unknown shelf category');
+  const shelves = Object.values(environment.shelves), target = environment.shelves[category.id];
+  const row = shelves.filter(item => Math.abs(item.point.y - target.point.y) < 70).sort((a, b) => a.point.x - b.point.x);
+  const index = row.indexOf(target);
+  const side = row.length === 1 ? '가운데' : index === 0 ? '왼편' : index === row.length - 1 ? '오른편' : '가운데';
+  const depth = target.point.y <= Math.min(...shelves.map(item => item.point.y)) + 70 ? '안쪽' : '중앙';
+  return `${category.label} 진열대에 있어요. 매장 ${depth} ${side}에서 찾아보세요.`;
 }

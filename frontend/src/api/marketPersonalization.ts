@@ -85,7 +85,7 @@ export class FirstPlayRequiredError extends Error {
 }
 
 export type MarketQuestProgress={jobId:string;status:string;stage:string;elapsedMs:number;deadlineSeconds:number;errorCode?:string;result?:MarketAiQuestResponse};
-const jobMessages:Record<string,string>={READING_EVIDENCE:'행동·이동 기록을 확인하고 있어요',ANALYZING_MOVEMENT:'행동 순서와 실제 이동 경로를 분석하고 있어요',SYNTHESIZING_OBSERVATIONS:'전체 경로의 관찰 결과와 근거를 종합하고 있어요',GENERATING:'연습 목표와 매장 조건을 구성하고 있어요',REVIEWING:'근거와 완료 조건을 검토하고 있어요',REPAIRING:'검토에서 발견한 부분을 수정하고 있어요',QUEUED:'생성을 기다리고 있어요'};
+const jobMessages:Record<string,string>={DESIGNING_CONDITIONS:'실제 연습 환경의 변경점을 고르고 있어요',READING_EVIDENCE:'행동·이동 기록을 확인하고 있어요',ANALYZING_MOVEMENT:'행동 순서와 실제 이동 경로를 분석하고 있어요',SYNTHESIZING_OBSERVATIONS:'전체 경로의 관찰 결과와 근거를 종합하고 있어요',GENERATING:'연습 목표와 매장 조건을 구성하고 있어요',REVIEWING:'근거와 완료 조건을 검토하고 있어요',REPAIRING:'검토에서 발견한 부분을 수정하고 있어요',QUEUED:'생성을 기다리고 있어요'};
 export function marketQuestProgressText(p:MarketQuestProgress){return `${jobMessages[p.stage]??'연습을 준비하고 있어요'} · ${Math.floor(p.elapsedMs/1000)}초 / 최대 ${p.deadlineSeconds}초`;}
 async function requestMarketAiQuest(accessToken: string, environmentContext?: MarketEnvironmentContext, onProgress?:(p:MarketQuestProgress)=>void) {
   if (!API_BASE_URL) throw new Error('EXPO_PUBLIC_API_URL이 설정되지 않았습니다.');

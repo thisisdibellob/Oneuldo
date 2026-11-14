@@ -1,3 +1,4 @@
+import { marketLocationResponse } from './marketHelp';
 import { MARKET_ENVIRONMENT_PLAYER_RADIUS, getMarketWrongWayGate, getMarketWrongWayRearm, createMarketEnvironment, isMarketEnvironmentBlocked, isNearMarketStation, MarketEnvironment, MarketEnvironmentConfig, MarketEnvironmentStationId, MarketCashierAvailability, MarketCheckoutId, MarketKioskId } from './marketEnvironment';
 import { MarketCategoryId, marketCategories, marketProducts, MarketProduct, getMarketProduct } from './scenarios';
 import { Point } from './prototypeWorld';
@@ -542,7 +543,7 @@ export function applyMarketAction(current: MarketSession, action: MarketAction):
       const categoryId = objective ? productOrThrow(objective.productId).categoryId : choice!.categoryId;
       const category = marketCategories.find(item => item.id === categoryId)!;
       record(session, 'product_location_requested', { staffStation: station, objectiveId: action.objectiveId,
-        categoryId, message: (objective?.label ?? choice!.label) + '는 ' + category.label + ' 진열대에서 살펴볼 수 있어요.' }, action.at);
+        categoryId, message: marketLocationResponse(session.environment, categoryId) }, action.at);
       return session;
     }
     const task = session.learning.stockout;

@@ -2,7 +2,7 @@ import { getMarketNavigationPath, isMarketNavigationSegmentClear } from '../game
 import { getMarketStationApproachPoint, isNearMarketStation, type MarketEnvironmentStationId } from '../game/marketEnvironment';
 import type { Point } from '../game/prototypeWorld';
 import { replayDelay, replayUntil, type ReplayMotionPort, type ReplayShelfPort } from './ports';
-import { replayPresentationKey, resolveReplayAnchor, visibleStations, type ReplayDirection, type ReplayPresentation } from '../game/marketReplayPerception';
+import { replayPresentationKey, resolveReplayAnchor, visibleStations, canApproachVisibleStation, REPLAY_VISIBLE_APPROACH_MAX_DISTANCE, type ReplayDirection, type ReplayPresentation } from '../game/marketReplayPerception';
 import { createDirectionalInputPlayback, MARKET_DIRECTIONAL_MOVE_SPEED, type DirectionalMovement } from '../game/marketDirectionalInput';
 
 const MOVE_SPEED = 190;
@@ -184,10 +184,10 @@ export async function walkToStation(port: ReplayMotionPort, station: MarketEnvir
 /** V2 local intention: one visible straight segment, never a global route or a replan. */
 async function walkLocal(port: ReplayMotionPort, target: Point, presentation: ReplayPresentation,
   movement: { speedMultiplier: number; accelerationMs: number }, signal: AbortSignal, report: MotionReport,
-  timeoutMs: number): Promise<void> {
+  timeoutMs: number, maxDistance = 180): Promise<void> {
   await replayUntil(() => !port.read().locked, signal);
   const start = port.read();
-  if (Math.hypot(target.x - start.position.x, target.y - start.position.y) > 180
+  if (Math.hypot(target.x - start.position.x, target.y - start.position.y) > maxDistance
     || !isMarketNavigationSegmentClear(start.environment, start.position, target, start.cashiers)) throw new Error('Local replay segment is not visible and clear');
   const profile = replayPresentationKey(presentation), speed = Math.max(.15, Math.min(1, movement.speedMultiplier));
   const inputRate = 1000 / Math.max(100, Math.min(300, movement.accelerationMs));
@@ -256,6 +256,34 @@ export async function walkToVisibleStation(port: ReplayMotionPort, station: Mark
   const target = getMarketStationApproachPoint(state.environment, station, state.position, state.cashiers);
   if (!target) throw new Error('Station has no local approach');
   return walkLocal(port, target, presentation, movement, signal, report, timeoutMs);
+}
+
+/** v11 visible-travel-v1: a nearby clear target walks the local segment; a farther visible target walks the floor path. */
+export async function walkToVisibleTarget(port: ReplayMotionPort, station: MarketEnvironmentStationId, presentation: ReplayPresentation,
+  movement: { speedMultiplier: number; accelerationMs: number; motorSeed: string | number; style?: string }, signal: AbortSignal, report: MotionReport, timeoutMs = 120000): Promise<void> {
+  await replayUntil(() => !port.read().locked, signal);
+  const state = port.read();
+  if (canApproachVisibleStation(state.environment, state.position, station, presentation, state.cashiers))
+    return walkToObservedStation(port, station, presentation, movement, signal, report, timeoutMs);
+  if (!visibleStations(state.environment, state.position, presentation, state.cashiers).some(s => s.id === station))
+    throw new Error('Station is not currently visible');
+  // Same floor waypoints the planner steps through (traceValidation visible-travel-v1), each a clear local segment.
+  const target = getMarketStationApproachPoint(state.environment, station, state.position, state.cashiers);
+  const path = target && getMarketNavigationPath(state.environment, state.position, target, state.cashiers);
+  if (!path) throw new Error(`No floor path to the visible ${station}`);
+  for (const point of path) await walkLocal(port, point, presentation, movement, signal, report, timeoutMs, Number.MAX_SAFE_INTEGER);
+}
+
+/** v11 only. The actor selected a currently visible target; ordinary joystick integration walks the clear segment. */
+export async function walkToObservedStation(port: ReplayMotionPort, station: MarketEnvironmentStationId, presentation: ReplayPresentation,
+  movement: { speedMultiplier: number; accelerationMs: number }, signal: AbortSignal, report: MotionReport, timeoutMs = 120000): Promise<void> {
+  await replayUntil(() => !port.read().locked, signal);
+  const state = port.read();
+  if (!canApproachVisibleStation(state.environment, state.position, station, presentation, state.cashiers, 0))
+    throw new Error('Station is not a currently visible target with a clear local approach');
+  const target = getMarketStationApproachPoint(state.environment, station, state.position, state.cashiers);
+  if (!target) throw new Error('Visible station has no approach');
+  return walkLocal(port, target, presentation, movement, signal, report, timeoutMs, REPLAY_VISIBLE_APPROACH_MAX_DISTANCE);
 }
 
 export async function dragProduct(port: ReplayShelfPort, productId: string,
