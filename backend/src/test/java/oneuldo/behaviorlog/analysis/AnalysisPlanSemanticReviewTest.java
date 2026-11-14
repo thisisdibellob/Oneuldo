@@ -44,8 +44,15 @@ class AnalysisPlanSemanticReviewTest {
                 .put("value","매대 위치를 기존 문자 안내로 확인하는 연습을 제안합니다.");
         when(client.complete(eq(ReviewSemanticTextPatch.SYSTEM),anyString(),eq(ReviewSemanticTextPatch.OUTPUT_TOKENS),eq(0.0)))
                 .thenReturn(new GroqChatClient.GroqChatResult(patch.toString(),"mock"));
-        when(client.complete(anyString(), anyString(), eq(AnalysisPlanSemanticReview.OUTPUT_TOKENS), eq(0.0)))
-                .thenReturn(new GroqChatClient.GroqChatResult(rejection(), "mock"), new GroqChatClient.GroqChatResult(valid, "mock"));
+        var proposed=ReviewSemanticTextPatch.apply(fixture.mapper,bad.toString(),rejection(),patch.toString());
+        var descriptor=SourceBoundReviewChecks.describe(fixture.mapper,proposed,prompt);
+        var approved=(ObjectNode)fixture.mapper.readTree(valid);var bound=approved.putObject("sourceBoundChecks");bound.putArray("stations");var units=bound.putArray("capabilities");
+        for(var unit:descriptor.path("capabilityUnits")) {
+            var row=units.addObject().put("path",unit.path("path").asString()).put("quote",unit.path("quote").asString());var proofs=row.putArray("proofs");
+            for(var field:unit.path("fieldPaths"))proofs.addObject().put("fieldPath",field.asString()).set("sourceValue",descriptor.path("implementedCapabilities").path("fields").path(field.asString()));
+        }
+        when(client.complete(eq(AnalysisPlanSemanticReview.system()), anyString(), anyInt(), eq(0.0)))
+                .thenReturn(new GroqChatClient.GroqChatResult(rejection(), "mock"), new GroqChatClient.GroqChatResult(approved.toString(), "mock"));
         var validator = new AiBehaviorAnalysisValidator(new MarketAiDifficultyValidator()); var audit = new ArrayList<AiBehaviorAnalysisRun.Attempt>();
         var pipeline = new TimelineAnalysisPipeline(new AiBehaviorAnalysisPromptFactory(fixture.mapper), validator, client, fixture.mapper)
                 .withQualityReview(true).withPlanSemanticReview(true);

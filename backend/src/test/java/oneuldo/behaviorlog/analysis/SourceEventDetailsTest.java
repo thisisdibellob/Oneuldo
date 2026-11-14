@@ -79,7 +79,7 @@ class SourceEventDetailsTest {
         assertThat(expanded.path("chunkScopes").get(0).path("partial").asBoolean()).isTrue();
         var endings=wire.path(SourceEventDetails.FIELD).findValues("sessionEnd");
         assertThat(endings).hasSize(1);assertThat(endings.getFirst().path("reason").asString()).isEqualTo("USER_ABORTED");
-        assertThat(expanded.path("eventDefinitions").toString()).contains("market-micro-behavior-v2-content");
+        assertThat(expanded.path(SourceEventDetails.FIELD).toString()).contains("market-micro-behavior-v2-content");
         assertThat(mapper.writeValueAsString(input)).isEqualTo(original);
     }
 

@@ -57,31 +57,95 @@ class ReviewClaimTextPatchTest {
                 .hasMessage("INVALID_REVIEW_CLAIM_TEXT_PATCH");
     }
 
-    @Test void pipeline_retries_only_the_small_malformed_patch_and_preserves_the_original_candidate() {
+    @Test void mixed_citation_annotation_preserves_the_recorded_literal_field() {
+        var candidate = candidate();
+        ((ObjectNode)candidate.at("/analysis/summary/0")).put("text", "선반을 열지 않았습니다(E16, E395 등 shelfOpened=false).");
+        assertThat(ReviewClaimTextPatch.canRepair(fixture.mapper, candidate.toString(), failure)).isTrue();
+        var valid = patch(Map.of("/analysis/summary/0/text", "선반을 열지 않았습니다(shelfOpened=false)."));
+        var result = fixture.mapper.readTree(ReviewClaimTextPatch.apply(fixture.mapper, candidate.toString(), valid));
+        assertThat(result.at("/analysis/summary/0/evidenceEventIds")).isEqualTo(candidate.at("/analysis/summary/0/evidenceEventIds"));
+        assertThatThrownBy(() -> ReviewClaimTextPatch.apply(fixture.mapper, candidate.toString(),
+                valid.replace("shelfOpened=false", "shelfOpened=true"))).hasMessage("INVALID_REVIEW_CLAIM_TEXT_PATCH");
+    }
+
+    @Test void pipeline_formats_annotations_without_another_model_call_and_preserves_the_original_response() {
         var bad = candidate();
         var client = client(bad);
-        String valid = patch(Map.of("/analysis/summary/0/text", "제공된 미션과 종료 기록입니다."));
-        String malformed = valid + " {}";
-        when(client.complete(eq(ReviewClaimTextPatch.SYSTEM), anyString(), eq(ReviewClaimTextPatch.outputTokens(fixture.mapper, bad.toString())), eq(0.0)))
-                .thenReturn(new GroqChatClient.GroqChatResult(malformed, "mock"), new GroqChatClient.GroqChatResult(valid, "mock"));
         var audit = new ArrayList<AiBehaviorAnalysisRun.Attempt>();
         var result = call(client, audit, false);
         assertThat(result.sessionAssessments().getFirst().judgment()).isEqualTo("FAILURE");
-        assertThat(audit).hasSize(3);
+        assertThat(audit).hasSize(1);
         assertThat(audit.getFirst().rawOutput()).isEqualTo(bad.toString());
-        assertThat(audit.get(1).source()).isEqualTo("REVIEW_CLAIM_TEXT_PATCH");
-        assertThat(audit.get(1).rawOutput()).isEqualTo(malformed);
-        assertThat(audit.get(1).errorCode()).isEqualTo("INVALID_REVIEW_CLAIM_TEXT_PATCH");
-        assertThat(audit.get(2).errorCode()).isNull();
-        for (var attempt : audit.subList(1,3)) assertThat(attempt.inputPrompt()).startsWith(source()).contains(bad.toString());
+        assertThat(audit.getFirst().source()).isEqualTo("LIVE");
+        assertThat(audit.getFirst().validationFailure().code()).isEqualTo("INLINE_REVIEW_REFERENCE_NOT_ALLOWED");
         verify(client,times(1)).complete(eq(AnalysisReviewPrompt.system()), anyString(), eq(2400), anyDouble());
+        verify(client,never()).complete(eq(ReviewClaimTextPatch.SYSTEM),anyString(),anyInt(),anyDouble());
+    }
+
+    @Test void local_formatting_preserves_every_other_json_value_and_rejects_non_annotation_references() {
+        var original = candidate();
+        ((ObjectNode)original.at("/analysis/findings/0/observation/0")).put("text", "선반은 닫혀 있습니다(E16, E395 등 shelfOpened=false).");
+        var normalized = fixture.mapper.readTree(ReviewClaimTextPatch.normalizeAnnotations(fixture.mapper, original.toString(), failure));
+        assertThat(normalized.at("/analysis/summary/0/text").asString()).isEqualTo("제공된 미션과 종료 기록입니다.");
+        assertThat(normalized.at("/analysis/findings/0/observation/0/text").asString()).isEqualTo("선반은 닫혀 있습니다(shelfOpened=false).");
+        for (String path : List.of("/analysis/summary/0", "/analysis/findings/0/observation/0"))
+            ((ObjectNode)normalized.at(path)).set("text", original.at(path).path("text"));
+        assertThat(normalized).isEqualTo(original);
+        ((ObjectNode)original.at("/analysis/summary/0")).put("text", "E1부터 E6까지 순서를 확인했습니다.");
+        assertThatThrownBy(() -> ReviewClaimTextPatch.normalizeAnnotations(fixture.mapper, original.toString(), failure))
+                .hasMessage("INVALID_REVIEW_CLAIM_TEXT_PATCH");
+    }
+
+    @Test void annotation_cleanup_followed_by_empty_observations_and_limits_asks_model_again_without_filling_them() {
+        var bad = candidate();
+        ((ObjectNode)bad.path("analysis")).putArray("findings");
+        ((ObjectNode)bad.path("analysis")).putArray("uncertainties");
+        ((ObjectNode)bad.at("/analysis/practicePlan")).putArray("targetFindingIds");
+        ((ObjectNode)bad.at("/analysis/practicePlan/rationale")).putArray("observed").addObject().put("findingId", "$summary").put("observationIndex", 0);
+        ((ObjectNode)bad.at("/analysis/practicePlan/rationale")).putArray("unknownCauseIndexes");
+        var good = bad.deepCopy();
+        ((ObjectNode)good.path("analysis")).putArray("uncertainties").add("행동의 원인과 안내 이해 여부는 기록으로 확인되지 않았습니다.");
+        var client = client(bad);
+        when(client.complete(eq(AnalysisReviewPrompt.system()), anyString(), eq(2400), anyDouble()))
+                .thenReturn(new GroqChatClient.GroqChatResult(bad.toString(), "mock"),
+                        new GroqChatClient.GroqChatResult(good.toString(), "mock"));
+        var audit = new ArrayList<AiBehaviorAnalysisRun.Attempt>();
+        var result = call(client, audit, false);
+        assertThat(result.findings()).isEmpty();
+        assertThat(result.uncertainties()).containsExactly("행동의 원인과 안내 이해 여부는 기록으로 확인되지 않았습니다.");
+        assertThat(result.sessionAssessments().getFirst().judgment()).isEqualTo("FAILURE");
+        assertThat(audit).hasSize(2);
+        assertThat(audit.getFirst().rawOutput()).isEqualTo(bad.toString());
+        assertThat(audit.getLast().rawOutput()).isEqualTo(good.toString());
+        verify(client).complete(eq(AnalysisReviewPrompt.system()), contains("ANALYSIS_OBSERVATIONS_OR_LIMITS_REQUIRED"), eq(2400), anyDouble());
+    }
+
+    @Test void empty_observations_and_limits_are_still_rejected_after_the_existing_retry_bound() {
+        var bad = candidate();
+        ((ObjectNode)bad.path("analysis")).putArray("findings");
+        ((ObjectNode)bad.path("analysis")).putArray("uncertainties");
+        ((ObjectNode)bad.at("/analysis/practicePlan")).putArray("targetFindingIds");
+        ((ObjectNode)bad.at("/analysis/practicePlan/rationale")).putArray("observed").addObject().put("findingId", "$summary").put("observationIndex", 0);
+        ((ObjectNode)bad.at("/analysis/practicePlan/rationale")).putArray("unknownCauseIndexes");
+        var client = client(bad);
+        var audit = new ArrayList<AiBehaviorAnalysisRun.Attempt>();
+        assertThatThrownBy(() -> call(client, audit, false)).hasMessage("INVALID_AI_ANALYSIS");
+        assertThat(audit).hasSize(3);
+        verify(client,times(3)).complete(eq(AnalysisReviewPrompt.system()), anyString(), eq(2400), anyDouble());
+    }
+
+    @Test void actual_v75_formatting_is_identical_to_the_previously_accepted_model_patch() throws Exception {
+        var path=Path.of("../output/analysis-nine-cold-20261016/results/superseded-candidate-v75/adult-minjae-unit-support-research-v2-1-baseline-pre/model-calls.json");
+        org.junit.jupiter.api.Assumptions.assumeTrue(Files.exists(path));
+        var calls=fixture.mapper.readTree(Files.readString(path));
+        String original=calls.get(2).path("rawOutput").asString(), modelPatch=calls.get(3).path("rawOutput").asString();
+        String expected=ReviewClaimTextPatch.apply(fixture.mapper,original,modelPatch);
+        assertThat(ReviewClaimTextPatch.normalizeAnnotations(fixture.mapper,original,failure)).isEqualTo(expected);
     }
 
     @Test void a_text_patch_still_must_pass_the_existing_source_and_independent_semantic_gates() {
         var bad = candidate();
         var client = client(bad);
-        when(client.complete(eq(ReviewClaimTextPatch.SYSTEM), anyString(), eq(ReviewClaimTextPatch.outputTokens(fixture.mapper, bad.toString())), eq(0.0)))
-                .thenReturn(new GroqChatClient.GroqChatResult(patch(Map.of("/analysis/summary/0/text", "제공된 미션과 종료 기록입니다.")), "mock"));
         String rejection = """
                 {"verdict":"REPAIR","checkedDimensions":["UNCERTAIN_CAUSES"],"issues":[{
                 "code":"UNCONFIRMED_CAUSE","path":"/summary/0/text","quote":"제공된 미션과 종료 기록입니다.","explanation":"독립 검토 거절 fixture"}]}
@@ -92,6 +156,7 @@ class ReviewClaimTextPatchTest {
         assertThatThrownBy(() -> call(client,audit,true)).isInstanceOf(AnalysisPlanSemanticReview.Rejected.class);
         assertThat(audit.getLast().source()).isEqualTo("PLAN_SOURCE_REVIEW");
         assertThat(audit.getLast().validationFailure().code()).isEqualTo("REVIEW_PLAN_SEMANTIC_MISMATCH");
+        verify(client,never()).complete(eq(ReviewClaimTextPatch.SYSTEM),anyString(),anyInt(),anyDouble());
 
         var input = input();
         var refs = new AnalysisReferences(fixture.mapper,input);

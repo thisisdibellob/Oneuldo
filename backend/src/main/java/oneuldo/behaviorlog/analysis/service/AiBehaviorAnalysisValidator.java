@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 /** 구조·참조·게임 실행 범위만 검사한다. 사용자 성공/실패는 계산하지 않는다. */
 @Component
 public class AiBehaviorAnalysisValidator {
+    public static final String OBSERVATIONS_OR_LIMITS_REQUIRED = "ANALYSIS_OBSERVATIONS_OR_LIMITS_REQUIRED";
     private final MarketAiDifficultyValidator difficultyValidator;
     public AiBehaviorAnalysisValidator(MarketAiDifficultyValidator difficultyValidator) {
         this.difficultyValidator = difficultyValidator;
@@ -37,6 +38,9 @@ public class AiBehaviorAnalysisValidator {
             require(finding.alternativeExplanations() != null
                     && finding.alternativeExplanations().size() <= 8);
             finding.alternativeExplanations().forEach(this::text);
+            if(finding.evidenceEventIds()!=null && finding.evidenceEventIds().size()>30)
+                throw new ReviewEvidenceException("ANALYSIS_FINDING_EVIDENCE_COUNT_EXCEEDS_LIMIT",
+                        "/analysis/findings/"+result.findings().indexOf(finding),List.of());
             evidence(finding.evidenceEventIds(), events);
         }
         require(result.sessionAssessments() != null && result.sessionAssessments().size() == sessions.size());
@@ -45,11 +49,16 @@ public class AiBehaviorAnalysisValidator {
             require(assessment != null && sessions.containsKey(assessment.sessionId()) && assessed.add(assessment.sessionId()));
             require(assessment.judgment() != null && Set.of("SUCCESS", "FAILURE", "UNDETERMINED").contains(assessment.judgment()));
             text(assessment.explanation());
+            if(assessment.evidenceEventIds()!=null && assessment.evidenceEventIds().size()>30)
+                throw new ReviewEvidenceException("ANALYSIS_SESSION_EVIDENCE_COUNT_EXCEEDS_LIMIT",
+                        "/analysis/sessionAssessments/"+result.sessionAssessments().indexOf(assessment),List.of());
             evidence(assessment.evidenceEventIds(), sessions.get(assessment.sessionId()));
         }
         var plan = result.practicePlan(); require(plan != null);
         require(plan.targetFindingIds() != null && findingIds.containsAll(plan.targetFindingIds()));
-        require(!findingIds.isEmpty() ? !plan.targetFindingIds().isEmpty() : !result.uncertainties().isEmpty());
+        if (findingIds.isEmpty() && result.uncertainties().isEmpty())
+            throw new ReviewEvidenceException(OBSERVATIONS_OR_LIMITS_REQUIRED, "/analysis/uncertainties", List.of());
+        require(findingIds.isEmpty() || !plan.targetFindingIds().isEmpty());
         text(plan.goal()); text(plan.rationale());
         require(plan.reasonCodes() != null && plan.quantityComplexity() != null
                 && plan.budgetPressure() != null && plan.textSupport() != null);

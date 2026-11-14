@@ -122,6 +122,37 @@ class CognitionReviewClaimsTest {
         assertThat(good).isEqualTo(bad);
     }
 
+    @Test void actual_uncertainty_array_claim_with_mistaken_valid_review_is_patched_without_full_regeneration() {
+        var input=fixture.mapper.treeToValue(new SyntheticAnalysisSmokeLiveTest().fixture("corrected-selection"),BehaviorAnalysisInputResponse.class);
+        var refs=new AnalysisReferences(fixture.mapper,input);
+        var prompts=new AiBehaviorAnalysisPromptFactory(fixture.mapper);
+        String source=AnalysisReviewPrompt.build(fixture.mapper,AnalysisSynthesisPrompt.build(fixture.mapper,prompts,input,List.of(),refs,false),null,refs);
+        var bad=candidate("선택 동기는 미확인입니다.");
+        String claim="상품 선택 방법을 인지했으나 조작하지 않았을 가능성을 배제할 수 없습니다.";
+        ((ObjectNode)bad.path("analysis")).putArray("uncertainties").add(claim);
+        String unchanged=bad.toString(), path="/uncertainties/0";
+        String actualReview=approval(path,"UNCERTAIN_OR_PROPOSED",null);
+        var client=mock(GroqChatClient.class);
+        when(client.complete(eq(AnalysisReviewPrompt.system()),anyString(),eq(2400),anyDouble()))
+                .thenReturn(new GroqChatClient.GroqChatResult(unchanged,"mock"));
+        when(client.complete(eq(ReviewSemanticTextPatch.SYSTEM),anyString(),eq(ReviewSemanticTextPatch.OUTPUT_TOKENS),eq(0.0)))
+                .thenReturn(new GroqChatClient.GroqChatResult("{\"patches\":[{\"path\":\"/analysis/uncertainties/0\",\"value\":\"상품 선택 방법을 인지했는지는 원본 기록만으로 확인할 수 없습니다.\"}]}","mock"));
+        when(client.complete(eq(AnalysisPlanSemanticReview.system()),anyString(),eq(AnalysisPlanSemanticReview.OUTPUT_TOKENS),eq(0.0)))
+                .thenReturn(new GroqChatClient.GroqChatResult(actualReview,"mock"));
+        var validator=new AiBehaviorAnalysisValidator(new MarketAiDifficultyValidator());
+        var pipeline=new TimelineAnalysisPipeline(prompts,validator,client,fixture.mapper).withQualityReview(true).withPlanSemanticReview(true);
+        var audit=new ArrayList<AiBehaviorAnalysisRun.Attempt>();
+        Function<String,AiBehaviorAnalysis> parse=raw->validator.validate(refs.read(AnalysisReviewPrompt.reviewedCurrentAnalysis(fixture.mapper,raw,refs)),input);
+        AiBehaviorAnalysis result=ReflectionTestUtils.invokeMethod(pipeline,"call",AnalysisReviewPrompt.system(),source,2400,24000,audit,parse,false,3);
+        assertThat(result.uncertainties()).containsExactly("상품 선택 방법을 인지했는지는 원본 기록만으로 확인할 수 없습니다.");
+        assertThat(audit).hasSize(4);
+        assertThat(audit.get(1).rawOutput()).isEqualTo(actualReview);
+        assertThat(audit.get(2).inputPrompt()).contains("Mechanical source-bound check",actualReview,claim);
+        assertThat(audit.get(2).source()).isEqualTo("REVIEW_SEMANTIC_TEXT_PATCH");
+        verify(client,times(1)).complete(eq(AnalysisReviewPrompt.system()),anyString(),eq(2400),anyDouble());
+        assertThat(bad.toString()).isEqualTo(unchanged);
+    }
+
     @Test void actual_seoyeon_valid_review_is_rejected_without_cognition_checks_and_preserves_the_full_source_budget() throws Exception {
         org.junit.jupiter.api.Assumptions.assumeTrue(Files.exists(OWN.resolve("ready-e7d00058-original.json")));
         var actual=fixture.mapper.readTree(Files.readString(OWN.resolve("ready-e7d00058-original.json")));
@@ -142,7 +173,10 @@ class CognitionReviewClaimsTest {
         var newPrompt=fixture.mapper.readTree(prompt);
         var priorPrompt=fixture.mapper.readTree(attempts.get(15).path("inputPrompt").asString());
         assertThat(newPrompt.path("candidate")).isEqualTo(fixture.mapper.readTree(candidate).path("analysis"));
-        assertThat(newPrompt.path("sourceFacts")).isEqualTo(priorPrompt.path("sourceFacts"));
+        var factsWithoutIndex=(ObjectNode)newPrompt.path("sourceFacts").deepCopy();
+        assertThat(factsWithoutIndex.path("literalEventIndex").isMissingNode()).isFalse();
+        factsWithoutIndex.remove("literalEventIndex");
+        assertThat(factsWithoutIndex).isEqualTo(priorPrompt.path("sourceFacts"));
         assertThat(newPrompt.path("cognitionClaimPaths")).isEqualTo(fixture.mapper.valueToTree(List.of(path)));
         int semantic=new AnalysisTokenBudget().total(AnalysisPlanSemanticReview.system(),prompt,AnalysisPlanSemanticReview.OUTPUT_TOKENS)+512;
         int primary=new AnalysisTokenBudget().total(AnalysisReviewPrompt.system(),source,1000)+512;

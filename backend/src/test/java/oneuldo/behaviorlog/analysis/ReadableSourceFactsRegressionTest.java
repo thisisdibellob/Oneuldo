@@ -162,7 +162,7 @@ class ReadableSourceFactsRegressionTest {
     @Test void legacy_generic_help_keeps_raw_action_and_micro_action_and_new_help_is_context_only() {
         var input = helpAndPurchaseInput();
         var refs = new AnalysisReferences(mapper, input);
-        var observation = mapper.readTree(refs.encode(new AiBehaviorAnalysisPromptFactory(mapper).observationPrompt(input, input)));
+        var observation = ObservationWireEncoding.decode(mapper,mapper.readTree(refs.encode(new AiBehaviorAnalysisPromptFactory(mapper).observationPrompt(input, input))));
         var oldGeneral = observation.path(SourceEventDetails.FIELD).get(7);
         assertThat(oldGeneral.path("eventCode").asString()).isEqualTo("SHOP.STAFF_HELP_REQUESTED");
         assertThat(oldGeneral.path("microActionId").asString()).isEqualTo("VIEWHELP");

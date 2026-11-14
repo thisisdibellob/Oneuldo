@@ -130,7 +130,7 @@ class ReviewAlternativeExplanationPatchTest {
         verify(client, never()).complete(eq(AnalysisPlanSemanticReview.system()), anyString(), anyInt(), anyDouble());
     }
 
-    @Test void the_last_metadata_slot_hands_off_to_two_targeted_alternative_patches_without_changing_its_three_attempt_limit() {
+    @Test void metadata_and_literal_formatting_hand_off_to_two_targeted_alternative_patches_without_extra_format_inference() {
         var candidate = bad(true); var client = mock(GroqChatClient.class);
         var firstClaim = (ObjectNode)candidate.at("/analysis/summary/0");
         String literal = firstClaim.path("text").asString();
@@ -142,8 +142,6 @@ class ReviewAlternativeExplanationPatchTest {
                 .thenReturn(new GroqChatClient.GroqChatResult(patch("/stationClaims/0", station, null), "mock"));
         when(client.complete(eq(ReviewMetadataPatch.SYSTEM), anyString(), anyInt(), eq(0.0)))
                 .thenReturn(new GroqChatClient.GroqChatResult(patch(ReviewMetadataPatch.PATH, fixture.mapper.nullNode(), null), "mock"));
-        when(client.complete(eq(ReviewClaimTextPatch.SYSTEM), anyString(), anyInt(), eq(0.0)))
-                .thenReturn(new GroqChatClient.GroqChatResult(patch("/analysis/summary/0/text", fixture.mapper.getNodeFactory().stringNode(literal), null), "mock"));
         when(client.complete(eq(ReviewAlternativeExplanationPatch.SYSTEM), anyString(), anyInt(), eq(0.0)))
                 .thenReturn(new GroqChatClient.GroqChatResult(patch(PATH, fixture.mapper.createArrayNode(), null), "mock"),
                         new GroqChatClient.GroqChatResult(patch("/analysis/findings/1/alternativeExplanations", fixture.mapper.createArrayNode(), null), "mock"));
@@ -159,13 +157,16 @@ class ReviewAlternativeExplanationPatchTest {
                 new ReviewEvidenceException.Details("REVIEW_STATION_CLAIM_INVALID", "/stationClaims/0", List.of("E4")), 24000, audit, parse);
         assertThat(result.sessionAssessments().getFirst().judgment()).isEqualTo("FAILURE");
         assertThat(result.findings()).hasSize(2).allSatisfy(finding -> assertThat(finding.alternativeExplanations()).isEmpty());
-        assertThat(audit).hasSize(6);
-        assertThat(audit.subList(0, 3)).extracting(AiBehaviorAnalysisRun.Attempt::source)
-                .containsExactly("REVIEW_STATION_PATCH", "REVIEW_METADATA_PATCH", "REVIEW_CLAIM_TEXT_PATCH");
+        assertThat(audit).hasSize(5);
+        assertThat(audit.subList(0, 2)).extracting(AiBehaviorAnalysisRun.Attempt::source)
+                .containsExactly("REVIEW_STATION_PATCH", "REVIEW_METADATA_PATCH");
+        assertThat(audit.get(1).validationFailure().code()).isEqualTo("INLINE_REVIEW_REFERENCE_NOT_ALLOWED");
         assertThat(audit.get(2).validationFailure().code()).isEqualTo("INVALID_REVIEW_CLAIM_ARRAY");
+        assertThat(audit.get(2).source()).isEqualTo("REVIEW_ALTERNATIVE_PATCH");
         assertThat(audit.get(3).source()).isEqualTo("REVIEW_ALTERNATIVE_PATCH");
-        assertThat(audit.get(4).source()).isEqualTo("REVIEW_ALTERNATIVE_PATCH");
+        assertThat(audit.getLast().source()).isEqualTo("PLAN_SOURCE_REVIEW");
         verify(client, times(2)).complete(eq(ReviewAlternativeExplanationPatch.SYSTEM), anyString(), anyInt(), eq(0.0));
+        verify(client, never()).complete(eq(ReviewClaimTextPatch.SYSTEM), anyString(), anyInt(), anyDouble());
     }
 
     @Test void preserved_unknown_source_evidence_still_fails_the_existing_source_gate() {

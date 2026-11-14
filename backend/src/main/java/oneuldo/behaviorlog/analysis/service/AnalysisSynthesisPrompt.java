@@ -6,7 +6,7 @@ import tools.jackson.databind.ObjectMapper;
 /** Synthesizes observations whose source IDs have been checked, without replaying raw scene blobs. */
 public final class AnalysisSynthesisPrompt {
     public static final String FINAL_STAGE="FINAL: compare original events with chunk observations. Originals take priority; no unrecorded actions. IDs alone prove no claim.";
-    public static final String VERSION="synthesis-v16-single-policy-copy";
+    public static final String VERSION="synthesis-v18-grounded-practice";
     public static final String CONTRACT="""
         짧은 JSON 객체: {"s":"요약","f":[["F1","기술","사실","가설",[],["E1"],"지원"]],
         "a":[["S1","SUCCESS|FAILURE|UNDETERMINED","이유",["E1"]]],"u":["한계"],
@@ -26,7 +26,9 @@ public final class AnalysisSynthesisPrompt {
     public static String build(ObjectMapper mapper,AiBehaviorAnalysisPromptFactory prompts,BehaviorAnalysisInputResponse input,
             List<AiObservationDigest> digests,AnalysisReferences refs,boolean limited,List<BehaviorAnalysisInputResponse> scopes) {
         var root=mapper.createObjectNode();root.put("synthesisVersion",VERSION);
-        root.put("stage",FINAL_STAGE);
+        root.put("stage",FINAL_STAGE);root.put("groundedPracticeContractVersion","v1");
+        root.set("implementedSupportCapabilities",SourceBoundReviewChecks.promptCapabilities(mapper));
+        root.set("retrievedKnowledge",KnowledgeRetrieval.retrieve(mapper.valueToTree(input.input())));
         var details=SourceEventDetails.build(mapper,input);
         root.set(SourceEventDetails.FIELD,details);
         var movementContext=MovementSourceContext.build(mapper,input);
@@ -42,7 +44,10 @@ public final class AnalysisSynthesisPrompt {
         // FinalAnalysisPromptCompactor.systemPrompt() already supplies the complete review guidance.
         // Keep the immutable source values here without repeating the same instruction block.
         root.set("taskContext",prompts.tasks(input));
+        root.set(SessionSourceLedger.FIELD,SessionSourceLedger.build(mapper,input));
+        root.put("sessionSourceLedgerRule",SessionSourceLedger.RULE);
         root.set("catalogProductCategories",ProductLocationSource.build(mapper,new AnalysisContentScope(mapper).catalog(input)));
+        PracticeDesignContract.attach(mapper,root,mapper.valueToTree(input.input()));
         root.set("chunkAnalyses",mapper.valueToTree(digests));
         root.put("movementDetailLimited",limited);
         var evidence=new HashSet<UUID>();digests.forEach(d->d.observations().forEach(o->evidence.addAll(o.evidenceEventIds())));
@@ -65,7 +70,7 @@ public final class AnalysisSynthesisPrompt {
         }
         root.put("outputContract",COMPACT_CONTRACT);
         AnalysisSourceContext.addMissionPlanProvenance(mapper,root);
-        String source = refs.encode(prompts.pack(root));
+        String source = refs.encode(prompts.pack(PriorAiPlanText.withhold(mapper,root)));
         var decoded = (tools.jackson.databind.node.ObjectNode) new LosslessTables(mapper).decode(mapper.readTree(source));
         return mapper.writeValueAsString(new FinalSourceEncoding(mapper).encodeReadable(decoded));
     }

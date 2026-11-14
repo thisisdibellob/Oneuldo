@@ -12,7 +12,7 @@ public final class FinalAnalysisPromptCompactor {
     public FinalAnalysisPromptCompactor(ObjectMapper mapper) { this.mapper = mapper; }
 
     public static String systemPrompt() {
-        return AnalysisSourceContext.FINAL_RULES + "\n" + AdaptiveObservationGuidance.RULE;
+        return AnalysisSourceContext.FINAL_RULES + "\n" + AdaptiveObservationGuidance.RULE + "\n" + GroundedPracticeContract.RULE;
     }
 
     public ObjectNode compactInstructions(ObjectNode source) {

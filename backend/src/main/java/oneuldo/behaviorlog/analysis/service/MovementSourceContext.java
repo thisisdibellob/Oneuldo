@@ -108,6 +108,8 @@ public final class MovementSourceContext {
                 var detail = events.addObject().put("id", event.behaviorLogId().toString())
                         .put("sequence", event.sequence()).put("timeMs", event.elapsedFromSessionStartMs()).put("eventCode", code);
                 for (String field : VALUES) copy(payload, field, detail, field);
+                copy(source, "userExperience", detail, "userExperience");
+                copy(source.path("presentation"), "renderErrorCode", detail, "renderErrorCode");
                 if (stations.containsKey(event.behaviorLogId().toString()))
                     detail.set("recordedStation", stations.get(event.behaviorLogId().toString()).deepCopy());
                 copy(content, "blockedPhase", detail, "blockedPhase");

@@ -15,8 +15,9 @@ import tools.jackson.databind.node.ObjectNode;
 /** Reversible final transport only. Every original source value and citation row survives decoding. */
 public final class FinalSourceEncoding {
     public static final String VERSION = "final-source-v2";
-    public static final String ENCODER_REVISION = "shared-source-text-v2-source-event-set";
+    public static final String ENCODER_REVISION = "shared-source-text-v3-literal-quantity-rows";
     private static final String VERSION_FIELD = "finalSourceEncodingVersion";
+    private static final String NUMERIC_WIRE = "finalNumericWireVersion";
     private static final String RULE_FIELD = "finalSourceEncoding";
     private static final String COLUMNS = "$finalColumns";
     private static final String LITERAL = "$finalLiteral";
@@ -38,7 +39,7 @@ public final class FinalSourceEncoding {
             + "[P,id]=sourceEventDetails의 id=id인 행의 sourceEventId=id,sessionId,product=selectedProduct 사본. [E,id]=같은 사건행 전체.";
     private static final String SHARE_RULE=" $r:n은 finalSourceShared의 n 원문으로 재귀 복원한다.";
     private static final String EVENT_SET_RULE=" $eventSet:[추가원문행]은 sourceEventDetails와 sourceMovementContext.sessions[].movementEventDetails의 모든 같은-ID 원본 id/sessionId/timeMs/eventCode 사본에 추가원문행을 합쳐 숫자 E 순서로 복원한다. 이동 sessionId=부모값. 원래 인용 행과 정확히 같은 경우만 쓴다.";
-    private static final Set<String> V2_RESERVED=Set.of(VERSION_FIELD,RULE_FIELD,SHARED_FIELD,"$ev","$v","$eventSet","$x","$r","$h",COLUMNS,LITERAL,EVENT_VIEW);
+    private static final Set<String> V2_RESERVED=Set.of(VERSION_FIELD,NUMERIC_WIRE,RULE_FIELD,SHARED_FIELD,"$ev","$v","$eventSet","$x","$r","$h",COLUMNS,LITERAL,EVENT_VIEW);
     private final ObjectMapper mapper;
     private final boolean literalSmallEventIds;
 
@@ -51,6 +52,7 @@ public final class FinalSourceEncoding {
         rest.remove(ReadableSourceFacts.FIELD);
         var result = encode(rest);
         var facts=ReadableSourceFacts.build(mapper,rest);
+        facts.set("eventsById",ReadableQuantityRows.encode(mapper,facts.path("eventsById")));
         // Keep literal ID/product/quantity pairs. Repeated mechanical count tables
         // use the same reversible column rules already included in this envelope.
         if(facts.has("recordedActionPresence")){
@@ -59,6 +61,22 @@ public final class FinalSourceEncoding {
             if(QwenTokenCounter.count(columns.toString())<QwenTokenCounter.count(presence.toString()))facts.set("recordedActionPresence",columns);
         }
         result.set(ReadableSourceFacts.FIELD,facts);
+        return compactNumbers(result);
+    }
+
+    /** Compact profile/history source without adding a second readable-fact projection. */
+    public ObjectNode encodeCompact(ObjectNode source) {return compactNumbers(encode(source));}
+
+    private ObjectNode compactNumbers(ObjectNode result) {
+        // Same exact-number transports as observation inputs; retain the smaller complete
+        // envelope and keep readable event IDs outside numeric aliasing.
+        if(!result.has(oneuldo.behaviorlog.personalization.service.AdaptiveNumericFragments.RULE_FIELD)
+            &&!result.has(oneuldo.behaviorlog.personalization.service.AdaptiveNumericColumnText.RULE_FIELD)) {
+            var packed=new oneuldo.behaviorlog.personalization.service.AdaptiveNumericFragments(mapper,true).encode(result);
+            packed=new oneuldo.behaviorlog.personalization.service.AdaptiveNumericColumnText(mapper).encode(packed);
+            packed.put(NUMERIC_WIRE,"exact-final-numbers-v1");
+            if(QwenTokenCounter.count(packed.toString())<QwenTokenCounter.count(result.toString()))return packed;
+        }
         return result;
     }
 
@@ -208,6 +226,15 @@ public final class FinalSourceEncoding {
 
     /** Also reads older table-only final sources so their immutable audit records remain usable. */
     public ObjectNode decode(JsonNode source) {
+        if(source.has(NUMERIC_WIRE)) {
+            if(!"exact-final-numbers-v1".equals(source.path(NUMERIC_WIRE).asString()))throw invalidV2();
+            var wire=((ObjectNode)source).deepCopy();wire.remove(NUMERIC_WIRE);
+            if(wire.has(oneuldo.behaviorlog.personalization.service.AdaptiveNumericColumnText.RULE_FIELD))
+                wire=oneuldo.behaviorlog.personalization.service.AdaptiveNumericColumnText.decode(mapper,wire);
+            if(wire.has(oneuldo.behaviorlog.personalization.service.AdaptiveNumericFragments.RULE_FIELD))
+                wire=oneuldo.behaviorlog.personalization.service.AdaptiveNumericFragments.decode(mapper,wire);
+            return decode(wire);
+        }
         if(VERSION.equals(source.path(VERSION_FIELD).asString())) {
             if(!(source instanceof ObjectNode root))throw invalidV2();
             String rule=root.path(RULE_FIELD).asString();
@@ -220,7 +247,7 @@ public final class FinalSourceEncoding {
             encoded.remove(List.of(VERSION_FIELD,RULE_FIELD,SHARED_FIELD));
             var columns=new FinalSourceColumns(mapper).decode(shared?unshare(encoded,dictionary,0):encoded);
             if(!(restoreV2(columns,null) instanceof ObjectNode partial))throw invalidV2();
-            return (ObjectNode)restoreV2(columns,new Build(partial));
+            return ReadableQuantityRows.restore(mapper,(ObjectNode)restoreV2(columns,new Build(partial)));
         }
         var tables = new LosslessTables(mapper);
         ObjectNode encoded = (ObjectNode) tables.decode(source);

@@ -36,22 +36,27 @@ public final class SourceEventDetails {
         var stations = RecordedStationIdentity.byEvent(mapper, input);
         for (var session : input.input().sessions()) for (var event : session.events()) {
             String code = event.action() == null ? null : event.action().eventCode();
-            if (code != null && MOVEMENT_EVENTS.contains(code)) continue;
+            JsonNode source = mapper.valueToTree(event);
+            boolean directSource = source.path("presentation").hasNonNull("renderErrorCode")
+                    || source.path("userExperience").hasNonNull("instructionUnderstood") || source.path("userExperience").hasNonNull("feedbackNote");
+            if (code != null && MOVEMENT_EVENTS.contains(code) && !directSource) continue;
             var row = result.addObject();
             row.put("id", event.behaviorLogId().toString());
             row.put("sessionId", session.sessionId().toString());
             row.put("timeMs", event.elapsedFromSessionStartMs());
             row.put("sequence", event.sequence());
             if (code != null) row.put("eventCode", code);
-            JsonNode source = mapper.valueToTree(event);
             if ("SHOP.STAFF_HELP_REQUESTED".equals(code) || "SHOP.GENERAL_HELP_OPENED".equals(code))
                 copy(source.path("action"), "microActionId", row, "microActionId");
             copy(source, "sessionEnd", row, "sessionEnd");
             copy(source, "userExperience", row, "userExperience");
+            copy(source.path("presentation"), "renderErrorCode", row, "renderErrorCode");
             if ("SHOP.SESSION_STARTED".equals(code) || "SHOP.SESSION_ENDED".equals(code))
                 copy(source.path("task"), "taskVersion", row, "collectorTaskVersion");
             var payload = source.path("payload");
             for (String field : VALUES) copy(payload, field, row, field);
+            if (directSource && code != null && MOVEMENT_EVENTS.contains(code))
+                for (String field : List.of("x", "y", "blocked", "controlMode")) copy(payload, field, row, field);
             if (stations.containsKey(event.behaviorLogId().toString()))
                 row.set("recordedStation", stations.get(event.behaviorLogId().toString()).deepCopy());
             copy(payload, "timing", row, "timing");

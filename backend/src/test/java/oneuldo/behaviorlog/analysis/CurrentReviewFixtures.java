@@ -23,7 +23,7 @@ final class CurrentReviewFixtures {
         var plan = (ObjectNode)analysis.path("practicePlan");
         var basis = plan.putObject("rationale");
         basis.putArray("observed").addObject().put("findingId", analysis.path("findings").get(0).path("id").asString()).put("observationIndex", 0);
-        basis.putArray("unknownCauseIndexes"); basis.put("proposedPractice", "목록과 구매 수를 비교하는 다음 조작을 관찰합니다.").putNull("baselineDifficulty");
+        basis.putArray("unknownCauseIndexes"); basis.put("proposedPractice", "변경: 안내에 목록과 구매 수 비교 문장을 추가합니다. 확인: 다음 수량 변경 조작을 관찰합니다.").putNull("baselineDifficulty");
         basis.putArray("supportCapabilities").add("TEXT_GUIDANCE");
         return root;
     }

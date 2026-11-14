@@ -45,7 +45,7 @@ class MarketTimingSourceContractTest {
         var prompts = new AiBehaviorAnalysisPromptFactory(mapper);
         var refs = new AnalysisReferences(mapper, input);
         var expected = mapper.readTree(refs.encode(mapper.writeValueAsString(source))).path(SourceEventDetails.FIELD);
-        var observation = tables.decode(mapper.readTree(refs.encode(prompts.observationPrompt(input, input))));
+        var observation = ObservationWireEncoding.decode(mapper,mapper.readTree(refs.encode(prompts.observationPrompt(input, input))));
         assertThat(observation.path("promptVersion").asString()).isEqualTo(AiBehaviorAnalysisPromptFactory.OBSERVATION_VERSION);
         assertThat(observation.path(SourceEventDetails.FIELD)).isEqualTo(expected);
         var synthesis = AnalysisSynthesisPrompt.build(mapper, prompts, input,

@@ -12,9 +12,9 @@ import tools.jackson.databind.node.ObjectNode;
 /** 원본 스냅샷은 변경하지 않고 기존 판정 필드만 AI 입력에서 분리한다. */
 @Component
 public class AiBehaviorAnalysisPromptFactory {
-    public static final String VERSION = "behavior-analysis-v62-cognition-review";
+    public static final String VERSION = "behavior-analysis-v109-source-consistent-practice";
     // Final transport changes do not relabel or invalidate unchanged observation requests.
-    public static final String OBSERVATION_VERSION = "behavior-analysis-v34-readable-action-source";
+    public static final String OBSERVATION_VERSION = "behavior-analysis-v41-no-invented-actions";
     public static final String EVIDENCE_VERSION = EvidenceIndex.VERSION;
     private final ObjectMapper mapper;
     @org.springframework.beans.factory.annotation.Value("${ai.behavior-analysis.movement-max-error:0}")
@@ -119,7 +119,7 @@ public class AiBehaviorAnalysisPromptFactory {
                 "outputContract", """
                         {"summary":"전체 관찰 요약", "usedEvidenceCardIds":["사용한 제공 카드 ID; 없으면 빈 배열"],
                          "findings":[{"id":"F1","skill":"관찰된 생활기술","observation":"실제 사건",
-                          "interpretation":"가설","alternativeExplanations":[],
+                          "interpretation":"관찰과 과제 요구의 관계","alternativeExplanations":[],
                           "evidenceEventIds":["제공된 실제 사건 ID"],"suggestedSupport":"지원 제안"}],
                          "sessionAssessments":[{"sessionId":"제공된 실제 세션 ID",
                           "judgment":"SUCCESS 또는 FAILURE 또는 UNDETERMINED","explanation":"AI 판단 이유",
@@ -154,9 +154,11 @@ public class AiBehaviorAnalysisPromptFactory {
                 + "느림·반복·도움 요청만으로 능력 부족을 단정하지 않는다. 근처 이동이 인지의 증거는 아니다. "
                 + "기존 SUCCESS/FAILURE/WRONG 이름을 판정으로 채택하지 않는다. 현재는 부분 관찰 단계이므로 성패·난이도·연습 계획을 출력하지 않는다. "
                 + "구간의 마지막 사건을 세션 종료로 취급하지 않는다. endedAt과 integrity는 전체 세션 메타데이터일 수 있다. "
+                + "사건 번호는 literalEventIndex의 실제 E 키를 복사한다. 표의 6번째 행을 E6으로 새로 부르지 않는다. 전/후는 같은 세션의 sequence와 timeMs로 확인한다. 이 상호작용 표에 없는 이동 원본도 behaviorTimeline에 있으므로 표만 보고 이동이 없다고 쓰지 않는다. "
                 + "상품 선택이 이 구간에 없으면 '이 구간에는 기록 없음'으로만 쓰고 전체 세션의 미수행으로 확대하지 않는다. "
                 + "누락·기기 문제·세션 경계를 고려하고 의학적 진단·IQ·장애 등급·개인정보를 출력하지 않는다. 한국어 JSON 하나만 출력한다."
                 + " 대안 설명을 채우려고 기기 오류·우연한 터치·자동 기능을 상상하지 않는다. 대안 설명은 원본 근거가 있는 경우에만 쓴다. 없으면 alternativeExplanations는 []이며, 동기·이해도 미확인은 uncertainties에 쓴다. 대안의 개수를 채우지 않는다. "
+                + "장바구니 열기는 담았다가 제거한 행동의 증거가 아니다. 도움말 열기는 의존도·이해·실제 도움 제공의 증거가 아니다. 미확인 원인을 이름 붙여 나열하지 않는다. "
                 + SourceEventDetails.RULE + marketEventSemantics();
     }
     /** Collector meaning, not a claim about the user's intent. Keep in sync with marketMovementDetector.ts. */
@@ -176,6 +178,9 @@ public class AiBehaviorAnalysisPromptFactory {
         root.put("promptVersion", OBSERVATION_VERSION);
         root.remove(List.of("evidenceCards", "availablePracticeScenarios", "practiceCapabilities", "excludedLegacyFields", "evidenceVersion"));
         root.put("outputContract", digestContract());
+        // The identical collector interpretation rule is already in observationSystem().
+        // Keep original event values untouched and send this instruction only once.
+        if(SourceEventDetails.RULE.equals(root.path("sourceEventDetailsRule").asString()))root.remove("sourceEventDetailsRule");
         root.set("eventDefinitions", AnalysisSourceContext.definitions(mapper));
         root.put("stage", "OBSERVE: 해당 구간의 관측을 읽고 근거 있는 해석만 작성. 구간 밖 행동을 가정하지 말 것.");
         var scope = root.putObject("observationScope");
@@ -185,7 +190,7 @@ public class AiBehaviorAnalysisPromptFactory {
         scope.put("rule", "판단 근거는 제공된 사건에 한정한다. 구간 끝은 세션 끝이 아니다. 세션 종료는 제공된 종료 사건으로만 확인한다.");
         root.set("taskContext", tasks(full));
         AnalysisSourceContext.addMissionPlanProvenance(mapper,root);
-        root.set("observedFacts", new ObservedFacts(mapper).build(chunk,full));
+        root.put("timingSource", "Read original event timestamps directly. A timestamp difference does not establish action duration, intent or cognition. All original events and coordinates are retained.");
         // Product attributes already present in this request's raw scene need not be repeated in the supplemental catalog.
         Set<String> supplied = new java.util.HashSet<>();
         var expanded = new CompactBehaviorTimeline(mapper).decodeExpanded(root.path("behaviorTimeline"));
@@ -201,14 +206,26 @@ public class AiBehaviorAnalysisPromptFactory {
             catalog.set("products", retained); catalog.remove("enabledScenarios");
             catalog.put("sourceNote", "보충 목록에 없는 상품의 원 관측 속성은 behaviorTimeline의 sceneSnapshot.products를 참조. 현재 목록으로 과거 값을 덮지 말 것.");
         }
-        return pack(new ObservationInputCompactor(mapper).compact(root,full));
+        root=new ObservationInputCompactor(mapper).compact(root,full);
+        // Identical source context precedes the variable chunk to permit exact prefix reuse.
+        var ordered=mapper.createObjectNode();
+        for(String field:List.of("promptVersion","inputScope","eventDefinitions","timingSource","taskContext",MovementSourceContext.FIELD))
+            if(root.has(field))ordered.set(field,root.get(field));
+        for(String field:root.propertyNames())if(!ordered.has(field))ordered.set(field,root.get(field));
+        return pack(PriorAiPlanText.withhold(mapper,ordered));
     }
     /** Whole-play source prompt: no intermediate AI summary and no server behavioral judgment. */
     public String wholeSourcePrompt(BehaviorAnalysisInputResponse input) {
         var root=(ObjectNode)new LosslessTables(mapper).decode(mapper.readTree(observationPrompt(input,input)));
         root.put("promptVersion", VERSION);
+        root.put("groundedPracticeContractVersion", "v1");
+        root.set("implementedSupportCapabilities",SourceBoundReviewChecks.promptCapabilities(mapper));
         // Derived interval tables repeat timestamps already present in every original event.
         root.remove(List.of("observedFacts","observationScope"));
+        root.set(SessionSourceLedger.FIELD,SessionSourceLedger.build(mapper,input));
+        root.put("sessionSourceLedgerRule",SessionSourceLedger.RULE);
+        root.set("retrievedKnowledge",KnowledgeRetrieval.retrieve(mapper.valueToTree(input.input())));
+        PracticeDesignContract.attach(mapper,root,mapper.valueToTree(input.input()));
         root.put("stage","FINAL: 아래는 제공된 분석 구간의 모든 원본 사건이다. 중간 AI 요약이 아니다. 근거는 해당 세션의 원본 사건 ID를 직접 인용한다.");
         root.put("outputContract",AnalysisSynthesisPrompt.CONTRACT.replace("evidenceReferences의 해당 세션 ID만","behaviorTimeline의 해당 세션 사건 ID만"));
         return pack(root);
@@ -218,10 +235,10 @@ public class AiBehaviorAnalysisPromptFactory {
     }
     public String digestContract() {
         return "필드 이름이 있는 JSON 객체 하나를 출력한다. 형식: "
-                + "{\"summary\":\"요약\",\"observations\":[{\"observation\":\"사실\",\"interpretation\":\"가설\",\"alternativeExplanations\":[],\"evidenceEventIds\":[\"E1\"]}],\"uncertainties\":[\"한계\"],\"requestedSegmentIds\":[]}. "
+                + "{\"summary\":\"요약\",\"observations\":[{\"observation\":\"사실\",\"interpretation\":\"관찰과 과제 요구의 관계\",\"alternativeExplanations\":[],\"evidenceEventIds\":[\"E1\"]}],\"uncertainties\":[\"한계\"],\"requestedSegmentIds\":[]}. "
                 + "예시 내용/ID는 제공 자료로 대체한다. evidenceEventIds에는 실제 사건 ID만, alternativeExplanations에는 원본 근거가 있는 대안만 쓰고 없으면 []로 둔다. 동기 미확인은 uncertainties에 쓴다. "
-                + "관찰 개수를 채우지 말고 관련 사건을 묶어 쓴다. summary는 관찰 본문을 반복하지 않는 한 문장으로 쓴다. 같은 행동의 반복은 합치고 수량 조정·목록 확인·가격 비교·도움·이동 중 실제로 기록된 서로 다른 행동과 반증을 보존한다. 각 관찰은 구체적인 사실과 가능한 해석을 완결된 문장으로 설명하고 근거1~3개와 대안1개를 포함한다. 출력 상한 안에서 중복 표현을 줄여 JSON을 완성하며 개수를 채우려고 관찰을 만들지 않는다. "
-                + "원문에 있는 상품 규격·수량·금액과 종료 사유를 관찰에 인용할 때 수치를 보존한다. 의도나 성패로 바꾸지 않는다. 반증/도움/자료 한계를 숨기지 않는다. 관찰이 없으면 uncertainties에 이유. 구간 밖 사실은 쓰지 않는다.";
+                + "관찰 개수를 채우지 말고 관련 사건을 묶어 쓴다. summary는 관찰 본문을 반복하지 않는 한 문장으로 쓴다. 같은 행동의 반복은 합치고 수량 조정·목록 확인·가격 비교·도움·이동 중 실제로 기록된 서로 다른 행동과 반증을 보존한다. 각 관찰은 구체적인 사실과 과제와의 관계를 짧은 완결 문장으로 설명하고 실제 근거를 인용한다. 근거 없는 원인·이해·동기는 해석에 반복하지 않는다. 대안은 직접 근거가 있을 때만 작성하고 없으면 []로 둔다.  출력 상한 안에서 중복 표현을 줄여 JSON을 완성하며 개수를 채우려고 관찰을 만들지 않는다. "
+                + "중복 서술은 피한다: summary는 구간 범위 한 문장, observations는 서로 다른 실제 행동·지원·반증을 설명하며 uncertainties는 각 미확인 사항을 한 번만 쓴다. 항목 수나 길이를 줄이려고 서로 다른 행동·반증·한계를 빼지 않는다. 원문에 있는 상품 규격·수량·금액과 종료 사유를 관찰에 인용할 때 수치를 보존한다. 의도나 성패로 바꾸지 않는다. 반증/도움/자료 한계를 숨기지 않는다. 관찰이 없으면 uncertainties에 이유. 구간 밖 사실은 쓰지 않는다.";
     }
     public String reductionContract() {
         return digestContract()+" 근거는 자식 관찰에 인용된 ID만 사용한다. allowedEvidenceEventIds는 이번 통합에서 인용 가능한 전체 목록이다. "

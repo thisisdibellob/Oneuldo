@@ -31,6 +31,7 @@ public class AiBehaviorAnalysisService {
     @Value("${ai.cache-identity:${ai.groq.model:qwen/qwen3.6-27b}}") private String configuredModel="qwen/qwen3.6-27b";
     private final oneuldo.ai.service.SingleFlight<String,AiBehaviorAnalysisResponse> requests=new oneuldo.ai.service.SingleFlight<>();
     private final oneuldo.ai.service.SingleFlight<String,AiBehaviorAnalysisResponse> datasets=new oneuldo.ai.service.SingleFlight<>();
+    @Value("${ai.behavior-analysis.observation-parallelism:1}") private int observationParallelism=1;
     private AnalysisCheckpointStore checkpointStore;
     @org.springframework.beans.factory.annotation.Autowired
     public void setCheckpointStore(AnalysisCheckpointStore store) {checkpointStore=store;}
@@ -65,6 +66,8 @@ public class AiBehaviorAnalysisService {
     private boolean qualityReview;
     @org.springframework.beans.factory.annotation.Value("${ai.behavior-analysis.plan-source-review:true}")
     private boolean planSourceReview;
+    @org.springframework.beans.factory.annotation.Value("${ai.behavior-analysis.direct-source-review:true}")
+    private boolean directSourceReview;
 
     private AiBehaviorAnalysisResponse analyzeShared(UUID memberId, BehaviorAnalysisInputResponse input) {
         return datasets.run(memberId+":"+input.id(),()->analyzeInput(memberId,input));
@@ -75,11 +78,11 @@ public class AiBehaviorAnalysisService {
         var references = new AnalysisReferences(mapper, input);
         String prompt = references.encode(prompts.userPrompt(input));
         String requestKey=oneuldo.ai.service.AiRequestFingerprint.of(mapper,memberId,input.id(),configuredModel,
-                system,mapper.readTree(prompt),prompts.observationSystem(),prompts.digestContract(),prompts.reductionContract(),
+                system,mapper.readTree(prompt),AiBehaviorAnalysisPromptFactory.OBSERVATION_VERSION,prompts.observationSystem(),prompts.digestContract(),prompts.reductionContract(),
                 FinalAnalysisPromptCompactor.systemPrompt(),FinalAnalysisPromptCompactor.VERSION,FinalSourceEncoding.VERSION,FinalSourceEncoding.ENCODER_REVISION,AnalysisSynthesisPrompt.VERSION,
                 budget.requestTokens(),budget.chunkOutputTokens(),budget.finalOutputTokens(),maxChunks,0.2,
-                MovementProjection.VERSION,prompts.movementMaxError(),MovementInputEncoder.VERSION,"analysis-reuse-v5-plan-source-reviewed", qualityReview, AnalysisReviewPrompt.VERSION, AnalysisReviewPrompt.system(),
-                planSourceReview, AnalysisPlanSemanticReview.VERSION, AnalysisPlanSemanticReview.system());
+                MovementProjection.VERSION,prompts.movementMaxError(),MovementInputEncoder.VERSION,CompactBehaviorTimeline.ENCODER_REVISION,SharedSourceObservations.VERSION,observationParallelism,"analysis-reuse-v5-plan-source-reviewed", qualityReview, AnalysisReviewPrompt.VERSION, AnalysisReviewPrompt.system(),
+                planSourceReview, directSourceReview, ObservationWireEncoding.VERSION, AnalysisPlanSemanticReview.VERSION, AnalysisPlanSemanticReview.system());
         var reusable=repository.findFirstByMemberIdAndDatasetIdAndRequestKeyAndStatusOrderByCreatedAtDesc(memberId,input.id(),requestKey,"READY");
         if(reusable.isPresent()) {
             try {
@@ -94,8 +97,11 @@ public class AiBehaviorAnalysisService {
             status = "NO_HISTORY";
         } else {
             var pipeline = new TimelineAnalysisPipeline(prompts, validator, client, mapper, maxChunks, budget, pacer)
-                    .withQualityReview(qualityReview).withPlanSemanticReview(qualityReview && planSourceReview);
-            if(checkpointStore!=null) pipeline.withCheckpoints(checkpointStore.scope(memberId,input.id()));
+                    .withQualityReview(qualityReview).withPlanSemanticReview(qualityReview && planSourceReview).withObservationParallelism(observationParallelism).withDirectSourceReview(directSourceReview);
+            if(checkpointStore!=null) {
+                var scope=checkpointStore.scope(memberId,input.id());pipeline.withCheckpoints(scope);
+                pipeline.withSharedObservations(new SharedSourceObservations(mapper,scope,input,prompts,validator,budget.chunkOutputTokens()));
+            }
             try {
                 analysis = pipeline.analyze(input, budget.requestTokens(), attempts, references, prompt);
                 model = pipeline.model(); status = "READY";

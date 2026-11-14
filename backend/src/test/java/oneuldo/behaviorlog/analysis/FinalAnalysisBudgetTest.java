@@ -55,4 +55,20 @@ class FinalAnalysisBudgetTest {
         assertThatThrownBy(()->budget.requireFits(prompts.wholeSourceSystem(),source,estimate.required()-1,"EXACT_REQUEST_TOO_LARGE"))
                 .hasMessageContaining("EXACT_REQUEST_TOO_LARGE");
     }
+
+    @Test void direct_review_counts_only_the_request_that_will_actually_be_sent() {
+        var input=fixture.input(fixture.fixture());
+        var refs=new AnalysisReferences(fixture.mapper,input);
+        String source=refs.encode(prompts.wholeSourcePrompt(input));
+        String ignoredDraftSystem="Unused draft instructions. ".repeat(4000);
+        var legacy=FinalAnalysisBudget.estimate(fixture.mapper,budget,ignoredDraftSystem,source,refs,true,"");
+        var direct=FinalAnalysisBudget.estimate(fixture.mapper,budget,ignoredDraftSystem,source,refs,true,true,"retry framing");
+        assertThat(legacy.draftRequest()).isGreaterThan(legacy.reviewRequest());
+        assertThat(direct.draftRequest()).isZero();
+        assertThat(direct.preparedReview()).isNotBlank();
+        assertThat(direct.required()).isEqualTo(budget.total(AnalysisReviewPrompt.system(),direct.preparedReview()+"retry framing",budget.finalOutputTokens())+256);
+        assertThat(direct.required()).isLessThan(legacy.required());
+        assertThatCode(()->budget.requireFits(AnalysisReviewPrompt.system(),direct.preparedReview()+"retry framing",budget.finalOutputTokens(),direct.required(),"ACTUAL_REVIEW_TOO_LARGE"))
+                .doesNotThrowAnyException();
+    }
 }

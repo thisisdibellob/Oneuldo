@@ -22,9 +22,26 @@ public final class TimelineAnalysisPipeline {
     public TimelineAnalysisPipeline withQualityReview(boolean enabled) {qualityReview=enabled;return this;}
     private boolean planSemanticReview;
     public TimelineAnalysisPipeline withPlanSemanticReview(boolean enabled) {planSemanticReview=enabled;return this;}
+    private boolean directSourceReview;
+    public TimelineAnalysisPipeline withDirectSourceReview(boolean enabled) {directSourceReview=enabled;return this;}
     private FinalAnalysisBudget.Estimate finalEstimate(String system,String source,AnalysisReferences refs) {
-        return FinalAnalysisBudget.estimate(mapper,budget,system,source,refs,qualityReview,RETRY);
+        var estimate=FinalAnalysisBudget.estimate(mapper,budget,system,source,refs,qualityReview,directSourceReview,RETRY);
+        if(estimate.preparedReview()!=null&&client.supportsCompactSourceSchemas()) {
+            String prepared=AnalysisReviewWire.prompt(mapper,estimate.preparedReview(),client.supportsConcretePracticeSchemas());
+            return new FinalAnalysisBudget.Estimate(estimate.draftRequest(),
+                budget.total(AnalysisReviewPrompt.system(),prepared+RETRY,budget.finalOutputTokens())+256,prepared);
+        }
+        return estimate;
     }
+    private int observationParallelism=1;
+    public TimelineAnalysisPipeline withObservationParallelism(int count) {
+        if(count<1||count>2)throw new IllegalArgumentException("INVALID_OBSERVATION_PARALLELISM");observationParallelism=count;return this;
+    }
+    private SharedSourceObservations sharedObservations;
+    public TimelineAnalysisPipeline withSharedObservations(SharedSourceObservations source) {sharedObservations=source;return this;}
+    private java.util.Map<String,String> preparedObservations=java.util.Collections.synchronizedMap(new java.util.LinkedHashMap<String,String>(64,0.75f,true) {
+        protected boolean removeEldestEntry(java.util.Map.Entry<String,String> entry){return size()>64;}
+    });
     private boolean movementDetailLimited;
     private int completedObservations;
     private int plannedObservations;
@@ -40,7 +57,8 @@ public final class TimelineAnalysisPipeline {
     public TimelineAnalysisPipeline(AiBehaviorAnalysisPromptFactory p, AiBehaviorAnalysisValidator v, GroqChatClient c, ObjectMapper m,
             int max, AnalysisTokenBudget b, AnalysisCallPacer pacer) {
         if (max < 1) throw new IllegalArgumentException("maxChunks must be positive");
-        prompts=p;validator=v;client=c;mapper=m;maxChunks=max;budget=b;this.pacer=pacer;
+        prompts=p;validator=v;mapper=m;maxChunks=max;budget=b;this.pacer=pacer;
+        client=c instanceof oneuldo.ai.client.InferenceBudgetClient?c:new oneuldo.ai.client.InferenceBudgetClient(c,()->maxChunks*2+2+(qualityReview?3:0)+(planSemanticReview?3:0));
     }
     public String model() { return model; }
     public List<BehaviorAnalysisInputResponse> partition(BehaviorAnalysisInputResponse input,int limit) {
@@ -51,6 +69,33 @@ public final class TimelineAnalysisPipeline {
         int from=0;
         while(from<input.eventCount()) {
             if(chunks.size()>=maxChunks)throw new IllegalArgumentException("CHUNK_CALL_BUDGET_EXCEEDED");
+            if(prompts.movementMaxError()==0) {
+                int remaining=input.eventCount()-from,size=Math.min(remaining,256);
+                int cost=observationCost(slice(input,from,from+size),input,refs);
+                while(cost>limit&&size>1) {
+                    size=Math.max(1,Math.min(size-1,(int)((long)size*limit/cost*9/10)));
+                    cost=observationCost(slice(input,from,from+size),input,refs);
+                }
+                if(cost>limit)throw new oneuldo.ai.exception.AiInputLimitException("SINGLE_EVENT_EXCEEDS_LIMIT",cost,limit);
+                // One bounded growth probe replaces repeated near-identical binary-search encodings.
+                // Estimate marginal cost from measured prefixes, not total cost (which includes
+                // fixed task/scene context). Each chosen prefix still gets an exact budget check.
+                int upper=size,upperCost=cost;
+                while(size<remaining) {
+                    int next=(int)Math.min(remaining,(long)size*2);
+                    int nextCost=observationCost(slice(input,from,from+next),input,refs);
+                    if(nextCost>limit){upper=next;upperCost=nextCost;break;}
+                    size=next;cost=nextCost;
+                }
+                for(int probe=0;probe<2 && upper>size+1;probe++) {
+                    long estimate=(long)(upper-size)*Math.max(0,limit-200-cost)/Math.max(1,upperCost-cost);
+                    int next=size+(int)Math.max(1,Math.min(upper-size-1,estimate));
+                    int nextCost=observationCost(slice(input,from,from+next),input,refs);
+                    if(nextCost<=limit){size=next;cost=nextCost;}else{upper=next;upperCost=nextCost;}
+                }
+                chunks.add(slice(input,from,from+size));from+=size;
+                AnalysisProgress.stage("PREPARING",from,input.eventCount());continue;
+            }
             // Bracket a fitting prefix locally. Starting every search at half of all
             // remaining events repeatedly encoded thousands of events for a small chunk.
             int best=from,remaining=input.eventCount()-from;
@@ -76,7 +121,12 @@ public final class TimelineAnalysisPipeline {
         return chunks;
     }
     private int observationCost(BehaviorAnalysisInputResponse part,BehaviorAnalysisInputResponse full,AnalysisReferences refs) {
-        return budget.total(prompts.observationSystem(),refs.encode(observationPrompt(part,full))+suffix(maxChunks,maxChunks)+RETRY,budget.chunkOutputTokens())+200;
+        return budget.total(prompts.observationSystem(),preparedObservation(part,full,refs)+suffix(maxChunks,maxChunks)+RETRY,budget.chunkOutputTokens())+200;
+    }
+    private String preparedObservation(BehaviorAnalysisInputResponse part,BehaviorAnalysisInputResponse full,AnalysisReferences refs) {
+        String key=full.id()+":"+prompts.movementMaxError()+":"+QwenTokenCounter.textHash(SharedSourceObservations.eventList(part).toString());
+        synchronized(preparedObservations){var saved=preparedObservations.get(key);if(saved!=null)return saved;
+            String value=refs.encode(observationPrompt(part,full));preparedObservations.put(key,value);return value;}
     }
     private String observationPrompt(BehaviorAnalysisInputResponse part,BehaviorAnalysisInputResponse full) {
         if(prompts.movementMaxError()==0) return prompts.observationPrompt(part,full);
@@ -122,29 +172,44 @@ public final class TimelineAnalysisPipeline {
     // Reuse the run's aliases and fingerprint prompt; never share user data across runs.
     AiBehaviorAnalysis analyze(BehaviorAnalysisInputResponse input,int limit,List<AiBehaviorAnalysisRun.Attempt> audit,
             AnalysisReferences refs,String preparedWhole) {
+        preparedObservations.clear();
+        try{return analyzePrepared(input,limit,audit,refs,preparedWhole);}
+        finally{preparedObservations.clear();}
+    }
+    private AiBehaviorAnalysis analyzePrepared(BehaviorAnalysisInputResponse input,int limit,List<AiBehaviorAnalysisRun.Attempt> audit,
+            AnalysisReferences refs,String preparedWhole) {
         // The school profile uses larger context; explicit 8K clients retain the older path.
         if(limit>8192) {
             String source=refs.encode(prompts.wholeSourcePrompt(input));
-            if(finalEstimate(prompts.wholeSourceSystem(),source,refs).required()+200<=limit) {
+            var estimate=finalEstimate(prompts.wholeSourceSystem(),source,refs);
+            if(estimate.required()+200<=limit) {
                 AnalysisProgress.stage("FINALIZING",0,1);
-                var result=finalCall(prompts.wholeSourceSystem(),source,refs,limit,audit,raw->validator.validate(refs.read(raw),input));
+                var result=finalCall(prompts.wholeSourceSystem(),source,refs,limit,audit,raw->validator.validate(refs.read(raw),input),estimate.preparedReview());
                 AnalysisProgress.stage("FINALIZING",1,1);return result;
             }
         }
         String whole=preparedWhole!=null?preparedWhole:refs.encode(prompts.userPrompt(input));
-        if(finalEstimate(prompts.systemPrompt(),whole,refs).required()+200<=limit) {
+        var wholeEstimate=finalEstimate(prompts.systemPrompt(),whole,refs);
+        if(wholeEstimate.required()+200<=limit) {
             AnalysisProgress.stage("FINALIZING",0,1);
-            var result=finalCall(prompts.systemPrompt(),whole,refs,limit,audit,raw->validator.validate(refs.read(raw),input));
+            var result=finalCall(prompts.systemPrompt(),whole,refs,limit,audit,raw->validator.validate(refs.read(raw),input),wholeEstimate.preparedReview());
             AnalysisProgress.stage("FINALIZING",1,1);return result;
         }
-        var chunks=partition(input,limit,refs);
-        log.info("AI analysis partition: events={}, chunks={}",input.eventCount(),chunks.size());
         List<Group> groups=new ArrayList<>();
-        plannedObservations=chunks.size();
-        AnalysisProgress.stage("OBSERVING",0,plannedObservations);
-        for(int i=0;i<chunks.size();i++) {
-            var chunk=chunks.get(i);
-            groups.addAll(observeBounded(chunk,input,refs,limit,audit));
+        var shared=sharedObservations==null||prompts.movementMaxError()!=0?Optional.<SharedSourceObservations.Document>empty():sharedObservations.load();
+        List<Group> originalGroups;
+        if(shared.isPresent()) {
+            for(var part:shared.get().synthesisParts())groups.add(new Group(sharedObservations.scope(part.eventIds()),part.digest()));
+            originalGroups=shared.get().originalParts().stream().map(p->new Group(sharedObservations.scope(p.eventIds()),p.digest())).toList();
+            completedObservations=plannedObservations=originalGroups.size();
+            audit.add(new AiBehaviorAnalysisRun.Attempt(audit.size()+1,"Exact source artifact",mapper.writeValueAsString(shared.get()),null,"SHARED_OBSERVATIONS",SharedSourceObservations.VERSION,1,"stop",0,0,0L));
+        } else {
+            var chunks=partition(input,limit,refs);
+            log.info("AI analysis partition: events={}, chunks={}, parallelism={}",input.eventCount(),chunks.size(),observationParallelism);
+            plannedObservations=chunks.size();AnalysisProgress.stage("OBSERVING",0,plannedObservations);
+            if(Math.min(observationParallelism,Math.max(1,client.maxConcurrency()))>1 && chunks.size()>1) groups.addAll(observeParallel(chunks,input,refs,limit,audit));
+            else for(var chunk:chunks)groups.addAll(observeBounded(chunk,input,refs,limit,audit));
+            originalGroups=List.copyOf(groups);
         }
         while(true) {
             AnalysisProgress.stage("FINALIZING",completedObservations,plannedObservations);
@@ -154,9 +219,11 @@ public final class TimelineAnalysisPipeline {
             log.info("AI final assembly: groups={}, draftRequestBudget={}, reviewRequestEstimate={}, required={}, limit={}",
                     groups.size(),estimate.draftRequest(),estimate.reviewRequest(),estimate.required(),limit);
             if(estimate.required()<=limit) {
+                if(sharedObservations!=null && !movementDetailLimited && prompts.movementMaxError()==0 && shared.isEmpty())
+                    sharedObservations.save(parts(originalGroups),parts(groups),model);
                 try {
                     return finalCall(finalSystem,finalPrompt,refs,limit,audit,
-                            raw->validateFinal(refs.read(raw),input,finalPrompt));
+                            raw->validateFinal(refs.read(raw),input,finalPrompt),estimate.preparedReview());
                 } catch(IllegalStateException failure) {
                     if(!"OUTPUT_TRUNCATED".equals(failure.getMessage()) || groups.size()<=1) throw failure;
                     log.info("AI final output truncated; reducing saved observations before retry");
@@ -178,6 +245,57 @@ public final class TimelineAnalysisPipeline {
             }
             groups=reduced;
         }
+    }
+    private List<SharedSourceObservations.Part> parts(List<Group> groups) {
+        return groups.stream().map(g->new SharedSourceObservations.Part(SharedSourceObservations.eventList(g.scope()),g.digest())).toList();
+    }
+    private List<Group> observeParallel(List<BehaviorAnalysisInputResponse> chunks,BehaviorAnalysisInputResponse input,
+            AnalysisReferences refs,int limit,List<AiBehaviorAnalysisRun.Attempt> audit) {
+        var pool=java.util.concurrent.Executors.newFixedThreadPool(2);
+        var futures=new ArrayList<java.util.concurrent.Future<List<Group>>>();
+        var localAudits=new ArrayList<List<AiBehaviorAnalysisRun.Attempt>>();
+        var children=new ArrayList<TimelineAnalysisPipeline>();
+        var deadline=oneuldo.ai.client.AiOperationDeadline.remaining();long submitted=System.nanoTime();
+        try {
+            for(int i=0;i<chunks.size();i++) {
+                var child=new TimelineAnalysisPipeline(prompts,validator,client,mapper,maxChunks,budget,pacer).withCheckpoints(checkpoints);
+                child.preparedObservations=preparedObservations;child.completedObservations=i;child.plannedObservations=chunks.size();children.add(child);
+                var local=new java.util.concurrent.CopyOnWriteArrayList<AiBehaviorAnalysisRun.Attempt>();localAudits.add(local);
+                var chunk=chunks.get(i);
+                futures.add(pool.submit(()->{
+                    var remaining=deadline==null?null:deadline.minusNanos(System.nanoTime()-submitted);
+                    if(remaining!=null&&(remaining.isNegative()||remaining.isZero()))throw new IllegalStateException("AI_OPERATION_TIMEOUT");
+                    try(var bound=remaining==null?null:new oneuldo.ai.client.AiOperationDeadline(remaining)) {
+                        return child.observeBounded(chunk,input,refs,limit,local);
+                    }
+                }));
+            }
+            var groups=new ArrayList<Group>();
+            for(int i=0;i<futures.size();i++) {
+                var completed=futures.get(i).get();groups.addAll(completed);model=children.get(i).model;
+                movementDetailLimited|=children.get(i).movementDetailLimited;
+                completedObservations+=completed.size();plannedObservations+=completed.size()-1;
+                AnalysisProgress.stage("OBSERVING",completedObservations,plannedObservations);
+            }
+            return groups;
+        }catch(java.util.concurrent.ExecutionException e){if(e.getCause() instanceof RuntimeException r)throw r;throw new IllegalStateException(e.getCause());}
+        catch(InterruptedException e){Thread.currentThread().interrupt();throw new IllegalStateException("AI_REQUEST_INTERRUPTED",e);}
+        finally {
+            futures.forEach(f->f.cancel(true));pool.shutdownNow();
+            try{pool.awaitTermination(5,java.util.concurrent.TimeUnit.SECONDS);}catch(InterruptedException e){Thread.currentThread().interrupt();}
+            for(var local:localAudits)for(var a:local)audit.add(new AiBehaviorAnalysisRun.Attempt(audit.size()+1,a.inputPrompt(),a.rawOutput(),a.errorCode(),a.source(),a.systemPrompt(),a.outputMax(),a.finishReason(),a.inputTokens(),a.outputTokens(),a.latencyMs(),a.transportFailure(),a.validationFailure()));
+        }
+    }
+    private GroqChatClient.GroqChatResult digestRequest(String system,String prompt,int output) {
+        if(!client.supportsSourceSchemas()||prompts.movementMaxError()!=0)return client.completeDigest(system,prompt,output,0.2);
+        // Aliases are explicit source facts, not every E-looking string in reference/coverage metadata.
+        String json=prompt.substring(0,prompt.lastIndexOf('}')+1);var root=ObservationWireEncoding.decode(mapper,mapper.readTree(json));
+        var ids=new LinkedHashSet<String>();
+        if(root.has("behaviorTimeline")) {
+            var timeline=new CompactBehaviorTimeline(mapper).decodeExpanded(root.path("behaviorTimeline"));
+            for(var session:timeline.path("sessions"))for(var event:session.path("events"))ids.add(event.path("behaviorLogId").asString());
+        } else root.path("allowedEvidenceEventIds").forEach(e->ids.add(e.asString()));
+        return client.completeStructured(system,prompt,output,0.2,oneuldo.ai.client.SourceOutputSchemas.digest(ids));
     }
     private List<Group> reduceBounded(List<Group> children,BehaviorAnalysisInputResponse input,AnalysisReferences refs,
             int limit,List<AiBehaviorAnalysisRun.Attempt> audit) {
@@ -235,7 +353,7 @@ public final class TimelineAnalysisPipeline {
         var visible=projection.visible();
         log.info("AI movement observation: chunk={}/{}, sourceEvents={}, visibleEvents={}, simplifiedSegments={}, maxError={}",
                 number,total,chunk.eventCount(),visible.eventCount(),projection.segments().size(),prompts.movementMaxError());
-        String prompt=refs.encode(observationPrompt(chunk,full))+suffix(number,total);
+        String prompt=preparedObservation(chunk,full,refs)+suffix(number,total);
         var digest=callDigest(prompts.observationSystem(),prompt,budget.chunkOutputTokens(),limit,audit,raw->{
             var value=refs.readDigest(raw);
             projection.expand(value.requestedSegmentIds()); // reject fabricated/cross-session segment requests
@@ -315,19 +433,51 @@ public final class TimelineAnalysisPipeline {
     }
     private static String suffix(int n,int count) {return "\n구간 "+n+"/"+count+": 세션 일부이며 구간 밖 행동을 가정하지 마세요.";}
     private AiBehaviorAnalysis finalCall(String system,String prompt,AnalysisReferences refs,int limit,
-            List<AiBehaviorAnalysisRun.Attempt> audit,Function<String,AiBehaviorAnalysis> parse) {
-        var draft=call(system,prompt,budget.finalOutputTokens(),limit,audit,parse);
+            List<AiBehaviorAnalysisRun.Attempt> audit,Function<String,AiBehaviorAnalysis> parse,String preparedReview) {
+        var draft=qualityReview&&directSourceReview?null:call(system,prompt,budget.finalOutputTokens(),limit,audit,parse);
         if(!qualityReview) return draft;
         AnalysisProgress.stage("REVIEWING",completedObservations,plannedObservations);
-        String review=AnalysisReviewPrompt.build(mapper,prompt,draft,refs);
+        // Use the very request that was counted. Building it again can extend the
+        // reference registry and make a near-limit preflight disagree with transmission.
+        String review=preparedReview!=null?preparedReview:AnalysisReviewPrompt.build(mapper,prompt,draft,refs);
+        if(client.supportsCompactSourceSchemas())review=AnalysisReviewWire.prompt(mapper,review,client.supportsConcretePracticeSchemas());
         return call(AnalysisReviewPrompt.system(),review,budget.finalOutputTokens(),limit,audit,
-                raw->parse.apply(AnalysisReviewPrompt.reviewedCurrentAnalysis(mapper,raw,refs)),false,3);
+                raw->{
+                    var result=parse.apply(AnalysisReviewPrompt.reviewedCurrentAnalysis(mapper,raw,refs));
+                    var source=new FinalSourceEncoding(mapper).decode(mapper.readTree(prompt));
+                    if(source.has("groundedPracticeContractVersion")) {
+                        var expanded=AnalysisReviewWire.expand(mapper.readTree(raw),refs);
+                        var issues=GroundedPracticeContract.inspect(expanded.path("analysis"),source,true);
+                        if(!issues.isEmpty())throw new GroundedPracticeContract.Rejected(mapper.writeValueAsString(expanded),issues);
+                    }
+                    return result;
+                },false,3);
     }
     private <T> T call(String system,String prompt,int output,int limit,List<AiBehaviorAnalysisRun.Attempt> audit,Function<String,T> parse) {
         return call(system,prompt,output,limit,audit,parse,false);
     }
     private <T> T callDigest(String system,String prompt,int output,int limit,List<AiBehaviorAnalysisRun.Attempt> audit,Function<String,T> parse) {
         return call(system,prompt,output,limit,audit,parse,true);
+    }
+    private Object reviewSchema(String originalPrompt) {
+        var source=new FinalSourceEncoding(mapper).decode(mapper.readTree(originalPrompt));
+        var ids=new LinkedHashSet<String>();source.path("evidenceReferences").forEach(e->ids.add(e.path("id").asString()));
+        source.path(SourceEventDetails.FIELD).forEach(e->ids.add(e.path("id").asString()));
+        var sessions=new TreeSet<String>();var baselines=new TreeSet<Integer>();
+        for(var task:source.path("taskContext")) {
+            sessions.add(task.path("sessionId").asString());var level=task.path("mission").path("difficulty");
+            if(level.isIntegralNumber()&&level.canConvertToInt())baselines.add(level.asInt());
+        }
+        for(var session:source.path("sourceCoverage").path("sessions"))sessions.add(session.path("sessionId").asString());
+        var rows=mapper.createArrayNode();var stations=ObservationWireEncoding.decode(mapper,source).path("stationClaimSources");
+        // The review input carries literal recorded lookup rows, not interpreted shelf locations.
+        for(var row:stations)rows.add(row.deepCopy());
+        var schema=client.supportsCompactSourceSchemas()
+            ?oneuldo.ai.client.SourceOutputSchemas.compactAnalysisReview(ids,sessions,rows,baselines)
+            :oneuldo.ai.client.SourceOutputSchemas.analysisReview(ids,sessions,rows,baselines);
+        if(client.supportsConcretePracticeSchemas()&&source.has(PracticeDesignContract.FIELD))
+            schema=oneuldo.ai.client.SourceOutputSchemas.concretePractice(schema,GroundedPracticeContract.hasDirectCauseEvidence(source));
+        return schema;
     }
     private <T> T call(String system,String prompt,int output,int limit,List<AiBehaviorAnalysisRun.Attempt> audit,Function<String,T> parse,boolean digest) {
         return call(system,prompt,output,limit,audit,parse,digest,2);
@@ -355,8 +505,11 @@ public final class TimelineAnalysisPipeline {
             long started=System.nanoTime();
             try {
                 log.info("AI analysis request: attempt={}, inputTokens={}, outputMax={}",audit.size()+1,QwenTokenCounter.inputTokens(system,submitted),output);
-                response=digest?client.completeDigest(system,submitted,output,0.2):client.complete(system,submitted,output,0.2);raw=response.text();model=response.model();
+                response=digest?digestRequest(system,submitted,output):system.equals(AnalysisReviewPrompt.system())&&client.supportsSourceSchemas()
+                        ?client.completeStructured(system,submitted,output,0.2,reviewSchema(prompt))
+                        :client.complete(system,submitted,output,0.2);raw=response.text();model=response.model();
                 if("length".equals(response.finishReason())) throw new IllegalArgumentException("OUTPUT_TRUNCATED");
+                if(system.equals(AnalysisReviewPrompt.system()))raw=ConcretePracticeSections.reviewText(mapper,raw);
                 result=parse.apply(raw);
                 if (planSemanticReview && system.equals(AnalysisReviewPrompt.system())) {
                     recordedCandidate = audit.size();
@@ -405,12 +558,21 @@ public final class TimelineAnalysisPipeline {
                             + "근거를 선택할 수 없으면 해당 한계를 uncertainties에 보존하고 무관한 ID로 채우지 마세요. "
                             + "모든 text에서 E번호 및 E번호 범위를 빼고 별도 evidenceEventIds에만 선택한 인용을 둡니다. "
                             + "이해·의도·원인이 미확인이라는 해석은 추측으로 채우지 않고 불확실성을 유지합니다.";
+                if(validation!=null && Set.of("ANALYSIS_FINDING_EVIDENCE_COUNT_EXCEEDS_LIMIT","ANALYSIS_SESSION_EVIDENCE_COUNT_EXCEEDS_LIMIT").contains(validation.code()))
+                    correction += "\n지정된 finding 또는 sessionAssessment의 모든 문장 근거 합집합은 최대 30개입니다. 각 문장이 30개 이하여도 합집합이 넘으면 실패합니다. "
+                            +"원본 사건을 삭제하거나 처음 30개로 자동 절단하지 말고, AI가 각 관찰을 뒷받침하는 관련 근거를 선택하세요. "
+                            +"서로 다른 행동의 모든 근거가 필요하면 finding을 분리하고 practicePlan의 참조도 일치시키세요. "
+                            +"finding 최상위 evidenceEventIds 필드를 추가하지 말고 기존 문장 객체의 evidenceEventIds만 사용하세요. 전체 원본·실제 수량·판정 기준은 그대로 보존합니다.";
+                if(validation!=null && "REVIEW_TASK_JUDGMENT_CONTRADICTION".equals(validation.code()))
+                    correction += "\n"+AnalysisReviewPrompt.taskOutcomeScope();
                 if (validation != null && validation.code().startsWith("REVIEW_TASK_"))
                     correction += "\ntaskChecks는 sessionId를 필드로 갖는 세션 객체 배열입니다. 원본 목표별 taskChecks와 budget/submission을 직접 대조하세요. 모든 status는 MET/UNMET/UNKNOWN 중 하나입니다. 종료 표기는 목표 달성이 아닙니다. "
                             + "AI가 쓴 UNMET/UNKNOWN과 전체 judgment의 모순을 해소하고 설명도 일치시키세요. 통과하려고 근거 없이 MET로 바꾸지 마세요.";
                 if (validation != null && (validation.code().startsWith("REVIEW_PLAN_") || validation.code().startsWith("REVIEW_UNSUPPORTED_")
                         || validation.code().startsWith("REVIEW_UNRECORDED_")))
                     correction += "\nrationale는 observed/unknownCauseIndexes/proposedPractice/baselineDifficulty/supportCapabilities 객체입니다. observed에는 {findingId,observationIndex} 참조만, unknownCauseIndexes에는 uncertainties의 0부터 시작하는 위치만 씁니다. 새 사실·원인을 재작성하지 마세요. 원본 난도가 없으면 null입니다.";
+                if (validation != null && "REVIEW_PLAN_OBSERVATION_REFERENCE".equals(validation.code()))
+                    correction += ReviewPlanReferenceFeedback.build(mapper, raw);
                 if (validation != null && validation.code().startsWith("REVIEW_STATION_"))
                     correction += "\n인용한 사건의 recordedStation 값을 stationClaims에 그대로 쓰고 대상 종류에 맞게 문장을 수정하세요. UNKNOWN이면 종류를 추측하지 마세요.";
                 if(validation!=null && "DIGEST_EVIDENCE_OUTSIDE_CHUNK".equals(validation.code()))
@@ -427,11 +589,28 @@ public final class TimelineAnalysisPipeline {
                 if(validation != null && "INLINE_REVIEW_REFERENCE_NOT_ALLOWED".equals(validation.code()))
                     correction = ClaimReferenceRepairPrompt.build(mapper, validation);
                 if(system.equals(AnalysisReviewPrompt.system())) {
+                    if(failure instanceof GroundedPracticeContract.Rejected rejected)
+                        return repairGroundedText(prompt,rejected,limit,audit,parse);
+                    if(raw != null && failure instanceof AnalysisPlanSemanticReview.Rejected rejected
+                            && ReviewAlternativeExplanationPatch.canRepair(mapper,raw,rejected))
+                        return repairReviewCauseAlternatives(prompt,raw,rejected,limit,audit,parse);
                     if(raw != null && failure instanceof AnalysisPlanSemanticReview.Rejected rejected
                             && ReviewSemanticTextPatch.canRepair(mapper,raw,rejected))
                         return repairReviewSemanticText(prompt,raw,rejected,limit,audit,parse);
-                    if (raw != null && technicalReviewPatch(validation, raw))
-                        return repairReviewMetadata(prompt, raw, validation, limit, audit, parse);
+                    if (raw != null && technicalReviewPatch(validation, raw)) {
+                        try {
+                            return repairReviewMetadata(prompt, raw, validation, limit, audit, parse);
+                        } catch (ReviewEvidenceException next) {
+                            // Formatting can expose a different domain error. Keep the rejected
+                            // provider response and ask the model to repair it within this call's
+                            // existing bound; never insert observations or uncertainty in Java.
+                            if (!AiBehaviorAnalysisValidator.OBSERVATIONS_OR_LIMITS_REQUIRED.equals(next.details().code())) throw next;
+                            correction = observationsOrLimitsFeedback(raw);
+                            continue;
+                        }
+                    }
+                    if (validation != null && AiBehaviorAnalysisValidator.OBSERVATIONS_OR_LIMITS_REQUIRED.equals(validation.code()))
+                        correction = observationsOrLimitsFeedback(raw);
                     String withCandidate=AnalysisRepairCandidate.append(mapper,correction,raw);
                     if(budget.total(system,prompt+RETRY+withCandidate,output)<=limit) correction=withCandidate;
                     else log.warn("Review repair candidate exceeds request budget; retaining complete original sources and error details");
@@ -448,7 +627,16 @@ public final class TimelineAnalysisPipeline {
         return failure != null && ("REVIEW_UNRECORDED_DIFFICULTY_BASELINE".equals(failure.code())
                 || failure.code().startsWith("REVIEW_STATION_CLAIM_")
                 || ReviewClaimTextPatch.canRepair(mapper, candidate, failure)
-                || ReviewAlternativeExplanationPatch.canRepair(mapper, candidate, failure));
+                || ReviewAlternativeExplanationPatch.canRepair(mapper, candidate, failure)
+                || ReviewEvidenceUnionPatch.canRepair(mapper, candidate, failure)
+                || ReviewObservationOrderPatch.canRepair(mapper, candidate, failure));
+    }
+    private String observationsOrLimitsFeedback(String candidate) {
+        return AnalysisRepairCandidate.append(mapper,
+                "\nANALYSIS_OBSERVATIONS_OR_LIMITS_REQUIRED: findings와 uncertainties를 동시에 비울 수 없습니다. "
+                + "원본에 기록된 관찰은 문장별 실제 근거와 함께 findings에 유지하거나, 관찰을 제시할 수 없다면 실제 미확인 범위·원인·이해의 한계를 uncertainties에 명시하세요. "
+                + "미확인 원인을 새 가설로 채우거나 통과용 사실·근거·성공을 만들지 마세요. targetFindingIds도 실제 findings와 일치시키세요. "
+                + "원본 전체·과제 조건·성패 기준은 그대로이며 서버가 문장을 채우지 않습니다. 전체 검토 JSON을 반환하세요.", candidate);
     }
     /** A semantic repair changes only the model-selected prose path and must pass both existing gates again. */
     private <T> T repairReviewSemanticText(String source,String candidate,AnalysisPlanSemanticReview.Rejected issue,
@@ -457,7 +645,7 @@ public final class TimelineAnalysisPipeline {
         for(int patchAttempt=0;patchAttempt<3;patchAttempt++) {
             if(audit.size()>=maxChunks*2+2+(qualityReview?3:0)+(planSemanticReview?3:0)) throw new IllegalArgumentException("TOTAL_CALL_BUDGET_EXCEEDED");
             String system=ReviewSemanticTextPatch.SYSTEM;
-            String prompt=ReviewSemanticTextPatch.prompt(mapper,source,corrected,issue.review())+correction;
+            String prompt=ReviewSemanticTextPatch.prompt(mapper,source,corrected,issue)+correction;
             budget.requireFits(system,prompt,ReviewSemanticTextPatch.OUTPUT_TOKENS+ReviewSemanticTextPatch.SAFETY_TOKENS,limit,"REVIEW_SEMANTIC_TEXT_PATCH_EXCEEDS_LIMIT");
             GroqChatClient.GroqChatResult response=null;
             long started=System.nanoTime();int index=audit.size();
@@ -466,7 +654,7 @@ public final class TimelineAnalysisPipeline {
                 var cached=checkpoints.find(system,prompt,ReviewSemanticTextPatch.OUTPUT_TOKENS);
                 response=cached.orElseGet(()->client.complete(system,prompt,ReviewSemanticTextPatch.OUTPUT_TOKENS,0.0));
                 if("length".equals(response.finishReason())) throw new IllegalArgumentException("OUTPUT_TRUNCATED");
-                String proposed=ReviewSemanticTextPatch.apply(mapper,before,issue.review(),response.text());
+                String proposed=ReviewSemanticTextPatch.apply(mapper,before,issue,response.text());
                 T result=parse.apply(proposed);
                 corrected=proposed;
                 audit.add(attempt(audit.size()+1,system,prompt,ReviewSemanticTextPatch.OUTPUT_TOKENS,response,null,
@@ -485,6 +673,9 @@ public final class TimelineAnalysisPipeline {
                         transport==null?"INVALID_REVIEW_SEMANTIC_TEXT_PATCH":transport.code().name(),"REVIEW_SEMANTIC_TEXT_PATCH",system,ReviewSemanticTextPatch.OUTPUT_TOKENS,
                         response==null?null:response.finishReason(),response==null?null:response.inputTokens(),response==null?null:response.outputTokens(),
                         (System.nanoTime()-started)/1_000_000,transport==null?null:transport.details(),details));
+                if(failure instanceof GroundedPracticeContract.Rejected grounded) return repairGroundedText(source,grounded,limit,audit,parse);
+                if(failure instanceof AnalysisPlanSemanticReview.Rejected cause && ReviewAlternativeExplanationPatch.canRepair(mapper,corrected,cause))
+                    return repairReviewCauseAlternatives(source,corrected,cause,limit,audit,parse);
                 if(patchAttempt==2) throw failure;
                 if(failure instanceof AnalysisPlanSemanticReview.Rejected next && ReviewSemanticTextPatch.canRepair(mapper,corrected,next)) {
                     issue=next;correction="";continue;
@@ -500,11 +691,39 @@ public final class TimelineAnalysisPipeline {
         }
         throw new IllegalStateException("INVALID_REVIEW_SEMANTIC_TEXT_PATCH");
     }
+    private <T> T normalizeReviewCitations(String source, String candidate, ReviewEvidenceException.Details failure,
+            int limit, List<AiBehaviorAnalysisRun.Attempt> audit, Function<String,T> parse) {
+        String corrected = ReviewClaimTextPatch.normalizeAnnotations(mapper, candidate, failure);
+        // The rejected provider response is already retained verbatim in audit. Formatting is
+        // not a model call and must not be recorded as a fabricated provider response.
+        log.info("Normalized citation annotations without inference; original claims, evidence and judgments retained");
+        try {
+            T result = parse.apply(corrected);
+            if (planSemanticReview) reviewPlanSource(source, corrected, limit, audit);
+            return result;
+        } catch (RuntimeException invalid) {
+            if (invalid instanceof AnalysisPlanSemanticReview.Rejected cause
+                    && ReviewAlternativeExplanationPatch.canRepair(mapper, corrected, cause))
+                return repairReviewCauseAlternatives(source, corrected, cause, limit, audit, parse);
+            if (invalid instanceof AnalysisPlanSemanticReview.Rejected rejected
+                    && ReviewSemanticTextPatch.canRepair(mapper, corrected, rejected))
+                return repairReviewSemanticText(source, corrected, rejected, limit, audit, parse);
+            if(invalid instanceof GroundedPracticeContract.Rejected rejected)
+                return repairGroundedText(source,rejected,limit,audit,parse);
+            if (invalid instanceof ReviewEvidenceException next && technicalReviewPatch(next.details(), corrected))
+                return repairReviewMetadata(source, corrected, next.details(), limit, audit, parse);
+            throw invalid;
+        }
+    }
     /** Small model patches preserve the whole original source and candidate under the request budget.
      * Every patched candidate must still pass the same source and independent semantic validators.
      */
     private <T> T repairReviewMetadata(String source, String candidate, ReviewEvidenceException.Details failure,
             int limit, List<AiBehaviorAnalysisRun.Attempt> audit, Function<String,T> parse) {
+        if (ReviewObservationOrderPatch.canRepair(mapper, candidate, failure))
+            return repairReviewObservationOrder(source, candidate, failure, limit, audit, parse);
+        if (ReviewEvidenceUnionPatch.canRepair(mapper, candidate, failure))
+            return repairReviewEvidenceUnion(source, candidate, failure, limit, audit, parse);
         if (ReviewAlternativeExplanationPatch.canRepair(mapper, candidate, failure))
             return repairReviewAlternatives(source, candidate, failure, limit, audit, parse);
         String corrected = candidate;
@@ -512,6 +731,8 @@ public final class TimelineAnalysisPipeline {
         for (int patchAttempt = 0; patchAttempt < 3; patchAttempt++) {
             if (audit.size() >= maxChunks*2+2+(qualityReview?3:0)+(planSemanticReview?3:0))
                 throw new IllegalArgumentException("TOTAL_CALL_BUDGET_EXCEEDED");
+            if (ReviewClaimTextPatch.canRepair(mapper, corrected, failure))
+                return normalizeReviewCitations(source, corrected, failure, limit, audit, parse);
             boolean station = failure.code().startsWith("REVIEW_STATION_CLAIM_");
             boolean claimText = "INLINE_REVIEW_REFERENCE_NOT_ALLOWED".equals(failure.code());
             String system = station ? ReviewStationPatch.SYSTEM : claimText ? ReviewClaimTextPatch.SYSTEM : ReviewMetadataPatch.SYSTEM;
@@ -549,6 +770,10 @@ public final class TimelineAnalysisPipeline {
                             response == null ? null : response.finishReason(), response == null ? null : response.inputTokens(),
                             response == null ? null : response.outputTokens(), (System.nanoTime()-started)/1_000_000,
                             transport == null ? null : transport.details(), details));
+                if(invalid instanceof GroundedPracticeContract.Rejected grounded) return repairGroundedText(source,grounded,limit,audit,parse);
+                if (invalid instanceof AnalysisPlanSemanticReview.Rejected cause
+                        && ReviewAlternativeExplanationPatch.canRepair(mapper,corrected,cause))
+                    return repairReviewCauseAlternatives(source,corrected,cause,limit,audit,parse);
                 if (invalid instanceof AnalysisPlanSemanticReview.Rejected rejected
                         && ReviewSemanticTextPatch.canRepair(mapper,corrected,rejected))
                     return repairReviewSemanticText(source,corrected,rejected,limit,audit,parse);
@@ -564,6 +789,8 @@ public final class TimelineAnalysisPipeline {
                             + ": previous patch failed INVALID_REVIEW_STATION_PATCH. Null is not a station-row deletion. Follow stationPatchMode; WHOLE_ARRAY means one /stationClaims array, preserving valid rows and all event/evidence IDs. Original sources/candidate unchanged.";
                     continue;
                 }
+                if (ReviewEvidenceUnionPatch.canRepair(mapper, corrected, details))
+                    return repairReviewEvidenceUnion(source, corrected, details, limit, audit, parse);
                 if (ReviewAlternativeExplanationPatch.canRepair(mapper, corrected, details))
                     return repairReviewAlternatives(source, corrected, details, limit, audit, parse);
                 if (!technicalReviewPatch(details, corrected) || patchAttempt == 2) throw invalid;
@@ -572,6 +799,86 @@ public final class TimelineAnalysisPipeline {
             }
         }
         throw new IllegalStateException("INVALID_REVIEW_METADATA_PATCH");
+    }
+    private <T> T repairReviewObservationOrder(String source,String candidate,ReviewEvidenceException.Details issue,
+            int limit,List<AiBehaviorAnalysisRun.Attempt> audit,Function<String,T> parse) {
+        String correction="";
+        for(int n=0;n<2;n++) {
+            if(audit.size()>=maxChunks*2+2+(qualityReview?3:0)+(planSemanticReview?3:0))
+                throw new IllegalArgumentException("TOTAL_CALL_BUDGET_EXCEEDED");
+            String system=ReviewObservationOrderPatch.SYSTEM;
+            String prompt=ReviewObservationOrderPatch.prompt(mapper,source,candidate,issue)+correction;
+            int output=256;budget.requireFits(system,prompt,output,limit,"REVIEW_ORDER_PATCH_EXCEEDS_LIMIT");
+            String corrected=candidate;boolean applied=false;
+            GroqChatClient.GroqChatResult response=null;long started=System.nanoTime();int auditIndex=audit.size();
+            try {
+                response=client.complete(system,prompt,output,0.0);
+                if("length".equals(response.finishReason()))throw new IllegalArgumentException("OUTPUT_TRUNCATED");
+                corrected=ReviewObservationOrderPatch.apply(mapper,candidate,issue,response.text());applied=true;
+                T result=parse.apply(corrected);
+                audit.add(attempt(audit.size()+1,system,prompt,output,response,null,"REVIEW_OBSERVATION_ORDER_PATCH"));
+                if(planSemanticReview)reviewPlanSource(source,corrected,limit,audit);
+                return result;
+            } catch(RuntimeException invalid) {
+                var details=invalid instanceof ReviewEvidenceException e?e.details():null;
+                var transport=invalid instanceof oneuldo.ai.exception.AiTransportException e?e:null;
+                if(audit.size()==auditIndex)audit.add(new AiBehaviorAnalysisRun.Attempt(audit.size()+1,prompt,response==null?null:response.text(),
+                    transport==null?"REVIEW_ORDER_PATCH_REJECTED":transport.code().name(),"REVIEW_OBSERVATION_ORDER_PATCH",system,output,
+                    response==null?null:response.finishReason(),response==null?null:response.inputTokens(),response==null?null:response.outputTokens(),
+                    (System.nanoTime()-started)/1_000_000,transport==null?null:transport.details(),details));
+                if(invalid instanceof GroundedPracticeContract.Rejected grounded) return repairGroundedText(source,grounded,limit,audit,parse);
+                if(applied && invalid instanceof AnalysisPlanSemanticReview.Rejected cause
+                        && ReviewAlternativeExplanationPatch.canRepair(mapper,corrected,cause))
+                    return repairReviewCauseAlternatives(source,corrected,cause,limit,audit,parse);
+                if(applied && invalid instanceof AnalysisPlanSemanticReview.Rejected rejected
+                        && ReviewSemanticTextPatch.canRepair(mapper,corrected,rejected))
+                    return repairReviewSemanticText(source,corrected,rejected,limit,audit,parse);
+                boolean orderFailure=details!=null&&details.code().equals("REVIEW_EVIDENCE_OUT_OF_ORDER");
+                if(transport!=null||n==1||(!orderFailure&&!"INVALID_REVIEW_ORDER_PATCH".equals(invalid.getMessage())&&!"OUTPUT_TRUNCATED".equals(invalid.getMessage())))throw invalid;
+                correction="\nPrevious permutation failed. Return a different complete chronological permutation; every existing clause once. Diagnostic: "+mapper.writeValueAsString(details);
+            }
+        }
+        throw new IllegalStateException("INVALID_REVIEW_ORDER_PATCH");
+    }
+
+    /** Repair only the model finding whose aggregate citation set exceeds the existing limit. */
+    private <T> T repairReviewEvidenceUnion(String source,String candidate,ReviewEvidenceException.Details issue,
+            int limit,List<AiBehaviorAnalysisRun.Attempt> audit,Function<String,T> parse) {
+        String correction="";
+        for(int patchAttempt=0;patchAttempt<3;patchAttempt++) {
+            if(audit.size()>=maxChunks*2+2+(qualityReview?3:0)+(planSemanticReview?3:0))throw new IllegalArgumentException("TOTAL_CALL_BUDGET_EXCEEDED");
+            String system=ReviewEvidenceUnionPatch.SYSTEM;
+            int output=ReviewEvidenceUnionPatch.outputTokens(mapper,candidate,issue);
+            String prompt=ReviewEvidenceUnionPatch.prompt(mapper,source,candidate,issue)+correction;
+            Object schema=client.supportsCitationPoolSchemas()?ReviewEvidenceUnionPatch.schema(mapper,candidate,issue):null;
+            budget.requireFits(system,prompt+(schema==null?"":mapper.writeValueAsString(schema)),output,limit,"REVIEW_EVIDENCE_UNION_PATCH_EXCEEDS_LIMIT");
+            long started=System.nanoTime();GroqChatClient.GroqChatResult response=null;int index=audit.size();boolean applied=false;String corrected=candidate;
+            try {
+                response=schema==null?client.complete(system,prompt,output,0.0):client.completeStructured(system,prompt,output,0.0,schema);
+                if("length".equals(response.finishReason()))throw new IllegalArgumentException("OUTPUT_TRUNCATED");
+                corrected=ReviewEvidenceUnionPatch.apply(mapper,candidate,issue,response.text());applied=true;
+                T result=parse.apply(corrected);
+                audit.add(attempt(audit.size()+1,system,prompt,output,response,null,"REVIEW_EVIDENCE_UNION_PATCH"));
+                if(planSemanticReview)reviewPlanSource(source,corrected,limit,audit);
+                return result;
+            } catch(RuntimeException invalid) {
+                var details=invalid instanceof ReviewEvidenceException next?next.details():invalid instanceof AnalysisPlanSemanticReview.Rejected rejected?rejected.details():null;
+                var transport=invalid instanceof oneuldo.ai.exception.AiTransportException t?t:null;
+                if(audit.size()==index)audit.add(new AiBehaviorAnalysisRun.Attempt(audit.size()+1,prompt,response==null?null:response.text(),
+                        transport==null?applied?"PATCH_RECHECK_REJECTED":"INVALID_REVIEW_EVIDENCE_UNION_PATCH":transport.code().name(),"REVIEW_EVIDENCE_UNION_PATCH",system,output,
+                        response==null?null:response.finishReason(),response==null?null:response.inputTokens(),response==null?null:response.outputTokens(),
+                        (System.nanoTime()-started)/1_000_000,transport==null?null:transport.details(),details));
+                if(invalid instanceof GroundedPracticeContract.Rejected grounded) return repairGroundedText(source,grounded,limit,audit,parse);
+                if(applied&&invalid instanceof AnalysisPlanSemanticReview.Rejected rejected&&ReviewAlternativeExplanationPatch.canRepair(mapper,corrected,rejected))
+                    return repairReviewCauseAlternatives(source,corrected,rejected,limit,audit,parse);
+                if(applied&&invalid instanceof AnalysisPlanSemanticReview.Rejected rejected&&ReviewSemanticTextPatch.canRepair(mapper,corrected,rejected))
+                    return repairReviewSemanticText(source,corrected,rejected,limit,audit,parse);
+                if(applied&&technicalReviewPatch(details,corrected))return repairReviewMetadata(source,corrected,details,limit,audit,parse);
+                if(applied||transport!=null||patchAttempt==2)throw invalid;
+                correction=ReviewEvidenceUnionPatch.retryFeedback(mapper,response==null?"null":response.text(),patchAttempt+2);
+            }
+        }
+        throw new IllegalStateException("INVALID_REVIEW_EVIDENCE_UNION_PATCH");
     }
     /** Bounded one-finding model patches, separate from metadata's three attempts and under the same total call budget. */
     private <T> T repairReviewAlternatives(String source, String candidate, ReviewEvidenceException.Details failure,
@@ -609,6 +916,10 @@ public final class TimelineAnalysisPipeline {
                             response == null ? null : response.finishReason(), response == null ? null : response.inputTokens(),
                             response == null ? null : response.outputTokens(), (System.nanoTime()-started)/1_000_000,
                             transport == null ? null : transport.details(), details));
+                if(invalid instanceof GroundedPracticeContract.Rejected grounded) return repairGroundedText(source,grounded,limit,audit,parse);
+                if (invalid instanceof AnalysisPlanSemanticReview.Rejected cause
+                        && ReviewAlternativeExplanationPatch.canRepair(mapper,corrected,cause))
+                    return repairReviewCauseAlternatives(source,corrected,cause,limit,audit,parse);
                 if (invalid instanceof AnalysisPlanSemanticReview.Rejected rejected
                         && ReviewSemanticTextPatch.canRepair(mapper,corrected,rejected))
                     return repairReviewSemanticText(source,corrected,rejected,limit,audit,parse);
@@ -624,27 +935,122 @@ public final class TimelineAnalysisPipeline {
         }
         throw new IllegalStateException("INVALID_REVIEW_ALTERNATIVE_PATCH");
     }
+    /** Three model attempts at only the exact comprehension/fault row reported by the literal source guard. */
+    private <T> T repairReviewCauseAlternatives(String source,String candidate,AnalysisPlanSemanticReview.Rejected issue,
+            int limit,List<AiBehaviorAnalysisRun.Attempt> audit,Function<String,T> parse) {
+        String corrected=candidate,correction="";
+        for(int patchAttempt=0;patchAttempt<3;patchAttempt++) {
+            if(audit.size()>=maxChunks*2+2+(qualityReview?3:0)+(planSemanticReview?3:0)) throw new IllegalArgumentException("TOTAL_CALL_BUDGET_EXCEEDED");
+            String system=ReviewAlternativeExplanationPatch.SYSTEM;
+            int output=ReviewAlternativeExplanationPatch.outputTokens(mapper,corrected,issue);
+            String prompt=ReviewAlternativeExplanationPatch.prompt(mapper,source,corrected,issue)+correction;
+            budget.requireFits(system,prompt,output+ReviewAlternativeExplanationPatch.SAFETY_TOKENS,limit,"REVIEW_ALTERNATIVE_SOURCE_PATCH_EXCEEDS_LIMIT");
+            GroqChatClient.GroqChatResult response=null;long started=System.nanoTime();int index=audit.size();boolean applied=false;
+            try {
+                response=client.complete(system,prompt,output,0.0);
+                if("length".equals(response.finishReason()))throw new IllegalArgumentException("OUTPUT_TRUNCATED");
+                corrected=ReviewAlternativeExplanationPatch.apply(mapper,corrected,issue,response.text());applied=true;
+                T result=parse.apply(corrected);
+                audit.add(attempt(audit.size()+1,system,prompt,output,response,null,"REVIEW_ALTERNATIVE_SOURCE_PATCH"));
+                if(planSemanticReview)reviewPlanSource(source,corrected,limit,audit);
+                return result;
+            } catch(RuntimeException failure) {
+                var details=failure instanceof ReviewEvidenceException e?e.details():failure instanceof AnalysisPlanSemanticReview.Rejected r?r.details():null;
+                var transport=failure instanceof oneuldo.ai.exception.AiTransportException t?t:null;
+                if(audit.size()==index)audit.add(new AiBehaviorAnalysisRun.Attempt(audit.size()+1,prompt,response==null?null:response.text(),
+                        transport!=null?transport.code().name():applied?"PATCH_RECHECK_REJECTED":"INVALID_REVIEW_ALTERNATIVE_PATCH",
+                        "REVIEW_ALTERNATIVE_SOURCE_PATCH",system,output,response==null?null:response.finishReason(),response==null?null:response.inputTokens(),
+                        response==null?null:response.outputTokens(),(System.nanoTime()-started)/1_000_000,transport==null?null:transport.details(),details));
+                if(failure instanceof GroundedPracticeContract.Rejected grounded) return repairGroundedText(source,grounded,limit,audit,parse);
+                if(failure instanceof AnalysisPlanSemanticReview.Rejected next && ReviewAlternativeExplanationPatch.canRepair(mapper,corrected,next) && patchAttempt<2) {
+                    issue=next;correction="";continue;
+                }
+                if(failure instanceof AnalysisPlanSemanticReview.Rejected next && ReviewSemanticTextPatch.canRepair(mapper,corrected,next))
+                    return repairReviewSemanticText(source,corrected,next,limit,audit,parse);
+                if(!applied && "INVALID_REVIEW_ALTERNATIVE_PATCH".equals(failure.getMessage()) && patchAttempt<2) {
+                    correction="\nRepair attempt "+(patchAttempt+2)+": retain every unreported row and the uncertainty prefix exactly. Remove only the reported unsupported row; no new claim, citation, grade or other path.";continue;
+                }
+                throw failure;
+            }
+        }
+        throw new IllegalStateException("INVALID_REVIEW_ALTERNATIVE_PATCH");
+    }
+    private <T> T repairGroundedText(String source,GroundedPracticeContract.Rejected rejected,int limit,
+            List<AiBehaviorAnalysisRun.Attempt> audit,Function<String,T> parse) {
+        var current=rejected;String feedback="";
+        for(int n=0;n<2;n++) {
+            if(audit.size()>=maxChunks*2+2+(qualityReview?3:0)+(planSemanticReview?3:0)) throw new IllegalArgumentException("TOTAL_CALL_BUDGET_EXCEEDED");
+            String system=GroundedTextPatch.SYSTEM;
+            String prompt=GroundedTextPatch.prompt(mapper,source,current,client.supportsGroundedTextPatchSchemas()&&client.supportsGroundedCauseEnums())+feedback;
+            int output=GroundedTextPatch.outputTokens(mapper,current);budget.requireFits(system,prompt,output,limit,"GROUNDED_PATCH_EXCEEDS_LIMIT");
+            GroqChatClient.GroqChatResult response=null;int index=audit.size();long started=System.nanoTime();String corrected=current.candidate();
+            try {
+                var paths=current.issues().stream().map(GroundedPracticeContract.Violation::path).distinct().toList();
+                response=client.supportsGroundedTextPatchSchemas()?client.completeStructured(system,prompt,output,0.0,GroundedTextPatch.outputSchema(mapper,current,client.supportsGroundedCauseEnums())):client.complete(system,prompt,output,0.0);
+                if("length".equals(response.finishReason()))throw new IllegalArgumentException("OUTPUT_TRUNCATED");
+                corrected=GroundedTextPatch.apply(mapper,current,response.text());
+                T result=parse.apply(corrected);
+                audit.add(attempt(audit.size()+1,system,prompt,output,response,null,"GROUNDED_TEXT_PATCH"));
+                if(planSemanticReview)reviewPlanSource(source,corrected,limit,audit);
+                return result;
+            }catch(RuntimeException failure){
+                var transport=failure instanceof oneuldo.ai.exception.AiTransportException t?t:null;
+                if(audit.size()==index)audit.add(new AiBehaviorAnalysisRun.Attempt(audit.size()+1,prompt,response==null?null:response.text(),
+                    transport==null?"GROUNDED_PATCH_REJECTED":transport.code().name(),"GROUNDED_TEXT_PATCH",system,output,
+                    response==null?null:response.finishReason(),response==null?null:response.inputTokens(),response==null?null:response.outputTokens(),
+                    (System.nanoTime()-started)/1_000_000,transport==null?null:transport.details(),null));
+                if(failure instanceof GroundedPracticeContract.Rejected remaining){current=remaining;feedback=GroundedTextPatch.retryFeedback(remaining);continue;}
+                if(failure instanceof AnalysisPlanSemanticReview.Rejected next && ReviewAlternativeExplanationPatch.canRepair(mapper,corrected,next))
+                    return repairReviewCauseAlternatives(source,corrected,next,limit,audit,parse);
+                if(failure instanceof AnalysisPlanSemanticReview.Rejected next && ReviewSemanticTextPatch.canRepair(mapper,corrected,next))
+                    return repairReviewSemanticText(source,corrected,next,limit,audit,parse);
+                if(failure instanceof ReviewEvidenceException technical && technicalReviewPatch(technical.details(),corrected))
+                    return repairReviewMetadata(source,corrected,technical.details(),limit,audit,parse);
+                if(n==0 && ("INVALID_GROUNDED_PATCH".equals(failure.getMessage())||"GROUNDED_PATCH_CHANGED_NUMBERS".equals(failure.getMessage()))) {
+                    feedback="\nPrevious repair rejected: "+failure.getMessage()+". Return patches OBJECT containing exactly these keys: "+mapper.writeValueAsString(current.issues().stream().map(GroundedPracticeContract.Violation::path).distinct().toList())+". Every value must be a string; do not include reviewFormat, evidence, stationClaims or arrays. Preserve numeric facts.";if(failure instanceof GroundedTextPatch.NumericMismatch mismatch)feedback+=mismatch.feedback(mapper);continue;
+                }
+                throw failure;
+            }
+        }
+        throw current;
+    }
+
     private void reviewPlanSource(String source, String candidate, int limit, List<AiBehaviorAnalysisRun.Attempt> audit) {
         String prompt = AnalysisPlanSemanticReview.prompt(mapper, source, candidate);
         String system = AnalysisPlanSemanticReview.system();
-        budget.requireFits(system, prompt, AnalysisPlanSemanticReview.OUTPUT_TOKENS, limit, "PLAN_SOURCE_REVIEW_EXCEEDS_LIMIT");
-        GroqChatClient.GroqChatResult response = null;
-        long start = System.nanoTime();
-        try {
-            response = client.complete(system, prompt, AnalysisPlanSemanticReview.OUTPUT_TOKENS, 0.0);
+        int output = SourceBoundReviewChecks.outputTokens(mapper, candidate, source);
+        String correction="";
+        for(int reviewAttempt=0;reviewAttempt<3;reviewAttempt++) {
+          if(audit.size()>=maxChunks*2+2+(qualityReview?3:0)+(planSemanticReview?3:0)) throw new IllegalArgumentException("TOTAL_CALL_BUDGET_EXCEEDED");
+          String submitted=prompt+correction;
+          budget.requireFits(system, submitted, output + SourceBoundReviewChecks.SAFETY_TOKENS, limit, "PLAN_SOURCE_REVIEW_EXCEEDS_LIMIT");
+          GroqChatClient.GroqChatResult response = null;
+          long start = System.nanoTime();
+          String auditSource=reviewAttempt==0?"PLAN_SOURCE_REVIEW":"PLAN_SOURCE_REVIEW_FORMAT_REPAIR";
+          try {
+            response = client.complete(system, submitted, output, 0.0);
             if ("length".equals(response.finishReason())) throw new ReviewEvidenceException("REVIEW_PLAN_SEMANTIC_FORMAT", "/", List.of());
             AnalysisPlanSemanticReview.validate(mapper, response.text(), candidate, source);
-            audit.add(attempt(audit.size()+1, system, prompt, AnalysisPlanSemanticReview.OUTPUT_TOKENS, response, null, "PLAN_SOURCE_REVIEW"));
-        } catch (RuntimeException failure) {
+            audit.add(attempt(audit.size()+1, system, submitted, output, response, null, auditSource));
+            return;
+          } catch (RuntimeException failure) {
             var transport = failure instanceof oneuldo.ai.exception.AiTransportException t ? t : null;
             var validation = failure instanceof ReviewEvidenceException e ? e.details()
                     : failure instanceof AnalysisPlanSemanticReview.Rejected r ? r.details() : null;
-            audit.add(new AiBehaviorAnalysisRun.Attempt(audit.size()+1, prompt, response == null ? null : response.text(),
-                    transport != null ? transport.code().name() : "INVALID_PLAN_SOURCE_REVIEW", "PLAN_SOURCE_REVIEW", system,
-                    AnalysisPlanSemanticReview.OUTPUT_TOKENS, response == null ? null : response.finishReason(),
+            audit.add(new AiBehaviorAnalysisRun.Attempt(audit.size()+1, submitted, response == null ? null : response.text(),
+                    transport != null ? transport.code().name() : "INVALID_PLAN_SOURCE_REVIEW", auditSource, system,
+                    output, response == null ? null : response.finishReason(),
                     response == null ? null : response.inputTokens(), response == null ? null : response.outputTokens(),
                     (System.nanoTime()-start)/1_000_000, transport == null ? null : transport.details(), validation));
-            throw failure;
+            boolean formatOnly=failure instanceof ReviewEvidenceException && validation!=null
+                    && Set.of("REVIEW_SOURCE_BOUND_CHECK_REQUIRED","REVIEW_PLAN_SEMANTIC_FORMAT").contains(validation.code());
+            if(!formatOnly || response==null || reviewAttempt==2) throw failure;
+            // Correct the review's technical envelope locally. The original analysis,
+            // source, verdict rules and both semantic gates remain unchanged.
+            correction="\nPrevious actual review response (untrusted): "+response.text()
+                    +"\nTechnical review-format error: "+mapper.writeValueAsString(validation)
+                    +"\nReturn the complete review JSON again. Copy each full literal capability descriptor OBJECT, including implemented/type/scope when present, from sourceBoundReview. Never substitute its scope string. Keep candidate and original evidence unchanged; reapply all semantic checks. This is not an instruction to return VALID.";
+          }
         }
     }
     private AiBehaviorAnalysisRun.Attempt attempt(int number,String system,String prompt,int output,GroqChatClient.GroqChatResult response,String error,String source) {

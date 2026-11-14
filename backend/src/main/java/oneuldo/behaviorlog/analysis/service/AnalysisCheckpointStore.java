@@ -30,8 +30,18 @@ public class AnalysisCheckpointStore {
         try {
             // Exact prompt/system/model/options match. No cross-user reuse or implicit prompt-version migration.
             int end=prompt.lastIndexOf('}');
-            Object canonical=end>=0?List.of(sorted(mapper.readTree(prompt.substring(0,end+1))),prompt.substring(end+1)):prompt;
-            String wire=mapper.writeValueAsString(List.of(member,dataset,model,system,canonical,output,0.2,"checkpoint-v1"));
+            Object canonical=prompt;
+            if(end>=0) {
+                try {
+                    var json=mapper.reader().with(tools.jackson.databind.DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+                            .readTree(prompt.substring(0,end+1));
+                    canonical=List.of(sorted(json),prompt.substring(end+1));
+                } catch(RuntimeException mixedPrompt) {
+                    // Multi-document repair prompts must retain every candidate and correction byte.
+                    canonical=prompt;
+                }
+            }
+            String wire=mapper.writeValueAsString(List.of(member,dataset,model,system,canonical,output,0.2,"checkpoint-v2-complete-prompt"));
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(wire.getBytes(StandardCharsets.UTF_8)));
         } catch(java.security.NoSuchAlgorithmException impossible) {throw new IllegalStateException(impossible);}
     }

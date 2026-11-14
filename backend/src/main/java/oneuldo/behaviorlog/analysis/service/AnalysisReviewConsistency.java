@@ -6,10 +6,12 @@ import tools.jackson.databind.JsonNode;
 /** Checks the AI's own condition judgments and literal source references; never calculates a player's answer. */
 public final class AnalysisReviewConsistency {
     public static final String FORMAT = "claim-evidence-v4";
+    public static final String SUMMARY_BASIS_ID = "$summary";
     public static final Set<String> CAPABILITIES = Set.of("TEXT_GUIDANCE", "ITEM_QUANTITY_BUDGET", "TIME_LIMIT", "SHELF_CATEGORY_ORDER");
     private AnalysisReviewConsistency() {}
 
     public static void validate(JsonNode envelope, AnalysisReferences refs) {
+        envelope=AnalysisReviewWire.expand(envelope,refs);
         if (!FORMAT.equals(envelope.path("reviewFormat").asString())) fail("CURRENT_REVIEW_FORMAT_REQUIRED", "/reviewFormat");
         var checks = envelope.path("taskChecks");
         var assessments = envelope.path("analysis").path("sessionAssessments");
@@ -85,6 +87,15 @@ public final class AnalysisReviewConsistency {
                     || !reference.path("findingId").isString() || !reference.path("observationIndex").isIntegralNumber()
                     || !reference.path("observationIndex").canConvertToInt()) fail("REVIEW_PLAN_OBSERVATION_REFERENCE", "/practicePlan/rationale/observed");
             int index = reference.path("observationIndex").asInt();
+            if (SUMMARY_BASIS_ID.equals(reference.path("findingId").asString())) {
+                var analysis = envelope.path("analysis");
+                var summary = analysis.path("summary");
+                if (!analysis.path("findings").isArray() || !analysis.path("findings").isEmpty()
+                        || !summary.isArray() || index < 0 || index >= summary.size()
+                        || !observations.add(SUMMARY_BASIS_ID + ":" + index))
+                    fail("REVIEW_PLAN_OBSERVATION_REFERENCE", "/practicePlan/rationale/observed");
+                continue;
+            }
             JsonNode finding = null;
             for (var row : envelope.path("analysis").path("findings")) if (row.path("id").equals(reference.path("findingId"))) finding = row;
             if (finding == null || index < 0 || index >= finding.path("observation").size()

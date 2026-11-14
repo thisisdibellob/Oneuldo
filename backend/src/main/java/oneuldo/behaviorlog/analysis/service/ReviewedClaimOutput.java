@@ -17,7 +17,7 @@ public final class ReviewedClaimOutput {
     private ReviewedClaimOutput(ObjectMapper mapper, AnalysisReferences refs) { this.mapper=mapper; this.refs=refs; }
 
     public static String read(ObjectMapper mapper, JsonNode envelope, AnalysisReferences refs) {
-        return new ReviewedClaimOutput(mapper,refs).normalize(envelope).toString();
+        return new ReviewedClaimOutput(mapper,refs).normalize(AnalysisReviewWire.expand(envelope,refs)).toString();
     }
 
     private ObjectNode normalize(JsonNode envelope) {
@@ -94,8 +94,12 @@ public final class ReviewedClaimOutput {
             var unknown = new ArrayList<String>();
             if (current) {
                 var claims = mapper.createArrayNode();
-                for (var reference : basis.path("observed")) for (var finding : analysis.path("findings"))
-                    if (finding.path("id").equals(reference.path("findingId"))) claims.add(finding.path("observation").get(reference.path("observationIndex").asInt()));
+                for (var reference : basis.path("observed")) {
+                    if (AnalysisReviewConsistency.SUMMARY_BASIS_ID.equals(reference.path("findingId").asString()))
+                        claims.add(analysis.path("summary").get(reference.path("observationIndex").asInt()));
+                    else for (var finding : analysis.path("findings"))
+                        if (finding.path("id").equals(reference.path("findingId"))) claims.add(finding.path("observation").get(reference.path("observationIndex").asInt()));
+                }
                 observed = sentences(claims, "/practicePlan/rationale/observed", true, new LinkedHashSet<>());
                 basis.path("unknownCauseIndexes").forEach(index -> unknown.add(analysis.path("uncertainties").get(index.asInt()).asString()));
             } else {

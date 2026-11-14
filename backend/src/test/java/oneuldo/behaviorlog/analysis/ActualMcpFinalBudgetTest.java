@@ -5,6 +5,7 @@ import tools.jackson.databind.json.JsonMapper;
 import oneuldo.behaviorlog.analysis.service.*;
 import static org.assertj.core.api.Assertions.*;
 class ActualMcpFinalBudgetTest {
+ @org.junit.jupiter.api.io.TempDir Path temporary;
  @Test void full_actual_mcp_final_source_fits_after_exact_count_table_encoding() throws Exception {
   var file=Path.of("../output/persona45-mcp-20261013/auditor/analyses.json");Assumptions.assumeTrue(Files.exists(file));
   var mapper=JsonMapper.builder().findAndAddModules().build();var codec=new FinalSourceEncoding(mapper);var report=mapper.createArrayNode();int found=0;
@@ -21,7 +22,7 @@ class ActualMcpFinalBudgetTest {
    int required=QwenTokenCounter.inputTokens(FinalAnalysisPromptCompactor.systemPrompt(),packed.toString())+3200+512;
    var item=report.addObject().put("analysisId",run.path("id").asString()).put("requiredTokens",required).put("allOriginalFactsPreserved",true);
    item.put("systemTokens",QwenTokenCounter.count(attempt.path("systemPrompt").asString()));var sizes=item.putObject("encodedFieldTokens");for(String field:packed.propertyNames())sizes.put(field,QwenTokenCounter.count(packed.get(field).toString()));
-   Files.writeString(Path.of("../output/persona45-mcp-20261013/final-source-count-budget.json"),mapper.writerWithDefaultPrettyPrinter().writeValueAsString(report));
+   Files.writeString(temporary.resolve("final-source-count-budget.json"),mapper.writerWithDefaultPrettyPrinter().writeValueAsString(report));
    assertThat(required).isLessThanOrEqualTo(24000);found++;
    var snapshotRows=mapper.readTree(Files.readString(Path.of("../output/persona45-mcp-20261013/auditor/input-snapshots.json")));
    for(var row:snapshotRows)if(row.path("id").asString().equals(run.path("dataset_id").asString())){
@@ -31,13 +32,15 @@ class ActualMcpFinalBudgetTest {
     var decodedReview=codec.decode(mapper.readTree(review));var stations=decodedReview.path("stationClaimSources");
     assertThat(stations).hasSize(refs.recordedStations().size());
     for(var station:stations){var recorded=refs.recordedStations().get(station.path("eventId").asString());assertThat(station.path("stationId")).isEqualTo(recorded.path("stationId"));assertThat(station.path("kind")).isEqualTo(recorded.path("kind"));}
-    int reviewRequired=QwenTokenCounter.inputTokens(AnalysisReviewPrompt.system(),review)+3200+512;item.put("reviewRequiredTokens",reviewRequired);
+    // Use the production review reservation instead of maintaining a second, larger padding constant.
+    var budget=new AnalysisTokenBudget();org.springframework.test.util.ReflectionTestUtils.setField(budget,"finalOutputTokens",3200);
+    int reviewRequired=FinalAnalysisBudget.estimate(mapper,budget,FinalAnalysisPromptCompactor.systemPrompt(),packed.toString(),refs,true,true,"").reviewRequest();item.put("reviewRequiredTokens",reviewRequired);
     item.put("reviewSystemTokens",QwenTokenCounter.count(AnalysisReviewPrompt.system()));var reviewSizes=item.putObject("reviewFieldTokens");var wire=mapper.readTree(review);for(String field:wire.propertyNames())reviewSizes.put(field,QwenTokenCounter.count(wire.get(field).toString()));
-    Files.writeString(Path.of("../output/persona45-mcp-20261013/final-source-count-budget.json"),mapper.writerWithDefaultPrettyPrinter().writeValueAsString(report));
+    Files.writeString(temporary.resolve("final-source-count-budget.json"),mapper.writerWithDefaultPrettyPrinter().writeValueAsString(report));
     assertThat(reviewRequired).isLessThanOrEqualTo(24000);
    }
   }
   Assumptions.assumeTrue(found>0);
-  Files.writeString(Path.of("../output/persona45-mcp-20261013/final-source-count-budget.json"),mapper.writerWithDefaultPrettyPrinter().writeValueAsString(report));
+  Files.writeString(temporary.resolve("final-source-count-budget.json"),mapper.writerWithDefaultPrettyPrinter().writeValueAsString(report));
  }
 }

@@ -6,11 +6,18 @@ import tools.jackson.databind.node.ObjectNode;
 
 /** A second model pass, never a server-side rewrite of behavioral judgments. */
 public final class AnalysisReviewPrompt {
-    public static final String VERSION = "analysis-review-v51-exact-station-columns";
+    public static final String VERSION = "analysis-review-v56-session-source-ledger";
     private AnalysisReviewPrompt() {}
+    /** Existing task-check verdict contract; never an independent-ability score. */
+    public static String taskOutcomeScope() {
+        return "Judge TASK OUTCOME, not ability: any required UNMET=FAILURE; otherwise UNKNOWN=UNDETERMINED; all MET=SUCCESS. "
+                +"Empty checkout can prove unmet purchases. Assistance/system checkout never erases unmet goals or actor prefix. "
+                +"Keep ownership/unknown ability separate; never change checks to pass. ";
+    }
+
     public static String system() {
-        return "Independently review originals, not prior draft prose. Korean single-line JSON in supplied claim-evidence-v4 envelope; no separate claimChecks. Narrate actual action order, not task/termination anchor order. Every factual/absence claim needs its own nonempty supporting evidenceEventIds; no inline E numbers/ranges or unrelated citations. Alternatives require source support, otherwise[]. Preserve objective comparisons, counterevidence and unresolved scope; cognition stays uncertain. "
-                + AnalysisSourceContext.FINAL_RULES + AdaptiveObservationGuidance.RULE;
+        return taskOutcomeScope()+"Korean JSON per outputContract; one line. Full E123 only in evidenceEventIds, never bare E/text. Concise complete facts/unknowns. ITEM_SEARCH_STARTED=automatic movement, no search-UI ambiguity. No measured route efficiency; describe transitions. "
+                + AnalysisSourceContext.FINAL_RULES + AdaptiveObservationGuidance.RULE + "\n" + GroundedPracticeContract.RULE;
     }
 
     public static String build(ObjectMapper mapper, String source, AiBehaviorAnalysis draft, AnalysisReferences refs) {
@@ -27,15 +34,16 @@ public final class AnalysisReviewPrompt {
             movement.put("rule", MovementSourceContext.RULE);
         root.put("reviewVersion", VERSION);
         // These application instructions are already covered by system and the review contracts.
-        root.remove(java.util.List.of("sourceEventDetailsRule", "interpretationRule", "practiceCapabilities", "draftRule", "reviewSourcePolicy", "claimExample", "finalReviewInstruction"));
+        root.remove(java.util.List.of("sourceEventDetailsRule", "interpretationRule", "practiceCapabilities", "implementedSupportCapabilities", "draftRule", "reviewSourcePolicy", "claimExample", "finalReviewInstruction"));
 
         root.put("stage", "REVIEW originals independently; draft prose withheld.");
+        if(root.has("sessionSourceLedgerRule"))root.put("sessionSourceLedgerRule",SessionSourceLedger.RULE);
         root.put("taskConsistencyContract", "taskChecks: one per session/objective; compare accepted SKU/spec/unit/package quantity against cart/submission with goal/action IDs. Each objective/budget/submission status MET|UNMET|UNKNOWN; recorded submission=MET. All MET=SUCCESS; any UNMET=FAILURE; otherwise UNDETERMINED. Lifecycle/budget never erases unmet goals. AI judges; server rejects contradictions.");
         root.set("taskCheckShape", mapper.readTree("""
                 [{"sessionId":"ID","objectives":[{"productId":"ID","status":"MET|UNMET|UNKNOWN","evidenceEventIds":["ID"]}],
                   "budget":{"status":"MET|UNMET|UNKNOWN","evidenceEventIds":[]},"submission":{"status":"MET|UNMET|UNKNOWN","evidenceEventIds":[]}}]
                 """));
-        root.put("planBasisContract", "rationale={observed:[{findingId,observationIndex}],unknownCauseIndexes:[int],proposedPractice:string,baselineDifficulty:original int|null,supportCapabilities:[TEXT_GUIDANCE|ITEM_QUANTITY_BUDGET|TIME_LIMIT|SHELF_CATEGORY_ORDER]}. Index existing finding.observation/uncertainties only; no new facts/evidence arrays. Propose an observation, not a cause. Missing difficulty=null.");
+        root.put("planBasisContract", "rationale={observed:[{findingId,observationIndex}],unknownCauseIndexes:[int],proposedPractice:string,baselineDifficulty:original int|null,supportCapabilities:[TEXT_GUIDANCE|ITEM_QUANTITY_BUDGET|TIME_LIMIT|SHELF_CATEGORY_ORDER]}. Index existing finding.observation/uncertainties only; no new facts/evidence arrays. ONLY when findings=[] use {findingId:\"$summary\",observationIndex:int} to reference an existing source-cited analysis.summary clause. Do not invent a finding, none or F1. With findings present use its actual IDs. Summary citations and all independent source/judgment checks remain mandatory. Propose an observation, not a cause. Missing difficulty=null.");
         root.put("stationIdentityContract", "stationClaims={eventId,stationId,kind}, one per cited recordedStation. Keep UNKNOWN; door/proximity/opening/exposure/selection differ. Location=recorded category/station, not storage labels.");
         // Detailed judgment/support instructions occur once in system(), not in every source copy.
         root.remove(java.util.List.of("sourceReview", "goalComparison", "learningEvidence"));
@@ -52,7 +60,17 @@ public final class AnalysisReviewPrompt {
         if(oldChunks.isArray()) {
             var chunks=root.putArray("chunkAnalyses");
             for(var chunk:oldChunks) {
-                var context=mapper.createObjectNode();context.set("localLimitationsToRecheck",chunk.has("localLimitationsToRecheck") ? chunk.path("localLimitationsToRecheck") : chunk.path("uncertainties"));
+                var context=mapper.createObjectNode();
+                var limitations=chunk.has("localLimitationsToRecheck")?chunk.path("localLimitationsToRecheck"):chunk.path("uncertainties");
+                var retained=context.putArray("localLimitationsToRecheck");int withheld=0;
+                for(var limitation:limitations) {
+                    var candidate=mapper.createObjectNode();candidate.putArray("uncertainties").add(limitation);
+                    // Only intermediary AI hypotheses are withheld. Original events/reports stay intact,
+                    // and the complete original digest remains in the immutable attempt audit.
+                    if(root.has("groundedPracticeContractVersion")&&!GroundedPracticeContract.inspect(candidate,decoded,false).isEmpty())withheld++;
+                    else retained.add(limitation);
+                }
+                if(withheld>0)context.put("unsupportedIntermediateHypothesesWithheld",withheld);
                 var observations=context.putArray("observations");
                 for(var observation:chunk.path("observations")) {
                     var ids=observation.path("evidenceEventIds");
@@ -66,11 +84,11 @@ public final class AnalysisReviewPrompt {
                 }
                 // Retain coverage limitations even when raw-backed observations are deduplicated.
                 // Full raw actions do not establish missing dynamic map/NPC state.
-                if (!observations.isEmpty() || !context.path("localLimitationsToRecheck").isEmpty()) chunks.add(context);
+                if (!observations.isEmpty() || !context.path("localLimitationsToRecheck").isEmpty() || withheld>0) chunks.add(context);
             }
         }
         root.put("rawBackedObservationsNotRepeated",rawBackedObservations);
-        root.put("outputContract", "Exactly {reviewFormat:'claim-evidence-v4',analysis,reviewNotes:[string],taskChecks,stationClaims}. analysis={sessionAssessments,summary,findings,uncertainties:[string],practicePlan,usedEvidenceCardIds:[]}. sessionAssessment={sessionId,judgment,explanation}; finding={id,skill,observation,interpretation,alternativeExplanations,suggestedSupport}. summary/observation/interpretation/alternatives/explanation are arrays of {text,evidenceEventIds}: supplied IDs max30, uncertain interpretation may[]; no finding-level evidence or claimChecks. practicePlan={targetFindingIds,goal,rationale:planBasisContract,recommendedDifficulty:1..3,itemCount:1..4,quantityComplexity:LOW|MEDIUM|HIGH,budgetPressure:LOW|MEDIUM|HIGH,textSupport:SIMPLIFIED|STANDARD|REDUCED,reasonCodes:[uppercase codes]}. Use taskCheckShape and exact station rows.");
+        root.put("outputContract", "Exactly {reviewFormat:'claim-evidence-v4',analysis,reviewNotes:[string],taskChecks,stationClaims}. analysis={sessionAssessments,summary,findings,uncertainties:[string],practicePlan,usedEvidenceCardIds:[]}. sessionAssessment={sessionId,judgment,explanation}; finding={id,skill,observation,interpretation,alternativeExplanations,suggestedSupport}. summary/observation/interpretation/alternatives/explanation are arrays of {text,evidenceEventIds}: supplied IDs max30, uncertain interpretation may[]; no finding-level evidence or claimChecks. practicePlan={targetFindingIds,goal,rationale:planBasisContract,recommendedDifficulty:1..3,itemCount:1..4,quantityComplexity:LOW|MEDIUM|HIGH,budgetPressure:LOW|MEDIUM|HIGH,textSupport:SIMPLIFIED|STANDARD|REDUCED,reasonCodes:[uppercase codes]}. Each finding and each sessionAssessment has a union limit of 30 DISTINCT evidence IDs across all its claim arrays. Do not add finding-level evidenceEventIds. Preserve full original sources; select relevant citations or split separate observations into findings. Use taskCheckShape and exact station rows.");
         root.set("taskComparisonSource", taskComparisonSource(mapper, decoded));
         AnalysisSourceContext.addMissionPlanProvenance(mapper,root);
         var encoded = new FinalSourceEncoding(mapper).encodeReadable(root);

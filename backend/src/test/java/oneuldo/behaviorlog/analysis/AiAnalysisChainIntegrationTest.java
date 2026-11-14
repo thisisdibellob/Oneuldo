@@ -249,9 +249,9 @@ class AiAnalysisChainIntegrationTest {
                 String evidence=input.path("currentAnalysis").path("findings").get(0).path("evidenceEventIds").get(0).asString();
                 return new GroqChatClient.GroqChatResult("""
                         {"summary":"목록 확인 행동이 누적 관찰되었습니다.","findings":[{"id":"F1","skill":"수량 확인","observation":"목록을 열었습니다.",
-                        "interpretation":"수량을 확인했을 가능성이 있습니다.","alternativeExplanations":["단순 탐색일 수도 있습니다."],
+                        "interpretation":"목록 열기는 기록되었고 수량 조절은 확인되지 않았습니다.","alternativeExplanations":["조작 목적은 기록으로 확인되지 않습니다."],
                         "evidenceEventIds":["%s"],"suggestedSupport":"목록을 함께 읽습니다."}],"uncertainties":["실생활 수행은 알 수 없습니다."],
-                        "practicePlan":{"targetFindingIds":["F1"],"goal":"목록과 수량 비교 연습","rationale":"누적 관찰과 연결",
+                        "practicePlan":{"targetFindingIds":["F1"],"goal":"목록과 수량 비교 연습","rationale":"변경: 수량 비교 안내를 추가. 확인: 목록과 수량 비교 조작.",
                         "recommendedDifficulty":1,"itemCount":2,"quantityComplexity":"LOW","budgetPressure":"LOW","textSupport":"SIMPLIFIED",
                         "reasonCodes":["QUANTITY_PRACTICE"]},"usedEvidenceCardIds":[]}
                         """.formatted(evidence),"mock-qwen");
@@ -264,7 +264,7 @@ class AiAnalysisChainIntegrationTest {
             var sessionId = UUID.randomUUID();
             var analysis = new AiBehaviorAnalysis("목록을 열었습니다.",
                     List.of(new AiBehaviorAnalysis.Finding("F1", "수량 확인", "목록을 열었습니다.", "수량을 확인했을 가능성이 있습니다.",
-                            List.of("단순 탐색일 수도 있습니다."), List.of(eventId), "목록을 함께 읽습니다.")),
+                            List.of("조작 목적은 기록으로 확인되지 않습니다."), List.of(eventId), "목록을 함께 읽습니다.")),
                     List.of(new AiBehaviorAnalysis.SessionAssessment(sessionId, "UNDETERMINED", "장면이 끝나지 않았습니다.", List.of(eventId))),
                     List.of("실생활 수행은 알 수 없습니다."),
                     new AiBehaviorAnalysis.PracticePlan(List.of("F1"), "목록과 수량 비교 연습", "목록 열람 행동과 연결", 1, 2,
