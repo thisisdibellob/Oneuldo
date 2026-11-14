@@ -21,14 +21,15 @@ public class RestOllamaChatClient implements GroqChatClient {
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(RestOllamaChatClient.class);
     private final RestClient restClient;
     private final OllamaProperties properties;
-    private final Semaphore execution = new Semaphore(1, true);
+    private final Semaphore execution;
     private final Semaphore admission;
 
     public RestOllamaChatClient(@Qualifier("ollamaRestClient") RestClient restClient,
             OllamaProperties properties) {
         this.restClient = restClient;
         this.properties = properties;
-        this.admission = new Semaphore(properties.maxQueued() + 1);
+        this.execution=new Semaphore(properties.parallelism(),true);
+        this.admission = new Semaphore(properties.maxQueued() + properties.parallelism());
     }
 
     @Override
@@ -46,6 +47,35 @@ public class RestOllamaChatClient implements GroqChatClient {
         return execute(systemPrompt, userPrompt, output, temperature, ObservationOutputSchema.VALUE);
     }
 
+    @Override public int maxConcurrency() { return Math.min(properties.parallelism(),capabilities().parallelism()); }
+    @Override public boolean supportsSourceSchemas() { return capabilities().sourceSchemas(); }
+    @Override public GroqChatResult completeStructured(String system,String prompt,int output,double temperature,Object schema) {
+        return execute(system,prompt,output,temperature,schema);
+    }
+    private record Capabilities(boolean sourceSchemas,boolean compactSchemas,boolean citationPoolSchemas,boolean groundedTextPatchSchemas,boolean groundedCauseEnums,boolean concretePracticeSchemas,int parallelism) {}
+    @Override public boolean supportsConcretePracticeSchemas(){return capabilities().concretePracticeSchemas();}
+    @Override public boolean supportsCompactSourceSchemas(){return capabilities().compactSchemas();}
+    @Override public boolean supportsGroundedCauseEnums(){return capabilities().groundedCauseEnums();}
+    @Override public boolean supportsGroundedTextPatchSchemas(){return capabilities().groundedTextPatchSchemas();}
+    @Override public boolean supportsCitationPoolSchemas(){return capabilities().citationPoolSchemas();}
+    private volatile Capabilities capabilities;
+    private volatile long capabilitiesUntil;
+    private synchronized Capabilities capabilities() {
+        if(capabilities!=null&&System.nanoTime()<capabilitiesUntil)return capabilities;
+        Capabilities value=new Capabilities(false,false,false,false,false,false,1);
+        try {
+            var f=new org.springframework.http.client.JdkClientHttpRequestFactory(java.net.http.HttpClient.newBuilder().connectTimeout(java.time.Duration.ofSeconds(5)).build());
+            f.setReadTimeout(java.time.Duration.ofSeconds(5));
+            var r=restClient.mutate().requestFactory(f).build().get().uri("/api/limits")
+                .headers(h->{if(!properties.apiKey().isBlank())h.setBearerAuth(properties.apiKey());}).retrieve().body(java.util.Map.class);
+            if(r!=null)value=new Capabilities(Boolean.TRUE.equals(r.get("sourceBoundSchemas")),Boolean.TRUE.equals(r.get("compactSourceSchemas")),Boolean.TRUE.equals(r.get("citationPoolSchemas")),Boolean.TRUE.equals(r.get("groundedTextPatchSchemas"))&&((Number)r.getOrDefault("groundedTextPatchSchemaVersion",1)).intValue()>=2,Boolean.TRUE.equals(r.get("groundedTextPatchSchemas"))&&((Number)r.getOrDefault("groundedTextPatchSchemaVersion",1)).intValue()>=3,Boolean.TRUE.equals(r.get("concretePracticeSchemas"))&&((Number)r.getOrDefault("concretePracticeSchemaVersion",0)).intValue()>=2,Math.max(1,Math.min(2,Math.min(((Number)r.getOrDefault("parallelism",1)).intValue(),((Number)r.getOrDefault("maxPerKey",1)).intValue()))));
+        }catch(RuntimeException unavailable){log.info("Gateway capabilities unavailable; retaining single-call fixed-schema compatibility");}
+        capabilities=value;capabilitiesUntil=System.nanoTime()+java.time.Duration.ofMinutes(1).toNanos();return value;
+    }
+    public record Timing(String requestId,long queueMs,long httpMs,Long loadNs,Long promptNs,Long outputNs,Integer cachedPromptTokens) {}
+    private final ThreadLocal<Timing> lastTiming=new ThreadLocal<>();
+    public Timing lastTiming() { return lastTiming.get(); }
+
     private GroqChatResult execute(String systemPrompt, String userPrompt, int output, double temperature, Object format) {
         if (output < 1) throw new IllegalArgumentException("INVALID_OUTPUT_TOKEN_BUDGET");
         int required = Math.addExact(QwenTokenCounter.inputTokens(systemPrompt, userPrompt), output);
@@ -54,15 +84,17 @@ public class RestOllamaChatClient implements GroqChatClient {
         String requestId = java.util.UUID.randomUUID().toString();
         long started = System.nanoTime();
         if (!admission.tryAcquire()) throw failure(Code.AI_QUEUE_FULL, requestId, "QUEUE", 0, started, null);
-        boolean acquired = false;
+        boolean acquired = false;long admittedAt=System.nanoTime();long queueMs=0;
         int attempts = 0;
         try {
             var remaining=AiOperationDeadline.remaining();
             acquired = execution.tryAcquire(remaining==null?properties.queueTimeout().toMillis():Math.min(remaining.toMillis(),properties.queueTimeout().toMillis()), TimeUnit.MILLISECONDS);
+            queueMs=elapsed(admittedAt);
             if (!acquired) throw failure(Code.AI_QUEUE_TIMEOUT, requestId, "QUEUE", 0, started, null);
             var body = new Request(properties.model(), List.of(new Message("system", systemPrompt),
                     new Message("user", userPrompt)), false, false, properties.keepAlive(),
                     new Options(properties.contextLength(), output, temperature, 0.8), format);
+            long httpStart=System.nanoTime();
             while (true) {
                 attempts++;
                 log.info("AI transport start: requestId={}, attempt={}", requestId, attempts);
@@ -98,6 +130,10 @@ public class RestOllamaChatClient implements GroqChatClient {
                     throw failure(Code.AI_INVALID_RESPONSE, requestId, "RESPONSE", attempts, started, null);
                 }
                 long elapsed = elapsed(started);
+                var timing=new Timing(requestId,queueMs,elapsed(httpStart),response.load_duration(),response.prompt_eval_duration(),response.eval_duration(),response.prompt_eval_cached_count());
+                lastTiming.set(timing);
+                log.info("AI inference timings: requestId={}, queueMs={}, httpMs={}, loadNs={}, promptNs={}, outputNs={}, cachedPromptTokens={}",
+                    requestId,timing.queueMs(),timing.httpMs(),timing.loadNs(),timing.promptNs(),timing.outputNs(),timing.cachedPromptTokens());
                 log.info("AI transport complete: requestId={}, attempts={}, elapsedMs={}", requestId, attempts, elapsed);
                 return new GroqChatResult(response.message().content(),
                         response.model() == null ? properties.model() : response.model(),
@@ -158,5 +194,5 @@ public class RestOllamaChatClient implements GroqChatClient {
     private record Request(String model, List<Message> messages, boolean think, boolean stream,
             String keep_alive, Options options, Object format) {}
     private record Response(String model, Message message, Boolean done, String done_reason,
-            Integer prompt_eval_count, Integer eval_count, String error) {}
+            Integer prompt_eval_count, Integer eval_count, String error, Long load_duration, Long prompt_eval_duration, Long eval_duration, Integer prompt_eval_cached_count) {}
 }

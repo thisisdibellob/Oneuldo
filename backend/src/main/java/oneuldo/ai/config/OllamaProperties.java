@@ -6,7 +6,11 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "ai.ollama")
 public record OllamaProperties(String baseUrl, String model, int contextLength,
         Duration timeout, Duration queueTimeout, int maxQueued, String keepAlive, String apiKey,
-        Duration connectTimeout, Integer connectRetries, Duration connectRetryDelay) {
+        Duration connectTimeout, Integer connectRetries, Duration connectRetryDelay, Integer parallelism) {
+    public OllamaProperties(String baseUrl,String model,int contextLength,Duration timeout,Duration queueTimeout,
+            int maxQueued,String keepAlive,String apiKey,Duration connectTimeout,Integer connectRetries,Duration connectRetryDelay) {
+        this(baseUrl,model,contextLength,timeout,queueTimeout,maxQueued,keepAlive,apiKey,connectTimeout,connectRetries,connectRetryDelay,null);
+    }
     public OllamaProperties(String baseUrl, String model, int contextLength,
             Duration timeout, Duration queueTimeout, int maxQueued, String keepAlive, String apiKey) {
         this(baseUrl, model, contextLength, timeout, queueTimeout, maxQueued, keepAlive, apiKey, null, null, null);
@@ -18,6 +22,8 @@ public record OllamaProperties(String baseUrl, String model, int contextLength,
     @org.springframework.boot.context.properties.bind.ConstructorBinding
     public OllamaProperties {
         apiKey = apiKey == null ? "" : apiKey;
+        parallelism=parallelism==null?1:parallelism;
+        if(parallelism<1 || parallelism>2) throw new IllegalArgumentException("Ollama parallelism must be 1 or 2");
         connectTimeout = connectTimeout == null ? Duration.ofSeconds(15) : connectTimeout;
         connectRetries = connectRetries == null ? 2 : connectRetries;
         connectRetryDelay = connectRetryDelay == null ? Duration.ofSeconds(1) : connectRetryDelay;
