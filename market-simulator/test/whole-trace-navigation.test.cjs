@@ -78,9 +78,13 @@ function witnessPath(state, accepts) {
   return null;
 }
 const walkActions = path => path.map(waypointId => ({ type: 'walk', waypointId }));
-function guardFor(settings) {
+// Pass the bundle's observationVersion to compare against the same actor observation the bundle recorded
+// (new unbound anchor requests default to anchor-visible-structures-v1, which adds visibleStructures).
+function guardFor(settings, observationVersion) {
   const p = getPersona(settings.personaId);
-  return new TraceGuard(settings.snapshot, p.id, p.version, 'offline-test', true, true);
+  return observationVersion
+    ? new TraceGuard(settings.snapshot, p.id, p.version, 'offline-test', true, true, false, false, false, false, true, false, observationVersion)
+    : new TraceGuard(settings.snapshot, p.id, p.version, 'offline-test', true, true);
 }
 
 test('both audited wall/HUD hops stay excluded, and forged graph hints cannot bypass compilation', async () => {
@@ -219,7 +223,7 @@ test('navigation carries no persona preference or newly observed product knowled
   const reference = fixture();
   for (const personaId of ['mild-intellectual-disability-adult', 'careful-checker', 'quick-decider']) {
     const { settings, bundle } = personaId === reference.settings.personaId ? reference : fixture({ personaId });
-    const persona = getPersona(personaId), guard = guardFor(settings);
+    const persona = getPersona(personaId), guard = guardFor(settings, bundle.observationVersion);
     const { behavior, ...characterMetadata } = bundle.persona;
     assert.deepEqual(characterMetadata, { id: persona.id, version: persona.version, name: persona.name,
       description: persona.description, character: persona.character });

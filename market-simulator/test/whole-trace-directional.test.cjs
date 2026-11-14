@@ -67,12 +67,16 @@ test('omitting the movement option preserves the exact pre-change default menus,
   const { bundle } = fixture({ enabled: false });
   // Captured from the unchanged checkout before directional implementation. These
   // hashes compare serialized bytes, including entry order, labels and optional keys.
+  // Menus and the initial choice frame are still the original capture. actorState,
+  // worldReference and inputHash were re-captured after three intended content changes:
+  // the anchor-visible-structures-v1 default (visibleStructures: [], 51b5692), persona
+  // strategy 5 (cbe8d3c) and the help line about asking staff for locations (a44f3a9).
   const baseline = {
     choiceCatalog: 'a2d836cb1f7af4e3b14f5c0615a060daaa1a959e244265b8c57b14f27a3eb205',
     initialChoiceFrame: 'eaee5bc6277e5e1d86294be9a672a74d10caf05d05e62d239dd8679fab9fe688',
-    actorState: 'd74a3e268080eff9237a1b693bd98e02987182fa9bcb276bcf6b850301c71ef5',
-    worldReference: '3169cf6d2bb691dc9b452b1b2c8bbe0c34899af08748e1483ec454a512d14a72',
-    inputHash: 'd3b11abee2446167bddfc84030f2403ab621c708a792e468774df2cc21a76169',
+    actorState: 'fcbafb394f00052555044f9ea72da19245288e10d3a076706fb8bcdf38725ead',
+    worldReference: '7faae91bd51cdc8ab4686362d805543aeedb71b3d57a718d414e1e874b3185d5',
+    inputHash: 'c78136f340db6e0b4f942c5cab086ee29d1ef37bdebcc34bda1b3fc01dd5d091',
   };
   for (const [key, expected] of Object.entries(baseline)) assert.equal(digest(bundle[key]), expected, key);
   assert.equal(bundle.bundleVersion, '8');
