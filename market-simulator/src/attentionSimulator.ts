@@ -121,7 +121,7 @@ export async function generateAttentionTrace(options: TraceOptions, persona: Act
   const activity = new ActorActivityMonitor();
   let systemCompletion: NonNullable<MarketReplayTrace['generation']>['systemCompletion'];
   if (options.decisionProvider && !options.actorDecisionProvider) throw new Error('Attention personas require actorDecisionProvider; raw game observations are not exposed');
-  const guard = new TraceGuard(options.snapshot, persona.id, persona.version, model, true, extendedActor, feedbackActor, directionalMovement, isStructuredFeedbackPolicy(actorPolicyVersion), isResultReflectionFeedbackPolicy(actorPolicyVersion), !wholeTraceDirectionalMovement, fixedAnchorMovement, options.wholeTraceObservationVersion, incrementalActor);
+  const guard = new TraceGuard(options.snapshot, persona.id, persona.version, model, true, extendedActor, feedbackActor, directionalMovement, isStructuredFeedbackPolicy(actorPolicyVersion), isResultReflectionFeedbackPolicy(actorPolicyVersion), !wholeTraceDirectionalMovement, fixedAnchorMovement, options.wholeTraceObservationVersion, incrementalActor, options.wholeTraceWayfindingVersion);
   const motor = new Random(`${options.seed}:presentation:${persona.id}:${persona.version}`);
   const history: TraceEntry[] = [], steps: MarketReplayStep[] = [];
   let plannedMs = 0;
@@ -245,6 +245,7 @@ export async function generateAttentionTrace(options: TraceOptions, persona: Act
       ...(wholeTraceDirectionalMovement ? { wholeTraceMovementVersion: options.wholeTraceMovementVersion,
         movementContract: 'joystick-direction-v1' as const } : {}),
       ...(options.wholeTraceObservationVersion ? { wholeTraceObservationVersion: options.wholeTraceObservationVersion } : {}),
+      ...(options.wholeTraceWayfindingVersion ? { wholeTraceWayfindingVersion: options.wholeTraceWayfindingVersion } : {}),
       ...(options.wholeTraceMovementValidationVersion ? { wholeTraceMovementValidationVersion: options.wholeTraceMovementValidationVersion,
         ...(options.wholeTraceMovementFeedbackVersion ? { wholeTraceMovementFeedbackVersion: options.wholeTraceMovementFeedbackVersion } : {}) } : {}),
       ...(wholeTraceHasAnchorMovementFeedback(options.wholeTraceMovementFeedbackVersion)

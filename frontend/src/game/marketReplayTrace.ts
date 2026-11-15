@@ -70,6 +70,7 @@ export type MarketReplayTrace = {
     wholeTraceObservationVersion?: 'anchor-visible-structures-v1';
     wholeTraceMovementValidationVersion?: '1';
     wholeTraceMovementFeedbackVersion?: 'recent-movement-v1' | 'recent-movement-anchor-v1' | 'recent-movement-anchor-capacity-v1';
+    wholeTraceWayfindingVersion?: 'wayfinding-v1';
     movementPolicy?: MarketReplayMovementPolicy;
     reasoningEffort?: 'low';
     feedback?: { observationScope: 'current-screen'; contextDelivery: 'stateless-http' | 'external-frame'; decisions: number } & (
@@ -266,6 +267,9 @@ export function validateMarketReplayTrace(value: unknown, snapshot?: MarketRepla
   if (generation?.wholeTraceObservationVersion !== undefined && (generation.wholeTraceObservationVersion !== 'anchor-visible-structures-v1'
     || generation.actorPolicyVersion !== 'whole-trace-v3' || generation.wholeTraceMovementVersion !== undefined || generation.trialBinding))
     errors.push('Anchor visible structures require an unbound whole-trace-v3 anchor observation contract.');
+  if (generation?.wholeTraceWayfindingVersion !== undefined && (generation.wholeTraceWayfindingVersion !== 'wayfinding-v1'
+    || generation.wholeTraceObservationVersion !== 'anchor-visible-structures-v1'))
+    errors.push('Wayfinding v1 requires the anchor-visible-structures-v1 whole-trace observation contract.');
   if (generation?.wholeTraceMovementValidationVersion !== undefined && (generation.wholeTraceMovementValidationVersion !== '1'
     || generation.actorPolicyVersion !== 'whole-trace-v3' || generation.trialBinding
     || generation.wholeTraceMovementVersion !== undefined && generation.wholeTraceMovementVersion !== 'directional-v2'))

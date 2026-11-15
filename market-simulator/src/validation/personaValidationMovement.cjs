@@ -1,7 +1,7 @@
 'use strict';
 
 const ANCHOR_FEEDBACK_VERSIONS = ['recent-movement-anchor-v1', 'recent-movement-anchor-capacity-v1'];
-const KEYS = ['movementValidationVersion', 'movementVersion', 'movementFeedbackVersion'];
+const KEYS = ['movementValidationVersion', 'movementVersion', 'movementFeedbackVersion', 'wayfindingVersion'];
 
 /** Explicit run binding only; absence preserves the historical validation contract. */
 function movementOptions(value = {}) {
@@ -18,6 +18,9 @@ function movementOptions(value = {}) {
     && !(ANCHOR_FEEDBACK_VERSIONS.includes(value.movementFeedbackVersion) && value.movementVersion === undefined
       && observationVersion === 'anchor-visible-structures-v1'))
     throw new Error('movementFeedbackVersion requires recent-movement-v1 with directional-v2, or recent-movement-anchor-v1/recent-movement-anchor-capacity-v1 with omitted movementVersion and anchor-visible-structures-v1');
+  if (value.wayfindingVersion !== undefined && (value.wayfindingVersion !== 'wayfinding-v1' || value.movementVersion !== undefined
+    || observationVersion !== 'anchor-visible-structures-v1'))
+    throw new Error('wayfindingVersion wayfinding-v1 requires omitted movementVersion and anchor-visible-structures-v1');
   return Object.fromEntries(present.map(key => [key, value[key]]));
 }
 
@@ -41,6 +44,7 @@ function assertMovementEvidence(manifest, { trace, bundle, audit }) {
     movementValidationVersion: generation.wholeTraceMovementValidationVersion,
     movementVersion: generation.wholeTraceMovementVersion,
     movementFeedbackVersion: generation.wholeTraceMovementFeedbackVersion,
+    wayfindingVersion: generation.wholeTraceWayfindingVersion,
   }, 'Trace movement evidence');
   assertMovementBinding(expected, bundle ?? {}, 'Bundle movement evidence');
   assertMovementBinding(expected, audit ?? {}, 'Knowledge audit movement evidence');
@@ -85,7 +89,7 @@ function movementMarkdown(report) {
   const rows = report.movementOpportunities?.perTrace ?? [];
   const kinds = [...new Set(rows.flatMap(row => Object.keys(row.metrics ?? {})))];
   return ['', '## 명시적 이동 검증 계약', '',
-    `movementValidationVersion=${report.movementValidationVersion}; movementVersion=${report.movementVersion ?? '생략(anchor 대조)'}; movementFeedbackVersion=${report.movementFeedbackVersion ?? '생략'}.`, '',
+    `movementValidationVersion=${report.movementValidationVersion}; movementVersion=${report.movementVersion ?? '생략(anchor 대조)'}; movementFeedbackVersion=${report.movementFeedbackVersion ?? '생략'}; wayfindingVersion=${report.wayfindingVersion ?? '생략'}.`, '',
     '연속 경로 근거는 continuous-route-v1이다. 동선 고수 기회는 방문한 anchor와 미방문 anchor가 함께 보이는 실제 anchor 선택에서만 센다. 방향 입력과 실제 도착·차단은 별도 진단에 남긴다. 아래 값은 관찰 기회의 기술 통계이며 별도의 성향 판정이나 성공률이 아니다. legacy의 기존 지표·판정은 유지한다. 개별 근거·제외 이유는 report.json의 movementOpportunities를 따른다.', '',
     '| 기회 지표 | 관찰 기회 합 | 측정 trace | 미발생·근거 부족 trace |',
     '| --- | ---: | ---: | ---: |',

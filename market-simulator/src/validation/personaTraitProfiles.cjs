@@ -69,7 +69,11 @@ function validateTraits(value, partial = false, schemaVersion = DEFAULT_SCHEMA_V
 }
 function assertValidPersona(persona) {
   safeData(persona);
-  shape(persona, ['id','version','name','description','prompt','parameters'], ['character','attention','shoppingStyle','traitProfile'], 'persona');
+  shape(persona, ['id','version','name','description','prompt','parameters'], ['character','attention','shoppingStyle','traitProfile','wayfinding'], 'persona');
+  if (persona.wayfinding !== undefined) {
+    const errors = require('../wholeTrace/wholeTraceWayfinding.ts').validateWayfindingProfile(persona.wayfinding);
+    if (errors.length) fail(errors.join('; '));
+  }
   id(persona.id); string(persona.version, 'version', 128); string(persona.name, 'name', 128);
   string(persona.description, 'description'); string(persona.prompt, 'prompt', 100000);
   const p = persona.parameters;
@@ -166,6 +170,9 @@ function customPersona(base, definition, schemaVersion = definition.schemaVersio
   const catalog = getCatalog(schemaVersion), omitted = definition.traitMode !== undefined;
   if (omitted) assertTraitMode(definition, schemaVersion); else validateTraits(definition.traits, false, schemaVersion);
   const persona = clone(base), context = buildSeparatedContext(base), traits = omitted ? null : clone(definition.traits);
+  // The base individual's wayfinding style is not a common trait. Composed profiles use the
+  // shared default under wayfinding-v1, and their authored hashes stay unchanged.
+  delete persona.wayfinding;
   const label = definition.label ?? definition.id, instructions = omitted ? [] : traitInstructions(traits, catalog);
   // traitMode is added only to baselines, so existing trait profile hashes and versions are unchanged.
   const traitProfile = {schemaVersion:catalog.schemaVersion,basePersonaId:base.id,presetId:omitted ? null : definition.presetId ?? null,

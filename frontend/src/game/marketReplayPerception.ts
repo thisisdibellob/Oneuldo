@@ -1,6 +1,7 @@
 import { MARKET_DEFAULT_ZOOM } from './worldZoom';
 import { getMarketWorldCameraFrame } from './marketWorldCamera';
-import { getNearestMarketStation, getMarketStationApproachPoint, isMarketEnvironmentBlocked, isNearMarketStation, type MarketEnvironment, type MarketCashierAvailability,
+import { getNearestMarketStation, getMarketStationApproachPoint, getMarketEnvironmentObstacles, isMarketEnvironmentBlocked, isNearMarketStation,
+  MARKET_ENVIRONMENT_PLAYER_RADIUS, type MarketEnvironment, type MarketCashierAvailability,
   type MarketEnvironmentStationId } from './marketEnvironment';
 import { isMarketNavigationSegmentClear } from './marketNavigation';
 import { getMarketShelfLayout } from './marketShelfLayout';
@@ -50,15 +51,18 @@ function relative(from: Point, to: Point): RelativeCue {
   return { direction: directions[octant], distanceBand: distance <= 110 ? 'near' : distance <= 240 ? 'medium' : 'far' };
 }
 /** Conservative screen projection. UI panels are excluded by the caller; this is the world HUD view. */
-function visiblePoint(environment: MarketEnvironment, position: Point, point: Point, p: ReplayPresentation): boolean {
+function screenState(environment: MarketEnvironment, position: Point, point: Point, p: ReplayPresentation): 'visible' | 'offscreen' | 'covered' {
   const frame = getMarketWorldCameraFrame(position, p, environment.world);
   const x = p.viewport.width / 2 + (point.x - frame.center.x) * p.zoom;
   const y = p.viewport.height / 2 + (point.y - frame.center.y) * p.zoom;
-  if (x < 12 || x > p.viewport.width - 12 || y < 12 || y > p.viewport.height - 12) return false;
+  if (x < 12 || x > p.viewport.width - 12 || y < 12 || y > p.viewport.height - 12) return 'offscreen';
   // The embedded shopping list covers the centre of the upper world. Do not read a sign through it.
   const hud = getMarketHudOcclusionRect(p);
-  if (x >= hud.left && x <= hud.right && y >= hud.top && y <= hud.bottom) return false;
-  return true;
+  if (x >= hud.left && x <= hud.right && y >= hud.top && y <= hud.bottom) return 'covered';
+  return 'visible';
+}
+function visiblePoint(environment: MarketEnvironment, position: Point, point: Point, p: ReplayPresentation): boolean {
+  return screenState(environment, position, point, p) === 'visible';
 }
 function marker(environment: MarketEnvironment, station: MarketEnvironment['stationDetails'][number]): Point {
   if (station.kind === 'shelf') {
@@ -160,6 +164,42 @@ export function visibleUnlabelledShelfBodies(environment: MarketEnvironment, pos
   // No stable identity, category order, or count of hidden fixtures survives.
   return [...cues.values()].sort((a, b) => directions.indexOf(a.direction) - directions.indexOf(b.direction)
     || ['near', 'medium', 'far'].indexOf(a.distanceBand) - ['near', 'medium', 'far'].indexOf(b.distanceBand));
+}
+
+/**
+ * wayfinding-v1: what the world view actually shows along each of the eight
+ * screen directions. A wall/edge or furniture is drawn on screen; "covered"
+ * means the shopping-list note hides that part of the floor, which is not a
+ * wall; "open" means the floor continues to the screen edge. Contains no
+ * category, product, coordinate, route or hidden-map identity.
+ */
+export type ReplayVisibleBoundary = { direction: ReplayDirection; kind: 'wall' | 'fixture' | 'covered' | 'open';
+  label: string; distanceBand: ReplayDistanceBand };
+const BOUNDARY_LABELS: Record<ReplayVisibleBoundary['kind'], string> = {
+  wall: '벽이나 매장 끝', fixture: '진열대·계산대 같은 집기', covered: '화면의 장보기 목록에 가려 보이지 않음', open: '바닥 통로가 화면 끝까지 이어짐',
+};
+export function visibleBoundaries(environment: MarketEnvironment, position: Point, presentation: ReplayPresentation,
+  cashiers: Partial<MarketCashierAvailability> = {}): ReplayVisibleBoundary[] {
+  if (!validateReplayPresentation(presentation)) throw new Error('Invalid replay presentation');
+  const obstacles = getMarketEnvironmentObstacles(environment, cashiers);
+  const unit: Record<ReplayDirection, Point> = { east: { x: 1, y: 0 }, southeast: { x: Math.SQRT1_2, y: Math.SQRT1_2 },
+    south: { x: 0, y: 1 }, southwest: { x: -Math.SQRT1_2, y: Math.SQRT1_2 }, west: { x: -1, y: 0 },
+    northwest: { x: -Math.SQRT1_2, y: -Math.SQRT1_2 }, north: { x: 0, y: -1 }, northeast: { x: Math.SQRT1_2, y: -Math.SQRT1_2 } };
+  const band = (distance: number): ReplayDistanceBand => distance <= 110 ? 'near' : distance <= 240 ? 'medium' : 'far';
+  return directions.map(direction => {
+    let last = 0;
+    for (let distance = 16; distance <= 1200; distance += 8) {
+      const point = { x: position.x + unit[direction].x * distance, y: position.y + unit[direction].y * distance };
+      const screen = screenState(environment, position, point, presentation);
+      const kind: ReplayVisibleBoundary['kind'] | null = screen === 'offscreen' ? 'open' : screen === 'covered' ? 'covered'
+        : !isMarketEnvironmentBlocked(environment, point, cashiers) ? null
+          : obstacles.some(rect => point.x + MARKET_ENVIRONMENT_PLAYER_RADIUS > rect.x && point.x - MARKET_ENVIRONMENT_PLAYER_RADIUS < rect.x + rect.width
+            && point.y + MARKET_ENVIRONMENT_PLAYER_RADIUS > rect.y && point.y - MARKET_ENVIRONMENT_PLAYER_RADIUS < rect.y + rect.height) ? 'fixture' : 'wall';
+      if (kind) return { direction, kind, label: BOUNDARY_LABELS[kind], distanceBand: band(kind === 'open' ? last : distance) };
+      last = distance;
+    }
+    return { direction, kind: 'open' as const, label: BOUNDARY_LABELS.open, distanceBand: 'far' as const };
+  });
 }
 
 export const REPLAY_ANCHOR_SPACING = 80;

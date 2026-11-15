@@ -3,6 +3,7 @@ import type { WholeTraceBasis, WholeTraceKnowledgeSnapshot } from './wholeTraceK
 import { matchesObjective, type MarketTaskObjective } from '../../../frontend/src/game/marketSession';
 import { validateWholeTraceMemoryUpdate, type WholeTraceMemoryUpdate } from './wholeTraceCognition';
 import { validateWholeTraceTaskUpdate, type WholeTraceTaskUpdate } from './wholeTraceTaskMemory';
+import { validateWholeTraceThought, type WholeTraceThought } from './wholeTraceWayfinding';
 
 export const WHOLE_TRACE_ACTIVITIES = ['orient', 'shop', 'interest', 'recover', 'check', 'finish', 'rest'] as const;
 export const WHOLE_TRACE_ORIENTATIONS = ['unfamiliar', 'recognizing', 'familiar'] as const;
@@ -28,6 +29,8 @@ export type WholeTraceActorState = {
   memoryUpdate?: WholeTraceMemoryUpdate;
   /** Candidate 7 explicit task selection/release; current attention does not delete pending goals. */
   taskUpdate?: WholeTraceTaskUpdate;
+  /** wayfinding-v1 free-form judgment (noticed/hypothesis/plan/next), returned verbatim in the next menu. */
+  thought?: WholeTraceThought;
 };
 
 export type WholeTraceActorStateContext = {
@@ -39,6 +42,8 @@ export type WholeTraceActorStateContext = {
   requireFocusFields?: boolean;
   allowMemoryUpdate?: boolean;
   allowTaskMemory?: boolean;
+  /** wayfinding-v1: optional free-form actor judgment, never a cue or knowledge source. */
+  allowThought?: boolean;
 };
 
 const stateFields = ['activity', 'task', 'heldGoalIds', 'uncertainGoalIds', 'focusedGoalId', 'focusedProductId', 'orientation', 'triggerCueRefs'];
@@ -63,7 +68,8 @@ export function validateWholeTraceActorState(value: unknown, context: WholeTrace
     return { valid: false, errors: ['maximumTriggerCueRefs must be a positive integer'] };
   if (!plain(value)) return { valid: false, errors: ['actorState must be a JSON object'] };
   if (Object.keys(value).some(field => !stateFields.includes(field) && !(context.allowMemoryUpdate && field === 'memoryUpdate')
-    && !(context.allowTaskMemory && field === 'taskUpdate'))) errors.push('Unknown actorState field');
+    && !(context.allowTaskMemory && field === 'taskUpdate') && !(context.allowThought && field === 'thought'))) errors.push('Unknown actorState field');
+  if (context.allowThought) errors.push(...validateWholeTraceThought(value.thought));
   if (context.allowTaskMemory) errors.push(...validateWholeTraceTaskUpdate(value.taskUpdate).errors);
   if (context.allowMemoryUpdate && value.memoryUpdate !== undefined)
     errors.push(...validateWholeTraceMemoryUpdate(value.memoryUpdate).errors);

@@ -28,6 +28,29 @@
     "familiarShortcutProbability": 0.06,
     "headingPersistence": 0.8
   },
+  "wayfinding": {
+    "version": "1",
+    "cueLevel": "landmark",
+    "planHorizon": "next-step",
+    "maxHypotheses": 1,
+    "memoryForm": "route-sequence",
+    "recoveryOrder": [
+      "return-to-known-landmark",
+      "view-help",
+      "seek-staff",
+      "follow-wide-aisle",
+      "reread-list"
+    ],
+    "thoughtForm": "one-sentence-concrete",
+    "explorationBudgetMs": 240000,
+    "minDistinctPlacesBeforeGiveUp": 20,
+    "basedOn": [
+      "character.selectedTraits[0]: 배운 순서를 안정적으로 수행하고 배치가 바뀌면 다시 확인",
+      "character.selectedTraits[1]: 눈앞의 항목을 차례로 대조",
+      "character.selectedTraits[3]: 낯선 단계에서 멈추거나 설명을 찾음",
+      "attention.goalMemoryCapacity=3"
+    ]
+  },
   "character": {
     "name": "서연",
     "age": 38,

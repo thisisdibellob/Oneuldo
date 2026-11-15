@@ -6,12 +6,15 @@ import type { ActorObservation } from '../types';
 import { canonicalMarketReplayJson } from '../../../frontend/src/game/marketReplayTrace';
 import type { WholeTraceChoiceFrame } from './wholeTraceChoices';
 import { wholeTraceHasAnchorMovementFeedback } from './wholeTraceMovementFeedback';
+import { WAYFINDING_GIVE_UP_LOCKED, wholeTraceOwnNotes } from './wholeTraceWayfinding';
 
 export type WholeTraceAuthoringOptions = { maxRewritesPerDecision?: number };
 export type WholeTraceAuthoringAttempt = {
   decisionIndex: number; decisionNumber: number; attempts: number; rewriteCount: number;
   firstAttemptPassed: boolean; accepted: boolean; rejectedRules: string[];
   originalEnding?: 'nonterminal' | 'submit' | 'giveUp';
+  /** wayfinding-v1: a locked giveUp is not a technical error; the next draft may choose any available action. */
+  giveUpLocked?: boolean;
 };
 export type WholeTraceAuthoringRewrite = {
   status: 'awaiting-rewrite' | 'exhausted'; decisionIndex: number; decisionNumber: number;
@@ -79,6 +82,24 @@ export async function createWholeTraceExecutionAuthoringCursor(settings: WholeTr
       sourceMenu.availableChoices = sourceMenu.availableChoices.map(mark);
       sourceMenu.visibleWalkChoices = sourceMenu.visibleWalkChoices.map(mark);
     }
+    // wayfinding-v1: the actor's own spatial memory and thoughts, plus visit marks.
+    // giveUp is hidden from the shopping menu until the compiler's eligibility holds.
+    const wayfinding = bundle.wayfindingVersion && preview.wayfinding ? (() => {
+      const anchorOf = (choiceId: string) => bundle.choiceCatalog.entries.find(entry => entry.choiceId === choiceId)
+        ?.cueRefs.find(ref => ref.startsWith('anchor:'))?.slice('anchor:'.length);
+      const visited = <T extends { choiceId: string; label: string }>(choice: T): T => {
+        const anchorId = choice.choiceId.startsWith('walk/') ? anchorOf(choice.choiceId) : undefined;
+        if (!anchorId) return choice;
+        const times = preview.wayfinding!.anchorVisits[anchorId] ?? 0;
+        return { ...choice, visitedTimes: times, label: times ? `${choice.label} · 내가 ${times}번 와 본 곳` : `${choice.label} · 아직 안 가 본 곳` } as T;
+      };
+      const locked = !preview.wayfinding!.spatialMemory.giveUp.available;
+      const keep = (id: string) => !(locked && id === 'control/giveUp');
+      sourceMenu.availableChoices = sourceMenu.availableChoices.filter(choice => keep(choice.choiceId)).map(visited);
+      sourceMenu.visibleWalkChoices = sourceMenu.visibleWalkChoices.map(visited);
+      sourceMenu.choiceIds = sourceMenu.choiceIds.filter(keep);
+      return { spatialMemory: structuredClone(preview.wayfinding!.spatialMemory), ownNotes: wholeTraceOwnNotes(decisions) };
+    })() : undefined;
     const currentObservation: WholeTraceAuthoringObservation = {
       kind: continuous ? 'validated-prefix-observation-v2' : bundle.observationVersion
         ? 'validated-prefix-observation-v4' : 'validated-prefix-observation-v3', acceptedDecisionCount: preview.acceptedActions,
@@ -93,7 +114,7 @@ export async function createWholeTraceExecutionAuthoringCursor(settings: WholeTr
       }),
       ...(continuous ? { notice: '같은 prefix를 앱과 공용 입력·충돌 함수로 실행한 현재 화면이다. 좌표·지도·목적지·이동 수치는 제공하지 않는다. 배우가 다음 행동을 선택한다.' } : {}),
     };
-    return { ...sourceMenu, currentObservation, advisory: structuredClone(preview.advisory),
+    return { ...sourceMenu, ...(wayfinding ?? {}), currentObservation, advisory: structuredClone(preview.advisory),
       ...(preview.movementResult ? { movementResult: structuredClone(preview.movementResult) } : {}),
       ...(preview.movementNotes ? { movementNotes: [...preview.movementNotes] } : {}) };
   };
@@ -109,7 +130,7 @@ export async function createWholeTraceExecutionAuthoringCursor(settings: WholeTr
       record.attempts++; record.rewriteCount = record.attempts - 1;
       try {
         const ending = endingOf(draft);
-        if (record.attempts === 1) record.originalEnding = ending;
+        if (record.attempts === 1 || record.giveUpLocked) { record.originalEnding = ending; record.giveUpLocked = false; }
         else if (ending !== record.originalEnding) {
           const message = `Technical rewrites must preserve the first draft's terminal intent (${record.originalEnding}); received ${ending}. No action was accepted or substituted.`;
           throw new WholeTraceSourceAuthoringError('AUTHORING_REWRITE_CHANGED_ENDING', message,
@@ -149,6 +170,7 @@ export async function createWholeTraceExecutionAuthoringCursor(settings: WholeTr
           ? 'choiceRef.choiceId' : 'decision', rule: code, message: cause.message }])
           .map(issue => ({ ...issue, decisionIndex, decisionNumber }));
         record.rejectedRules.push(...issues.map(issue => issue.rule));
+        if (code === WAYFINDING_GIVE_UP_LOCKED) record.giveUpLocked = true;
         failed = record.attempts >= 1 + maxRewritesPerDecision;
         const remainingRewrites = Math.max(0, 1 + maxRewritesPerDecision - record.attempts);
         const rewrite: WholeTraceAuthoringRewrite = { status: failed ? 'exhausted' : 'awaiting-rewrite',

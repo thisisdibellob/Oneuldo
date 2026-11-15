@@ -13,6 +13,10 @@
     "parameters"
   ],
   "properties": {
+    "wayfinding": {
+      "type": "object",
+      "description": "wayfinding-v1 search and judgment style. Shapes how the person searches, never whether to keep searching. Validated by src/wholeTrace/wholeTraceWayfinding.ts validateWayfindingProfile."
+    },
     "id": {
       "type": "string",
       "minLength": 1

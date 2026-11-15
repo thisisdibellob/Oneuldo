@@ -246,6 +246,7 @@ export class WholeTraceSession {
       ...(this.bundle.movementValidationVersion ? { movementValidationVersion: this.bundle.movementValidationVersion } : {}),
       ...(this.bundle.movementVersion ? { movementVersion: this.bundle.movementVersion } : {}),
       ...(this.bundle.movementFeedbackVersion ? { movementFeedbackVersion: this.bundle.movementFeedbackVersion } : {}),
+      ...(this.bundle.wayfindingVersion ? { wayfindingVersion: this.bundle.wayfindingVersion } : {}),
       ...(this.bundle.choiceOrderVersion ? { choiceOrderVersion: this.bundle.choiceOrderVersion } : {}),
       ...(this.bundle.authoringExampleVersion ? { authoringExampleVersion: this.bundle.authoringExampleVersion } : {}),
       actionBinding: this.originalCandidateVersion === '3' ? 'explicit-legacy-v3' : 'state-bound-choice-v1',
@@ -289,7 +290,8 @@ export class WholeTraceSession {
         }
       }
       const shape = validateWholeTraceCandidate(value, this.requestId,
-        { objectiveIds: this.bundle.worldReference.objectives.map(goal => goal.id), movementVersion: this.bundle.movementVersion });
+        { objectiveIds: this.bundle.worldReference.objectives.map(goal => goal.id), movementVersion: this.bundle.movementVersion,
+          wayfinding: !!this.bundle.wayfindingVersion });
       if (!shape.valid) throw new WholeTraceCompileError(shape);
       const candidate = value as WholeTraceCandidate;
       if (this.originalCandidateVersion && candidate.candidateVersion !== this.originalCandidateVersion)

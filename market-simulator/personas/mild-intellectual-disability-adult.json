@@ -89,5 +89,28 @@
     "preCheckoutCheckProbability": 0.6,
     "familiarShortcutProbability": 0.2,
     "headingPersistence": 0.4
+  },
+  "wayfinding": {
+    "version": "1",
+    "cueLevel": "landmark",
+    "planHorizon": "next-step",
+    "maxHypotheses": 1,
+    "memoryForm": "route-sequence",
+    "recoveryOrder": [
+      "return-to-known-landmark",
+      "follow-wide-aisle",
+      "view-help",
+      "seek-staff",
+      "reread-list"
+    ],
+    "thoughtForm": "one-sentence-concrete",
+    "explorationBudgetMs": 240000,
+    "minDistinctPlacesBeforeGiveUp": 20,
+    "basedOn": [
+      "character.selectedTraits[0]: 눈앞의 구체적인 단서와 현재 한 항목에 집중",
+      "character.selectedTraits[1]: 시작할 곳이 불확실하면 알아보는 단서나 도움을 찾음",
+      "attention.goalMemoryCapacity=2",
+      "character.preferences[3]: 짧고 구체적인 설명이나 도움 이용"
+    ]
   }
 }

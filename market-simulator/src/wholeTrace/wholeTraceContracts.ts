@@ -11,6 +11,7 @@ import type { WholeTraceAuthoringGuide } from './wholeTraceAuthoring';
 import { WHOLE_TRACE_DIRECTIONS, wholeTraceDirectionalLocation, wholeTraceHasDirectionalMovement, wholeTraceIsContinuousFrame, type WholeTraceMovementVersion } from './wholeTraceMovement';
 import type { ActorDirection } from '../types';
 import type { WholeTraceMovementFeedbackVersion } from './wholeTraceMovementFeedback';
+import type { WayfindingProfile, WholeTraceWayfindingVersion } from './wholeTraceWayfinding';
 
 export const WHOLE_TRACE_BUNDLE_VERSION = '8' as const;
 export const WHOLE_TRACE_CANDIDATE_VERSION = '7' as const;
@@ -66,9 +67,12 @@ export type WholeTraceBundle = {
   /** Optional experiment options; absent in default and archived bundles. */
   choiceOrderVersion?: WholeTraceChoiceOrderVersion;
   authoringExampleVersion?: WholeTraceAuthoringExampleVersion;
+  /** wayfinding-v1: boundaries, actor spatial memory, own notes and give-up eligibility. */
+  wayfindingVersion?: WholeTraceWayfindingVersion;
   bundleVersion: typeof WHOLE_TRACE_BUNDLE_VERSION; requestId: string; inputHash: string; policyVersion: typeof WHOLE_TRACE_POLICY_VERSION;
   model: typeof WHOLE_TRACE_MODEL; reasoningEffort: 'low'; observationScope: 'whole-world'; actorKnowledgeScope: 'observed-and-remembered';
-  snapshotId: string; seed: string | number; persona: Pick<Persona, 'id' | 'version' | 'name' | 'description' | 'character'> & { behavior: WholeTracePersonaInput };
+  snapshotId: string; seed: string | number; persona: Pick<Persona, 'id' | 'version' | 'name' | 'description' | 'character'> & { behavior: WholeTracePersonaInput;
+    wayfinding?: { profile: WayfindingProfile; instructions: string } };
   /** Optional in saved bundle 8 files predating the additive authoring guidance. */
   authoringGuide?: WholeTraceAuthoringGuide;
   generationLimits: { acceptedActionHorizon: 100; technicalActionBudget: number; maxRepairs: number; plannedTimeBudgetMs?: number };
@@ -88,7 +92,8 @@ export type WholeTraceBundle = {
 };
 export type WholeTraceSettings = Pick<TraceOptions, 'personaId' | 'seed' | 'snapshot' | 'timingProfile' | 'maxActions' |
   'timeBudgetMs' | 'attentionExperience' | 'learnerIdentity' | 'trialBinding' | 'llm'> & { outputPath?: string; maxRepairs?: number; movementValidationVersion?: '1'; movementVersion?: WholeTraceMovementVersion; movementFeedbackVersion?: WholeTraceMovementFeedbackVersion;
-  choiceOrderVersion?: WholeTraceChoiceOrderVersion; authoringExampleVersion?: WholeTraceAuthoringExampleVersion };
+  choiceOrderVersion?: WholeTraceChoiceOrderVersion; authoringExampleVersion?: WholeTraceAuthoringExampleVersion;
+  wayfindingVersion?: WholeTraceWayfindingVersion };
 /** give-up-last-v1 lists control/giveUp after every other currently available choice. Availability is unchanged. */
 export const WHOLE_TRACE_CHOICE_ORDER_VERSIONS = ['give-up-last-v1'] as const;
 export type WholeTraceChoiceOrderVersion = typeof WHOLE_TRACE_CHOICE_ORDER_VERSIONS[number];
@@ -125,7 +130,7 @@ export function wholeTraceTerminalIntent(decision: WholeTraceWireDecision | unde
 }
 const shortRefArray = (value: unknown, maximum: number) => Array.isArray(value) && value.length <= maximum
   && value.every(ref => typeof ref === 'string' && !!ref.trim() && ref.length <= 300) && new Set(value).size === value.length;
-function validateChoiceDecision(d: Record<string, unknown>, at: string, errors: string[], requireFocusFields: boolean, cognitive = false, persistent = false, movementVersion?: WholeTraceMovementVersion) {
+function validateChoiceDecision(d: Record<string, unknown>, at: string, errors: string[], requireFocusFields: boolean, cognitive = false, persistent = false, movementVersion?: WholeTraceMovementVersion, wayfinding = false) {
   if (Object.keys(d).some(k => !['choiceRef', 'delayMs', 'reason', 'basis', 'actorState'].includes(k))) errors.push(`${at}: unknown field`);
   const basis = d.basis;
   if (!plain(basis)) errors.push(`${at}: basis must be a JSON object`);
@@ -137,7 +142,7 @@ function validateChoiceDecision(d: Record<string, unknown>, at: string, errors: 
   const state = d.actorState;
   if (!plain(state)) errors.push(`${at}: actorState must be a JSON object`);
   else {
-    for (const error of validateWholeTraceActorState({ ...state, triggerCueRefs: ['control:pause'] }, { requireFocusFields, allowMemoryUpdate: cognitive, allowTaskMemory: persistent }).errors) errors.push(`${at}: ${error}`);
+    for (const error of validateWholeTraceActorState({ ...state, triggerCueRefs: ['control:pause'] }, { requireFocusFields, allowMemoryUpdate: cognitive, allowTaskMemory: persistent, allowThought: wayfinding }).errors) errors.push(`${at}: ${error}`);
     if (state.triggerCueRefs !== undefined && !shortRefArray(state.triggerCueRefs, 12)) errors.push(`${at}: invalid optional actorState.triggerCueRefs`);
   }
   const ref = d.choiceRef;
@@ -176,7 +181,7 @@ function validateChoiceDecision(d: Record<string, unknown>, at: string, errors: 
  * Full-candidate identity, objective spelling, horizon and terminal checks still run at submission.
  */
 export function validateWholeTraceChoiceDecisionSyntax(value: unknown,
-  candidateVersion: '4' | '5' | '6' | '7' = '7', options: { movementVersion?: WholeTraceMovementVersion } = {}): WholeTraceValidation {
+  candidateVersion: '4' | '5' | '6' | '7' = '7', options: { movementVersion?: WholeTraceMovementVersion; wayfinding?: boolean } = {}): WholeTraceValidation {
   const errors: string[] = [], at = 'decision';
   if (!plain(value)) return { valid: false, errors: [`${at}: expected object`], code: 'CANDIDATE_SCHEMA' };
   if (!['4', '5', '6', '7'].includes(candidateVersion))
@@ -185,20 +190,20 @@ export function validateWholeTraceChoiceDecisionSyntax(value: unknown,
     errors.push(`${at}: delayMs must be 1..120000`);
   if (typeof value.reason !== 'string' || !value.reason.trim() || value.reason.length > 1000)
     errors.push(`${at}: reason must be a short nonempty description`);
-  validateChoiceDecision(value, at, errors, candidateVersion !== '4', ['6', '7'].includes(candidateVersion), candidateVersion === '7', options.movementVersion);
+  validateChoiceDecision(value, at, errors, candidateVersion !== '4', ['6', '7'].includes(candidateVersion), candidateVersion === '7', options.movementVersion, options.wayfinding);
   return { valid: !errors.length, errors, ...(errors.length ? { code: 'CANDIDATE_SCHEMA' } : {}) };
 }
 export function validateWholeTraceCandidate(value: unknown, requestId: string,
-  options: { objectiveIds?: readonly string[]; movementVersion?: WholeTraceMovementVersion } = {}): WholeTraceValidation {
+  options: { objectiveIds?: readonly string[]; movementVersion?: WholeTraceMovementVersion; wayfinding?: boolean } = {}): WholeTraceValidation {
   return validateCandidate(value, requestId, options, false);
 }
 /** A prefix has no ending yet; every supplied decision keeps the full wire contract. */
 export function validateWholeTraceCandidatePrefix(value: unknown, requestId: string,
-  options: { objectiveIds?: readonly string[]; movementVersion?: WholeTraceMovementVersion } = {}): WholeTraceValidation {
+  options: { objectiveIds?: readonly string[]; movementVersion?: WholeTraceMovementVersion; wayfinding?: boolean } = {}): WholeTraceValidation {
   return validateCandidate(value, requestId, options, true);
 }
 function validateCandidate(value: unknown, requestId: string,
-  options: { objectiveIds?: readonly string[]; movementVersion?: WholeTraceMovementVersion }, prefix: boolean): WholeTraceValidation {
+  options: { objectiveIds?: readonly string[]; movementVersion?: WholeTraceMovementVersion; wayfinding?: boolean }, prefix: boolean): WholeTraceValidation {
   const errors: string[] = [];
   if (!plain(value)) return { valid: false, errors: ['Candidate must be a JSON object'], code: 'CANDIDATE_SCHEMA' };
   if (Object.keys(value).some(k => !['candidateVersion', 'requestId', 'decisions'].includes(k))) errors.push('Unknown candidate field');
@@ -213,7 +218,7 @@ function validateCandidate(value: unknown, requestId: string,
     if (!plain(d)) { errors.push(`${at}: expected object`); return; }
     if (!Number.isInteger(d.delayMs) || (d.delayMs as number) < 1 || (d.delayMs as number) > 120000) errors.push(`${at}: delayMs must be 1..120000`);
     if (typeof d.reason !== 'string' || !d.reason.trim() || d.reason.length > 1000) errors.push(`${at}: reason must be a short nonempty description`);
-    if (['4', '5', '6', '7'].includes(value.candidateVersion as string)) validateChoiceDecision(d, at, errors, value.candidateVersion !== '4', ['6', '7'].includes(value.candidateVersion as string), value.candidateVersion === '7', options.movementVersion);
+    if (['4', '5', '6', '7'].includes(value.candidateVersion as string)) validateChoiceDecision(d, at, errors, value.candidateVersion !== '4', ['6', '7'].includes(value.candidateVersion as string), value.candidateVersion === '7', options.movementVersion, options.wayfinding);
     else {
       if (Object.keys(d).some(k => !['action', 'delayMs', 'reason', 'basis', 'actorState'].includes(k))) errors.push(`${at}: unknown field`);
       for (const error of validateWholeTraceBasis(d.basis).errors) errors.push(`${at}: ${error}`);

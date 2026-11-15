@@ -111,6 +111,21 @@ legacy와 traits v1의 기존 판정은 유지하고, 새 `movementOpportunities
 
 목적은 Luna 배우의 조기 포기가 입력 표현(선택지 순서·예시 구성)에 영향을 받는지 가려내는 것이다. 포기를 줄이는 것 자체를 목표로 삼거나 결과를 성능 향상으로 해석하지 않는다.
 
+### 길 찾기 인지 옵션 `wayfindingVersion:"wayfinding-v1"` (선택, 기본 꺼짐)
+
+2026-11-15 실행에서 장애·일반 성인 페르소나 모두 시작 구역에서 매대를 한 번도 보지 못한 채 1분 안팎에 포기했다. 매장 배치를 바꾸지 않고, 배우가 실제로 본 정보로 매장 구조를 추정하고 스스로 판단하게 하는 옵션이다. 행동·경로·상품은 계속 배우가 고른다.
+
+1. **지각**: `observation.boundaries`가 화면의 8방향에 실제로 그려진 것을 알려 준다. `wall`(벽·매장 끝), `fixture`(진열대·계산대 같은 집기), `covered`(화면의 장보기 목록이 바닥을 가림, 벽이 아님), `open`(바닥이 화면 끝까지 이어짐) 중 하나와 거리대를 준다. 좌표·카테고리·경로는 넣지 않는다.
+2. **기억**: 메뉴의 `spatialMemory`는 배우가 수락된 관찰과 걷기만으로 만든 대략적인 기억이다. 출발점 기준 어림 걸음(near=1, medium=2, far=3), 훑은 범위, 본 랜드마크·벽, 써 본 회복 전략, 포기 가능 여부를 담는다. 걷기 선택지에는 `visitedTimes`와 "내가 N번 와 본 곳/아직 안 가 본 곳" 표시가 붙는다.
+3. **판단**: `actorState.thought`(`noticed`·`hypothesis`·`plan`·`next` 중 하나 이상, 각 200자 이하)에 배우가 자유롭게 판단을 쓴다. 다음 메뉴의 `ownNotes`가 이를 그대로 돌려준다(현재 계획과 최근 4개). thought는 믿음일 뿐 단서 원장이나 상품 위치의 근거가 아니다. `reason`은 지금처럼 관찰 가능한 설명만 쓴다.
+4. **포기 조건**: 장보기 화면의 `control/giveUp`은 아래 중 하나를 만족할 때만 메뉴에 나타나고, 컴파일러도 같은 조건으로 검사한다(`WAYFINDING_GIVE_UP_LOCKED`). 포기 결정에는 `thought.plan`이 필요하다. 조건을 못 채운 포기 제출은 기술 오류가 아니라 재작성 대상이며, 다음 초안은 종료 의도와 관계없이 다른 행동을 고를 수 있다. 계산 단계에서는 언제든 포기할 수 있다.
+   - 계획 시간이 페르소나 `wayfinding.explorationBudgetMs` 이상이다.
+   - 서로 다른 곳을 `minDistinctPlacesBeforeGiveUp` 이상 걸었고, 이용 안내를 봤고, 본 직원이 있으면 말을 걸었다.
+   - 3곳 이상 걸었고 본 통로를 모두 가 봤다.
+5. **페르소나별 판단 방식**: 각 페르소나 JSON의 `wayfinding` 프로필(`cueLevel`, `planHorizon`, `maxHypotheses`, `memoryForm`, `recoveryOrder`, `thoughtForm`, `basedOn`)이 지시문 절 "길을 찾고 판단하는 방식"으로 렌더링된다. 차이는 탐색 방식에만 두고, 포기 기준은 모든 페르소나가 같다.
+
+`prepare_whole_trace`에서는 `movementVersion` 없이 줄 수 있다. 검증 run에서는 `prepare_persona_validation`에 `{"movementValidationVersion":"1","wayfindingVersion":"wayfinding-v1"}`로 묶어야 하며, 일반 성인 대조군도 이 경로로 실행한다. inputHash, bundle, trace generation(`wholeTraceWayfindingVersion`), knowledge audit에 모두 기록된다.
+
 ### 후보 작성과 제출 계약
 
 기술 수정이 허용된 실패에는 `repair_whole_trace({requestId,repair:{decisions:[...]}})`로 수정할 suffix만 보낸다. `repairFilePath`도 같은 `{ "decisions": [...] }` 객체를 받는다. 서버가 요청·버전·수정 시작 위치를 채우고 이미 수락한 prefix와 원래 종료 의도, 수정 1회 제한을 유지한다. 기존 명시형 wrapper도 지원하며 잘못 명시한 값은 거절한다. 별도 사전 검사 왕복이나 행동별 AI 호출을 추가하지 않는다.

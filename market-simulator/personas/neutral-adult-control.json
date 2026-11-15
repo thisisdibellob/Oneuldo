@@ -86,5 +86,26 @@
     "preCheckoutCheckProbability": 0.35,
     "familiarShortcutProbability": 0.45,
     "headingPersistence": 0.65
+  },
+  "wayfinding": {
+    "version": "1",
+    "cueLevel": "layout-schema",
+    "planHorizon": "short-sequence",
+    "maxHypotheses": 2,
+    "memoryForm": "area-coverage",
+    "recoveryOrder": [
+      "scan-unvisited-direction",
+      "follow-wide-aisle",
+      "view-help",
+      "seek-staff"
+    ],
+    "thoughtForm": "conditional-short",
+    "explorationBudgetMs": 240000,
+    "minDistinctPlacesBeforeGiveUp": 20,
+    "basedOn": [
+      "별도 인지·적응 어려움을 선택하지 않은 대조군",
+      "attention.goalMemoryCapacity=5",
+      "character.selectedTraits[1]: 확인·도움·수정은 실제 불확실성에 맞춰 선택"
+    ]
   }
 }
