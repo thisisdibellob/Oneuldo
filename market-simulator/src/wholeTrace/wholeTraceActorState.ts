@@ -74,9 +74,9 @@ export function validateWholeTraceActorState(value: unknown, context: WholeTrace
   if (context.allowTaskMemory) errors.push(...validateWholeTraceTaskUpdate(value.taskUpdate).errors);
   if (context.allowMemoryUpdate && value.memoryUpdate !== undefined)
     errors.push(...validateWholeTraceMemoryUpdate(value.memoryUpdate).errors);
-  if (!WHOLE_TRACE_ACTIVITIES.includes(value.activity as WholeTraceActorState['activity'])) errors.push('Unsupported actorState.activity');
+  if (!WHOLE_TRACE_ACTIVITIES.includes(value.activity as WholeTraceActorState['activity'])) errors.push(`Unsupported actorState.activity; allowed values: ${WHOLE_TRACE_ACTIVITIES.join(', ')}`);
   if (typeof value.task !== 'string' || !value.task.trim() || value.task.length > 160) errors.push('actorState.task must be a short nonempty behavioral description');
-  if (!WHOLE_TRACE_ORIENTATIONS.includes(value.orientation as WholeTraceActorState['orientation'])) errors.push('Unsupported actorState.orientation');
+  if (!WHOLE_TRACE_ORIENTATIONS.includes(value.orientation as WholeTraceActorState['orientation'])) errors.push(`Unsupported actorState.orientation; allowed values: ${WHOLE_TRACE_ORIENTATIONS.join(', ')}`);
   for (const field of ['heldGoalIds', 'uncertainGoalIds'] as const)
     if (!refs(value[field], 24)) errors.push(`actorState.${field} must contain 0..24 distinct short references`);
   if (!refs(value.triggerCueRefs, maximumTriggerCueRefs, 1)) errors.push(`actorState.triggerCueRefs must contain 1..${maximumTriggerCueRefs} distinct short references`);

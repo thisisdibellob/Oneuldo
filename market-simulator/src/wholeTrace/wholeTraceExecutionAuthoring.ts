@@ -15,6 +15,14 @@ export type WholeTraceAuthoringAttempt = {
   originalEnding?: 'nonterminal' | 'submit' | 'giveUp';
   /** wayfinding-v1: a locked giveUp is not a technical error; the next draft may choose any available action. */
   giveUpLocked?: boolean;
+  originalChoiceId?: string | null;
+  originalChoiceAvailable?: boolean;
+  originalQuantity?: number | null;
+  originalIntent?: string | null;
+  originalReason?: string | null;
+  choiceUnavailableRewrite?: boolean;
+  rewriteChangedAvailableChoice?: boolean;
+  rewriteChoices?: { attempt: number; choiceId: string | null; quantity: number | null }[];
 };
 export type WholeTraceAuthoringRewrite = {
   status: 'awaiting-rewrite' | 'exhausted'; decisionIndex: number; decisionNumber: number;
@@ -136,6 +144,20 @@ export async function createWholeTraceExecutionAuthoringCursor(settings: WholeTr
         rewriteCount: 0, firstAttemptPassed: false, accepted: false, rejectedRules: [] };
       record.attempts++; record.rewriteCount = record.attempts - 1;
       try {
+        const choiceId = typeof draft?.choiceRef?.choiceId === 'string' ? draft.choiceRef.choiceId : null;
+        const quantity = typeof draft?.choiceRef?.quantity === 'number' ? draft.choiceRef.quantity : null;
+        if (record.attempts === 1) {
+          record.originalChoiceId = choiceId;
+          record.originalQuantity = quantity;
+          record.originalChoiceAvailable = typeof choiceId === 'string' && (await menu()).choiceIds.includes(choiceId);
+          record.originalIntent = typeof draft?.basis?.intent === 'string' ? draft.basis.intent : null;
+          record.originalReason = typeof draft?.reason === 'string' ? draft.reason : null;
+        } else if (choiceId !== record.originalChoiceId || quantity !== record.originalQuantity) {
+          (record.rewriteChoices ??= []).push({ attempt: record.attempts, choiceId, quantity });
+          if (record.originalChoiceAvailable === false && choiceId !== record.originalChoiceId)
+            record.choiceUnavailableRewrite = true;
+          else record.rewriteChangedAvailableChoice = true;
+        }
         const ending = endingOf(draft);
         if (record.attempts === 1 || record.giveUpLocked) { record.originalEnding = ending; record.giveUpLocked = false; }
         else if (ending !== record.originalEnding) {

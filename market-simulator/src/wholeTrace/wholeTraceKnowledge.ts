@@ -39,7 +39,7 @@ export function validateWholeTraceBasis(value: unknown, options: WholeTraceBasis
     errors.push('basis.goalId is required: an explicit goal reference or null for non-goal decisions');
   if (options.allowMemoryUses && x.memoryUses !== undefined)
     errors.push(...validateWholeTraceMemoryUses(x.memoryUses).errors);
-  if (!WHOLE_TRACE_INTENTS.includes(x.intent)) errors.push('Unsupported basis intent');
+  if (!WHOLE_TRACE_INTENTS.includes(x.intent)) errors.push(`Unsupported basis intent; allowed values: ${WHOLE_TRACE_INTENTS.join(', ')}`);
   if (!Array.isArray(x.cueRefs) || x.cueRefs.length < 1 || x.cueRefs.length > maximumCueRefs
     || x.cueRefs.some(c => typeof c !== 'string' || !c.trim() || c.length > 300)
     || new Set(x.cueRefs).size !== x.cueRefs.length) errors.push(`basis.cueRefs must contain 1..${maximumCueRefs} distinct short references`);

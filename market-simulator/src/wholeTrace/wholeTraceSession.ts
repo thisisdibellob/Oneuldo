@@ -2,7 +2,7 @@ import { randomUUID, createHash } from 'node:crypto';
 import { existsSync, mkdirSync, writeFileSync, appendFileSync, renameSync, unlinkSync, openSync, closeSync } from 'node:fs';
 import { resolve, dirname, join } from 'node:path';
 import { performance } from 'node:perf_hooks';
-import { canonicalMarketReplayJson } from '../../../frontend/src/game/marketReplayTrace';
+import { canonicalMarketReplayJson, marketReplayTraceId } from '../../../frontend/src/game/marketReplayTrace';
 import { buildWholeTraceBundle, wholeTraceInputHash } from './wholeTraceBundle';
 import { compileWholeTraceCandidate, WholeTraceCompileError } from './wholeTraceCompiler';
 import { WHOLE_TRACE_MODEL, WHOLE_TRACE_POLICY_VERSION, validateWholeTraceCandidate,
@@ -312,6 +312,20 @@ export class WholeTraceSession {
       stage = 'generation';
       const compiled = await compileWholeTraceCandidate(this.settings, this.bundle, candidate, this.attempts,
         checkpoint => journal!.checkpoint(checkpoint));
+      if (this.authoring && compiled.trace.generation) {
+        const rewrites = this.authoring.metrics().decisions.filter(row => row.rewriteChoices?.length);
+        if (rewrites.length) compiled.trace.generation.authoringRewriteAudit = {
+          version: 'choice-availability-v1', decisions: rewrites.map(row => ({
+            decisionNumber: row.decisionNumber, originalChoiceId: row.originalChoiceId,
+            originalChoiceAvailable: row.originalChoiceAvailable, originalQuantity: row.originalQuantity,
+            originalIntent: row.originalIntent, originalReason: row.originalReason,
+            ...(row.choiceUnavailableRewrite ? { choiceUnavailableRewrite: true } : {}),
+            ...(row.rewriteChangedAvailableChoice ? { rewriteChangedAvailableChoice: true } : {}),
+            rewriteChoices: row.rewriteChoices,
+          })),
+        };
+      }
+      compiled.trace.traceId = marketReplayTraceId(compiled.trace);
       const validationStart = performance.now();
       const validation = validateTrace(compiled.trace, this.settings.snapshot);
       if (!validation.valid) throw new WholeTraceCompileError(validation);

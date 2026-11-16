@@ -305,3 +305,24 @@ for (const committed of [false, true]) test(`a ${committed ? 'lost submit respon
   assert.equal(closeCalls, 1);
   assert.equal(readMailboxStatus(ownerDirectory).completionVerified, true);
 });
+
+test('CLI calls save exact independent input/stdout/stderr/exit receipts on success, conflict and invalid JSON', async t => {
+  const f = await fixture(t);
+  const file = path.join(f.directory, 'exact.json');
+  const inputs = [JSON.stringify(operation('receipt-begin', 'begin_whole_trace_authoring'), null, 4) + '\n',
+    JSON.stringify(operation('receipt-begin', 'whole_trace_status')), '{invalid'];
+  for (const [i, input] of inputs.entries()) {
+    fs.writeFileSync(file, input);
+    const before = new Set(fs.existsSync(path.join(f.ownerDirectory, 'calls')) ? fs.readdirSync(path.join(f.ownerDirectory, 'calls')) : []);
+    const response = await runCli(['call', f.ownerDirectory, '--operation-file', file]).exited;
+    assert.equal(response.code, i ? 1 : 0);
+    const names = fs.readdirSync(path.join(f.ownerDirectory, 'calls')).filter(name => !before.has(name));
+    assert.equal(names.length, 1);
+    const dir = path.join(f.ownerDirectory, 'calls', names[0]);
+    assert.equal(fs.readFileSync(path.join(dir, 'input.json'), 'utf8'), input);
+    assert.equal(fs.readFileSync(path.join(dir, 'stdout.log'), 'utf8'), response.stdout);
+    assert.equal(fs.readFileSync(path.join(dir, 'stderr.log'), 'utf8'), response.stderr);
+    assert.equal(Number(fs.readFileSync(path.join(dir, 'exit-code'), 'utf8')), response.code);
+    assert.equal(json(path.join(dir, 'completion.json')).exitCode, response.code);
+  }
+});

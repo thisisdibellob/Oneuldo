@@ -138,7 +138,7 @@ async function runHost(directory, hostId) {
     stdinOwnership: 'detached-ignored', requests: {}, operations: {} };
   function event(type, fields = {}) {
     const entry = { time: now(), hostId, pid: process.pid, type, ...fields };
-    fs.appendFileSync(journalPath, JSON.stringify(entry) + '\n', { mode: 0o600 });
+    fs.appendFileSync(journalPath, JSON.stringify(entry, (key, value) => key === 'originalReason' ? undefined : value) + '\n', { mode: 0o600 });
     state.updatedAt = entry.time;
     atomicJson(statePath, state);
   }

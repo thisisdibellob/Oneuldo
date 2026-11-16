@@ -77,3 +77,14 @@ test('missing console records, overwritten inputs, mixed language and access/aut
   assert.ok(s.automationFlags.some(f => f.loopSyntax));
   assert.equal(s.ledgerVsSelfReport.match, false, "the fixture self-report claims 1 rejection but the ledger has none");
 });
+
+test('v4 permits an unavailable reference correction but still flags changes of available choices and quantities', t => {
+  const { run, slot } = slotFixture(t, [begin, rejected('d-1', 0, 'open/missing'),
+    accepted('d-1-r1', 0, 'walk/W1', ['walk/W2', 'walk/W3']),
+    rejected('d-2', 1, 'walk/W2'), accepted('d-2-r1', 1, 'walk/W3', [])]);
+  fs.writeFileSync(path.join(slot, 'projection.json'), JSON.stringify({ actorInstructions: { templateId: 'authoring-v4-h200' } }));
+  const s = audit(run).slots['s-01'];
+  assert.equal(s.rewriteChecks[0].choiceUnavailableRewrite, true);
+  assert.equal(s.procedureViolations.length, 1);
+  assert.equal(s.procedureViolations[0].decisionNumber, 2);
+});

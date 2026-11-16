@@ -42,7 +42,7 @@ function ownerLedger(slot) {
 }
 
 // 1. Rewrite fidelity: the first rejected draft's choice must equal the finally accepted choice.
-function rewriteChecks(ledger) {
+function rewriteChecks(ledger, allowUnavailable = false) {
   let lastMenu = null;
   const byIndex = new Map(), menuBefore = new Map();
   for (const entry of ledger) {
@@ -69,6 +69,9 @@ function rewriteChecks(ledger) {
     const before = menuBefore.get(index);
     checks.push({ decisionNumber: index + 1, attempts: attempts.length, firstRejected: first, final,
       choicePreserved: changed.length === 0,
+      choiceUnavailableRewrite: allowUnavailable && changed.length > 0 && before?.choiceIds?.includes(first.choiceId) === false
+        && changed.every(attempt => attempt.choiceId !== first.choiceId && before.choiceIds.includes(attempt.choiceId))
+        && final.accepted === true,
       ...(changed.length ? { changedTo: [...new Set(changed.map(attempt => attempt.choiceId))],
         originalChoiceInPrecedingMenu: before?.choiceIds ? before.choiceIds.includes(first.choiceId) : null } : {}) });
   }
@@ -78,6 +81,20 @@ function rewriteChecks(ledger) {
 // 2. Record completeness, derived from the mailbox calls the actor actually ran.
 function callRecords(slot, cmds) {
   const calls = [];
+  const receiptRoot = path.join(slot, 'owner', 'calls');
+  if (fs.existsSync(receiptRoot)) {
+    for (const name of fs.readdirSync(receiptRoot)) {
+      const dir = path.join(receiptRoot, name);
+      const completed = exists(path.join(dir, 'completion.json')) ? read(path.join(dir, 'completion.json')) : null;
+      let operationId = completed?.operationId ?? null;
+      try { operationId ??= read(path.join(dir, 'input.json')).operationId; } catch { /* preserve incomplete receipt */ }
+      calls.push({ eventItem: `owner-call:${name}`, commandExit: completed?.exitCode ?? null, operationId,
+        operationFile: path.relative(slot, path.join(dir, 'input.json')),
+        delivered: !!operationId && exists(path.join(slot, 'owner', 'commands', `${operationId}.json`)),
+        inputSaved: exists(path.join(dir, 'input.json')), stdoutSaved: exists(path.join(dir, 'stdout.log')),
+        stderrSaved: exists(path.join(dir, 'stderr.log')), exitSaved: exists(path.join(dir, 'exit-code')) && !!completed });
+    }
+  }
   for (const cmd of cmds) {
     const text = unescape(cmd.command);
     const pattern = /whole-trace-mailbox\.cjs\s+call\s+(\S+)\s+--operation-file\s+(\S+)([^\n;&|]*)/g;
@@ -97,6 +114,7 @@ function callRecords(slot, cmds) {
       if (exists(operationFile)) { try { operationId = read(operationFile).operationId ?? null; } catch { /* unreadable input */ } }
       operationId ??= /operationId['"]?\s*[:=]\s*['"]([A-Za-z0-9._-]+)/.exec(text)?.[1] ?? null;
       const delivered = !!operationId && exists(path.join(slot, 'owner', 'commands', `${operationId}.json`));
+      if (calls.some(call => call.operationId === operationId && call.eventItem.startsWith('owner-call:'))) continue;
       calls.push({ eventItem: cmd.id, commandExit: cmd.exitCode, operationId, operationFile: path.relative(slot, operationFile), delivered,
         inputSaved: exists(operationFile),
         stdoutSaved: !!stdoutTarget && exists(resolve(stdoutTarget)),
@@ -201,14 +219,15 @@ function auditSlot(slot, code, allCodes) {
   const rejectedAppends = appends.length - acceptedAppends;
   const selfReport = exists(path.join(slot, 'actor-completion.json')) ? read(path.join(slot, 'actor-completion.json')) : null;
   const status = exists(path.join(slot, 'owner', 'status.json')) ? read(path.join(slot, 'owner', 'status.json')) : null;
-  const rewrites = rewriteChecks(ledger);
+  const projection = exists(path.join(slot, 'projection.json')) ? read(path.join(slot, 'projection.json')) : null;
+  const rewrites = rewriteChecks(ledger, ['authoring-v4', 'authoring-v4-h200'].includes(projection?.actorInstructions?.templateId));
   const calls = callRecords(slot, cmds);
   const result = {
     owner: { state: status?.state ?? null, requestStatus: status?.requestStatus?.status ?? null,
       failureCode: status?.requestStatus?.result?.code ?? null, completionVerified: status?.completionVerified ?? null },
     ledger: { acceptedAppends, rejectedAppends, operations: ledger.length },
     rewriteChecks: rewrites,
-    procedureViolations: rewrites.filter(check => !check.choicePreserved).map(check => ({ type: 'rewrite-changed-chosen-action',
+    procedureViolations: rewrites.filter(check => !check.choicePreserved && !check.choiceUnavailableRewrite).map(check => ({ type: 'rewrite-changed-chosen-action',
       decisionNumber: check.decisionNumber, from: check.firstRejected.choiceId, to: check.changedTo,
       originalChoiceInPrecedingMenu: check.originalChoiceInPrecedingMenu })),
     ledgerVsSelfReport: { selfReport: selfReport && { acceptedDecisionCount: selfReport.acceptedDecisionCount, rejectionCount: selfReport.rejectionCount },

@@ -260,3 +260,11 @@ low/high는 [고정 도달성 fixture](../test/fixtures/whole-trace-reachability
 이 카메라 변경은 앱 재생에 쓰는 `GamePrototypeScreen`의 embedded market 경로에 적용한다. standalone `MarketMap`은 변경하지 않는다. bundle의 `sourceFiles`에 카메라 구현 해시를 추가한다. 저장된 bundle·trace·검증 파일은 수정하지 않으며, 작은 화면에서 새로 컴파일하거나 재검증할 때는 현재 카메라 투영을 사용한다.
 
 방향 BFS는 24px cell을 방문 중복 판정에만 쓰고 실제 끝점을 cell 중심이나 waypoint로 옮기지 않는다. 입력은 8방향, 400ms, `speedMultiplier:0.7`, `accelerationMs:200`의 고정된 합법 motor profile이다. cell마다 한 도착점만 보존하는 유한 탐색이므로 실패는 이 설정에서 경로를 찾지 못했다는 뜻이며 연속 공간에서의 물리적 불가능 증명은 아니다. 이 검사는 기계적 도달성 회귀이며 페르소나의 행동 선택·구매 성공률·실제 앱 실행을 측정하지 않는다.
+
+### 선택 불가 재작성 기록과 자동 호출 영수증
+
+명시적으로 선택하는 새 `authoring-v4` / `authoring-v4-h200` 템플릿은 첫 초안의 choiceId가 해당 결정 직전 메뉴에 없었던 경우, 원래 초안·의도를 보존하고 그 의도에 맞는 메뉴 선택으로 기술 재작성할 수 있다. 기존 종료 의도 가드와 재작성 예산은 그대로이며, 메뉴에 있던 선택이나 구매 수량을 바꾸는 것은 계속 절차 위반이다. 기본 템플릿은 v3로 유지한다.
+
+작성 metrics는 첫 선택·가용성·수량·intent·reason과 후속 변경을 기록한다. `choiceUnavailableRewrite`는 첫 선택이 불가능했던 변경의 출처 표시이며 의미 보존을 자동 입증하지 않는다. `rewriteChangedAvailableChoice`는 가용 선택/수량 변경을 남긴다. 변경이 있을 때만 trace의 `generation.authoringRewriteAudit`에 같은 증거를 추가한다. 후보·bundle·inputHash의 계약은 변하지 않는다. 감사 스크립트는 새 템플릿이 기록된 슬롯에서만 선택 불가 예외를 인정하며, 기존 실행의 판정을 소급 변경하지 않는다.
+
+mailbox CLI `call`은 배우의 출력 리다이렉션과 별도로 `owner/calls/<고유 ID>/`에 원본 입력, stdout, stderr, exit-code 및 시작·종료 영수증을 저장한다. 동일 operationId의 재전송도 별도 호출 영수증이며 엔진 결정은 중복 실행하지 않는다. 강제 종료로 종료 영수증이 없으면 누락으로 남고, 완료를 추정하지 않는다. 스키마 enum 거절은 activity·orientation·intent의 허용값을 표시한다.

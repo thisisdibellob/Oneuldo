@@ -63,7 +63,12 @@ export type MarketReplayTrace = {
   experienceMode?: 'first-play' | 'revisit';
   attentionExperience?: { layoutKey: string; memory: Record<string, unknown>; source: 'planned-trace' };
   /** Fresh LLM requests are not seed deterministic. A captured trace is replayable. */
-  generation?: { model: string; reproducibility: 'seed-and-snapshot' | 'captured-trace'; requestId?: string;
+  generation?: { authoringRewriteAudit?: { version: 'choice-availability-v1'; decisions: {
+    decisionNumber: number; originalChoiceId?: string | null; originalChoiceAvailable?: boolean;
+    originalQuantity?: number | null; originalIntent?: string | null; originalReason?: string | null;
+    choiceUnavailableRewrite?: boolean; rewriteChangedAvailableChoice?: boolean;
+    rewriteChoices?: { attempt: number; choiceId: string | null; quantity: number | null }[];
+  }[] }; model: string; reproducibility: 'seed-and-snapshot' | 'captured-trace'; requestId?: string;
     timingProfile?: 'compact-v1' | 'actor-preserved-v1' | 'activity-duration-v1' | 'activity-duration-v2'; sourceTraceId?: string; actorPolicyVersion?: 'episodic-choice-v1' | 'episodic-choice-v2' | 'episodic-choice-v3' | 'episodic-choice-v4' | 'episodic-choice-v5' | 'episodic-choice-v6' | 'episodic-choice-v7' | 'episodic-choice-v8' | 'episodic-choice-v9' | 'episodic-choice-v10' | 'episodic-choice-v11' | 'feedback-choice-v1' | 'feedback-choice-v2' | 'feedback-choice-v3' | 'feedback-choice-v4' | 'feedback-choice-v5' | 'feedback-choice-v6' | 'feedback-choice-v7' | 'feedback-choice-v8' | 'feedback-choice-v9' | 'feedback-choice-v10' | 'feedback-choice-v11' | 'feedback-choice-v12' | 'feedback-choice-v13' | 'whole-trace-v1' | 'whole-trace-v2' | 'whole-trace-v3';
     movementContract?: 'joystick-direction-v1';
     wholeTraceMovementVersion?: 'directional-v1' | 'directional-v2';
