@@ -89,15 +89,16 @@ const jobMessages:Record<string,string>={DESIGNING_CONDITIONS:'실제 연습 환
 export function marketQuestProgressText(p:MarketQuestProgress){return `${jobMessages[p.stage]??'연습을 준비하고 있어요'} · ${Math.floor(p.elapsedMs/1000)}초 / 최대 ${p.deadlineSeconds}초`;}
 async function requestMarketAiQuest(accessToken: string, environmentContext?: MarketEnvironmentContext, onProgress?:(p:MarketQuestProgress)=>void) {
   if (!API_BASE_URL) throw new Error('EXPO_PUBLIC_API_URL이 설정되지 않았습니다.');
+  // One server path: every quest is a job with real stages. A caller that sent its runtime context must also get a runtime plan back.
   const adaptive=!!environmentContext?.runtimeContext;
   const startController=new AbortController();
-  const startTimeout=adaptive?setTimeout(()=>startController.abort(),15000):undefined;
-  const response = await fetch(`${API_BASE_URL}/api/market-personalization/${adaptive?'quest-jobs':'quest'}`, {
+  const startTimeout=setTimeout(()=>startController.abort(),15000);
+  const response = await fetch(`${API_BASE_URL}/api/market-personalization/quest-jobs`, {
     method: 'POST',
-    ...(adaptive?{signal:startController.signal}:{}),
+    signal:startController.signal,
     headers: { Authorization: `Bearer ${accessToken}`, ...(environmentContext ? { 'Content-Type': 'application/json' } : {}) },
     ...(environmentContext ? { body: JSON.stringify({ environmentContext }) } : {}),
-  }).finally(()=>{if(startTimeout)clearTimeout(startTimeout);});
+  }).finally(()=>clearTimeout(startTimeout));
   if (!response.ok) {
     let body: { code?: string; stage?: string; message?: string } | null = null;
     try { body = await response.json(); } catch { /* Non-readiness responses keep their HTTP error. */ }
@@ -111,7 +112,7 @@ async function requestMarketAiQuest(accessToken: string, environmentContext?: Ma
     throw new Error(`AI 맞춤 장보기 퀘스트 생성 실패: ${response.status}`);
   }
   let result:MarketAiQuestResponse;
-  if(adaptive){let job=await response.json() as MarketQuestProgress;
+  {let job=await response.json() as MarketQuestProgress;
     const remainingMs=job.deadlineSeconds*1000-Math.max(0,job.elapsedMs??0);
     const pollingDeadline=Date.now()+Math.max(0,remainingMs)+15000;
     while(true){if(!job?.jobId||!['RUNNING','READY','FAILED'].includes(job.status))throw new Error('추천 생성 응답 형식이 올바르지 않아요.');onProgress?.(job);if(job.status==='READY'&&job.result){result=job.result;break;}
@@ -123,7 +124,7 @@ async function requestMarketAiQuest(accessToken: string, environmentContext?: Ma
         if(!status.ok)throw new Error('추천 생성 상태를 확인하지 못했어요.');job=await status.json() as MarketQuestProgress;
       }finally{clearTimeout(timeout);}
     }
-  }else result=await response.json() as MarketAiQuestResponse;
+  }
   const promptVersion = /^market-ai-quest-v(\d+)/.exec(result.promptVersion ?? '');
   const timeLimitSeconds = resolveMarketTimeLimitSeconds(result.quest.timeLimitSeconds,
     promptVersion !== null && Number(promptVersion[1]) >= 20);

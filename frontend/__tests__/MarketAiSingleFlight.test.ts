@@ -1,6 +1,8 @@
 process.env.EXPO_PUBLIC_API_URL = 'http://test-server';
 jest.mock('../src/game/scenarios', () => ({ resolveMarketAiMission: (quest: unknown) => quest }));
 const { getMarketAiQuest, MarketQuestReadinessError } = require('../src/api/marketPersonalization') as typeof import('../src/api/marketPersonalization');
+// Every quest now arrives as a finished job; the body under test is its result.
+const ready = (result: unknown) => ({ jobId: 'job', status: 'READY', stage: 'READY', elapsedMs: 0, deadlineSeconds: 300, result });
 const { createMarketEnvironment } = require('../src/game/marketEnvironment') as typeof import('../src/game/marketEnvironment');
 const { getMarketEnvironmentContext } = require('../src/game/marketEnvironmentPlan') as typeof import('../src/game/marketEnvironmentPlan');
 
@@ -17,10 +19,10 @@ describe('장보기 재진입 요청 공유', () => {
     const third = getMarketAiQuest('account-a');
     expect(second).toBe(first); expect(third).toBe(first);
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    finish({ ok: true, json: async () => ({ generationId: 'G1', quest: {} }) });
+    finish({ ok: true, json: async () => ready({ generationId: 'G1', quest: {} }) });
     expect((await second).generationId).toBe('G1');
     await first;
-    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ generationId: 'G1', quest: {} }) });
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ready({ generationId: 'G1', quest: {} }) });
     await getMarketAiQuest('account-a');
     expect(fetchMock).toHaveBeenCalledTimes(2); // Server checks new logs and persistent reuse.
   });
@@ -53,7 +55,7 @@ describe('장보기 재진입 요청 공유', () => {
   it('진행 상태 뒤 프로필 반영이 완료되면 재요청에서 실제 AI 과제를 받는다', async () => {
     global.fetch = jest.fn()
       .mockResolvedValueOnce({ ok: false, status: 409, json: async () => ({ code: 'LATEST_PLAY_PROFILE_PENDING', stage: 'PROFILE' }) })
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ generationId: 'new-profile-quest', quest: {} }) });
+      .mockResolvedValueOnce({ ok: true, json: async () => ready({ generationId: 'new-profile-quest', quest: {} }) });
     await expect(getMarketAiQuest('recovered-account')).rejects.toBeInstanceOf(MarketQuestReadinessError);
     expect((await getMarketAiQuest('recovered-account')).generationId).toBe('new-profile-quest');
   });
@@ -73,15 +75,15 @@ describe('장보기 재진입 요청 공유', () => {
     const request = jest.mocked(global.fetch).mock.calls[0][1]!;
     expect(JSON.parse(request.body as string)).toEqual({ environmentContext: context });
     expect(request.headers).toMatchObject({ 'Content-Type': 'application/json' });
-    finishes.forEach(finish => finish({ ok: true, json: async () => ({ generationId: 'context', quest: {} }) }));
+    finishes.forEach(finish => finish({ ok: true, json: async () => ready({ generationId: 'context', quest: {} }) }));
     await Promise.all([first, same, otherLayout, preserve]);
   });
 
   it('새 AI 생성의 null·누락 계획을 거부하고 예전 저장 응답은 호환한다', async () => {
     global.fetch = jest.fn()
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ promptVersion: 'market-ai-quest-v18-ai-shelf-plan', quest: {} }) })
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ promptVersion: 'market-ai-quest-v18-ai-shelf-plan', quest: { environmentPlan: null } }) })
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ promptVersion: 'market-ai-quest-v17', generationId: 'legacy', quest: { environmentPlan: null } }) });
+      .mockResolvedValueOnce({ ok: true, json: async () => ready({ promptVersion: 'market-ai-quest-v18-ai-shelf-plan', quest: {} }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ready({ promptVersion: 'market-ai-quest-v18-ai-shelf-plan', quest: { environmentPlan: null } }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ready({ promptVersion: 'market-ai-quest-v17', generationId: 'legacy', quest: { environmentPlan: null } }) });
     await expect(getMarketAiQuest('new-plan')).rejects.toThrow('추천이 빠져');
     await expect(getMarketAiQuest('new-plan')).rejects.toThrow('추천이 빠져');
     expect((await getMarketAiQuest('new-plan')).generationId).toBe('legacy');
@@ -92,10 +94,10 @@ describe('장보기 재진입 요청 공유', () => {
     const order = context.shelfSlots.map(slot => slot.categoryId);
     const accepted = { shelfOrder: order, rationale: '직접 선택한 매대에서 목록의 분류를 찾아가요.' };
     global.fetch = jest.fn()
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ promptVersion: 'market-ai-quest-v18-ai-shelf-plan', quest: {
+      .mockResolvedValueOnce({ ok: true, json: async () => ready({ promptVersion: 'market-ai-quest-v18-ai-shelf-plan', quest: {
         environmentPlan: { ...accepted, shelfOrder: [...order].reverse() },
       } }) })
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ promptVersion: 'market-ai-quest-v18-ai-shelf-plan', quest: { environmentPlan: accepted } }) });
+      .mockResolvedValueOnce({ ok: true, json: async () => ready({ promptVersion: 'market-ai-quest-v18-ai-shelf-plan', quest: { environmentPlan: accepted } }) });
     await expect(getMarketAiQuest('manual-account', context)).rejects.toThrow('직접 설정한 진열대 순서');
     expect((await getMarketAiQuest('manual-account', context)).quest.environmentPlan).toEqual(accepted);
     expect(JSON.parse(jest.mocked(global.fetch).mock.calls[1][1]!.body as string).environmentContext.preserveShelfOrder).toBe(true);

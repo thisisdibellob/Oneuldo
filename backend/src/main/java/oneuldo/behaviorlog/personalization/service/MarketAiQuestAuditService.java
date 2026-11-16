@@ -38,6 +38,16 @@ public class MarketAiQuestAuditService {
                         g.getLatencyMs(),g.getPersonalizationMode(),g.getPromptVersion(),g.getValidatedQuest()));
     }
 
+    /** The validated quest of one of this member's own generations, as it was returned when it was made. */
+    @Transactional(readOnly=true)
+    public java.util.Optional<MarketAiQuestResponse> findGeneration(UUID memberId,UUID generationId) {
+        if(generationId==null)return java.util.Optional.empty();
+        return generationRepository.findById(generationId)
+                .filter(g->g.getMember().getId().equals(memberId)&&g.getValidatedQuest()!=null)
+                .map(g->MarketAiQuestResponse.from(g.getId(),g.getAnalysisId(),g.getProfileId(),g.getSource(),g.getModel(),
+                        g.getLatencyMs(),g.getPersonalizationMode(),g.getPromptVersion(),g.getValidatedQuest()));
+    }
+
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void record(UUID memberId, UUID analysisInputSnapshotId, MarketAiQuestResponse response,
             MarketAiQuestDraft validatedQuest, List<MarketAiQuestGeneration.Attempt> attempts,
