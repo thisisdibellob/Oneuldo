@@ -10,10 +10,10 @@ class KnowledgeRetrievalTest {
   var result=KnowledgeRetrieval.retrieve(source);
   assertThat(source).isEqualTo(before);
   assertThat(result.path("gameDocuments").toString()).contains("G-CART").doesNotContain("G-WORLD");
-  assertThat(result.path("officialDocuments").toString()).contains("O-ADAPT","O-STEPS");
+  assertThat(result.path("officialDocuments").toString()).contains("O-STEPS");
   assertThat(result).isEqualTo(KnowledgeRetrieval.retrieve(source));
-  assertThat(result.path("gameDocuments").size()).isLessThanOrEqualTo(3);
-  assertThat(result.path("officialDocuments").size()).isLessThanOrEqualTo(3);
+  assertThat(result.path("gameDocuments").size()).isLessThanOrEqualTo(2);
+  assertThat(result.path("officialDocuments").size()).isLessThanOrEqualTo(2);
  }
  @Test void absentActionDoesNotRetrieveItsGameInstructions(){
   var result=KnowledgeRetrieval.retrieve(m.readTree("{\"eventCode\":\"SHOP.SESSION_ENDED\"}"));
@@ -22,7 +22,24 @@ class KnowledgeRetrievalTest {
  @Test void unrelatedSceneDoesNotReceiveMarketInstructions(){
   var result=KnowledgeRetrieval.retrieve(m.readTree("{\"eventCode\":\"BUS.SESSION_ENDED\",\"quantityAfter\":2}"));
   assertThat(result.path("gameDocuments").size()).isZero();
+  assertThat(result.path("matchedGames").size()).isZero();
   assertThat(result.path("officialDocuments").size()).isPositive();
+ }
+ @Test void playsWithDifferentRecordedBehaviorReceiveDifferentDocuments(){
+  var quantity=KnowledgeRetrieval.retrieve(m.readTree("[\"SHOP.SESSION_ENDED\",\"SHOP.QUANTITY_CHANGED\",\"SHOP.QUANTITY_CHANGED\",\"SHOP.CART_OPENED\"]"));
+  var route=KnowledgeRetrieval.retrieve(m.readTree("[\"SHOP.SESSION_ENDED\",\"SHOP.SHELF_REVISITED\",\"SHOP.ROUTE_LOOP_DETECTED\",\"SHOP.WRONG_AISLE_ENTERED\"]"));
+  assertThat(quantity.path("gameDocuments").toString()).contains("G-CART").doesNotContain("G-WORLD");
+  assertThat(route.path("gameDocuments").toString()).contains("G-WORLD","G-PLAN").doesNotContain("G-CART");
+  assertThat(quantity.path("officialDocuments")).isNotEqualTo(route.path("officialDocuments"));
+  assertThat(route.path("matchedTopicEventCounts").path("movement").asInt()).isEqualTo(3);
+ }
+ @Test void countsWholeEventNamesAndSendsOnlyFieldsTheModelReads(){
+  var result=KnowledgeRetrieval.retrieve(m.readTree("[\"SHOP.MOVEMENT_BLOCKED_REPEATEDLY\",\"SHOP.MOVEMENT_SAMPLED\"]"));
+  assertThat(result.path("matchedTopicEventCounts").path("movement").asInt()).isEqualTo(1);
+  for(var document:result.path("gameDocuments")){
+   assertThat(document.propertyNames()).containsExactlyInAnyOrder("id","title","source","summary","limitations");
+  }
+  assertThat(result.path("corpusSha256").asString()).hasSize(64);
  }
  @Test void retrievalSurvivesFinalEncodingAndIndependentReviewWithRawSources() {
   var mapper=JsonMapper.builder().findAndAddModules().build();

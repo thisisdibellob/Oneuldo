@@ -1,9 +1,69 @@
 {
-  "version": "dual-knowledge-20261024-v1",
+  "version": "dual-knowledge-20261115-v2",
+  "games": {
+    "MARKET_SIMULATION": {
+      "title": "장보기",
+      "markers": [
+        "SHOP.",
+        "marketContent",
+        "MARKET_SIMULATION"
+      ],
+      "topicEvents": {
+        "cart": [
+          "CART_OPENED",
+          "CART_CLEARED",
+          "ITEM_REMOVED"
+        ],
+        "quantity": [
+          "QUANTITY_CHANGED",
+          "QUANTITY_OVERSHOT",
+          "QUANTITY_MATCHED"
+        ],
+        "terminal": [
+          "CHECKOUT_SUBMITTED",
+          "CHECKOUT_CORRECTION_STARTED",
+          "SESSION_ENDED"
+        ],
+        "timing": [
+          "TIME_LIMIT_EXPIRED"
+        ],
+        "help": [
+          "GENERAL_HELP_OPENED"
+        ],
+        "staff": [
+          "STAFF_HELP_REQUESTED"
+        ],
+        "movement": [
+          "ROUTE_LOOP_DETECTED",
+          "WRONG_AISLE_ENTERED",
+          "MOVEMENT_BLOCKED",
+          "MOVEMENT_BLOCKED_REPEATEDLY",
+          "TARGET_PASSED",
+          "SHELF_REVISITED",
+          "TARGET_SHELF_REVISITED",
+          "OFF_TARGET_DWELL",
+          "TARGET_SHELF_LEFT_WITHOUT_SELECTION"
+        ],
+        "stock": [
+          "OUT_OF_STOCK_DETECTED",
+          "ITEM_MISSING",
+          "SUBSTITUTE_SELECTED"
+        ],
+        "goals": [
+          "WRONG_ITEM_SELECTED",
+          "NON_TARGET_SHELF_OPENED",
+          "BUDGET_EXCEEDED",
+          "SHOPPING_LIST_OPENED",
+          "LIST_OPENED"
+        ]
+      }
+    }
+  },
   "cards": [
     {
       "id": "G-CART",
       "kind": "GAME",
+      "game": "MARKET_SIMULATION",
       "title": "장바구니 열기와 수량 변경",
       "source": "frontend/src/behavior/marketBehaviorTracker.ts",
       "section": "cartOpened, quantityChanged",
@@ -20,6 +80,7 @@
     {
       "id": "G-END",
       "kind": "GAME",
+      "game": "MARKET_SIMULATION",
       "title": "종료·타이머·제출 구분",
       "source": "backend/src/main/java/oneuldo/behaviorlog/analysis/service/SessionSourceLedger.java",
       "section": "literal source ledger; project interpretation boundary",
@@ -36,6 +97,7 @@
     {
       "id": "G-HELP",
       "kind": "GAME",
+      "game": "MARKET_SIMULATION",
       "title": "도움말 및 직원 지원",
       "source": "frontend/src/screens/MarketSimulationScreen.tsx",
       "section": "viewHelp logging",
@@ -52,6 +114,7 @@
     {
       "id": "G-WORLD",
       "kind": "GAME",
+      "game": "MARKET_SIMULATION",
       "title": "조절 가능한 환경",
       "source": "shared/market/adaptive-policy.json",
       "section": "adaptive world ranges",
@@ -69,6 +132,7 @@
     {
       "id": "G-PLAN",
       "kind": "GAME",
+      "game": "MARKET_SIMULATION",
       "title": "지원 계획의 실행 범위",
       "source": "backend/src/main/java/oneuldo/behaviorlog/analysis/service/AdaptiveObservationGuidance.java",
       "section": "supported mechanics",
