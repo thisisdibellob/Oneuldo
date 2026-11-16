@@ -157,7 +157,8 @@ public class AiBehaviorAnalysisPromptFactory {
                 + "사건 번호는 literalEventIndex의 실제 E 키를 복사한다. 표의 6번째 행을 E6으로 새로 부르지 않는다. 전/후는 같은 세션의 sequence와 timeMs로 확인한다. 이 상호작용 표에 없는 이동 원본도 behaviorTimeline에 있으므로 표만 보고 이동이 없다고 쓰지 않는다. "
                 + "상품 선택이 이 구간에 없으면 '이 구간에는 기록 없음'으로만 쓰고 전체 세션의 미수행으로 확대하지 않는다. "
                 + "누락·기기 문제·세션 경계를 고려하고 의학적 진단·IQ·장애 등급·개인정보를 출력하지 않는다. 한국어 JSON 하나만 출력한다."
-                + " 대안 설명을 채우려고 기기 오류·우연한 터치·자동 기능을 상상하지 않는다. 대안 설명은 원본 근거가 있는 경우에만 쓴다. 없으면 alternativeExplanations는 []이며, 동기·이해도 미확인은 uncertainties에 쓴다. 대안의 개수를 채우지 않는다. "
+                // The alternative-explanation and uncertainty rule is stated once, in the output contract of the same request.
+                + " 대안 설명을 채우려고 기기 오류·우연한 터치·자동 기능을 상상하지 않는다. "
                 + "장바구니 열기는 담았다가 제거한 행동의 증거가 아니다. 도움말 열기는 의존도·이해·실제 도움 제공의 증거가 아니다. 미확인 원인을 이름 붙여 나열하지 않는다. "
                 + SourceEventDetails.RULE + marketEventSemantics();
     }
@@ -236,13 +237,12 @@ public class AiBehaviorAnalysisPromptFactory {
     public String digestContract() {
         return "필드 이름이 있는 JSON 객체 하나를 출력한다. 형식: "
                 + "{\"summary\":\"요약\",\"observations\":[{\"observation\":\"사실\",\"interpretation\":\"관찰과 과제 요구의 관계\",\"alternativeExplanations\":[],\"evidenceEventIds\":[\"E1\"]}],\"uncertainties\":[\"한계\"],\"requestedSegmentIds\":[]}. "
-                + "예시 내용/ID는 제공 자료로 대체한다. evidenceEventIds에는 실제 사건 ID만, alternativeExplanations에는 원본 근거가 있는 대안만 쓰고 없으면 []로 둔다. 동기 미확인은 uncertainties에 쓴다. "
-                + "관찰 개수를 채우지 말고 관련 사건을 묶어 쓴다. summary는 관찰 본문을 반복하지 않는 한 문장으로 쓴다. 같은 행동의 반복은 합치고 수량 조정·목록 확인·가격 비교·도움·이동 중 실제로 기록된 서로 다른 행동과 반증을 보존한다. 각 관찰은 구체적인 사실과 과제와의 관계를 짧은 완결 문장으로 설명하고 실제 근거를 인용한다. 근거 없는 원인·이해·동기는 해석에 반복하지 않는다. 대안은 직접 근거가 있을 때만 작성하고 없으면 []로 둔다.  출력 상한 안에서 중복 표현을 줄여 JSON을 완성하며 개수를 채우려고 관찰을 만들지 않는다. "
-                + "중복 서술은 피한다: summary는 구간 범위 한 문장, observations는 서로 다른 실제 행동·지원·반증을 설명하며 uncertainties는 각 미확인 사항을 한 번만 쓴다. 항목 수나 길이를 줄이려고 서로 다른 행동·반증·한계를 빼지 않는다. 원문에 있는 상품 규격·수량·금액과 종료 사유를 관찰에 인용할 때 수치를 보존한다. 의도나 성패로 바꾸지 않는다. 반증/도움/자료 한계를 숨기지 않는다. 관찰이 없으면 uncertainties에 이유. 구간 밖 사실은 쓰지 않는다.";
+                + "예시 내용/ID는 제공 자료로 대체한다. evidenceEventIds에는 실제 사건 ID만 쓴다. 동기 미확인은 uncertainties에 쓴다. "
+                + "관찰 개수나 대안 개수를 채우지 말고 관련 사건을 묶어 쓴다. summary는 관찰 본문을 반복하지 않는 구간 범위 한 문장으로 쓴다. 같은 행동의 반복은 합치고 수량 조정·목록 확인·가격 비교·도움·이동 중 실제로 기록된 서로 다른 행동·지원·반증을 보존한다. 각 관찰은 구체적인 사실과 과제와의 관계를 짧은 완결 문장으로 설명하고 실제 근거를 인용한다. 근거 없는 원인·이해·동기는 해석에 반복하지 않는다. 대안은 직접 근거가 있을 때만 작성하고 없으면 alternativeExplanations를 []로 둔다. 출력 상한 안에서 중복 표현을 줄여 JSON을 완성한다. "
+                + "uncertainties는 각 미확인 사항을 한 번만 쓴다. 항목 수나 길이를 줄이려고 서로 다른 행동·반증·한계를 빼지 않는다. 원문에 있는 상품 규격·수량·금액과 종료 사유를 관찰에 인용할 때 수치를 보존한다. 의도나 성패로 바꾸지 않는다. 반증/도움/자료 한계를 숨기지 않는다. 관찰이 없으면 uncertainties에 이유. 구간 밖 사실은 쓰지 않는다.";
     }
     public String reductionContract() {
         return digestContract()+" 근거는 자식 관찰에 인용된 ID만 사용한다. allowedEvidenceEventIds는 이번 통합에서 인용 가능한 전체 목록이다. "
-                + "summary/uncertainties의 사건 번호와 chunkScopes의 범위 경계는 관찰 근거가 아니다. 목록 밖 ID로 새 관찰을 만들지 않는다. "
                 + "허용 근거가 없는 자식의 자료 한계는 uncertainties에 유지하고 evidenceEventIds로 승격하지 않는다. "
                 + "allowedEvidenceEventIds가 비어 있으면 observations는 []로 두고 불확실성을 보존한다. "
                 + "uncertainties는 필수이며 축약으로 빠진 관찰과 상충을 명시한다. 인과를 지어내지 않는다. "

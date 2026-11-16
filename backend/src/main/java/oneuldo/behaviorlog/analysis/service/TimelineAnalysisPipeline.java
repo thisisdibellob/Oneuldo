@@ -195,6 +195,7 @@ public final class TimelineAnalysisPipeline {
             var result=finalCall(prompts.systemPrompt(),whole,refs,limit,audit,raw->validator.validate(refs.read(raw),input),wholeEstimate.preparedReview());
             AnalysisProgress.stage("FINALIZING",1,1);return result;
         }
+        requireFinalSourceFloorFits(input,limit,audit);
         List<Group> groups=new ArrayList<>();
         var shared=sharedObservations==null||prompts.movementMaxError()!=0?Optional.<SharedSourceObservations.Document>empty():sharedObservations.load();
         List<Group> originalGroups;
@@ -427,6 +428,21 @@ public final class TimelineAnalysisPipeline {
         merge.put("outputContract",prompts.reductionContract());
         return prompts.compactReductionPrompt(refs.encode(mapper.writeValueAsString(merge)));
     }
+    /**
+     * The final request always carries the source context, with or without observations. When that context alone
+     * cannot fit, every observation and reduction call would be spent before the same failure, so stop first.
+     * A separate reference registry keeps this size probe from changing the aliases of the real requests.
+     */
+    private void requireFinalSourceFloorFits(BehaviorAnalysisInputResponse input,int limit,List<AiBehaviorAnalysisRun.Attempt> audit) {
+        var probe=new AnalysisReferences(mapper,input);
+        String floorPrompt=finalPrompt(input,List.of(),probe);
+        String floorSystem=FinalAnalysisPromptCompactor.systemPrompt();
+        int required=finalEstimate(floorSystem,floorPrompt,probe).required();
+        if(required<=limit)return;
+        log.info("AI final source floor exceeds limit before observation: required={}, limit={}",required,limit);
+        audit.add(new AiBehaviorAnalysisRun.Attempt(audit.size()+1,floorPrompt,null,"FINAL_EVIDENCE_EXCEEDS_LIMIT","PREFLIGHT",floorSystem,budget.finalOutputTokens(),null,null,null,0L));
+        throw new oneuldo.ai.exception.AiInputLimitException("FINAL_EVIDENCE_EXCEEDS_LIMIT",required,limit);
+    }
     private String finalPrompt(BehaviorAnalysisInputResponse input,List<Group> groups,AnalysisReferences refs) {
         return AnalysisSynthesisPrompt.build(mapper,prompts,input,groups.stream().map(Group::digest).toList(),refs,movementDetailLimited,
                 groups.stream().map(Group::scope).toList());
@@ -463,6 +479,12 @@ public final class TimelineAnalysisPipeline {
         var source=new FinalSourceEncoding(mapper).decode(mapper.readTree(originalPrompt));
         var ids=new LinkedHashSet<String>();source.path("evidenceReferences").forEach(e->ids.add(e.path("id").asString()));
         source.path(SourceEventDetails.FIELD).forEach(e->ids.add(e.path("id").asString()));
+        // A whole-play request has no evidenceReferences list: its contract lets the review cite any event of the
+        // supplied timeline, and its station rows point at those events. Without them the schema rejected the request.
+        if(source.has("behaviorTimeline")) {
+            var timeline=new CompactBehaviorTimeline(mapper).decodeExpanded(ObservationWireEncoding.decode(mapper,source).path("behaviorTimeline"));
+            for(var session:timeline.path("sessions"))for(var event:session.path("events"))ids.add(event.path("behaviorLogId").asString());
+        }
         var sessions=new TreeSet<String>();var baselines=new TreeSet<Integer>();
         for(var task:source.path("taskContext")) {
             sessions.add(task.path("sessionId").asString());var level=task.path("mission").path("difficulty");
@@ -988,7 +1010,7 @@ public final class TimelineAnalysisPipeline {
                 var paths=current.issues().stream().map(GroundedPracticeContract.Violation::path).distinct().toList();
                 response=client.supportsGroundedTextPatchSchemas()?client.completeStructured(system,prompt,output,0.0,GroundedTextPatch.outputSchema(mapper,current,client.supportsGroundedCauseEnums())):client.complete(system,prompt,output,0.0);
                 if("length".equals(response.finishReason()))throw new IllegalArgumentException("OUTPUT_TRUNCATED");
-                corrected=GroundedTextPatch.apply(mapper,current,response.text());
+                corrected=GroundedTextPatch.apply(mapper,current,response.text(),source);
                 T result=parse.apply(corrected);
                 audit.add(attempt(audit.size()+1,system,prompt,output,response,null,"GROUNDED_TEXT_PATCH"));
                 if(planSemanticReview)reviewPlanSource(source,corrected,limit,audit);

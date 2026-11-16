@@ -50,6 +50,20 @@ class ReviewSemanticTextPatchTest {
                 .hasMessage("INVALID_REVIEW_SEMANTIC_TEXT_PATCH");
     }
 
+    @Test void an_owner_mismatch_the_reviewer_quotes_gets_the_same_single_path_rewrite() {
+        var candidate=bad();
+        for(String code:List.of("EXECUTION_OWNER_MISMATCH")) {
+            String review=review("REPAIR",PATH,BAD).replace("UNCONFIRMED_COGNITION",code);
+            assertThat(ReviewSemanticTextPatch.target(fixture.mapper,candidate.toString(),review).path()).isEqualTo("/analysis"+PATH);
+            var after=fixture.mapper.readTree(ReviewSemanticTextPatch.apply(fixture.mapper,candidate.toString(),review,patch("/analysis"+PATH,GOOD)));
+            ((ObjectNode)after.at("/analysis/findings/0/interpretation/0")).set("text",candidate.at("/analysis"+PATH));
+            assertThat(after).isEqualTo(candidate);
+        }
+        // A cause wording belongs to the cause and alternative-explanation patches; a never-recorded action is not something a rewrite can settle.
+        for(String code:List.of("UNCONFIRMED_CAUSE","UNRECORDED_ACTION_HYPOTHESIS"))
+            assertThatThrownBy(()->ReviewSemanticTextPatch.target(fixture.mapper,candidate.toString(),review("REPAIR",PATH,BAD).replace("UNCONFIRMED_COGNITION",code)))
+                .hasMessage("INVALID_REVIEW_SEMANTIC_TEXT_PATCH");
+    }
     @Test void a_bad_patch_is_audited_then_one_model_string_repair_is_reviewed_and_only_its_real_response_is_checkpointed() {
         var bad=bad();var client=client(bad);var audit=new ArrayList<AiBehaviorAnalysisRun.Attempt>();
         String malformed=patch("/analysis/sessionAssessments/0/judgment","SUCCESS");

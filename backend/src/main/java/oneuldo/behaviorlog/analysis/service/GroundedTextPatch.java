@@ -30,7 +30,35 @@ public final class GroundedTextPatch {
                 .put("originalSourceSha256",QwenTokenCounter.textHash(source))
                 .put("scope","The complete source was checked and remains in the run audit. Every permitted field has the same closed singleton cause-unknown enum as before. All other source, claims, evidence, verdict and plan fields remain immutable; the original source validators still run after this response.").toString();
         }
+        else if(!r.issues().isEmpty()&&r.issues().stream().allMatch(GroundedTextPatch::guidanceOrCauseOnly)) {
+            var reduced=guidanceSource(m,source);
+            if(reduced!=null)submittedSource=reduced;
+        }
         return submittedSource+"\nProse correction only; all unreported candidate fields are immutable and preserved by the caller. No new verdict/citation/past action. Only flagged future guidance may add implemented UI steps required by its explanation.\n"+context;
+    }
+    /** Future guidance and cause-unknown limits are rewritten from the task, product and capability sources alone. */
+    private static final List<String> GUIDANCE_FIELDS=List.of("taskContext",SessionSourceLedger.FIELD,"sessionSourceLedgerRule","taskComparisonSource",
+        ReadableSourceFacts.FIELD,"catalogProductCategories","categoryMeaning","practiceProductSources","implementedSupportCapabilities",
+        "concretePracticeDesignRule","concretePracticeResponseRule","planBasisContract");
+    static boolean guidanceOrCauseOnly(GroundedPracticeContract.Violation v) {
+        return v.path().startsWith("/practicePlan/")||v.path().contains("suggestedSupport")
+            ||v.code().equals("UNCONFIRMED_CAUSE")&&v.path().matches("/(?:uncertainties/[0-9]+|findings/[0-9]+/alternativeExplanations/[0-9]+(?:/text)?)");
+    }
+    /**
+     * A past-action sentence is never corrected from this subset: any such issue keeps the complete source.
+     * The corrected candidate is still checked against the complete source by the same validators afterwards.
+     */
+    static String guidanceSource(ObjectMapper m,String source) {
+        JsonNode decoded;
+        try {decoded=new FinalSourceEncoding(m).decode(m.readTree(source));}
+        catch(RuntimeException ignored){return null;}
+        var kept=m.createObjectNode();
+        for(String field:GUIDANCE_FIELDS)if(decoded.has(field))kept.set(field,decoded.get(field));
+        if(!kept.has("taskContext")&&!kept.has(SessionSourceLedger.FIELD))return null;
+        var context=m.createObjectNode().put("correctionContext","PLAN_GUIDANCE_CORRECTION").put("originalSourceSha256",QwenTokenCounter.textHash(source))
+            .put("scope","Only future practice guidance and cause-unknown limits are being corrected. These are the complete original task, session ledger, readable facts, product, category and capability sources. Event-by-event movement rows are omitted from this request only; they remain in the run and every validator rechecks the corrected candidate against the complete source. Do not add a past action, citation, cause or verdict.");
+        context.set("planGuidanceSource",kept);
+        return context.toString();
     }
     /** Re-expose only literal source fields for the rejected partial-quantity relation. Never author a summary. */
     private static ArrayNode partialQuantitySources(ObjectMapper m,String source) {
@@ -102,7 +130,15 @@ public final class GroundedTextPatch {
         var seen=new HashSet<String>();for(var v:r.issues())if(seen.add(v.path()))rows.addObject().put("path",v.path()).put("value",v.quote());
         return Math.min(3200,Math.max(512,QwenTokenCounter.count(expected.toString())+512));
     }
-    public static String apply(ObjectMapper m,GroundedPracticeContract.Rejected r,String raw) {
+    public static String apply(ObjectMapper m,GroundedPracticeContract.Rejected r,String raw) {return apply(m,r,raw,null);}
+    /**
+     * With the original source, a partial-quantity correction may write the required quantity itself
+     * ("목표 수량인 2"): the same source value that made the program raise the issue. Counts and every other new number stay rejected.
+     */
+    public static String apply(ObjectMapper m,GroundedPracticeContract.Rejected r,String raw,String source) {
+        var requiredQuantities=new HashSet<String>();
+        if(source!=null&&r.issues().stream().anyMatch(x->x.code().equals("PARTIAL_QUANTITY_EVIDENCE_OMITTED")))
+            for(var row:partialQuantitySources(m,source))if(row.at("/objective/quantity").isIntegralNumber()&&!row.path("quantityEventsWithRequiredAfterValue").isEmpty())requiredQuantities.add(row.at("/objective/quantity").asString());
         var patch=m.reader().with(DeserializationFeature.FAIL_ON_TRAILING_TOKENS).readTree(raw);
         if(patch.isObject()&&patch.propertyNames().equals(Set.of("patches"))&&patch.path("patches").isObject()) {
             var normalized=m.createObjectNode();var entries=normalized.putArray("patches");
@@ -134,12 +170,18 @@ public final class GroundedTextPatch {
                         else if(!allowedNew.contains(number))throw new NumericMismatch(path,before,after);
                     }
                     if(at!=before.size())throw new NumericMismatch(path,before,after);
-                } else if(!after.equals(before)&&!(before.isEmpty()&&allowedObservationReuse(originalCandidate,r,path,value))&&!allowedVerifiedEmptyQuantity(r,path,value,before))throw new NumericMismatch(path,before,after);
+                } else if(!after.equals(before)&&!(before.isEmpty()&&allowedObservationReuse(originalCandidate,r,path,value))&&!allowedVerifiedEmptyQuantity(r,path,value,before)&&!allowedRequiredQuantity(r,path,before,after,requiredQuantities))throw new NumericMismatch(path,before,after);
             }
             int last=full.lastIndexOf('/');var parent=root.at(full.substring(0,last));String field=full.substring(last+1);
             if(parent instanceof ObjectNode o)o.put(field,value);else if(parent instanceof ArrayNode a)a.set(Integer.parseInt(field),m.getNodeFactory().stringNode(value));else throw new IllegalArgumentException("INVALID_GROUNDED_PATCH");
         }
         return m.writeValueAsString(root);
+    }
+    /** Original digits all stay in order; the only additions are the source-verified required quantity, on the path the partial-quantity issue names. */
+    private static boolean allowedRequiredQuantity(GroundedPracticeContract.Rejected rejected,String path,List<String> before,List<String> after,Set<String> requiredQuantities) {
+        if(requiredQuantities.isEmpty()||rejected.issues().stream().noneMatch(v->v.path().equals(path)&&v.code().equals("PARTIAL_QUANTITY_EVIDENCE_OMITTED")))return false;
+        int at=0;for(String number:after){if(at<before.size()&&number.equals(before.get(at)))at++;else if(!requiredQuantities.contains(number))return false;}
+        return at==before.size();
     }
     private static boolean allowedVerifiedEmptyQuantity(GroundedPracticeContract.Rejected rejected,String path,String value,List<String> before) {
         if(rejected.issues().stream().noneMatch(v->v.path().equals(path)&&v.code().equals("PROFILE_OUTCOME_CONTRADICTS_ORIGINAL")))return false;

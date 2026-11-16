@@ -18,7 +18,9 @@ public final class ReviewSemanticTextPatch {
             + "No inline E IDs/ranges, no full candidate, no extra path. Concise Korean JSON only.";
     private static final Pattern PROSE=Pattern.compile("/analysis/(?:summary/(?:0|[1-9][0-9]*)/text|findings/(?:0|[1-9][0-9]*)/(?:(?:observation|interpretation|alternativeExplanations)/(?:0|[1-9][0-9]*)/text|suggestedSupport)|sessionAssessments/(?:0|[1-9][0-9]*)/explanation/(?:0|[1-9][0-9]*)/text|uncertainties/(?:0|[1-9][0-9]*)|practicePlan/(?:goal|rationale/proposedPractice))");
     private static final Set<String> REPAIR_CODES=Set.of("UNCONFIRMED_COGNITION","UNSUPPORTED_CAPABILITY",
-            "PRODUCT_STATION_MISMATCH","STATION_KIND_MISMATCH","STATION_PROXIMITY_MISMATCH","COLLECTOR_MEANING_MISMATCH","UNMEASURED_ROUTE_EFFICIENCY");
+            "PRODUCT_STATION_MISMATCH","STATION_KIND_MISMATCH","STATION_PROXIMITY_MISMATCH","COLLECTOR_MEANING_MISMATCH","UNMEASURED_ROUTE_EFFICIENCY",
+            // The reviewer names the exact sentence and which recorded owner performed the event: one bounded rewrite of that quote, then the same review again.
+            "EXECUTION_OWNER_MISMATCH");
     private static final Pattern NUMBERS=Pattern.compile("[0-9]+(?:[.,][0-9]+)*");
     private ReviewSemanticTextPatch() {}
     public record Target(String path,String code,String quote) {}
