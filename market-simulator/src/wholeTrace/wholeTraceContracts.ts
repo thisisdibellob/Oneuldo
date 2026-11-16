@@ -19,6 +19,14 @@ export const WHOLE_TRACE_CANDIDATE_VERSION = '7' as const;
 export const WHOLE_TRACE_POLICY_VERSION = 'whole-trace-v3' as const;
 export const WHOLE_TRACE_MODEL = 'gpt-6-luna' as const;
 export const WHOLE_TRACE_ACTION_LIMIT = 100;
+/** Explicit accepted-decision observation horizons. 100 is the default; 200 is an opt-in experiment setting. */
+export const WHOLE_TRACE_ACTION_HORIZONS = [100, 200] as const;
+export type WholeTraceActionHorizon = typeof WHOLE_TRACE_ACTION_HORIZONS[number];
+export function wholeTraceActionHorizon(value: unknown): WholeTraceActionHorizon {
+  if (value === undefined) return WHOLE_TRACE_ACTION_LIMIT;
+  if (!WHOLE_TRACE_ACTION_HORIZONS.includes(value as WholeTraceActionHorizon)) throw new Error('actionHorizon must be 100 or 200');
+  return value as WholeTraceActionHorizon;
+}
 export type WholeTraceAction =
   | { type: 'readList' | 'pause' | 'lookAround' | 'viewCart' | 'viewHelp' | 'closeView' | 'closeStation' | 'submit' | 'giveUp' }
   | { type: 'walk'; waypointId: string }
@@ -78,7 +86,7 @@ export type WholeTraceBundle = {
     wayfinding?: { profile: WayfindingProfile; instructions: string } };
   /** Optional in saved bundle 8 files predating the additive authoring guidance. */
   authoringGuide?: WholeTraceAuthoringGuide;
-  generationLimits: { acceptedActionHorizon: 100; technicalActionBudget: number; maxRepairs: number; plannedTimeBudgetMs?: number };
+  generationLimits: { acceptedActionHorizon: WholeTraceActionHorizon; technicalActionBudget: number; maxRepairs: number; plannedTimeBudgetMs?: number };
   worldReference: {
     world: MarketReplaySnapshot['environment']; presentation: NonNullable<MarketReplaySnapshot['presentation']>;
     waypoints: ReturnType<typeof wholeReplayWaypointCatalog>; navigation: WholeTraceNavigation;
@@ -96,7 +104,9 @@ export type WholeTraceBundle = {
 export type WholeTraceSettings = Pick<TraceOptions, 'personaId' | 'seed' | 'snapshot' | 'timingProfile' | 'maxActions' |
   'timeBudgetMs' | 'attentionExperience' | 'learnerIdentity' | 'trialBinding' | 'llm'> & { outputPath?: string; maxRepairs?: number; movementValidationVersion?: '1'; movementVersion?: WholeTraceMovementVersion; movementFeedbackVersion?: WholeTraceMovementFeedbackVersion;
   choiceOrderVersion?: WholeTraceChoiceOrderVersion; authoringExampleVersion?: WholeTraceAuthoringExampleVersion;
-  wayfindingVersion?: WholeTraceWayfindingVersion };
+  wayfindingVersion?: WholeTraceWayfindingVersion;
+  /** Opt-in accepted-decision observation horizon. Absent means the default 100. */
+  actionHorizon?: WholeTraceActionHorizon };
 /** give-up-last-v1 lists control/giveUp after every other currently available choice. Availability is unchanged. */
 export const WHOLE_TRACE_CHOICE_ORDER_VERSIONS = ['give-up-last-v1'] as const;
 export type WholeTraceChoiceOrderVersion = typeof WHOLE_TRACE_CHOICE_ORDER_VERSIONS[number];
@@ -198,24 +208,25 @@ export function validateWholeTraceChoiceDecisionSyntax(value: unknown,
   return { valid: !errors.length, errors, ...(errors.length ? { code: 'CANDIDATE_SCHEMA' } : {}) };
 }
 export function validateWholeTraceCandidate(value: unknown, requestId: string,
-  options: { objectiveIds?: readonly string[]; movementVersion?: WholeTraceMovementVersion; wayfinding?: WholeTraceWayfindingVersion } = {}): WholeTraceValidation {
+  options: { objectiveIds?: readonly string[]; movementVersion?: WholeTraceMovementVersion; wayfinding?: WholeTraceWayfindingVersion; actionHorizon?: WholeTraceActionHorizon } = {}): WholeTraceValidation {
   return validateCandidate(value, requestId, options, false);
 }
 /** A prefix has no ending yet; every supplied decision keeps the full wire contract. */
 export function validateWholeTraceCandidatePrefix(value: unknown, requestId: string,
-  options: { objectiveIds?: readonly string[]; movementVersion?: WholeTraceMovementVersion; wayfinding?: WholeTraceWayfindingVersion } = {}): WholeTraceValidation {
+  options: { objectiveIds?: readonly string[]; movementVersion?: WholeTraceMovementVersion; wayfinding?: WholeTraceWayfindingVersion; actionHorizon?: WholeTraceActionHorizon } = {}): WholeTraceValidation {
   return validateCandidate(value, requestId, options, true);
 }
 function validateCandidate(value: unknown, requestId: string,
-  options: { objectiveIds?: readonly string[]; movementVersion?: WholeTraceMovementVersion; wayfinding?: WholeTraceWayfindingVersion }, prefix: boolean): WholeTraceValidation {
+  options: { objectiveIds?: readonly string[]; movementVersion?: WholeTraceMovementVersion; wayfinding?: WholeTraceWayfindingVersion; actionHorizon?: WholeTraceActionHorizon }, prefix: boolean): WholeTraceValidation {
   const errors: string[] = [];
+  const horizon = wholeTraceActionHorizon(options.actionHorizon);
   if (!plain(value)) return { valid: false, errors: ['Candidate must be a JSON object'], code: 'CANDIDATE_SCHEMA' };
   if (Object.keys(value).some(k => !['candidateVersion', 'requestId', 'decisions'].includes(k))) errors.push('Unknown candidate field');
   if (!['3', '4', '5', '6', '7'].includes(value.candidateVersion as string))
     errors.push('candidateVersion must be 7 (persistent task memory), 6 (working-memory choices), 5 (focused choices), 4 (state-bound choices) or explicit legacy 3');
   if (value.requestId !== requestId) errors.push('Candidate requestId differs from the prepared input');
-  if (!Array.isArray(value.decisions) || value.decisions.length < (prefix ? 0 : 1) || value.decisions.length > WHOLE_TRACE_ACTION_LIMIT)
-    return { valid: false, errors: [...errors, 'decisions must contain 1..100 complete actor decisions'], code: 'CANDIDATE_SCHEMA' };
+  if (!Array.isArray(value.decisions) || value.decisions.length < (prefix ? 0 : 1) || value.decisions.length > horizon)
+    return { valid: false, errors: [...errors, `decisions must contain 1..${horizon} complete actor decisions`], code: 'CANDIDATE_SCHEMA' };
   const decisions = value.decisions;
   decisions.forEach((d, i) => {
     const at = `decisions[${i}]`;
@@ -264,7 +275,7 @@ function validateCandidate(value: unknown, requestId: string,
     }
     if (wholeTraceTerminalIntent(d as WholeTraceWireDecision) && i !== decisions.length - 1) errors.push(`${at}: terminal action must be last`);
   });
-  if (!prefix && decisions.length < WHOLE_TRACE_ACTION_LIMIT && !wholeTraceTerminalIntent(decisions.at(-1) as WholeTraceWireDecision))
-    errors.push('A plan shorter than 100 decisions must end with submit or giveUp');
+  if (!prefix && decisions.length < horizon && !wholeTraceTerminalIntent(decisions.at(-1) as WholeTraceWireDecision))
+    errors.push(`A plan shorter than ${horizon} decisions must end with submit or giveUp`);
   return { valid: errors.length === 0, errors, ...(errors.length ? { code: 'CANDIDATE_SCHEMA' } : {}) };
 }

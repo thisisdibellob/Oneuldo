@@ -71,6 +71,8 @@ export type MarketReplayTrace = {
     wholeTraceMovementValidationVersion?: '1';
     wholeTraceMovementFeedbackVersion?: 'recent-movement-v1' | 'recent-movement-anchor-v1' | 'recent-movement-anchor-capacity-v1';
     wholeTraceWayfindingVersion?: 'wayfinding-v1' | 'wayfinding-v2' | 'wayfinding-v3' | 'wayfinding-v4';
+    /** Opt-in whole-trace-v3 observation horizon; absent means 100. */
+    wholeTraceActionHorizon?: 200;
     movementPolicy?: MarketReplayMovementPolicy;
     reasoningEffort?: 'low';
     feedback?: { observationScope: 'current-screen'; contextDelivery: 'stateless-http' | 'external-frame'; decisions: number } & (
@@ -270,6 +272,8 @@ export function validateMarketReplayTrace(value: unknown, snapshot?: MarketRepla
   if (generation?.wholeTraceWayfindingVersion !== undefined && (!['wayfinding-v1', 'wayfinding-v2', 'wayfinding-v3', 'wayfinding-v4'].includes(generation.wholeTraceWayfindingVersion)
     || generation.wholeTraceObservationVersion !== 'anchor-visible-structures-v1'))
     errors.push('Wayfinding v1 requires the anchor-visible-structures-v1 whole-trace observation contract.');
+  if (generation?.wholeTraceActionHorizon !== undefined && (generation.wholeTraceActionHorizon !== 200 || generation.actorPolicyVersion !== 'whole-trace-v3'))
+    errors.push('An explicit 200-decision horizon requires a whole-trace-v3 trace.');
   if (generation?.wholeTraceMovementValidationVersion !== undefined && (generation.wholeTraceMovementValidationVersion !== '1'
     || generation.actorPolicyVersion !== 'whole-trace-v3' || generation.trialBinding
     || generation.wholeTraceMovementVersion !== undefined && generation.wholeTraceMovementVersion !== 'directional-v2'))
@@ -369,7 +373,8 @@ export function validateMarketReplayTrace(value: unknown, snapshot?: MarketRepla
     if (trace.generation.controlledStop) errors.push('System completion and controlled stop are mutually exclusive.');
     if (trace.generationPolicy !== 'llm' || trace.traceSchemaVersion !== '2' || !['5','6'].includes(trace.policyVersion)
       || !['episodic-choice-v9','episodic-choice-v10','episodic-choice-v11','feedback-choice-v9','feedback-choice-v10','feedback-choice-v11','feedback-choice-v12','feedback-choice-v13','whole-trace-v1','whole-trace-v2','whole-trace-v3'].includes(trace.generation.actorPolicyVersion ?? '')) errors.push('System completion requires an episodic-choice-v9, v10, v11, feedback-choice-v9 to v13 or whole-trace-v1/v2/v3 LLM trace with schema 2 and policy 5 or 6.');
-    const limit = trace.generation.actorPolicyVersion === 'episodic-choice-v11' ? 200 : 100;
+    const limit = trace.generation.actorPolicyVersion === 'episodic-choice-v11'
+      || trace.generation.actorPolicyVersion === 'whole-trace-v3' && trace.generation.wholeTraceActionHorizon === 200 ? 200 : 100;
     if(completion.actionLimit !== limit || completion.afterDecisions !== limit) errors.push(`System completion requires the explicit ${limit}-decision bound for this actor policy.`);
     const first = trace.steps.findIndex(step => step.id === completion.firstStepId);
     if (first < limit + 1 || first > submit) errors.push(`System completion must begin after at least ${limit} actor steps and no later than submission.`);

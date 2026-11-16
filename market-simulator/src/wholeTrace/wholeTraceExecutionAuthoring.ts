@@ -202,7 +202,7 @@ export async function createWholeTraceExecutionAuthoringCursor(settings: WholeTr
       // plan. Do not turn its missing ending into another actor choice after a
       // schema error: that would let technical delivery manufacture a giveUp.
       // Pending decision rewrites above remain authoring, not finalization.
-      if (!prefix.terminal && decisions.length < 100) {
+      if (!prefix.terminal && decisions.length < (bundle.generationLimits.acceptedActionHorizon ?? 100)) {
         failed = true; failureCode = 'AUTHORING_INCOMPLETE_FINALIZATION';
         throw Object.assign(error(failureCode,
           'Finalization received an unfinished plan. This request is now a technical failure; its accepted decisions are preserved and no continuation or replacement ending is accepted.'),

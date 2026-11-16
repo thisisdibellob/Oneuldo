@@ -109,6 +109,8 @@ const INSTRUCTION_TEMPLATES = Object.freeze({
   'authoring-v1': path.join(__dirname, 'actor-instructions', 'legacy', 'authoring-v1.txt'),
   'authoring-v2': path.join(__dirname, 'actor-instructions', 'legacy', 'authoring-v2.txt'),
   'authoring-v3': path.join(__dirname, 'actor-instructions', 'authoring-v3.txt'),
+  // Identical to authoring-v3 except the explicit 200-decision horizon (prepare actionHorizon:200).
+  'authoring-v3-h200': path.join(__dirname, 'actor-instructions', 'authoring-v3-h200.txt'),
 });
 const DEFAULT_INSTRUCTION_TEMPLATE = 'authoring-v3';
 const MAILBOX_CLI = path.join(__dirname, 'whole-trace-mailbox.cjs');
@@ -134,7 +136,12 @@ function writeActorInput(prepareResponseFile, outputFile, options = {}) {
     // <slot>/actor-input.json, so refuse layouts it would describe wrongly.
     if (path.basename(outputFile) !== 'actor-input.json') throw new Error('actor input must be named actor-input.json for the instruction template');
     if (!fs.existsSync(path.join(slotDirectory, 'owner'))) throw new Error(`Owner directory not found at ${path.join(slotDirectory, 'owner')}`);
-    instructions = renderActorInstructions(options.template ?? DEFAULT_INSTRUCTION_TEMPLATE, slotDirectory);
+    // The instruction text names the decision horizon, so it must match the prepared bundle.
+    const horizon = actorInput.bundle.generationLimits?.acceptedActionHorizon ?? 100;
+    const templateId = options.template ?? (horizon === 200 ? 'authoring-v3-h200' : DEFAULT_INSTRUCTION_TEMPLATE);
+    if ((templateId === 'authoring-v3-h200') !== (horizon === 200))
+      throw new Error(`Instruction template ${templateId} does not match the prepared ${horizon}-decision horizon`);
+    instructions = renderActorInstructions(templateId, slotDirectory);
     instructions.file = path.join(slotDirectory, 'actor-instructions.txt');
     if (fs.existsSync(instructions.file)) throw new Error(`Refusing to overwrite ${instructions.file}`);
   }

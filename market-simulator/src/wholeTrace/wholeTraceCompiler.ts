@@ -138,7 +138,8 @@ async function executeWholeTraceCandidate(settings: WholeTraceSettings, bundle: 
     || bundle.movementValidationVersion !== settings.movementValidationVersion)
     throw new WholeTraceCompileError({ valid: false, code: 'PREPARED_INPUT_MISMATCH', errors: ['Candidate input differs from the prepared bundle'] });
   const structure = (prefix ? validateWholeTraceCandidatePrefix : validateWholeTraceCandidate)(value, bundle.requestId,
-    { objectiveIds: bundle.worldReference.objectives.map(goal => goal.id), movementVersion: bundle.movementVersion, wayfinding: bundle.wayfindingVersion });
+    { objectiveIds: bundle.worldReference.objectives.map(goal => goal.id), movementVersion: bundle.movementVersion, wayfinding: bundle.wayfindingVersion,
+      actionHorizon: bundle.generationLimits.acceptedActionHorizon });
   if (!structure.valid) throw new WholeTraceCompileError({ ...structure, issues: structure.errors.map(message => {
     const decisionIndex = Number(message.match(/^decisions\[(\d+)\]/)?.[1] ?? 0);
     return runtimeIssues(structure.code ?? 'CANDIDATE_SCHEMA', [message], decisionIndex)[0];
@@ -199,6 +200,8 @@ async function executeWholeTraceCandidate(settings: WholeTraceSettings, bundle: 
   if (bundle.wayfindingVersion !== undefined && (!isWholeTraceWayfindingVersion(bundle.wayfindingVersion) || bundle.wayfindingVersion !== settings.wayfindingVersion
     || !bundle.observationVersion || canonicalMarketReplayJson(bundle.persona.wayfinding?.profile) !== canonicalMarketReplayJson(wayfindingProfileOf(persona, bundle.wayfindingVersion))))
     throw new WholeTraceCompileError({ valid: false, code: 'PREPARED_INPUT_MISMATCH', errors: ['Prepared wayfinding contract or persona profile differs from the selected persona'] });
+  if ((bundle.generationLimits.acceptedActionHorizon ?? 100) !== (settings.actionHorizon ?? 100))
+    throw new WholeTraceCompileError({ valid: false, code: 'PREPARED_INPUT_MISMATCH', errors: ['Prepared action horizon differs from the selected settings'] });
   if (bundle.wayfindingVersion === undefined && settings.wayfindingVersion !== undefined)
     throw new WholeTraceCompileError({ valid: false, code: 'PREPARED_INPUT_MISMATCH', errors: ['Candidate input differs from the prepared bundle'] });
   const wayfinding = bundle.wayfindingVersion
@@ -262,9 +265,10 @@ async function executeWholeTraceCandidate(settings: WholeTraceSettings, bundle: 
         ...(bundle.movementFeedbackVersion ? { wholeTraceMovementFeedbackVersion: bundle.movementFeedbackVersion } : {}) } : {}),
       ...(anchorFeedback ? { wholeTraceMovementFeedbackVersion: bundle.movementFeedbackVersion } : {}),
       ...(bundle.wayfindingVersion ? { wholeTraceWayfindingVersion: bundle.wayfindingVersion } : {}),
+      ...(bundle.generationLimits.acceptedActionHorizon === 200 ? { wholeTraceActionHorizon: 200 as const } : {}),
       actorPolicyVersion: WHOLE_TRACE_POLICY_VERSION, reasoningEffort: 'low',
       planningSubmissions: submissions, repairSubmissions: submissions - 1,
-      maxActions: settings.maxActions ?? 100,
+      maxActions: settings.maxActions ?? bundle.generationLimits.acceptedActionHorizon ?? 100,
       llm: { ...settings.llm, model: WHOLE_TRACE_MODEL, maxCalls: settings.llm?.maxCalls ?? 100 },
       actorDecisionProvider: async o => {
         rawBefore = structuredClone(o);
@@ -277,7 +281,7 @@ async function executeWholeTraceCandidate(settings: WholeTraceSettings, bundle: 
         proposedTaskMemory = undefined;
         const observation = ledger.observe(o);
         const wire = candidate.decisions[accepted];
-        if (!wire) throw new Error('Candidate exhausted before natural termination or the 100-action horizon');
+        if (!wire) throw new Error('Candidate exhausted before natural termination or the accepted-action horizon');
         const binding = candidate.candidateVersion !== '3'
           ? resolveWholeTraceChoice(wire as import('./wholeTraceContracts').WholeTraceChoiceDecision, o, bundle, acceptedFrame, observation.knowledge)
           : undefined;
@@ -386,7 +390,7 @@ async function executeWholeTraceCandidate(settings: WholeTraceSettings, bundle: 
           movementFeedback.record({ action: entry.action, delayMs: entry.delayMs, reason: entry.reason }, rawBefore, after);
         }
         lastApplied = structuredClone(after);
-        if (prefix && accepted === candidate.decisions.length && accepted < 100
+        if (prefix && accepted === candidate.decisions.length && accepted < (bundle.generationLimits.acceptedActionHorizon ?? 100)
           && !wholeTraceTerminalIntent(candidate.decisions.at(-1))) capturePrefix(after, false);
       },
       onCheckpoint: onCheckpoint ? entry => {

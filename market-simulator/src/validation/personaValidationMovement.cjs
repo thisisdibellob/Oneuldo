@@ -1,7 +1,9 @@
 'use strict';
 
 const ANCHOR_FEEDBACK_VERSIONS = ['recent-movement-anchor-v1', 'recent-movement-anchor-capacity-v1'];
-const KEYS = ['movementValidationVersion', 'movementVersion', 'movementFeedbackVersion', 'wayfindingVersion'];
+const MOVEMENT_KEYS = ['movementValidationVersion', 'movementVersion', 'movementFeedbackVersion', 'wayfindingVersion'];
+// actionHorizon is an opt-in run binding (absent = the historical 100-decision horizon).
+const KEYS = [...MOVEMENT_KEYS, 'actionHorizon'];
 
 /** Explicit run binding only; absence preserves the historical validation contract. */
 function movementOptions(value = {}) {
@@ -21,12 +23,14 @@ function movementOptions(value = {}) {
   if (value.wayfindingVersion !== undefined && (!['wayfinding-v1', 'wayfinding-v2', 'wayfinding-v3', 'wayfinding-v4'].includes(value.wayfindingVersion) || value.movementVersion !== undefined
     || observationVersion !== 'anchor-visible-structures-v1'))
     throw new Error('wayfindingVersion wayfinding-v1/v2 requires omitted movementVersion and anchor-visible-structures-v1');
+  if (value.actionHorizon !== undefined && value.actionHorizon !== 200)
+    throw new Error('actionHorizon must be 200 when supplied; omit it for the default 100-decision horizon');
   return Object.fromEntries(present.map(key => [key, value[key]]));
 }
 
-function assertMovementBinding(expected, actual, label = 'Validation movement binding') {
+function assertMovementBinding(expected, actual, label = 'Validation movement binding', keys = KEYS) {
   const a = movementOptions(expected), b = movementOptions(actual);
-  if (KEYS.some(key => a[key] !== b[key])) throw new Error(`${label} differs; use the exact prepared movement options`);
+  if (keys.some(key => a[key] !== b[key])) throw new Error(`${label} differs; use the exact prepared movement options`);
   return a;
 }
 
@@ -45,9 +49,12 @@ function assertMovementEvidence(manifest, { trace, bundle, audit }) {
     movementVersion: generation.wholeTraceMovementVersion,
     movementFeedbackVersion: generation.wholeTraceMovementFeedbackVersion,
     wayfindingVersion: generation.wholeTraceWayfindingVersion,
+    actionHorizon: generation.wholeTraceActionHorizon,
   }, 'Trace movement evidence');
-  assertMovementBinding(expected, bundle ?? {}, 'Bundle movement evidence');
-  assertMovementBinding(expected, audit ?? {}, 'Knowledge audit movement evidence');
+  assertMovementBinding(expected, { ...(bundle ?? {}),
+    actionHorizon: bundle?.generationLimits?.acceptedActionHorizon === 200 ? 200 : undefined }, 'Bundle movement evidence');
+  // The knowledge audit records movement contracts only; the horizon is checked in the trace and bundle.
+  assertMovementBinding(expected, audit ?? {}, 'Knowledge audit movement evidence', MOVEMENT_KEYS);
   if (ANCHOR_FEEDBACK_VERSIONS.includes(expected.movementFeedbackVersion)
     && [generation.wholeTraceObservationVersion, bundle?.observationVersion, audit?.observationVersion]
       .some(version => version !== 'anchor-visible-structures-v1'))

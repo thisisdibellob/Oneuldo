@@ -921,6 +921,9 @@
         "wholeTraceMovementFeedbackVersion": {
           "enum": ["recent-movement-v1", "recent-movement-anchor-v1", "recent-movement-anchor-capacity-v1"]
         },
+        "wholeTraceActionHorizon": {
+          "enum": [200]
+        },
         "movementPolicy": {
           "$ref": "#/$defs/movementPolicy"
         }

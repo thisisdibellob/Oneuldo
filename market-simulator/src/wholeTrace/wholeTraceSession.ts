@@ -7,7 +7,7 @@ import { buildWholeTraceBundle, wholeTraceInputHash } from './wholeTraceBundle';
 import { compileWholeTraceCandidate, WholeTraceCompileError } from './wholeTraceCompiler';
 import { WHOLE_TRACE_MODEL, WHOLE_TRACE_POLICY_VERSION, validateWholeTraceCandidate,
   wholeTraceTerminalIntent, type WholeTraceBundle, type WholeTraceCandidate, type WholeTraceSettings,
-  type WholeTraceValidation, type WholeTraceWireDecision } from './wholeTraceContracts';
+  type WholeTraceValidation, type WholeTraceWireDecision, wholeTraceActionHorizon } from './wholeTraceContracts';
 import { validateTrace } from '../traceValidation';
 import { summarizeTrace } from '../simulator';
 import { createWholeTraceExecutionAuthoringCursor, type WholeTraceAuthoringOptions } from './wholeTraceExecutionAuthoring';
@@ -65,11 +65,12 @@ export class WholeTraceSession {
     if (!['string', 'number'].includes(typeof input.seed) || !String(input.seed).trim() || String(input.seed).length > 200
       || typeof input.seed === 'number' && !Number.isFinite(input.seed)) throw new Error('A finite seed is required');
     if (input.maxRepairs !== undefined && ![0, 1].includes(input.maxRepairs)) throw new Error('maxRepairs must be 0 or 1');
-    if (input.maxActions !== undefined && (!Number.isInteger(input.maxActions) || input.maxActions < 1 || input.maxActions > 100)) throw new Error('Whole mode maxActions must be 1..100');
+    const horizon = wholeTraceActionHorizon(input.actionHorizon);
+    if (input.maxActions !== undefined && (!Number.isInteger(input.maxActions) || input.maxActions < 1 || input.maxActions > horizon)) throw new Error(`Whole mode maxActions must be 1..${horizon}`);
     if (input.timingProfile !== undefined && input.timingProfile !== 'original') throw new Error('Whole-trace-v3 preserves actor judgment timing; timingProfile must be original');
     if (input.timeBudgetMs !== undefined && (!Number.isInteger(input.timeBudgetMs) || input.timeBudgetMs < 1000 || input.timeBudgetMs > 3600000)) throw new Error('timeBudgetMs must be 1000..3600000');
     if (input.llm?.model !== undefined && input.llm.model !== WHOLE_TRACE_MODEL) throw new Error('Whole trace actor must be the native Luna session');
-    this.settings = structuredClone({ ...input, maxActions: input.maxActions ?? 100, maxRepairs: input.maxRepairs ?? 0,
+    this.settings = structuredClone({ ...input, maxActions: input.maxActions ?? horizon, maxRepairs: input.maxRepairs ?? 0,
       timingProfile: input.timingProfile ?? 'original', llm: { ...input.llm, model: WHOLE_TRACE_MODEL, maxCalls: input.llm?.maxCalls ?? 100 } });
     this.bundle = buildWholeTraceBundle(this.settings, this.requestId);
     this.inputHash = wholeTraceInputHash(this.settings, this.bundle.observationVersion);
@@ -198,7 +199,8 @@ export class WholeTraceSession {
     if ((repair.candidateVersion !== '3' && repair.candidateVersion !== '4' && repair.candidateVersion !== '5' && repair.candidateVersion !== '6' && repair.candidateVersion !== '7')
       || repair.candidateVersion !== this.originalCandidateVersion) throw new Error('Repair candidateVersion must match the original candidate wire version');
     if (!Array.isArray(repair.decisions) || repair.decisions.length < 1) throw new Error('Repair decisions must contain a nonempty suffix');
-    const remainingActionBudget = Math.min(100, this.settings.maxActions ?? 100) - this.preservedPrefix.length;
+    const horizon = wholeTraceActionHorizon(this.settings.actionHorizon);
+    const remainingActionBudget = Math.min(horizon, this.settings.maxActions ?? horizon) - this.preservedPrefix.length;
     if (remainingActionBudget < 1 || repair.decisions.length > remainingActionBudget)
       throw new Error('Repair suffix exceeds the remaining action budget');
     if (wholeTraceInputHash(this.settings, this.bundle.observationVersion) !== this.inputHash) throw new Error('Prepared whole trace input changed');
@@ -207,7 +209,7 @@ export class WholeTraceSession {
     if (existsSync(suffixPath)) throw new Error('Repair diagnostic destination already exists');
     const assembled = { candidateVersion: repair.candidateVersion, requestId: this.requestId,
       decisions: [...structuredClone(this.preservedPrefix), ...structuredClone(repair.decisions)] };
-    if (assembled.decisions.length > 100 || assembled.decisions.length > (this.settings.maxActions ?? 100))
+    if (assembled.decisions.length > horizon || assembled.decisions.length > (this.settings.maxActions ?? horizon))
       throw new Error('Repair candidate exceeds the accepted action horizon');
     if (canonicalMarketReplayJson(assembled).length > 1000000) throw new Error('Repair candidate exceeds the bounded JSON size');
     const assembledHash = createHash('sha256').update(canonicalMarketReplayJson(assembled)).digest('hex');
@@ -285,13 +287,13 @@ export class WholeTraceSession {
         const declared = value as any;
         if ((declared?.candidateVersion === '3' || declared?.candidateVersion === '4' || declared?.candidateVersion === '5' || declared?.candidateVersion === '6' || declared?.candidateVersion === '7') && declared.requestId === this.requestId) {
           this.originalCandidateVersion = declared.candidateVersion;
-          if (Array.isArray(declared.decisions) && declared.decisions.length >= 1 && declared.decisions.length <= 100)
+          if (Array.isArray(declared.decisions) && declared.decisions.length >= 1 && declared.decisions.length <= wholeTraceActionHorizon(this.settings.actionHorizon))
             this.originalEnding = this.candidateTerminalIntent(declared);
         }
       }
       const shape = validateWholeTraceCandidate(value, this.requestId,
         { objectiveIds: this.bundle.worldReference.objectives.map(goal => goal.id), movementVersion: this.bundle.movementVersion,
-          wayfinding: this.bundle.wayfindingVersion });
+          wayfinding: this.bundle.wayfindingVersion, actionHorizon: this.bundle.generationLimits.acceptedActionHorizon });
       if (!shape.valid) throw new WholeTraceCompileError(shape);
       const candidate = value as WholeTraceCandidate;
       if (this.originalCandidateVersion && candidate.candidateVersion !== this.originalCandidateVersion)
@@ -367,7 +369,7 @@ export class WholeTraceSession {
         this.lastResult = { status: 'invalid', ...this.wireMetadata(), requestId: this.requestId, validation,
           attempts: this.attempts, canRepair: this.attempts < 1 + (this.settings.maxRepairs ?? 0),
           repairContext: { baseAttempt: this.attempts, fromDecisionIndex: this.preservedPrefix.length,
-            remainingActionBudget: Math.max(0, Math.min(100, this.settings.maxActions ?? 100) - this.preservedPrefix.length),
+            remainingActionBudget: Math.max(0, Math.min(wholeTraceActionHorizon(this.settings.actionHorizon), this.settings.maxActions ?? wholeTraceActionHorizon(this.settings.actionHorizon)) - this.preservedPrefix.length),
             originalCandidateVersion: this.originalCandidateVersion ?? null,
             before: validation.before ?? null, knowledge: validation.knowledge ?? null, workingMemory: validation.workingMemory ?? null,
             rejectedWorkingMemoryProposal: validation.proposedWorkingMemory ?? null,

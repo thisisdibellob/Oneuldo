@@ -35,7 +35,10 @@ export async function generateAttentionTrace(options: TraceOptions, persona: Act
   const wholeTrace = options.planningMode === 'whole-trace';
   const actorPolicyVersion = attentionActorPolicyVersion(options);
   const incrementalActor=actorPolicyVersion==='episodic-choice-v11';
-  const actionHorizon=incrementalActor?INCREMENTAL_ACTOR_ACTION_LIMIT:ACTOR_ACTION_LIMIT;
+  if(options.wholeTraceActionHorizon!==undefined && (![100,200].includes(options.wholeTraceActionHorizon) || !wholeTrace || actorPolicyVersion!=='whole-trace-v3'))
+    throw new Error('wholeTraceActionHorizon requires whole-trace-v3 and 100 or 200');
+  const wholeTraceHorizon200=wholeTrace && options.wholeTraceActionHorizon===200;
+  const actionHorizon=incrementalActor||wholeTraceHorizon200?INCREMENTAL_ACTOR_ACTION_LIMIT:ACTOR_ACTION_LIMIT;
   if(incrementalActor && options.maxActions!==undefined && options.maxActions!==INCREMENTAL_ACTOR_ACTION_LIMIT)
     throw new Error('v11 uses the explicit 200-action observation horizon');
   const cognition=incrementalActor?new IncrementalCognition(persona):null;
@@ -246,6 +249,7 @@ export async function generateAttentionTrace(options: TraceOptions, persona: Act
         movementContract: 'joystick-direction-v1' as const } : {}),
       ...(options.wholeTraceObservationVersion ? { wholeTraceObservationVersion: options.wholeTraceObservationVersion } : {}),
       ...(options.wholeTraceWayfindingVersion ? { wholeTraceWayfindingVersion: options.wholeTraceWayfindingVersion } : {}),
+      ...(wholeTraceHorizon200 ? { wholeTraceActionHorizon: 200 as const } : {}),
       ...(options.wholeTraceMovementValidationVersion ? { wholeTraceMovementValidationVersion: options.wholeTraceMovementValidationVersion,
         ...(options.wholeTraceMovementFeedbackVersion ? { wholeTraceMovementFeedbackVersion: options.wholeTraceMovementFeedbackVersion } : {}) } : {}),
       ...(wholeTraceHasAnchorMovementFeedback(options.wholeTraceMovementFeedbackVersion)

@@ -177,6 +177,8 @@ export type TraceOptions = {
   wholeTraceMovementFeedbackVersion?: import('./wholeTrace/wholeTraceMovementFeedback').WholeTraceMovementFeedbackVersion;
   /** Explicit opt-in: visible boundaries, actor-built spatial memory, actor thoughts and give-up eligibility. */
   wholeTraceWayfindingVersion?: import('./wholeTrace/wholeTraceWayfinding').WholeTraceWayfindingVersion;
+  /** Opt-in whole-trace-v3 accepted-decision horizon. Absent means 100. */
+  wholeTraceActionHorizon?: 100 | 200;
   planningMode?: 'whole-trace'; planningSubmissions?: number; repairSubmissions?: number;
   /** Compact is a test execution schedule, not an estimate of a person's speed. */
   timingProfile?: 'original' | 'compact';

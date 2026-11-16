@@ -156,6 +156,16 @@ legacy와 traits v1의 기존 판정은 유지하고, 새 `movementOpportunities
 - **포기 조건(v4)**: v3과 같되 "본 직원에게 물어봄"은 직원 창 열기가 아니라 답을 받은 위치 질문으로만 센다.
 - 위치 질문은 앱과 같이 장보기 목록 상품만 대상이다. 계산대 위치 질문, 반품 부탁 같은 기능은 게임에 먼저 추가한 뒤 연결해야 한다.
 
+### 관찰 상한 옵션 `actionHorizon:200` (선택, 기본 100)
+
+품목이 많은 과제처럼 100행동 안에 끝나기 어려운 실험에서 수락 결정 관찰 상한을 200으로 늘린다. 기본값은 100이며 값을 주지 않은 bundle·inputHash·trace는 이전과 같다.
+
+- `prepare_whole_trace({actionHorizon:200})`이면 `generationLimits.acceptedActionHorizon`과 기본 `technicalActionBudget`이 200이 된다. 배우에게 보이는 상한 문구(`actionContract.ending`, 작성 안내의 최종화 조건, 지시문)는 정해진 문장만 200으로 바꾸며, 문장이 바뀌어 대응을 못 찾으면 bundle 생성이 실패한다.
+- 종료 없이 200번째 결정까지 진행했을 때만 그때의 장바구니로 시스템 계산을 붙인다. trace에는 `generation.wholeTraceActionHorizon:200`과 `systemCompletion.afterDecisions/actionLimit:200`이 남고, 검증기는 이 표시가 있는 whole-trace-v3만 200 경계를 받는다. 200 상한에서 100번째에 `finish`하면 미완성 최종화로 기술 실패다.
+- 배우 지시문은 `authoring-v3-h200` 템플릿(authoring-v3와 상한 숫자만 다름)을 쓴다. `whole-trace-actor-input.cjs`는 bundle의 상한에 맞는 템플릿을 고르고, 맞지 않는 템플릿 지정은 거절한다.
+- 검증 run에서는 `prepare_persona_validation`에 `{"movementValidationVersion":"1","actionHorizon":200}`으로 묶는다. 슬롯 요청·bundle·trace의 상한이 run 바인딩과 다르면 거절한다.
+- legacy 검증 run도 `lowGoalCount`(2~4)를 명시하면 low snapshot의 목표 수를 그 값으로 검사하고 manifest에 남긴다. 생략하면 기존처럼 2개다. 일반 성인 대조군으로 품목 수를 늘린 과제를 돌릴 때 함께 쓴다.
+
 저장 trace의 JSON 스키마에서도 `generation.wholeTraceWayfindingVersion`을 선택 항목으로 허용한다. 허용값은 `wayfinding-v1`·`wayfinding-v2`·`wayfinding-v3`·`wayfinding-v4`이며, 알 수 없는 필드·버전은 계속 거절한다. `whole-trace-wayfinding-finalization.test.cjs`는 옵션을 켠 candidate 7의 허용된 포기·계산 제출·100행동 시스템 계산과 세션 저장까지 검사한다. 중간 관찰·메뉴 검사만으로 최종 생성 성공을 대신하지 않는다.
 
 ### 후보 작성과 제출 계약

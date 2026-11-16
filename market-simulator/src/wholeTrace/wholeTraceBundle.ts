@@ -22,7 +22,7 @@ import { validWholeTraceMovementFeedback, wholeTraceHasAnchorMovementFeedback, W
 
 const WHOLE_TRACE_FOCUS_INSTRUCTIONS = `매 단계 focusedGoalId와 focusedProductId를 별도로 기록한다. focusedGoalId는 지금 처리하는 실제 읽은 목표 한 개이고 heldGoalIds에 포함되어야 한다. focusedProductId는 이번 방문에서 실제 선반이나 장바구니에 표시된 상품 중 지금 살피거나 고르는 한 개다. 집중 대상이 없으면 null을 쓰며 heldGoalIds의 첫 항목을 집중 목표로 복사하지 않는다. 목록을 읽기 전에는 집중 목표가 null이고 상품을 보기 전에는 집중 상품도 null이다. 관심 상품을 살필 때 focusedGoalId는 null일 수 있지만 아직 끝내지 않은 구매 목표는 taskMemory.openGoalIds와 heldGoalIds에 계속 남는다. 상품을 실제로 살피기 시작하면 실제 표시된 focusedProductId와 그 관심에 따른 행동을 연결한다. 담거나 돌려놓는 상품과 현재 집중 상품이 다르면 그 불일치를 그대로 기록하며 정답 상품으로 바꾸지 않는다.
 한 상품을 처리한 뒤 다음 항목으로 넘어갈 때는 선택한 개인의 실제 확인 습관을 이어간다. 선택한 프로필이 다음 항목에서 목록을 다시 확인하는 습관을 가진 경우(지민)는 이유에 목록 cue를 쓰는 것으로 대신하지 않고 실제 readList 행동으로 표현한다. 다른 개인에게 지민의 습관을 추가하지 않는다. 집중 목표를 바꾼 뒤 목록을 읽고 다음 상품을 담는 순서도 가능하다. 새 표지·처음 여는 선반·여러 목표와 수량 조건·실제로 눈에 들어온 관심 상품에 따라 현재 집중, 불확실성, 확인이나 스스로 회상하는 선택을 연결한다. 변화의 계기를 알려진 triggerCueRefs와 짧은 행동 설명으로 남긴다. 간편식품 표지를 본 것과 카레 종류를 실제로 본 것은 다르다. 낯섦이나 관심을 이유에만 쓰고 상태와 행동을 매번 동일하게 복사하지 않는다. 상황이 단순하거나 익숙하면 안정적으로 수행할 수 있으며 관심 전환·망각·망설임 횟수를 채우지 않는다.`;
-import { WHOLE_TRACE_BUNDLE_VERSION, WHOLE_TRACE_MODEL, WHOLE_TRACE_POLICY_VERSION, WHOLE_TRACE_CHOICE_ORDER_VERSIONS, WHOLE_TRACE_AUTHORING_EXAMPLE_VERSIONS, type WholeTraceBundle, type WholeTraceNavigation, type WholeTraceSettings } from './wholeTraceContracts';
+import { WHOLE_TRACE_BUNDLE_VERSION, WHOLE_TRACE_MODEL, WHOLE_TRACE_POLICY_VERSION, WHOLE_TRACE_CHOICE_ORDER_VERSIONS, WHOLE_TRACE_AUTHORING_EXAMPLE_VERSIONS, wholeTraceActionHorizon, type WholeTraceBundle, type WholeTraceNavigation, type WholeTraceSettings } from './wholeTraceContracts';
 import { WHOLE_TRACE_WAYFINDING_V2_VERSION, WHOLE_TRACE_WAYFINDING_V3_VERSION, WHOLE_TRACE_WAYFINDING_V4_VERSION, WAYFINDING_COMMON_INSTRUCTIONS, WAYFINDING_COMMON_INSTRUCTIONS_V2,
   WAYFINDING_COMMON_INSTRUCTIONS_V3, WAYFINDING_COMMON_INSTRUCTIONS_V4, renderWayfindingInstructionsV4, isWholeTraceWayfindingVersion, renderWayfindingInstructions, renderWayfindingInstructionsV2,
   renderWayfindingInstructionsV3, wayfindingProfileOf } from './wholeTraceWayfinding';
@@ -136,7 +136,7 @@ export function buildWholeTraceBundle(settings: WholeTraceSettings, requestId: s
       description: persona.description, character: structuredClone(persona.character), behavior: buildWholeTracePersonaInput(persona) },
     authoringGuide: buildWholeTraceAuthoringGuide({ requestId, inputHash, snapshotId: snapshot.snapshotId,
       persona, seed: settings.seed, candidateVersion: '7' }, { maxRepairs: settings.maxRepairs ?? 0, observationVersion, authoringExampleVersion: settings.authoringExampleVersion }),
-    generationLimits: { acceptedActionHorizon: 100, technicalActionBudget: settings.maxActions ?? 100,
+    generationLimits: { acceptedActionHorizon: wholeTraceActionHorizon(settings.actionHorizon), technicalActionBudget: settings.maxActions ?? wholeTraceActionHorizon(settings.actionHorizon),
       maxRepairs: settings.maxRepairs ?? 0, ...(settings.timeBudgetMs === undefined ? {} : { plannedTimeBudgetMs: settings.timeBudgetMs }) },
     worldReference: { world: structuredClone(raw.environment), presentation,
     waypoints, navigation,
@@ -223,5 +223,36 @@ export function buildWholeTraceBundle(settings: WholeTraceSettings, requestId: s
   }
   if (settings.authoringExampleVersion)
     bundle.actionContract.authoringExamples = 'walk-while-unseen-v1 adds authoringGuide.sourceAuthoring.taskDeclarationExamples.walkWhileUnseen, a syntax example of choosing an available walk while no shelf is visible yet. It is not a required route or a ban on other actions.';
+  if (bundle.generationLimits.acceptedActionHorizon === 200) applyHorizon200Wording(bundle);
   return bundle;
+}
+
+// Exact horizon wording shown to the actor. Default (100) bundles are untouched;
+// an explicit 200 horizon rewrites only these phrases and fails closed on drift.
+const HORIZON_200_WORDING: readonly (readonly [string, string])[] = [
+  ['An array below 100 decisions must end in the actor-chosen submit/giveUp', 'An array below 200 decisions must end in the actor-chosen submit/giveUp'],
+  ['or the existing 100-action horizon', 'or the explicit 200-action horizon'],
+  ['기존 100행동 관찰 상한', '명시된 200행동 관찰 상한'],
+  ['Provide 1..100 decisions', 'Provide 1..200 decisions'],
+  ['provide exactly 100 nonterminal decisions', 'provide exactly 200 nonterminal decisions'],
+  ['A technical budget below 100 requires', 'A technical budget below 200 requires'],
+  ['At the 100-action horizon the system', 'At the 200-action horizon the system'],
+];
+function applyHorizon200Wording(bundle: WholeTraceBundle): void {
+  const used = new Set<string>();
+  const rewrite = (value: unknown): unknown => {
+    if (typeof value === 'string') {
+      let text = value;
+      for (const [from, to] of HORIZON_200_WORDING) if (text.includes(from)) { text = text.split(from).join(to); used.add(from); }
+      return text;
+    }
+    if (Array.isArray(value)) return value.map(rewrite);
+    if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, rewrite(item)]));
+    return value;
+  };
+  bundle.instructions = rewrite(bundle.instructions) as string;
+  bundle.actionContract = rewrite(bundle.actionContract) as WholeTraceBundle['actionContract'];
+  if (bundle.authoringGuide) bundle.authoringGuide = rewrite(bundle.authoringGuide) as WholeTraceBundle['authoringGuide'];
+  const missing = HORIZON_200_WORDING.filter(([from]) => !used.has(from));
+  if (missing.length) throw new Error(`200-action horizon wording drifted: ${missing.map(([from]) => from).join(' | ')}`);
 }

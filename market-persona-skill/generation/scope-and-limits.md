@@ -14,6 +14,8 @@
 
 `episodic-choice-v9`·`episodic-choice-v10`·`whole-trace-v3`에서는 모델이 선택해 적용한 상위 행동을 최대 100회 관찰한다. 기본 `generate_trace`의 v4는 기존 기술 실행 상한을 사용한다. 게임 시작·이동의 세부 입력·이후 시스템 처리 단계는 이 수에 포함하지 않는다. 100번째를 포함해 모델이 제출·자발적 포기를 선택하면 그 결과를 따른다. 100회 후에도 진행 중일 때만 **그때의 장바구니 그대로 계산·분석 접수하는 시스템 구간**을 추가한다. 빈 장바구니도 그대로 제출하며 상품을 담거나 빼거나 정답으로 보정하지 않는다. 기존 이동 입력으로 계산대까지 이동하고, 직원이 없으면 직원에게 호출을 요청한 뒤 `submitForReview → awaitReviewAccepted → leave`로 끝낸다. [행동 상한 기준](../../market-simulator/README.md#행동-100회-상한과-시스템-계산)은 관찰 범위이며 장애 특성이나 임상 기준이 아니다. 확률 모드의 종료 정책은 바뀌지 않는다.
 
+whole-trace-v3는 `actionHorizon:200`을 명시하면 상한이 200회가 되고, 시스템 계산도 200번째 뒤에만 붙는다(검증 run은 `prepare_persona_validation`에 함께 묶음, 배우 지시문은 `authoring-v3-h200`). 자세한 조건은 [whole-trace 문서](../../market-simulator/docs/whole-trace.md#관찰-상한-옵션-actionhorizon200-선택-기본-100)를 따른다. 아래 설명의 100은 기본 상한 기준이다.
+
 `generation.systemCompletion = {reason:"action-limit", afterDecisions:100, actionLimit:100, firstStepId, checkoutId, cartAtStart}`로 시스템 구간과 당시 장바구니를 기록한다. `firstStepId`부터는 시스템이 결정한 처리이므로 페르소나가 스스로 계산대를 찾아 제출한 능력으로 보고하지 않는다. 실행·DB 증거와 실제 제출 장바구니의 일치를 확인한 뒤 **시스템 구간 이전의 경험만** 개인 기억으로 저장한다. 자동 이동·계산·직원 호출은 다음 회차 경험에 넣지 않는다. 이 회차는 `assisted-submission`으로 분석·다음 퀘스트 연결을 이어갈 수 있지만, `performanceEligible:false`와 `metrics:null`로 독립 완수 비교에서 제외한다. 제출 내용의 누락·초과 등은 별도 측정에 남긴다. 계획에 분석 접수 단계가 있어도 실제 서버 접수·분석 `READY`는 별도로 확인한다. 생성 중 `.generation/` 진단 자료는 완성 trace·실행 경험 대신 사용하지 않는다. 새 정책 실험은 이전 개인·실험을 덮어쓰지 않고 별도로 만든다.
 
 기존 v6/v7의 반복 정체 종료와 v8의 100회 포기 종료는 `generation.controlledStop`으로 계속 구분한다. 호환 검증을 유지하되 v9의 시스템 계산과 섞거나 메타데이터를 지워 자발적 수행으로 바꾸지 않는다. 기술 오류로 생성이 끊긴 자료도 시스템 계산을 완료한 trace로 보고하지 않는다.

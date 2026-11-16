@@ -97,7 +97,8 @@ export function createWholeTraceSourceAuthoringCursor(bundle: WholeTraceBundle) 
   const objectiveIds = bundle.worldReference.objectives.map(objective => objective.id);
   let taskDeclarations = createWholeTraceAuthoringTaskState(bundle.actorState?.taskMemory);
   const goalMemoryCapacity = bundle.persona?.behavior?.behavioralContext.goalMemoryCapacity;
-  const requestId = bundle.requestId, actionBudget = Math.min(100, bundle.generationLimits.technicalActionBudget);
+  const requestId = bundle.requestId, horizon = bundle.generationLimits.acceptedActionHorizon ?? 100,
+    actionBudget = Math.min(horizon, bundle.generationLimits.technicalActionBudget);
   const entries = new Map<string, WholeTraceChoiceEntry>();
   for (const entry of catalog.entries) {
     if (entries.has(entry.choiceId)) fail('AUTHORING_UNSUPPORTED_TRANSITION', `Duplicate catalog choice ${entry.choiceId}`);
@@ -424,7 +425,7 @@ export function createWholeTraceSourceAuthoringCursor(bundle: WholeTraceBundle) 
     },
     acceptExecutionTerminal(acceptedActions: number): void {
       if (!continuous || acceptedActions !== decisions.length
-        || !terminal && decisions.length !== 100)
+        || !terminal && decisions.length !== horizon)
         return fail('AUTHORING_UNSUPPORTED_TRANSITION', 'Execution termination requires the accepted actor ending or full horizon');
       terminal = true; awaitingExecution = false;
     },
@@ -463,7 +464,7 @@ export function createWholeTraceSourceAuthoringCursor(bundle: WholeTraceBundle) 
     },
     finish(): WholeTraceTaskChoiceCandidate {
       const candidate: WholeTraceTaskChoiceCandidate = { candidateVersion: '7', requestId, decisions: structuredClone(decisions) };
-      const syntax = validateWholeTraceCandidate(candidate, requestId, { objectiveIds, movementVersion: bundle.movementVersion, wayfinding: bundle.wayfindingVersion });
+      const syntax = validateWholeTraceCandidate(candidate, requestId, { objectiveIds, movementVersion: bundle.movementVersion, wayfinding: bundle.wayfindingVersion, actionHorizon: horizon });
       if (!syntax.valid) return fail('AUTHORING_SCHEMA', syntax.errors.join('; '));
       return candidate;
     },
