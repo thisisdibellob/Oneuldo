@@ -4,7 +4,7 @@ import tools.jackson.databind.*;
 import tools.jackson.databind.node.*;
 /** Compile only the original AI's explicit bounded choice; no fallback or auto-picked quest. */
 final class AdaptiveQuestLayoutChoice {
- static final String SYSTEM="Choose one layout choiceId from options for this future practice. Each option maps exact shelfOrder indexes to actual game geometry and reference distances. The previous candidate's position claims were wrong. Do not generate a permutation or infer that index 0 is near the entrance. Pick a practical option for the listed objectives and current profile. Prefer retaining unrelated placements when equally suitable. Return ONLY {choiceId:string} using a supplied ID. You select the arrangement; the app applies that exact option. No claim of human learning or measured route improvement is requested.";
+ static final String SYSTEM="Choose one layout choiceId from options for this future practice. Each option maps exact shelfOrder indexes to actual game geometry and reference distances. The previous candidate's position claims were wrong. Do not generate a permutation or infer that index 0 is near the entrance. Pick a practical option for the listed objectives and current profile. Prefer retaining unrelated placements when equally suitable. Return ONLY JSON {\"choiceId\":\"<supplied ID>\"} with both quotes around the key. You select the arrangement; the app applies that exact option. No claim of human learning or measured route improvement is requested.";
  static ArrayNode options(ObjectMapper m,JsonNode evidence,JsonNode candidate,JsonNode locks) {
   var out=m.createArrayNode();
   for(String lock:locks.propertyNames())if(lock.equals("/environmentPlan/shelfOrder")||lock.equals("/environmentPlan"))return out;
@@ -49,6 +49,9 @@ final class AdaptiveQuestLayoutChoice {
   return out;
  }
  static ObjectNode schema(ObjectMapper m,ArrayNode options){var s=m.createObjectNode().put("type","object").put("additionalProperties",false);s.putArray("required").add("choiceId");var field=s.putObject("properties").putObject("choiceId").put("type","string");var ids=field.putArray("enum");for(var option:options)ids.add(option.path("choiceId").asString());return s;}
+ private static final java.util.regex.Pattern BARE_KEY=java.util.regex.Pattern.compile("\\s*\\{\\s*choiceId\\s*:\\s*\"(P[0-9]{1,3})\"\\s*\\}\\s*");
+ /** The reply is one bounded ID. {choiceId:"P2"} names the same option as its quoted form; reading it changes no choice, and selected() still checks the ID. */
+ static JsonNode parse(ObjectMapper m,String text){var bare=BARE_KEY.matcher(text==null?"":text);return bare.matches()?m.createObjectNode().put("choiceId",bare.group(1)):m.readTree(text);}
  static JsonNode selected(JsonNode response,ArrayNode options){
   if(!response.isObject()||!response.propertyNames().equals(Set.of("choiceId")))throw AdaptiveQuestContract.problem("/environmentPlan/shelfOrder","INVALID_LAYOUT_CHOICE");
   for(var option:options)if(option.path("choiceId").equals(response.path("choiceId")))return option;

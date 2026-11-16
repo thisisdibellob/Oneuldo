@@ -36,6 +36,16 @@ final class AdaptiveQuestDeliveryText {
   if(!response.isObject()||!response.propertyNames().equals(Set.of("description","briefing","adaptationSummary","rationale","observationPlan")))throw AdaptiveQuestContract.problem("/briefing","FOCUSED_TEXT_OBJECT_REQUIRED");
   var out=m.createObjectNode();var patches=out.putArray("patches");for(String path:PATHS){String key=path.substring(path.lastIndexOf('/')+1);patches.addObject().put("path",path).set("value",response.get(key));}return out;
  }
+ /**
+  * The text rewrite replaces the whole observationPlan, but only its prose is being rewritten.
+  * The purpose is a fixed code the model chose when it designed the quest (and was shown here as questConfiguration.purpose);
+  * a rewritten sentence in its place was failing the enum check. Fields the rewrite does not carry are kept as they were.
+  */
+ static void keepNonTextChoices(JsonNode before,JsonNode candidate){
+  if(!(candidate.path("observationPlan") instanceof ObjectNode plan)||!before.isObject())return;
+  if(before.path("purpose").isString())plan.set("purpose",before.get("purpose"));
+  for(String field:before.propertyNames())if(!plan.has(field))plan.set(field,before.get(field));
+ }
  static JsonNode parseResponse(ObjectMapper m,String raw){
   String value=raw.strip();
   if(value.startsWith("```json\n")&&value.endsWith("\n```"))value=value.substring(8,value.length()-4);

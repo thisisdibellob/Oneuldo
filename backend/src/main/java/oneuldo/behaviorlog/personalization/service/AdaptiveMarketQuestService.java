@@ -15,7 +15,7 @@ import tools.jackson.databind.node.ObjectNode;
 @Service
 @RequiredArgsConstructor
 public class AdaptiveMarketQuestService {
-    public static final String VERSION="market-ai-quest-v86-guidance-contract";
+    public static final String VERSION="market-ai-quest-v93-without-played-action-facts";
     static final String DELIVERY_CONSISTENCY=" Numeric coordinates and English category IDs are not learner-facing guidance. Use Korean shelf labels and relative location. Employees answer location questions in text; no physical escort or automatic navigation exists. Past behavior/movementObservation contain past facts only; expected effects and condition changes belong to evaluationFocus/changeReasons.  After a completed play with no SHELF_OPENED, GUIDED_PRACTICE must not increase the selected target categories referenceRoutePx versus the latest actual layout. Choose concrete navigation help and a suitable existing slot; do not equate first array position with easier access. This reference is not measured player travel. Apply requiredAiDesign.path/value exactly: it was chosen by this same application AI for this task. Explain it without claiming an observed effect. Guided practice briefing must give the concrete goal, the next executable action/location help, and how to check the result; do not hide the steps only in changeReasons or evaluationFocus. Help view also displays this briefing. Use actualLayoutReference for shelf positions; array index is not route order.  Match every product size in briefing/description to the chosen catalog SKU, including equivalent mL/L units. Actual configured budget must match explanations saying it is retained. Budget headroom alone is not new practice; change the observed task/support condition meaningfully. Help openings do not demonstrate dependence or dependence reduction, and cart openings do not prove added-then-removed products. No target arrows, automatic shortage alerts or automatic help opening are implemented. Existing staff help and text guidance remain available.";
     private final MarketDifficultyRecommendationService recommendations;
     private final AiUserProfileService profiles;
@@ -133,27 +133,29 @@ public class AdaptiveMarketQuestService {
                 progress.accept("DESIGNING_CONDITIONS");
                 var designSource=wire.deepCopy();designSource.remove(List.of("outputSchema","catalog","catalogUnitPrices","literalCatalogPricesAndCategories"));
                 designSource.set("editableConditions",designOptions);
+                var routeFacts=AdaptiveQuestDesign.routeFacts(mapper,evidence,designOptions);if(!routeFacts.isEmpty())designSource.set("optionRouteFacts",routeFacts);
                 String designPrompt=mapper.writeValueAsString(AdaptiveQuestTransport.encode(mapper,designSource));
-                for(int attempt=0;attempt<2;attempt++) {
+                // A reason a few characters over the limit is the usual miss; the rewrite succeeds most of the time, so allow it twice.
+                for(int attempt=0;attempt<AdaptiveQuestDesign.MAX_ATTEMPTS;attempt++) {
                     var response=call(AdaptiveQuestDesign.SYSTEM,designPrompt,650,0.2);
                     try { design=mapper.readTree(response.text());AdaptiveQuestDesign.validate(design,designOptions);
                         attempts.add(new MarketAiQuestGeneration.Attempt(attempts.size()+1,response.text(),null,Map.of("stage","CONDITION_DESIGN","submittedPrompt",designPrompt,"systemPrompt",AdaptiveQuestDesign.SYSTEM)));break;
                     } catch(RuntimeException invalid) {
                         var details=AdaptiveQuestDesign.failureDetails(mapper,design,designOptions,invalid);
                         attempts.add(new MarketAiQuestGeneration.Attempt(attempts.size()+1,response.text(),"INVALID_CONDITION_DESIGN",Map.of("stage","CONDITION_DESIGN","submittedPrompt",designPrompt,"systemPrompt",AdaptiveQuestDesign.SYSTEM,"validationFailure",details)));
-                        design=null;if(attempt==1)throw invalid;
+                        design=null;if(attempt==AdaptiveQuestDesign.MAX_ATTEMPTS-1)throw invalid;
                         designPrompt+=AdaptiveQuestDesign.retryFeedback(details);
                     }
                 }
                 wire.set("requiredAiDesign",design);
             }
             packed=mapper.writeValueAsString(AdaptiveQuestTransport.encodeGeneration(mapper,wire));
-            int deliveryRepairs=0;
+            int deliveryRepairs=0;var budget=new AdaptiveQuestBudget();
             // One generation and at most two targeted repairs; never restart raw observations.
             for(int round=1;round<=3;round++) {
                 progress.accept(round==1?"GENERATING":"REPAIRING");
                 String system=(round==1?GENERATION_SYSTEM:REPAIR_SYSTEM)+DELIVERY_CONSISTENCY+" Required objective count is exactly "+rec.adjustments().itemCount()+" and difficulty exactly "+rec.recommendedDifficulty()+". Example/schema values are not default decisions. Make explicit choices from source and constraints.";
-                system+=" For future costs use catalogUnitPrices exactly: sum unit price times selected quantity plus any chosen extra-drink cost, then budget within that total..total+4000. Historical goal amounts are not current catalog prices. State the same actual price calculation in changeReasons.";
+                system+=AdaptiveQuestBudget.RULE;
                 if(!locked.isEmpty())system+=" REQUIRED USER SETTINGS (exact JSON pointer values): "+locked+". These override previous practice choices. Explain their actual application without claiming they were previously observed.";
                 if(round>1)system+=" Return a patches array with EXACTLY these paths: "+mapper.writeValueAsString(repairPaths(candidate,issues))+". No other path is accepted.";
                 String prompt=round==1?packed:repairPrompt(packed,candidate,issues);
@@ -167,6 +169,13 @@ public class AdaptiveMarketQuestService {
                 try {
                     var json=mapper.readTree(raw);
                     candidate=round==1||candidate==null?json:applyRepair(candidate,json,issues);
+                    budget.apply(candidate);
+                    int dropped=dropUnknownCitations(candidate,AdaptiveQuestEvidence.ids(evidence,false));
+                    if(dropped>0)attempts.add(new MarketAiQuestGeneration.Attempt(attempts.size()+1,null,null,Map.of("stage","UNKNOWN_CITATIONS_DROPPED","count",dropped,"compiledBy","existing-id-list-only")));
+                    if(AdaptiveQuestDesign.restoreSettingObjects(mapper,candidate,schema()))
+                        attempts.add(new MarketAiQuestGeneration.Attempt(attempts.size()+1,null,null,Map.of("stage","SETTING_NOTATION_RESTORED","compiledBy","template-key-order-only")));
+                    if(AdaptiveQuestDesign.apply(design,candidate))
+                        attempts.add(new MarketAiQuestGeneration.Attempt(attempts.size()+1,null,null,Map.of("stage","DESIGN_VALUE_APPLIED","path",design.path("path").asString(),"compiledBy","exact-AI-choice-only")));
                     AdaptiveQuestDesign.requireApplied(design,candidate);
                     draft=contract.validate(candidate,rec.recommendedDifficulty(),rec.adjustments().itemCount(),context,evidence);
                     AdaptiveQuestDesign.verifyAccessClaim(mapper,evidence,candidate);
@@ -178,7 +187,10 @@ public class AdaptiveMarketQuestService {
                         var textResult=call(AdaptiveQuestDeliveryText.SYSTEM,textPrompt,2100,0.0);
                         var textPaths=AdaptiveQuestDeliveryText.PATHS.stream().map(p->Map.<String,Object>of("path",p,"code","FOCUSED_DELIVERY_REPAIR")).toList();
                         attempts.add(new MarketAiQuestGeneration.Attempt(attempts.size()+1,textResult.text(),null,Map.of("stage","DELIVERY_TEXT_REPAIR","submittedPrompt",textPrompt,"systemPrompt",AdaptiveQuestDeliveryText.SYSTEM)));
+                        var beforeText=candidate.path("observationPlan").deepCopy();
                         candidate=applyRepair(candidate,AdaptiveQuestDeliveryText.asPatch(mapper,AdaptiveQuestDeliveryText.parseResponse(mapper,textResult.text())),textPaths);
+                        AdaptiveQuestDeliveryText.keepNonTextChoices(beforeText,candidate);
+                        dropUnknownCitations(candidate,AdaptiveQuestEvidence.ids(evidence,false));
                         draft=contract.validate(candidate,rec.recommendedDifficulty(),rec.adjustments().itemCount(),context,evidence);
                     }
                     AdaptiveQuestDeliveryText.requireValid(mapper,evidence,candidate);
@@ -212,7 +224,7 @@ public class AdaptiveMarketQuestService {
                             // sourceSchemas advertises only the gateway's approved source schemas, not arbitrary schemas.
                             // Keep the ordinary transport and strictly validate the explicit choice below.
                             var picked=call(AdaptiveQuestLayoutChoice.SYSTEM,layoutPrompt,120,0.0);
-                            var selection=AdaptiveQuestLayoutChoice.selected(mapper.readTree(picked.text()),options);
+                            var selection=AdaptiveQuestLayoutChoice.selected(AdaptiveQuestLayoutChoice.parse(mapper,picked.text()),options);
                             ((ObjectNode)candidate.path("environmentPlan")).set("shelfOrder",selection.path("shelfOrder").deepCopy());
                             if(design!=null&&design.path("path").asString().equals("/environmentPlan/shelfOrder")) {
                                 design=design.deepCopy();((ObjectNode)design).set("value",selection.path("shelfOrder").deepCopy());wire.set("requiredAiDesign",design);
@@ -266,6 +278,7 @@ public class AdaptiveMarketQuestService {
                 reviewInput.set("citedOriginalRecords",citedOriginalRecords(evidence,candidate));
                 var reviewSource=AdaptiveQuestTransport.decode(mapper,mapper.readTree(packed));
                 // Original behavior/navigation stays intact. The reviewer does not choose new products.
+                // The reviewer checks the candidate against the play, not against reference documents or their usage report.
                 reviewSource.remove(List.of("outputSchema","deepObservation","allowedBehaviorEvidenceIds","allowedMovementEvidenceIds","catalogUnitPrices","literalCatalogPricesAndCategories"));
                 var selectedIds=new HashSet<String>();draft.objectives().forEach(o->selectedIds.add(o.productId()));
                 var reviewCatalog=mapper.createArrayNode();for(var product:source.path("catalog"))if(selectedIds.contains(product.path("id").asString()))reviewCatalog.add(product);
@@ -273,7 +286,8 @@ public class AdaptiveMarketQuestService {
                 reviewSource.put("literalSelectedCatalog",MarketQuestCatalog.PRODUCTS.stream().filter(p->selectedIds.contains(p.id()))
                     .map(p->p.id()+"|"+p.price()+"|"+p.categoryId()).collect(java.util.stream.Collectors.joining("\n","productId|unitPrice|category\n","")));
                 reviewSource.put("reviewScope","Every original interaction/navigation record is retained. Only prior AI observation, output template, duplicate allowed-ID lists and unselected prospective catalog entries are omitted. Cited originals are also expanded into literal same-ID rows for checking claims.");
-                reviewInput.set("originalSource",reviewSource);reviewInput.set("candidate",candidate);
+                var reviewed=candidate.deepCopy();
+                reviewInput.set("originalSource",reviewSource);reviewInput.set("candidate",reviewed);
                 reviewInput.set("literalChanges",literalChanges(source,candidate));
                 reviewInput.set("progressionComparison",AdaptiveQuestProgression.comparison(mapper,evidence,candidate));
                 var costs=reviewInput.putObject("computedObjectiveCosts");int total=0;
@@ -289,6 +303,22 @@ public class AdaptiveMarketQuestService {
         return response;
     }
     static boolean requiresObservationSynthesis(JsonNode observed) { return observed.path("parts").size()>2; }
+    /**
+     * An id that names no supplied event cannot support a statement. It is removed only while the same list keeps
+     * at least one real event; a list left with none stays as written and is rejected by the contract as before.
+     */
+    static int dropUnknownCitations(JsonNode candidate,Set<String> allowed) {
+        int dropped=0;
+        if(candidate==null||!(candidate.path("observationPlan") instanceof ObjectNode plan))return 0;
+        for(String field:List.of("behaviorEvidenceIds","movementEvidenceIds")) {
+            if(!plan.path(field).isArray())continue;
+            var kept=new LinkedHashSet<String>();int unknown=0;
+            for(var id:plan.path(field)){if(id.isString()&&allowed.contains(id.asString()))kept.add(id.asString());else unknown++;}
+            if(unknown==0||kept.isEmpty())continue;
+            var array=plan.putArray(field);kept.forEach(array::add);dropped+=unknown;
+        }
+        return dropped;
+    }
     static final int REVIEW_OUTPUT_TOKENS=1200;
     static String reviewSystem() {
         return REVIEW_SYSTEM+" literalDeliveryFacts explicitly separates prior actual settings from future candidate positions. Use it for new shelf positions, not recordedGeometry from the old play. Numeric coordinates and category IDs do not belong in learner-facing text. Staff provide text directions, never physical escort. Examine all text fields together so the same error in briefing, rationale and summary is reported in this review. Allowed grouped issue paths: "+SourceOutputSchemas.QUEST_REVIEW_PATHS+". Historical behaviorEvidenceIds/movementEvidenceIds are REQUIRED justification for this future task, not its future outcome IDs. Never reject them merely for citing the previous play; future IDs do not exist yet. Behavior/movementObservation describe historical facts only; future questions belong to evaluationFocus. A complete source with no selection event plus its empty terminal cart supports absence; never demand nonexistent selection IDs. Proximity/entry/exit/segment records also support recorded route transitions. Report the incorrect field's allowed parent: wrong changeReasons text belongs to /observationPlan, not a correct /budget. Read literalSelectedCatalog for actual categories/prices; storage labels never change category. A budgetOnlyChange without a concrete changed support/choice condition is repeated practice. More spending headroom alone does not implement a new observation. Briefing product size and all retained-value explanations must match actual selected settings. No target-direction arrows, automatic cart-shortage alerts or auto-opening help are implemented.";
@@ -404,7 +434,10 @@ public class AdaptiveMarketQuestService {
         var result=(ObjectNode)schema();
         result.put("difficulty",difficulty);
         result.put("objectives","[{productId:string,quantity:int 1..3}]: exactly "+count+" distinct catalog products; actual next-question goals");
-        result.put("budget","int: objective+extra-drink cost .. cost+4000");
+        // The template asks for the headroom in the place of the budget; AdaptiveQuestBudget writes the budget itself.
+        var ordered=mapper.createObjectNode();
+        for(String field:result.propertyNames()){if(field.equals("budget"))ordered.put(AdaptiveQuestBudget.FIELD,AdaptiveQuestBudget.TEMPLATE);else ordered.set(field,result.get(field));}
+        result=ordered;
         result.put("timeLimitSeconds","int "+MarketQuestTimePolicy.MINIMUM_SECONDS+".."+MarketQuestTimePolicy.MAXIMUM_SECONDS);
         result.put("title","string<=40");result.put("description","string<=120");result.put("successMessage","string<=80");result.put("adaptationSummary","string<=120");
         result.putArray("briefing").add("1..5 strings<=80: actual goals, position, next action and checking");

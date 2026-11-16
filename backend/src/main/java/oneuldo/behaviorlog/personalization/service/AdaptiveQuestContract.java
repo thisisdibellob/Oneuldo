@@ -53,9 +53,10 @@ public class AdaptiveQuestContract {
         // Validate nested raw shapes before deserialization so repair gets the actual field.
         {
         var p=raw.path("observationPlan");
-        shape(p,"/observationPlan",List.of("purpose","behaviorObservation","movementObservation","behaviorEvidenceIds","movementEvidenceIds","alternativeExplanations","unknowns","changeReasons","evaluationFocus"));
+        var planKeys=new ArrayList<>(List.of("purpose","behaviorObservation","movementObservation","behaviorEvidenceIds","movementEvidenceIds","alternativeExplanations","unknowns","changeReasons","evaluationFocus"));
+        shape(p,"/observationPlan",planKeys);
         if(!p.path("changeReasons").isArray()||p.path("changeReasons").isEmpty()||p.path("changeReasons").size()>12)throw problem("/observationPlan/changeReasons","ONE_TO_TWELVE_REASONS_REQUIRED");
-        for(var c:p.path("changeReasons")) {shape(c,"/observationPlan/changeReasons",List.of("path","reason"));String path=c.path("path").asString();if(!path.startsWith("/")||raw.at(path).isMissingNode()||path.startsWith("/observationPlan"))throw problem(path,"CHANGE_PATH_NOT_IN_QUEST");text(c.path("reason"),200,path);}
+        changeReasons(raw);
         choice(p,"purpose",List.of("GUIDED_PRACTICE","INDEPENDENT_CHECK","TRANSFER","EXPLORATION"),"/observationPlan");
         for(String f:List.of("behaviorObservation","movementObservation","evaluationFocus"))text(p.path(f),360,"/observationPlan/"+f);
         citations(p.path("behaviorEvidenceIds"),AdaptiveQuestEvidence.ids(evidence,false),"/observationPlan/behaviorEvidenceIds",true);
@@ -132,5 +133,12 @@ public class AdaptiveQuestContract {
     private void choice(JsonNode n,String k,List<String> values,String p){if(!n.path(k).isString()||!values.contains(n.path(k).asString()))throw problem(p+"/"+k,"ALLOWED:"+values);}
     private void bool(JsonNode n,String k,String p){if(!n.path(k).isBoolean())throw problem(p+"/"+k,"BOOLEAN_REQUIRED");}
     private void text(JsonNode n,int max,String p){if(!n.isString()||n.asString().isBlank()||n.asString().length()>max)throw problem(p,"TEXT_LENGTH:1.."+max);}
+    /** Each change reason names an existing quest setting outside observationPlan and explains it in at most 200 characters. */
+    void changeReasons(JsonNode raw) {
+        var p=raw.path("observationPlan");
+        for(var c:p.path("changeReasons")) {shape(c,"/observationPlan/changeReasons",List.of("path","reason"));String path=c.path("path").asString();if(!path.startsWith("/")||raw.at(path).isMissingNode()||path.startsWith("/observationPlan"))
+            // The faulty thing is this change-reason entry, so the repair is pointed at the list that holds it; the path it names may not exist or may be a valid field of its own.
+            throw new MarketQuestValidationException("적응형 과제 설정",Map.of("code","CHANGE_PATH_NOT_IN_QUEST","path","/observationPlan/changeReasons","offendingChangePath",path,"explanation","changeReasons[].path must name an existing quest setting outside observationPlan. Remove or correct this entry; do not change the field it names."));text(c.path("reason"),200,path);}
+    }
     public static MarketQuestValidationException problem(String path,String code){return new MarketQuestValidationException("적응형 과제 설정",Map.of("code",code,"path",path));}
 }

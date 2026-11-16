@@ -16,11 +16,23 @@ final class AdaptiveObjectTuples {
     private final ArrayNode dictionary;
     private boolean matrixUsed;
     AdaptiveObjectTuples(ObjectMapper mapper){this.mapper=mapper;dictionary=mapper.createArrayNode();}
+    /**
+     * The output template and the already chosen design value are what the model must write back, so they are
+     * never turned into tuples: a tuple-shaped template was being copied into the answer as an array.
+     */
+    static final List<String> LITERAL=List.of("outputSchema","requiredAiDesign");
+    static final String LITERAL_RULE=" outputSchema·requiredAiDesign은 원문이며 응답도 그 객체 형태로 쓴다.";
     ObjectNode encode(ObjectNode source){
         if(source.has(FIELD)||source.has(RULE_FIELD))return source.deepCopy();
-        count(source);select();var result=(ObjectNode)object(source,false);
+        var body=source.deepCopy();body.remove(LITERAL);
+        count(body);select();var encoded=(ObjectNode)object(body,false);
         if(dictionary.isEmpty()&&!matrixUsed)return source.deepCopy();
-        result.set(FIELD,dictionary);result.put(RULE_FIELD,RULE);return result;
+        var result=mapper.createObjectNode();boolean kept=false;
+        for(String field:source.propertyNames()) {
+            if(LITERAL.contains(field)){result.set(field,source.get(field).deepCopy());kept=true;}
+            else result.set(field,encoded.get(field));
+        }
+        result.set(FIELD,dictionary);result.put(RULE_FIELD,kept?RULE+LITERAL_RULE:RULE);return result;
     }
     private List<String> keys(JsonNode object){var result=new ArrayList<String>();object.propertyNames().forEach(result::add);return result;}
     private void count(JsonNode node){if(node.isObject())counts.merge(keys(node),1,Integer::sum);if(node.isObject()||node.isArray())node.forEach(this::count);}
@@ -61,9 +73,17 @@ final class AdaptiveObjectTuples {
     }
     private static boolean reserved(JsonNode array){if(array.size()==0||!array.get(0).isString())return false;String first=array.get(0).asString();return Set.of("~","#").contains(first)||first.length()==1&&ALPHABET.indexOf(first.charAt(0))>=0;}
     static ObjectNode decode(ObjectMapper mapper,ObjectNode source){
-        if(!RULE.equals(source.path(RULE_FIELD).asString())||!source.path(FIELD).isArray()||source.path(FIELD).size()>52)throw invalid();
+        String rule=source.path(RULE_FIELD).asString();boolean literal=rule.equals(RULE+LITERAL_RULE);
+        if(!literal&&!RULE.equals(rule)||!source.path(FIELD).isArray()||source.path(FIELD).size()>52)throw invalid();
         var dictionary=source.get(FIELD);for(var keys:dictionary){if(!keys.isArray()||keys.isEmpty())throw invalid();var unique=new HashSet<String>();for(var key:keys)if(!key.isString()||!unique.add(key.asString()))throw invalid();}
-        var copy=source.deepCopy();copy.remove(List.of(FIELD,RULE_FIELD));return (ObjectNode)restore(mapper,copy,dictionary);
+        var copy=source.deepCopy();copy.remove(List.of(FIELD,RULE_FIELD));
+        if(!literal)return (ObjectNode)restore(mapper,copy,dictionary);
+        // Requests encoded with the literal rule carry those fields untouched; older stored requests decode as before.
+        var kept=mapper.createObjectNode();for(String field:LITERAL)if(copy.has(field))kept.set(field,copy.remove(field));
+        var restored=(ObjectNode)restore(mapper,copy,dictionary);
+        var result=mapper.createObjectNode();
+        for(String field:source.propertyNames()){if(kept.has(field))result.set(field,kept.get(field));else if(restored.has(field))result.set(field,restored.get(field));}
+        return result;
     }
     private static JsonNode restore(ObjectMapper mapper,JsonNode node,JsonNode dictionary){
         if(node instanceof ArrayNode array){
