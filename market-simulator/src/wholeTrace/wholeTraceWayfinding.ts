@@ -21,7 +21,16 @@ export const WHOLE_TRACE_WAYFINDING_VERSION = 'wayfinding-v1' as const;
  * recovery was tried and no observed lead remains (or the time floor passed).
  */
 export const WHOLE_TRACE_WAYFINDING_V2_VERSION = 'wayfinding-v2' as const;
-export const WHOLE_TRACE_WAYFINDING_VERSIONS = [WHOLE_TRACE_WAYFINDING_VERSION, WHOLE_TRACE_WAYFINDING_V2_VERSION] as const;
+/**
+ * wayfinding-v3: boundaries name what is drawn (wall, shelf, counter, bench...)
+ * instead of calling every collider "furniture like shelves"; the observation
+ * says what kind of area the player stands in (shop floor vs. lobby) and which
+ * displayed walk choices pass through a visible door gate. giveUp counts the
+ * unexplored frontier (seen passages never walked, a seen entrance never passed)
+ * as leads: seeing nothing interactable is never by itself a reason to stop.
+ */
+export const WHOLE_TRACE_WAYFINDING_V3_VERSION = 'wayfinding-v3' as const;
+export const WHOLE_TRACE_WAYFINDING_VERSIONS = [WHOLE_TRACE_WAYFINDING_VERSION, WHOLE_TRACE_WAYFINDING_V2_VERSION, WHOLE_TRACE_WAYFINDING_V3_VERSION] as const;
 export type WholeTraceWayfindingVersion = typeof WHOLE_TRACE_WAYFINDING_VERSIONS[number];
 export function isWholeTraceWayfindingVersion(value: unknown): value is WholeTraceWayfindingVersion {
   return (WHOLE_TRACE_WAYFINDING_VERSIONS as readonly unknown[]).includes(value);
@@ -38,7 +47,7 @@ const NON_KOREAN_SCRIPT = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff
 export function validateWholeTraceThought(value: unknown, version: WholeTraceWayfindingVersion = WHOLE_TRACE_WAYFINDING_VERSION): string[] {
   if (value === undefined) return [];
   if (!value || typeof value !== 'object' || Array.isArray(value)) return ['actorState.thought must be a JSON object'];
-  const v2 = version === WHOLE_TRACE_WAYFINDING_V2_VERSION;
+  const v2 = version !== WHOLE_TRACE_WAYFINDING_VERSION; // v2 and later
   const fields: readonly string[] = v2 ? [...WHOLE_TRACE_THOUGHT_FIELDS, 'destination'] : WHOLE_TRACE_THOUGHT_FIELDS;
   const entries = Object.entries(value as Record<string, unknown>);
   const errors: string[] = [];
@@ -365,27 +374,27 @@ function unit(seed: string, key: string, decision: number): number {
 
 /** v2 memory: the actor sees the decaying view; give-up eligibility uses the objective observation record. */
 export class WholeTraceWayfindingMemoryV2 {
-  private north = 0;
-  private east = 0;
-  private readonly extent = { north: 0, south: 0, east: 0, west: 0 };
-  private readonly visits = new Map<string, number>();
-  private readonly seenAnchors = new Set<string>();
-  private readonly places = new Map<string, LandmarkRecord>();
-  private readonly shelfBodies = new Map<string, { north: number; east: number }>();
-  private readonly walls = new Map<string, WholeTraceSpatialMemory['wallsSeen'][number]>();
-  private readonly recovery = { readList: false, viewedHelp: false, staffSeen: false, talkedToStaff: false };
-  private readonly openedShelves = new Set<string>();
-  private readonly events: WholeTraceWayfindingMemoryEvent[] = [];
-  private addedItems = false;
-  private checkoutReachedAfterAdd = false;
-  private destination?: string;
-  private previous?: ActorObservation;
-  private lastSequence?: number;
-  private decision = 0;
-  private elapsedMs = 0;
-  constructor(private readonly profile: WayfindingProfile, private readonly seed: string) {}
+  protected north = 0;
+  protected east = 0;
+  protected readonly extent = { north: 0, south: 0, east: 0, west: 0 };
+  protected readonly visits = new Map<string, number>();
+  protected readonly seenAnchors = new Set<string>();
+  protected readonly places = new Map<string, LandmarkRecord>();
+  protected readonly shelfBodies = new Map<string, { north: number; east: number }>();
+  protected readonly walls = new Map<string, WholeTraceSpatialMemory['wallsSeen'][number]>();
+  protected readonly recovery = { readList: false, viewedHelp: false, staffSeen: false, talkedToStaff: false };
+  protected readonly openedShelves = new Set<string>();
+  protected readonly events: WholeTraceWayfindingMemoryEvent[] = [];
+  protected addedItems = false;
+  protected checkoutReachedAfterAdd = false;
+  protected destination?: string;
+  protected previous?: ActorObservation;
+  protected lastSequence?: number;
+  protected decision = 0;
+  protected elapsedMs = 0;
+  constructor(protected readonly profile: WayfindingProfile, protected readonly seed: string) {}
 
-  private decayTo(decision: number) {
+  protected decayTo(decision: number) {
     const memory = this.profile.landmarkMemory;
     for (; this.decision < decision; this.decision++) {
       if (memory?.retention !== 'decaying') continue;
@@ -458,12 +467,12 @@ export class WholeTraceWayfindingMemoryV2 {
   memoryEvents(): WholeTraceWayfindingMemoryEvent[] { return structuredClone(this.events); }
   visitCount(anchorId: string): number { return this.visits.get(anchorId) ?? 0; }
 
-  private unresolvedShelfBodies() {
+  protected unresolvedShelfBodies() {
     const named = [...this.places.values()].filter(place => place.kind === 'shelf');
     return [...this.shelfBodies.values()].filter(body => !named.some(place => Math.hypot(place.north - body.north, place.east - body.east) <= 2.5));
   }
   /** Objective leads from what was actually displayed; fading does not remove them, so forgetting never eases giving up. */
-  private leads(): { remembered: string[]; others: number } {
+  protected leads(): { remembered: string[]; others: number } {
     const remembered: string[] = []; let others = 0;
     const note = (place: LandmarkRecord | undefined, text: string) => { if (place && place.state !== 'forgotten') remembered.push(text); else others++; };
     for (const place of this.places.values()) if (place.kind === 'shelf' && !this.openedShelves.has(place.key)) note(place, `본 ${place.label} 매대를 아직 열어 보지 않음`);
@@ -492,7 +501,7 @@ export class WholeTraceWayfindingMemoryV2 {
     return { available: false, notice: `그만두기는 아직 선택지에 없다. 남은 단서: ${missing.join(', ') || '탐색 시간이 더 남음'}.` };
   }
 
-  snapshot(o: ActorObservation): WholeTraceSpatialMemoryV2 {
+  snapshot(o: ActorObservation): WholeTraceSpatialMemoryV2 | WholeTraceSpatialMemoryV3 {
     const here = (north: number, east: number) => vectorCue(north - this.north, east - this.east);
     const visible = [...this.places.values()].filter(place => place.state !== 'forgotten')
       .sort((a, b) => b.lastSeenDecision - a.lastSeenDecision || a.label.localeCompare(b.label));
@@ -536,12 +545,90 @@ export class WholeTraceWayfindingMemoryV2 {
   }
 }
 
+/* ------------------------------------------------------------- wayfinding-v3 */
+
+export function renderWayfindingInstructionsV3(profile: WayfindingProfile): string {
+  return renderWayfindingInstructionsV2(profile).replace('(wayfinding-v2)', '(wayfinding-v3)');
+}
+
+export const WAYFINDING_COMMON_INSTRUCTIONS_V3 = `${WAYFINDING_COMMON_INSTRUCTIONS_V2.replace('wayfinding-v2 공통 규칙 (v1 규칙에 아래를 더한다):', 'wayfinding-v3 공통 규칙 (v1 규칙에 아래를 더한다):')}
+- currentObservation.observation.area와 spatialMemory.currentArea는 지금 서 있는 곳이 화면에서 어떤 곳인지(매장 안 판매 구역, 매장 밖 로비, 복도 등) 알려 준다. interactionContext의 "매장 통로 화면"은 화면 종류일 뿐 위치가 아니다. 매장 밖에서 시작할 수 있고, 진열대는 보통 매장 안에 있다.
+- boundaries는 그 방향 끝에 실제로 그려진 것을 이름으로 알려 준다(벽, 진열대, 계산대, 의자와 탁자·화분·ATM 같은 비품, 사람 등). 비품과 벽은 매대가 아니다.
+- 걷기 선택지에 "입구를 지나 매장 안으로"처럼 문을 지나는 표시가 붙어 있으면, 그 통로가 화면에 보이는 출입 게이트를 지난다는 뜻이다. 어디로 갈지는 내가 정한다.
+- 그만두기는 본 입구로 매장 안에 들어가 보기 전에는 열리지 않는다. 본 통로 중 안 가 본 곳이 남아 있으면 탐색 시간이 충분히 지나야 열린다. 화면에 상호작용할 것이 안 보인다는 이유만으로는 그만두지 않는다.`;
+
+export type WholeTraceSpatialMemoryV3 = Omit<WholeTraceSpatialMemoryV2, 'kind'> & {
+  kind: 'actor-spatial-memory-v3';
+  currentArea?: string; areasVisited: string[]; gatesPassed: string[];
+};
+
+/** v3 memory: v2 plus the area record and frontier leads (seen passages, a seen but unentered entrance). */
+export class WholeTraceWayfindingMemoryV3 extends WholeTraceWayfindingMemoryV2 {
+  protected readonly areasVisited: string[] = [];
+  protected readonly gatesPassed: string[] = [];
+  protected currentArea?: NonNullable<ActorObservation['area']>;
+  protected enteredSalesFloor = false;
+  protected entranceSeen = false;
+
+  override observe(o: ActorObservation, acceptedDecisions: number): void {
+    if (o.sequence !== undefined && o.sequence === this.lastSequence) return;
+    const before = this.previous;
+    super.observe(o, acceptedDecisions);
+    const result = o.result as ActorObservation['result'] | undefined;
+    if (result?.accepted && result.actionType === 'walkToAnchor' && result.anchorId) {
+      const passage = before?.gatePassages?.find(item => item.anchorId === result.anchorId);
+      if (passage) this.gatesPassed.push(passage.label);
+    }
+    if (o.area) {
+      this.currentArea = structuredClone(o.area);
+      if (!this.areasVisited.includes(o.area.label)) this.areasVisited.push(o.area.label);
+      if (o.area.kind === 'sales-floor') this.enteredSalesFloor = true;
+    }
+    // A shelf, counter or staff member can only be opened from inside the shop.
+    if (o.activeStation) this.enteredSalesFloor = true;
+    if (o.visibleStations.some(station => station.kind === 'entrance' && station.label === '입구')) this.entranceSeen = true;
+  }
+
+  protected frontier(): { hard: string[]; soft: string[] } {
+    const unwalked = [...this.seenAnchors].filter(id => !this.visits.has(id)).length;
+    return {
+      hard: this.entranceSeen && !this.enteredSalesFloor ? ['본 입구를 지나 매장 안에 아직 들어가 보지 않음'] : [],
+      soft: unwalked ? [`본 통로 중 아직 안 가 본 곳 ${unwalked}곳`] : [],
+    };
+  }
+
+  override giveUpStatus(o: Pick<ActorObservation, 'phase'>): { available: boolean; notice: string } {
+    if (o.phase !== 'shopping') return { available: true, notice: '계산 단계에서는 그만두기를 고를 수 있다.' };
+    const tried = this.recovery.viewedHelp && (this.recovery.talkedToStaff || !this.recovery.staffSeen);
+    const leads = this.leads(), frontier = this.frontier();
+    const noLeads = !leads.remembered.length && !leads.others && !frontier.soft.length;
+    if (tried && !frontier.hard.length && (this.elapsedMs >= this.profile.explorationBudgetMs || noLeads))
+      return { available: true, notice: '그만두기를 고를 수 있다.' };
+    const missing = [
+      !this.recovery.viewedHelp ? '이용 방법 안내를 아직 보지 않음' : '',
+      this.recovery.staffSeen && !this.recovery.talkedToStaff ? '본 직원에게 아직 묻지 않음' : '',
+      ...frontier.hard,
+      ...leads.remembered,
+      leads.others ? '기억은 흐릿하지만 확인하지 않은 곳이 더 있을 수 있음' : '',
+      ...frontier.soft,
+    ].filter(Boolean);
+    return { available: false, notice: `그만두기는 아직 선택지에 없다. 남은 단서: ${missing.join(', ') || '탐색 시간이 더 남음'}.` };
+  }
+
+  override snapshot(o: ActorObservation): WholeTraceSpatialMemoryV3 {
+    const { kind: _kind, ...rest } = super.snapshot(o);
+    return { kind: 'actor-spatial-memory-v3', ...rest,
+      ...(this.currentArea ? { currentArea: this.currentArea.label } : {}),
+      areasVisited: [...this.areasVisited], gatesPassed: this.gatesPassed.slice(-6) };
+  }
+}
+
 export type WholeTraceWayfindingRuntime = {
   version: WholeTraceWayfindingVersion;
   observe(o: ActorObservation, acceptedDecisions: number): void;
   visitCount(anchorId: string): number;
   giveUpStatus(o: Pick<ActorObservation, 'phase'>): { available: boolean; notice: string };
-  snapshot(o: ActorObservation): WholeTraceSpatialMemory | WholeTraceSpatialMemoryV2;
+  snapshot(o: ActorObservation): WholeTraceSpatialMemory | WholeTraceSpatialMemoryV2 | WholeTraceSpatialMemoryV3;
   canTarget?(label: string): boolean;
   rememberedLabels?(): string[];
   setDestination?(label: string | undefined): void;
@@ -549,6 +636,7 @@ export type WholeTraceWayfindingRuntime = {
   memoryEvents?(): WholeTraceWayfindingMemoryEvent[];
 };
 export function createWholeTraceWayfindingMemory(version: WholeTraceWayfindingVersion, profile: WayfindingProfile, seed: string | number): WholeTraceWayfindingRuntime {
-  const memory = version === WHOLE_TRACE_WAYFINDING_V2_VERSION ? new WholeTraceWayfindingMemoryV2(profile, String(seed)) : new WholeTraceWayfindingMemory(profile);
+  const memory = version === WHOLE_TRACE_WAYFINDING_V3_VERSION ? new WholeTraceWayfindingMemoryV3(profile, String(seed))
+    : version === WHOLE_TRACE_WAYFINDING_V2_VERSION ? new WholeTraceWayfindingMemoryV2(profile, String(seed)) : new WholeTraceWayfindingMemory(profile);
   return Object.assign(memory, { version });
 }

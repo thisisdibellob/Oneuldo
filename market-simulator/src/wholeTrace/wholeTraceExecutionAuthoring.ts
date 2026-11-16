@@ -94,8 +94,11 @@ export async function createWholeTraceExecutionAuthoringCursor(settings: WholeTr
         const memory = preview.wayfinding!.spatialMemory;
         const toward = preview.wayfinding!.towardDestination?.includes(anchorId) && 'destination' in memory && memory.destination
           ? memory.destination.label : undefined;
-        const label = `${choice.label} · ${times ? `내가 ${times}번 와 본 곳` : '아직 안 가 본 곳'}${toward ? ` · 기억한 ${toward} 쪽` : ''}`;
-        return { ...choice, visitedTimes: times, ...(toward ? { towardRememberedDestination: toward } : {}), label } as T;
+        // v3: a displayed passage through a visible door gate, as drawn on screen; never a recommendation.
+        const gate = preview.before?.gatePassages?.find(item => item.anchorId === anchorId);
+        const label = `${choice.label}${gate ? ` · ${gate.label}` : ''} · ${times ? `내가 ${times}번 와 본 곳` : '아직 안 가 본 곳'}${toward ? ` · 기억한 ${toward} 쪽` : ''}`;
+        return { ...choice, visitedTimes: times, ...(gate ? { gatePassage: gate.label } : {}),
+          ...(toward ? { towardRememberedDestination: toward } : {}), label } as T;
       };
       const locked = !preview.wayfinding!.spatialMemory.giveUp.available;
       const keep = (id: string) => !(locked && id === 'control/giveUp');

@@ -18,7 +18,7 @@ function movementOptions(value = {}) {
     && !(ANCHOR_FEEDBACK_VERSIONS.includes(value.movementFeedbackVersion) && value.movementVersion === undefined
       && observationVersion === 'anchor-visible-structures-v1'))
     throw new Error('movementFeedbackVersion requires recent-movement-v1 with directional-v2, or recent-movement-anchor-v1/recent-movement-anchor-capacity-v1 with omitted movementVersion and anchor-visible-structures-v1');
-  if (value.wayfindingVersion !== undefined && (!['wayfinding-v1', 'wayfinding-v2'].includes(value.wayfindingVersion) || value.movementVersion !== undefined
+  if (value.wayfindingVersion !== undefined && (!['wayfinding-v1', 'wayfinding-v2', 'wayfinding-v3'].includes(value.wayfindingVersion) || value.movementVersion !== undefined
     || observationVersion !== 'anchor-visible-structures-v1'))
     throw new Error('wayfindingVersion wayfinding-v1/v2 requires omitted movementVersion and anchor-visible-structures-v1');
   return Object.fromEntries(present.map(key => [key, value[key]]));

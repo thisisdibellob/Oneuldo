@@ -202,6 +202,115 @@ export function visibleBoundaries(environment: MarketEnvironment, position: Poin
   });
 }
 
+/**
+ * wayfinding-v3: the same eight rays, but the hit is named by what the world
+ * view actually draws there. v1/v2 grouped every collider (walls, benches,
+ * planters, the shop front) as "furniture like shelves or counters", which sent
+ * actors after lobby benches. Archived v1/v2 traces keep visibleBoundaries.
+ */
+export type ReplayVisibleBoundaryV3 = { direction: ReplayDirection;
+  kind: 'wall' | 'shelf' | 'checkout' | 'furniture' | 'person' | 'construction' | 'fixture' | 'covered' | 'open';
+  label: string; distanceBand: ReplayDistanceBand };
+const FURNITURE_LABELS: Record<MarketEnvironment['objects'][number]['kind'], string> = {
+  pillar: '기둥', chair: '의자', kiosk: '무인 계산기', restSet: '의자와 탁자', atm: 'ATM 기기', elevator: '엘리베이터', planter: '화분',
+};
+const BOUNDARY_V3_LABELS: Record<Exclude<ReplayVisibleBoundaryV3['kind'], 'furniture'>, string> = {
+  wall: '벽', shelf: '진열대', checkout: '계산대', person: '사람', construction: '공사 구역 가림막', fixture: '집기',
+  covered: '화면의 장보기 목록에 가려 보이지 않음', open: '바닥 통로가 화면 끝까지 이어짐',
+};
+function touches(point: Point, rect: { x: number; y: number; width: number; height: number }): boolean {
+  const r = MARKET_ENVIRONMENT_PLAYER_RADIUS;
+  return point.x + r > rect.x && point.x - r < rect.x + rect.width && point.y + r > rect.y && point.y - r < rect.y + rect.height;
+}
+export function visibleBoundariesV3(environment: MarketEnvironment, position: Point, presentation: ReplayPresentation,
+  cashiers: Partial<MarketCashierAvailability> = {}): ReplayVisibleBoundaryV3[] {
+  if (!validateReplayPresentation(presentation)) throw new Error('Invalid replay presentation');
+  const obstacles = getMarketEnvironmentObstacles(environment, cashiers);
+  const shelves = Object.values(environment.shelves).flatMap(shelf => getMarketShelfUnitRects(shelf));
+  const people = [...environment.employees, ...environment.customers].map(person => person.collider);
+  const classify = (point: Point): Omit<ReplayVisibleBoundaryV3, 'direction' | 'distanceBand'> => {
+    if (shelves.some(rect => touches(point, rect))) return { kind: 'shelf', label: BOUNDARY_V3_LABELS.shelf };
+    if (environment.checkouts.some(checkout => touches(point, checkout.rect)) || environment.kiosks.some(kiosk => touches(point, kiosk.rect)))
+      return { kind: 'checkout', label: BOUNDARY_V3_LABELS.checkout };
+    const object = environment.objects.find(item => touches(point, item.rect));
+    if (object) return { kind: 'furniture', label: FURNITURE_LABELS[object.kind] ?? '비품' };
+    if ((environment.constructionZones ?? []).some(zone => touches(point, zone.rect))) return { kind: 'construction', label: BOUNDARY_V3_LABELS.construction };
+    if (people.some(rect => touches(point, rect)) || environment.checkouts.some(checkout => touches(point, checkout.cashierCollider)))
+      return { kind: 'person', label: BOUNDARY_V3_LABELS.person };
+    if (environment.walls.some(rect => touches(point, rect)) || !obstacles.some(rect => touches(point, rect))) return { kind: 'wall', label: BOUNDARY_V3_LABELS.wall };
+    return { kind: 'fixture', label: BOUNDARY_V3_LABELS.fixture };
+  };
+  const unit: Record<ReplayDirection, Point> = { east: { x: 1, y: 0 }, southeast: { x: Math.SQRT1_2, y: Math.SQRT1_2 },
+    south: { x: 0, y: 1 }, southwest: { x: -Math.SQRT1_2, y: Math.SQRT1_2 }, west: { x: -1, y: 0 },
+    northwest: { x: -Math.SQRT1_2, y: -Math.SQRT1_2 }, north: { x: 0, y: -1 }, northeast: { x: Math.SQRT1_2, y: -Math.SQRT1_2 } };
+  const band = (distance: number): ReplayDistanceBand => distance <= 110 ? 'near' : distance <= 240 ? 'medium' : 'far';
+  return directions.map(direction => {
+    let last = 0;
+    for (let distance = 16; distance <= 1200; distance += 8) {
+      const point = { x: position.x + unit[direction].x * distance, y: position.y + unit[direction].y * distance };
+      const screen = screenState(environment, position, point, presentation);
+      if (screen === 'offscreen') return { direction, kind: 'open' as const, label: BOUNDARY_V3_LABELS.open, distanceBand: band(last) };
+      if (screen === 'covered') return { direction, kind: 'covered' as const, label: BOUNDARY_V3_LABELS.covered, distanceBand: band(distance) };
+      if (isMarketEnvironmentBlocked(environment, point, cashiers)) return { direction, ...classify(point), distanceBand: band(distance) };
+      last = distance;
+    }
+    return { direction, kind: 'open' as const, label: BOUNDARY_V3_LABELS.open, distanceBand: 'far' as const };
+  });
+}
+
+/**
+ * wayfinding-v3: which kind of place the player is standing in, as the world
+ * view shows it (shelves around vs. a lobby with benches and the shop front).
+ * A coarse kind and Korean label only; no area ID, rectangle or neighbour list.
+ */
+export type ReplayCurrentArea = { kind: 'sales-floor' | 'lobby' | 'corridor' | 'elevator' | 'building-door' | 'other'; label: string };
+const AREA_BY_ID: Record<string, ReplayCurrentArea> = {
+  'main-sales-floor': { kind: 'sales-floor', label: '매장 안 판매 구역' },
+  'entrance-lobby': { kind: 'lobby', label: '매장 밖 로비 (매장 앞)' },
+  'west-corridor': { kind: 'corridor', label: '매장 옆 복도' }, 'east-corridor': { kind: 'corridor', label: '매장 옆 복도' },
+  'elevator-room': { kind: 'elevator', label: '엘리베이터 앞' },
+  'common-door-threshold': { kind: 'building-door', label: '건물 공동 출입문 앞' },
+};
+export function replayCurrentArea(environment: MarketEnvironment, position: Point): ReplayCurrentArea {
+  // Areas overlap by a wall thickness; the area the player is deepest inside wins.
+  const inset = (area: MarketEnvironment['walkableAreas'][number]) => Math.min(position.x - area.x, area.x + area.width - position.x,
+    position.y - area.y, area.y + area.height - position.y);
+  const area = environment.walkableAreas.filter(candidate => inset(candidate) >= 0).sort((a, b) => inset(b) - inset(a))[0];
+  return area ? structuredClone(AREA_BY_ID[area.id] ?? { kind: 'other', label: '통로' }) : { kind: 'other', label: '통로' };
+}
+
+/**
+ * wayfinding-v3: a displayed walk choice whose straight segment passes through a
+ * visible door gate (entrance/exit/side door). This is what the screen shows
+ * when the passage goes through the gate; it never names where the gate leads
+ * beyond "inside"/"outside" the shop and never recommends taking it.
+ */
+export type ReplayGatePassage = { anchorId: string; gate: 'entrance' | 'exit' | 'side-door'; direction: 'inward' | 'outward'; label: string };
+export function visibleGatePassages(environment: MarketEnvironment, position: Point, presentation: ReplayPresentation,
+  anchors: readonly ReplayVisibleAnchor[], cashiers: Partial<MarketCashierAvailability> = {}): ReplayGatePassage[] {
+  if (!validateReplayPresentation(presentation)) throw new Error('Invalid replay presentation');
+  const points = new Map(localAnchors(environment, position, presentation, cashiers).map(anchor => [anchor.id, anchor.point]));
+  return anchors.flatMap(anchor => {
+    const target = points.get(anchor.id);
+    if (!target) return [];
+    for (const gate of environment.alarmGates) {
+      const along = gate.axis === 'y' ? 'y' : 'x', across = gate.axis === 'y' ? 'x' : 'y';
+      const from = position[along] - gate.boundary, to = target[along] - gate.boundary;
+      if (from === 0 || to === 0 || Math.sign(from) === Math.sign(to)) continue;
+      const t = from / (from - to);
+      const crossing = { x: position.x + (target.x - position.x) * t, y: position.y + (target.y - position.y) * t };
+      const start = across === 'x' ? gate.gate.x : gate.gate.y, size = across === 'x' ? gate.gate.width : gate.gate.height;
+      if (crossing[across] < start || crossing[across] > start + size) continue;
+      if (screenState(environment, position, crossing, presentation) === 'offscreen') continue;
+      const kind = gate.id === 'entrance' ? 'entrance' as const : gate.id === 'exit' ? 'exit' as const : 'side-door' as const;
+      const direction = Math.sign(to) === gate.outward ? 'outward' as const : 'inward' as const;
+      const name = kind === 'entrance' ? '입구' : kind === 'exit' ? '출구' : '옆문';
+      return [{ anchorId: anchor.id, gate: kind, direction, label: `${name}를 지나 매장 ${direction === 'inward' ? '안으로' : '밖으로'}` }];
+    }
+    return [];
+  });
+}
+
 export const REPLAY_ANCHOR_SPACING = 80;
 export const REPLAY_ANCHOR_MAX_DISTANCE = 180;
 export type WholeReplayWaypoint = { waypointId: string; anchorId: string; point: Point };

@@ -5,7 +5,7 @@ import { canonicalMarketReplayJson, isMarketReplaySystemCompletionStep, validate
 import { planWalk } from './navigation';
 import { Random } from './random';
 import { FeedbackMovementPolicy } from './feedbackMovementPolicy';
-import { DEFAULT_REPLAY_PRESENTATION, visibleStations, visibleAnchors, visibleUnlabelledShelfBodies, visibleBoundaries, resolveReplayAnchor, getReplayShelfPage, replayShelfPageFractions, canApproachVisibleStation } from '../../frontend/src/game/marketReplayPerception';
+import { DEFAULT_REPLAY_PRESENTATION, visibleStations, visibleAnchors, visibleUnlabelledShelfBodies, visibleBoundaries, visibleBoundariesV3, replayCurrentArea, visibleGatePassages, resolveReplayAnchor, getReplayShelfPage, replayShelfPageFractions, canApproachVisibleStation } from '../../frontend/src/game/marketReplayPerception';
 import { directionalInputSlices, MARKET_DIRECTIONAL_MOVE_SPEED } from '../../frontend/src/game/marketDirectionalInput';
 import { localWalkInputSlices } from '../../frontend/src/game/marketLocalInput';
 import { getMarketStationApproachPoint } from '../../frontend/src/game/marketEnvironment';
@@ -28,7 +28,7 @@ export class TraceGuard {
   private readonly mission;
   private readonly helpLines;
   private readonly initialStock: Record<string, number>;
-  constructor(snapshot: MarketReplaySnapshot, personaId = 'trace-validator', personaVersion = '1', model = 'trace-validation/1', private readonly attentionMode = false, private readonly extendedActor = false, private readonly feedbackMode = false, private readonly directionalMovement = false, private readonly richFeedbackObservation = false, private readonly shelfCartCue = false, private readonly observeDirectionalStructures = true, private readonly fixedAnchorMovement = false, private readonly wholeTraceObservationVersion?: 'anchor-visible-structures-v1', private readonly incrementalSpatial = false, private readonly wayfindingVersion?: 'wayfinding-v1' | 'wayfinding-v2') {
+  constructor(snapshot: MarketReplaySnapshot, personaId = 'trace-validator', personaVersion = '1', model = 'trace-validation/1', private readonly attentionMode = false, private readonly extendedActor = false, private readonly feedbackMode = false, private readonly directionalMovement = false, private readonly richFeedbackObservation = false, private readonly shelfCartCue = false, private readonly observeDirectionalStructures = true, private readonly fixedAnchorMovement = false, private readonly wholeTraceObservationVersion?: 'anchor-visible-structures-v1', private readonly incrementalSpatial = false, private readonly wayfindingVersion?: 'wayfinding-v1' | 'wayfinding-v2' | 'wayfinding-v3') {
     const valid = validateMarketReplaySnapshot(snapshot);
     if (!valid.valid) throw new Error(valid.errors.join('; '));
     this.adapter = createMarketAgentAdapter({ ...snapshot.config,
@@ -40,6 +40,14 @@ export class TraceGuard {
     this.helpLines = getMarketHelpLines(snapshot.config.alarmPenaltyPoints);
   }
   observe(): Observation { return this.adapter.observe(); }
+  /** wayfinding-v3: named boundaries, the kind of area the player stands in, and walk choices through a visible door gate. */
+  private wayfindingV3(o: Observation, world: boolean): Pick<ActorObservation, 'boundaries' | 'area' | 'gatePassages'> {
+    if (!world) return { boundaries: [], gatePassages: [] };
+    const anchors = visibleAnchors(o.environment, o.playerPosition, this.presentation, o.cashierAvailability);
+    return { boundaries: visibleBoundariesV3(o.environment, o.playerPosition, this.presentation, o.cashierAvailability),
+      area: replayCurrentArea(o.environment, o.playerPosition),
+      gatePassages: visibleGatePassages(o.environment, o.playerPosition, this.presentation, anchors, o.cashierAvailability) };
+  }
   /** This is the only observation sent to attention policies. Raw state remains guard-owned. */
   observeActor(): ActorObservation {
     const o = this.observe();
@@ -65,6 +73,7 @@ export class TraceGuard {
         ? visibleUnlabelledShelfBodies(o.environment, o.playerPosition, this.presentation, o.cashierAvailability) : [] } : {}),
       ...(this.wayfindingVersion === 'wayfinding-v1' || this.wayfindingVersion === 'wayfinding-v2' ? { boundaries: world
         ? visibleBoundaries(o.environment, o.playerPosition, this.presentation, o.cashierAvailability) : [] } : {}),
+      ...(this.wayfindingVersion === 'wayfinding-v3' ? this.wayfindingV3(o, world) : {}),
       // The shelf add control reads "한 개 더 담기" once a product is in the basket; it never shows the amount.
       // The raw observation hides the closed basket, and shelf stock only falls by what was put into it.
       products: shelfOpen ? o.products.filter(p => visible.has(p.id)).map(p => ({ ...p, stock: o.stock[p.id],

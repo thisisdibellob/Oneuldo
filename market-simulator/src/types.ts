@@ -113,7 +113,11 @@ export type ActorObservation = {
   /** Visible shelf bodies whose signs cannot be read; no category IDs or hidden products. */
   visibleStructures?: { kind: 'shelf'; label: '진열대'; direction: ActorDirection; distanceBand: ActorDistanceBand }[];
   /** wayfinding-v1: what the world view draws along each screen direction; covered is the list note, not a wall. */
-  boundaries?: { direction: ActorDirection; kind: 'wall' | 'fixture' | 'covered' | 'open'; label: string; distanceBand: ActorDistanceBand }[];
+  boundaries?: { direction: ActorDirection; kind: 'wall' | 'fixture' | 'covered' | 'open' | 'shelf' | 'checkout' | 'furniture' | 'person' | 'construction'; label: string; distanceBand: ActorDistanceBand }[];
+  /** wayfinding-v3: the kind of place the world view shows around the player (sales floor, lobby, corridor). */
+  area?: { kind: 'sales-floor' | 'lobby' | 'corridor' | 'elevator' | 'building-door' | 'other'; label: string };
+  /** wayfinding-v3: displayed walk choices whose segment passes through a visible door gate. */
+  gatePassages?: { anchorId: string; gate: 'entrance' | 'exit' | 'side-door'; direction: 'inward' | 'outward'; label: string }[];
   shelf: { page: number; pageCount: number; scrollFraction: number; pageFractions?: number[] } | null;
   listAvailable: boolean;
   /** Present for one observation after an accepted readList, never prefilled at entry. */
