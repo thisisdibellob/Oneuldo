@@ -23,7 +23,7 @@ async function until(check, message = 'mailbox condition') {
   }
   throw new Error(`Timed out waiting for ${message}`);
 }
-function runCli(args, stdin) {
+function runCli(args) {
   const child = spawn(process.execPath, [mailboxCli, ...args], { stdio: ['pipe', 'pipe', 'pipe'] });
   let stdout = '', stderr = '';
   child.stdout.on('data', chunk => { stdout += chunk; });
@@ -34,7 +34,7 @@ function runCli(args, stdin) {
   });
   // The input channel ends immediately, just as an actor client can disappear.
   // It must not own or retire the independently running prepared request.
-  child.stdin.end(stdin);
+  child.stdin.end();
   return { child, exited, stderr: () => stderr };
 }
 async function fixture(t, { restrictOperations = false } = {}) {
@@ -356,39 +356,4 @@ test('optional operation root blocks outside inputs and symlink escapes before r
   // No restriction was configured for the legacy owner; the same external file works.
   const defaultResponse = await runCli(['call', legacy.ownerDirectory, '--operation-file', path.join(restricted.directory, 'client-1.json')]).exited;
   assert.equal(defaultResponse.code, 0, defaultResponse.stderr);
-});
-
-
-test('inline stdin keeps exact bytes, concurrent retries execute once, keys distinguish intentional repeats', async t => {
-  const f = await fixture(t, { restrictOperations: true });
-  const invoke = (tool, bytes, key, useJson = false) => runCli(['call', f.ownerDirectory, '--tool', tool,
-    ...(useJson ? ['--json', bytes] : ['--stdin']), ...(key ? ['--delivery-key', key] : [])], useJson ? undefined : bytes).exited;
-  const begun = await invoke('begin_whole_trace_authoring', '{ "maxRewritesPerDecision": 3 }\n', 'begin');
-  assert.equal(begun.code, 0, begun.stderr);
-  const bytes = '  ' + JSON.stringify({ decision: draft() }, null, 2) + '\n';
-  const [a, b] = await Promise.all([invoke('append_whole_trace_decision', bytes, 'd1'), invoke('append_whole_trace_decision', bytes, 'd1')]);
-  assert.equal(a.code, 0, a.stderr); assert.equal(b.stdout, a.stdout);
-  assert.equal(JSON.parse(a.stdout).accepted, true);
-  const changed = await invoke('append_whole_trace_decision', bytes.trim(), 'd1');
-  assert.equal(changed.code, 1); assert.match(changed.stderr, /MAILBOX_OPERATION_CONFLICT/);
-  const c = await invoke('append_whole_trace_decision', bytes, 'd2', true);
-  assert.equal(c.code, 0, c.stderr); assert.equal(JSON.parse(c.stdout).decisionIndex, 1);
-  const implicit = await invoke('whole_trace_authoring_menu', '{}');
-  assert.equal((await invoke('whole_trace_authoring_menu', '{}')).stdout, implicit.stdout);
-  const badBytes = '{ "decision": malformed\n';
-  assert.equal((await invoke('append_whole_trace_decision', badBytes, 'bad')).code, 1);
-  assert.equal((await invoke('append_whole_trace_decision', JSON.stringify({ decision: draft('control/giveUp') }), 'end')).code, 0);
-  const finished = await invoke('finish_and_submit_whole_trace', '{}', 'finish');
-  assert.equal(finished.code, 0, finished.stderr);
-  await f.owner.exited;
-  assert.equal((await invoke('finish_and_submit_whole_trace', '{}', 'finish')).stdout, finished.stdout);
-  const summary = json(path.join(f.ownerDirectory, 'actor-completion.json'));
-  assert.equal(summary.source, 'mailbox-owner'); assert.equal(summary.acceptedDecisionCount, 3);
-  assert.equal(summary.rejectionCount, 0); assert.equal(summary.status, 'complete');
-  const receipts = fs.readdirSync(path.join(f.ownerDirectory, 'calls')).map(name => path.join(f.ownerDirectory, 'calls', name));
-  assert.ok(receipts.some(dir => fs.readFileSync(path.join(dir, 'input.json'), 'utf8') === badBytes));
-  assert.equal(receipts.filter(dir => fs.readFileSync(path.join(dir, 'input.json'), 'utf8') === bytes).length, 3);
-  for (const dir of receipts) {
-    for (const file of ['input.json', 'stdout.log', 'stderr.log', 'exit-code', 'completion.json']) assert.ok(fs.existsSync(path.join(dir, file)));
-  }
 });

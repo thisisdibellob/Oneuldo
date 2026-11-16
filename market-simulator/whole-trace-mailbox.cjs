@@ -186,70 +186,32 @@ async function serveMailbox({ directory, prepareArguments, service, pollInterval
     throw error;
   } finally {
     process.removeListener('SIGTERM', onTerm); process.removeListener('SIGINT', onInt);
-    try {
-      // Owner evidence, not an actor self-report. Never invent an ending on exit.
-      const entries = fs.readdirSync(path.join(directory, 'responses')).map(name => ({
-        command: readJson(path.join(directory, 'commands', name)), response: readJson(path.join(directory, 'responses', name)),
-      })).filter(entry => entry.command.tool === 'append_whole_trace_decision');
-      const accepted = entries.filter(entry => entry.response.ok && entry.response.result?.accepted === true).length;
-      publishNew(path.join(directory, 'actor-completion.json'), { source: 'mailbox-owner', recordedAt: now(),
-        status: state.completionVerified ? 'complete' : 'technical-failure', requestId: state.requestId,
-        outputPath: state.completionVerified ? state.requestStatus.result.outputPath : null,
-        acceptedDecisionCount: accepted, rejectionCount: entries.length - accepted,
-        interruption: state.interruptionReason ?? state.error ?? null, ownerState: state.state,
-        requestStatus: state.requestStatus?.status ?? null });
-    } finally { await service.close(); }
+    await service.close();
   }
   return structuredClone(state);
 }
 // One immutable receipt per CLI invocation, including invalid JSON, rejected calls,
 // cached responses and retries. Capture before publication, never rely on actor redirects.
-async function recordedCall(directory, inputFile, inline) {
+async function recordedCall(directory, inputFile) {
   const calls = path.join(path.resolve(directory), 'calls');
   fs.mkdirSync(calls, { recursive: true, mode: 0o700 });
   const receipt = path.join(calls, crypto.randomUUID());
   fs.mkdirSync(receipt, { mode: 0o700 });
   const startedAt = now();
-  publishNew(path.join(receipt, 'started.json'), { startedAt, pid: process.pid,
-    ...(inline ? { transport: inline.stdin ? 'stdin' : 'inline', tool: inline.tool, deliveryKey: inline.deliveryKey ?? null }
-      : { inputFile: path.resolve(inputFile) }) });
+  publishNew(path.join(receipt, 'started.json'), { startedAt, inputFile: path.resolve(inputFile), pid: process.pid });
   let stdout = '', stderr = '', exitCode = 0, operationId = null;
   try {
-    let bytes;
-    if (inline) bytes = inline.stdin ? fs.readFileSync(0) : Buffer.from(inline.json, 'utf8');
-    else {
-      const status = readMailboxStatus(directory);
-      const resolvedInput = fs.realpathSync(path.resolve(inputFile));
-      if (status.operationRoot) {
-        const relative = path.relative(status.operationRoot, resolvedInput);
-        if (relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative))
-          throw fail('MAILBOX_OPERATION_OUTSIDE_SLOT', `Save a new operation file inside ${status.operationRoot}; external paths and symlink escapes are not accepted`);
-      }
-      bytes = fs.readFileSync(resolvedInput);
+    const status = readMailboxStatus(directory);
+    const resolvedInput = fs.realpathSync(path.resolve(inputFile));
+    if (status.operationRoot) {
+      const relative = path.relative(status.operationRoot, resolvedInput);
+      if (relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative))
+        throw fail('MAILBOX_OPERATION_OUTSIDE_SLOT', `Save a new operation file inside ${status.operationRoot}; external paths and symlink escapes are not accepted`);
     }
+    const bytes = fs.readFileSync(resolvedInput);
     fs.writeFileSync(path.join(receipt, 'input.json'), bytes, { flag: 'wx', mode: 0o600 });
     if (bytes.length > MAX_BYTES) throw fail('MAILBOX_SIZE', 'JSON exceeds 4 MiB');
-    let input = JSON.parse(bytes.toString('utf8'));
-    if (inline) {
-      const inputSha256 = crypto.createHash('sha256').update(bytes).digest('hex');
-      const deliveryKey = inline.deliveryKey ?? inputSha256;
-      if (typeof deliveryKey !== 'string' || !/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$/.test(deliveryKey))
-        throw fail('MAILBOX_DELIVERY_KEY', 'delivery-key must be 1–128 letters, digits, dots, underscores or hyphens');
-      operationId = 'inline-' + crypto.createHash('sha256').update(JSON.stringify([inline.tool, deliveryKey])).digest('hex');
-      input = { operationId, tool: inline.tool, arguments: input };
-      operation(input); // Validate before binding a key; never change authored arguments.
-      publishNew(path.join(receipt, 'operation.json'), input);
-      const bindings = path.join(path.resolve(directory), 'inline-inputs');
-      fs.mkdirSync(bindings, { recursive: true, mode: 0o700 });
-      const bindingFile = path.join(bindings, operationId + '.json');
-      const binding = { operationId, tool: inline.tool, deliveryKey, inputSha256 };
-      try { publishNew(bindingFile, binding); }
-      catch (error) {
-        if (error.code !== 'EEXIST') throw error;
-        if (readJson(bindingFile).inputSha256 !== inputSha256)
-          throw fail('MAILBOX_OPERATION_CONFLICT', 'delivery-key was already used with different input bytes; preserve the original retry');
-      }
-    }
+    const input = JSON.parse(bytes.toString('utf8'));
     operationId = input?.operationId ?? null;
     const result = await callMailbox(directory, input);
     stdout = JSON.stringify(result, null, 2) + '\n';
@@ -266,19 +228,6 @@ async function recordedCall(directory, inputFile, inline) {
 
 async function main() {
   const [command, directory, flag, input, ...extra] = process.argv.slice(2);
-  if (command === 'call' && directory && flag === '--tool' && input) {
-    const options = { tool: input };
-    for (let index = 0; index < extra.length; index++) {
-      const key = extra[index];
-      if (key === '--stdin' && options.stdin === undefined) options.stdin = true;
-      else if (key === '--json' && options.json === undefined && extra[index + 1] !== undefined) options.json = extra[++index];
-      else if (key === '--delivery-key' && options.deliveryKey === undefined && extra[index + 1] !== undefined) options.deliveryKey = extra[++index];
-      else throw fail('MAILBOX_USAGE', 'call DIR --tool TOOL (--stdin | --json JSON) [--delivery-key KEY]');
-    }
-    if (!!options.stdin === (options.json !== undefined))
-      throw fail('MAILBOX_USAGE', 'Choose exactly one of --stdin or --json');
-    return recordedCall(directory, undefined, options);
-  }
   const hasOperationRoot = command === 'serve' && extra.length === 2 && extra[0] === '--operation-root' && extra[1];
   if (!directory || extra.length && !hasOperationRoot) throw fail('MAILBOX_USAGE', 'serve DIR --prepare-file FILE [--operation-root DIR] | call DIR --operation-file FILE | status DIR | abort DIR --reason TEXT');
   let result;

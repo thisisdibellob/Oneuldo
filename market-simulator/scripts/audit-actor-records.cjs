@@ -10,7 +10,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-const VERSION = 'scripted-actor-audit-v2';
+const VERSION = 'scripted-actor-audit-v1';
 const read = file => JSON.parse(fs.readFileSync(file, 'utf8'));
 const exists = file => { try { return fs.statSync(file).isFile(); } catch { return false; } };
 
@@ -154,50 +154,6 @@ function overwrittenInputs(slot, cmds) {
   return [...writes].filter(([, items]) => items.length > 1).map(([file, items]) => ({ file: path.relative(slot, file), writes: items }));
 }
 
-// Recorded actor tool writes are distinct from files produced by the launcher or
-// mailbox. Shell targets are review signals: shell parsing is not syscall tracing.
-function actorFileWrites(slot, cmds) {
-  const writes = [];
-  const add = (target, eventItem, evidence) => {
-    const file = path.resolve(slot, clean(target));
-    const relative = path.relative(slot, file);
-    writes.push({ eventItem, file, evidence,
-      insideSlot: relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative),
-      mailboxMediated: false, nullDevice: file === '/dev/null' });
-  };
-  for (const event of events(slot)) {
-    if (event.type !== 'item.completed' || event.item?.type !== 'file_change') continue;
-    for (const change of event.item.changes ?? []) if (change.path) add(change.path, event.item.id, 'file-change-tool');
-  }
-  for (const cmd of cmds) {
-    const text = unescape(cmd.command);
-    // Do not interpret JSON prose (including > comparisons) as shell writes.
-    const shell = text.replace(/--json\s+'[^']*'/g, '--json LITERAL').replace(/<<\s*['"]?(\w+)['"]?[^\n]*\n[\s\S]*?\n\1\b/g, '<<LITERAL');
-    const targets = [...shell.matchAll(/(?:^|[\s;])(?:\d*>>?|&>)\s*(?![>&])([^\s;&|]+)/g)].map(m => m[1])
-      .concat([...shell.matchAll(/\b(?:tee\s+(?:-a\s+)?|touch\s+|mkdir\s+(?:-p\s+)?)([^\s;&|]+)/g)].map(m => m[1]))
-      .concat([...shell.matchAll(/writeFile(?:Sync)?\(\s*['"]([^'"]+)['"]/g)].map(m => m[1]))
-      .concat([...shell.matchAll(/open\(\s*['"]([^'"]+)['"]\s*,\s*['"][wax]/g)].map(m => m[1]))
-      .concat([...shell.matchAll(/Path\(\s*['"]([^'"]+)['"]\s*\)\.write_(?:text|bytes)\(/g)].map(m => m[1]));
-    for (const target of new Set(targets)) add(target, cmd.id, 'shell-write-target');
-  }
-  const baselineFile = path.join(slot, 'actor-file-baseline.json');
-  const unaccountedFiles = [];
-  if (exists(baselineFile)) {
-    const baseline = read(baselineFile), known = new Set(baseline.files);
-    const walk = directory => {
-      for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
-        const file = path.join(directory, entry.name), relative = path.relative(slot, file);
-        if (relative === 'owner') continue;
-        if (entry.isDirectory()) walk(file);
-        else if (!known.has(relative) && !(baseline.launcherOutputs ?? []).includes(relative)) unaccountedFiles.push(relative);
-      }
-    };
-    walk(slot);
-  }
-  return { writes, unaccountedFiles, baselineAvailable: exists(baselineFile),
-    scope: 'Actor tool events and literal shell targets; unaccounted files require attribution. No OS-wide syscall or hidden runtime-file audit.' };
-}
-
 // 3. Out-of-scope access signals (flags only; intent needs review).
 const RUN_LEVEL = ['results.json', 'results.csv', 'selected-slots.json', 'PROTOCOL.md', 'REPORT', 'run-metadata.json', 'binding-', '/snapshots/', 'independent-record-audit'];
 function accessFlags(slot, code, allCodes, cmds) {
@@ -261,11 +217,10 @@ function auditSlot(slot, code, allCodes) {
   const appends = ledger.filter(entry => entry.tool === 'append_whole_trace_decision');
   const acceptedAppends = appends.filter(entry => entry.response.ok && entry.response.result?.accepted === true).length;
   const rejectedAppends = appends.length - acceptedAppends;
-  const selfReportFile = exists(path.join(slot, 'actor-completion.json')) ? path.join(slot, 'actor-completion.json') : path.join(slot, 'owner', 'actor-completion.json');
-  const selfReport = exists(selfReportFile) ? read(selfReportFile) : null;
+  const selfReport = exists(path.join(slot, 'actor-completion.json')) ? read(path.join(slot, 'actor-completion.json')) : null;
   const status = exists(path.join(slot, 'owner', 'status.json')) ? read(path.join(slot, 'owner', 'status.json')) : null;
   const projection = exists(path.join(slot, 'projection.json')) ? read(path.join(slot, 'projection.json')) : null;
-  const rewrites = rewriteChecks(ledger, ['authoring-v4', 'authoring-v4-h200', 'authoring-v5', 'authoring-v5-h200', 'authoring-v6', 'authoring-v6-h200'].includes(projection?.actorInstructions?.templateId));
+  const rewrites = rewriteChecks(ledger, ['authoring-v4', 'authoring-v4-h200', 'authoring-v5', 'authoring-v5-h200'].includes(projection?.actorInstructions?.templateId));
   const calls = callRecords(slot, cmds);
   const result = {
     owner: { state: status?.state ?? null, requestStatus: status?.requestStatus?.status ?? null,
@@ -280,15 +235,12 @@ function auditSlot(slot, code, allCodes) {
     mailboxCalls: { total: calls.length, delivered: calls.filter(call => call.delivered).length },
     recordGaps: recordGaps(calls),
     overwrittenInputs: overwrittenInputs(slot, cmds),
-    actorFileWrites: actorFileWrites(slot, cmds),
     languageIssues: languageIssues(ledger),
     accessFlags: accessFlags(slot, code, allCodes, cmds),
     automationFlags: automationFlags(cmds),
     advisoryFlags: advisoryFlags(cmds),
   };
   result.reviewQueue = [
-    ...result.actorFileWrites.writes.filter(write => !write.nullDevice).map(write => ({ kind: 'actor-file-write', ...write })),
-    ...result.actorFileWrites.unaccountedFiles.map(file => ({ kind: 'unaccounted-slot-file', file })),
     ...result.accessFlags.map(flag => ({ kind: 'access', eventItem: flag.eventItem, hits: flag.hits })),
     ...result.automationFlags.map(flag => ({ kind: 'automation', eventItem: flag.eventItem })),
     ...(result.advisoryFlags.length ? [{ kind: 'advisory-printed', count: result.advisoryFlags.length }] : []),
@@ -314,7 +266,7 @@ function audit(runDirectory) {
   return out;
 }
 
-module.exports = { VERSION, audit, auditSlot, rewriteChecks, callRecords, languageIssues, actorFileWrites };
+module.exports = { VERSION, audit, auditSlot, rewriteChecks, callRecords, languageIssues };
 
 if (require.main === module) {
   const args = process.argv.slice(2);
