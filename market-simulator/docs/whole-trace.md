@@ -275,3 +275,12 @@ mailbox CLI `call`은 배우의 출력 리다이렉션과 별도로 `owner/calls
 `serve DIR --prepare-file FILE --operation-root SLOT`은 CLI `call` 입력 파일의 실제 경로를 SLOT 내부로 제한한다. 외부 경로와 외부 파일을 가리키는 심볼릭 링크는 읽거나 복사하기 전에 `MAILBOX_OPERATION_OUTSIDE_SLOT`로 거절한다. 시도한 경로·stderr·exit·종료 영수증은 남고, 전달하지 않은 외부 입력 본문은 보관하지 않는다. 옵션 없는 기존 owner와 라이브러리 `callMailbox`는 기존 계약을 유지하며 bundle·inputHash·trace에는 영향을 주지 않는다. 이는 CLI 파일 전달 검사이며 배우 프로세스의 전체 파일시스템 접근을 격리하는 보안 경계는 아니다.
 
 새 `authoring-v5` / `authoring-v5-h200`는 v4의 선택 불가 재작성 예외를 유지하고, 슬롯 내부의 고유 operation 파일 경로·슬롯 밖 임시 파일 금지·choiceRef 구조·허용된 기술 재작성 지속·코드로 선택하지 않는 원칙을 명시한다. v1~v4와 기본 v3는 수정하지 않는다. 실행 담당자는 슬롯의 operations/와 tmp/를 만들고 TMPDIR도 해당 tmp/로 지정할 수 있다. 배우별 감사는 경로 검사 통과 여부와 별개로 실제 파일 접근 및 행동 자동화를 계속 확인한다.
+
+
+### 파일 없는 배우 전달 (선택 v6 템플릿)
+
+`call DIR --tool TOOL --stdin [--delivery-key KEY]`는 stdin의 도구 arguments JSON 원문을 받는다. `--stdin` 대신 `--json 'JSON'` 인라인 인자를 쓸 수 있다. 배우가 operation 파일이나 operationId를 만들지 않는다. mailbox는 `owner/calls/<호출 ID>/input.json`에 입력 바이트를 그대로 저장하고 `operation.json`에 전달용 wrapper를 별도로 남긴다. 입력·stdout·stderr·exit·종료 영수증은 잘못된 JSON과 중복 재전송에도 각각 남는다. 행동·수량·상태·종료는 채우거나 변경하지 않는다.
+
+operationId는 tool과 delivery-key에서 안정적으로 발급한다. 같은 tool·key·입력 바이트는 같은 결과를 반환하고, 같은 key의 다른 바이트는 충돌로 거절한다. 키를 생략하면 입력 바이트 SHA-256을 키로 사용한다. 의도적인 동일 행동 반복·새 메뉴 조회·수정 초안은 새 key로 구분하고, 불확실한 전송 재시도는 원래 key와 바이트를 보존한다. 이 구분 없이 같은 입력을 새 행동인지 재전송인지 자동 판단하지 않는다. 기존 파일 기반 call과 저장된 bundle·trace·inputHash는 유지한다.
+
+새 `authoring-v6` / `authoring-v6-h200`는 배우가 슬롯 안팎의 파일을 쓰지 않고 매 결정의 literal JSON을 직접 전달하도록 한다. 스크립트·반복문·변수 치환으로 행동을 생성하는 것도 금지한다. owner 종료 때 `owner/actor-completion.json`에 원장 기반 결과·수락/거절 수·중단 사유를 기록한다. 이는 배우 자기 보고가 아니며 launcher의 배우 종료 코드를 대신하지 않는다. 기존 템플릿과 기본 v3는 유지한다. 감사는 actor file-change 이벤트와 shell 쓰기 대상, 시작 전 파일 목록 대비 미확인 파일을 검토 대상으로 남긴다. 전체 OS syscall 또는 공급자 런타임의 암묵적 파일 쓰기를 추적한 것으로 보고하지 않는다.

@@ -154,3 +154,18 @@ test('v5 adds slot-local transport and literal-only authoring reminders without 
     assert.match(rendered.text, /Preserve the first draft delayMs on every rewrite/);
   }
 });
+
+
+test('v6 instructs literal fileless calls and owner completion while retaining rewrite and horizon rules', () => {
+  const { renderActorInstructions } = require('../whole-trace-actor-input.cjs');
+  for (const id of ['authoring-v6', 'authoring-v6-h200']) {
+    const text = renderActorInstructions(id, '/slot').text;
+    assert.match(text, /Do not create, edit, overwrite or delete ANY file/);
+    assert.match(text, /--tool TOOL_NAME --delivery-key UNIQUE_DELIVERY_KEY --json/);
+    assert.match(text, /Never use a script, loop, variable substitution/);
+    assert.match(text, /owner\/actor-completion.json/);
+    assert.match(text, /Preserve the first draft delayMs/);
+    assert.match(text, id.endsWith('h200') ? /200-decision horizon/ : /100-decision horizon/);
+    assert.doesNotMatch(text, /--operation-file|Save actor-completion/);
+  }
+});

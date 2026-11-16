@@ -88,3 +88,22 @@ test('v4 permits an unavailable reference correction but still flags changes of 
   assert.equal(s.procedureViolations.length, 1);
   assert.equal(s.procedureViolations[0].decisionNumber, 2);
 });
+
+
+test('file write audit separates actor edits, shell targets, mailbox transport and unaccounted files', t => {
+  const { run, slot } = slotFixture(t, [], [
+    `node ${MAILBOX} call owner --tool append_whole_trace_decision --json '{"decision":{"reason":"a > b"}}'`,
+    'cat > actor-completion.json << EOF\n{}\nEOF',
+    'echo bad > /tmp/actor-file.json',
+    'node -e "require(\'fs\').writeFileSync(\'local.json\', \'{}\')"',
+  ]);
+  fs.appendFileSync(path.join(slot, 'actor-events.jsonl'), JSON.stringify({ type:'item.completed', item: {
+    id:'patch', type:'file_change', changes:[{path:path.join(slot, 'edit.json'),kind:'add'}] } })+'\n');
+  fs.writeFileSync(path.join(slot, 'actor-file-baseline.json'), JSON.stringify({files:['actor-events.jsonl','actor-completion.json','actor-file-baseline.json'],launcherOutputs:[]}));
+  fs.writeFileSync(path.join(slot, 'unexpected.txt'), 'preserved');
+  const writes = audit(run).slots['s-01'].actorFileWrites;
+  assert.equal(writes.writes.length, 4);
+  assert.equal(writes.writes.filter(w => !w.insideSlot).length, 1);
+  assert.ok(writes.writes.every(w => !w.mailboxMediated));
+  assert.deepEqual(writes.unaccountedFiles, ['unexpected.txt']);
+});

@@ -109,6 +109,8 @@ const INSTRUCTION_TEMPLATES = Object.freeze({
   'authoring-v1': path.join(__dirname, 'actor-instructions', 'legacy', 'authoring-v1.txt'),
   'authoring-v2': path.join(__dirname, 'actor-instructions', 'legacy', 'authoring-v2.txt'),
   'authoring-v3': path.join(__dirname, 'actor-instructions', 'authoring-v3.txt'),
+  'authoring-v6': path.join(__dirname, 'actor-instructions', 'authoring-v6.txt'),
+  'authoring-v6-h200': path.join(__dirname, 'actor-instructions', 'authoring-v6-h200.txt'),
   'authoring-v5': path.join(__dirname, 'actor-instructions', 'authoring-v5.txt'),
   'authoring-v5-h200': path.join(__dirname, 'actor-instructions', 'authoring-v5-h200.txt'),
   'authoring-v4': path.join(__dirname, 'actor-instructions', 'authoring-v4.txt'),
