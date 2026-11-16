@@ -117,6 +117,8 @@ export function createWholeTraceSourceAuthoringCursor(bundle: WholeTraceBundle) 
     expectedStock[product.id] = product.stock;
   }
   let hiddenShelfPage: number | null = null, terminal = false;
+  // wayfinding-v4: whether the staff dialogue's location menu is open (same panel source, different buttons).
+  let staffLocationHelp = false;
   let movementPosition: WholeTraceMovementPosition | undefined;
   const decisions: WholeTraceTaskChoiceDecision[] = [];
   const stateFor = (current: WholeTraceChoiceSource) => {
@@ -206,7 +208,10 @@ export function createWholeTraceSourceAuthoringCursor(bundle: WholeTraceBundle) 
       }
       const staff = catalog.staff.find(staff => staff.stationId === current.activeStation);
       if (!staff) return fail('AUTHORING_UNSUPPORTED_TRANSITION', `Unknown active station ${current.activeStation}`);
-      return describe('staff', [...common, ...catalog.common.staff, ...staff.choiceIds.filter(id => {
+      const dialogue = catalog.staffDialogue;
+      if (dialogue && staffLocationHelp) return describe('staff', [...common, ...catalog.common.staff, dialogue.backToStaffChoiceId,
+        ...dialogue.askLocationChoiceIds], `${stationLabel} 직원 대화: 물건 위치 묻기`);
+      return describe('staff', [...common, ...catalog.common.staff, ...(dialogue ? [dialogue.openLocationHelpChoiceId] : []), ...staff.choiceIds.filter(id => {
         const entry = entries.get(id);
         return entry?.action.type === 'requestCashier' && state.cashierAvailability[entry.action.checkoutId as keyof typeof state.cashierAvailability] === false;
       })], `${stationLabel} 직원 대화 열림`);
@@ -304,7 +309,8 @@ export function createWholeTraceSourceAuthoringCursor(bundle: WholeTraceBundle) 
         return structuredClone(stored);
       }
       const next = structuredClone(source), nextCart = { ...expectedCart }, nextStock = { ...expectedStock };
-      let nextHiddenShelfPage = hiddenShelfPage, nextTerminal = false;
+      let nextHiddenShelfPage = hiddenShelfPage, nextTerminal = false, nextStaffLocationHelp = staffLocationHelp;
+      if (action.type === 'interact' || action.type === 'closeStation') nextStaffLocationHelp = false;
       switch (action.type) {
         case 'moveDirection':
           if (bundle.movementVersion !== 'directional-v1') return fail('AUTHORING_UNSUPPORTED_TRANSITION', 'Direction movement requires its explicit bundle version');
@@ -387,11 +393,20 @@ export function createWholeTraceSourceAuthoringCursor(bundle: WholeTraceBundle) 
         case 'readList':
         case 'pause':
         case 'lookAround': break;
+        case 'openLocationHelp':
+        case 'backToStaff':
+        case 'askLocation':
+          if (!catalog.staffDialogue || !source.activeStation?.startsWith('staff:'))
+            return fail('AUTHORING_UNSUPPORTED_TRANSITION', 'Staff location questions require an open employee dialogue');
+          if (action.type === 'askLocation' && !staffLocationHelp)
+            return fail('AUTHORING_CHOICE_NOT_AVAILABLE', 'Open the location menu (이 물건은 어디에 있나요?) first');
+          if (action.type !== 'askLocation') nextStaffLocationHelp = action.type === 'openLocationHelp';
+          break;
         default: return fail('AUTHORING_UNSUPPORTED_TRANSITION', 'The saved choice has an unsupported source transition');
       }
       // All checks precede commitment: an error leaves the cursor and caller data intact.
       source = next; expectedCart = nextCart; expectedStock = nextStock;
-      hiddenShelfPage = nextHiddenShelfPage; terminal = nextTerminal;
+      hiddenShelfPage = nextHiddenShelfPage; terminal = nextTerminal; staffLocationHelp = nextStaffLocationHelp;
       if (action.type === 'moveDirection' || action.type === 'walk') movementPosition = undefined;
       taskDeclarations = taskPreview.nextState;
       decisions.push(stored);

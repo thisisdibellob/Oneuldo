@@ -32,6 +32,8 @@ export type WholeTraceChoiceCatalog = {
   navigation: { navigationStateId: string; locations: { location: string; choiceIds: string[]; visibleWalkChoices: { choiceId: string; label: string; direction: string; distanceBand: string }[] }[] }[];
   shelves: { stationId: string; pages: { pageIndex: number; choiceIds: string[] }[]; browseChoiceIds: string[] }[];
   staff: { stationId: string; choiceIds: string[] }[];
+  /** wayfinding-v4 only: the app's staff location-question controls ("이 물건은 어디에 있나요?"). Absent in older bundles. */
+  staffDialogue?: { openLocationHelpChoiceId: string; backToStaffChoiceId: string; askLocationChoiceIds: string[] };
   checkout: { checkoutId: string; choiceIds: string[] }[];
   cartProductChoiceIds: string[];
   instruction: string;
@@ -50,6 +52,8 @@ export function wholeTraceChoiceId(action: WholeTraceChoiceAction, stationId?: s
   if (action.type === 'interact') return `open/${action.station}`;
   if (action.type === 'checkout' || action.type === 'requestCashier') return `${action.type}/${action.checkoutId}`;
   if (action.type === 'add' || action.type === 'remove') return `${action.type}/${action.productId}`;
+  if (action.type === 'openLocationHelp' || action.type === 'backToStaff') return `staff/${action.type}`;
+  if (action.type === 'askLocation') return `staff/askLocation/${action.objectiveId}`;
   if (action.type === 'browse') {
     if (!stationId) throw new Error('Browse choices require an exact shelf station');
     return `browse/${stationId}/${action.pageIndex}`;
@@ -73,7 +77,8 @@ function cueRefsFor(action: WholeTraceChoiceAction, world: ChoiceWorld, stationI
   return [...target, ...wholeTraceControlCueRefs({ type } as PolicyAction)];
 }
 /** Construct a stable unranked vocabulary. No goal, persona, price preference or shortest path enters IDs/order. */
-export function buildWholeTraceChoiceCatalog(world: ChoiceWorld, movementVersion?: WholeTraceMovementVersion): WholeTraceChoiceCatalog {
+export function buildWholeTraceChoiceCatalog(world: ChoiceWorld, movementVersion?: WholeTraceMovementVersion,
+  options: { staffDialogue?: boolean } = {}): WholeTraceChoiceCatalog {
   const entries = new Map<string, WholeTraceChoiceEntry>();
   const put = (action: WholeTraceChoiceAction, label?: string, stationId?: string, maxQuantity?: number) => {
     const choiceId = wholeTraceChoiceId(action, stationId);
@@ -139,8 +144,15 @@ export function buildWholeTraceChoiceCatalog(world: ChoiceWorld, movementVersion
     };
   });
   const cashierChoices = world.world.checkouts.map(checkout => put({ type: 'requestCashier', checkoutId: checkout.id }, `${checkout.id} 직원 호출하기`));
+  // The dialogue lists every shopping-list item, exactly as the app's location menu does.
+  const staffDialogue = options.staffDialogue ? {
+    openLocationHelpChoiceId: put({ type: 'openLocationHelp' }, '이 물건은 어디에 있나요?'),
+    backToStaffChoiceId: put({ type: 'backToStaff' }, '뒤로가기'),
+    askLocationChoiceIds: world.objectives.map(goal => put({ type: 'askLocation', objectiveId: goal.id }, `${goal.label} 위치 물어보기`)),
+  } : undefined;
   return { schemaVersion: 'state-choices-v1', entries: [...entries.values()], common, navigation, shelves,
     ...(movementChoiceIds ? { movementChoiceIds } : {}),
+    ...(staffDialogue ? { staffDialogue } : {}),
     referenceAliases: world.world.checkouts.flatMap(checkout => {
       const aliasChoiceId = `open/${checkout.id}`, canonicalChoiceId = `checkout/${checkout.id}`;
       return !entries.has(aliasChoiceId) && entries.has(canonicalChoiceId)
@@ -188,6 +200,8 @@ function canonicalAction(a: PolicyAction, o: ActorObservation, bundle: WholeTrac
   if (a.type === 'add' || a.type === 'remove') return { type: a.type, productId: a.productId, quantity: a.quantity ?? 1 };
   if (a.type === 'checkout' || a.type === 'requestCashier') return { type: a.type, checkoutId: a.checkoutId ?? 'checkout' };
   if (['interact', 'viewCart', 'viewHelp', 'closeView', 'closeStation', 'submit', 'giveUp'].includes(a.type)) return structuredClone(a) as WholeTraceAction;
+  if (a.type === 'openLocationHelp' || a.type === 'backToStaff') return { type: a.type };
+  if (a.type === 'askLocation') return { type: 'askLocation', objectiveId: a.objectiveId };
   return undefined;
 }
 function availableSelection(o: ActorObservation, bundle: WholeTraceBundle, source: WholeTraceChoiceSource) {

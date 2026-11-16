@@ -26,7 +26,10 @@ export type WholeTraceAction =
   | { type: 'interact'; station: string }
   | { type: 'checkout' | 'requestCashier'; checkoutId: string }
   | { type: 'add' | 'remove'; productId: string; quantity: number }
-  | { type: 'browse'; pageIndex: number };
+  | { type: 'browse'; pageIndex: number }
+  /** wayfinding-v4: the staff dialogue's existing location-question controls. */
+  | { type: 'openLocationHelp' | 'backToStaff' }
+  | { type: 'askLocation'; objectiveId: string };
 export type WholeTraceDecision = { action: WholeTraceAction; delayMs: number; reason: string; basis: WholeTraceBasis; actorState: WholeTraceActorState };
 export type WholeTraceChoiceSource = {
   location: 'start' | string; navigationStateId: string; phase: 'shopping' | 'checkout';
@@ -117,6 +120,7 @@ const fields: Record<string, string[]> = {
   readList: [], pause: [], lookAround: [], viewCart: [], viewHelp: [], closeView: [], closeStation: [], submit: [], giveUp: [],
   walk: ['waypointId'], interact: ['station'], checkout: ['checkoutId'], requestCashier: ['checkoutId'],
   add: ['productId', 'quantity'], remove: ['productId', 'quantity'], browse: ['pageIndex'],
+  openLocationHelp: [], backToStaff: [], askLocation: ['objectiveId'],
 };
 function plain(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object' && !Array.isArray(value) && Object.getPrototypeOf(value) === Object.prototype;

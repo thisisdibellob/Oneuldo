@@ -136,14 +136,14 @@ test('wayfinding stays optional while unknown versions, unknown metadata and mis
   assert.equal(Object.hasOwn(trace.generation, 'wholeTraceWayfindingVersion'), false);
   assert.deepEqual(validateMarketReplayTrace(trace, settings.snapshot), { valid: true, errors: [] });
   assert.deepEqual(validateTrace(trace, settings.snapshot), { valid: true, errors: [] });
-  assert.throws(() => fixture({ wayfindingVersion: 'wayfinding-v4' }), /wayfindingVersion wayfinding-v1\/v2 requires/);
+  assert.throws(() => fixture({ wayfindingVersion: 'wayfinding-v5' }), /wayfindingVersion wayfinding-v1\/v2 requires/);
   const changed = change => {
     const copy = structuredClone(trace);
     change(copy.generation);
     copy.traceId = marketReplayTraceId(copy);
     return validateMarketReplayTrace(copy, settings.snapshot);
   };
-  const unknownVersion = changed(generation => { generation.wholeTraceWayfindingVersion = 'wayfinding-v4'; });
+  const unknownVersion = changed(generation => { generation.wholeTraceWayfindingVersion = 'wayfinding-v5'; });
   assert.equal(unknownVersion.valid, false);
   assert.ok(unknownVersion.errors.some(error => /wholeTraceWayfindingVersion: unsupported value/.test(error)));
   const unknownField = changed(generation => { generation.wholeTraceFutureVersion = 'future'; });

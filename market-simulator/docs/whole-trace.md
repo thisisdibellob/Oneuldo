@@ -147,7 +147,16 @@ legacy와 traits v1의 기존 판정은 유지하고, 새 `movementOpportunities
 - **포기 조건(v3)**: 이용 안내를 봤고 본 직원이 있으면 말을 걸어 봤다는 조건은 그대로다. 그 위에 다음을 둔다. (1) 본 입구로 매장 안에 들어가 보기 전에는 시간이 지나도 잠긴다. (2) 본 통로 중 아직 안 가 본 곳도 단서로 센다. 이런 곳이 남아 있으면 `explorationBudgetMs`가 지나야 열린다. (3) v2 단서(본 매대 미개봉, 담은 뒤 계산대 미방문, 이름 없는 진열대 미접근)는 그대로 유지한다. 그래서 화면에 상호작용할 것이 안 보인다는 이유만으로는 그만두기가 열리지 않는다.
 - 페르소나 프로필 형태(`landmarkMemory` 포함)와 thought 규칙(목적지, 한국어)은 v2와 같다.
 
-저장 trace의 JSON 스키마에서도 `generation.wholeTraceWayfindingVersion`을 선택 항목으로 허용한다. 허용값은 `wayfinding-v1`·`wayfinding-v2`·`wayfinding-v3`이며, 알 수 없는 필드·버전은 계속 거절한다. `whole-trace-wayfinding-finalization.test.cjs`는 옵션을 켠 candidate 7의 허용된 포기·계산 제출·100행동 시스템 계산과 세션 저장까지 검사한다. 중간 관찰·메뉴 검사만으로 최종 생성 성공을 대신하지 않는다.
+### `wayfindingVersion:"wayfinding-v4"`
+
+2026-11-16 v3 일반 성인 10회(`output/persona-control10-wayfinding-v3-20261116-103248`) 중 7번은 우유 위치를 물으려 직원 대화를 열었지만 '잠시 멈추기·주변 보기·닫기'만 받았다. 실제 게임(`MarketSimulationScreen`)과 공용 세션(`marketSession`의 `askLocation`), TraceGuard 관찰(`staffLocationHelp`·`locationChoices`)과 trace 재생(`talkToStaff` `openLocationHelp`/`askLocation`/`backToStaff`)에는 모두 있었고, whole-trace 선택지 변환(`wholeTraceChoices.ts`의 `canonicalAction`)만 이 세 버튼을 버리고 있었다. 동시에 포기 조건은 직원 창을 연 것만으로 "직원에게 물어봄"으로 셌다. 게임 코드는 바꾸지 않는다. v1~v3는 보관 기록 재현을 위해 그대로 둔다.
+
+- **직원 대화 선택지 연결**(v4 bundle에만 catalog `staffDialogue`): 직원 대화에서 `staff/openLocationHelp`("이 물건은 어디에 있나요?") → 장보기 목록 항목마다 `staff/askLocation/<목표 ID>`("○○ 위치 물어보기") → 답변. `staff/backToStaff`("뒤로가기")는 첫 대화 화면으로 돌아간다. 위치 메뉴가 열린 동안 계산원 호출 버튼은 앱과 같이 보이지 않는다. 저장 trace는 기존 `talkToStaff` 단계 그대로다.
+- **답변**: 게임의 `marketLocationResponse` 문장이 `currentObservation.observation.result.message`에 나오고, `spatialMemory.staffAnswers`(최근 4개)에 남는다. `spatialMemory.recovery.askedStaff`는 실제로 답을 받았는지 나타낸다.
+- **포기 조건(v4)**: v3과 같되 "본 직원에게 물어봄"은 직원 창 열기가 아니라 답을 받은 위치 질문으로만 센다.
+- 위치 질문은 앱과 같이 장보기 목록 상품만 대상이다. 계산대 위치 질문, 반품 부탁 같은 기능은 게임에 먼저 추가한 뒤 연결해야 한다.
+
+저장 trace의 JSON 스키마에서도 `generation.wholeTraceWayfindingVersion`을 선택 항목으로 허용한다. 허용값은 `wayfinding-v1`·`wayfinding-v2`·`wayfinding-v3`·`wayfinding-v4`이며, 알 수 없는 필드·버전은 계속 거절한다. `whole-trace-wayfinding-finalization.test.cjs`는 옵션을 켠 candidate 7의 허용된 포기·계산 제출·100행동 시스템 계산과 세션 저장까지 검사한다. 중간 관찰·메뉴 검사만으로 최종 생성 성공을 대신하지 않는다.
 
 ### 후보 작성과 제출 계약
 

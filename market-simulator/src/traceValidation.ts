@@ -28,7 +28,7 @@ export class TraceGuard {
   private readonly mission;
   private readonly helpLines;
   private readonly initialStock: Record<string, number>;
-  constructor(snapshot: MarketReplaySnapshot, personaId = 'trace-validator', personaVersion = '1', model = 'trace-validation/1', private readonly attentionMode = false, private readonly extendedActor = false, private readonly feedbackMode = false, private readonly directionalMovement = false, private readonly richFeedbackObservation = false, private readonly shelfCartCue = false, private readonly observeDirectionalStructures = true, private readonly fixedAnchorMovement = false, private readonly wholeTraceObservationVersion?: 'anchor-visible-structures-v1', private readonly incrementalSpatial = false, private readonly wayfindingVersion?: 'wayfinding-v1' | 'wayfinding-v2' | 'wayfinding-v3') {
+  constructor(snapshot: MarketReplaySnapshot, personaId = 'trace-validator', personaVersion = '1', model = 'trace-validation/1', private readonly attentionMode = false, private readonly extendedActor = false, private readonly feedbackMode = false, private readonly directionalMovement = false, private readonly richFeedbackObservation = false, private readonly shelfCartCue = false, private readonly observeDirectionalStructures = true, private readonly fixedAnchorMovement = false, private readonly wholeTraceObservationVersion?: 'anchor-visible-structures-v1', private readonly incrementalSpatial = false, private readonly wayfindingVersion?: 'wayfinding-v1' | 'wayfinding-v2' | 'wayfinding-v3' | 'wayfinding-v4') {
     const valid = validateMarketReplaySnapshot(snapshot);
     if (!valid.valid) throw new Error(valid.errors.join('; '));
     this.adapter = createMarketAgentAdapter({ ...snapshot.config,
@@ -73,7 +73,7 @@ export class TraceGuard {
         ? visibleUnlabelledShelfBodies(o.environment, o.playerPosition, this.presentation, o.cashierAvailability) : [] } : {}),
       ...(this.wayfindingVersion === 'wayfinding-v1' || this.wayfindingVersion === 'wayfinding-v2' ? { boundaries: world
         ? visibleBoundaries(o.environment, o.playerPosition, this.presentation, o.cashierAvailability) : [] } : {}),
-      ...(this.wayfindingVersion === 'wayfinding-v3' ? this.wayfindingV3(o, world) : {}),
+      ...(this.wayfindingVersion === 'wayfinding-v3' || this.wayfindingVersion === 'wayfinding-v4' ? this.wayfindingV3(o, world) : {}),
       // The shelf add control reads "한 개 더 담기" once a product is in the basket; it never shows the amount.
       // The raw observation hides the closed basket, and shelf stock only falls by what was put into it.
       products: shelfOpen ? o.products.filter(p => visible.has(p.id)).map(p => ({ ...p, stock: o.stock[p.id],

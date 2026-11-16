@@ -916,7 +916,7 @@
           "enum": ["anchor-visible-structures-v1"]
         },
         "wholeTraceWayfindingVersion": {
-          "enum": ["wayfinding-v1", "wayfinding-v2", "wayfinding-v3"]
+          "enum": ["wayfinding-v1", "wayfinding-v2", "wayfinding-v3", "wayfinding-v4"]
         },
         "wholeTraceMovementFeedbackVersion": {
           "enum": ["recent-movement-v1", "recent-movement-anchor-v1", "recent-movement-anchor-capacity-v1"]

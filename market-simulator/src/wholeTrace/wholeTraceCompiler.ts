@@ -24,7 +24,7 @@ import type { WholeTraceChoiceFrame, WholeTraceAcceptedFrame } from './wholeTrac
 import type { WholeTraceChoiceSource } from './wholeTraceContracts';
 import { createWholeTraceNavigationRecorder, type WholeTraceNavigationEvidence } from './wholeTraceNavigationEvidence';
 import { WAYFINDING_GIVE_UP_LOCKED, createWholeTraceWayfindingMemory, isWholeTraceWayfindingVersion, wayfindingProfileOf,
-  type WholeTraceSpatialMemory, type WholeTraceSpatialMemoryV2, type WholeTraceSpatialMemoryV3, type WholeTraceWayfindingMemoryEvent } from './wholeTraceWayfinding';
+  type WholeTraceSpatialMemory, type WholeTraceSpatialMemoryV2, type WholeTraceSpatialMemoryV3, type WholeTraceSpatialMemoryV4, type WholeTraceWayfindingMemoryEvent } from './wholeTraceWayfinding';
 
 export class WholeTraceCompileError extends Error {
   constructor(readonly validation: WholeTraceValidation) { super(validation.errors.join('; ')); }
@@ -47,7 +47,7 @@ export type WholeTracePrefixResult = {
   taskMemory?: ReturnType<WholeTraceTaskMemoryEngine['snapshot']>; advisory: WholeTraceCalculatedAdvisory;
   choiceFrame?: WholeTraceChoiceFrame; movementResult?: WholeTracePublicMovementResult; movementNotes?: string[];
   /** wayfinding-v1 actor-side memory at this boundary, built from accepted observations only. */
-  wayfinding?: { spatialMemory: WholeTraceSpatialMemory | WholeTraceSpatialMemoryV2 | WholeTraceSpatialMemoryV3; anchorVisits: Record<string, number>;
+  wayfinding?: { spatialMemory: WholeTraceSpatialMemory | WholeTraceSpatialMemoryV2 | WholeTraceSpatialMemoryV3 | WholeTraceSpatialMemoryV4; anchorVisits: Record<string, number>;
     /** v2: currently shown anchors that point toward the actor's own remembered destination. */
     towardDestination?: string[];
     /** v2 analysis record of fading/forgetting/relearning; not part of the actor menu. */

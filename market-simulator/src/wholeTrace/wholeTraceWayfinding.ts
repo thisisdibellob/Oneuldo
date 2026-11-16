@@ -30,7 +30,14 @@ export const WHOLE_TRACE_WAYFINDING_V2_VERSION = 'wayfinding-v2' as const;
  * as leads: seeing nothing interactable is never by itself a reason to stop.
  */
 export const WHOLE_TRACE_WAYFINDING_V3_VERSION = 'wayfinding-v3' as const;
-export const WHOLE_TRACE_WAYFINDING_VERSIONS = [WHOLE_TRACE_WAYFINDING_VERSION, WHOLE_TRACE_WAYFINDING_V2_VERSION, WHOLE_TRACE_WAYFINDING_V3_VERSION] as const;
+/**
+ * wayfinding-v4: v3 plus the staff dialogue's existing location questions
+ * ("이 물건은 어디에 있나요?" -> list item -> answer) as actor choices. Opening a
+ * staff dialogue no longer counts as asking: the give-up condition needs an
+ * answered question, and answers stay in the actor's spatial memory.
+ */
+export const WHOLE_TRACE_WAYFINDING_V4_VERSION = 'wayfinding-v4' as const;
+export const WHOLE_TRACE_WAYFINDING_VERSIONS = [WHOLE_TRACE_WAYFINDING_VERSION, WHOLE_TRACE_WAYFINDING_V2_VERSION, WHOLE_TRACE_WAYFINDING_V3_VERSION, WHOLE_TRACE_WAYFINDING_V4_VERSION] as const;
 export type WholeTraceWayfindingVersion = typeof WHOLE_TRACE_WAYFINDING_VERSIONS[number];
 export function isWholeTraceWayfindingVersion(value: unknown): value is WholeTraceWayfindingVersion {
   return (WHOLE_TRACE_WAYFINDING_VERSIONS as readonly unknown[]).includes(value);
@@ -501,7 +508,7 @@ export class WholeTraceWayfindingMemoryV2 {
     return { available: false, notice: `그만두기는 아직 선택지에 없다. 남은 단서: ${missing.join(', ') || '탐색 시간이 더 남음'}.` };
   }
 
-  snapshot(o: ActorObservation): WholeTraceSpatialMemoryV2 | WholeTraceSpatialMemoryV3 {
+  snapshot(o: ActorObservation): WholeTraceSpatialMemoryV2 | WholeTraceSpatialMemoryV3 | WholeTraceSpatialMemoryV4 {
     const here = (north: number, east: number) => vectorCue(north - this.north, east - this.east);
     const visible = [...this.places.values()].filter(place => place.state !== 'forgotten')
       .sort((a, b) => b.lastSeenDecision - a.lastSeenDecision || a.label.localeCompare(b.label));
@@ -615,11 +622,62 @@ export class WholeTraceWayfindingMemoryV3 extends WholeTraceWayfindingMemoryV2 {
     return { available: false, notice: `그만두기는 아직 선택지에 없다. 남은 단서: ${missing.join(', ') || '탐색 시간이 더 남음'}.` };
   }
 
-  override snapshot(o: ActorObservation): WholeTraceSpatialMemoryV3 {
+  override snapshot(o: ActorObservation): WholeTraceSpatialMemoryV3 | WholeTraceSpatialMemoryV4 {
     const { kind: _kind, ...rest } = super.snapshot(o);
     return { kind: 'actor-spatial-memory-v3', ...rest,
       ...(this.currentArea ? { currentArea: this.currentArea.label } : {}),
       areasVisited: [...this.areasVisited], gatesPassed: this.gatesPassed.slice(-6) };
+  }
+}
+
+/* ------------------------------------------------------------- wayfinding-v4 */
+
+export function renderWayfindingInstructionsV4(profile: WayfindingProfile): string {
+  return renderWayfindingInstructionsV2(profile).replace('(wayfinding-v2)', '(wayfinding-v4)');
+}
+
+export const WAYFINDING_COMMON_INSTRUCTIONS_V4 = `${WAYFINDING_COMMON_INSTRUCTIONS_V3.replace('wayfinding-v3 공통 규칙 (v1 규칙에 아래를 더한다):', 'wayfinding-v4 공통 규칙 (v1 규칙에 아래를 더한다):')}
+- 직원에게 말을 걸면 대화 화면에서 "이 물건은 어디에 있나요?"를 고를 수 있다. 그러면 장보기 목록의 물건마다 "○○ 위치 물어보기"가 나오고, 고르면 직원의 답이 currentObservation.observation.result.message에 나온다. 답은 spatialMemory.staffAnswers에도 남는다. "뒤로가기"는 첫 대화 화면으로 돌아간다.
+- 직원 창을 열기만 한 것은 물어본 것이 아니다. 그만두기 조건의 "직원에게 물어봄"은 실제로 위치를 물어 답을 받은 경우만 센다.`;
+
+export type WholeTraceSpatialMemoryV4 = Omit<WholeTraceSpatialMemoryV3, 'kind' | 'recovery'> & {
+  kind: 'actor-spatial-memory-v4';
+  recovery: WholeTraceSpatialMemory['recovery'] & { askedStaff: boolean };
+  staffAnswers: { decisionsAgo: number; answer: string }[];
+};
+
+/** v4 memory: v3 plus answered staff questions; an opened dialogue alone is not asking. */
+export class WholeTraceWayfindingMemoryV4 extends WholeTraceWayfindingMemoryV3 {
+  protected readonly staffAnswers: { decision: number; answer: string }[] = [];
+  protected askedStaff = false;
+
+  override observe(o: ActorObservation, acceptedDecisions: number): void {
+    if (o.sequence !== undefined && o.sequence === this.lastSequence) return;
+    super.observe(o, acceptedDecisions);
+    const result = o.result as ActorObservation['result'] | undefined;
+    if (result?.accepted && result.actionType === 'askLocation' && result.message) {
+      this.askedStaff = true;
+      this.staffAnswers.push({ decision: acceptedDecisions, answer: result.message });
+    }
+  }
+
+  override giveUpStatus(o: Pick<ActorObservation, 'phase'>): { available: boolean; notice: string } {
+    if (o.phase !== 'shopping') return { available: true, notice: '계산 단계에서는 그만두기를 고를 수 있다.' };
+    // Same rule as v3 with "talked to staff" replaced by an answered location question.
+    const opened = this.recovery.talkedToStaff;
+    this.recovery.talkedToStaff = this.askedStaff;
+    try {
+      const status = super.giveUpStatus(o);
+      return status.available ? status : { available: false,
+        notice: status.notice.replace('본 직원에게 아직 묻지 않음', '본 직원에게 아직 물건 위치를 물어 답을 받지 않음') };
+    } finally { this.recovery.talkedToStaff = opened; }
+  }
+
+  override snapshot(o: ActorObservation): WholeTraceSpatialMemoryV4 {
+    const { kind: _kind, ...rest } = super.snapshot(o);
+    return { kind: 'actor-spatial-memory-v4', ...rest,
+      recovery: { ...rest.recovery, askedStaff: this.askedStaff },
+      staffAnswers: this.staffAnswers.slice(-4).map(item => ({ decisionsAgo: this.decision - item.decision, answer: item.answer })) };
   }
 }
 
@@ -628,7 +686,7 @@ export type WholeTraceWayfindingRuntime = {
   observe(o: ActorObservation, acceptedDecisions: number): void;
   visitCount(anchorId: string): number;
   giveUpStatus(o: Pick<ActorObservation, 'phase'>): { available: boolean; notice: string };
-  snapshot(o: ActorObservation): WholeTraceSpatialMemory | WholeTraceSpatialMemoryV2 | WholeTraceSpatialMemoryV3;
+  snapshot(o: ActorObservation): WholeTraceSpatialMemory | WholeTraceSpatialMemoryV2 | WholeTraceSpatialMemoryV3 | WholeTraceSpatialMemoryV4;
   canTarget?(label: string): boolean;
   rememberedLabels?(): string[];
   setDestination?(label: string | undefined): void;
@@ -636,7 +694,8 @@ export type WholeTraceWayfindingRuntime = {
   memoryEvents?(): WholeTraceWayfindingMemoryEvent[];
 };
 export function createWholeTraceWayfindingMemory(version: WholeTraceWayfindingVersion, profile: WayfindingProfile, seed: string | number): WholeTraceWayfindingRuntime {
-  const memory = version === WHOLE_TRACE_WAYFINDING_V3_VERSION ? new WholeTraceWayfindingMemoryV3(profile, String(seed))
+  const memory = version === WHOLE_TRACE_WAYFINDING_V4_VERSION ? new WholeTraceWayfindingMemoryV4(profile, String(seed))
+    : version === WHOLE_TRACE_WAYFINDING_V3_VERSION ? new WholeTraceWayfindingMemoryV3(profile, String(seed))
     : version === WHOLE_TRACE_WAYFINDING_V2_VERSION ? new WholeTraceWayfindingMemoryV2(profile, String(seed)) : new WholeTraceWayfindingMemory(profile);
   return Object.assign(memory, { version });
 }
