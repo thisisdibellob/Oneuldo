@@ -29,7 +29,14 @@ public final class LosslessEventColumns {
         for (var session : result.path("sessions")) {
             List<JsonNode> events = new ArrayList<>(); session.path("events").forEach(events::add);
             var encoded = mapper.createObjectNode().put("count", events.size());
-            if(!events.isEmpty() && events.stream().allMatch(e -> e.path("behaviorLogId").isString() && e.path("action").path("eventCode").isString())) {
+            boolean indexed=!events.isEmpty() && events.stream().allMatch(e -> e.path("behaviorLogId").isString() && e.path("action").path("eventCode").isString());
+            if(indexed && consecutiveIds(events)) {
+                // Consecutive aliases are an exact arithmetic run: send its two ends instead of every ID.
+                var codes=mapper.createArrayNode();String first=events.getFirst().path("behaviorLogId").asString(),last=events.getLast().path("behaviorLogId").asString();
+                for(var event:events) {((ObjectNode)event).remove("behaviorLogId");codes.add(((ObjectNode)event.path("action")).remove("eventCode"));}
+                encoded.set("idRun",mapper.createArrayNode().add(first).add(last));encoded.set("codes",codes);
+                runRule(result);
+            } else if(indexed) {
                 var index=mapper.createArrayNode();
                 for(var event:events) {
                     index.addArray().add(((ObjectNode)event).remove("behaviorLogId")).add(((ObjectNode)event.path("action")).remove("eventCode"));
@@ -37,12 +44,42 @@ public final class LosslessEventColumns {
                 // Keep the evidence ID beside its action to avoid mental joins across separate columns.
                 encoded.set("index",index);
             }
+            if(consecutiveSequences(events)) {
+                var first=events.getFirst().get("sequence").deepCopy();var last=events.getLast().get("sequence").deepCopy();
+                for(var event:events)((ObjectNode)event).remove("sequence");
+                encoded.set("sequenceRun",mapper.createArrayNode().add(first).add(last));
+                runRule(result);
+            }
             encoded.set("data", series(events));
             ((ObjectNode) session).set("events", encoded);
         }
         return result;
     }
 
+    private static final String RUN_RULE=" idRun:[첫ID,끝ID]가 있으면 사건 ID는 원본 순서대로 번호가 1씩 증가하며 0기준 p번째 행의 ID 번호는 첫ID 번호+p다. codes는 같은 행 순서의 action.eventCode다. sequenceRun:[첫값,끝값]은 행마다 1씩 증가하는 sequence 원문이다.";
+    private static final java.util.regex.Pattern RUN_ID=java.util.regex.Pattern.compile("([A-Za-z]+)([1-9][0-9]{0,8})");
+    private static void runRule(ObjectNode result) {
+        String rules=result.path("encodingRules").asString();
+        if(!rules.endsWith(RUN_RULE))result.put("encodingRules",rules+RUN_RULE);
+    }
+    private static boolean consecutiveIds(List<JsonNode> events) {
+        if(events.size()<3)return false;
+        var first=RUN_ID.matcher(events.getFirst().path("behaviorLogId").asString());
+        if(!first.matches())return false;
+        String prefix=first.group(1);long start=Long.parseLong(first.group(2));
+        for(int i=0;i<events.size();i++)if(!events.get(i).path("behaviorLogId").asString().equals(prefix+(start+i)))return false;
+        return true;
+    }
+    private static boolean consecutiveSequences(List<JsonNode> events) {
+        if(events.size()<3)return false;
+        var first=events.getFirst().path("sequence");
+        if(!first.isIntegralNumber())return false;
+        for(int i=0;i<events.size();i++) {
+            var value=events.get(i).path("sequence");
+            if(!value.isIntegralNumber()||value.isInt()!=first.isInt()||value.asLong()!=first.asLong()+i)return false;
+        }
+        return true;
+    }
     private ObjectNode series(List<JsonNode> values) {
         ObjectNode literal = mapper.createObjectNode(); literal.set("values", mapper.valueToTree(values));
         var best = new Choice(literal);
@@ -92,7 +129,9 @@ public final class LosslessEventColumns {
                     var group = fields(positions.stream().map(values::get).toList());
                     group.set("positions", mapper.valueToTree(positions)); groups.add(group);
                 }
-                best.consider(mapper.createObjectNode().set("groups", groups));
+                // Grouped numeric columns are delta-packed by the later exact-number wire; a literal row list is not.
+                // Compare both after that same packing so a near-tie does not keep thousands of long literals.
+                best.considerPacked(mapper.createObjectNode().set("groups", groups));
             }
         }
         if (values.stream().allMatch(v -> v.isArray() && v.size() == first.size())) {
@@ -113,10 +152,16 @@ public final class LosslessEventColumns {
         return mapper.createObjectNode().set("fields", fields);
     }
     /** A candidate is not mutated while it is being compared in this series call. */
-    private static final class Choice {
+    private final class Choice {
         private ObjectNode node;
         private int tokens = -1;
         private Choice(ObjectNode node) { this.node = node; }
+        private int packed(ObjectNode value) {
+            return QwenTokenCounter.count(new ExactNumericDeltas(mapper).encode(mapper.createObjectNode().set("v", value)).toString());
+        }
+        private void considerPacked(ObjectNode candidate) {
+            if (packed(candidate) < packed(node)) { node = candidate; tokens = -1; }
+        }
         private void consider(ObjectNode candidate) {
             if (tokens < 0) tokens = QwenTokenCounter.count(node.toString());
             int candidateTokens = QwenTokenCounter.count(candidate.toString());
@@ -131,6 +176,28 @@ public final class LosslessEventColumns {
         for (var session : result.path("sessions")) {
             var events = session.path("events");
             var rows=expand(events.path("data"), events.path("count").asInt());
+            if(events.has("sequenceRun")) {
+                var run=events.path("sequenceRun");
+                if(!run.isArray()||run.size()!=2||!run.get(0).isIntegralNumber()||!run.get(1).isIntegralNumber()
+                        ||run.get(1).asLong()-run.get(0).asLong()!=rows.size()-1) throw new IllegalArgumentException("INVALID_SEQUENCE_RUN");
+                for(int i=0;i<rows.size();i++) {
+                    if(rows.get(i).has("sequence")) throw new IllegalArgumentException("INVALID_SEQUENCE_RUN");
+                    long value=run.get(0).asLong()+i;
+                    if(run.get(0).isInt()&&run.get(1).isInt())((ObjectNode)rows.get(i)).put("sequence",(int)value);else ((ObjectNode)rows.get(i)).put("sequence",value);
+                }
+            }
+            if(events.has("idRun")) {
+                var run=events.path("idRun");var codes=events.path("codes");
+                if(events.has("index")||!run.isArray()||run.size()!=2||!run.get(0).isString()||!codes.isArray()||codes.size()!=rows.size()) throw new IllegalArgumentException("INVALID_EVENT_ID_RUN");
+                var first=RUN_ID.matcher(run.get(0).asString());
+                if(!first.matches()) throw new IllegalArgumentException("INVALID_EVENT_ID_RUN");
+                long start=Long.parseLong(first.group(2));
+                if(!run.get(1).asString().equals(first.group(1)+(start+rows.size()-1))) throw new IllegalArgumentException("INVALID_EVENT_ID_RUN");
+                for(int i=0;i<rows.size();i++) {
+                    if(!codes.get(i).isString()||rows.get(i).has("behaviorLogId")||!(rows.get(i).path("action") instanceof ObjectNode action)||action.has("eventCode")) throw new IllegalArgumentException("INVALID_EVENT_ID_RUN");
+                    ((ObjectNode)rows.get(i)).put("behaviorLogId",first.group(1)+(start+i));action.set("eventCode",codes.get(i));
+                }
+            }
             if(events.has("index")) {
                 if(events.path("index").size()!=rows.size()) throw new IllegalArgumentException("INVALID_EVENT_INDEX");
                 for(int i=0;i<rows.size();i++) {

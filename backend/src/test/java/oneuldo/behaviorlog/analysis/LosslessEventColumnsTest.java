@@ -43,6 +43,34 @@ class LosslessEventColumnsTest {
         assertThat(QwenTokenCounter.count(encoded.toString())).isLessThan(QwenTokenCounter.count(source.toString()));
     }
 
+    @Test void 연속된_사건번호와_순번은_양끝만_보내고_그대로_복원한다() {
+        var source=mapper.createObjectNode();var events=source.putArray("sessions").addObject().put("sessionId","S1").putArray("events");
+        for(int i=0;i<40;i++) {
+            var event=events.addObject().put("behaviorLogId","E"+(481+i)).put("sequence",5001L+i);
+            event.putObject("action").put("eventCode",i%4==0?"SHOP.QUANTITY_CHANGED":"SHOP.MOVEMENT_SAMPLED");
+            event.putObject("payload").put("x",700+i).put("y",1300-i);
+        }
+        var encoded=codec.encode(source);var run=encoded.path("sessions").get(0).path("events");
+        assertThat(run.has("index")).isFalse();
+        assertThat(run.path("idRun")).isEqualTo(mapper.readTree("[\"E481\",\"E520\"]"));
+        assertThat(run.path("sequenceRun").toString()).isEqualTo("[5001,5040]");
+        assertThat(run.path("codes").size()).isEqualTo(40);
+        assertThat(encoded.path("encodingRules").asString()).contains("idRun:[첫ID,끝ID]");
+        assertThat(mapper.readTree(codec.decode(mapper.readTree(encoded.toString())).toString())).isEqualTo(mapper.readTree(source.toString()));
+        assertThat(QwenTokenCounter.count(encoded.toString())).isLessThan(QwenTokenCounter.count(source.toString()));
+
+        // A gap is not a run: every ID stays literal beside its action.
+        ((ObjectNode)events.get(7)).put("behaviorLogId","E999").put("sequence",9999L);
+        var literal=codec.encode(source).path("sessions").get(0).path("events");
+        assertThat(literal.has("idRun")).isFalse();assertThat(literal.has("sequenceRun")).isFalse();
+        assertThat(literal.path("index").get(7).get(0).asString()).isEqualTo("E999");
+        assertThat(mapper.readTree(codec.decode(codec.encode(source)).toString())).isEqualTo(mapper.readTree(source.toString()));
+
+        // A run whose ends do not match the row count cannot be restored.
+        ((ObjectNode)run).set("idRun",mapper.readTree("[\"E481\",\"E519\"]"));
+        assertThatThrownBy(()->codec.decode(encoded)).hasMessage("INVALID_EVENT_ID_RUN");
+    }
+
     @Test void 누락된_행이나_손상된_참조는_복원실패한다() {
         var bad=(ObjectNode)mapper.readTree("""
             {"encoding":"event-columns-v1","sessions":[{"events":{"count":2,"data":{"dictionary":[1],"refs":[0,4]}}}]}
