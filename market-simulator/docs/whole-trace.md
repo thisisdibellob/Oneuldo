@@ -268,3 +268,10 @@ low/high는 [고정 도달성 fixture](../test/fixtures/whole-trace-reachability
 작성 metrics는 첫 선택·가용성·수량·intent·reason과 후속 변경을 기록한다. `choiceUnavailableRewrite`는 첫 선택이 불가능했던 변경의 출처 표시이며 의미 보존을 자동 입증하지 않는다. `rewriteChangedAvailableChoice`는 가용 선택/수량 변경을 남긴다. 변경이 있을 때만 trace의 `generation.authoringRewriteAudit`에 같은 증거를 추가한다. 후보·bundle·inputHash의 계약은 변하지 않는다. 감사 스크립트는 새 템플릿이 기록된 슬롯에서만 선택 불가 예외를 인정하며, 기존 실행의 판정을 소급 변경하지 않는다.
 
 mailbox CLI `call`은 배우의 출력 리다이렉션과 별도로 `owner/calls/<고유 ID>/`에 원본 입력, stdout, stderr, exit-code 및 시작·종료 영수증을 저장한다. 동일 operationId의 재전송도 별도 호출 영수증이며 엔진 결정은 중복 실행하지 않는다. 강제 종료로 종료 영수증이 없으면 누락으로 남고, 완료를 추정하지 않는다. 스키마 enum 거절은 activity·orientation·intent의 허용값을 표시한다.
+
+
+### 슬롯 내부 operation 경로 (선택 옵션)
+
+`serve DIR --prepare-file FILE --operation-root SLOT`은 CLI `call` 입력 파일의 실제 경로를 SLOT 내부로 제한한다. 외부 경로와 외부 파일을 가리키는 심볼릭 링크는 읽거나 복사하기 전에 `MAILBOX_OPERATION_OUTSIDE_SLOT`로 거절한다. 시도한 경로·stderr·exit·종료 영수증은 남고, 전달하지 않은 외부 입력 본문은 보관하지 않는다. 옵션 없는 기존 owner와 라이브러리 `callMailbox`는 기존 계약을 유지하며 bundle·inputHash·trace에는 영향을 주지 않는다. 이는 CLI 파일 전달 검사이며 배우 프로세스의 전체 파일시스템 접근을 격리하는 보안 경계는 아니다.
+
+새 `authoring-v5` / `authoring-v5-h200`는 v4의 선택 불가 재작성 예외를 유지하고, 슬롯 내부의 고유 operation 파일 경로·슬롯 밖 임시 파일 금지·choiceRef 구조·허용된 기술 재작성 지속·코드로 선택하지 않는 원칙을 명시한다. v1~v4와 기본 v3는 수정하지 않는다. 실행 담당자는 슬롯의 operations/와 tmp/를 만들고 TMPDIR도 해당 tmp/로 지정할 수 있다. 배우별 감사는 경로 검사 통과 여부와 별개로 실제 파일 접근 및 행동 자동화를 계속 확인한다.

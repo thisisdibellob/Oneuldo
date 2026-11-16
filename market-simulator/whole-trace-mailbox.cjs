@@ -99,14 +99,17 @@ function abortMailbox(directory, reason) {
   publishNew(path.join(directory, 'supervisor-abort.json'), { reason, requestedAt: now() });
   return { requested: true, requestId: status.requestId };
 }
-async function serveMailbox({ directory, prepareArguments, service, pollIntervalMs = 25 }) {
+async function serveMailbox({ directory, prepareArguments, service, pollIntervalMs = 25, operationRoot }) {
   directory = path.resolve(directory);
+  // Optional transport containment; no change to prepared inputs or the default owner.
+  const permittedOperationRoot = operationRoot === undefined ? undefined : fs.realpathSync(path.resolve(operationRoot));
   fs.mkdirSync(directory, { mode: 0o700 }); // Never reuse an old owner or its results.
   for (const sub of ['commands', 'responses']) fs.mkdirSync(path.join(directory, sub), { mode: 0o700 });
   service ??= require('./server.cjs').createService();
   const invokeTool = (tool, args) => service.invokeTool(tool, args);
   const state = { version: 1, ownerId: crypto.randomUUID(), pid: process.pid, state: 'starting',
-    createdAt: now(), updatedAt: now(), requestId: null, requestStatus: null, completionVerified: false };
+    createdAt: now(), updatedAt: now(), requestId: null, requestStatus: null, completionVerified: false,
+    ...(permittedOperationRoot ? { operationRoot: permittedOperationRoot } : {}) };
   const persist = () => { state.updatedAt = now(); replaceStatus(path.join(directory, 'status.json'), state); };
   const event = value => fs.appendFileSync(path.join(directory, 'events.jsonl'), JSON.stringify({ time: now(), ...value }) + '\n', { mode: 0o600 });
   let interrupted;
@@ -198,7 +201,14 @@ async function recordedCall(directory, inputFile) {
   publishNew(path.join(receipt, 'started.json'), { startedAt, inputFile: path.resolve(inputFile), pid: process.pid });
   let stdout = '', stderr = '', exitCode = 0, operationId = null;
   try {
-    const bytes = fs.readFileSync(path.resolve(inputFile));
+    const status = readMailboxStatus(directory);
+    const resolvedInput = fs.realpathSync(path.resolve(inputFile));
+    if (status.operationRoot) {
+      const relative = path.relative(status.operationRoot, resolvedInput);
+      if (relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative))
+        throw fail('MAILBOX_OPERATION_OUTSIDE_SLOT', `Save a new operation file inside ${status.operationRoot}; external paths and symlink escapes are not accepted`);
+    }
+    const bytes = fs.readFileSync(resolvedInput);
     fs.writeFileSync(path.join(receipt, 'input.json'), bytes, { flag: 'wx', mode: 0o600 });
     if (bytes.length > MAX_BYTES) throw fail('MAILBOX_SIZE', 'JSON exceeds 4 MiB');
     const input = JSON.parse(bytes.toString('utf8'));
@@ -218,13 +228,14 @@ async function recordedCall(directory, inputFile) {
 
 async function main() {
   const [command, directory, flag, input, ...extra] = process.argv.slice(2);
-  if (!directory || extra.length) throw fail('MAILBOX_USAGE', 'serve DIR --prepare-file FILE | call DIR --operation-file FILE | status DIR | abort DIR --reason TEXT');
+  const hasOperationRoot = command === 'serve' && extra.length === 2 && extra[0] === '--operation-root' && extra[1];
+  if (!directory || extra.length && !hasOperationRoot) throw fail('MAILBOX_USAGE', 'serve DIR --prepare-file FILE [--operation-root DIR] | call DIR --operation-file FILE | status DIR | abort DIR --reason TEXT');
   let result;
   if (command === 'serve' && flag === '--prepare-file' && input) {
     const prepared = readJson(path.resolve(input));
     if (prepared.tool !== 'prepare_whole_trace' || !prepared.arguments || Object.keys(prepared).some(key => !['tool', 'arguments'].includes(key)))
       throw fail('MAILBOX_PREPARE', 'Prepare file must be {tool:"prepare_whole_trace",arguments:<unchanged readiness arguments>}');
-    result = await serveMailbox({ directory, prepareArguments: prepared.arguments });
+    result = await serveMailbox({ directory, prepareArguments: prepared.arguments, ...(hasOperationRoot ? { operationRoot: extra[1] } : {}) });
   } else if (command === 'call' && flag === '--operation-file' && input) return recordedCall(directory, input);
   else if (command === 'status' && !flag) result = readMailboxStatus(directory);
   else if (command === 'abort' && flag === '--reason' && input) result = abortMailbox(directory, input);

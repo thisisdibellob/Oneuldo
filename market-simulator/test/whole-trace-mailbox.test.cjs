@@ -37,7 +37,7 @@ function runCli(args) {
   child.stdin.end();
   return { child, exited, stderr: () => stderr };
 }
-async function fixture(t) {
+async function fixture(t, { restrictOperations = false } = {}) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'whole-mailbox-test-'));
   const ownerDirectory = path.join(directory, 'owner');
   const snapshot = createMarketReplaySnapshot(createMarketSession({ seed: 'mailbox-regression',
@@ -46,7 +46,7 @@ async function fixture(t) {
     snapshot, outputPath: path.join(directory, 'trace.json'), maxRepairs: 0 };
   const prepareFile = path.join(directory, 'prepare.json');
   fs.writeFileSync(prepareFile, JSON.stringify({ tool: 'prepare_whole_trace', arguments: prepareArguments }));
-  const owner = runCli(['serve', ownerDirectory, '--prepare-file', prepareFile]);
+  const owner = runCli(['serve', ownerDirectory, '--prepare-file', prepareFile, ...(restrictOperations ? ['--operation-root', directory] : [])]);
   t.after(async () => {
     if (owner.child.exitCode === null && owner.child.signalCode === null) {
       try { await abortMailbox(ownerDirectory, 'test cleanup'); } catch { owner.child.kill('SIGTERM'); }
@@ -325,4 +325,35 @@ test('CLI calls save exact independent input/stdout/stderr/exit receipts on succ
     assert.equal(Number(fs.readFileSync(path.join(dir, 'exit-code'), 'utf8')), response.code);
     assert.equal(json(path.join(dir, 'completion.json')).exitCode, response.code);
   }
+});
+
+
+test('optional operation root blocks outside inputs and symlink escapes before reading, while default owners remain compatible', async t => {
+  const restricted = await fixture(t, { restrictOperations: true });
+  const legacy = await fixture(t);
+  assert.equal(readMailboxStatus(restricted.ownerDirectory).operationRoot, fs.realpathSync(restricted.directory));
+  assert.equal(Object.hasOwn(readMailboxStatus(legacy.ownerDirectory), 'operationRoot'), false);
+  const outside = path.join(legacy.directory, 'external.json');
+  fs.writeFileSync(outside, JSON.stringify(operation('outside-begin', 'begin_whole_trace_authoring')));
+  const link = path.join(restricted.directory, 'escape.json');
+  fs.symlinkSync(outside, link);
+  for (const file of [outside, link]) {
+    const response = await runCli(['call', restricted.ownerDirectory, '--operation-file', file]).exited;
+    assert.equal(response.code, 1);
+    assert.match(response.stderr, /MAILBOX_OPERATION_OUTSIDE_SLOT/);
+  }
+  assert.equal(fs.readdirSync(path.join(restricted.ownerDirectory, 'commands')).length, 0);
+  for (const name of fs.readdirSync(path.join(restricted.ownerDirectory, 'calls'))) {
+    const receipt = path.join(restricted.ownerDirectory, 'calls', name);
+    assert.equal(fs.existsSync(path.join(receipt, 'input.json')), false, 'do not read or copy outside bytes');
+    assert.equal(json(path.join(receipt, 'completion.json')).exitCode, 1);
+    assert.match(fs.readFileSync(path.join(receipt, 'stderr.log'), 'utf8'), /MAILBOX_OPERATION_OUTSIDE_SLOT/);
+    assert.equal(fs.readFileSync(path.join(receipt, 'stdout.log'), 'utf8'), '');
+    assert.equal(fs.readFileSync(path.join(receipt, 'exit-code'), 'utf8'), '1\n');
+  }
+  const accepted = await restricted.cliCall(operation('inside-begin', 'begin_whole_trace_authoring'));
+  assert.equal(accepted.requestId, restricted.prepared.requestId);
+  // No restriction was configured for the legacy owner; the same external file works.
+  const defaultResponse = await runCli(['call', legacy.ownerDirectory, '--operation-file', path.join(restricted.directory, 'client-1.json')]).exited;
+  assert.equal(defaultResponse.code, 0, defaultResponse.stderr);
 });

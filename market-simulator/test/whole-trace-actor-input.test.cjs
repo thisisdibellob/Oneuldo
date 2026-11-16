@@ -141,3 +141,16 @@ test('authoring-v3 is v2 plus only the relative-direction sentences', () => {
   assert.match(added, /may lie in a different direction or be out of view/);
   assert.doesNotMatch(added, /checkout|south|exit/i);
 });
+
+
+test('v5 adds slot-local transport and literal-only authoring reminders without changing the v4 policy', () => {
+  for (const suffix of ['', '-h200']) {
+    const rendered = renderActorInstructions(`authoring-v5${suffix}`, '/experiment/slot');
+    assert.match(rendered.text, /--operation-file \/experiment\/slot\/operations\//);
+    assert.match(rendered.text, /never use \/tmp, \/private\/tmp/);
+    assert.match(rendered.text, /Put choiceId inside choiceRef/);
+    assert.match(rendered.text, /must never select a choiceId/);
+    assert.match(rendered.text, /choiceUnavailableRewrite/);
+    assert.match(rendered.text, /Preserve the first draft delayMs on every rewrite/);
+  }
+});
