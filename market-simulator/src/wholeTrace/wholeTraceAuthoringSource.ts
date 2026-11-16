@@ -274,7 +274,7 @@ export function createWholeTraceSourceAuthoringCursor(bundle: WholeTraceBundle) 
       if (Object.hasOwn(draft.choiceRef, 'source'))
         return fail('AUTHORING_SOURCE_SUPPLIED', 'cursor.append takes a source-free draft: choiceRef:{choiceId,quantity?}. Omit the source key entirely (not null or undefined). Direct candidates require source, but cursor drafts forbid it; an actor-supplied source is never overwritten');
       const decision = { ...draft, choiceRef: { ...draft.choiceRef, source: structuredClone(source) } };
-      const syntax = validateWholeTraceChoiceDecisionSyntax(decision, '7', { movementVersion: bundle.movementVersion, wayfinding: !!bundle.wayfindingVersion });
+      const syntax = validateWholeTraceChoiceDecisionSyntax(decision, '7', { movementVersion: bundle.movementVersion, wayfinding: bundle.wayfindingVersion });
       if (!syntax.valid) {
         const issues = draftSyntaxIssues(draft);
         return fail('AUTHORING_SCHEMA', [...syntax.errors,
@@ -448,7 +448,7 @@ export function createWholeTraceSourceAuthoringCursor(bundle: WholeTraceBundle) 
     },
     finish(): WholeTraceTaskChoiceCandidate {
       const candidate: WholeTraceTaskChoiceCandidate = { candidateVersion: '7', requestId, decisions: structuredClone(decisions) };
-      const syntax = validateWholeTraceCandidate(candidate, requestId, { objectiveIds, movementVersion: bundle.movementVersion, wayfinding: !!bundle.wayfindingVersion });
+      const syntax = validateWholeTraceCandidate(candidate, requestId, { objectiveIds, movementVersion: bundle.movementVersion, wayfinding: bundle.wayfindingVersion });
       if (!syntax.valid) return fail('AUTHORING_SCHEMA', syntax.errors.join('; '));
       return candidate;
     },

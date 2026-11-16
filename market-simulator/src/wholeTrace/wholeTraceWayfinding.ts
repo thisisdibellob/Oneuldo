@@ -14,23 +14,41 @@ import type { ActorDirection, ActorObservation, Persona } from '../types';
  *    or tried recovery; the system never selects or substitutes an action.
  */
 export const WHOLE_TRACE_WAYFINDING_VERSION = 'wayfinding-v1' as const;
-export type WholeTraceWayfindingVersion = typeof WHOLE_TRACE_WAYFINDING_VERSION;
+/**
+ * wayfinding-v2: named places are never evicted from memory; remembered places
+ * carry a rough "from here" direction by path integration; the actor may keep a
+ * self-chosen destination; per-persona landmark fading; giveUp opens only when
+ * recovery was tried and no observed lead remains (or the time floor passed).
+ */
+export const WHOLE_TRACE_WAYFINDING_V2_VERSION = 'wayfinding-v2' as const;
+export const WHOLE_TRACE_WAYFINDING_VERSIONS = [WHOLE_TRACE_WAYFINDING_VERSION, WHOLE_TRACE_WAYFINDING_V2_VERSION] as const;
+export type WholeTraceWayfindingVersion = typeof WHOLE_TRACE_WAYFINDING_VERSIONS[number];
+export function isWholeTraceWayfindingVersion(value: unknown): value is WholeTraceWayfindingVersion {
+  return (WHOLE_TRACE_WAYFINDING_VERSIONS as readonly unknown[]).includes(value);
+}
 export const WAYFINDING_GIVE_UP_LOCKED = 'WAYFINDING_GIVE_UP_LOCKED';
 
 export const WHOLE_TRACE_THOUGHT_FIELDS = ['noticed', 'hypothesis', 'plan', 'next'] as const;
-export type WholeTraceThought = Partial<Record<typeof WHOLE_TRACE_THOUGHT_FIELDS[number], string>>;
+export type WholeTraceThought = Partial<Record<typeof WHOLE_TRACE_THOUGHT_FIELDS[number] | 'destination', string>>;
 export const WHOLE_TRACE_THOUGHT_MAX_LENGTH = 200;
+/** Chinese characters and kana are not Korean; Hangul, digits, Latin IDs and punctuation are allowed. */
+const NON_KOREAN_SCRIPT = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/;
 
-export function validateWholeTraceThought(value: unknown): string[] {
+/** v1 accepts noticed/hypothesis/plan/next. v2 also accepts destination and requires Korean text. */
+export function validateWholeTraceThought(value: unknown, version: WholeTraceWayfindingVersion = WHOLE_TRACE_WAYFINDING_VERSION): string[] {
   if (value === undefined) return [];
   if (!value || typeof value !== 'object' || Array.isArray(value)) return ['actorState.thought must be a JSON object'];
+  const v2 = version === WHOLE_TRACE_WAYFINDING_V2_VERSION;
+  const fields: readonly string[] = v2 ? [...WHOLE_TRACE_THOUGHT_FIELDS, 'destination'] : WHOLE_TRACE_THOUGHT_FIELDS;
   const entries = Object.entries(value as Record<string, unknown>);
   const errors: string[] = [];
-  if (!entries.length) errors.push('actorState.thought must contain at least one of noticed, hypothesis, plan, next');
+  if (!entries.some(([key]) => (WHOLE_TRACE_THOUGHT_FIELDS as readonly string[]).includes(key)))
+    errors.push('actorState.thought must contain at least one of noticed, hypothesis, plan, next');
   for (const [key, text] of entries) {
-    if (!(WHOLE_TRACE_THOUGHT_FIELDS as readonly string[]).includes(key)) errors.push(`Unknown actorState.thought field ${key}`);
-    else if (typeof text !== 'string' || !text.trim() || text.length > WHOLE_TRACE_THOUGHT_MAX_LENGTH)
-      errors.push(`actorState.thought.${key} must be a nonempty sentence of at most ${WHOLE_TRACE_THOUGHT_MAX_LENGTH} characters`);
+    if (!fields.includes(key)) errors.push(`Unknown actorState.thought field ${key}`);
+    else if (typeof text !== 'string' || !text.trim() || text.length > (key === 'destination' ? 60 : WHOLE_TRACE_THOUGHT_MAX_LENGTH))
+      errors.push(`actorState.thought.${key} must be a nonempty sentence of at most ${key === 'destination' ? 60 : WHOLE_TRACE_THOUGHT_MAX_LENGTH} characters`);
+    else if (v2 && NON_KOREAN_SCRIPT.test(text)) errors.push(`actorState.thought.${key} must be written in Korean`);
   }
   return errors;
 }
@@ -62,7 +80,13 @@ export type WayfindingProfile = {
   minDistinctPlacesBeforeGiveUp: number;
   /** Persona fields this profile is derived from; documentation for review, not instructions. */
   basedOn: string[];
+  /** wayfinding-v2 only: how remembered named places fade. Synthetic design values, not measurements. */
+  landmarkMemory?: LandmarkMemoryProfile;
 };
+export type LandmarkMemoryProfile =
+  | { retention: 'stable'; basedOn: string[] }
+  | { retention: 'decaying'; protectedDecisions: number; fadeProbabilityPerDecision: number;
+    forgetProbabilityPerDecision: number; basedOn: string[] };
 
 export const DEFAULT_WAYFINDING_PROFILE: WayfindingProfile = {
   version: '1', cueLevel: 'layout-schema', planHorizon: 'short-sequence', maxHypotheses: 2, memoryForm: 'area-coverage',
@@ -76,7 +100,8 @@ export function validateWayfindingProfile(value: unknown): string[] {
   const p = value as Record<string, unknown>;
   const keys = ['version', 'cueLevel', 'planHorizon', 'maxHypotheses', 'memoryForm', 'recoveryOrder', 'thoughtForm',
     'explorationBudgetMs', 'minDistinctPlacesBeforeGiveUp', 'basedOn'];
-  if (Object.keys(p).some(key => !keys.includes(key)) || keys.some(key => !Object.hasOwn(p, key))) errors.push('wayfinding fields mismatch');
+  if (Object.keys(p).some(key => !keys.includes(key) && key !== 'landmarkMemory') || keys.some(key => !Object.hasOwn(p, key))) errors.push('wayfinding fields mismatch');
+  if (p.landmarkMemory !== undefined) errors.push(...validateLandmarkMemoryProfile(p.landmarkMemory));
   if (p.version !== '1') errors.push('unknown wayfinding version');
   if (!['landmark', 'layout-schema'].includes(p.cueLevel as string)) errors.push('wayfinding.cueLevel');
   if (!['next-step', 'short-sequence'].includes(p.planHorizon as string)) errors.push('wayfinding.planHorizon');
@@ -91,8 +116,29 @@ export function validateWayfindingProfile(value: unknown): string[] {
   return errors;
 }
 
-export function wayfindingProfileOf(persona: Pick<Persona, 'wayfinding'>): WayfindingProfile {
-  return structuredClone(persona.wayfinding ?? DEFAULT_WAYFINDING_PROFILE);
+function validateLandmarkMemoryProfile(value: unknown): string[] {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return ['wayfinding.landmarkMemory must be an object'];
+  const m = value as Record<string, unknown>;
+  const basedOn = Array.isArray(m.basedOn) && m.basedOn.every(entry => typeof entry === 'string' && !!entry.trim());
+  if (m.retention === 'stable')
+    return Object.keys(m).every(key => ['retention', 'basedOn'].includes(key)) && basedOn ? [] : ['wayfinding.landmarkMemory stable fields'];
+  if (m.retention !== 'decaying') return ['wayfinding.landmarkMemory.retention'];
+  const keys = ['retention', 'protectedDecisions', 'fadeProbabilityPerDecision', 'forgetProbabilityPerDecision', 'basedOn'];
+  const errors: string[] = [];
+  if (Object.keys(m).some(key => !keys.includes(key)) || keys.some(key => !Object.hasOwn(m, key))) errors.push('wayfinding.landmarkMemory decaying fields');
+  if (!Number.isInteger(m.protectedDecisions) || (m.protectedDecisions as number) < 1 || (m.protectedDecisions as number) > 100) errors.push('wayfinding.landmarkMemory.protectedDecisions');
+  for (const key of ['fadeProbabilityPerDecision', 'forgetProbabilityPerDecision'])
+    if (typeof m[key] !== 'number' || !Number.isFinite(m[key]) || (m[key] as number) < 0 || (m[key] as number) > 0.5) errors.push(`wayfinding.landmarkMemory.${key}`);
+  if (!basedOn) errors.push('wayfinding.landmarkMemory.basedOn');
+  return errors;
+}
+
+/** v1 keeps the exact archived profile shape; landmarkMemory belongs to v2 only. */
+export function wayfindingProfileOf(persona: Pick<Persona, 'wayfinding'>, version: WholeTraceWayfindingVersion = WHOLE_TRACE_WAYFINDING_VERSION): WayfindingProfile {
+  const profile = structuredClone(persona.wayfinding ?? DEFAULT_WAYFINDING_PROFILE);
+  if (version === WHOLE_TRACE_WAYFINDING_VERSION) delete profile.landmarkMemory;
+  else profile.landmarkMemory ??= { retention: 'stable', basedOn: ['기본값: 별도 설정 없음'] };
+  return profile;
 }
 
 const CUE_TEXT = {
@@ -260,4 +306,249 @@ export function wholeTraceOwnNotes(decisions: { actorState: { thought?: WholeTra
     ...(lastPlan ? { currentPlan: { decisionNumber: lastPlan.decisionNumber, plan: lastPlan.thought.plan! } } : {}),
     recent: withThought.slice(-recent).map(entry => structuredClone(entry)),
   };
+}
+
+/* ------------------------------------------------------------- wayfinding-v2 */
+
+export function renderWayfindingInstructionsV2(profile: WayfindingProfile): string {
+  const memory = profile.landmarkMemory?.retention === 'decaying'
+    ? '- 오래 다시 보지 않은 장소는 기억이 흐려지거나 사라질 수 있다(spatialMemory.landmarks의 memory:"faded"는 대략적인 방향만 남은 상태). 흐릿하거나 기억나지 않으면 이용 안내·직원·아는 곳으로 돌아가 다시 둘러보기로 확인한다. 잊었다는 이유만으로 그만두지 않는다.'
+    : '- 본 장소는 대체로 기억한다. 그래도 추정 방향은 어림이므로 화면으로 확인한다.';
+  return `${renderWayfindingInstructions(profile).replace('(wayfinding-v1)', '(wayfinding-v2)')}\n${memory}`;
+}
+
+export const WAYFINDING_COMMON_INSTRUCTIONS_V2 = `${WAYFINDING_COMMON_INSTRUCTIONS.replace('wayfinding-v1 공통 규칙:', 'wayfinding-v2 공통 규칙 (v1 규칙에 아래를 더한다):')}
+- spatialMemory.landmarks에는 내가 본 이름 있는 장소(계산대·출구·입구·직원·매대)가 남는다. memory:"clear"인 장소에는 fromHere(지금 위치에서의 대략적인 방향·걸음 수, 걸어온 기록으로 어림한 값)가 있다. 벽·집기 때문에 직선으로 못 갈 수 있으니 화면의 통로로 돌아서 간다.
+- 가고 싶은 기억 속 장소가 있으면 thought.destination에 그 장소 이름(spatialMemory.landmarks의 label 그대로)을 쓴다. 다른 목적지를 쓰기 전까지 유지되며, 다음 메뉴의 spatialMemory.destination에 남은 방향이 나오고 그쪽에 가까운 걷기 선택지에 "기억한 ○○ 쪽" 표시가 붙는다. 목적지와 경로 선택은 내가 한다.
+- 장바구니에 담은 뒤에는 이용 안내의 "출구 옆 계산대"와 기억한 계산대를 활용해 계산하러 간다.
+- thought는 한국어로 쓴다.
+- 그만두기가 선택지에 없으면 아직 확인하지 않은 단서가 남아 있다는 뜻이다. spatialMemory.giveUp.notice를 참고해 탐색을 이어 간다.`;
+
+type LandmarkRecord = { key: string; label: string; kind: string; north: number; east: number;
+  firstSeenDecision: number; lastSeenDecision: number; state: 'clear' | 'faded' | 'forgotten'; decayedThrough: number };
+export type WholeTraceSpatialMemoryV2 = {
+  kind: 'actor-spatial-memory-v2'; notice: string;
+  position: { fromStart: string; north: number; east: number };
+  explored: { north: number; south: number; east: number; west: number };
+  placesVisited: number; passagesSeenNotVisited: number;
+  landmarks: ({ label: string; kind: string; memory: 'clear'; fromHere: { direction: ActorDirection | 'here'; steps: number; text: string }; lastSeenDecisionsAgo: number }
+    | { label: string; kind: string; memory: 'faded'; vague: string; lastSeenDecisionsAgo: number })[];
+  unlabelledShelves: { fromHere: { direction: ActorDirection | 'here'; steps: number; text: string } }[];
+  wallsSeen: WholeTraceSpatialMemory['wallsSeen'];
+  recovery: WholeTraceSpatialMemory['recovery'];
+  destination?: { label: string; memory: 'clear'; fromHere: { direction: ActorDirection | 'here'; steps: number; text: string }; reached: boolean }
+    | { label: string; memory: 'faded' | 'forgotten'; text: string };
+  plannedTimeMs: number;
+  giveUp: { available: boolean; notice: string };
+};
+export type WholeTraceWayfindingMemoryEvent = { decision: number; label: string; from: LandmarkRecord['state']; to: LandmarkRecord['state'] };
+
+const DIRECTION_TEXT: Record<ActorDirection, string> = { north: '북쪽', northeast: '북동쪽', east: '동쪽', southeast: '남동쪽',
+  south: '남쪽', southwest: '남서쪽', west: '서쪽', northwest: '북서쪽' };
+const OCTANTS: ActorDirection[] = ['north', 'northeast', 'east', 'southeast', 'south', 'southwest', 'west', 'northwest'];
+function vectorCue(north: number, east: number) {
+  const steps = Math.round(Math.hypot(north, east));
+  if (steps < 1) return { direction: 'here' as const, steps: 0, text: '지금 위치 바로 근처(추정)' };
+  const direction = OCTANTS[(Math.round(Math.atan2(east, north) / (Math.PI / 4)) + 8) % 8];
+  return { direction, steps, text: `지금 위치에서 ${DIRECTION_TEXT[direction]} 약 ${steps}걸음(추정)` };
+}
+function vagueCue(north: number, east: number) {
+  const text = Math.abs(north) >= Math.abs(east) ? (north >= 0 ? '북쪽' : '남쪽') : (east >= 0 ? '동쪽' : '서쪽');
+  return `${text} 어딘가에서 본 것 같다(흐릿함)`;
+}
+/** Deterministic in [0,1) from the trace seed, place and decision: replays and prefix checks agree. */
+function unit(seed: string, key: string, decision: number): number {
+  let hash = 2166136261;
+  for (const char of `${seed}|${key}|${decision}`) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619);
+  return (hash >>> 0) / 4294967296;
+}
+
+/** v2 memory: the actor sees the decaying view; give-up eligibility uses the objective observation record. */
+export class WholeTraceWayfindingMemoryV2 {
+  private north = 0;
+  private east = 0;
+  private readonly extent = { north: 0, south: 0, east: 0, west: 0 };
+  private readonly visits = new Map<string, number>();
+  private readonly seenAnchors = new Set<string>();
+  private readonly places = new Map<string, LandmarkRecord>();
+  private readonly shelfBodies = new Map<string, { north: number; east: number }>();
+  private readonly walls = new Map<string, WholeTraceSpatialMemory['wallsSeen'][number]>();
+  private readonly recovery = { readList: false, viewedHelp: false, staffSeen: false, talkedToStaff: false };
+  private readonly openedShelves = new Set<string>();
+  private readonly events: WholeTraceWayfindingMemoryEvent[] = [];
+  private addedItems = false;
+  private checkoutReachedAfterAdd = false;
+  private destination?: string;
+  private previous?: ActorObservation;
+  private lastSequence?: number;
+  private decision = 0;
+  private elapsedMs = 0;
+  constructor(private readonly profile: WayfindingProfile, private readonly seed: string) {}
+
+  private decayTo(decision: number) {
+    const memory = this.profile.landmarkMemory;
+    for (; this.decision < decision; this.decision++) {
+      if (memory?.retention !== 'decaying') continue;
+      const step = this.decision + 1;
+      for (const place of this.places.values()) {
+        if (place.state === 'forgotten' || step - place.lastSeenDecision <= memory.protectedDecisions || place.decayedThrough >= step) continue;
+        place.decayedThrough = step;
+        const next = place.state === 'clear' ? (unit(this.seed, `fade:${place.key}`, step) < memory.fadeProbabilityPerDecision ? 'faded' : 'clear')
+          : unit(this.seed, `forget:${place.key}`, step) < memory.forgetProbabilityPerDecision ? 'forgotten' : 'faded';
+        if (next !== place.state) { this.events.push({ decision: step, label: place.label, from: place.state, to: next }); place.state = next; }
+      }
+    }
+  }
+
+  /** Idempotent per displayed observation sequence. */
+  observe(o: ActorObservation, acceptedDecisions: number): void {
+    if (o.sequence !== undefined && o.sequence === this.lastSequence) return;
+    this.lastSequence = o.sequence;
+    this.decayTo(acceptedDecisions);
+    this.elapsedMs = o.elapsedMs ?? this.elapsedMs;
+    const result = o.result as ActorObservation['result'] | undefined;
+    if (result?.accepted && result.actionType === 'walkToAnchor' && result.anchorId) {
+      const shown = this.previous?.anchors.find(anchor => anchor.id === result.anchorId);
+      if (shown) {
+        const [n, e] = UNIT[shown.direction], steps = STEPS[shown.distanceBand];
+        this.north += n * steps; this.east += e * steps;
+        this.extent.north = Math.max(this.extent.north, this.north); this.extent.south = Math.max(this.extent.south, -this.north);
+        this.extent.east = Math.max(this.extent.east, this.east); this.extent.west = Math.max(this.extent.west, -this.east);
+      }
+      this.visits.set(result.anchorId, (this.visits.get(result.anchorId) ?? 0) + 1);
+    }
+    if (result?.accepted && result.actionType === 'readList') this.recovery.readList = true;
+    if (result?.accepted && result.actionType === 'add') this.addedItems = true;
+    if (o.view === 'help') this.recovery.viewedHelp = true;
+    if (o.activeStation?.startsWith('staff:')) this.recovery.talkedToStaff = true;
+    if (o.activeStation && !o.activeStation.startsWith('staff:') && !o.activeStation.startsWith('checkout')) this.openedShelves.add(o.activeStation);
+    if (o.phase === 'checkout' && this.addedItems) this.checkoutReachedAfterAdd = true;
+    for (const anchor of o.anchors) this.seenAnchors.add(anchor.id);
+    for (const station of o.visibleStations) {
+      if (station.kind === 'employee') this.recovery.staffSeen = true;
+      if (station.kind === 'checkout' && station.near && this.addedItems) this.checkoutReachedAfterAdd = true;
+      const [n, e] = UNIT[station.direction], steps = STEPS[station.distanceBand];
+      // Signs change with cashier state ("· 계산 가능"); the place identity is the station.
+      const label = station.kind === 'checkout' ? station.label.split(' · ')[0] : station.label;
+      const known = this.places.get(station.id);
+      if (known && known.state !== 'clear') this.events.push({ decision: acceptedDecisions, label, from: known.state, to: 'clear' });
+      this.places.set(station.id, { key: station.id, label, kind: station.kind, north: this.north + n * steps, east: this.east + e * steps,
+        firstSeenDecision: known?.firstSeenDecision ?? acceptedDecisions, lastSeenDecision: acceptedDecisions, state: 'clear',
+        decayedThrough: acceptedDecisions });
+    }
+    for (const body of o.visibleStructures ?? []) {
+      const [n, e] = UNIT[body.direction], steps = STEPS[body.distanceBand];
+      const north = this.north + n * steps, east = this.east + e * steps;
+      this.shelfBodies.set(`${Math.round(north / 2)}:${Math.round(east / 2)}`, { north, east });
+    }
+    const from = describe(this.north, this.east);
+    for (const boundary of o.boundaries ?? []) if (boundary.kind === 'wall')
+      this.walls.set(`${from}:${boundary.direction}`, { seenFrom: from, direction: boundary.direction, distanceBand: boundary.distanceBand });
+    if (o.phase === 'shopping' && o.view === 'world' && !o.activeStation) this.previous = structuredClone(o);
+  }
+
+  /** The actor's own choice; only a currently remembered (not forgotten) place can become a destination. */
+  canTarget(label: string): boolean {
+    return [...this.places.values()].some(place => place.label === label && place.state !== 'forgotten');
+  }
+  rememberedLabels(): string[] {
+    return [...new Set([...this.places.values()].filter(place => place.state !== 'forgotten').map(place => place.label))];
+  }
+  setDestination(label: string | undefined): void { if (label) this.destination = label; }
+  memoryEvents(): WholeTraceWayfindingMemoryEvent[] { return structuredClone(this.events); }
+  visitCount(anchorId: string): number { return this.visits.get(anchorId) ?? 0; }
+
+  private unresolvedShelfBodies() {
+    const named = [...this.places.values()].filter(place => place.kind === 'shelf');
+    return [...this.shelfBodies.values()].filter(body => !named.some(place => Math.hypot(place.north - body.north, place.east - body.east) <= 2.5));
+  }
+  /** Objective leads from what was actually displayed; fading does not remove them, so forgetting never eases giving up. */
+  private leads(): { remembered: string[]; others: number } {
+    const remembered: string[] = []; let others = 0;
+    const note = (place: LandmarkRecord | undefined, text: string) => { if (place && place.state !== 'forgotten') remembered.push(text); else others++; };
+    for (const place of this.places.values()) if (place.kind === 'shelf' && !this.openedShelves.has(place.key)) note(place, `본 ${place.label} 매대를 아직 열어 보지 않음`);
+    if (this.addedItems && !this.checkoutReachedAfterAdd) {
+      const checkout = [...this.places.values()].filter(place => place.kind === 'checkout');
+      if (checkout.length) note(checkout.find(place => place.state !== 'forgotten'), '담은 상품을 들고 본 계산대에 아직 가 보지 않음');
+      else others++;
+    }
+    const bodies = this.unresolvedShelfBodies().length;
+    if (bodies) remembered.push(`이름이 안 보이던 진열대 ${bodies}곳에 아직 다가가 보지 않음`);
+    return { remembered, others };
+  }
+
+  giveUpStatus(o: Pick<ActorObservation, 'phase'>): { available: boolean; notice: string } {
+    if (o.phase !== 'shopping') return { available: true, notice: '계산 단계에서는 그만두기를 고를 수 있다.' };
+    const tried = this.recovery.viewedHelp && (this.recovery.talkedToStaff || !this.recovery.staffSeen);
+    const leads = this.leads();
+    if (tried && (this.elapsedMs >= this.profile.explorationBudgetMs || !leads.remembered.length && !leads.others))
+      return { available: true, notice: '그만두기를 고를 수 있다.' };
+    const missing = [
+      !this.recovery.viewedHelp ? '이용 방법 안내를 아직 보지 않음' : '',
+      this.recovery.staffSeen && !this.recovery.talkedToStaff ? '본 직원에게 아직 묻지 않음' : '',
+      ...leads.remembered,
+      leads.others ? '기억은 흐릿하지만 확인하지 않은 곳이 더 있을 수 있음' : '',
+    ].filter(Boolean);
+    return { available: false, notice: `그만두기는 아직 선택지에 없다. 남은 단서: ${missing.join(', ') || '탐색 시간이 더 남음'}.` };
+  }
+
+  snapshot(o: ActorObservation): WholeTraceSpatialMemoryV2 {
+    const here = (north: number, east: number) => vectorCue(north - this.north, east - this.east);
+    const visible = [...this.places.values()].filter(place => place.state !== 'forgotten')
+      .sort((a, b) => b.lastSeenDecision - a.lastSeenDecision || a.label.localeCompare(b.label));
+    const target = this.destination ? [...this.places.values()].filter(place => place.label === this.destination)
+      .sort((a, b) => (a.state === 'clear' ? 0 : 1) - (b.state === 'clear' ? 0 : 1) || b.lastSeenDecision - a.lastSeenDecision)[0] : undefined;
+    const cue = target && here(target.north, target.east);
+    return {
+      kind: 'actor-spatial-memory-v2',
+      notice: '내가 실제로 본 화면과 걸은 방향만으로 만든 대략적인 기억이다. 걸음 수와 fromHere는 화면의 near=1, medium=2, far=3을 어림해 더한 값이며 지도·좌표·경로 추천이 아니다. 해석과 계획은 내가 한다.',
+      position: { fromStart: describe(this.north, this.east), north: round(this.north), east: round(this.east) },
+      explored: { north: round(this.extent.north), south: round(this.extent.south), east: round(this.extent.east), west: round(this.extent.west) },
+      placesVisited: this.visits.size,
+      passagesSeenNotVisited: [...this.seenAnchors].filter(id => !this.visits.has(id)).length,
+      landmarks: visible.map(place => place.state === 'clear'
+        ? { label: place.label, kind: place.kind, memory: 'clear' as const, fromHere: here(place.north, place.east), lastSeenDecisionsAgo: this.decision - place.lastSeenDecision }
+        : { label: place.label, kind: place.kind, memory: 'faded' as const, vague: vagueCue(place.north - this.north, place.east - this.east), lastSeenDecisionsAgo: this.decision - place.lastSeenDecision }),
+      unlabelledShelves: this.unresolvedShelfBodies().map(body => ({ fromHere: here(body.north, body.east) }))
+        .sort((a, b) => a.fromHere.steps - b.fromHere.steps).slice(0, 4),
+      wallsSeen: [...this.walls.values()].slice(-12),
+      recovery: { ...this.recovery },
+      ...(this.destination ? { destination: target && cue && target.state === 'clear'
+        ? { label: this.destination, memory: 'clear' as const, fromHere: cue, reached: cue.steps <= 1 }
+        : { label: this.destination, memory: target?.state === 'faded' ? 'faded' as const : 'forgotten' as const,
+          text: target?.state === 'faded' ? vagueCue(target.north - this.north, target.east - this.east) : '어디였는지 기억나지 않는다' } } : {}),
+      plannedTimeMs: this.elapsedMs,
+      giveUp: this.giveUpStatus(o),
+    };
+  }
+
+  /** Walk choices whose displayed direction points within 45 degrees of the remembered destination. */
+  towardDestination(o: ActorObservation): string[] {
+    if (!this.destination) return [];
+    const target = [...this.places.values()].find(place => place.label === this.destination && place.state === 'clear');
+    if (!target) return [];
+    const dn = target.north - this.north, de = target.east - this.east, length = Math.hypot(dn, de);
+    if (length < 1) return [];
+    return o.anchors.filter(anchor => {
+      const [n, e] = UNIT[anchor.direction];
+      return (n * dn + e * de) / length >= Math.cos(Math.PI / 4) - 1e-9;
+    }).map(anchor => anchor.id);
+  }
+}
+
+export type WholeTraceWayfindingRuntime = {
+  version: WholeTraceWayfindingVersion;
+  observe(o: ActorObservation, acceptedDecisions: number): void;
+  visitCount(anchorId: string): number;
+  giveUpStatus(o: Pick<ActorObservation, 'phase'>): { available: boolean; notice: string };
+  snapshot(o: ActorObservation): WholeTraceSpatialMemory | WholeTraceSpatialMemoryV2;
+  canTarget?(label: string): boolean;
+  rememberedLabels?(): string[];
+  setDestination?(label: string | undefined): void;
+  towardDestination?(o: ActorObservation): string[];
+  memoryEvents?(): WholeTraceWayfindingMemoryEvent[];
+};
+export function createWholeTraceWayfindingMemory(version: WholeTraceWayfindingVersion, profile: WayfindingProfile, seed: string | number): WholeTraceWayfindingRuntime {
+  const memory = version === WHOLE_TRACE_WAYFINDING_V2_VERSION ? new WholeTraceWayfindingMemoryV2(profile, String(seed)) : new WholeTraceWayfindingMemory(profile);
+  return Object.assign(memory, { version });
 }

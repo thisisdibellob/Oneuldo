@@ -82,7 +82,7 @@ export async function createWholeTraceExecutionAuthoringCursor(settings: WholeTr
       sourceMenu.availableChoices = sourceMenu.availableChoices.map(mark);
       sourceMenu.visibleWalkChoices = sourceMenu.visibleWalkChoices.map(mark);
     }
-    // wayfinding-v1: the actor's own spatial memory and thoughts, plus visit marks.
+    // wayfinding-v1/v2: the actor's own spatial memory and thoughts, plus visit (and v2 destination) marks.
     // giveUp is hidden from the shopping menu until the compiler's eligibility holds.
     const wayfinding = bundle.wayfindingVersion && preview.wayfinding ? (() => {
       const anchorOf = (choiceId: string) => bundle.choiceCatalog.entries.find(entry => entry.choiceId === choiceId)
@@ -91,7 +91,11 @@ export async function createWholeTraceExecutionAuthoringCursor(settings: WholeTr
         const anchorId = choice.choiceId.startsWith('walk/') ? anchorOf(choice.choiceId) : undefined;
         if (!anchorId) return choice;
         const times = preview.wayfinding!.anchorVisits[anchorId] ?? 0;
-        return { ...choice, visitedTimes: times, label: times ? `${choice.label} · 내가 ${times}번 와 본 곳` : `${choice.label} · 아직 안 가 본 곳` } as T;
+        const memory = preview.wayfinding!.spatialMemory;
+        const toward = preview.wayfinding!.towardDestination?.includes(anchorId) && 'destination' in memory && memory.destination
+          ? memory.destination.label : undefined;
+        const label = `${choice.label} · ${times ? `내가 ${times}번 와 본 곳` : '아직 안 가 본 곳'}${toward ? ` · 기억한 ${toward} 쪽` : ''}`;
+        return { ...choice, visitedTimes: times, ...(toward ? { towardRememberedDestination: toward } : {}), label } as T;
       };
       const locked = !preview.wayfinding!.spatialMemory.giveUp.available;
       const keep = (id: string) => !(locked && id === 'control/giveUp');

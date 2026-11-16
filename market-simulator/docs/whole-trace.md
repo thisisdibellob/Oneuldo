@@ -126,6 +126,17 @@ legacy와 traits v1의 기존 판정은 유지하고, 새 `movementOpportunities
 
 `prepare_whole_trace`에서는 `movementVersion` 없이 줄 수 있다. 검증 run에서는 `prepare_persona_validation`에 `{"movementValidationVersion":"1","wayfindingVersion":"wayfinding-v1"}`로 묶어야 하며, 일반 성인 대조군도 이 경로로 실행한다. inputHash, bundle, trace generation(`wholeTraceWayfindingVersion`), knowledge audit에 모두 기록된다.
 
+### `wayfindingVersion:"wayfinding-v2"`
+
+2026-11-15 v1 20회(`output/persona-wayfinding20-20261115-225536`)에서 일반 성인 7건 중 5건이 상품을 다 담고도 계산대를 찾지 못했다. v1 공간 기억은 랜드마크를 최근 본 순서로 12개만 남겼고, 이름이 안 보이는 진열대를 본 위치마다 따로 저장해 앞서 본 계산대가 밀려났다. 포기 조건은 "20곳 걷기 + 안내"로 22~27번째 행동 만에 열렸다. v1은 보관 기록 재현을 위해 그대로 두고, 아래 변경은 v2에만 적용한다.
+
+- **이름 있는 장소는 밀려나지 않는다.** 계산대·출구·입구·직원·매대는 station별로 하나씩 남는다. 계산대 표지는 "· 계산 가능" 같은 상태 표시를 뗀 이름으로 저장한다. 이름이 안 보이는 진열대는 걸음 2칸 단위로 묶은 위치 중 가까운 4곳만 `unlabelledShelves`에 보인다.
+- **"대략 저쪽" 감각.** 장소마다 걸어온 기록으로 어림한 위치를 저장하고, 메뉴에 `fromHere`(예: "지금 위치에서 남동쪽 약 9걸음(추정)")를 준다. 벽·집기를 고려한 경로가 아니다.
+- **배우가 정하는 목적지.** `thought.destination`에 기억한 장소 이름을 쓰면 다른 목적지를 쓸 때까지 유지되고, `spatialMemory.destination`에 남은 방향과 도착 여부가, 그 방향 45도 안의 걷기 선택지에 "기억한 ○○ 쪽"이 표시된다. 기억에 없는(잊었거나 본 적 없는) 장소는 목적지로 거절된다.
+- **페르소나별 기억 흐려짐** (`wayfinding.landmarkMemory`). `stable`은 잊지 않는다(일반 성인). `decaying`은 마지막으로 본 뒤 `protectedDecisions` 동안 보호하고, 이후 결정마다 `fadeProbabilityPerDecision` 확률로 흐려지고(대략 방향만 남음), 흐려진 뒤 `forgetProbabilityPerDecision` 확률로 사라진다. 다시 보면 즉시 선명해진다. 확률은 trace seed·장소·결정 번호로 정하는 결정적 난수라 재검증에서도 같다. 지적장애 페르소나 3명은 10 / 0.05 / 0.03으로 둔 합성 설계값이며 실측 기억 능력이 아니다. 흐려짐·잊음·재인식 기록은 knowledge audit의 `wayfindingMemoryEvents`에 남는다.
+- **포기 조건.** 이용 안내를 봤고 본 직원이 있으면 말을 걸었다는 조건에 더해, (a) 계획 시간이 `explorationBudgetMs` 이상이거나 (b) 관찰 기록상 남은 단서가 없어야 열린다. 단서는 본 매대를 아직 열지 않음, 상품을 담은 뒤 본 계산대에 아직 가지 않음, 이름이 안 보이던 진열대에 아직 다가가지 않음이다. 단서는 실제 관찰 기록으로 판단하므로 잊어도 포기가 쉬워지지 않는다. 잊은 단서는 안내문에서 이름을 밝히지 않는다. 열렸을 때 안내문은 "그만두기를 고를 수 있다."뿐이다.
+- **thought는 한국어만 허용한다**(한자·가나 거절).
+
 ### 후보 작성과 제출 계약
 
 기술 수정이 허용된 실패에는 `repair_whole_trace({requestId,repair:{decisions:[...]}})`로 수정할 suffix만 보낸다. `repairFilePath`도 같은 `{ "decisions": [...] }` 객체를 받는다. 서버가 요청·버전·수정 시작 위치를 채우고 이미 수락한 prefix와 원래 종료 의도, 수정 1회 제한을 유지한다. 기존 명시형 wrapper도 지원하며 잘못 명시한 값은 거절한다. 별도 사전 검사 왕복이나 행동별 AI 호출을 추가하지 않는다.

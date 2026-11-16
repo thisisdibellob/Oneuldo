@@ -23,7 +23,8 @@ import { createWholeTraceMovementFeedback, validWholeTraceMovementFeedback, whol
 import type { WholeTraceChoiceFrame, WholeTraceAcceptedFrame } from './wholeTraceChoices';
 import type { WholeTraceChoiceSource } from './wholeTraceContracts';
 import { createWholeTraceNavigationRecorder, type WholeTraceNavigationEvidence } from './wholeTraceNavigationEvidence';
-import { WHOLE_TRACE_WAYFINDING_VERSION, WAYFINDING_GIVE_UP_LOCKED, WholeTraceWayfindingMemory, wayfindingProfileOf, type WholeTraceSpatialMemory } from './wholeTraceWayfinding';
+import { WAYFINDING_GIVE_UP_LOCKED, createWholeTraceWayfindingMemory, isWholeTraceWayfindingVersion, wayfindingProfileOf,
+  type WholeTraceSpatialMemory, type WholeTraceSpatialMemoryV2, type WholeTraceWayfindingMemoryEvent } from './wholeTraceWayfinding';
 
 export class WholeTraceCompileError extends Error {
   constructor(readonly validation: WholeTraceValidation) { super(validation.errors.join('; ')); }
@@ -46,7 +47,11 @@ export type WholeTracePrefixResult = {
   taskMemory?: ReturnType<WholeTraceTaskMemoryEngine['snapshot']>; advisory: WholeTraceCalculatedAdvisory;
   choiceFrame?: WholeTraceChoiceFrame; movementResult?: WholeTracePublicMovementResult; movementNotes?: string[];
   /** wayfinding-v1 actor-side memory at this boundary, built from accepted observations only. */
-  wayfinding?: { spatialMemory: WholeTraceSpatialMemory; anchorVisits: Record<string, number> };
+  wayfinding?: { spatialMemory: WholeTraceSpatialMemory | WholeTraceSpatialMemoryV2; anchorVisits: Record<string, number>;
+    /** v2: currently shown anchors that point toward the actor's own remembered destination. */
+    towardDestination?: string[];
+    /** v2 analysis record of fading/forgetting/relearning; not part of the actor menu. */
+    memoryEvents?: WholeTraceWayfindingMemoryEvent[] };
 };
 class WholeTracePrefixComplete extends Error {
   constructor(readonly result: WholeTracePrefixResult) { super('Whole trace prefix checked'); }
@@ -133,7 +138,7 @@ async function executeWholeTraceCandidate(settings: WholeTraceSettings, bundle: 
     || bundle.movementValidationVersion !== settings.movementValidationVersion)
     throw new WholeTraceCompileError({ valid: false, code: 'PREPARED_INPUT_MISMATCH', errors: ['Candidate input differs from the prepared bundle'] });
   const structure = (prefix ? validateWholeTraceCandidatePrefix : validateWholeTraceCandidate)(value, bundle.requestId,
-    { objectiveIds: bundle.worldReference.objectives.map(goal => goal.id), movementVersion: bundle.movementVersion, wayfinding: !!bundle.wayfindingVersion });
+    { objectiveIds: bundle.worldReference.objectives.map(goal => goal.id), movementVersion: bundle.movementVersion, wayfinding: bundle.wayfindingVersion });
   if (!structure.valid) throw new WholeTraceCompileError({ ...structure, issues: structure.errors.map(message => {
     const decisionIndex = Number(message.match(/^decisions\[(\d+)\]/)?.[1] ?? 0);
     return runtimeIssues(structure.code ?? 'CANDIDATE_SCHEMA', [message], decisionIndex)[0];
@@ -191,12 +196,13 @@ async function executeWholeTraceCandidate(settings: WholeTraceSettings, bundle: 
     acceptedFrame = wholeTraceContinuousFrame(bundle, initial.playerPosition, initial.cashierAvailability);
   }
   const movementFeedback = bundle.movementFeedbackVersion ? createWholeTraceMovementFeedback({ spatialMemoryCapacity }) : undefined;
-  if (bundle.wayfindingVersion !== undefined && (bundle.wayfindingVersion !== WHOLE_TRACE_WAYFINDING_VERSION || bundle.wayfindingVersion !== settings.wayfindingVersion
-    || !bundle.observationVersion || canonicalMarketReplayJson(bundle.persona.wayfinding?.profile) !== canonicalMarketReplayJson(wayfindingProfileOf(persona))))
+  if (bundle.wayfindingVersion !== undefined && (!isWholeTraceWayfindingVersion(bundle.wayfindingVersion) || bundle.wayfindingVersion !== settings.wayfindingVersion
+    || !bundle.observationVersion || canonicalMarketReplayJson(bundle.persona.wayfinding?.profile) !== canonicalMarketReplayJson(wayfindingProfileOf(persona, bundle.wayfindingVersion))))
     throw new WholeTraceCompileError({ valid: false, code: 'PREPARED_INPUT_MISMATCH', errors: ['Prepared wayfinding contract or persona profile differs from the selected persona'] });
   if (bundle.wayfindingVersion === undefined && settings.wayfindingVersion !== undefined)
     throw new WholeTraceCompileError({ valid: false, code: 'PREPARED_INPUT_MISMATCH', errors: ['Candidate input differs from the prepared bundle'] });
-  const wayfinding = bundle.wayfindingVersion ? new WholeTraceWayfindingMemory(wayfindingProfileOf(persona)) : undefined;
+  const wayfinding = bundle.wayfindingVersion
+    ? createWholeTraceWayfindingMemory(bundle.wayfindingVersion, wayfindingProfileOf(persona, bundle.wayfindingVersion), settings.seed) : undefined;
   const navigationRecorder = bundle.movementValidationVersion ? createWholeTraceNavigationRecorder(settings, bundle) : undefined;
   let rawBefore: ActorObservation | undefined;
   const safeObservation = (o: ActorObservation) => continuous ? wholeTracePublicObservation(o) : o;
@@ -236,7 +242,9 @@ async function executeWholeTraceCandidate(settings: WholeTraceSettings, bundle: 
       ...(execution ? execution : {}), ...(movementResult ? { movementResult } : {}),
       ...(workingMemory ? { workingMemory } : {}), ...(taskState ? { taskMemory: taskState } : {}),
       ...(wayfinding ? { wayfinding: { spatialMemory: wayfinding.snapshot(observation),
-        anchorVisits: Object.fromEntries(observation.anchors.map(anchor => [anchor.id, wayfinding.visitCount(anchor.id)])) } } : {}),
+        anchorVisits: Object.fromEntries(observation.anchors.map(anchor => [anchor.id, wayfinding.visitCount(anchor.id)])),
+        ...(wayfinding.towardDestination ? { towardDestination: wayfinding.towardDestination(observation) } : {}),
+        ...(wayfinding.memoryEvents ? { memoryEvents: wayfinding.memoryEvents() } : {}) } } : {}),
       advisory: { kind: 'reference-calculated-state-v1',
         notice: '참고용 계산값. 보조기는 행동이나 상태 값을 채우거나 고치지 않으며, 선언은 계속 AI가 한다.',
         assumptions: { activity: context?.actorState.activity ?? cognition?.snapshot().context.activity ?? 'orient',
@@ -277,11 +285,14 @@ async function executeWholeTraceCandidate(settings: WholeTraceSettings, bundle: 
         const decision = resolveWholeTraceDecision(d, o, bundle);
         if (wayfinding && decision.action.type === 'giveUp') {
           const status = wayfinding.giveUpStatus(o);
-          if (!status.available) throw Object.assign(new Error(`giveUp is not yet available in wayfinding-v1: ${status.notice}`),
+          if (!status.available) throw Object.assign(new Error(`giveUp is not yet available in ${bundle.wayfindingVersion}: ${status.notice}`),
             { code: WAYFINDING_GIVE_UP_LOCKED });
           if (!d.actorState.thought?.plan)
-            throw Object.assign(new Error('A wayfinding-v1 giveUp requires actorState.thought.plan describing what was tried and why the person stops'), { code: 'ACTOR_STATE' });
+            throw Object.assign(new Error('A wayfinding giveUp requires actorState.thought.plan describing what was tried and why the person stops'), { code: 'ACTOR_STATE' });
         }
+        const destination = d.actorState.thought?.destination;
+        if (wayfinding?.canTarget && destination !== undefined && !wayfinding.canTarget(destination))
+          throw Object.assign(new Error(`thought.destination must be a remembered landmark label: ${wayfinding.rememberedLabels!().join(', ') || '(none remembered yet)'}`), { code: 'ACTOR_STATE' });
         // The wire was already checked at 24/12. Exact generated control/read-goal
         // proofs must not displace any declared reference or make a valid wire overflow.
         const composedBounds = binding ? {
@@ -291,7 +302,7 @@ async function executeWholeTraceCandidate(settings: WholeTraceSettings, bundle: 
         try { ledger.assertBasis(d.basis, decision.action, { ...composedBounds, allowMemoryUses: cognitive, allowTaskMemory: persistent }); }
         catch (error) { throw Object.assign(new Error((error as Error).message), { code: 'KNOWLEDGE_BASIS' }); }
         const stateCheck = validateWholeTraceActorState(d.actorState, { knowledge: observation.knowledge, persona, previous: previousState,
-          requireFocusFields: candidate.candidateVersion === '5' || cognitive, allowMemoryUpdate: cognitive, allowTaskMemory: persistent, allowThought: !!bundle.wayfindingVersion,
+          requireFocusFields: candidate.candidateVersion === '5' || cognitive, allowMemoryUpdate: cognitive, allowTaskMemory: persistent, allowThought: !!bundle.wayfindingVersion, ...(bundle.wayfindingVersion ? { thoughtVersion: bundle.wayfindingVersion } : {}),
           ...(composedBounds ? { maximumTriggerCueRefs: composedBounds.maximumTriggerCueRefs } : {}) });
         if (!stateCheck.valid) throw Object.assign(new Error(stateCheck.errors.join('; ')), { code: 'ACTOR_STATE', errors: stateCheck.errors });
         const rawBasis = (wire as import('./wholeTraceContracts').WholeTraceTaskChoiceDecision).basis;
@@ -357,6 +368,7 @@ async function executeWholeTraceCandidate(settings: WholeTraceSettings, bundle: 
             acceptedFrame = { ...acceptedFrame, navigationStateId: next.stateId };
           }
           knowledgeAudit.push(pending); previousState = structuredClone(pending.actorState);
+          wayfinding?.setDestination?.(pending.actorState.thought?.destination);
           cognition?.commit();
           taskMemory?.commit();
         }
@@ -396,6 +408,7 @@ async function executeWholeTraceCandidate(settings: WholeTraceSettings, bundle: 
     const taskExpression = persistent ? reviewWholeTraceTaskExpression(roleEntries) : undefined;
     if (prefix) capturePrefix(lastApplied ?? before!, true);
     return { trace, acceptedActions: accepted, knowledgeAudit,
+      ...(wayfinding?.memoryEvents ? { wayfindingMemoryEvents: wayfinding.memoryEvents() } : {}),
       ...(cognition ? { workingMemory: cognition.snapshot() } : {}),
       ...(taskMemory ? { taskMemory: taskMemory.snapshot() } : {}),
       personaReview: { ...personaReview,

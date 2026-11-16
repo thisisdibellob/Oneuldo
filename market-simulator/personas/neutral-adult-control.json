@@ -106,6 +106,13 @@
       "별도 인지·적응 어려움을 선택하지 않은 대조군",
       "attention.goalMemoryCapacity=5",
       "character.selectedTraits[1]: 확인·도움·수정은 실제 불확실성에 맞춰 선택"
-    ]
+    ],
+    "landmarkMemory": {
+      "retention": "stable",
+      "basedOn": [
+        "별도 인지·적응 어려움을 선택하지 않은 대조군",
+        "attention.switchMemoryDecay=0"
+      ]
+    }
   }
 }

@@ -291,7 +291,7 @@ export class WholeTraceSession {
       }
       const shape = validateWholeTraceCandidate(value, this.requestId,
         { objectiveIds: this.bundle.worldReference.objectives.map(goal => goal.id), movementVersion: this.bundle.movementVersion,
-          wayfinding: !!this.bundle.wayfindingVersion });
+          wayfinding: this.bundle.wayfindingVersion });
       if (!shape.valid) throw new WholeTraceCompileError(shape);
       const candidate = value as WholeTraceCandidate;
       if (this.originalCandidateVersion && candidate.candidateVersion !== this.originalCandidateVersion)
@@ -326,6 +326,7 @@ export class WholeTraceSession {
         referenceAccess: 'whole-world', actorKnowledgeScope: 'observed-and-remembered',
         validationScope: this.originalCandidateVersion === '7' ? 'declared-cues-persistent-tasks-working-memory-actor-state-and-game-guards' : this.originalCandidateVersion === '6' ? 'declared-cues-working-memory-actor-state-and-game-guards' : 'declared-cues-actor-state-and-game-guards',
         limitation: 'The actor receives the whole reference world. Cue validation cannot prove that hidden information had no implicit influence, nor establish clinical validity.',
+        ...(compiled.wayfindingMemoryEvents ? { wayfindingMemoryEvents: compiled.wayfindingMemoryEvents } : {}),
         decisions: compiled.knowledgeAudit };
       const knowledgeAuditHash = createHash('sha256').update(canonicalMarketReplayJson(audit)).digest('hex');
       saveNew(knowledgeAuditPath, audit); auditSaved = true;

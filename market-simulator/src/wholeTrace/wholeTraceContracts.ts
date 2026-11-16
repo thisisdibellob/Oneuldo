@@ -130,7 +130,7 @@ export function wholeTraceTerminalIntent(decision: WholeTraceWireDecision | unde
 }
 const shortRefArray = (value: unknown, maximum: number) => Array.isArray(value) && value.length <= maximum
   && value.every(ref => typeof ref === 'string' && !!ref.trim() && ref.length <= 300) && new Set(value).size === value.length;
-function validateChoiceDecision(d: Record<string, unknown>, at: string, errors: string[], requireFocusFields: boolean, cognitive = false, persistent = false, movementVersion?: WholeTraceMovementVersion, wayfinding = false) {
+function validateChoiceDecision(d: Record<string, unknown>, at: string, errors: string[], requireFocusFields: boolean, cognitive = false, persistent = false, movementVersion?: WholeTraceMovementVersion, wayfinding?: WholeTraceWayfindingVersion) {
   if (Object.keys(d).some(k => !['choiceRef', 'delayMs', 'reason', 'basis', 'actorState'].includes(k))) errors.push(`${at}: unknown field`);
   const basis = d.basis;
   if (!plain(basis)) errors.push(`${at}: basis must be a JSON object`);
@@ -142,7 +142,7 @@ function validateChoiceDecision(d: Record<string, unknown>, at: string, errors: 
   const state = d.actorState;
   if (!plain(state)) errors.push(`${at}: actorState must be a JSON object`);
   else {
-    for (const error of validateWholeTraceActorState({ ...state, triggerCueRefs: ['control:pause'] }, { requireFocusFields, allowMemoryUpdate: cognitive, allowTaskMemory: persistent, allowThought: wayfinding }).errors) errors.push(`${at}: ${error}`);
+    for (const error of validateWholeTraceActorState({ ...state, triggerCueRefs: ['control:pause'] }, { requireFocusFields, allowMemoryUpdate: cognitive, allowTaskMemory: persistent, allowThought: !!wayfinding, ...(wayfinding ? { thoughtVersion: wayfinding } : {}) }).errors) errors.push(`${at}: ${error}`);
     if (state.triggerCueRefs !== undefined && !shortRefArray(state.triggerCueRefs, 12)) errors.push(`${at}: invalid optional actorState.triggerCueRefs`);
   }
   const ref = d.choiceRef;
@@ -181,7 +181,7 @@ function validateChoiceDecision(d: Record<string, unknown>, at: string, errors: 
  * Full-candidate identity, objective spelling, horizon and terminal checks still run at submission.
  */
 export function validateWholeTraceChoiceDecisionSyntax(value: unknown,
-  candidateVersion: '4' | '5' | '6' | '7' = '7', options: { movementVersion?: WholeTraceMovementVersion; wayfinding?: boolean } = {}): WholeTraceValidation {
+  candidateVersion: '4' | '5' | '6' | '7' = '7', options: { movementVersion?: WholeTraceMovementVersion; wayfinding?: WholeTraceWayfindingVersion } = {}): WholeTraceValidation {
   const errors: string[] = [], at = 'decision';
   if (!plain(value)) return { valid: false, errors: [`${at}: expected object`], code: 'CANDIDATE_SCHEMA' };
   if (!['4', '5', '6', '7'].includes(candidateVersion))
@@ -194,16 +194,16 @@ export function validateWholeTraceChoiceDecisionSyntax(value: unknown,
   return { valid: !errors.length, errors, ...(errors.length ? { code: 'CANDIDATE_SCHEMA' } : {}) };
 }
 export function validateWholeTraceCandidate(value: unknown, requestId: string,
-  options: { objectiveIds?: readonly string[]; movementVersion?: WholeTraceMovementVersion; wayfinding?: boolean } = {}): WholeTraceValidation {
+  options: { objectiveIds?: readonly string[]; movementVersion?: WholeTraceMovementVersion; wayfinding?: WholeTraceWayfindingVersion } = {}): WholeTraceValidation {
   return validateCandidate(value, requestId, options, false);
 }
 /** A prefix has no ending yet; every supplied decision keeps the full wire contract. */
 export function validateWholeTraceCandidatePrefix(value: unknown, requestId: string,
-  options: { objectiveIds?: readonly string[]; movementVersion?: WholeTraceMovementVersion; wayfinding?: boolean } = {}): WholeTraceValidation {
+  options: { objectiveIds?: readonly string[]; movementVersion?: WholeTraceMovementVersion; wayfinding?: WholeTraceWayfindingVersion } = {}): WholeTraceValidation {
   return validateCandidate(value, requestId, options, true);
 }
 function validateCandidate(value: unknown, requestId: string,
-  options: { objectiveIds?: readonly string[]; movementVersion?: WholeTraceMovementVersion; wayfinding?: boolean }, prefix: boolean): WholeTraceValidation {
+  options: { objectiveIds?: readonly string[]; movementVersion?: WholeTraceMovementVersion; wayfinding?: WholeTraceWayfindingVersion }, prefix: boolean): WholeTraceValidation {
   const errors: string[] = [];
   if (!plain(value)) return { valid: false, errors: ['Candidate must be a JSON object'], code: 'CANDIDATE_SCHEMA' };
   if (Object.keys(value).some(k => !['candidateVersion', 'requestId', 'decisions'].includes(k))) errors.push('Unknown candidate field');

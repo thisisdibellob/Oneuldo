@@ -44,6 +44,7 @@ export type WholeTraceActorStateContext = {
   allowTaskMemory?: boolean;
   /** wayfinding-v1: optional free-form actor judgment, never a cue or knowledge source. */
   allowThought?: boolean;
+  thoughtVersion?: import('./wholeTraceWayfinding').WholeTraceWayfindingVersion;
 };
 
 const stateFields = ['activity', 'task', 'heldGoalIds', 'uncertainGoalIds', 'focusedGoalId', 'focusedProductId', 'orientation', 'triggerCueRefs'];
@@ -69,7 +70,7 @@ export function validateWholeTraceActorState(value: unknown, context: WholeTrace
   if (!plain(value)) return { valid: false, errors: ['actorState must be a JSON object'] };
   if (Object.keys(value).some(field => !stateFields.includes(field) && !(context.allowMemoryUpdate && field === 'memoryUpdate')
     && !(context.allowTaskMemory && field === 'taskUpdate') && !(context.allowThought && field === 'thought'))) errors.push('Unknown actorState field');
-  if (context.allowThought) errors.push(...validateWholeTraceThought(value.thought));
+  if (context.allowThought) errors.push(...validateWholeTraceThought(value.thought, context.thoughtVersion));
   if (context.allowTaskMemory) errors.push(...validateWholeTraceTaskUpdate(value.taskUpdate).errors);
   if (context.allowMemoryUpdate && value.memoryUpdate !== undefined)
     errors.push(...validateWholeTraceMemoryUpdate(value.memoryUpdate).errors);

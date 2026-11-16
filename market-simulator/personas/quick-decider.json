@@ -53,7 +53,18 @@
       "character.selectedTraits[2]: 빠르게 결정하고 긴 비교를 선호하지 않음(상품 선택 성향이며 포기 성향이 아님)",
       "character.selectedTraits[3]: 불확실하면 현재 단계의 도움 사용",
       "attention.goalMemoryCapacity=2"
-    ]
+    ],
+    "landmarkMemory": {
+      "retention": "decaying",
+      "protectedDecisions": 10,
+      "fadeProbabilityPerDecision": 0.05,
+      "forgetProbabilityPerDecision": 0.03,
+      "basedOn": [
+        "character.selectedTraits[1]: 여러 조건을 동시에 유지하는 부담",
+        "attention.switchMemoryDecay 설정과 같은 부담 방향",
+        "합성 설계값이며 실측 기억 능력이 아님"
+      ]
+    }
   },
   "character": {
     "name": "민수",
