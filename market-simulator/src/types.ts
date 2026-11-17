@@ -65,6 +65,8 @@ export type Persona = {
   attention?: AttentionProfile;
   /** Stable shopping habits; probabilities are synthetic design settings, not population estimates. */
   shoppingStyle?: ShoppingStyle;
+  /** wayfinding-v1 search/judgment style; shapes how the person searches, never whether to keep searching. */
+  wayfinding?: import('./wholeTrace/wholeTraceWayfinding').WayfindingProfile;
   parameters: {
     reactionMedianMs: number; reactionSigma: number; walkSpeed: number;
     recheckProbability: number; hesitationProbability: number; confusionProbability: number;
@@ -110,6 +112,12 @@ export type ActorObservation = {
   visibleApproachEnabled?: true;
   /** Visible shelf bodies whose signs cannot be read; no category IDs or hidden products. */
   visibleStructures?: { kind: 'shelf'; label: '진열대'; direction: ActorDirection; distanceBand: ActorDistanceBand }[];
+  /** wayfinding-v1: what the world view draws along each screen direction; covered is the list note, not a wall. */
+  boundaries?: { direction: ActorDirection; kind: 'wall' | 'fixture' | 'covered' | 'open' | 'shelf' | 'checkout' | 'furniture' | 'person' | 'construction'; label: string; distanceBand: ActorDistanceBand }[];
+  /** wayfinding-v3: the kind of place the world view shows around the player (sales floor, lobby, corridor). */
+  area?: { kind: 'sales-floor' | 'lobby' | 'corridor' | 'elevator' | 'building-door' | 'other'; label: string };
+  /** wayfinding-v3: displayed walk choices whose segment passes through a visible door gate. */
+  gatePassages?: { anchorId: string; gate: 'entrance' | 'exit' | 'side-door'; direction: 'inward' | 'outward'; label: string }[];
   shelf: { page: number; pageCount: number; scrollFraction: number; pageFractions?: number[] } | null;
   listAvailable: boolean;
   /** Present for one observation after an accepted readList, never prefilled at entry. */
@@ -167,6 +175,10 @@ export type TraceOptions = {
   wholeTraceObservationVersion?: 'anchor-visible-structures-v1';
   wholeTraceMovementValidationVersion?: '1';
   wholeTraceMovementFeedbackVersion?: import('./wholeTrace/wholeTraceMovementFeedback').WholeTraceMovementFeedbackVersion;
+  /** Explicit opt-in: visible boundaries, actor-built spatial memory, actor thoughts and give-up eligibility. */
+  wholeTraceWayfindingVersion?: import('./wholeTrace/wholeTraceWayfinding').WholeTraceWayfindingVersion;
+  /** Opt-in whole-trace-v3 accepted-decision horizon. Absent means 100. */
+  wholeTraceActionHorizon?: 100 | 200;
   planningMode?: 'whole-trace'; planningSubmissions?: number; repairSubmissions?: number;
   /** Compact is a test execution schedule, not an estimate of a person's speed. */
   timingProfile?: 'original' | 'compact';

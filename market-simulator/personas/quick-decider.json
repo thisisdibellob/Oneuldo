@@ -32,6 +32,40 @@
     "familiarShortcutProbability": 0.65,
     "headingPersistence": 0.9
   },
+  "wayfinding": {
+    "version": "1",
+    "cueLevel": "landmark",
+    "planHorizon": "next-step",
+    "maxHypotheses": 1,
+    "memoryForm": "route-sequence",
+    "recoveryOrder": [
+      "follow-wide-aisle",
+      "return-to-known-landmark",
+      "seek-staff",
+      "view-help",
+      "reread-list"
+    ],
+    "thoughtForm": "one-sentence-concrete",
+    "explorationBudgetMs": 240000,
+    "minDistinctPlacesBeforeGiveUp": 20,
+    "basedOn": [
+      "character.selectedTraits[0]: 익숙하고 구체적인 단서로 선택지를 좁힘",
+      "character.selectedTraits[2]: 빠르게 결정하고 긴 비교를 선호하지 않음(상품 선택 성향이며 포기 성향이 아님)",
+      "character.selectedTraits[3]: 불확실하면 현재 단계의 도움 사용",
+      "attention.goalMemoryCapacity=2"
+    ],
+    "landmarkMemory": {
+      "retention": "decaying",
+      "protectedDecisions": 10,
+      "fadeProbabilityPerDecision": 0.05,
+      "forgetProbabilityPerDecision": 0.03,
+      "basedOn": [
+        "character.selectedTraits[1]: 여러 조건을 동시에 유지하는 부담",
+        "attention.switchMemoryDecay 설정과 같은 부담 방향",
+        "합성 설계값이며 실측 기억 능력이 아님"
+      ]
+    }
+  },
   "character": {
     "name": "민수",
     "age": 29,

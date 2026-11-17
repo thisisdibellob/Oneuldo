@@ -35,7 +35,10 @@ export async function generateAttentionTrace(options: TraceOptions, persona: Act
   const wholeTrace = options.planningMode === 'whole-trace';
   const actorPolicyVersion = attentionActorPolicyVersion(options);
   const incrementalActor=actorPolicyVersion==='episodic-choice-v11';
-  const actionHorizon=incrementalActor?INCREMENTAL_ACTOR_ACTION_LIMIT:ACTOR_ACTION_LIMIT;
+  if(options.wholeTraceActionHorizon!==undefined && (![100,200].includes(options.wholeTraceActionHorizon) || !wholeTrace || actorPolicyVersion!=='whole-trace-v3'))
+    throw new Error('wholeTraceActionHorizon requires whole-trace-v3 and 100 or 200');
+  const wholeTraceHorizon200=wholeTrace && options.wholeTraceActionHorizon===200;
+  const actionHorizon=incrementalActor||wholeTraceHorizon200?INCREMENTAL_ACTOR_ACTION_LIMIT:ACTOR_ACTION_LIMIT;
   if(incrementalActor && options.maxActions!==undefined && options.maxActions!==INCREMENTAL_ACTOR_ACTION_LIMIT)
     throw new Error('v11 uses the explicit 200-action observation horizon');
   const cognition=incrementalActor?new IncrementalCognition(persona):null;
@@ -121,7 +124,7 @@ export async function generateAttentionTrace(options: TraceOptions, persona: Act
   const activity = new ActorActivityMonitor();
   let systemCompletion: NonNullable<MarketReplayTrace['generation']>['systemCompletion'];
   if (options.decisionProvider && !options.actorDecisionProvider) throw new Error('Attention personas require actorDecisionProvider; raw game observations are not exposed');
-  const guard = new TraceGuard(options.snapshot, persona.id, persona.version, model, true, extendedActor, feedbackActor, directionalMovement, isStructuredFeedbackPolicy(actorPolicyVersion), isResultReflectionFeedbackPolicy(actorPolicyVersion), !wholeTraceDirectionalMovement, fixedAnchorMovement, options.wholeTraceObservationVersion, incrementalActor);
+  const guard = new TraceGuard(options.snapshot, persona.id, persona.version, model, true, extendedActor, feedbackActor, directionalMovement, isStructuredFeedbackPolicy(actorPolicyVersion), isResultReflectionFeedbackPolicy(actorPolicyVersion), !wholeTraceDirectionalMovement, fixedAnchorMovement, options.wholeTraceObservationVersion, incrementalActor, options.wholeTraceWayfindingVersion);
   const motor = new Random(`${options.seed}:presentation:${persona.id}:${persona.version}`);
   const history: TraceEntry[] = [], steps: MarketReplayStep[] = [];
   let plannedMs = 0;
@@ -245,6 +248,8 @@ export async function generateAttentionTrace(options: TraceOptions, persona: Act
       ...(wholeTraceDirectionalMovement ? { wholeTraceMovementVersion: options.wholeTraceMovementVersion,
         movementContract: 'joystick-direction-v1' as const } : {}),
       ...(options.wholeTraceObservationVersion ? { wholeTraceObservationVersion: options.wholeTraceObservationVersion } : {}),
+      ...(options.wholeTraceWayfindingVersion ? { wholeTraceWayfindingVersion: options.wholeTraceWayfindingVersion } : {}),
+      ...(wholeTraceHorizon200 ? { wholeTraceActionHorizon: 200 as const } : {}),
       ...(options.wholeTraceMovementValidationVersion ? { wholeTraceMovementValidationVersion: options.wholeTraceMovementValidationVersion,
         ...(options.wholeTraceMovementFeedbackVersion ? { wholeTraceMovementFeedbackVersion: options.wholeTraceMovementFeedbackVersion } : {}) } : {}),
       ...(wholeTraceHasAnchorMovementFeedback(options.wholeTraceMovementFeedbackVersion)

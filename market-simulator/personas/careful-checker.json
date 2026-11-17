@@ -28,6 +28,40 @@
     "familiarShortcutProbability": 0.06,
     "headingPersistence": 0.8
   },
+  "wayfinding": {
+    "version": "1",
+    "cueLevel": "landmark",
+    "planHorizon": "next-step",
+    "maxHypotheses": 1,
+    "memoryForm": "route-sequence",
+    "recoveryOrder": [
+      "return-to-known-landmark",
+      "view-help",
+      "seek-staff",
+      "follow-wide-aisle",
+      "reread-list"
+    ],
+    "thoughtForm": "one-sentence-concrete",
+    "explorationBudgetMs": 240000,
+    "minDistinctPlacesBeforeGiveUp": 20,
+    "basedOn": [
+      "character.selectedTraits[0]: 배운 순서를 안정적으로 수행하고 배치가 바뀌면 다시 확인",
+      "character.selectedTraits[1]: 눈앞의 항목을 차례로 대조",
+      "character.selectedTraits[3]: 낯선 단계에서 멈추거나 설명을 찾음",
+      "attention.goalMemoryCapacity=3"
+    ],
+    "landmarkMemory": {
+      "retention": "decaying",
+      "protectedDecisions": 10,
+      "fadeProbabilityPerDecision": 0.05,
+      "forgetProbabilityPerDecision": 0.03,
+      "basedOn": [
+        "description: 낯선 배치에서는 배운 방식을 옮기는 데 구체적인 확인이 더 필요",
+        "attention.switchMemoryDecay 설정과 같은 부담 방향",
+        "합성 설계값이며 실측 기억 능력이 아님"
+      ]
+    }
+  },
   "character": {
     "name": "서연",
     "age": 38,

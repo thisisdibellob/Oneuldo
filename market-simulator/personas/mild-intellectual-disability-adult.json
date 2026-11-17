@@ -89,5 +89,39 @@
     "preCheckoutCheckProbability": 0.6,
     "familiarShortcutProbability": 0.2,
     "headingPersistence": 0.4
+  },
+  "wayfinding": {
+    "version": "1",
+    "cueLevel": "landmark",
+    "planHorizon": "next-step",
+    "maxHypotheses": 1,
+    "memoryForm": "route-sequence",
+    "recoveryOrder": [
+      "return-to-known-landmark",
+      "follow-wide-aisle",
+      "view-help",
+      "seek-staff",
+      "reread-list"
+    ],
+    "thoughtForm": "one-sentence-concrete",
+    "explorationBudgetMs": 240000,
+    "minDistinctPlacesBeforeGiveUp": 20,
+    "basedOn": [
+      "character.selectedTraits[0]: 눈앞의 구체적인 단서와 현재 한 항목에 집중",
+      "character.selectedTraits[1]: 시작할 곳이 불확실하면 알아보는 단서나 도움을 찾음",
+      "attention.goalMemoryCapacity=2",
+      "character.preferences[3]: 짧고 구체적인 설명이나 도움 이용"
+    ],
+    "landmarkMemory": {
+      "retention": "decaying",
+      "protectedDecisions": 10,
+      "fadeProbabilityPerDecision": 0.05,
+      "forgetProbabilityPerDecision": 0.03,
+      "basedOn": [
+        "character.selectedTraits[0]: 여러 정보를 동시에 기억하는 부담이 있어 눈앞의 단서에 집중",
+        "attention.switchMemoryDecay=0.08",
+        "합성 설계값이며 실측 기억 능력이 아님"
+      ]
+    }
   }
 }

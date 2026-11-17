@@ -910,16 +910,153 @@
           ]
         },
         "wholeTraceMovementValidationVersion": {
-          "enum": ["1"]
+          "enum": [
+            "1"
+          ]
         },
         "wholeTraceObservationVersion": {
-          "enum": ["anchor-visible-structures-v1"]
+          "enum": [
+            "anchor-visible-structures-v1"
+          ]
+        },
+        "wholeTraceWayfindingVersion": {
+          "enum": [
+            "wayfinding-v1",
+            "wayfinding-v2",
+            "wayfinding-v3",
+            "wayfinding-v4"
+          ]
         },
         "wholeTraceMovementFeedbackVersion": {
-          "enum": ["recent-movement-v1", "recent-movement-anchor-v1", "recent-movement-anchor-capacity-v1"]
+          "enum": [
+            "recent-movement-v1",
+            "recent-movement-anchor-v1",
+            "recent-movement-anchor-capacity-v1"
+          ]
+        },
+        "wholeTraceActionHorizon": {
+          "enum": [
+            200
+          ]
         },
         "movementPolicy": {
           "$ref": "#/$defs/movementPolicy"
+        },
+        "authoringRewriteAudit": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "version",
+            "decisions"
+          ],
+          "properties": {
+            "version": {
+              "const": "choice-availability-v1"
+            },
+            "decisions": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "decisionNumber"
+                ],
+                "properties": {
+                  "decisionNumber": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "originalChoiceId": {
+                    "oneOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "const": null
+                      }
+                    ]
+                  },
+                  "originalIntent": {
+                    "oneOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "const": null
+                      }
+                    ]
+                  },
+                  "originalReason": {
+                    "oneOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "const": null
+                      }
+                    ]
+                  },
+                  "originalQuantity": {
+                    "oneOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "const": null
+                      }
+                    ]
+                  },
+                  "originalChoiceAvailable": {
+                    "type": "boolean"
+                  },
+                  "choiceUnavailableRewrite": {
+                    "type": "boolean"
+                  },
+                  "rewriteChangedAvailableChoice": {
+                    "type": "boolean"
+                  },
+                  "rewriteChoices": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "attempt",
+                        "choiceId",
+                        "quantity"
+                      ],
+                      "properties": {
+                        "attempt": {
+                          "type": "integer",
+                          "minimum": 2
+                        },
+                        "choiceId": {
+                          "oneOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "const": null
+                            }
+                          ]
+                        },
+                        "quantity": {
+                          "oneOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "const": null
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
         }
       },
       "required": [

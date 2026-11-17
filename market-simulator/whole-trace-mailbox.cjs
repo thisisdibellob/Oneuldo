@@ -187,6 +187,35 @@ async function serveMailbox({ directory, prepareArguments, service, pollInterval
   }
   return structuredClone(state);
 }
+// One immutable receipt per CLI invocation, including invalid JSON, rejected calls,
+// cached responses and retries. Capture before publication, never rely on actor redirects.
+async function recordedCall(directory, inputFile) {
+  const calls = path.join(path.resolve(directory), 'calls');
+  fs.mkdirSync(calls, { recursive: true, mode: 0o700 });
+  const receipt = path.join(calls, crypto.randomUUID());
+  fs.mkdirSync(receipt, { mode: 0o700 });
+  const startedAt = now();
+  publishNew(path.join(receipt, 'started.json'), { startedAt, inputFile: path.resolve(inputFile), pid: process.pid });
+  let stdout = '', stderr = '', exitCode = 0, operationId = null;
+  try {
+    const bytes = fs.readFileSync(path.resolve(inputFile));
+    fs.writeFileSync(path.join(receipt, 'input.json'), bytes, { flag: 'wx', mode: 0o600 });
+    if (bytes.length > MAX_BYTES) throw fail('MAILBOX_SIZE', 'JSON exceeds 4 MiB');
+    const input = JSON.parse(bytes.toString('utf8'));
+    operationId = input?.operationId ?? null;
+    const result = await callMailbox(directory, input);
+    stdout = JSON.stringify(result, null, 2) + '\n';
+  } catch (error) {
+    stderr = `${error.code ?? 'ERROR'}: ${error.message}\n`;
+    exitCode = 1;
+  }
+  fs.writeFileSync(path.join(receipt, 'stdout.log'), stdout, { flag: 'wx', mode: 0o600 });
+  fs.writeFileSync(path.join(receipt, 'stderr.log'), stderr, { flag: 'wx', mode: 0o600 });
+  fs.writeFileSync(path.join(receipt, 'exit-code'), `${exitCode}\n`, { flag: 'wx', mode: 0o600 });
+  publishNew(path.join(receipt, 'completion.json'), { startedAt, finishedAt: now(), operationId, exitCode });
+  process.stdout.write(stdout); process.stderr.write(stderr); process.exitCode = exitCode;
+}
+
 async function main() {
   const [command, directory, flag, input, ...extra] = process.argv.slice(2);
   if (!directory || extra.length) throw fail('MAILBOX_USAGE', 'serve DIR --prepare-file FILE | call DIR --operation-file FILE | status DIR | abort DIR --reason TEXT');
@@ -196,7 +225,7 @@ async function main() {
     if (prepared.tool !== 'prepare_whole_trace' || !prepared.arguments || Object.keys(prepared).some(key => !['tool', 'arguments'].includes(key)))
       throw fail('MAILBOX_PREPARE', 'Prepare file must be {tool:"prepare_whole_trace",arguments:<unchanged readiness arguments>}');
     result = await serveMailbox({ directory, prepareArguments: prepared.arguments });
-  } else if (command === 'call' && flag === '--operation-file' && input) result = await callMailbox(directory, readJson(path.resolve(input)));
+  } else if (command === 'call' && flag === '--operation-file' && input) return recordedCall(directory, input);
   else if (command === 'status' && !flag) result = readMailboxStatus(directory);
   else if (command === 'abort' && flag === '--reason' && input) result = abortMailbox(directory, input);
   else throw fail('MAILBOX_USAGE', 'Invalid mailbox arguments');

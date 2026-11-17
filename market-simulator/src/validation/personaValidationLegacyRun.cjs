@@ -31,12 +31,19 @@ function validateConfiguration({ runId, outputDirectory, snapshotFilePaths, seed
   if (!Array.isArray(seeds) || !seeds.length || seeds.some(s => !['string', 'number'].includes(typeof s) || !String(s).trim() || String(s).length > 200 || typeof s === 'number' && !Number.isFinite(s)) || new Set(seeds.map(String)).size !== seeds.length) throw new Error('Provide unique finite or nonempty seeds');
   if (!Array.isArray(personaIds) || personaIds.length !== IDS.length || new Set(personaIds).size !== IDS.length || !IDS.every(id => personaIds.includes(id))) throw new Error('Use the three personas and neutral adult control');
 }
+// Optional legacy task design: an explicit low-condition goal count (2..4). Absent keeps the historical 2.
+function lowGoalCountOf(value) {
+  if (value === undefined) return 2;
+  if (!Number.isInteger(value) || value < 2 || value > 4) throw new Error('lowGoalCount must be an integer from 2 to 4');
+  return value;
+}
 function assertSnapshots(m) {
   for (const condition of CONDITIONS) {
     const record = m.snapshots[condition];
     if (!record || fileHash(record.filePath) !== record.sha256) throw new Error(`Snapshot file changed: ${condition}`);
     const snapshot = read(record.filePath);
     if (snapshot.snapshotId !== record.snapshotId) throw new Error(`Mixed snapshot: ${condition}`);
+    if (condition === 'low' && snapshot.config.objectives.length !== lowGoalCountOf(m.lowGoalCount)) throw new Error('low snapshot goal count differs from the run binding');
   }
 }
 function assertManifest(m, directory = m?.runDirectory) {
@@ -70,6 +77,7 @@ function prepare(args) {
   if (fs.existsSync(file)) {
     const m = readManifest(dir);
     assertMovementBinding(m, args, 'Existing run movement binding');
+    if (lowGoalCountOf(m.lowGoalCount) !== lowGoalCountOf(args.lowGoalCount)) throw new Error('Existing run configuration differs');
     if (digest(m.seeds) !== digest(seeds) || digest(m.personaIds) !== digest(personaIds) || CONDITIONS.some(k => path.resolve(snapshotFilePaths[k]) !== m.snapshots[k].filePath)) throw new Error('Existing run configuration differs');
     return refresh(m);
   }
@@ -78,7 +86,8 @@ function prepare(args) {
     const valid = validateMarketReplaySnapshot(snapshot);
     if (!valid.valid) throw new Error(`Invalid ${condition} snapshot: ${valid.errors.join('; ')}`);
     const goals = snapshot.config.objectives;
-    if (goals.length !== (condition === 'low' ? 2 : 5)) throw new Error(`${condition} snapshot requires ${condition === 'low' ? 2 : 5} goals`);
+    const required = condition === 'low' ? lowGoalCountOf(args.lowGoalCount) : 5;
+    if (goals.length !== required) throw new Error(`${condition} snapshot requires ${required} goals`);
     if (condition === 'high' && !goals.some(g => g.quantity > 1)) throw new Error('High snapshot requires a quantity greater than one');
     return [condition, { filePath: source, snapshotId: snapshot.snapshotId, sha256: fileHash(source) }];
   }));
@@ -87,7 +96,7 @@ function prepare(args) {
     condition, seed, personaId, tracePath: path.join(dir, 'traces', condition, seedDirectory(seed, index), `${personaId}.json`),
     snapshotId: snapshots[condition].snapshotId, ...versions, ...movement, personaVersion: profile(personaId).version, traceId: null, exists: false,
   }))));
-  const m = { schema: SCHEMA, version: 2, runId, runDirectory: dir, ...movement, snapshots, seeds, personaIds, slots, versions, specHash: digest(spec), specVersion: spec.version, analysisVersion: spec.analysisVersion,
+  const m = { schema: SCHEMA, version: 2, runId, runDirectory: dir, ...movement, ...(args.lowGoalCount === undefined ? {} : { lowGoalCount: lowGoalCountOf(args.lowGoalCount) }), snapshots, seeds, personaIds, slots, versions, specHash: digest(spec), specVersion: spec.version, analysisVersion: spec.analysisVersion,
     profiles: Object.fromEntries(IDS.map(id => [id, { version: profile(id).version, hash: digest(profile(id)) }])), fixtureOnly: false };
   m.opportunityAudit = require('./personaValidationOpportunity.cjs').auditManifestSnapshots(m);
   m.opportunityAuditHash = digest(m.opportunityAudit);

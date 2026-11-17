@@ -402,3 +402,40 @@ test('a concurrent append is rejected without closing the pending request or add
   assert.equal((await session.appendAuthoring(draft('control/giveUp', { intent: 'finish' }))).accepted, true);
   assert.equal(session.finishAuthoring().candidate.decisions.length, 2);
 });
+
+test('unavailable first choice rewrites retain provenance; available choices remain flagged', async () => {
+  const { settings, bundle } = fixture();
+  const cursor = await createWholeTraceExecutionAuthoringCursor(settings, bundle);
+  const unavailable = draft('open/nonexistent');
+  const rejected = await cursor.append(unavailable);
+  assert.equal(rejected.accepted, false);
+  assert.equal(rejected.metrics.decisions[0].originalChoiceAvailable, false);
+  const accepted = await cursor.append(draft('control/pause'));
+  assert.equal(accepted.accepted, true);
+  assert.equal(accepted.metrics.decisions[0].choiceUnavailableRewrite, true);
+  assert.equal(accepted.metrics.decisions[0].originalReason, unavailable.reason);
+  assert.equal(accepted.metrics.decisions[0].originalIntent, unavailable.basis.intent);
+  const invalid = draft('control/pause'); invalid.actorState.activity = 'explore';
+  const bad = await cursor.append(invalid);
+  assert.equal(bad.accepted, false);
+  assert.match(JSON.stringify(bad.issues), /allowed values: orient, shop, interest, recover, check, finish, rest/);
+  const changed = await cursor.append(draft('control/lookAround'));
+  assert.equal(changed.accepted, true);
+  assert.equal(changed.metrics.decisions[1].rewriteChangedAvailableChoice, true);
+  assert.equal(changed.metrics.decisions[1].choiceUnavailableRewrite, undefined);
+});
+
+test('rewrite audit survives trace persistence without changing the candidate', async t => {
+  const session = sessionFixture(t);
+  await session.beginAuthoring();
+  await session.appendAuthoring(draft('open/nonexistent'));
+  await session.appendAuthoring(draft('control/pause'));
+  await session.appendAuthoring(draft('control/giveUp', { intent: 'finish' }));
+  const finished = session.finishAuthoring();
+  const result = await session.submit(finished.candidate);
+  assert.equal(result.status, 'complete', JSON.stringify(result));
+  const trace = JSON.parse(fs.readFileSync(result.outputPath, 'utf8'));
+  assert.equal(trace.generation.authoringRewriteAudit.decisions[0].choiceUnavailableRewrite, true);
+  assert.equal(trace.generation.authoringRewriteAudit.decisions[0].originalChoiceId, 'open/nonexistent');
+  assert.equal(finished.candidate.decisions[0].choiceUnavailableRewrite, undefined);
+});

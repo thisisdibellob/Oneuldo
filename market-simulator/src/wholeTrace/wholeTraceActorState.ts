@@ -3,6 +3,7 @@ import type { WholeTraceBasis, WholeTraceKnowledgeSnapshot } from './wholeTraceK
 import { matchesObjective, type MarketTaskObjective } from '../../../frontend/src/game/marketSession';
 import { validateWholeTraceMemoryUpdate, type WholeTraceMemoryUpdate } from './wholeTraceCognition';
 import { validateWholeTraceTaskUpdate, type WholeTraceTaskUpdate } from './wholeTraceTaskMemory';
+import { validateWholeTraceThought, type WholeTraceThought } from './wholeTraceWayfinding';
 
 export const WHOLE_TRACE_ACTIVITIES = ['orient', 'shop', 'interest', 'recover', 'check', 'finish', 'rest'] as const;
 export const WHOLE_TRACE_ORIENTATIONS = ['unfamiliar', 'recognizing', 'familiar'] as const;
@@ -28,6 +29,8 @@ export type WholeTraceActorState = {
   memoryUpdate?: WholeTraceMemoryUpdate;
   /** Candidate 7 explicit task selection/release; current attention does not delete pending goals. */
   taskUpdate?: WholeTraceTaskUpdate;
+  /** wayfinding-v1 free-form judgment (noticed/hypothesis/plan/next), returned verbatim in the next menu. */
+  thought?: WholeTraceThought;
 };
 
 export type WholeTraceActorStateContext = {
@@ -39,6 +42,9 @@ export type WholeTraceActorStateContext = {
   requireFocusFields?: boolean;
   allowMemoryUpdate?: boolean;
   allowTaskMemory?: boolean;
+  /** wayfinding-v1: optional free-form actor judgment, never a cue or knowledge source. */
+  allowThought?: boolean;
+  thoughtVersion?: import('./wholeTraceWayfinding').WholeTraceWayfindingVersion;
 };
 
 const stateFields = ['activity', 'task', 'heldGoalIds', 'uncertainGoalIds', 'focusedGoalId', 'focusedProductId', 'orientation', 'triggerCueRefs'];
@@ -63,13 +69,14 @@ export function validateWholeTraceActorState(value: unknown, context: WholeTrace
     return { valid: false, errors: ['maximumTriggerCueRefs must be a positive integer'] };
   if (!plain(value)) return { valid: false, errors: ['actorState must be a JSON object'] };
   if (Object.keys(value).some(field => !stateFields.includes(field) && !(context.allowMemoryUpdate && field === 'memoryUpdate')
-    && !(context.allowTaskMemory && field === 'taskUpdate'))) errors.push('Unknown actorState field');
+    && !(context.allowTaskMemory && field === 'taskUpdate') && !(context.allowThought && field === 'thought'))) errors.push('Unknown actorState field');
+  if (context.allowThought) errors.push(...validateWholeTraceThought(value.thought, context.thoughtVersion));
   if (context.allowTaskMemory) errors.push(...validateWholeTraceTaskUpdate(value.taskUpdate).errors);
   if (context.allowMemoryUpdate && value.memoryUpdate !== undefined)
     errors.push(...validateWholeTraceMemoryUpdate(value.memoryUpdate).errors);
-  if (!WHOLE_TRACE_ACTIVITIES.includes(value.activity as WholeTraceActorState['activity'])) errors.push('Unsupported actorState.activity');
+  if (!WHOLE_TRACE_ACTIVITIES.includes(value.activity as WholeTraceActorState['activity'])) errors.push(`Unsupported actorState.activity; allowed values: ${WHOLE_TRACE_ACTIVITIES.join(', ')}`);
   if (typeof value.task !== 'string' || !value.task.trim() || value.task.length > 160) errors.push('actorState.task must be a short nonempty behavioral description');
-  if (!WHOLE_TRACE_ORIENTATIONS.includes(value.orientation as WholeTraceActorState['orientation'])) errors.push('Unsupported actorState.orientation');
+  if (!WHOLE_TRACE_ORIENTATIONS.includes(value.orientation as WholeTraceActorState['orientation'])) errors.push(`Unsupported actorState.orientation; allowed values: ${WHOLE_TRACE_ORIENTATIONS.join(', ')}`);
   for (const field of ['heldGoalIds', 'uncertainGoalIds'] as const)
     if (!refs(value[field], 24)) errors.push(`actorState.${field} must contain 0..24 distinct short references`);
   if (!refs(value.triggerCueRefs, maximumTriggerCueRefs, 1)) errors.push(`actorState.triggerCueRefs must contain 1..${maximumTriggerCueRefs} distinct short references`);

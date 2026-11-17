@@ -42,6 +42,9 @@ async function generateOriginalTrace(options: TraceOptions): Promise<MarketRepla
   if (options.wholeTraceObservationVersion !== undefined && (options.wholeTraceObservationVersion !== 'anchor-visible-structures-v1'
     || !wholeTraceCompiler || options.wholeTraceMovementVersion !== undefined || options.trialBinding))
     throw new Error('wholeTraceObservationVersion requires a new unbound whole-trace anchor request');
+  if (options.wholeTraceWayfindingVersion !== undefined && (!['wayfinding-v1', 'wayfinding-v2', 'wayfinding-v3', 'wayfinding-v4'].includes(options.wholeTraceWayfindingVersion)
+    || !wholeTraceCompiler || options.wholeTraceObservationVersion !== 'anchor-visible-structures-v1'))
+    throw new Error('wholeTraceWayfindingVersion wayfinding-v1/v2 requires the whole-trace compiler with anchor-visible-structures-v1');
   if (options.wholeTraceMovementValidationVersion !== undefined && (options.wholeTraceMovementValidationVersion !== '1'
     || !wholeTraceCompiler || options.trialBinding || options.wholeTraceMovementVersion !== undefined && options.wholeTraceMovementVersion !== 'directional-v2'))
     throw new Error('wholeTraceMovementValidationVersion 1 requires the whole-trace compiler and anchor or directional-v2 movement');

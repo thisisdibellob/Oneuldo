@@ -111,6 +111,63 @@ legacy와 traits v1의 기존 판정은 유지하고, 새 `movementOpportunities
 
 목적은 Luna 배우의 조기 포기가 입력 표현(선택지 순서·예시 구성)에 영향을 받는지 가려내는 것이다. 포기를 줄이는 것 자체를 목표로 삼거나 결과를 성능 향상으로 해석하지 않는다.
 
+### 길 찾기 인지 옵션 `wayfindingVersion:"wayfinding-v1"` (선택, 기본 꺼짐)
+
+2026-11-15 실행에서 장애·일반 성인 페르소나 모두 시작 구역에서 매대를 한 번도 보지 못한 채 1분 안팎에 포기했다. 매장 배치를 바꾸지 않고, 배우가 실제로 본 정보로 매장 구조를 추정하고 스스로 판단하게 하는 옵션이다. 행동·경로·상품은 계속 배우가 고른다.
+
+1. **지각**: `observation.boundaries`가 화면의 8방향에 실제로 그려진 것을 알려 준다. `wall`(벽·매장 끝), `fixture`(진열대·계산대 같은 집기), `covered`(화면의 장보기 목록이 바닥을 가림, 벽이 아님), `open`(바닥이 화면 끝까지 이어짐) 중 하나와 거리대를 준다. 좌표·카테고리·경로는 넣지 않는다.
+2. **기억**: 메뉴의 `spatialMemory`는 배우가 수락된 관찰과 걷기만으로 만든 대략적인 기억이다. 출발점 기준 어림 걸음(near=1, medium=2, far=3), 훑은 범위, 본 랜드마크·벽, 써 본 회복 전략, 포기 가능 여부를 담는다. 걷기 선택지에는 `visitedTimes`와 "내가 N번 와 본 곳/아직 안 가 본 곳" 표시가 붙는다.
+3. **판단**: `actorState.thought`(`noticed`·`hypothesis`·`plan`·`next` 중 하나 이상, 각 200자 이하)에 배우가 자유롭게 판단을 쓴다. 다음 메뉴의 `ownNotes`가 이를 그대로 돌려준다(현재 계획과 최근 4개). thought는 믿음일 뿐 단서 원장이나 상품 위치의 근거가 아니다. `reason`은 지금처럼 관찰 가능한 설명만 쓴다.
+4. **포기 조건**: 장보기 화면의 `control/giveUp`은 아래 중 하나를 만족할 때만 메뉴에 나타나고, 컴파일러도 같은 조건으로 검사한다(`WAYFINDING_GIVE_UP_LOCKED`). 포기 결정에는 `thought.plan`이 필요하다. 조건을 못 채운 포기 제출은 기술 오류가 아니라 재작성 대상이며, 다음 초안은 종료 의도와 관계없이 다른 행동을 고를 수 있다. 계산 단계에서는 언제든 포기할 수 있다.
+   - 계획 시간이 페르소나 `wayfinding.explorationBudgetMs` 이상이다.
+   - 서로 다른 곳을 `minDistinctPlacesBeforeGiveUp` 이상 걸었고, 이용 안내를 봤고, 본 직원이 있으면 말을 걸었다.
+   - 3곳 이상 걸었고 본 통로를 모두 가 봤다.
+5. **페르소나별 판단 방식**: 각 페르소나 JSON의 `wayfinding` 프로필(`cueLevel`, `planHorizon`, `maxHypotheses`, `memoryForm`, `recoveryOrder`, `thoughtForm`, `basedOn`)이 지시문 절 "길을 찾고 판단하는 방식"으로 렌더링된다. 차이는 탐색 방식에만 두고, 포기 기준은 모든 페르소나가 같다.
+
+`prepare_whole_trace`에서는 `movementVersion` 없이 줄 수 있다. 검증 run에서는 `prepare_persona_validation`에 `{"movementValidationVersion":"1","wayfindingVersion":"wayfinding-v1"}`로 묶어야 하며, 일반 성인 대조군도 이 경로로 실행한다. inputHash, bundle, trace generation(`wholeTraceWayfindingVersion`), knowledge audit에 모두 기록된다.
+
+### `wayfindingVersion:"wayfinding-v2"`
+
+2026-11-15 v1 20회(`output/persona-wayfinding20-20261115-225536`)에서 일반 성인 7건 중 5건이 상품을 다 담고도 계산대를 찾지 못했다. v1 공간 기억은 랜드마크를 최근 본 순서로 12개만 남겼고, 이름이 안 보이는 진열대를 본 위치마다 따로 저장해 앞서 본 계산대가 밀려났다. 포기 조건은 "20곳 걷기 + 안내"로 22~27번째 행동 만에 열렸다. v1은 보관 기록 재현을 위해 그대로 두고, 아래 변경은 v2에만 적용한다.
+
+- **이름 있는 장소는 밀려나지 않는다.** 계산대·출구·입구·직원·매대는 station별로 하나씩 남는다. 계산대 표지는 "· 계산 가능" 같은 상태 표시를 뗀 이름으로 저장한다. 이름이 안 보이는 진열대는 걸음 2칸 단위로 묶은 위치 중 가까운 4곳만 `unlabelledShelves`에 보인다.
+- **"대략 저쪽" 감각.** 장소마다 걸어온 기록으로 어림한 위치를 저장하고, 메뉴에 `fromHere`(예: "지금 위치에서 남동쪽 약 9걸음(추정)")를 준다. 벽·집기를 고려한 경로가 아니다.
+- **배우가 정하는 목적지.** `thought.destination`에 기억한 장소 이름을 쓰면 다른 목적지를 쓸 때까지 유지되고, `spatialMemory.destination`에 남은 방향과 도착 여부가, 그 방향 45도 안의 걷기 선택지에 "기억한 ○○ 쪽"이 표시된다. 기억에 없는(잊었거나 본 적 없는) 장소는 목적지로 거절된다.
+- **페르소나별 기억 흐려짐** (`wayfinding.landmarkMemory`). `stable`은 잊지 않는다(일반 성인). `decaying`은 마지막으로 본 뒤 `protectedDecisions` 동안 보호하고, 이후 결정마다 `fadeProbabilityPerDecision` 확률로 흐려지고(대략 방향만 남음), 흐려진 뒤 `forgetProbabilityPerDecision` 확률로 사라진다. 다시 보면 즉시 선명해진다. 확률은 trace seed·장소·결정 번호로 정하는 결정적 난수라 재검증에서도 같다. 지적장애 페르소나 3명은 10 / 0.05 / 0.03으로 둔 합성 설계값이며 실측 기억 능력이 아니다. 흐려짐·잊음·재인식 기록은 knowledge audit의 `wayfindingMemoryEvents`에 남는다.
+- **포기 조건.** 이용 안내를 봤고 본 직원이 있으면 말을 걸었다는 조건에 더해, (a) 계획 시간이 `explorationBudgetMs` 이상이거나 (b) 관찰 기록상 남은 단서가 없어야 열린다. 단서는 본 매대를 아직 열지 않음, 상품을 담은 뒤 본 계산대에 아직 가지 않음, 이름이 안 보이던 진열대에 아직 다가가지 않음이다. 단서는 실제 관찰 기록으로 판단하므로 잊어도 포기가 쉬워지지 않는다. 잊은 단서는 안내문에서 이름을 밝히지 않는다. 열렸을 때 안내문은 "그만두기를 고를 수 있다."뿐이다.
+- **thought는 한국어만 허용한다**(한자·가나 거절).
+
+### `wayfindingVersion:"wayfinding-v3"`
+
+2026-11-16 v2로 일반 성인 10회(`output/persona-control10-wayfinding-v2-20261116-022400`)를 돌렸을 때 4회가 매장 안에 들어가지 못한 채 포기했다. 출발점은 매장 앞 벽 바깥 로비이고, 매대는 입구 게이트 안에 있다. 원인은 세 가지였다. 첫째, 포기 조건이 이미 본 매대·계산대만 단서로 세서, 아무것도 못 본 상태가 "남은 단서 없음"이 됐다. 그래서 이용 안내를 보자마자(20~66초) 포기를 고를 수 있었다. 둘째, v1/v2 경계 분류가 모든 충돌 사각형(벽, 로비 의자·화분·ATM)을 "진열대·계산대 같은 집기"라고 불러 배우가 로비 의자를 매대로 알고 쫓아갔다. 셋째, 로비라는 사실과 입구를 지나는 통로라는 표시가 없어, 입구 바로 앞까지 가고도 돌아섰다. v1/v2는 보관 기록 재현을 위해 그대로 두고, 아래 변경은 v3에만 적용한다. 매장 맵은 바꾸지 않는다.
+
+- **경계는 실제로 그려진 것의 이름을 쓴다** (`visibleBoundariesV3`): 벽, 진열대, 계산대, 비품(의자와 탁자·화분·ATM·기둥 등), 사람, 공사 구역, 그 밖의 집기, 목록에 가림, 화면 끝까지 이어진 바닥.
+- **지금 서 있는 구역의 종류** (`observation.area`, `spatialMemory.currentArea`·`areasVisited`): 매장 안 판매 구역 / 매장 밖 로비 / 복도 / 엘리베이터 앞 / 건물 출입문 앞. 구역 ID·좌표·인접 정보는 넣지 않는다. 메뉴의 "매장 통로 화면"은 화면 종류이며 위치가 아니라고 안내한다.
+- **출입 게이트를 지나는 걷기 선택지 표시** (`observation.gatePassages`, 걷기 라벨 "· 입구를 지나 매장 안으로"): 화면에 보이는 걷기 선택지의 직선 구간이 화면 안에서 입구·출구·옆문 게이트를 지날 때만 붙는다. 어느 쪽으로 갈지 추천하지 않는다. 지나간 게이트는 `spatialMemory.gatesPassed`에 남는다.
+- **포기 조건(v3)**: 이용 안내를 봤고 본 직원이 있으면 말을 걸어 봤다는 조건은 그대로다. 그 위에 다음을 둔다. (1) 본 입구로 매장 안에 들어가 보기 전에는 시간이 지나도 잠긴다. (2) 본 통로 중 아직 안 가 본 곳도 단서로 센다. 이런 곳이 남아 있으면 `explorationBudgetMs`가 지나야 열린다. (3) v2 단서(본 매대 미개봉, 담은 뒤 계산대 미방문, 이름 없는 진열대 미접근)는 그대로 유지한다. 그래서 화면에 상호작용할 것이 안 보인다는 이유만으로는 그만두기가 열리지 않는다.
+- 페르소나 프로필 형태(`landmarkMemory` 포함)와 thought 규칙(목적지, 한국어)은 v2와 같다.
+
+### `wayfindingVersion:"wayfinding-v4"`
+
+2026-11-16 v3 일반 성인 10회(`output/persona-control10-wayfinding-v3-20261116-103248`) 중 7번은 우유 위치를 물으려 직원 대화를 열었지만 '잠시 멈추기·주변 보기·닫기'만 받았다. 실제 게임(`MarketSimulationScreen`)과 공용 세션(`marketSession`의 `askLocation`), TraceGuard 관찰(`staffLocationHelp`·`locationChoices`)과 trace 재생(`talkToStaff` `openLocationHelp`/`askLocation`/`backToStaff`)에는 모두 있었고, whole-trace 선택지 변환(`wholeTraceChoices.ts`의 `canonicalAction`)만 이 세 버튼을 버리고 있었다. 동시에 포기 조건은 직원 창을 연 것만으로 "직원에게 물어봄"으로 셌다. 게임 코드는 바꾸지 않는다. v1~v3는 보관 기록 재현을 위해 그대로 둔다.
+
+- **직원 대화 선택지 연결**(v4 bundle에만 catalog `staffDialogue`): 직원 대화에서 `staff/openLocationHelp`("이 물건은 어디에 있나요?") → 장보기 목록 항목마다 `staff/askLocation/<목표 ID>`("○○ 위치 물어보기") → 답변. `staff/backToStaff`("뒤로가기")는 첫 대화 화면으로 돌아간다. 위치 메뉴가 열린 동안 계산원 호출 버튼은 앱과 같이 보이지 않는다. 저장 trace는 기존 `talkToStaff` 단계 그대로다.
+- **답변**: 게임의 `marketLocationResponse` 문장이 `currentObservation.observation.result.message`에 나오고, `spatialMemory.staffAnswers`(최근 4개)에 남는다. `spatialMemory.recovery.askedStaff`는 실제로 답을 받았는지 나타낸다.
+- **포기 조건(v4)**: v3과 같되 "본 직원에게 물어봄"은 직원 창 열기가 아니라 답을 받은 위치 질문으로만 센다.
+- 위치 질문은 앱과 같이 장보기 목록 상품만 대상이다. 계산대 위치 질문, 반품 부탁 같은 기능은 게임에 먼저 추가한 뒤 연결해야 한다.
+
+### 관찰 상한 옵션 `actionHorizon:200` (선택, 기본 100)
+
+품목이 많은 과제처럼 100행동 안에 끝나기 어려운 실험에서 수락 결정 관찰 상한을 200으로 늘린다. 기본값은 100이며 값을 주지 않은 bundle·inputHash·trace는 이전과 같다.
+
+- `prepare_whole_trace({actionHorizon:200})`이면 `generationLimits.acceptedActionHorizon`과 기본 `technicalActionBudget`이 200이 된다. 배우에게 보이는 상한 문구(`actionContract.ending`, 작성 안내의 최종화 조건, 지시문)는 정해진 문장만 200으로 바꾸며, 문장이 바뀌어 대응을 못 찾으면 bundle 생성이 실패한다.
+- 종료 없이 200번째 결정까지 진행했을 때만 그때의 장바구니로 시스템 계산을 붙인다. trace에는 `generation.wholeTraceActionHorizon:200`과 `systemCompletion.afterDecisions/actionLimit:200`이 남고, 검증기는 이 표시가 있는 whole-trace-v3만 200 경계를 받는다. 200 상한에서 100번째에 `finish`하면 미완성 최종화로 기술 실패다.
+- 배우 지시문은 `authoring-v3-h200` 템플릿(authoring-v3와 상한 숫자만 다름)을 쓴다. `whole-trace-actor-input.cjs`는 bundle의 상한에 맞는 템플릿을 고르고, 맞지 않는 템플릿 지정은 거절한다.
+- 검증 run에서는 `prepare_persona_validation`에 `{"movementValidationVersion":"1","actionHorizon":200}`으로 묶는다. 슬롯 요청·bundle·trace의 상한이 run 바인딩과 다르면 거절한다.
+- legacy 검증 run도 `lowGoalCount`(2~4)를 명시하면 low snapshot의 목표 수를 그 값으로 검사하고 manifest에 남긴다. 생략하면 기존처럼 2개다. 일반 성인 대조군으로 품목 수를 늘린 과제를 돌릴 때 함께 쓴다.
+
+저장 trace의 JSON 스키마에서도 `generation.wholeTraceWayfindingVersion`을 선택 항목으로 허용한다. 허용값은 `wayfinding-v1`·`wayfinding-v2`·`wayfinding-v3`·`wayfinding-v4`이며, 알 수 없는 필드·버전은 계속 거절한다. `whole-trace-wayfinding-finalization.test.cjs`는 옵션을 켠 candidate 7의 허용된 포기·계산 제출·100행동 시스템 계산과 세션 저장까지 검사한다. 중간 관찰·메뉴 검사만으로 최종 생성 성공을 대신하지 않는다.
+
 ### 후보 작성과 제출 계약
 
 기술 수정이 허용된 실패에는 `repair_whole_trace({requestId,repair:{decisions:[...]}})`로 수정할 suffix만 보낸다. `repairFilePath`도 같은 `{ "decisions": [...] }` 객체를 받는다. 서버가 요청·버전·수정 시작 위치를 채우고 이미 수락한 prefix와 원래 종료 의도, 수정 1회 제한을 유지한다. 기존 명시형 wrapper도 지원하며 잘못 명시한 값은 거절한다. 별도 사전 검사 왕복이나 행동별 AI 호출을 추가하지 않는다.
@@ -203,3 +260,11 @@ low/high는 [고정 도달성 fixture](../test/fixtures/whole-trace-reachability
 이 카메라 변경은 앱 재생에 쓰는 `GamePrototypeScreen`의 embedded market 경로에 적용한다. standalone `MarketMap`은 변경하지 않는다. bundle의 `sourceFiles`에 카메라 구현 해시를 추가한다. 저장된 bundle·trace·검증 파일은 수정하지 않으며, 작은 화면에서 새로 컴파일하거나 재검증할 때는 현재 카메라 투영을 사용한다.
 
 방향 BFS는 24px cell을 방문 중복 판정에만 쓰고 실제 끝점을 cell 중심이나 waypoint로 옮기지 않는다. 입력은 8방향, 400ms, `speedMultiplier:0.7`, `accelerationMs:200`의 고정된 합법 motor profile이다. cell마다 한 도착점만 보존하는 유한 탐색이므로 실패는 이 설정에서 경로를 찾지 못했다는 뜻이며 연속 공간에서의 물리적 불가능 증명은 아니다. 이 검사는 기계적 도달성 회귀이며 페르소나의 행동 선택·구매 성공률·실제 앱 실행을 측정하지 않는다.
+
+### 선택 불가 재작성 기록과 자동 호출 영수증
+
+명시적으로 선택하는 새 `authoring-v4` / `authoring-v4-h200` 템플릿은 첫 초안의 choiceId가 해당 결정 직전 메뉴에 없었던 경우, 원래 초안·의도를 보존하고 그 의도에 맞는 메뉴 선택으로 기술 재작성할 수 있다. 기존 종료 의도 가드와 재작성 예산은 그대로이며, 메뉴에 있던 선택이나 구매 수량을 바꾸는 것은 계속 절차 위반이다. 기본 템플릿은 v3로 유지한다.
+
+작성 metrics는 첫 선택·가용성·수량·intent·reason과 후속 변경을 기록한다. `choiceUnavailableRewrite`는 첫 선택이 불가능했던 변경의 출처 표시이며 의미 보존을 자동 입증하지 않는다. `rewriteChangedAvailableChoice`는 가용 선택/수량 변경을 남긴다. 변경이 있을 때만 trace의 `generation.authoringRewriteAudit`에 같은 증거를 추가한다. 후보·bundle·inputHash의 계약은 변하지 않는다. 감사 스크립트는 새 템플릿이 기록된 슬롯에서만 선택 불가 예외를 인정하며, 기존 실행의 판정을 소급 변경하지 않는다.
+
+mailbox CLI `call`은 배우의 출력 리다이렉션과 별도로 `owner/calls/<고유 ID>/`에 원본 입력, stdout, stderr, exit-code 및 시작·종료 영수증을 저장한다. 동일 operationId의 재전송도 별도 호출 영수증이며 엔진 결정은 중복 실행하지 않는다. 강제 종료로 종료 영수증이 없으면 누락으로 남고, 완료를 추정하지 않는다. 스키마 enum 거절은 activity·orientation·intent의 허용값을 표시한다.

@@ -101,7 +101,7 @@ test('task-design hash, shape and actual snapshot goal counts are bound during r
   assert.equal((await service.invokeTool('check_persona_validation_readiness', { runDirectory: prepared.runDirectory })).required, 4);
 });
 
-test('lowGoalCount is a bounded v2-only opt-in and the tool schema exposes it', async t => {
+test('lowGoalCount is a bounded opt-in (traits v2 or legacy) and the tool schema exposes it', async t => {
   const { service, args, directory } = fixture(t, 4);
   assert.deepEqual(definitions.find(d => d.name === 'prepare_persona_validation').inputSchema.properties.lowGoalCount,
     { type: 'integer', minimum: 2, maximum: 4 });
@@ -112,8 +112,9 @@ test('lowGoalCount is a bounded v2-only opt-in and the tool schema exposes it', 
   const v1 = { ...args, lowGoalCount: 4, profiles: args.profiles.map(p => ({ ...p, schemaVersion: 'persona-traits-v1' })) };
   await assert.rejects(service.invokeTool('prepare_persona_validation', v1), /only for traits catalog v2/);
   const { profiles, ...withoutProfiles } = args;
-  await assert.rejects(service.invokeTool('prepare_persona_validation', { ...withoutProfiles, lowGoalCount: 4,
-    validationMode: 'legacy' }), /only for traits catalog v2/);
+  // Legacy runs accept an explicit lowGoalCount (see persona-validation-legacy-goal-count) but keep its bounds.
+  await assert.rejects(service.invokeTool('prepare_persona_validation', { ...withoutProfiles, lowGoalCount: 5, validationMode: 'legacy',
+    personaIds: ['mild-intellectual-disability-adult', 'careful-checker', 'quick-decider', 'neutral-adult-control'] }), /lowGoalCount/);
   const prepared = await service.invokeTool('prepare_persona_validation', { ...args, lowGoalCount: 4 });
   assert.equal(prepared.taskDesign.goalCounts.low, 4);
 });
