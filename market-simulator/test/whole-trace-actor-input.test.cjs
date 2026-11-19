@@ -10,7 +10,7 @@ const { createService } = require('../server.cjs');
 const { createMarketSession } = require('../../frontend/src/game/marketSession.ts');
 const { createMarketReplaySnapshot } = require('../../frontend/src/game/marketReplayTrace.ts');
 const crypto = require('node:crypto');
-const { buildActorInput, renderActorInstructions, REPLACEMENTS, OMITTED_BUNDLE_KEYS, INSTRUCTION_TEMPLATES } = require('../whole-trace-actor-input.cjs');
+const { buildActorInput, renderActorInstructions, REPLACEMENTS, OMITTED_BUNDLE_KEYS, INSTRUCTION_TEMPLATES, extractVisitMemo, validateVisitMemo } = require('../whole-trace-actor-input.cjs');
 
 async function prepared(t, extra = {}) {
   const service = createService();
@@ -153,4 +153,64 @@ test('v5 adds slot-local transport and literal-only authoring reminders without 
     assert.match(rendered.text, /choiceUnavailableRewrite/);
     assert.match(rendered.text, /Preserve the first draft delayMs on every rewrite/);
   }
+});
+
+test('authoring-v5-h200-memo is v5-h200 plus only the previous-visit and visit-memo paragraphs', () => {
+  const v5 = fs.readFileSync(INSTRUCTION_TEMPLATES['authoring-v5-h200'], 'utf8');
+  const memo = fs.readFileSync(INSTRUCTION_TEMPLATES['authoring-v5-h200-memo'], 'utf8');
+  const anchor = 'For final delivery call finish_and_submit_whole_trace with {}.';
+  const [head, tail] = v5.split(anchor);
+  const [memoHead, memoTail] = memo.split(anchor);
+  assert.ok(memoHead.startsWith(head));
+  assert.match(memoHead.slice(head.length), /^If actor-input\.json has a top-level previousVisit field/);
+  assert.ok(memoTail.startsWith(tail.trimEnd()));
+  assert.match(memoTail.slice(tail.trimEnd().length), /^\n\nAfter final delivery, write the person's visit memo:.*at most 300 characters/s);
+  assert.doesNotMatch(renderActorInstructions('authoring-v5-h200-memo', '/experiment/slot').text, /__[A-Z_]+__/);
+});
+
+test('visit memo extraction takes the last tagged memo verbatim and never repairs it', () => {
+  assert.equal(extractVisitMemo('done\n<visit-memo>\n우유는 들어가서 왼쪽 냉장 매대.\n</visit-memo>\n'), '우유는 들어가서 왼쪽 냉장 매대.');
+  assert.equal(extractVisitMemo('<visit-memo>a</visit-memo> then <visit-memo>b</visit-memo>'), 'b');
+  assert.equal(extractVisitMemo('<visit-memo></visit-memo>'), '');
+  assert.equal(extractVisitMemo('no memo here'), null);
+  assert.throws(() => validateVisitMemo(''), /empty/);
+  assert.throws(() => validateVisitMemo('가'.repeat(301)), /301 characters/);
+  assert.equal(validateVisitMemo(' 가'.repeat(150)).characters, 299);
+});
+
+test('a previous visit memo is carried verbatim into the actor copy only with a memo template', async t => {
+  const response = await prepared(t, { actionHorizon: 200 });
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'actor-input-memo-'));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  fs.mkdirSync(path.join(directory, 'owner'));
+  const source = path.join(directory, 'owner', 'prepare-response.json');
+  const output = path.join(directory, 'actor-input.json');
+  const memoFile = path.join(directory, 'memo.txt');
+  const memo = '들어가서 왼쪽으로 가면 냉장 매대에 우유가 있었다. 계산대는 출구 옆.';
+  fs.writeFileSync(source, JSON.stringify(response));
+  fs.writeFileSync(memoFile, `${memo}\n`);
+  const cli = path.resolve(__dirname, '../whole-trace-actor-input.cjs');
+  const refused = spawnSync(process.execPath, [cli, source, output, '--template', 'authoring-v5-h200', '--previous-visit-memo', memoFile], { encoding: 'utf8' });
+  assert.notEqual(refused.status, 0);
+  assert.match(refused.stderr, /-memo instruction template/);
+  assert.equal(fs.existsSync(output), false);
+  const written = spawnSync(process.execPath, [cli, source, output, '--template', 'authoring-v5-h200-memo', '--previous-visit-memo', memoFile], { encoding: 'utf8' });
+  assert.equal(written.status, 0, written.stderr);
+  const summary = JSON.parse(written.stdout);
+  const actorInput = JSON.parse(fs.readFileSync(output, 'utf8'));
+  assert.equal(actorInput.previousVisit.memo, memo);
+  assert.equal(actorInput.previousVisit.version, 'previous-visit-memo-v1');
+  assert.equal(actorInput.bundle.inputHash, response.bundle.inputHash, 'the prepared bundle identity is unchanged');
+  assert.equal(text(actorInput.bundle), text(buildActorInput(response).bundle), 'the memo is not merged into the bundle');
+  assert.equal(summary.previousVisit.characters, Array.from(memo).length);
+  assert.equal(summary.previousVisit.memoSha256, crypto.createHash('sha256').update(memo).digest('hex'));
+  assert.equal(summary.actorInstructions.templateId, 'authoring-v5-h200-memo');
+  const firstVisit = fs.mkdtempSync(path.join(os.tmpdir(), 'actor-input-first-'));
+  t.after(() => fs.rmSync(firstVisit, { recursive: true, force: true }));
+  fs.mkdirSync(path.join(firstVisit, 'owner'));
+  fs.writeFileSync(path.join(firstVisit, 'owner', 'prepare-response.json'), JSON.stringify(response));
+  const plain = spawnSync(process.execPath, [cli, path.join(firstVisit, 'owner', 'prepare-response.json'), path.join(firstVisit, 'actor-input.json'), '--template', 'authoring-v5-h200-memo'], { encoding: 'utf8' });
+  assert.equal(plain.status, 0, plain.stderr);
+  assert.equal(JSON.parse(plain.stdout).previousVisit, null);
+  assert.equal(Object.hasOwn(JSON.parse(fs.readFileSync(path.join(firstVisit, 'actor-input.json'), 'utf8')), 'previousVisit'), false);
 });

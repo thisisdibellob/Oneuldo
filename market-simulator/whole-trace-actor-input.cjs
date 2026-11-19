@@ -103,6 +103,31 @@ function buildActorInput(prepareResponse) {
 
 const sha256 = text => crypto.createHash('sha256').update(text).digest('hex');
 
+// A persona-authored memo from a previous visit. It is the actor's own words,
+// carried verbatim; code never summarises, corrects or adds to it.
+const PREVIOUS_VISIT_VERSION = 'previous-visit-memo-v1';
+const VISIT_MEMO_MAX_CHARACTERS = 300;
+const PREVIOUS_VISIT_NOTICE = 'previousVisit.memo는 이 인물이 지난번 같은 마트에 왔을 때 마지막에 자기 말로 남긴 기억 메모다. 인물은 이 마트에 한 번 와 봤다는 것을 안다. 메모는 인물의 기억이라 틀리거나 흐리거나 빠진 것이 있을 수 있다. 장보기 목록은 새로 읽어야 하며 지난번과 다를 수 있다. 메모를 얼마나 믿고 쓸지는 인물이 현재 화면과 대조해 정한다. 메모에 적힌 매대·계산대도 걸어서 현재 화면에 보이고 가까워져야 열 수 있으며, 메모는 cueRef가 아니다.';
+const VISIT_MEMO_TAG = /^<visit-memo>\s*$([\s\S]*?)^<\/visit-memo>\s*$|<visit-memo>([\s\S]*?)<\/visit-memo>/gm;
+
+function validateVisitMemo(memo) {
+  if (typeof memo !== 'string') throw new TypeError('visit memo must be a string');
+  const text = memo.trim();
+  const characters = Array.from(text).length;
+  if (characters === 0) throw new Error('visit memo is empty');
+  if (characters > VISIT_MEMO_MAX_CHARACTERS) throw new Error(`visit memo has ${characters} characters; the limit is ${VISIT_MEMO_MAX_CHARACTERS}`);
+  if (/<\/?visit-memo>/.test(text)) throw new Error('visit memo must not contain memo tags');
+  return { text, characters };
+}
+
+/** Returns the last tagged memo in an actor's final reply, or null when there is none. Never repairs it. */
+function extractVisitMemo(reply) {
+  if (typeof reply !== 'string') throw new TypeError('actor reply must be a string');
+  let last = null;
+  for (const match of reply.matchAll(VISIT_MEMO_TAG)) last = (match[1] ?? match[2]).trim();
+  return last;
+}
+
 // Fixed actor instruction templates. A new wording is a new file and id; an
 // existing template is never edited, so recorded SHAs keep identifying it.
 const INSTRUCTION_TEMPLATES = Object.freeze({
@@ -115,6 +140,8 @@ const INSTRUCTION_TEMPLATES = Object.freeze({
   'authoring-v4-h200': path.join(__dirname, 'actor-instructions', 'authoring-v4-h200.txt'),
   // Identical to authoring-v3 except the explicit 200-decision horizon (prepare actionHorizon:200).
   'authoring-v3-h200': path.join(__dirname, 'actor-instructions', 'authoring-v3-h200.txt'),
+  // authoring-v5-h200 plus reading an optional previousVisit memo and writing a visit memo at the end.
+  'authoring-v5-h200-memo': path.join(__dirname, 'actor-instructions', 'authoring-v5-h200-memo.txt'),
 });
 const DEFAULT_INSTRUCTION_TEMPLATE = 'authoring-v3';
 const MAILBOX_CLI = path.join(__dirname, 'whole-trace-mailbox.cjs');
@@ -132,6 +159,16 @@ function renderActorInstructions(templateId, slotDirectory) {
 function writeActorInput(prepareResponseFile, outputFile, options = {}) {
   const sourceText = fs.readFileSync(prepareResponseFile, 'utf8');
   const actorInput = buildActorInput(JSON.parse(sourceText));
+  let previousVisit = null;
+  if (options.previousVisitMemoFile !== undefined) {
+    if (options.instructions === false || !String(options.template ?? '').endsWith('-memo'))
+      throw new Error('A previous visit memo requires a -memo instruction template that tells the actor how to read it');
+    const memoText = fs.readFileSync(options.previousVisitMemoFile, 'utf8');
+    const { text, characters } = validateVisitMemo(memoText);
+    actorInput.previousVisit = { version: PREVIOUS_VISIT_VERSION, notice: PREVIOUS_VISIT_NOTICE, memo: text };
+    previousVisit = { version: PREVIOUS_VISIT_VERSION, file: path.resolve(options.previousVisitMemoFile),
+      sha256: sha256(memoText), memoSha256: sha256(text), characters };
+  }
   const outputText = JSON.stringify(actorInput, null, 2) + '\n';
   const slotDirectory = path.dirname(path.resolve(outputFile));
   let instructions = null;
@@ -143,7 +180,7 @@ function writeActorInput(prepareResponseFile, outputFile, options = {}) {
     // The instruction text names the decision horizon, so it must match the prepared bundle.
     const horizon = actorInput.bundle.generationLimits?.acceptedActionHorizon ?? 100;
     const templateId = options.template ?? (horizon === 200 ? 'authoring-v3-h200' : DEFAULT_INSTRUCTION_TEMPLATE);
-    if (templateId.endsWith('-h200') !== (horizon === 200))
+    if (/-h200(?:-|$)/.test(templateId) !== (horizon === 200))
       throw new Error(`Instruction template ${templateId} does not match the prepared ${horizon}-decision horizon`);
     instructions = renderActorInstructions(templateId, slotDirectory);
     instructions.file = path.join(slotDirectory, 'actor-instructions.txt');
@@ -164,6 +201,7 @@ function writeActorInput(prepareResponseFile, outputFile, options = {}) {
     omittedBundleKeys: actorInput.actorInputProjection.omittedBundleKeys,
     omittedTopLevelKeys: actorInput.actorInputProjection.omittedTopLevelKeys,
     replacements: actorInput.actorInputProjection.replacements,
+    previousVisit,
     actorInstructions: instructions && {
       templateId: instructions.templateId,
       templateFile: instructions.templateFile,
@@ -175,7 +213,8 @@ function writeActorInput(prepareResponseFile, outputFile, options = {}) {
 }
 
 module.exports = { VERSION, OMITTED_BUNDLE_KEYS, OMITTED_TOP_LEVEL_KEYS, REPLACEMENTS, INSTRUCTION_TEMPLATES,
-  DEFAULT_INSTRUCTION_TEMPLATE, buildActorInput, renderActorInstructions, writeActorInput };
+  DEFAULT_INSTRUCTION_TEMPLATE, PREVIOUS_VISIT_VERSION, VISIT_MEMO_MAX_CHARACTERS, buildActorInput, renderActorInstructions,
+  writeActorInput, validateVisitMemo, extractVisitMemo };
 
 if (require.main === module) {
   const args = process.argv.slice(2);
@@ -184,11 +223,12 @@ if (require.main === module) {
   for (let index = 0; index < args.length; index += 1) {
     if (args[index] === '--template') options.template = args[++index];
     else if (args[index] === '--no-instructions') options.instructions = false;
+    else if (args[index] === '--previous-visit-memo') options.previousVisitMemoFile = args[++index];
     else positional.push(args[index]);
   }
   const [input, output] = positional;
   if (!input || !output) {
-    process.stderr.write('Usage: node market-simulator/whole-trace-actor-input.cjs <slot>/owner/prepare-response.json <slot>/actor-input.json [--template authoring-v3] [--no-instructions]\nWrites <slot>/actor-input.json and <slot>/actor-instructions.txt (never overwrites) and prints a provenance summary.\n');
+    process.stderr.write('Usage: node market-simulator/whole-trace-actor-input.cjs <slot>/owner/prepare-response.json <slot>/actor-input.json [--template authoring-v3] [--no-instructions] [--previous-visit-memo <memo.txt> (requires a -memo template)]\nWrites <slot>/actor-input.json and <slot>/actor-instructions.txt (never overwrites) and prints a provenance summary.\n');
     process.exitCode = 2;
   } else {
     try { process.stdout.write(JSON.stringify(writeActorInput(input, output, options), null, 2) + '\n'); }
