@@ -6,8 +6,8 @@
     "1": {
       "specHash": "bf61f70fef64d0a3c04b421789de18343c6b9b165058a6e0ef9829bd99613be5",
       "profileVersions": {
-        "checking-low": "traits-2-4b4fc18d6108",
-        "checking-high": "traits-2-f68cf2a2ae92"
+        "checking-low": "traits-2-0aae955153a7",
+        "checking-high": "traits-2-3bb20cb0b19a"
       },
       "measurementsHash": "0052ed0c27dc71f03c597677c0eba4c963e811fb1bb56925e81342834bd556b2",
       "reportHash": "ed50d3e22ff7c8bff9af7268596a23a1f87600454cb7bd21c57cbb6130890ff8"
@@ -15,8 +15,8 @@
     "absent": {
       "specHash": "67256b5957e08642d23b3e60dee8c3a871c667908f9dbbab5ed20378117a59f1",
       "profileVersions": {
-        "checking-low": "traits-2-4b4fc18d6108",
-        "checking-high": "traits-2-f68cf2a2ae92"
+        "checking-low": "traits-2-0aae955153a7",
+        "checking-high": "traits-2-3bb20cb0b19a"
       },
       "measurementsHash": "5296af29f5e0323bad07bf932f0727454a28e9e14391610c100569be6bc0f105",
       "reportHash": "28b3ef341a308b9eca8e1dcb13154194b3752530f1113f9c8b1dc3f0c9d78f4a"
