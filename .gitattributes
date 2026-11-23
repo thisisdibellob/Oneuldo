@@ -1,0 +1,2 @@
+# Frozen lifecycle reference is verified by its original byte hash, also on Windows.
+frontend/__tests__/fixtures/marketBehaviorTracker.f124a95.source -text

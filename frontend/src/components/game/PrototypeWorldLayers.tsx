@@ -14,6 +14,9 @@ import {
 
 import {
   BUS_STOP_POINT,
+  CAFE_ENTRANCE_POINT,
+  LAUNDRY_ENTRANCE_POINT,
+  HOME_LAUNDRY_POINT,
   HOME_EXIT_POINT,
   HOME_FRIDGE_POINT,
   HOUSE_ENTRANCE_POINT,
@@ -34,6 +37,7 @@ import {
   villageLandmarkArt,
 } from '../../game/gameAssets';
 import { VILLAGE_NPC_ART_SCALE, villageNpcArt } from '../../game/villageNpcArt';
+import { laundryArt } from '../../game/laundryArt';
 import { getVillageRenderDepth } from '../../game/villageStreets';
 import { colors, fonts } from '../../theme';
 import { PressScale } from '../PressScale';
@@ -43,8 +47,8 @@ import { VillageStreets } from './VillageStreets';
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
 export type PrototypeControlMode = 'joystick' | 'touch';
-export type VillagePortalId = 'home' | 'market';
-export type HomeStationId = 'fridge' | 'exit';
+export type VillagePortalId = 'home' | 'market' | 'cafe' | 'laundry';
+export type HomeStationId = 'fridge' | 'exit' | 'laundry';
 
 export type ExpandedVillageLayerProps = {
   children?: ReactNode;
@@ -190,7 +194,7 @@ function InteractionCloud({
 
 function VillageBuilding({ building }: { building: VillageBuildingDefinition }) {
   const compact = building.width < 110;
-  const artSource = villageBuildingArt[building.id];
+  const artSource = building.id === 'laundry' ? laundryArt.storefront : villageBuildingArt[building.id];
   return (
     <View
       pointerEvents="none"
@@ -479,6 +483,27 @@ export function ExpandedVillageLayer({
         />
       </PressScale>
 
+      <PressScale
+        accessibilityHint={controlMode === 'touch' ? nearbyPortalId === 'cafe' ? '누르면 카페에 들어갑니다' : '누르면 카페 입구로 이동합니다' : undefined}
+        accessibilityLabel={controlMode === 'touch' ? '카페 들어가기' : '카페 입구'}
+        accessibilityRole={controlMode === 'touch' ? 'button' : undefined}
+        disabled={controlMode !== 'touch' || controlsLocked}
+        onPress={event => { event?.stopPropagation?.(); onPortalPress(event, 'cafe'); }}
+        scaleTo={0.96}
+        style={[styles.portal, { left: CAFE_ENTRANCE_POINT.x - 82, top: CAFE_ENTRANCE_POINT.y - 94 }]}
+        testID="village-cafe-portal"
+      >
+        <InteractionCloud icon="cafe" label="카페" testID="cafe-proximity-cloud" visible={nearbyPortalId === 'cafe'} />
+      </PressScale>
+
+      <PressScale accessibilityLabel={controlMode === 'touch' ? '동네 빨래방 들어가기' : '빨래방 입구'}
+        accessibilityRole={controlMode === 'touch' ? 'button' : undefined}
+        disabled={controlMode !== 'touch' || controlsLocked}
+        onPress={event => { event?.stopPropagation?.(); onPortalPress(event, 'laundry'); }}
+        style={[styles.portal, { left: LAUNDRY_ENTRANCE_POINT.x - 82, top: LAUNDRY_ENTRANCE_POINT.y - 94 }]}
+        testID="village-laundry-portal">
+        <InteractionCloud icon="shirt" label="빨래방" testID="laundry-proximity-cloud" visible={nearbyPortalId === 'laundry'} />
+      </PressScale>
       {VILLAGE_NPCS.map((npc) => (
         <VillageNpc
           controlMode={controlMode}
@@ -590,6 +615,15 @@ export function HomeWorldLayer({
         <FurnitureLabel>소파</FurnitureLabel>
       </View>
 
+      <PressScale accessibilityLabel="빨래 바구니와 옷장 열기" accessibilityRole={controlMode === 'touch' ? 'button' : undefined}
+        disabled={controlMode !== 'touch' || controlsLocked} onPress={event => { event?.stopPropagation?.(); onStationPress(event, 'laundry'); }}
+        style={{ position: 'absolute', left: 594, top: 710, width: 200, height: 170 }} testID="home-laundry-station">
+        <Image source={laundryArt.wardrobe} resizeMode="contain" style={{ position: 'absolute', right: 0, bottom: 10, width: 115, height: 160 }} />
+        <Image source={laundryArt.basket} resizeMode="contain" style={{ position: 'absolute', left: 0, bottom: 20, width: 90, height: 44 }} />
+        <View style={{ position: 'absolute', left: HOME_LAUNDRY_POINT.x - 594 - 45, top: 10 }}>
+          <InteractionCloud icon="shirt" label="빨래 정리" testID="home-laundry-proximity-cloud" visible={nearbyStationId === 'laundry'} />
+        </View>
+      </PressScale>
       <View pointerEvents="none" style={styles.tvConsole}>
         <View style={styles.tvScreen} />
         <FurnitureLabel>TV</FurnitureLabel>

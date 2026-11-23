@@ -28,3 +28,14 @@ export function getMarketShelfUnitRects(shelf: { x: number; y: number; orientati
     width: MARKET_SHELF_UNIT_WIDTH, height: MARKET_SHELF_UNIT_HEIGHT,
   }));
 }
+
+/** One floating sign above the rear/top fixture, centred on the category pair. */
+export function getMarketCategoryMarkerRect(shelf: { x: number; y: number; width: number }, categoryId: string) {
+  const artHeight = categoryId === 'produce' ? 172 * MARKET_SHELF_SCALE : MARKET_SHELF_ART_HEIGHT;
+  const width = 92, height = 24;
+  return {
+    x: shelf.x + (shelf.width - width) / 2,
+    y: shelf.y + MARKET_SHELF_UNIT_HEIGHT - MARKET_SHELF_ART_BOTTOM - artHeight - 10 - height,
+    width, height,
+  };
+}

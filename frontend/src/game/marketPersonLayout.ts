@@ -1,23 +1,25 @@
 import { getMarketPersonAppearance, type MarketPersonAppearanceId, type MarketPersonKind } from './marketPeople';
 import type { Point, Rect } from './prototypeWorld';
 
-// The SD player stands about 86 world px tall with a wider head and body.
-// Give the slimmer adult NPC art 104 world px of height to balance its presence.
-// NPC images have 504 opaque rows on a 256 x 512 canvas (8 clear rows above).
+// Match the SD player's ~86px visible height with slightly taller 92px adults.
+// Chibi v2 art is uniformly fitted to 344 rows on a 256 x 384 transparent canvas.
 export const MARKET_PERSON_SOURCE_WIDTH = 256;
-export const MARKET_PERSON_SOURCE_HEIGHT = 512;
-export const MARKET_PERSON_OPAQUE_SOURCE_HEIGHT = 504;
-export const MARKET_PERSON_VISIBLE_HEIGHT = 104;
+export const MARKET_PERSON_SOURCE_HEIGHT = 384;
+export const MARKET_PERSON_OPAQUE_SOURCE_HEIGHT = 344;
+export const MARKET_PERSON_VISIBLE_HEIGHT = 92;
 export const MARKET_PERSON_SCALE = MARKET_PERSON_VISIBLE_HEIGHT / MARKET_PERSON_OPAQUE_SOURCE_HEIGHT;
 export const MARKET_PERSON_HEIGHT = MARKET_PERSON_SOURCE_HEIGHT * MARKET_PERSON_SCALE;
 // This is the accessible press frame, never the physical collision rectangle.
 export const MARKET_PERSON_WIDTH = Math.max(44, Math.ceil(MARKET_PERSON_SOURCE_WIDTH * MARKET_PERSON_SCALE));
-// Include a small shoe-edge margin in source pixels so it grows with the art.
-const MARKET_PERSON_SOURCE_FOOT_PADDING = 12;
+// Keep the established v1 ground footprint independent of illustration changes.
+// This preserves recorded layouts, navigation, and staff interaction distances.
+const COLLISION_SOURCE_SCALE = 104 / 504;
+const COLLISION_SOURCE_WIDTH = 256;
+const COLLISION_SOURCE_FOOT_PADDING = 12;
 
-/** Alpha >= 32 bounds of the lowest 10% of each runtime PNG, including both shoes.
- * Keep this pure metadata available to the headless agent and native/web renderers.
- * Re-measure these values when replacing any of the matching v1 PNG assets.
+/** Canonical v1 shoe bounds, retained as the game's physical footprint contract.
+ * Chibi v2 display dimensions do not resize these collision rectangles.
+ * Keep this pure metadata available to both the headless agent and renderers.
  */
 const SHOE_BOUNDS: Record<MarketPersonAppearanceId, { left: number; right: number }> = {
   'employee-male-01': { left: 76, right: 180 },
@@ -42,14 +44,15 @@ export function getMarketPersonGeometry(kind: MarketPersonKind, appearance: numb
   const variant = getMarketPersonAppearance(kind, appearance);
   const sourceScale = MARKET_PERSON_SCALE * variant.heightScale;
   const shoes = SHOE_BOUNDS[variant.id];
-  const footprintWidth = (shoes.right - shoes.left + 1 + MARKET_PERSON_SOURCE_FOOT_PADDING) * sourceScale;
+  const collisionScale = COLLISION_SOURCE_SCALE * variant.heightScale;
+  const footprintWidth = (shoes.right - shoes.left + 1 + COLLISION_SOURCE_FOOT_PADDING) * collisionScale;
   return {
     imageWidth: MARKET_PERSON_SOURCE_WIDTH * sourceScale,
     imageHeight: MARKET_PERSON_SOURCE_HEIGHT * sourceScale,
     visibleHeight: MARKET_PERSON_OPAQUE_SOURCE_HEIGHT * sourceScale,
     footprintWidth,
     footprintHeight: footprintWidth * 0.6,
-    footprintOffsetX: ((shoes.left + shoes.right + 1) / 2 - MARKET_PERSON_SOURCE_WIDTH / 2) * sourceScale,
+    footprintOffsetX: ((shoes.left + shoes.right + 1) / 2 - COLLISION_SOURCE_WIDTH / 2) * collisionScale,
   };
 }
 

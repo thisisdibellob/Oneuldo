@@ -143,9 +143,10 @@ test('stopping during a v2 list read prevents later scroll inputs', async () => 
   const presentation = { viewport: { width: 390, height: 844 }, zoom: 1.3 };
   let briefing = true;
   const scrollList = jest.fn();
+  const viewShoppingList = jest.fn();
   const ui = { snapshot: () => ({ presentation }), presentation: () => presentation,
     read: () => ({ briefing, briefingStep: 0, phase: 'shopping', shelf: null, cartOpen: false, helpOpen: false, staffOpen: false }),
-    advanceBriefing: () => { briefing = false; }, scrollList,
+    advanceBriefing: () => { briefing = false; }, scrollList, viewShoppingList,
   } as unknown as ReplayUiPort;
   const motion = { read: () => ({ locked: false, presentation }), stop: jest.fn() } as unknown as ReplayMotionPort;
   const trace = { traceSchemaVersion: '2', steps: [
@@ -153,11 +154,14 @@ test('stopping during a v2 list read prevents later scroll inputs', async () => 
   ].map((step, i) => ({ ...step, id: `step-${i}`, timeoutMs: 3000, reactionDelayMs: 0, reason: 'read visible list' })) } as unknown as MarketReplayTrace;
   const controller = new AbortController(), progress: ReplayProgress[] = [];
   const run = playMarketTrace(trace, () => ui, motion, controller.signal, value => progress.push(value));
+  await jest.advanceTimersByTimeAsync(100);
   await untilCalled(scrollList);
   expect(scrollList).toHaveBeenCalledWith(0);
+  expect(viewShoppingList).toHaveBeenLastCalledWith(true);
   controller.abort('reader stopped'); await run;
   await jest.advanceTimersByTimeAsync(5000);
   expect(scrollList).toHaveBeenCalledTimes(1);
+  expect(viewShoppingList.mock.calls).toEqual([[true], [false]]);
   expect(progress.at(-1)).toMatchObject({ status: 'stopped', error: 'reader stopped' });
 });
 

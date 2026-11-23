@@ -41,7 +41,7 @@ test('STATIC hard baseline with an empty basket submits actual AI analysis witho
     expect(view.queryByText(/총 6/)).toBeNull();
     expect(view.queryByText(/19,400/)).toBeNull();
     fireEvent.press(view.getByText('다음'));
-    fireEvent.press(view.getByText('장보기 시작'));
+    fireEvent.press(view.getByRole('button', {name:'장보기 시작'}));
     await act(async () => { jest.advanceTimersByTime(300); await Promise.resolve(); });
     position.current = environment.stations.checkout;
     interaction = { id: 1, station: 'checkout' };

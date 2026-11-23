@@ -26,3 +26,10 @@ it('opens the shared world for the day and errand stories while server quest car
   fireEvent.press(screen.getByRole('button', { name: '퇴근길 장보기 퀘스트 열기' }));
   expect(onGameQuest).toHaveBeenLastCalledWith('errand');
 });
+
+it('retains the practice fallback when a host does not provide a game callback', () => {
+  const onPractice = jest.fn();
+  const screen = render(<QuestScreen onPractice={onPractice} />);
+  fireEvent.press(screen.getByRole('button', { name: '카페 첫 근무 퀘스트 열기' }));
+  expect(onPractice).toHaveBeenCalledTimes(1);
+});

@@ -6,6 +6,8 @@ import { useGamePreferences } from '../../game/gamePreferences';
 import { getJoystickMovement, JOYSTICK_RADIUS, type GameMovementInput } from '../../game/movementControls';
 import { fonts } from '../../theme';
 import { PressScale } from '../PressScale';
+import { GAME_ACTION_BUTTON_LAYOUT } from '../../game/gameControlLayout';
+export { GAME_ACTION_BUTTON_LAYOUT } from '../../game/gameControlLayout';
 
 type Action = {
   label: string;
@@ -15,6 +17,7 @@ type Action = {
   onPress: () => void;
 };
 type Props = {
+  bottomOffset?: number;
   controlMode: 'joystick' | 'touch';
   locked: boolean;
   /** Keeps the shared action button usable while a vehicle is moving. */
@@ -33,6 +36,27 @@ type Props = {
 const PAD_SIZE = 110;
 const ZONE_HEIGHT = 270;
 const REST_CENTER = { x: 76, y: 198 };
+const ACTION_LAYOUT = GAME_ACTION_BUTTON_LAYOUT;
+const SHORTCUT_SIZE = 58;
+
+/** A smaller companion circle, aligned to the left of the shared world action. */
+export function GameControlShortcut({ label, accessibilityLabel, onPress, bottomOffset = 0 }: {
+  label: string; accessibilityLabel: string; onPress: () => void; bottomOffset?: number;
+}) {
+  return <PressScale testID="game-control-shortcut" accessibilityRole="button" accessibilityLabel={accessibilityLabel}
+    onPress={event => { event?.stopPropagation?.(); onPress(); }} style={[s.shortcut, { bottom: ACTION_LAYOUT.bottom + (ACTION_LAYOUT.size - SHORTCUT_SIZE) / 2 + bottomOffset }]}>
+    <Text style={s.actionText}>{label}</Text>
+  </PressScale>;
+}
+
+export function GameActionButton({ action, reduceMotion = false }: { action: Action; reduceMotion?: boolean }) {
+  return <PressScale accessibilityRole="button" accessibilityLabel={action.accessibilityLabel ?? action.label}
+    accessibilityState={{ disabled: !action.available }} disabled={!action.available}
+    onPress={event => { event?.stopPropagation?.(); action.onPress(); }} scaleTo={reduceMotion ? 1 : 0.94}
+    style={[s.action, !action.available && s.disabled]}>
+    <Ionicons name={action.icon} size={26} color="#FFFDF6" /><Text numberOfLines={1} style={s.actionText}>{action.label}</Text>
+  </PressScale>;
+}
 
 /** All world controls share the same placement, appearance and floating-stick behaviour. */
 export function GameControls(props: Props) {
@@ -115,26 +139,21 @@ export function GameControls(props: Props) {
       ]}
       accessibilityState={{ disabled: props.movementDisabled }}
       onAccessibilityAction={event => { if (!props.movementDisabled) props.onAccessibilityMove?.(event.nativeEvent.actionName); }}
-      onLayout={event => { size.current = event.nativeEvent.layout; }} style={s.zone} {...responder.panHandlers}>
+      onLayout={event => { size.current = event.nativeEvent.layout; }} style={[s.zone, { bottom: 104 + (props.bottomOffset ?? 0) }]} {...responder.panHandlers}>
       <View pointerEvents="none" testID="game-joystick-pad" style={[s.pad, { left: center.x - PAD_SIZE / 2, top: center.y - PAD_SIZE / 2, opacity: props.movementDisabled ? 0.25 : engaged ? 1 : 0.8 }]}>
         <View style={s.crossH} /><View style={s.crossV} />
         <Animated.View testID="game-joystick-knob" style={[s.knob, { transform: knob.getTranslateTransform() }]} />
         {preferences.runMode === 'distance' && autoRunning && <View style={s.runningBadge}><Ionicons name="footsteps" size={17} color="#FCF9EF" /></View>}
       </View>
     </View>}
-    <View pointerEvents="box-none" style={s.actions}>
+    <View pointerEvents="box-none" style={[s.actions, { bottom: ACTION_LAYOUT.bottom + (props.bottomOffset ?? 0) }]}>
       {preferences.runMode === 'toggle' && !props.movementDisabled && <PressScale accessibilityRole="button" accessibilityLabel={props.runEnabled ? '달리기 끄기' : '달리기 켜기'}
         accessibilityHint="한 번 누르면 달리기를 켜고 다시 누르면 끕니다" accessibilityState={{ selected: props.runEnabled }}
         onPress={event => { event?.stopPropagation?.(); props.onRunEnabledChange(!props.runEnabled); }} scaleTo={props.reduceMotion ? 1 : 0.94}
         style={[s.run, props.runEnabled && s.runActive]}>
         <Ionicons name="footsteps" size={25} color={props.runEnabled ? '#FFFCF2' : '#59715B'} />
       </PressScale>}
-      <PressScale accessibilityRole="button" accessibilityLabel={props.action.accessibilityLabel ?? props.action.label}
-        accessibilityState={{ disabled: !props.action.available }} disabled={!props.action.available}
-        onPress={event => { event?.stopPropagation?.(); props.action.onPress(); }} scaleTo={props.reduceMotion ? 1 : 0.94}
-        style={[s.action, !props.action.available && s.disabled]}>
-        <Ionicons name={props.action.icon} size={26} color="#FFFDF6" /><Text numberOfLines={1} style={s.actionText}>{props.action.label}</Text>
-      </PressScale>
+      <GameActionButton action={props.action} reduceMotion={props.reduceMotion} />
     </View>
   </View>;
 }
@@ -147,8 +166,12 @@ const s = StyleSheet.create({
   crossH: { position: 'absolute', width: 81, height: 1, backgroundColor: '#D8D3BD' },
   crossV: { position: 'absolute', width: 1, height: 81, backgroundColor: '#D8D3BD' },
   runningBadge: { position: 'absolute', right: -3, top: -3, borderRadius: 16, backgroundColor: '#6D8A69', padding: 6 },
-  actions: { position: 'absolute', right: 23, bottom: 126, zIndex: 22, alignItems: 'flex-end', gap: 10 },
-  action: { width: 84, height: 84, borderRadius: 45, backgroundColor: '#537960', alignItems: 'center', justifyContent: 'center', gap: 4, borderWidth: 3, borderColor: '#FCF6E7' },
+  actions: { position: 'absolute', right: ACTION_LAYOUT.right, bottom: ACTION_LAYOUT.bottom, zIndex: 22, alignItems: 'flex-end', gap: 10 },
+  action: { width: ACTION_LAYOUT.size, height: ACTION_LAYOUT.size, borderRadius: 45, backgroundColor: '#537960', alignItems: 'center', justifyContent: 'center', gap: 4, borderWidth: 3, borderColor: '#FCF6E7' },
+  shortcut: { position: 'absolute', right: ACTION_LAYOUT.right + ACTION_LAYOUT.size + 12,
+    bottom: ACTION_LAYOUT.bottom + (ACTION_LAYOUT.size - SHORTCUT_SIZE) / 2,
+    width: SHORTCUT_SIZE, height: SHORTCUT_SIZE, borderRadius: SHORTCUT_SIZE / 2,
+    backgroundColor: '#537960', borderWidth: 3, borderColor: '#FCF6E7', alignItems: 'center', justifyContent: 'center', zIndex: 40 },
   actionText: { fontFamily: fonts.laundryBold, fontSize: 15, color: '#FFFCF2' },
   run: { width: 52, height: 52, borderRadius: 28, backgroundColor: '#F7F3E5', alignItems: 'center', justifyContent: 'center', marginRight: 12 },
   runActive: { backgroundColor: '#6B8765' }, disabled: { opacity: 0.38 },

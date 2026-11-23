@@ -1,4 +1,6 @@
+import type { MarketViewFrame } from './MarketWorldGuidance';
 import { getMarketNavigationPath } from '../../game/marketNavigation';
+import { cameraBoundActorTransform } from '../../game/cameraBoundActor';
 import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -17,6 +19,7 @@ import { chibiPlayerAvatar as freshPlayerAvatar } from '../../game/chibiPlayerAv
 import { createAvatarWalkCycle, getAvatarMovement, type AvatarFacing, type AvatarMotion } from '../../game/avatarAnimation';
 import { useMarketReducedMotion } from './MarketPanelTransition';
 import { PressScale } from '../PressScale';
+import { GAME_ACTION_BUTTON_LAYOUT } from './GameControls';
 import {
   MarketShelfTarget,
   MarketCheckoutFixture,
@@ -51,6 +54,8 @@ function clampMarketPoint(point: MarketPoint, bounds: MarketEnvironment['world']
 }
 export function MarketMap({
   environment,
+  onViewFrame,
+  controlBottomOffset = 0,
   cashierCalled = {},
   controlledPlayerPosition,
   onPositionChange,
@@ -60,6 +65,8 @@ export function MarketMap({
   onNearbyStationChange,
 }: {
   environment: MarketEnvironment;
+  onViewFrame?: (frame:MarketViewFrame)=>void;
+  controlBottomOffset?: number;
   cashierCalled?: Partial<MarketCashierAvailability>;
   controlledPlayerPosition?: MarketPoint;
   onPositionChange?: (point: MarketPoint) => void;
@@ -76,8 +83,10 @@ export function MarketMap({
     return isMarketBlocked(point) ? current : point;
   };
   const viewportNode = useRef<View | null>(null);
-  const camera = useRef(new Animated.ValueXY()).current;
-  const playerWorldPosition = useRef(new Animated.ValueXY(environment.spawn)).current;
+  const camera = useRef(new Animated.ValueXY({x:-environment.spawn.x,y:-environment.spawn.y}, { useNativeDriver: Platform.OS !== 'web' })).current;
+  const viewportCenterAnimation = useRef(new Animated.ValueXY()).current;
+  const playerOffsetAnimation = useRef(new Animated.ValueXY()).current;
+  const [actorTransform] = useState(() => cameraBoundActorTransform(camera, viewportCenterAnimation, playerOffsetAnimation));
   const playerDepth = useRef(new Animated.Value(getMarketRenderDepth(environment.spawn.y))).current;
   const cameraCenter = useRef<MarketPoint>({ ...environment.spawn });
   const joystickKnob = useRef(new Animated.ValueXY()).current;
@@ -115,10 +124,11 @@ export function MarketMap({
     const frame = getWorldCameraFrame(point, viewport.current, MARKET_DEFAULT_ZOOM,
       geometryRef.current.environment.world);
     cameraCenter.current = frame.center;
+    onViewFrame?.({...viewport.current,center:{...frame.center},zoom:MARKET_DEFAULT_ZOOM});
     camera.setValue(frame.translation);
-    playerWorldPosition.setValue(point);
+    playerOffsetAnimation.setValue(frame.playerOffset);
     playerDepth.setValue(getMarketRenderDepth(point.y));
-  }, [camera, playerDepth, playerWorldPosition]);
+  }, [camera, playerDepth, playerOffsetAnimation, onViewFrame]);
 
   const updateStationProximity = useCallback((point: MarketPoint) => {
     const closest = getNearestMarketStation(geometryRef.current.environment, point, geometryRef.current.cashierCalled)?.id ?? null;
@@ -297,6 +307,7 @@ export function MarketMap({
 
   const handleViewportLayout = (event: LayoutChangeEvent) => {
     viewport.current = event.nativeEvent.layout;
+    viewportCenterAnimation.setValue({ x: viewport.current.width / 2, y: viewport.current.height / 2 });
     viewportNode.current?.measureInWindow((x, y) => {
       viewportOrigin.current = { x, y };
     });
@@ -474,7 +485,7 @@ export function MarketMap({
               zIndex: getMarketRenderDepth(person.point.y)
             }}
           >
-            <MarketPersonFixture person={person} />
+            <MarketPersonFixture person={person} active={nearbyStation === `staff:${person.id}`} />
           </PressScale>
           : <View
             key={person.id}
@@ -562,7 +573,7 @@ export function MarketMap({
         </PressScale> : null}
         <Animated.View testID="market-player-world"
           accessibilityLabel="마트 안 내 캐릭터" pointerEvents="none"
-          style={[styles.marketPlayerFixed, { transform: playerWorldPosition.getTranslateTransform(), zIndex: playerDepth }]}>
+          style={[styles.marketPlayerFixed, { transform: actorTransform, zIndex: playerDepth }]}>
           <DirectionalAvatar facing={avatarPose.facing} manifest={freshPlayerAvatar} motion={avatarPose.motion}
             walkCycle={playerWalkCycle} reduceMotion={reduceMotion} scale={0.5} />
         </Animated.View>
@@ -578,7 +589,7 @@ export function MarketMap({
               event?.stopPropagation?.();
               selectControlMode(controlMode === 'joystick' ? 'touch' : 'joystick');
             }}
-            style={styles.marketControlToggle}
+            style={[styles.marketControlToggle, { bottom: GAME_ACTION_BUTTON_LAYOUT.bottom + GAME_ACTION_BUTTON_LAYOUT.size + 10 + 50 + 10 + controlBottomOffset }]}
           >
             <Ionicons
               color="#FFF8E8"
@@ -606,7 +617,7 @@ export function MarketMap({
               syncSpeedMultiplier();
               setRunEnabled(next);
             }}
-            style={[styles.marketRunButton, runEnabled && styles.marketRunButtonActive]}
+            style={[styles.marketRunButton, { bottom: GAME_ACTION_BUTTON_LAYOUT.bottom + GAME_ACTION_BUTTON_LAYOUT.size + 10 + controlBottomOffset }, runEnabled && styles.marketRunButtonActive]}
           >
             <Ionicons
               color={runEnabled ? '#FFFFFF' : '#39493F'}
@@ -632,7 +643,7 @@ export function MarketMap({
             onLayout={(event) => {
               joystickZoneSize.current = event.nativeEvent.layout;
             }}
-            style={styles.marketJoystickZone}
+            style={[styles.marketJoystickZone, { bottom: 72 + controlBottomOffset + (controlBottomOffset ? 28 : 0) }]}
             {...joystickResponder.panHandlers}
           >
             <Animated.View
@@ -736,7 +747,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     position: 'absolute',
     right: 14,
-    bottom: 230,
+    bottom: GAME_ACTION_BUTTON_LAYOUT.bottom + GAME_ACTION_BUTTON_LAYOUT.size + 10 + 50 + 10,
     zIndex: 26
   },
   marketControlToggleText: { color: '#FFF8E8', fontFamily: fonts.bold, fontSize: 9 },
@@ -746,11 +757,11 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(75,64,46,0.28)',
     borderRadius: 25,
     borderWidth: 2,
-    bottom: 162,
+    bottom: GAME_ACTION_BUTTON_LAYOUT.bottom + GAME_ACTION_BUTTON_LAYOUT.size + 10,
     height: 50,
     justifyContent: 'center',
     position: 'absolute',
-    right: 92,
+    right: GAME_ACTION_BUTTON_LAYOUT.right + 12,
     width: 50,
     zIndex: 24
   },

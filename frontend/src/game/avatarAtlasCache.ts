@@ -16,7 +16,7 @@ async function downloadAtlas(source: ImageSourcePropType): Promise<ImageSourcePr
   return { uri: asset.localUri ?? asset.uri };
 }
 
-/** Shares downloaded files across map mounts. Only the requested direction is fetched. */
+/** Shares downloaded files across map mounts, with active poses ahead of optional warmup. */
 export function createAvatarAtlasCache(download: Download = downloadAtlas) {
   const entries = new Map<string, Entry>();
   const queue: Entry[] = [];
@@ -43,17 +43,22 @@ export function createAvatarAtlasCache(download: Download = downloadAtlas) {
     }
   };
   return {
-    subscribe(source: ImageSourcePropType, listener: (result: AvatarAtlasLoad) => void) {
+    subscribe(source: ImageSourcePropType, listener: (result: AvatarAtlasLoad) => void, priority: 'foreground' | 'background' = 'foreground') {
       const key = JSON.stringify(source);
       let entry = entries.get(key);
       if (!entry) { entry = { source, started: false, listeners: new Set(), attempts: 0, retryAfter: 0 }; entries.set(key, entry); }
       entry.listeners.add(listener);
       if (entry.result) listener(entry.result);
       const retry = entry.result?.status === 'failed' && entry.attempts < 2 && Date.now() >= entry.retryAfter;
-      if (!entry.started && (!entry.result || retry) && !queue.includes(entry)) {
+      if (!entry.started && (!entry.result || retry)) {
         if (retry) entry.result = undefined;
-        // Active movement takes priority over stale queued directions.
-        queue.unshift(entry); pump();
+        const queued = queue.indexOf(entry);
+        if (queued >= 0 && priority === 'foreground') queue.splice(queued, 1);
+        if (!queue.includes(entry)) {
+          if (priority === 'background') queue.push(entry);
+          else queue.unshift(entry);
+        }
+        pump();
       }
       return () => entry!.listeners.delete(listener);
     },

@@ -22,6 +22,7 @@ export function MarketPersonIllustration({ kind, appearance, active = false, tes
     <Image
       accessibilityIgnoresInvertColors
       accessible={false}
+      fadeDuration={0}
       resizeMode="contain"
       source={marketPeopleArt[variant.id]}
       style={[styles.art, {

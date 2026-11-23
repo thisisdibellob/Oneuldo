@@ -32,6 +32,7 @@ export interface ReplayUiPort {
   snapshot(): MarketReplaySnapshot;
   presentation?(): ReplayPresentation | undefined;
   scrollList?(fraction: number): void;
+  viewShoppingList?(open: boolean): void;
   sessionId(): string | null;
   read(): ReplayUiState;
   shelf(): ReplayShelfPort | null;

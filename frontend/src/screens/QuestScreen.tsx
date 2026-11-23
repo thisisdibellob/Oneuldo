@@ -9,6 +9,7 @@ import { StickyBrandHeader } from '../components/ui';
 import { colors, fonts } from '../theme';
 import { DAY_JOURNEY_GUIDANCE, dayJourneyStep, useDayJourney } from '../game/dayJourney';
 import { getShoppingErrandStatus, useShoppingErrand } from '../game/shoppingErrandStore';
+import { laundryArt } from '../game/laundryArt';
 
 type CalendarCell = {
   day: string;
@@ -31,6 +32,12 @@ const weeks: CalendarCell[][] = [
   [{ day: '30' }, { day: '31', event: '월간 목표 확인', eventColor: '#FFF0B7' }, { day: '1', muted: true }, { day: '2', muted: true }, { day: '3', muted: true }, { day: '4', muted: true }, { day: '5', muted: true }],
 ];
 const categories = ['전체', '대중교통', '생활 훈련', '경제생활', '안전'];
+const localGameQuests = [
+  {id:'market',category:'경제생활',icon:icons.money,title:'마트에서 장보기',description:'예산 안에서 필요한 물건을\n직접 골라 계산해요.'},
+  {id:'cafe',category:'생활 훈련',icon:icons.cashier,title:'카페 첫 근무',description:'주문을 받고 음료를 만들어요.\n손님 세 명과 함께하는 작은 카페'},
+  {id:'laundry',category:'생활 훈련',icon:laundryArt.basket,title:'동네 빨래방',description:'빨래를 나누고 세탁한 뒤,\n집 옷장에 차곡차곡 정리해요.'},
+  {id:'phishing',category:'안전',icon:icons.gamePhone,title:'수상한 연락 확인하기',description:'민수에게 온 연락, 직접 확인해요.\n한 이야기 3~5분'},
+] as const;
 const categoryVisuals: Record<string, { color: string; icon: ImageSourcePropType }> = {
   ECONOMIC_LIFE: { color: '#33BB5B', icon: icons.money },
   PUBLIC_TRANSPORT: { color: '#57ABD8', icon: icons.bus },
@@ -46,20 +53,22 @@ const difficultyLabels: Record<QuestDifficulty, string> = {
 };
 
 export function QuestScreen({
+  onPractice,
   error,
   loading,
   onGameQuest,
   onQuest,
-  quests,
+  quests = [],
   showPersonalDifficulty,
 }: {
-  error: string | null;
-  loading: boolean;
+  error?: string | null;
+  onPractice?: () => void;
+  loading?: boolean;
   /** Village story quests (library day, errand). Server quest cards always open practice via onQuest. */
-  onGameQuest?: (activity: 'day' | 'errand') => void;
-  onQuest: (uuid: string) => void;
-  quests: QuestSummary[];
-  showPersonalDifficulty: boolean;
+  onGameQuest?: (activity: 'day' | 'errand' | 'market' | 'cafe' | 'laundry' | 'phishing') => void;
+  onQuest?: (uuid: string) => void;
+  quests?: QuestSummary[];
+  showPersonalDifficulty?: boolean;
 }) {
   const journey = useDayJourney();
   const errand = useShoppingErrand();
@@ -146,10 +155,13 @@ export function QuestScreen({
       ) : null}
 
       <View style={styles.questList}>
+        {localGameQuests.filter(q=>selected==='전체'||q.category===selected).map(quest=><PressScale key={quest.id} accessibilityRole="button" accessibilityLabel={quest.title+' 퀘스트 열기'} onPress={()=>onGameQuest?onGameQuest(quest.id):onPractice?.()} style={styles.questCard}>
+          <Image source={quest.icon} style={styles.questIcon}/><View style={styles.questCopy}><Text style={styles.questCategory}>{quest.category==='생활 훈련'?'일상생활':quest.category}</Text><Text style={styles.questTitle}>{quest.title}</Text><Text style={styles.questDescription}>{quest.description}</Text></View>
+        </PressScale>)}
         {loading ? <Text style={styles.questState}>퀘스트를 불러오고 있어요.</Text> : null}
         {error ? <Text style={styles.questState}>{error}</Text> : null}
         {!loading && !error && visible.length === 0 ? <Text style={styles.questState}>표시할 퀘스트가 없어요.</Text> : null}
-        {visible.map((quest) => <QuestCard key={quest.id} onPress={() => onQuest(quest.id)} quest={quest} />)}
+        {visible.map((quest) => <QuestCard key={quest.id} onPress={() => onQuest?.(quest.id)} quest={quest} />)}
       </View>
       <View style={styles.bottomSpace} />
     </ScrollView>

@@ -4,8 +4,8 @@ import { getNearestMarketStation, getMarketStationApproachPoint, isMarketEnviron
   type MarketEnvironmentStationId } from './marketEnvironment';
 import { isMarketNavigationSegmentClear } from './marketNavigation';
 import { getMarketShelfLayout } from './marketShelfLayout';
-import { getMarketHudOcclusionRect, type MarketHudRect } from './marketHudLayout';
-import { getMarketShelfUnitRects, MARKET_SHELF_ART_BOTTOM, MARKET_SHELF_ART_HEIGHT, MARKET_SHELF_ART_WIDTH, MARKET_SHELF_SCALE } from './marketFixtureLayout';
+import { getMarketHudActionsRect, getMarketHudOcclusionRect, type MarketHudRect } from './marketHudLayout';
+import { getMarketCategoryMarkerRect, getMarketShelfUnitRects, MARKET_SHELF_ART_BOTTOM, MARKET_SHELF_ART_HEIGHT, MARKET_SHELF_ART_WIDTH, MARKET_SHELF_SCALE } from './marketFixtureLayout';
 import { marketCategories } from './scenarios';
 import type { Point } from './prototypeWorld';
 
@@ -58,12 +58,15 @@ function visiblePoint(environment: MarketEnvironment, position: Point, point: Po
   // The embedded shopping list covers the centre of the upper world. Do not read a sign through it.
   const hud = getMarketHudOcclusionRect(p);
   if (x >= hud.left && x <= hud.right && y >= hud.top && y <= hud.bottom) return false;
+  const actions = getMarketHudActionsRect(p);
+  if (x >= actions.left && x <= actions.right && y >= actions.top && y <= actions.bottom) return false;
   return true;
 }
 function marker(environment: MarketEnvironment, station: MarketEnvironment['stationDetails'][number]): Point {
   if (station.kind === 'shelf') {
     const shelf = environment.shelves[station.categoryId!];
-    return { x: shelf.x + shelf.width / 2, y: shelf.y + shelf.height + 10 };
+    const sign = getMarketCategoryMarkerRect(shelf, station.categoryId!);
+    return { x: sign.x + sign.width / 2, y: sign.y + sign.height / 2 };
   }
   return station.point;
 }
@@ -79,7 +82,7 @@ export function visibleStations(environment: MarketEnvironment, position: Point,
       const checkout = environment.checkouts.find(c => c.id === station.id);
       const person = environment.employees.find(p => `staff:${p.id}` === station.id);
       const signVisible = positions.every(point => visiblePoint(environment, point, marker(environment, station), presentation));
-      const label = category?.label ?? (checkout ? `${checkout.id === 'checkout' ? 1 : 2}번 계산대${signVisible ? ` · ${(cashiers[checkout.id] ?? checkout.cashierPresent) ? '계산 가능' : '직원 호출'}` : ''}`
+      const label = category?.label ?? (checkout ? `${checkout.id === 'checkout' ? 1 : 2}번 계산대${signVisible && (cashiers[checkout.id] ?? checkout.cashierPresent) ? ' · 계산 가능' : ''}`
         : person?.label ?? (station.kind === 'entrance' ? station.available === false ? '입구 · 공사 중' : '입구' : station.kind === 'exit' ? '출구' : '공동 출입문'));
       return { id: station.id, kind: station.kind, label, ...relative(position, marker(environment, station)),
         near: positions.every(point => isNearMarketStation(environment, station.id, point, undefined, cashiers)) };
@@ -108,14 +111,18 @@ function unmaskedBodyPieces(rect: ScreenRect, presentation: ReplayPresentation):
   const clipped = intersectRect(rect, { left: 12, top: 12,
     right: presentation.viewport.width - 12, bottom: presentation.viewport.height - 12 });
   if (!clipped) return [];
-  const mask = getMarketHudOcclusionRect(presentation);
-  const overlap = intersectRect(clipped, mask);
-  if (!overlap) return [clipped];
-  return [
-    { ...clipped, bottom: overlap.top }, { ...clipped, top: overlap.bottom },
-    { left: clipped.left, right: overlap.left, top: overlap.top, bottom: overlap.bottom },
-    { left: overlap.right, right: clipped.right, top: overlap.top, bottom: overlap.bottom },
-  ].filter(piece => piece.right > piece.left && piece.bottom > piece.top);
+  let pieces = [clipped];
+  for (const mask of [getMarketHudOcclusionRect(presentation), getMarketHudActionsRect(presentation)]) {
+    pieces = pieces.flatMap(piece => {
+      const overlap = intersectRect(piece, mask);
+      if (!overlap) return [piece];
+      return [{ ...piece, bottom: overlap.top }, { ...piece, top: overlap.bottom },
+        { left: piece.left, right: overlap.left, top: overlap.top, bottom: overlap.bottom },
+        { left: overlap.right, right: piece.right, top: overlap.top, bottom: overlap.bottom }]
+        .filter(part => part.right > part.left && part.bottom > part.top);
+    });
+  }
+  return pieces;
 }
 
 /**

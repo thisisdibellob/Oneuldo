@@ -118,6 +118,24 @@ test('agent provenance binds the recorded session without adding an automatic su
   expect(jest.getTimerCount()).toBe(0);
 });
 
+test('shelf and quantity logs carry a snapshot of the action position for backend route markers', async () => {
+  jest.clearAllMocks(); jest.setSystemTime(start);
+  const tracker = new MarketBehaviorTracker('test-token', buildMarketScenarioMission('S02'));
+  const position = { x: 321, y: 456 };
+  tracker.shelfOpened('fresh', position);
+  tracker.quantityChanged('milk', 0, 2, { milk: 2 }, position);
+  tracker.quantityChanged('milk', 2, 1, { milk: 1 }, position);
+  tracker.shelfClosed('fresh', { milk: 1 }, start, position);
+  position.x = 999;
+  await tracker.complete({ milk: 1 });
+  const events = jest.mocked(queue.enqueueBehaviorEvents).mock.calls.flatMap(call => call[1]).map(row => row.event)
+    .filter(e => ['SHOP.SHELF_OPENED', 'SHOP.SHELF_CLOSED', 'SHOP.QUANTITY_CHANGED'].includes(e.action.eventCode));
+  expect(events).toHaveLength(4);
+  for (const e of events) expect(e.payload).toMatchObject({ x: 321, y: 456 });
+  expect(events[1].payload).toMatchObject({ quantityBefore: 0, quantityAfter: 2 });
+  expect(events[2].payload).toMatchObject({ quantityBefore: 2, quantityAfter: 1 });
+});
+
 test.each([
   ['aborted', false], ['submitted', false], ['complete', false],
   ['aborted', true], ['submitted', true], ['complete', true],

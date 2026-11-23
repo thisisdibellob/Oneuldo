@@ -1,8 +1,11 @@
 import { useSyncExternalStore } from 'react';
 import { getBusResult, STOP_NAMES, type BusSession, type BusStopId } from './busSession';
 import { getLibraryResult, type LibrarySession } from './librarySession';
+import { canCompletePhishingSession, getPhishingFacts, PHISHING_SCENARIOS, type PhishingSession } from './phishingSession';
+import { getCafeResult, type CafeSession } from './cafeSession';
+import { getLaundryResult, type LaundrySession } from './laundrySession';
 
-export type ActivityKind = 'bus' | 'library' | 'shopping' | 'delivery';
+export type ActivityKind = 'bus' | 'library' | 'shopping' | 'delivery' | 'safety' | 'cafe' | 'laundry';
 export type ActivityMetric = Readonly<{ label: string; value: number; unit: string }>;
 export type ActivityRecord = Readonly<{
   id: string; kind: ActivityKind; sessionId: string; completedAt: number;
@@ -15,7 +18,7 @@ export const ACTIVITY_ALBUM_STORAGE_KEY = 'oneuldo.activity-album.v1';
 export const ACTIVITY_ALBUM_LIMIT = 100;
 const EMPTY: readonly ActivityRecord[] = Object.freeze([]);
 const MAX_BYTES = 256_000;
-const KINDS = ['bus', 'library', 'shopping', 'delivery'];
+const KINDS = ['bus', 'library', 'shopping', 'delivery', 'safety', 'cafe', 'laundry'];
 const validText = (value: unknown, max = 240): value is string => typeof value === 'string' && value.length > 0 && value.length <= max;
 const validCount = (value: unknown): value is number => Number.isSafeInteger(value) && (value as number) >= 0 && (value as number) <= 1_000_000_000;
 const validTime = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value) && value > 0 && value <= 8.64e15;
@@ -143,6 +146,69 @@ export function recordCompletedBusActivity(session: BusSession) { const record =
 export function recordCompletedLibraryActivity(session: LibrarySession, completedAt = Date.now()) { const record = makeCompletedLibraryActivity(session, completedAt); return record ? album.add(record) : null; }
 export function recordCompletedShoppingActivity(input: CompletedShoppingActivity) { const record = makeCompletedShoppingActivity(input); return record ? album.add(record) : null; }
 export function recordCompletedDeliveryActivity(input: CompletedDeliveryActivity) { const record = makeCompletedDeliveryActivity(input); return record ? album.add(record) : null; }
+
+/** Only the completed fictional episode is recorded. Reporting and financial help remain practice. */
+export function createPhishingActivity(session: PhishingSession): CompletedActivity | null {
+  const scenario = PHISHING_SCENARIOS[session.scenarioId];
+  if (!scenario || session.status !== 'completed' || !validText(session.id, 200)
+    || !validTime(session.completedAt) || !Number.isFinite(session.startedAt) || session.completedAt < session.startedAt
+    || !canCompletePhishingSession(session)) return null;
+  const summary = session.verification?.verdict === 'genuine'
+    ? session.genuineDecision === 'accept' ? '연락을 확인하고 약속을 정했어요' : '연락을 확인하고 약속을 사양했어요'
+    : session.exposure !== 'none' ? '사칭 연락 확인 · 피해 대처 연습' : '사칭 연락 확인 · 차단';
+  return {
+    id: key('safety', session.id), kind: 'safety', sessionId: session.id, completedAt: session.completedAt,
+    title: scenario.title, place: '우리 마을 · 연락 확인', summary,
+    metrics: [{ label: '확인한 연락', value: 1, unit: '건' },
+      ...(session.askedForHelp ? [{ label: '도움 요청', value: 1, unit: '회' }] : [])],
+    facts: getPhishingFacts(session),
+  };
+}
+export function recordCompletedPhishingActivity(session: PhishingSession) {
+  const record = createPhishingActivity(session);
+  return record ? album.add(record) : null;
+}
+
+export function makeCompletedCafeActivity(session: CafeSession): CompletedActivity | null {
+  if (session.phase !== 'finished' || !validText(session.id, 200) || !validTime(session.completedAt)) return null;
+  const result = getCafeResult(session);
+  if (!result) return null;
+  return {
+    id: key('cafe', session.id), kind: 'cafe', sessionId: session.id, completedAt: session.completedAt,
+    title: '카페 근무 완료', place: '마을 카페',
+    summary: `음료 ${result.guestsServed}잔 · 자리 정리 ${result.tablesCleaned}곳`,
+    metrics: [
+      { label: '건넨 음료', value: result.guestsServed, unit: '잔' },
+      { label: '정리한 자리', value: result.tablesCleaned, unit: '곳' },
+      ...(result.helpUsed ? [{ label: '도움받은 주문', value: result.helpUsed, unit: '건' }] : []),
+    ],
+    facts: result.facts,
+  };
+}
+export function recordCompletedCafeActivity(session: CafeSession) {
+  const record = makeCompletedCafeActivity(session);
+  return record ? album.add(record) : null;
+}
+
+export function makeCompletedLaundryActivity(session: LaundrySession): CompletedActivity | null {
+  if (session.phase !== 'finished' || !validText(session.id, 200) || !validTime(session.completedAt)) return null;
+  const result = getLaundryResult(session);
+  if (!result) return null;
+  return {
+    id: key('laundry', session.id), kind: 'laundry', sessionId: session.id, completedAt: result.completedAt,
+    title: '빨래 정리 완료', place: '우리 집 · 동네 빨래방', summary: `세탁 ${result.itemsWashed}개 · 옷장 정리 완료`,
+    metrics: [
+      { label: '세탁한 빨래', value: result.itemsWashed, unit: '개' },
+      { label: '갠 빨래', value: result.itemsFolded, unit: '개' },
+      { label: '맞춘 양말', value: result.sockPairs, unit: '쌍' },
+    ],
+    facts: result.facts,
+  };
+}
+export function recordCompletedLaundryActivity(session: LaundrySession) {
+  const record = makeCompletedLaundryActivity(session);
+  return record ? album.add(record) : null;
+}
 
 export function filterActivityRecords(records: readonly ActivityRecord[], query = '', favoritesOnly = false): readonly ActivityRecord[] {
   const terms = query.trim().toLocaleLowerCase('ko-KR').split(/\s+/).filter(Boolean);

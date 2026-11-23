@@ -146,8 +146,8 @@ test.each([
   expect(visibleUnlabelledShelfBodies(shelf, bodyObserver, { ...bodyPresentation, ...accessibility })).toEqual([]);
 });
 
-test('v2 notices a visible shelf body when its label is below the viewport, without changing v1 cues', () => {
-  const e = isolatedShelfBody(640, 800);
+test('v2 notices a visible shelf body when its overhead label is off-screen, without changing v1 cues', () => {
+  const e = isolatedShelfBody(800, 750);
   const before = visibleStations(e, bodyObserver, bodyPresentation);
   expect(before).toEqual([]);
   const bodies = visibleUnlabelledShelfBodies(e, bodyObserver, bodyPresentation);
@@ -179,8 +179,9 @@ test('a readable nearby shelf is represented once as a labelled station, not aga
 });
 
 test('anonymous body cues do not disclose the hidden category through IDs, ordering or duplicate counts', () => {
-  const e = isolatedShelfBody(640, 800);
+  const e = isolatedShelfBody(800, 750);
   const original = visibleUnlabelledShelfBodies(e, bodyObserver, bodyPresentation);
+  expect(original.length).toBeGreaterThan(0);
   const changed = structuredClone(e);
   changed.shelves.fresh = { ...changed.shelves.drink };
   changed.stationDetails = [{ ...changed.stationDetails[0], id: 'fresh', categoryId: 'fresh' }];

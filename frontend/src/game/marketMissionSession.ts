@@ -13,15 +13,17 @@ export function createMissionSession(config: Partial<MarketSessionConfig>, missi
   const runtime=resolveMarketRuntimePlan(mission.runtimePlan);
   const adaptive=runtime?runtimeSessionConfig(runtime):{};
   const selected=manualOverride?{...adaptive,...config}:{...config,...adaptive};
+  const listChanged=config.objectives&&JSON.stringify(config.objectives.map(({productId,quantity})=>({productId,quantity})))!==JSON.stringify(mission.objectives.map(({productId,quantity})=>({productId,quantity})));
+  const objectives=manualOverride&&listChanged?config.objectives!:mission.objectives;
   const missionConfig = { ...selected, difficulty: (runtime||manualOverride?selected.difficulty:undefined) ?? 'exact' as const,
     // Adaptive plans carry executable practice conditions; legacy quests retain their original semantics.
     learning: runtime||manualOverride?selected.learning:{ ...config.learning, stockoutEnabled: false, budgetChoiceEnabled: false, checkoutReviewMode: 'normal' as const },
     environment: { ...getMarketMissionEnvironmentConfig(mission.environmentPlan, selected.environment), kioskLane: selected.environment?.kioskLane ?? 'none' as const },
-    objectives: mission.objectives.map(({ productId, quantity }) => ({ productId, quantity, match: (runtime||manualOverride?selected.difficulty:undefined) ?? 'exact' as const })) };
+    objectives: objectives.map(({ productId, quantity }) => ({ productId, quantity, match: (runtime||manualOverride?selected.difficulty:undefined) ?? 'exact' as const })) };
   const draft = createMarketSession(missionConfig, environment);
   const preset = enabledMarketScenarios.find(candidate => candidate.id === mission.scenarioId);
   const required = new Set([
-    ...mission.objectives.flatMap(objective => [objective.productId, ...(objective.acceptedProductIds ?? [])]),
+    ...objectives.flatMap(objective => [objective.productId, ...('acceptedProductIds' in objective?objective.acceptedProductIds??[]:[])]),
     ...getMarketContrastProductIds(mission),
     ...(preset?.mandatoryProductIds ?? []), ...(preset?.distractorProductIds ?? []),
     ...(mission.scene?.products.map(product => product.id) ?? []),
@@ -34,7 +36,7 @@ export function createMissionSession(config: Partial<MarketSessionConfig>, missi
   }
   const session = createMarketSession({ ...draft.config, inventoryProductIds }, draft.environment);
   return { ...session, objectives: session.objectives.map((objective, index) => ({
-    ...objective, label: marketObjectiveLabel(mission.objectives[index]),
+    ...objective, label: marketObjectiveLabel(objectives[index]),
     quantityUnit: getMarketProduct(objective.productId)?.salesUnit ?? '개',
   })) };
 }

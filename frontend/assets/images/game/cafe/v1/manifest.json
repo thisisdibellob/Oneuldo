@@ -1,0 +1,54 @@
+{
+  "created": "2026-10-17",
+  "tool": "image_gen.imagegen (built-in)",
+  "transparent_background": true,
+  "reference": "Existing library/village art supplied to generation; player proportions kept in game at library scale 0.55.",
+  "processing": "Generated originals preserved in source/. Runtime files alpha-trimmed and proportionally downsampled with sharp; no image stretching.",
+  "assets": {
+    "counter.png": {
+      "width": 1024,
+      "height": 324,
+      "gameWidth": 450,
+      "gameHeight": 142
+    },
+    "table.png": {
+      "width": 512,
+      "height": 267,
+      "gameWidth": 200,
+      "gameHeight": 104
+    },
+    "shelf.png": {
+      "width": 768,
+      "height": 262,
+      "gameWidth": 260,
+      "gameHeight": 89
+    },
+    "coworker.png": {
+      "width": 167,
+      "height": 384,
+      "gameHeight": 92
+    },
+    "iced-latte.png": {
+      "width": 317,
+      "height": 384
+    },
+    "iced-americano.png": {
+      "width": 343,
+      "height": 384
+    },
+    "iced-peach-tea.png": {
+      "width": 345,
+      "height": 384
+    }
+  },
+  "prompts": {
+    "cafeCounterPrompt": "Use case: stylized-concept. Asset type: transparent sprite for a cozy 2D Korean life-simulation game. Create one wide cafe coffee preparation counter, isolated on genuine transparent background. Warm honey oak rounded wooden countertop, soft ivory front panel, muted sage-green side/base trim, medium-bold clean dark warm brown outlines matching a charming hand-painted children's game. Camera straight-on with slight view of top surface (NOT isometric diagonal), same parallel horizontal furniture perspective as a cozy library reception desk. On top: a compact sage espresso machine toward left, small grinder, a stack of cream mugs, two clear syrup bottles and small folded cloth on right; open working space in center. No people, no letters, no logos, no numbers, no background floor, no room, no detached shadows. Everything inside margins. The counter itself must feel waist-height relative to a chibi human, wide 3.0:1 overall silhouette including machine, no gigantic machine. Crisp solid painted colors, minimal soft shading, no noise or glitter, no photorealism, no tiny detailed clutter. Output landscape high resolution sprite with clean alpha edges.",
+    "cafeTablePrompt": "Use case: stylized-concept. Asset type: transparent furniture sprite for a cozy 2D Korean life simulation. One small cafe seating set, honey oak round tabletop with two sage-green upholstered wooden chairs, chair on either left/right side with seats open to center, no chairs in front hiding the tabletop. Front-facing parallel projection with gentle view of tabletop from above, not diagonal isometric, legs visible and stable floor plane. A tiny cream vase of two daisies at rear edge; table otherwise entirely empty for gameplay cup overlays. Designed to scale to 170px width beside a chibi character about95px tall, table atwaistheight, chairs halfcharacterheight. Medium-bold clean warm brown outlines, warm ivory/oak/sage muted palette, simple hand-painted shading matching cozy library furniture, crisp fills no grain or speckles. No people, no text, no floor, no room background, no heavy dropshadow. Entire seating set centered with transparent margin, genuine transparent alpha background. Landscape 3:2.",
+    "cafeTableEditPrompt": "Use case: precise-object-edit. Edit this cafe seating sprite. Remove ALL brown glow, brown backdrop, atmospheric shadow and exterior colored pixels, leaving genuine clean transparent alpha right up to the table/chairs/flowers. Preserve just the furniture set. Simplify the ornate turned table pedestal into four simple rounded wooden legs, simplify chair leg trim. Make colors cleaner and flatter, with warm medium-bold brown outlines and restrained soft painted shading, matching a cozy 2D library furniture game sprite. Preserve front-facing slightly overhead viewpoint and the two side chairs. No text, no surrounding ground or environment. Transparent background mandatory, no vignette or glow or cast shadows.",
+    "cafeShelfPrompt": "Use case: stylized-concept. Asset: one transparent cafe wall-mounted shelf installation for cozy 2D Korean game. Straight-on front facing horizontal shelf, slight tabletop visibility, same perspective as cozy illustrated library bookcase. Two honey oak wooden shelves held by sage green brackets, containing a sparse neat arrangement of cream mugs and saucers, 3 warm coffee bean bags WITHOUT readable labels, one small trailing green plant and a simple cream ceramic teapot. Two shelves read as one cohesive broad object. Clean warm medium brown outlines, restrained soft hand painted shading, clear shapes, warm ivory sage oak palette. Simple polished game illustration, no photorealistic texture or noisygrain. No people, no wall or floor, no letters, no signs, no background and no surrounding glow. Entire object with margins. Transparent alpha background, wide landscape 2.5:1 composition.",
+    "cafelattePrompt": "Use case: stylized-concept. Asset: one transparent finished drink sprite for a polished cozy cafe game. One delicious iced latte in a short gently tapered clear glass, milk ivory at bottom and coffee caramel at top, 3 visible large ice cubes, no straw, no logo. Front view with a little visible top, whole glass centered with generous transparent margins. Warm medium-bold brown outlines, simple creamy warm palette, illustrated hand-painted style matching cozy wooden library game furniture. Clean flat colors and restrained shading, appetizing but never photo-realistic. Plain transparent alpha background, no tabletop, no saucer, no props, no words, no glow or cast shadow, no realistic condensation microtexture. Square image.",
+    "cafeamericanoPrompt": "Use case: stylized-concept. Asset: one transparent finished drink sprite for a polished cozy cafe game. One delicious iced black americano in a short gently tapered clear glass, dark amber coffee and 3 large ice cubes, no straw, no logo. Front view with a little visible top, whole glass centered with generous transparent margins. Warm medium-bold brown outlines, simple creamy warm palette, illustrated hand-painted style matching cozy wooden library game furniture. Clean flat colors and restrained shading, appetizing but never photo-realistic. Plain transparent alpha background, no tabletop, no saucer, no props, no words, no glow or cast shadow, no realistic condensation microtexture. Square image.",
+    "cafepeachPrompt": "Use case: stylized-concept. Asset: one transparent finished drink sprite for a polished cozy cafe game. One delicious iced peach tea in a short gently tapered clear glass, clear golden orange tea and 3 large ice cubes with one small peach wedge on rim, no straw, no logo. Front view with a little visible top, whole glass centered with generous transparent margins. Warm medium-bold brown outlines, simple creamy warm palette, illustrated hand-painted style matching cozy wooden library game furniture. Clean flat colors and restrained shading, appetizing but never photo-realistic. Plain transparent alpha background, no tabletop, no saucer, no props, no words, no glow or cast shadow, no realistic condensation microtexture. Square image.",
+    "cafeCoworkerPrompt": "Use case: stylized-concept. Asset: one full-body front-facing female cafe coworker chibi NPC sprite, transparent background, for a cozy Korean life simulation. Friendly young adult with neat warm chestnut bob hair tucked behind ears, small simple dark brown oval eyes and tiny brown curved smile, no realistic facial detailing. Cream short-sleeve shirt, sage green waist apron tied neatly, straight slim dark warm-grey trousers, cream flat sneakers. Big head about45 percent totalheight with small compact body, exactly analogous to cozy game chibi college student NPCs, 2.3headstall. Arms relaxed at sides, no cup or other held objects, neutral symmetrical standingpose. Medium-bold consistent warm brown outlines and clean flat colors with verygentle hand painted shading. No photorealism, no 3D rendering, no noisy texture. One character only, amplemargin hair to soles. No floor, no background, no label, no castshadow, no surrounding glow. Genuine transparent alpha. Portrait fullbody."
+  }
+}

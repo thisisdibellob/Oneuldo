@@ -1,0 +1,15 @@
+{
+  "expo": {
+    "name": "오늘도 함께",
+    "slug": "oneuldo-guardian",
+    "scheme": "oneuldo-guardian",
+    "version": "0.1.0",
+    "orientation": "default",
+    "userInterfaceStyle": "light",
+    "icon": "./assets/icon.png",
+    "ios": { "supportsTablet": true, "bundleIdentifier": "com.oneuldo.guardian" },
+    "android": { "package": "com.oneuldo.guardian" },
+    "web": { "bundler": "metro", "favicon": "./assets/icon.png" },
+    "plugins": ["expo-font"]
+  }
+}

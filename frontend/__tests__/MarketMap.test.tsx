@@ -268,7 +268,7 @@ it('이전 기록을 보다가 Android 뒤로 가기를 누르면 게임을 포�
     fireEvent.press(screen.getByRole('button', { name: '이전 게임 기록' }));
     expect(screen.getByRole('header', { name: '이전 게임 기록' })).toBeTruthy();
     act(() => { expect(back!({ type: 'hardwareBackPress', timeStamp: 1 })).toBe(true); });
-    expect(screen.getByRole('header', { name: '마트에서 장보기' })).toBeTruthy();
+    expect(screen.getByRole('header', { name: '장 보기' })).toBeTruthy();
     expect(screen.queryByRole('header', { name: '이전 게임 기록' })).toBeNull();
     expect(screen.queryByText('실패 (포기)')).toBeNull();
   } finally { screen.unmount(); listener.mockRestore(); }
@@ -308,19 +308,21 @@ it('플레이어는 진열대와 같은 월드 안에서 발 위치의 깊이로
     const readAnimated = (value: number | { __getValue: () => number }) => typeof value === 'number' ? value : value.__getValue();
     expect(readAnimated(style().zIndex)).toBe(10 + environment.spawn.y);
     expect(style()).toMatchObject({ left: 0, top: 0 });
-    fireEvent(screen.getByLabelText('하늘마트 매장'), 'accessibilityAction', { nativeEvent: { actionName: 'moveDown' } });
-    expect(readAnimated(style().zIndex)).toBe(10 + environment.spawn.y + 24);
-    expect(readAnimated(style().transform[1].translateY)).toBe(environment.spawn.y + 24);
+    // Spawn is beside the closed common door; walk north into the free corridor.
+    fireEvent(screen.getByLabelText('하늘마트 매장'), 'accessibilityAction', { nativeEvent: { actionName: 'moveUp' } });
+    expect(readAnimated(style().zIndex)).toBe(10 + environment.spawn.y - 24);
+    expect(readAnimated(style().transform[1].translateY)).toBe(environment.spawn.y - 24);
   } finally { screen.unmount(); }
 });
 
 
-it('모퉁이 지점은 자체 월드 크기·공동문 스폰을 사용하고 이전 매장 오른쪽 경계를 넘어 이동한다', () => {
+it('모퉁이 지점은 자체 월드 크기·공동문 스폰을 사용하고 이전 매장 오른쪽 경계를 넘어 이동한다', async () => {
   const environment = createMarketEnvironment({ layoutId: 'corner', seed: 'corner-camera', employeeCount: 1,
     customerCount: 1, pillarCount: 0, chairCount: 0, cashierCount: 0, kioskPresent: false });
   const onPositionChange = jest.fn();
+  const onViewFrame = jest.fn();
   const screen = render(<MarketMap environment={environment} interactive hintedStation={null} nearbyStation={null}
-    onPositionChange={onPositionChange} onNearbyStationChange={jest.fn()} />);
+    onViewFrame={onViewFrame} onPositionChange={onPositionChange} onNearbyStationChange={jest.fn()} />);
   try {
     expect(StyleSheet.flatten(screen.getByTestId('market-world').props.style)).toEqual(expect.objectContaining(environment.world));
     const map = screen.getByLabelText('하늘마트 매장');
@@ -330,14 +332,15 @@ it('모퉁이 지점은 자체 월드 크기·공동문 스폰을 사용하고 �
     expect(read(player.transform![0].translateX)).toBe(environment.spawn.x);
     expect(read(player.transform![1].translateY)).toBe(environment.spawn.y);
     for (let step = 0; step < 4; step++) fireEvent(map, 'accessibilityAction', { nativeEvent: { actionName: 'moveRight' } });
+    await act(async()=>{await Promise.resolve();});
     const moved = onPositionChange.mock.calls.at(-1)![0];
     expect(moved.x).toBe(environment.spawn.x + 96);
     expect(moved.x).toBeGreaterThan(1100);
     expect(isMarketEnvironmentBlocked(environment, moved)).toBe(false);
-    const world = StyleSheet.flatten(screen.getByTestId('market-world').props.style);
     const expected = require('../src/game/worldZoom').getWorldCameraFrame(moved, { width: 375, height: 812 }, 1.3, environment.world);
-    expect(read(world.transform![0].translateX)).toBeCloseTo(expected.translation.x);
-    expect(read(world.transform![1].translateY)).toBeCloseTo(expected.translation.y);
+    // Native-driven values do not re-render the Jest mock on every frame. The
+    // guidance frame is published by the same camera update used by the world.
+    expect(onViewFrame).toHaveBeenLastCalledWith(expect.objectContaining({width:375,height:812,zoom:1.3,center:expected.center}));
   } finally { screen.unmount(); }
 });
 

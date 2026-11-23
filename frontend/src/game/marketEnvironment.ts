@@ -11,6 +11,7 @@ import {
 import { getMarketPersonCollider } from './marketPersonLayout';
 import type { MarketCategoryId } from './scenarios';
 import { MARKET_CUSTOMER_APPEARANCES, MARKET_EMPLOYEE_APPEARANCES, getMarketPersonAppearance, type MarketPersonAppearanceId } from './marketPeople';
+import { applyMarketTilemapToConfig, applyMarketTilemapToEnvironment, type MarketTilemapV1 } from './marketTilemap';
 
 export type MarketLayoutId = 'classic' | 'aisles' | 'corner';
 export const MARKET_LAYOUT_OPTIONS = [
@@ -28,6 +29,8 @@ export type MarketKioskLane = 'none' | MarketCheckoutId | 'random';
 export type MarketCashierAvailability = Record<MarketCheckoutId, boolean>;
 export type MarketEnvironmentStationId = MarketCategoryId | MarketCheckoutId | MarketKioskId | 'entrance' | 'exit' | 'common-door' | `staff:${string}`;
 export type MarketEnvironmentConfig = {
+  /** Explicit grid placements override random shelf and people slots; omitted in legacy JSON. */
+  tilemap?: MarketTilemapV1;
   /** Older configuration JSON omits this field and keeps the classic floor plan. */
   layoutId?: MarketLayoutId;
   /** Close the front entrance; the common door and inner side entrance remain open. */
@@ -417,10 +420,11 @@ function makePeople(kind: MarketPerson['kind'], slots: PersonSlot[], appearanceR
 
 export function createMarketEnvironment(overrides: Partial<MarketEnvironmentConfig> = {}): MarketEnvironment {
   const knownKeys = ['layoutId', 'entranceConstruction', 'seed', 'employeeCount', 'customerCount', 'pillarCount', 'chairCount', 'cashierCount',
-    'kioskPresent', 'kioskLane', 'shelfOrder', 'employeeSlotIds', 'customerSlotIds', 'pillarSlotIds', 'chairSlotIds'];
+    'kioskPresent', 'kioskLane', 'shelfOrder', 'employeeSlotIds', 'customerSlotIds', 'pillarSlotIds', 'chairSlotIds', 'tilemap'];
   if (!overrides || typeof overrides !== 'object' || Array.isArray(overrides) ||
     Object.keys(overrides).some((key) => !knownKeys.includes(key))) throw new Error('알 수 없는 마트 환경 변수입니다.');
-  const config: MarketEnvironmentConfig = { ...DEFAULT_MARKET_ENVIRONMENT_CONFIG, ...overrides };
+  const mergedConfig: MarketEnvironmentConfig = { ...DEFAULT_MARKET_ENVIRONMENT_CONFIG, ...overrides };
+  const config = mergedConfig.tilemap !== undefined ? applyMarketTilemapToConfig(mergedConfig, mergedConfig.tilemap) : mergedConfig;
   if (config.layoutId === undefined) config.layoutId = 'classic';
   if (!MARKET_LAYOUT_OPTIONS.some(layout => layout.id === config.layoutId)) throw new Error('layoutId는 classic, aisles, corner 중 하나를 지정하세요.');
   if (config.entranceConstruction === undefined) config.entranceConstruction = false;
@@ -443,7 +447,7 @@ export function createMarketEnvironment(overrides: Partial<MarketEnvironmentConf
   }
   for (const [count, name, min, max, candidates, ids] of [
     [config.employeeCount, 'employeeCount', 1, 3, slots.employees, config.employeeSlotIds],
-    [config.customerCount, 'customerCount', 1, 5, slots.customers, config.customerSlotIds],
+    [config.customerCount, 'customerCount', config.tilemap ? 0 : 1, 5, slots.customers, config.customerSlotIds],
     [config.pillarCount, 'pillarCount', 0, 4, slots.pillars, config.pillarSlotIds],
     [config.chairCount, 'chairCount', 0, 4, slots.chairs, config.chairSlotIds],
   ] as const) {
@@ -462,7 +466,7 @@ export function createMarketEnvironment(overrides: Partial<MarketEnvironmentConf
     drawCount(config.employeeCount, 'employeeCount', 1, 3, random), 'employeeSlotIds', random),
     createMarketRandom(`${config.seed}:employee-appearance:v1`));
   const customers = makePeople('customer', chooseSlots(slots.customers, config.customerSlotIds,
-    drawCount(config.customerCount, 'customerCount', 1, 5, random), 'customerSlotIds', random),
+    drawCount(config.customerCount, 'customerCount', config.tilemap ? 0 : 1, 5, random), 'customerSlotIds', random),
     createMarketRandom(`${config.seed}:customer-appearance:v1`));
   const objects: MarketEnvironmentObject[] = [
     ...structure.fixedObjects.map(object => ({ ...object, rect: { ...object.rect } })),
@@ -528,7 +532,7 @@ export function createMarketEnvironment(overrides: Partial<MarketEnvironmentConf
       ...checkouts.filter(checkout => checkout.cashierPresent).map(checkout => checkout.cashierCollider)].map((rect) => ({ x: rect.x, y: rect.y, width: rect.width, height: rect.height })),
     spawn: { ...structure.spawn }, exit: { ...structure.commonDoor.point },
   };
-  return environment;
+  return config.tilemap ? applyMarketTilemapToEnvironment(environment, config.tilemap) : environment;
 }
 
 /** Exact directional crossing, independent of world axis and outward sign. */

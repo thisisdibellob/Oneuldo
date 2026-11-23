@@ -1,4 +1,6 @@
 import { marketLocationResponse } from './marketHelp';
+import { normalizeMarketTraining, marketIncidentPlan, type MarketTrainingConfig } from './marketTraining';
+import { buildMarketTrajectory } from './marketTrajectory';
 import { MARKET_ENVIRONMENT_PLAYER_RADIUS, getMarketWrongWayGate, getMarketWrongWayRearm, createMarketEnvironment, isMarketEnvironmentBlocked, isNearMarketStation, MarketEnvironment, MarketEnvironmentConfig, MarketEnvironmentStationId, MarketCashierAvailability, MarketCheckoutId, MarketKioskId } from './marketEnvironment';
 import { MarketCategoryId, marketCategories, marketProducts, MarketProduct, getMarketProduct } from './scenarios';
 import { Point } from './prototypeWorld';
@@ -7,12 +9,14 @@ import { resolveMarketEnvironmentMovement } from './marketMovement';
 import { normalizeMarketLearningConfig, type MarketLearningConfig, type MarketLearningState, type MarketStockoutState, type MarketUnavailableReason } from './marketLearning';
 import { createMarketCheckoutReview, correctMarketCheckoutReview, evaluateMarketCheckoutReview, getMarketCartFingerprint,
   getMarketCheckoutReview, isStaffedCheckoutReviewReady, type MarketCheckoutReviewState } from './marketCheckoutReview';
+import { applyMarketTilemapToConfig, type MarketTilemapV1 } from './marketTilemap';
 
 export type MarketMatchRule = 'family' | 'exact';
 export type MarketTaskObjectiveInput = { productId: string; quantity: number; match?: MarketMatchRule };
 export type MarketTaskObjective = MarketTaskObjectiveInput & { id: string; match: MarketMatchRule; label: string; familyId: string; quantityUnit?: string };
 export type MarketProvenance = { source: 'human' | 'synthetic'; participantId?: string; agentModel?: string; personaId?: string; personaVersion?: string; notes?: string };
 export type MarketSessionConfig = {
+  training?: Partial<MarketTrainingConfig>;
   seed: string | number;
   difficulty: MarketMatchRule;
   objectives: MarketTaskObjectiveInput[];
@@ -35,6 +39,8 @@ export type MarketRating = { difficulty: number; interest: number };
 export type MarketCashierRequestFeedback = { accepted: boolean; message: string; checkoutIds: MarketCheckoutId[]; penaltyPoints: number };
 export type MarketEpisodeEvent = { sequence: number; timestamp: string; type: string; payload: Record<string, unknown> };
 export type MarketAction = (
+  | { type: 'startTraining' | 'trainingTick' | 'endTraining' }
+  | { type: 'finishShelfTask' }
   | { type: 'setPosition'; point: Point }
   | { type: 'move'; dx: number; dy: number }
   /** Bounded physical input: collision may stop or slide the player without rejecting the action. */
@@ -133,7 +139,7 @@ function shuffle<T>(values: T[], random: () => number) {
 }
 function normalizeConfig(input: Partial<MarketSessionConfig>): MarketSessionConfig {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('게임 설정은 JSON 객체여야 합니다.');
-  const knownFields = ['seed', 'difficulty', 'objectives', 'stockPerProduct', 'alarmPenaltyPoints', 'cashierRequestPenaltyPoints', 'wrongWayPenaltyPoints', 'stockOverrides', 'learning', 'inventoryProductIds', 'environment', 'provenance', 'startedAt', 'sessionId'];
+  const knownFields = ['training', 'seed', 'difficulty', 'objectives', 'stockPerProduct', 'alarmPenaltyPoints', 'cashierRequestPenaltyPoints', 'wrongWayPenaltyPoints', 'stockOverrides', 'learning', 'inventoryProductIds', 'environment', 'provenance', 'startedAt', 'sessionId'];
   for (const key of Object.keys(input)) if (!knownFields.includes(key)) throw new Error(`지원하지 않는 게임 설정입니다: ${key}`);
   const config = clone({ ...DEFAULT_MARKET_SESSION_CONFIG, ...input,
     environment: { ...DEFAULT_MARKET_SESSION_CONFIG.environment, ...input.environment,
@@ -141,6 +147,7 @@ function normalizeConfig(input: Partial<MarketSessionConfig>): MarketSessionConf
       // Opt-in learning sessions retain the new seeded kiosk placement.
       ...(input.learning === undefined && input.environment?.kioskLane === undefined ? { kioskLane: 'none' as const } : {}) },
     learning: normalizeMarketLearningConfig(input.learning),
+    training: normalizeMarketTraining(input.training),
     stockOverrides: { ...input.stockOverrides }, provenance: { ...DEFAULT_MARKET_SESSION_CONFIG.provenance, ...input.provenance },
   });
   if (!['string', 'number'].includes(typeof config.seed) || !String(config.seed).trim() || (typeof config.seed === 'number' && !Number.isFinite(config.seed))) throw new Error('seed가 올바르지 않습니다.');
@@ -332,6 +339,11 @@ function record(session: MarketSession, type: string, payload: Record<string, un
     ? new Date(at).toISOString() : new Date(Date.parse(previous) + (session.events.length ? 1 : 0)).toISOString();
   session.events.push({ sequence: session.events.length, timestamp, type, payload });
 }
+function recordShelfClosed(session: MarketSession, at?: string, station = session.activeStation) {
+  if (marketCategories.some(category => category.id === station)) {
+    record(session, 'station_closed', { station, playerPosition: clone(session.playerPosition) }, at);
+  }
+}
 function ensureCheckoutReview(session: MarketSession, at?: string) {
   if (!isStaffedCheckoutReviewReady(session)) return;
   if (session.checkoutReview?.cartFingerprint === getMarketCartFingerprint(session.cart)) return;
@@ -410,6 +422,7 @@ export function applyMarketAction(current: MarketSession, action: MarketAction):
   if (!action || typeof action.type !== 'string') return reject(session, action, '알 수 없는 행동이에요.');
   if (session.phase === 'finished' && !['rate', 'skipRating'].includes(action.type)) return reject(session, action, '이미 종료된 게임이에요.');
   if (action.type === 'expireTimeLimit') {
+    recordShelfClosed(session, action.at);
     session.phase = 'finished'; session.outcome = 'time-limit-expired'; session.activeStation = null; session.view = 'world';
     record(session, 'time_limit_expired', { timing: action.timing, cart: clone(session.cart), objectives: clone(session.objectives) }, action.at);
     record(session, 'session_finished', { outcome: session.outcome, attempts: session.attempts, cart: clone(session.cart),
@@ -418,6 +431,7 @@ export function applyMarketAction(current: MarketSession, action: MarketAction):
     return session;
   }
   if (action.type === 'giveUp') {
+    recordShelfClosed(session, action.at);
     session.phase = 'finished'; session.outcome = 'gave-up'; session.activeStation = null; session.view = 'world';
     record(session, 'session_finished', { outcome: session.outcome, attempts: session.attempts, cart: clone(session.cart), reason: 'player_gave_up', score: session.score, penaltyPoints: session.penaltyPoints, alarmCount: session.alarmCount, wrongWayEntryCount: session.wrongWayEntryCount, paid: session.paid }, action.at);
     return session;
@@ -430,6 +444,33 @@ export function applyMarketAction(current: MarketSession, action: MarketAction):
     } else { session.ratings = null; session.ratingSkipped = true; }
     record(session, action.type === 'rate' ? 'ratings_submitted' : 'ratings_skipped', { ratings: session.ratings }, action.at);
     return session;
+  }
+  if (action.type === 'startTraining') {
+    if (session.events.some(e=>e.type==='training_started')) return session;
+    record(session,'training_started',{point:clone(session.playerPosition)},action.at); return session;
+  }
+  if(action.type==='endTraining'){
+    if(!session.events.some(e=>e.type==='training_ended'))record(session,'training_ended',{point:clone(session.playerPosition)},action.at);
+    return session;
+  }
+  if (action.type === 'trainingTick') {
+    if (session.phase !== 'shopping' && session.phase !== 'checkout') return session;
+    if(session.events.some(e=>e.type==='training_ended'))return session;
+    const start = session.events.find(e=>e.type==='training_started')?.timestamp ?? session.config.startedAt;
+    const seconds = Math.max(0,(Date.parse(action.at ?? new Date().toISOString())-Date.parse(start))/1000);
+    for(const incident of marketIncidentPlan(session.environment, session.config.training)) {
+      if(seconds>=incident.elapsedSeconds && !session.events.some(e=>e.type==='incident_started'&&e.payload.id===incident.id))
+        record(session,'incident_started',{...incident,actualElapsedSeconds:seconds},action.at);
+    }
+    return session;
+  }
+  if (action.type === 'finishShelfTask') {
+    if (session.phase!=='shopping'||session.activeStation||session.view!=='world'||normalizeMarketTraining(session.config.training).task!=='shelf-finder')
+      return reject(session,action,'매대 찾기 과제에서 열린 화면을 닫은 뒤 완료해 주세요.');
+    const needed=[...new Set(session.objectives.map(o=>productOrThrow(o.productId).categoryId))];
+    if(!needed.every(id=>session.learning.visitedCategoryIds.includes(id)))return reject(session,action,'목록에 있는 물건의 매대를 모두 살펴봐 주세요.');
+    session.phase='finished';session.outcome='success';session.feedback={success:true};session.attempts++;
+    record(session,'session_finished',{outcome:session.outcome,task:'shelf-finder',visitedCategories:needed},action.at);return session;
   }
   if (action.type === 'moveInput') {
     if (session.phase === 'feedback') return reject(session, action, '다시 시도하거나 그만하기를 선택해 주세요.');
@@ -470,7 +511,7 @@ export function applyMarketAction(current: MarketSession, action: MarketAction):
     session.playerPosition = { ...point };
     checkEntranceCrossing(session, previousPosition, point, action.at);
     checkWrongWayEntry(session, previousPosition, point, action.at);
-    if (session.activeStation && !isNearMarketStation(session.environment, session.activeStation, point, undefined, session.cashierAvailability)) { session.activeStation = null; if (session.phase === 'checkout') session.phase = 'shopping'; }
+    if (session.activeStation && !isNearMarketStation(session.environment, session.activeStation, point, undefined, session.cashierAvailability)) { recordShelfClosed(session, action.at); session.activeStation = null; if (session.phase === 'checkout') session.phase = 'shopping'; }
     record(session, 'player_moved', { point: clone(point), input: action.type === 'move' ? 'bounded-agent-step' : 'trusted-renderer' }, action.at);
     return session;
   }
@@ -483,6 +524,7 @@ export function applyMarketAction(current: MarketSession, action: MarketAction):
   if (session.phase === 'feedback') return reject(session, action, '다시 시도하거나 그만하기를 선택해 주세요.');
   if (action.type === 'viewRequester') {
     if (session.phase !== 'shopping') return reject(session, action, '장보는 동안 부탁한 분에게 연락할 수 있어요.');
+    recordShelfClosed(session, action.at);
     session.view = 'requester'; session.activeStation = null;
     record(session, 'requester_contacted', {}, action.at);
     return session;
@@ -492,12 +534,18 @@ export function applyMarketAction(current: MarketSession, action: MarketAction):
     record(session, action.type === 'viewCart' ? 'cart_viewed' : action.type === 'viewHelp' ? 'help_viewed' : 'view_closed', action.type === 'viewCart' ? { cart: clone(session.cart) } : {}, action.at);
     return session;
   }
-  if (action.type === 'closeStation') { session.activeStation = null; session.phase = 'shopping'; session.view = 'world'; record(session, 'station_closed', {}, action.at); return session; }
+  if (action.type === 'closeStation') {
+    const station = session.activeStation;
+    session.activeStation = null; session.phase = 'shopping'; session.view = 'world';
+    if (station) record(session, 'station_closed', { station, playerPosition: clone(session.playerPosition) }, action.at);
+    return session;
+  }
   if (action.type === 'interact' || action.type === 'checkout') {
     if (session.view !== 'world') return reject(session, action, '열린 화면을 닫고 다가가 주세요.');
     const station = action.type === 'interact' ? action.station : action.checkoutId ?? 'checkout';
     if (station === 'entrance' && session.environment.config.entranceConstruction) return reject(session, action, '안쪽 입구를 이용해 주세요.');
     if (!isNearMarketStation(session.environment, station, session.playerPosition, undefined, session.cashierAvailability)) return reject(session, action, '가까이 다가간 뒤 선택해 주세요.');
+    const previousStation = session.activeStation;
     session.activeStation = station;
     const kiosk = session.environment.kiosks?.find(item => item.id === station);
     if (kiosk) {
@@ -513,6 +561,7 @@ export function applyMarketAction(current: MarketSession, action: MarketAction):
       session.cashierAvailable = session.cashierAvailability[station];
     }
     else session.phase = 'shopping';
+    if (previousStation !== station) recordShelfClosed(session, action.at, previousStation);
     record(session, 'station_interacted', { station, playerPosition: clone(session.playerPosition) }, action.at);
     ensureCheckoutReview(session, action.at);
     const category = marketCategories.find(item => item.id === station);
@@ -647,7 +696,8 @@ export function applyMarketAction(current: MarketSession, action: MarketAction):
     record(session, 'cart_changed', {
       operation: action.type === 'add' ? 'add' : 'remove', method: action.type === 'requestReturn' ? 'employee' : 'shelf',
       ...(action.type === 'requestReturn' ? { staffStation: session.activeStation } : {}),
-      categoryId: product.categoryId, productId: product.id, quantity, cart: clone(session.cart), stock: clone(session.stock),
+      categoryId: product.categoryId, productId: product.id, productName: product.name, quantity,
+      playerPosition: clone(session.playerPosition), cart: clone(session.cart), stock: clone(session.stock),
     }, action.at);
     // A receipt is tied to the basket, never to the counter or number of retries.
     // Editing the basket invalidates both the old bill and its staff response.
@@ -755,6 +805,13 @@ export function getMarketObservation(session: MarketSession) {
   } : null;
   return clone({
     schemaVersion: 1, sessionId: session.id, seed: session.config.seed, phase: session.phase, view: session.view,
+    training: normalizeMarketTraining(session.config.training),
+    visibleIncidents: session.events.filter(e=>e.type==='incident_started').map(e=>e.payload).filter(i=>{
+      const started=session.events.find(e=>e.type==='training_started')?.timestamp??session.config.startedAt;
+      const elapsed=(Date.parse(session.events.at(-1)?.timestamp??started)-Date.parse(started))/1000;
+      const at=Number(i.actualElapsedSeconds??i.elapsedSeconds);
+      return elapsed>=at&&elapsed<at+Number(i.durationSeconds);
+    }),
     objectives: session.objectives.map(({ id, label, quantity, match }) => ({ id, label, quantity, match })),
     environment: session.environment, playerPosition: session.playerPosition, activeStation: session.activeStation,
     shelfSlots: activeCategory ? { [activeCategory]: visibleSlots } : {}, products: visibleProductIds.map((id) => {
@@ -782,12 +839,13 @@ export function exportMarketEpisode(session: MarketSession) {
     cashierAvailability: session.cashierAvailability, selectedCheckoutId: session.selectedCheckoutId, checkoutReview: session.checkoutReview,
     score: session.score, penaltyPoints: session.penaltyPoints, alarmCount: session.alarmCount, wrongWayEntryCount: session.wrongWayEntryCount, paid: session.paid,
     attempts: session.attempts, outcome: session.outcome, ratings: session.ratings, ratingSkipped: session.ratingSkipped, events: session.events,
+    trajectory: buildMarketTrajectory(session.events, session.environment.spawn, normalizeMarketTraining(session.config.training).routeIntervalSeconds),
   });
 }
 export function serializeMarketEpisode(session: MarketSession) { return JSON.stringify(exportMarketEpisode(session), null, 2); }
 export function parseMarketSessionConfig(json: string): MarketSessionConfig { return createMarketSession(JSON.parse(json) as Partial<MarketSessionConfig>).config; }
 
-export type MarketAgentAction = Exclude<MarketAction, { type: 'setPosition' }>;
+export type MarketAgentAction = Exclude<MarketAction, { type: 'setPosition' | 'startTraining' | 'trainingTick' | 'endTraining' }>;
 /** Local synchronous adapter for next week's agent runner. It owns state, forbids teleport synchronization, and returns only actor-safe observations. */
 export function createMarketAgentAdapter(config: Partial<MarketSessionConfig>, environmentOverride?: MarketEnvironment) {
   if (config.provenance?.source !== 'synthetic') throw new Error('Agent episodes must identify synthetic provenance, agentModel, and personaId.');
@@ -796,9 +854,45 @@ export function createMarketAgentAdapter(config: Partial<MarketSessionConfig>, e
     observe: () => getMarketObservation(session),
     act: (action: MarketAgentAction) => {
       if ((action as MarketAction | undefined)?.type === 'setPosition') throw new Error('Agent action setPosition is not allowed; use bounded move.');
+      if(['startTraining','endTraining','trainingTick'].includes((action as MarketAction|undefined)?.type??''))throw new Error('Agent action is internal to the training clock.');
       session = applyMarketAction(session, action);
       return getMarketObservation(session);
     },
     exportEpisode: () => exportMarketEpisode(session),
   };
+}
+
+export function replaceMarketSessionTilemap(current: MarketSession, tilemap: MarketTilemapV1, at?: string): MarketSession {
+  if (current.phase !== 'shopping' || current.view !== 'world' || current.activeStation !== null || current.paid) {
+    throw new Error('대화와 계산 화면을 닫고 장보는 중에 배치를 바꿀 수 있어요.');
+  }
+  // Validate the full replacement before changing any progress or adding an event.
+  const environment = createMarketEnvironment(applyMarketTilemapToConfig(current.environment.config, tilemap));
+  const originalCashierRects = environment.checkouts.filter(counter => counter.cashierPresent).map(counter => counter.cashierCollider);
+  const sameRect = (a: typeof originalCashierRects[number], b: typeof originalCashierRects[number]) => a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height;
+  const cashierAvailability = Object.fromEntries(environment.checkouts.map(counter => [counter.id,
+    counter.kind !== 'kiosk' && current.cashierAvailability[counter.id]])) as MarketCashierAvailability;
+  // Called cashiers stay at their counter. Changed people counts must not reroll this progress.
+  environment.checkouts = environment.checkouts.map(counter => ({ ...counter, cashierPresent: cashierAvailability[counter.id] }));
+  environment.checkout = environment.checkouts[0];
+  environment.obstacles = [...environment.obstacles.filter(rect => !originalCashierRects.some(cashier => sameRect(rect, cashier))),
+    ...environment.checkouts.filter(counter => counter.cashierPresent).map(counter => counter.cashierCollider)];
+  const session = clone(current);
+  const previousTilemap = clone(current.environment.config.tilemap ?? null);
+  session.environment = environment;
+  session.config.environment = clone(environment.config);
+  session.playerPosition = { ...environment.spawn };
+  session.activeStation = null;
+  session.selectedCheckoutId = null;
+  session.selectedKioskId = null;
+  session.checkoutReview = null;
+  session.cashierAvailability = cashierAvailability;
+  session.cashierAvailable = cashierAvailability.checkout;
+  session.lastActionError = null;
+  // Relocation is not a gate crossing; score, alarms and prior task progress are retained.
+  record(session, 'layout_changed', { previousLayoutId: current.environment.config.layoutId ?? 'classic',
+    previousTilemap, tilemap: clone(environment.config.tilemap), environment: clone(environment),
+    previousPosition: clone(current.playerPosition), playerPosition: clone(session.playerPosition),
+    cashierAvailability: clone(cashierAvailability) }, at);
+  return session;
 }
