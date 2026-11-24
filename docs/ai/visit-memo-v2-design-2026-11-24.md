@@ -66,21 +66,58 @@ v2는 아래 연구들을 바탕으로 칸을 정하고, 매 방문 끝에 메�
 
 ## 구현
 
-- **지침:** `market-simulator/actor-instructions/authoring-v5-h200-memo-v2.txt`. v1 메모 지침과 비교해 메모 읽기 문단과 메모 쓰기 문단 두 줄만 달라요(테스트로 확인). v1 지침 파일은 고치지 않았어요.
-- **입력 생성:** `market-simulator/whole-trace-actor-input.cjs`
+- **지침:** `market-simulator/actor-instructions/authoring-v5-h200-memo-v2.txt`
+  - v1 메모 지침과 비교해 메모 읽기 문단과 메모 쓰기 문단 두 줄만 달라요(테스트로 확인). v1 지침 파일은 고치지 않았어요.
+  - 읽기 문단은 방문 횟수(`visit.number`), 메모 프로필, 지난 메모, 다른 매장 요령을 읽는 법을 설명해요.
+  - 쓰기 문단은 아래 "방문이 쌓일 때의 규칙"의 칸별 고쳐 쓰기 규칙과 메모 프로필을 따르게 해요.
+- **메모 공통 모듈:** `market-simulator/visit-memo.cjs`
   - `MEMO_FORMATS`로 지침마다 메모 형식을 정해요. `authoring-v5-h200-memo`는 `previous-visit-memo-v1`(300자, 자유 서술), `authoring-v5-h200-memo-v2`는 `previous-visit-memo-v2`(500자, 칸 구조)를 써요.
-  - `parseVisitMemoSections`는 형식만 검사해요. 알 수 없는 칸, 중복, 순서 어긋남, 첫 칸 앞의 글, 내용이 하나도 없는 메모, 항목 수 초과를 거부해요. 메모를 고치거나 채우거나 다시 정렬하지 않아요.
-  - 실행 요약의 `previousVisit.sections`에 칸별 줄 수와 항목 수를 남겨 분석에 써요.
-  - v1 메모를 v2 지침에 넣으면 "no section headers"로 거부해요. 형식을 자동으로 바꾸지 않아요.
-- **사용 예:**
+  - `parseVisitMemoSections`는 형식만 검사해요. 알 수 없는 칸, 중복, 순서 어긋남, 첫 칸 앞의 글, 내용이 하나도 없는 메모, 항목 수 초과를 거부해요. 메모를 고치거나 채우거나 다시 정렬하지 않아요. v1 메모는 "no section headers"로 거부해요.
+  - `visitMemoMetrics`는 글자 수, 칸별 줄 수와 항목 수, (확실)·(흐릿) 개수를 세요. 내용이 맞는지는 판단하지 않아요.
+  - `storeKeyOf`는 같은 매장인지 정하는 키를 만들어요. `visitMemoProfileOf`는 페르소나의 메모 프로필을 읽어요.
+- **입력 생성:** `market-simulator/whole-trace-actor-input.cjs`
+  - v2 지침은 `--visit-memo-chain`이 반드시 필요해요. 방문 횟수와 지난 메모를 손으로 넘기지 않고 사슬 기록에서만 가져오게 하려는 거예요. v2 지침에 `--previous-visit-memo`를 쓰면 거부해요.
+  - 사슬의 페르소나 id·버전과 매장 키가 준비된 요청과 다르면 거부해요.
+  - 배우 입력에 `visit`, `visitMemoProfile`, (있으면) `previousVisit`, (새 매장 첫 방문이면) `otherStoreTips`를 붙여요. bundle과 `inputHash`는 바꾸지 않아요.
+  - 실행 요약의 `visitMemoChain`에 사슬 파일 SHA-256, 방문 횟수, 넘긴 메모의 SHA-256, 프로필 파일 SHA-256을 남겨요.
+- **사슬 도구:** `market-simulator/visit-memo-chain.cjs` (`init`, `record`, `metrics`)
+- **사용 순서 (사람 × 매장 하나):**
 
   ```bash
-  node market-simulator/whole-trace-actor-input.cjs <slot>/owner/prepare-response.json <slot>/actor-input.json \
-    --template authoring-v5-h200-memo-v2 --previous-visit-memo <지난-방문-memo.txt>
+  # 처음 한 번: 사슬 만들기 (다른 매장 사슬에서 요령을 가져오려면 --carry-any-store-from <다른-사슬.json>)
+  node market-simulator/visit-memo-chain.cjs init output/<실험>/memo-chain.json <slot-1>/owner/prepare-response.json
+
+  # 방문마다: 배우 입력 만들기 → 플레이 → 배우의 마지막 답을 파일로 저장 → 기록
+  node market-simulator/whole-trace-actor-input.cjs <slot-N>/owner/prepare-response.json <slot-N>/actor-input.json \
+    --template authoring-v5-h200-memo-v2 --visit-memo-chain output/<실험>/memo-chain.json
+  node market-simulator/visit-memo-chain.cjs record output/<실험>/memo-chain.json <slot-N> <slot-N>/actor-final-reply.txt
+  #   결정이 하나도 수락되기 전에 기술적으로 실패했으면 record에 --no-visit
+
+  # 1차 비교: 페르소나별 메모 양과 형태
+  node market-simulator/visit-memo-chain.cjs metrics output/<실험>/jimin-chain.json output/<실험>/neutral-chain.json
   ```
 
-  첫 방문에는 `--previous-visit-memo` 없이 같은 지침을 써요. 메모는 배우의 마지막 답에서 `extractVisitMemo`로 꺼낸 원문을 그대로 다음 방문에 넘겨요.
-- **검증:** `whole-trace-actor-input` 테스트 15건, market-simulator 전체 테스트 1242건 통과, `git diff --check` 통과. 이 검사는 입력 계약과 형식만 확인하고, 실제 학습 효과는 확인하지 않아요.
+- **검증:** 사슬 테스트 5건(`test/visit-memo-chain.test.cjs`), 입력 생성 테스트 14건, market-simulator 전체 테스트 1246건 통과, `git diff --check` 통과. 이 검사는 입력 계약과 기록 형식만 확인하고, 실제 학습 효과는 확인하지 않아요.
+
+## 페르소나별 메모 프로필
+
+일반 성인과 지적장애인은 기억하는 방식과 질이 달라야 해요. 다만 기억하는 양을 숫자 상한으로 정할 근거는 찾지 못했어요. 레포 근거 검토(P14)도 작업기억 결과가 과제 조건에 따라 달라서 고정 한계로 볼 수 없다고 정리했어요. 그래서 다음 순서로 진행해요.
+
+1. **지금:** 기억하는 방식만 프로필로 다르게 해요. 양은 모든 페르소나가 같은 상한(500자, 장면 3개, 계획 2개) 안에서 스스로 정해요.
+2. **1차 비교:** 두 페르소나의 메모를 `metrics`로 비교해요. 글자 수, 칸별 항목 수, 확실 비율, 장소 서술 형태, 경험하지 않은 내용이 들어갔는지를 봐요.
+3. **그 뒤:** 양이 거의 같게 나오면 페르소나별 상한을 정해요. 정하더라도 세션 중 `landmarkMemory`처럼 "합성 설계값이며 실측 기억 능력이 아님"이라고 표시해요.
+
+프로필은 `market-simulator/personas/visit-memo-profiles.json`에 있어요. 페르소나 JSON에 넣지 않고 별도 파일로 뒀어요.
+- **이유:** 페르소나 JSON을 고치면 페르소나 버전과 bundle `inputHash`, 회귀 fixture가 바뀌고, `neutral-adult-control` v4 전용 길찾기 문구 조건도 다시 맞춰야 해요. 메모 프로필은 플레이 중 행동이 아니라 메모를 쓸 때만 쓰는 정보라서 배우 입력에만 붙여요.
+- **버전 묶기:** 각 프로필은 작성 기준이 된 페르소나 버전을 갖고 있어요. 페르소나 버전이 바뀌면 프로필을 다시 검토하기 전까지 사용을 거부해요.
+- **프로필이 없는 페르소나:** `careful-checker`, `quick-decider`는 v2 메모 사슬을 만들 수 없어요.
+
+| 항목 | 일반 성인 (`neutral-adult-control` v4) | 지민 (`mild-intellectual-disability-adult` v6) | 근거 |
+|---|---|---|---|
+| 장소 쓰는 방식 `placeForm` | `area-layout`: 구역과 배치 | `route-sequence`: 움직인 순서, 전체 배치로 잘 묶지 않음 | `wayfinding.memoryForm`·`cueLevel`, Courbois 2013·2019 |
+| 계획 형식 `planForm` | `conditional-short`: 조건이 있는 짧은 계획 | `next-step`: 바로 다음 한 걸음, 한 문장 | `wayfinding.planHorizon`·`thoughtForm` |
+| 일반 요령 `generalTips` | `may-generalize`: 다른 마트에 통할 요령을 떠올림 | `situation-bound`: 장면·상품 표기에 묶인 구체 기억이 주가 됨 | 일반화 연구(L01·L03·L04) |
+| 확실해지는 방식 `confidence` | `once-confirmed`: 한 번 직접 확인하면 확실 | `repetition-needed`: 여러 번 겪어야 확실, 안 간 곳은 빨리 흐려짐 | `wayfinding.landmarkMemory.retention`, P10 |
 
 ## 하지 않은 것
 
@@ -89,9 +126,11 @@ v2는 아래 연구들을 바탕으로 칸을 정하고, 매 방문 끝에 메�
 - 방문 횟수, 망각률, 칸별 용량을 장애 유형에 따라 정하지 않았어요.
 - 메모 내용이 맞는지, 정답에 가까운지 판정하지 않아요.
 
-## 방문이 쌓일 때의 규칙 (설계, 아직 구현 전)
+## 방문이 쌓일 때의 규칙
 
 ### 1. 기억은 "사람 × 매장" 단위로 이어져요
+
+매장 키(`store-key-v1`)는 배치 버전, `layoutId`, 입구 공사 여부, 세계 크기, 벽, 입구, 출구로 만들어요. 매대 순서, 상품, 사람 수는 넣지 않아서 바뀌어도 같은 매장이에요(테스트로 확인).
 
 - 메모 사슬은 페르소나 한 명과 매장 하나마다 따로 있어요. 2회차 메모는 1회차 메모를 이어받고, 3회차 메모는 2회차 메모를 이어받아요.
 - **같은 매장인지는 시스템이 정해요.** 사람도 들어가기 전에 "그 마트"에 간다는 걸 알기 때문이에요. 기준은 같은 배치(`layoutId`)와 같은 건물 구조예요.
@@ -169,25 +208,33 @@ v2는 아래 연구들을 바탕으로 칸을 정하고, 매 방문 끝에 메�
 
 ### 6. 사슬 기록 `memo-chain.json`
 
-사람 × 매장마다 한 파일을 둬요. 실험 폴더에 두고, 외장하드 보관 대상에 포함해요.
+사람 × 매장마다 한 파일을 둬요. 실험 폴더에 두고, 외장하드 보관 대상에 포함해요. 경로는 사슬 파일 위치를 기준으로 한 상대 경로예요.
 
 ```json
 {
   "version": "visit-memo-chain-v1",
-  "personaId": "<페르소나>",
-  "storeKey": "<배치와 구조로 만든 매장 키>",
+  "template": "authoring-v5-h200-memo-v2",
+  "memoFormat": "previous-visit-memo-v2",
+  "personaId": "mild-intellectual-disability-adult",
+  "personaVersion": "6",
+  "storeKey": "store-key-v1:classic:<16자리 해시>",
+  "storeKeyBasis": ["world.layoutVersion", "world.config.layoutId", "..."],
+  "carriedAnyStoreTips": null,
   "entries": [
-    { "visit": 1, "runFolder": "output/<실행-1>", "template": "authoring-v5-h200-memo-v2",
-      "inputMemoSha256": null, "outputMemoFile": "visit-memo.txt", "outputMemoSha256": "<sha>",
-      "memoStatus": "valid", "sections": [{ "id": "places", "items": 2 }] },
-    { "visit": 2, "runFolder": "output/<실행-2>", "template": "authoring-v5-h200-memo-v2",
-      "inputMemoSha256": "<1회차 outputMemoSha256과 같아야 함>", "outputMemoFile": "visit-memo.txt",
-      "outputMemoSha256": "<sha>", "memoStatus": "valid", "sections": [] }
+    { "visit": 1, "slot": "slot-1", "actorInputSha256": "<sha>", "inputMemoSha256": null,
+      "replyFile": "slot-1/actor-final-reply.txt", "replySha256": "<sha>",
+      "outputMemoFile": "slot-1/visit-memo.txt", "outputMemoSha256": "<sha>",
+      "memoStatus": "valid", "error": null,
+      "metrics": { "characters": 182, "sureMarks": 0, "vagueMarks": 1, "sections": [{ "id": "places", "lines": 1, "items": 1 }] },
+      "recordedAt": "2026-11-24T00:00:00.000Z" },
+    { "visit": 2, "slot": "slot-2", "inputMemoSha256": "<1회차 outputMemoSha256과 같음>", "memoStatus": "valid" }
   ]
 }
 ```
 
-- 반드시: N회차의 `inputMemoSha256`은 바로 전 유효 메모의 `outputMemoSha256`과 같아야 해요. 다르면 다음 방문을 준비하지 않아요.
+- 반드시: N회차 배우 입력의 방문 횟수와 지난 메모는 사슬이 지금 넘겨줄 값과 같아야 해요. 다르면 `record`가 거부해요.
+- 같은 slot을 두 번 기록하거나 이미 있는 `visit-memo.txt`를 덮어쓰지 않아요.
+- 넘겨줄 메모 파일이 기록 뒤에 바뀌었으면(SHA-256 불일치) 다음 방문 입력을 만들지 않아요.
 - `memoStatus`는 `valid`, `missing`, `invalid`, `no-visit` 중 하나예요. 퀘스트 성패와는 다른 값이에요.
 
 ### 7. 예시: 3회 방문

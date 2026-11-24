@@ -102,86 +102,9 @@ function buildActorInput(prepareResponse) {
 }
 
 const sha256 = text => crypto.createHash('sha256').update(text).digest('hex');
-
-// A persona-authored memo from a previous visit. It is the actor's own words,
-// carried verbatim; code never summarises, corrects or adds to it.
-const PREVIOUS_VISIT_VERSION = 'previous-visit-memo-v1';
-const VISIT_MEMO_MAX_CHARACTERS = 300;
-const PREVIOUS_VISIT_NOTICE = 'previousVisit.memo는 이 인물이 지난번 같은 마트에 왔을 때 마지막에 자기 말로 남긴 기억 메모다. 인물은 이 마트에 한 번 와 봤다는 것을 안다. 메모는 인물의 기억이라 틀리거나 흐리거나 빠진 것이 있을 수 있다. 장보기 목록은 새로 읽어야 하며 지난번과 다를 수 있다. 메모를 얼마나 믿고 쓸지는 인물이 현재 화면과 대조해 정한다. 메모에 적힌 매대·계산대도 걸어서 현재 화면에 보이고 가까워져야 열 수 있으며, 메모는 cueRef가 아니다.';
-const VISIT_MEMO_TAG = /^<visit-memo>\s*$([\s\S]*?)^<\/visit-memo>\s*$|<visit-memo>([\s\S]*?)<\/visit-memo>/gm;
-
-// v2: the persona fills fixed sections in its own words and rewrites the memo
-// on every visit (docs/ai/visit-memo-v2-design-2026-11-24.md). Code checks only
-// the shape; it never fills, reorders, trims or judges the content.
-const PREVIOUS_VISIT_V2_VERSION = 'previous-visit-memo-v2';
-const VISIT_MEMO_V2_MAX_CHARACTERS = 500;
-const VISIT_MEMO_V2_SECTIONS = Object.freeze([
-  Object.freeze({ id: 'routine', header: '[장보기 순서]', maxItems: null }),
-  Object.freeze({ id: 'scenes', header: '[기억나는 장면]', maxItems: 3 }),
-  Object.freeze({ id: 'places', header: '[장소와 길]', maxItems: null }),
-  Object.freeze({ id: 'nextTime', header: '[다음엔]', maxItems: 2 }),
-  Object.freeze({ id: 'anyStore', header: '[어느 마트에서나]', maxItems: null }),
-]);
-const PREVIOUS_VISIT_V2_NOTICE = 'previousVisit.memo는 이 인물이 지난번 같은 마트 방문을 마치며 자기 말로 다시 쓴 기억 메모이고, 그 전 방문들에서 아직 기억하는 것도 합쳐져 있다. 인물은 이 마트에 와 본 적이 있다는 것을 안다. 칸은 [장보기 순서], [기억나는 장면], [장소와 길], [다음엔], [어느 마트에서나]이며, 기억나지 않아 비었거나 빠진 칸이 있을 수 있다. (확실)·(흐릿)은 인물 자신의 느낌이고 확실이라고 적힌 것도 틀릴 수 있다. 장보기 목록은 새로 읽어야 하며 지난번과 다를 수 있다. 메모를 얼마나 믿고 [다음엔]의 계획을 따를지는 인물이 현재 화면과 대조해 정한다. 메모에 적힌 매대·계산대도 걸어서 현재 화면에 보이고 가까워져야 열 수 있으며, 메모는 cueRef가 아니다.';
-
-// Which memo format each memo template reads and writes.
-const MEMO_FORMATS = Object.freeze({
-  'authoring-v5-h200-memo': Object.freeze({ version: PREVIOUS_VISIT_VERSION, maxCharacters: VISIT_MEMO_MAX_CHARACTERS, notice: PREVIOUS_VISIT_NOTICE, sections: null }),
-  'authoring-v5-h200-memo-v2': Object.freeze({ version: PREVIOUS_VISIT_V2_VERSION, maxCharacters: VISIT_MEMO_V2_MAX_CHARACTERS, notice: PREVIOUS_VISIT_V2_NOTICE, sections: VISIT_MEMO_V2_SECTIONS }),
-});
-
-/** Splits a v2 memo into its sections without repairing it. Throws on any shape violation. */
-function parseVisitMemoSections(text) {
-  const byHeader = new Map(VISIT_MEMO_V2_SECTIONS.map(section => [section.header, section]));
-  const sections = [];
-  let current = null;
-  if (!text.split('\n').some(line => /^\[[^\]]*\]$/.test(line.trim()))) throw new Error('visit memo has no section headers');
-  for (const rawLine of text.split('\n')) {
-    const line = rawLine.trim();
-    if (line === '') continue;
-    if (/^\[[^\]]*\]$/.test(line)) {
-      const section = byHeader.get(line);
-      if (!section) throw new Error(`visit memo has an unknown section header ${line}`);
-      const order = VISIT_MEMO_V2_SECTIONS.indexOf(section);
-      if (sections.some(entry => entry.id === section.id)) throw new Error(`visit memo repeats section ${line}`);
-      if (current && VISIT_MEMO_V2_SECTIONS.findIndex(entry => entry.id === current.id) > order)
-        throw new Error(`visit memo section ${line} is out of order`);
-      current = { id: section.id, header: section.header, lines: [] };
-      sections.push(current);
-      continue;
-    }
-    if (!current) throw new Error('visit memo has text before the first section header');
-    current.lines.push(line);
-  }
-  if (!sections.some(section => section.lines.length > 0)) throw new Error('visit memo has no content in any section');
-  for (const section of sections) {
-    const spec = VISIT_MEMO_V2_SECTIONS.find(entry => entry.id === section.id);
-    section.items = section.lines.filter(line => line.startsWith('- ')).length;
-    if (spec.maxItems !== null && section.items > spec.maxItems)
-      throw new Error(`visit memo section ${spec.header} has ${section.items} items; the limit is ${spec.maxItems}`);
-  }
-  return sections;
-}
-
-function validateVisitMemo(memo, format = MEMO_FORMATS['authoring-v5-h200-memo']) {
-  if (typeof memo !== 'string') throw new TypeError('visit memo must be a string');
-  const text = memo.trim();
-  const characters = Array.from(text).length;
-  if (characters === 0) throw new Error('visit memo is empty');
-  if (characters > format.maxCharacters) throw new Error(`visit memo has ${characters} characters; the limit is ${format.maxCharacters}`);
-  if (/<\/?visit-memo>/.test(text)) throw new Error('visit memo must not contain memo tags');
-  if (!format.sections) return { text, characters };
-  const sections = parseVisitMemoSections(text);
-  return { text, characters, sections: sections.map(({ id, lines, items }) => ({ id, lines: lines.length, items })) };
-}
-
-/** Returns the last tagged memo in an actor's final reply, or null when there is none. Never repairs it. */
-function extractVisitMemo(reply) {
-  if (typeof reply !== 'string') throw new TypeError('actor reply must be a string');
-  let last = null;
-  for (const match of reply.matchAll(VISIT_MEMO_TAG)) last = (match[1] ?? match[2]).trim();
-  return last;
-}
+const memo = require('./visit-memo.cjs');
+const { PREVIOUS_VISIT_VERSION, VISIT_MEMO_MAX_CHARACTERS, PREVIOUS_VISIT_V2_VERSION, VISIT_MEMO_V2_MAX_CHARACTERS,
+  VISIT_MEMO_V2_SECTIONS, MEMO_FORMATS, validateVisitMemo, parseVisitMemoSections, extractVisitMemo } = memo;
 
 // Fixed actor instruction templates. A new wording is a new file and id; an
 // existing template is never edited, so recorded SHAs keep identifying it.
@@ -215,17 +138,49 @@ function renderActorInstructions(templateId, slotDirectory) {
 
 function writeActorInput(prepareResponseFile, outputFile, options = {}) {
   const sourceText = fs.readFileSync(prepareResponseFile, 'utf8');
-  const actorInput = buildActorInput(JSON.parse(sourceText));
+  const prepareResponse = JSON.parse(sourceText);
+  const actorInput = buildActorInput(prepareResponse);
+  const format = options.instructions === false ? undefined : MEMO_FORMATS[options.template];
   let previousVisit = null;
+  let visitMemoChain = null;
+  if (format?.sections && options.visitMemoChainFile === undefined)
+    throw new Error(`${options.template} requires --visit-memo-chain so the visit number and the previous memo come from the recorded chain`);
+  if (options.visitMemoChainFile !== undefined && !format?.sections)
+    throw new Error('A visit memo chain requires the authoring-v5-h200-memo-v2 instruction template');
   if (options.previousVisitMemoFile !== undefined) {
-    const format = options.instructions === false ? undefined : MEMO_FORMATS[options.template];
     if (!format)
       throw new Error('A previous visit memo requires a -memo instruction template that tells the actor how to read it');
+    if (format.sections) throw new Error('With a v2 memo template the previous memo comes from --visit-memo-chain, not --previous-visit-memo');
     const memoText = fs.readFileSync(options.previousVisitMemoFile, 'utf8');
     const { text, characters, sections } = validateVisitMemo(memoText, format);
     actorInput.previousVisit = { version: format.version, notice: format.notice, memo: text };
     previousVisit = { version: format.version, file: path.resolve(options.previousVisitMemoFile),
       sha256: sha256(memoText), memoSha256: sha256(text), characters, ...(sections && { sections }) };
+  }
+  if (options.visitMemoChainFile !== undefined) {
+    const chainFile = path.resolve(options.visitMemoChainFile);
+    const { chain, sha256: chainSha256 } = memo.readChain(chainFile);
+    const persona = prepareResponse.bundle?.persona ?? {};
+    if (chain.personaId !== persona.id || String(chain.personaVersion) !== String(persona.version))
+      throw new Error(`Visit memo chain is for ${chain.personaId} v${chain.personaVersion}, not the prepared ${persona.id} v${persona.version}`);
+    const storeKey = memo.storeKeyOf(prepareResponse);
+    if (chain.storeKey !== storeKey)
+      throw new Error(`Visit memo chain is for store ${chain.storeKey}, not the prepared store ${storeKey}; start a new chain for a different store`);
+    const profile = memo.visitMemoProfileOf(persona.id, persona.version);
+    const next = memo.nextVisitOf(chain, chainFile);
+    actorInput.visit = { version: memo.CHAIN_VERSION, number: next.number, notice: memo.VISIT_NOTICE };
+    actorInput.visitMemoProfile = profile.actorCopy;
+    if (next.previousMemo) {
+      const { text, characters, sections } = validateVisitMemo(next.previousMemo.text, format);
+      actorInput.previousVisit = { version: format.version, notice: format.notice, memo: text };
+      previousVisit = { version: format.version, fromVisit: next.previousMemo.visit, sha256: next.previousMemo.sha256,
+        memoSha256: sha256(text), characters, sections };
+    }
+    if (next.otherStoreTips)
+      actorInput.otherStoreTips = { version: memo.OTHER_STORE_TIPS_VERSION, notice: memo.OTHER_STORE_TIPS_NOTICE, tips: next.otherStoreTips.text };
+    visitMemoChain = { file: chainFile, sha256: chainSha256, storeKey, visitNumber: next.number,
+      previousMemoSha256: next.previousMemo?.sha256 ?? null, otherStoreTips: next.otherStoreTips ? { fromMemoSha256: next.otherStoreTips.fromMemoSha256 } : null,
+      profile: profile.provenance };
   }
   const outputText = JSON.stringify(actorInput, null, 2) + '\n';
   const slotDirectory = path.dirname(path.resolve(outputFile));
@@ -260,6 +215,7 @@ function writeActorInput(prepareResponseFile, outputFile, options = {}) {
     omittedTopLevelKeys: actorInput.actorInputProjection.omittedTopLevelKeys,
     replacements: actorInput.actorInputProjection.replacements,
     previousVisit,
+    visitMemoChain,
     actorInstructions: instructions && {
       templateId: instructions.templateId,
       templateFile: instructions.templateFile,
@@ -283,11 +239,12 @@ if (require.main === module) {
     if (args[index] === '--template') options.template = args[++index];
     else if (args[index] === '--no-instructions') options.instructions = false;
     else if (args[index] === '--previous-visit-memo') options.previousVisitMemoFile = args[++index];
+    else if (args[index] === '--visit-memo-chain') options.visitMemoChainFile = args[++index];
     else positional.push(args[index]);
   }
   const [input, output] = positional;
   if (!input || !output) {
-    process.stderr.write('Usage: node market-simulator/whole-trace-actor-input.cjs <slot>/owner/prepare-response.json <slot>/actor-input.json [--template authoring-v3] [--no-instructions] [--previous-visit-memo <memo.txt> (requires a memo template: authoring-v5-h200-memo or authoring-v5-h200-memo-v2)]\nWrites <slot>/actor-input.json and <slot>/actor-instructions.txt (never overwrites) and prints a provenance summary.\n');
+    process.stderr.write('Usage: node market-simulator/whole-trace-actor-input.cjs <slot>/owner/prepare-response.json <slot>/actor-input.json [--template authoring-v3] [--no-instructions] [--previous-visit-memo <memo.txt> (authoring-v5-h200-memo)] [--visit-memo-chain <memo-chain.json> (required by authoring-v5-h200-memo-v2)]\nWrites <slot>/actor-input.json and <slot>/actor-instructions.txt (never overwrites) and prints a provenance summary.\n');
     process.exitCode = 2;
   } else {
     try { process.stdout.write(JSON.stringify(writeActorInput(input, output, options), null, 2) + '\n'); }

@@ -241,43 +241,6 @@ test('a v2 visit memo is validated by shape only and empty or omitted sections a
   assert.equal(validateVisitMemo(`[장보기 순서]\n${'가'.repeat(400)}`, MEMO_V2).characters, 409, 'v2 allows more than the v1 limit of 300');
 });
 
-test('the v2 memo template carries a sectioned memo and refuses an unsectioned one', async t => {
-  const response = await prepared(t, { actionHorizon: 200 });
-  const cli = path.resolve(__dirname, '../whole-trace-actor-input.cjs');
-  const slot = () => {
-    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'actor-input-memo-v2-'));
-    t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
-    fs.mkdirSync(path.join(directory, 'owner'));
-    fs.writeFileSync(path.join(directory, 'owner', 'prepare-response.json'), JSON.stringify(response));
-    return directory;
-  };
-  const run = (directory, memoText) => {
-    const memoFile = path.join(directory, 'memo.txt');
-    fs.writeFileSync(memoFile, memoText);
-    return spawnSync(process.execPath, [cli, path.join(directory, 'owner', 'prepare-response.json'), path.join(directory, 'actor-input.json'),
-      '--template', 'authoring-v5-h200-memo-v2', '--previous-visit-memo', memoFile], { encoding: 'utf8' });
-  };
-  const refusedSlot = slot();
-  const refused = run(refusedSlot, '들어가서 왼쪽으로 가면 냉장 매대에 우유가 있었다.\n');
-  assert.notEqual(refused.status, 0);
-  assert.match(refused.stderr, /no section headers/);
-  assert.equal(fs.existsSync(path.join(refusedSlot, 'actor-input.json')), false);
-  const directory = slot();
-  const written = run(directory, `${sectionedMemo}\n`);
-  assert.equal(written.status, 0, written.stderr);
-  const summary = JSON.parse(written.stdout);
-  const actorInput = JSON.parse(fs.readFileSync(path.join(directory, 'actor-input.json'), 'utf8'));
-  assert.equal(actorInput.previousVisit.version, 'previous-visit-memo-v2');
-  assert.equal(actorInput.previousVisit.memo, sectionedMemo);
-  assert.match(actorInput.previousVisit.notice, /\[다음엔\]/);
-  assert.equal(text(actorInput.bundle), text(buildActorInput(response).bundle), 'the memo is not merged into the bundle');
-  assert.deepEqual(summary.previousVisit.sections.map(section => section.id), ['routine', 'scenes', 'places', 'nextTime']);
-  assert.equal(summary.actorInstructions.templateId, 'authoring-v5-h200-memo-v2');
-  const instructions = fs.readFileSync(path.join(directory, 'actor-instructions.txt'), 'utf8');
-  for (const header of ['[장보기 순서]', '[기억나는 장면]', '[장소와 길]', '[다음엔]', '[어느 마트에서나]']) assert.ok(instructions.includes(header), header);
-  assert.match(instructions, /rewrite it as one memo/);
-});
-
 test('the v2 memo template differs from the v1 memo template only in the two memo paragraphs', () => {
   const lines = file => fs.readFileSync(INSTRUCTION_TEMPLATES[file], 'utf8').split('\n');
   const v1 = lines('authoring-v5-h200-memo');
