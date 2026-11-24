@@ -10,7 +10,7 @@ const { createService } = require('../server.cjs');
 const { createMarketSession } = require('../../frontend/src/game/marketSession.ts');
 const { createMarketReplaySnapshot } = require('../../frontend/src/game/marketReplayTrace.ts');
 const crypto = require('node:crypto');
-const { buildActorInput, renderActorInstructions, REPLACEMENTS, OMITTED_BUNDLE_KEYS, INSTRUCTION_TEMPLATES, extractVisitMemo, validateVisitMemo } = require('../whole-trace-actor-input.cjs');
+const { buildActorInput, renderActorInstructions, REPLACEMENTS, OMITTED_BUNDLE_KEYS, INSTRUCTION_TEMPLATES, extractVisitMemo, validateVisitMemo, MEMO_FORMATS } = require('../whole-trace-actor-input.cjs');
 
 async function prepared(t, extra = {}) {
   const service = createService();
@@ -213,4 +213,76 @@ test('a previous visit memo is carried verbatim into the actor copy only with a 
   assert.equal(plain.status, 0, plain.stderr);
   assert.equal(JSON.parse(plain.stdout).previousVisit, null);
   assert.equal(Object.hasOwn(JSON.parse(fs.readFileSync(path.join(firstVisit, 'actor-input.json'), 'utf8')), 'previousVisit'), false);
+});
+
+const MEMO_V2 = MEMO_FORMATS['authoring-v5-h200-memo-v2'];
+const sectionedMemo = [
+  '[장보기 순서]', '목록 보고 → 오른쪽 안쪽 냉장고 → 계산대',
+  '[기억나는 장면]', '- 과일만 보였다 → 왼쪽으로 갔다 → 벽이 나와 헤맸다. 답답했다.',
+  '[장소와 길]', '- 우유: 입구에서 오른쪽 벽 끝 냉장고 (확실)', '- 계산대: 입구 근처 (흐릿)',
+  '[다음엔]', '- 과일이 보이면 오른쪽 벽 쪽으로 간다.',
+].join('\n');
+
+test('a v2 visit memo is validated by shape only and empty or omitted sections are allowed', () => {
+  const result = validateVisitMemo(`\n${sectionedMemo}\n`, MEMO_V2);
+  assert.equal(result.text, sectionedMemo, 'the memo is carried verbatim apart from outer whitespace');
+  assert.deepEqual(result.sections.map(section => [section.id, section.items]),
+    [['routine', 0], ['scenes', 1], ['places', 2], ['nextTime', 1]]);
+  assert.deepEqual(validateVisitMemo('[장소와 길]\n- 우유는 냉장고 (흐릿)\n[다음엔]', MEMO_V2).sections.map(section => section.id), ['places', 'nextTime']);
+  assert.throws(() => validateVisitMemo('우유는 냉장고', MEMO_V2), /no section headers/);
+  assert.throws(() => validateVisitMemo('메모\n[장소와 길]\n- 우유', MEMO_V2), /before the first section header/);
+  assert.throws(() => validateVisitMemo('[장소와 길]\n[다음엔]', MEMO_V2), /no content/);
+  assert.throws(() => validateVisitMemo('[기분]\n좋았다', MEMO_V2), /unknown section header/);
+  assert.throws(() => validateVisitMemo('[다음엔]\n- a\n[장소와 길]\n- b', MEMO_V2), /out of order/);
+  assert.throws(() => validateVisitMemo('[다음엔]\n- a\n[다음엔]\n- b', MEMO_V2), /repeats section/);
+  assert.throws(() => validateVisitMemo('[기억나는 장면]\n- a\n- b\n- c\n- d', MEMO_V2), /limit is 3/);
+  assert.throws(() => validateVisitMemo('[다음엔]\n- a\n- b\n- c', MEMO_V2), /limit is 2/);
+  assert.throws(() => validateVisitMemo(`[장보기 순서]\n${'가'.repeat(500)}`, MEMO_V2), /limit is 500/);
+  assert.equal(validateVisitMemo(`[장보기 순서]\n${'가'.repeat(400)}`, MEMO_V2).characters, 409, 'v2 allows more than the v1 limit of 300');
+});
+
+test('the v2 memo template carries a sectioned memo and refuses an unsectioned one', async t => {
+  const response = await prepared(t, { actionHorizon: 200 });
+  const cli = path.resolve(__dirname, '../whole-trace-actor-input.cjs');
+  const slot = () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'actor-input-memo-v2-'));
+    t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+    fs.mkdirSync(path.join(directory, 'owner'));
+    fs.writeFileSync(path.join(directory, 'owner', 'prepare-response.json'), JSON.stringify(response));
+    return directory;
+  };
+  const run = (directory, memoText) => {
+    const memoFile = path.join(directory, 'memo.txt');
+    fs.writeFileSync(memoFile, memoText);
+    return spawnSync(process.execPath, [cli, path.join(directory, 'owner', 'prepare-response.json'), path.join(directory, 'actor-input.json'),
+      '--template', 'authoring-v5-h200-memo-v2', '--previous-visit-memo', memoFile], { encoding: 'utf8' });
+  };
+  const refusedSlot = slot();
+  const refused = run(refusedSlot, '들어가서 왼쪽으로 가면 냉장 매대에 우유가 있었다.\n');
+  assert.notEqual(refused.status, 0);
+  assert.match(refused.stderr, /no section headers/);
+  assert.equal(fs.existsSync(path.join(refusedSlot, 'actor-input.json')), false);
+  const directory = slot();
+  const written = run(directory, `${sectionedMemo}\n`);
+  assert.equal(written.status, 0, written.stderr);
+  const summary = JSON.parse(written.stdout);
+  const actorInput = JSON.parse(fs.readFileSync(path.join(directory, 'actor-input.json'), 'utf8'));
+  assert.equal(actorInput.previousVisit.version, 'previous-visit-memo-v2');
+  assert.equal(actorInput.previousVisit.memo, sectionedMemo);
+  assert.match(actorInput.previousVisit.notice, /\[다음엔\]/);
+  assert.equal(text(actorInput.bundle), text(buildActorInput(response).bundle), 'the memo is not merged into the bundle');
+  assert.deepEqual(summary.previousVisit.sections.map(section => section.id), ['routine', 'scenes', 'places', 'nextTime']);
+  assert.equal(summary.actorInstructions.templateId, 'authoring-v5-h200-memo-v2');
+  const instructions = fs.readFileSync(path.join(directory, 'actor-instructions.txt'), 'utf8');
+  for (const header of ['[장보기 순서]', '[기억나는 장면]', '[장소와 길]', '[다음엔]', '[어느 마트에서나]']) assert.ok(instructions.includes(header), header);
+  assert.match(instructions, /rewrite it as one memo/);
+});
+
+test('the v2 memo template differs from the v1 memo template only in the two memo paragraphs', () => {
+  const lines = file => fs.readFileSync(INSTRUCTION_TEMPLATES[file], 'utf8').split('\n');
+  const v1 = lines('authoring-v5-h200-memo');
+  const v2 = lines('authoring-v5-h200-memo-v2');
+  assert.equal(v2.length, v1.length);
+  const changed = v1.map((line, index) => line === v2[index] ? null : index).filter(index => index !== null);
+  assert.deepEqual(changed.map(index => v1[index].slice(0, 30)), ['If actor-input.json has a top-', 'After final delivery, write th']);
 });
