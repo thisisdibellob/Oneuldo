@@ -223,7 +223,7 @@ v2는 아래 연구들을 바탕으로 칸을 정하고, 매 방문 끝에 메�
   "entries": [
     { "visit": 1, "slot": "slot-1", "actorInputSha256": "<sha>", "inputMemoSha256": null,
       "replyFile": "slot-1/actor-final-reply.txt", "replySha256": "<sha>",
-      "outputMemoFile": "slot-1/visit-memo.txt", "outputMemoSha256": "<sha>",
+      "outputMemoFile": "memos/visit-1-slot-1.txt", "outputMemoSha256": "<sha>",
       "memoStatus": "valid", "error": null,
       "metrics": { "characters": 182, "sureMarks": 0, "vagueMarks": 1, "sections": [{ "id": "places", "lines": 1, "items": 1 }] },
       "recordedAt": "2026-11-24T00:00:00.000Z" },
@@ -233,7 +233,8 @@ v2는 아래 연구들을 바탕으로 칸을 정하고, 매 방문 끝에 메�
 ```
 
 - 반드시: N회차 배우 입력의 방문 횟수와 지난 메모는 사슬이 지금 넘겨줄 값과 같아야 해요. 다르면 `record`가 거부해요.
-- 같은 slot을 두 번 기록하거나 이미 있는 `visit-memo.txt`를 덮어쓰지 않아요.
+- 메모 사본은 사슬 파일 옆 `memos/visit-<N>-<slot 이름>.txt`에 저장해요. 배우 slot 안에는 저장하지 않아요. 배우는 자기 slot에 어떤 이름의 파일이든 만들 수 있어서, 같은 이름의 파일과 충돌할 수 있기 때문이에요(2026-11-24 실험이 이 충돌로 중단됨).
+- 같은 slot을 두 번 기록하거나 이미 있는 메모 사본을 다른 내용으로 덮어쓰지 않아요.
 - 넘겨줄 메모 파일이 기록 뒤에 바뀌었으면(SHA-256 불일치) 다음 방문 입력을 만들지 않아요.
 - `memoStatus`는 `valid`, `missing`, `invalid`, `no-visit` 중 하나예요. 퀘스트 성패와는 다른 값이에요.
 

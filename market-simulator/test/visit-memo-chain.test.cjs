@@ -71,11 +71,13 @@ test('a chain hands each visit its number, the profile and the last valid memo, 
   assert.equal(summary1.visitMemoChain.profile.personaVersion, '6');
   const entry1 = recordVisit(chainFile, first, w.reply(first, FIRST));
   assert.equal(entry1.memoStatus, 'valid');
-  assert.equal(fs.readFileSync(path.join(first, 'visit-memo.txt'), 'utf8'), FIRST);
+  assert.equal(fs.readFileSync(path.resolve(w.root, entry1.outputMemoFile), 'utf8'), FIRST);
+  assert.equal(entry1.outputMemoFile, path.join('memos', 'visit-1-slot-1.txt'), 'the memo is kept beside the chain, not in the actor slot');
   assert.equal(entry1.metrics.vagueMarks, 1);
 
   const second = w.slot(response);
   w.build(second, chainFile);
+  fs.writeFileSync(path.join(second, 'visit-memo.txt'), 'the actor may write its own file with this name');
   const input2 = w.input(second);
   assert.equal(input2.visit.number, 2);
   assert.equal(input2.previousVisit.memo, FIRST, 'the previous memo is carried verbatim');
@@ -114,7 +116,7 @@ test('missing, invalid and no-visit records are kept without repair and handled 
   const invalidEntry = recordVisit(chainFile, invalid, w.reply(invalid, '우유는 오른쪽 냉장고'));
   assert.equal(invalidEntry.memoStatus, 'invalid');
   assert.match(invalidEntry.error, /no section headers/);
-  assert.equal(fs.readFileSync(path.join(invalid, 'visit-memo.txt'), 'utf8'), '우유는 오른쪽 냉장고', 'an invalid memo is kept verbatim');
+  assert.equal(fs.readFileSync(path.resolve(w.root, invalidEntry.outputMemoFile), 'utf8'), '우유는 오른쪽 냉장고', 'an invalid memo is kept verbatim');
 
   const missing = w.slot(response);
   w.build(missing, chainFile);

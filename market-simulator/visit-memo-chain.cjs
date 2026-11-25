@@ -49,7 +49,8 @@ function initChain(chainFile, prepareResponseFile, options = {}) {
 /**
  * Appends one visit. The slot's actor input must carry the visit number and
  * previous memo this chain would hand out now. The memo is the last tagged
- * memo in the actor's final reply, saved verbatim as <slot>/visit-memo.txt.
+ * memo in the actor's final reply, saved verbatim as memos/visit-<N>-<slot>.txt
+ * beside the chain file, never inside the actor's slot.
  */
 function recordVisit(chainFile, slotDirectory, replyFile, options = {}) {
   chainFile = path.resolve(chainFile);
@@ -77,8 +78,11 @@ function recordVisit(chainFile, slotDirectory, replyFile, options = {}) {
   } else if (!extracted) {
     entry.memoStatus = 'missing';
   } else {
-    const memoFile = path.join(slot, 'visit-memo.txt');
-    fs.writeFileSync(memoFile, extracted, { flag: 'wx' });
+    // Kept beside the chain, outside the actor's slot: the actor may write any
+    // file in its own slot, including one named like a memo.
+    const memoFile = path.join(path.dirname(chainFile), 'memos', `visit-${expected.number}-${path.basename(slot)}.txt`);
+    fs.mkdirSync(path.dirname(memoFile), { recursive: true });
+    if (!fs.existsSync(memoFile) || fs.readFileSync(memoFile, 'utf8') !== extracted) fs.writeFileSync(memoFile, extracted, { flag: 'wx' });
     entry.outputMemoFile = path.relative(path.dirname(chainFile), memoFile);
     entry.outputMemoSha256 = memo.sha256(extracted);
     try {
