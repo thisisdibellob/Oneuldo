@@ -249,3 +249,13 @@ test('the v2 memo template differs from the v1 memo template only in the two mem
   const changed = v1.map((line, index) => line === v2[index] ? null : index).filter(index => index !== null);
   assert.deepEqual(changed.map(index => v1[index].slice(0, 30)), ['If actor-input.json has a top-', 'After final delivery, write th']);
 });
+
+test('the v3 memo template differs from the v2 memo template only in the two memo paragraphs', () => {
+  const lines = id => fs.readFileSync(INSTRUCTION_TEMPLATES[id], 'utf8').split('\n');
+  const v2 = lines('authoring-v5-h200-memo-v2');
+  const v3 = lines('authoring-v5-h200-memo-v3');
+  assert.equal(v3.length, v2.length);
+  const changed = v2.map((line, index) => line === v3[index] ? null : index).filter(index => index !== null);
+  assert.deepEqual(changed, [12, 16]);
+  for (const phrase of ['[들어가는 길]', 'menu.rememberedVisit', '〈 〉', 'at most 600 characters']) assert.ok(v3.join('\n').includes(phrase), phrase);
+});

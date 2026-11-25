@@ -307,6 +307,64 @@ v2는 아래 연구들을 바탕으로 칸을 정하고, 매 방문 끝에 메�
 - 바뀐 배치를 메모에서 바로잡기까지 걸린 방문 수
 - 규칙 위반: 가지 않은 곳의 확실도가 오른 경우, 경험에 없는 내용이 생긴 경우. 이건 사람이 검토해요.
 
+## 메모 v3 — 기억을 행동에 묶기 (2026-11-25)
+
+### 왜 바꿨나
+
+메모 v2로 두 인물을 5회씩 돌린 결과(`output/persona-memo-chain-5x-20261125-120419`), 회차가 지나도 행동이 나아지지 않았어요. 일반 성인은 5회 모두 성공했지만 목표 도달 행동 수가 35 → 40 → 26 → 42 → 51이었어요. 지민은 성공 → 성공 → 포기 → 포기 → 결제 실패였어요. 메모 없는 대조군이 없어서 메모 효과를 판정할 수는 없어요. 다만 트레이스를 보면 **기억이 행동으로 이어지지 않는 지점**이 보였어요.
+
+- **떠올렸지만 쓰지 못했어요.** 일반 성인 4회차는 2번째 결정에서 "지난 방문에는 출구 통로를 지나 매장 안으로 들어갔다"를 떠올렸어요. 그런데 4번째 결정에서는 "북쪽 통로가 그 통로*일 수 있다*"라고 추측했고, 5~14번째 결정은 모두 "안 가 본 가까운 통로"로 갔어요.
+- **메모 표현이 화면과 맞물리지 않았어요.** 메모는 "출구를 지나 매장 안으로"라고 적었는데, 화면 표지는 "입구를 지나 매장 안으로"였어요.
+- **처음부터 가는 길이 없었어요.** 매번 같은 곳에서 출발하는데, 메모에는 장소만 있고 출발점에서 가는 순서가 없었어요.
+- **메모를 처음에만 읽었어요.** 50~80번의 결정 동안 메모가 다시 보이지 않았어요.
+
+### 바꾼 것 (지침 `authoring-v5-h200-memo-v3`, 형식 `previous-visit-memo-v3`)
+
+1. **`[들어가는 길]` 칸:** 출발점에서 판매 구역, 매대, 계산대까지 걸은 순서를 메뉴와 같은 방향 말(북쪽, 남서쪽 등)로 적어요. 기억하면 `menu.spatialMemory.position.fromStart`의 대략적인 위치(예: "출발점에서 북쪽 4 · 서쪽 2 걸음쯤")도 적어요. 매 방문 걸은 대로 고쳐 쓰고, 걷지 않은 걸음은 쓰지 않아요.
+2. **〈이름〉 표시:** 화면에 보였던 이름(매대·계산대, "입구를 지나 매장 안으로" 같은 통로, "매장 밖 로비 (매장 앞)" 같은 구역)을 글자 그대로 〈 〉 안에 옮겨 적을 수 있어요. 자기 말로 한 설명은 〈 〉 밖에 써요.
+3. **다시 알아보기와 되뇌기:** 지난 메모가 있으면 owner가 매 메뉴에 `menu.rememberedVisit`를 붙여요.
+   - `memo`: 지난 메모 원문. 매 결정마다 보여요.
+   - `recognized`: 메모의 〈이름〉이 지금 화면의 이름과 글자까지 똑같은 메모 줄.
+   - 비교 대상은 화면의 매대·계산대 이름(" · 계산 가능" 같은 상태 앞부분 포함), 통로 이름, 구역 이름이에요. "진열대", "벽" 같은 일반 이름은 비교하지 않아요.
+   - 시스템은 글자가 같은지만 확인해요. 그 기억이 맞는지, 어디로 갈지는 판단하지 않아요. 선택지는 바꾸지 않아요.
+4. **글자 수 상한:** 칸이 하나 늘어서 600자로 올렸어요. 입력 보호용이고 기억 용량을 뜻하지 않아요.
+5. **페르소나 프로필 `routeInstructions`:** v3에서만 붙어요.
+   - 일반 성인: 출발점 기준 위치와 방향, 구역 연결까지 적을 수 있어요.
+   - 지민: 걸은 순서와 눈에 띈 이름을 적고, 걸음 수는 잘 기억하지 않는 편이에요(Courbois 외 2019).
+6. **대조군 지원:** 사슬에 `--condition no-memory`를 주면 매 방문을 첫 방문처럼 보여 줘요. 방문 횟수는 1, 메모와 다시 알아보기는 없고, 메모는 똑같이 쓰고 기록해요. 실제 방문 순서는 사슬에 따로 남아요.
+
+### 구현
+
+- `market-simulator/visit-memo.cjs`: v3 형식, `memoLabelsOf`(〈〉 짝·빈 이름·40자 초과 거부), `buildVisitRecall`, `visibleNamesOf`, `recallForMenu`, 사슬 `condition`, `memoFormatOf`
+- `market-simulator/whole-trace-mailbox.cjs`: owner가 첫 메뉴 응답 때 `owner/visit-recall.json`을 한 번 읽어 고정하고(`events.jsonl`에 SHA-256 기록), 그 뒤 모든 메뉴에 `rememberedVisit`를 붙여요. 첫 메뉴 뒤에 생기거나 바뀐 파일은 쓰지 않아요. 파일이 없으면 메뉴는 그대로예요. owner 응답 파일에 배우가 본 내용이 그대로 남아요.
+- `market-simulator/whole-trace-actor-input.cjs`: v3 사슬에 지난 메모가 있으면 `owner/visit-recall.json`을 만들어요. owner가 이미 응답한 뒤라면 거부해요. 사슬 지침과 요청한 지침이 다르면 거부해요.
+- `market-simulator/visit-memo-chain.cjs`: `init --template authoring-v5-h200-memo-v3 --condition memory|no-memory`. 지표에 지침, 조건, 〈이름〉 개수가 들어가요.
+- `market-simulator/scripts/audit-actor-records.cjs`: 재작성 예외 지침 목록에 v3를 추가했어요.
+- 테스트: `test/visit-memo-recall.test.cjs`(형식, 다시 알아보기, owner 고정 동작), `test/visit-memo-chain.test.cjs`(v3 사슬, 대조군), `test/whole-trace-actor-input.test.cjs`(v3 지침이 v2와 두 문단만 다름). market-simulator 전체 1253건 통과.
+
+### 사용 순서
+
+```bash
+# 사슬 만들기: 기억 조건 / 대조군
+node market-simulator/visit-memo-chain.cjs init <run>/<인물>-memory.json <slot-1>/owner/prepare-response.json --template authoring-v5-h200-memo-v3
+node market-simulator/visit-memo-chain.cjs init <run>/<인물>-control.json <slot-1>/owner/prepare-response.json --template authoring-v5-h200-memo-v3 --condition no-memory
+
+# 방문마다 (owner를 띄운 뒤, 배우가 begin하기 전에)
+node market-simulator/whole-trace-actor-input.cjs <slot>/owner/prepare-response.json <slot>/actor-input.json \
+  --template authoring-v5-h200-memo-v3 --visit-memo-chain <chain.json>
+node market-simulator/visit-memo-chain.cjs record <chain.json> <slot> <slot>/actor-final-reply.txt
+```
+
+### 실험할 때 볼 것
+
+- **조건:** 인물마다 기억 사슬(v3)과 대조군 사슬(v3, no-memory)을 같은 퀘스트·시드로 돌려요. 실행마다 흔들림이 크므로 조건마다 사슬을 3개 이상 둬요.
+- **주 지표:** 판매 구역에 처음 들어간 행동 번호, 계산대에 도착한 행동 번호, 성공 여부.
+- **기억이 행동으로 이어졌는지:**
+  - `recognized`가 뜬 결정에서 그 메모 줄과 맞는 선택을 했는지
+  - `[들어가는 길]`의 첫 몇 걸음을 실제로 따라 걸었는지
+  - 방문이 쌓이며 `[들어가는 길]`이 짧아지고 (확실)이 늘어나는지
+- **한계:** 다시 알아보기는 글자가 완전히 같을 때만 일어나요. 페르소나가 이름을 다르게 옮겨 적으면 떠오르지 않아요. 이것도 사람의 "알아보지 못함"과 비슷하지만, 원인이 옮겨 적기 실수인지 따로 기록해야 해요.
+
 ## 실험할 때 볼 것
 
 - **공간 지식의 변화:** 방문이 쌓이며 `[장소와 길]`이 랜드마크 → 경로 → 전체 배치로 바뀌는지 봐요. 지적장애 페르소나가 경로 수준에 머무는 것은 Courbois 연구와 맞는 결과일 수 있어요.

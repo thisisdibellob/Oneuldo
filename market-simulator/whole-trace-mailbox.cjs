@@ -6,6 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { finishAndSubmit } = require('./whole-trace-delivery.cjs');
+const { VISIT_RECALL_VERSION, recallForMenu } = require('./visit-memo.cjs');
 const ALLOWED = new Set(['begin_whole_trace_authoring', 'append_whole_trace_decision',
   'whole_trace_authoring_menu', 'finish_whole_trace_authoring', 'whole_trace_status',
   'repair_whole_trace', 'finish_and_submit_whole_trace']);
@@ -112,6 +113,30 @@ async function serveMailbox({ directory, prepareArguments, service, pollInterval
     ...(permittedOperationRoot ? { operationRoot: permittedOperationRoot } : {}) };
   const persist = () => { state.updatedAt = now(); replaceStatus(path.join(directory, 'status.json'), state); };
   const event = value => fs.appendFileSync(path.join(directory, 'events.jsonl'), JSON.stringify({ time: now(), ...value }) + '\n', { mode: 0o600 });
+  // Optional persona-authored visit recall (visit-recall.json, written by
+  // whole-trace-actor-input before the actor begins). Frozen at the first menu:
+  // a file that appears later is never used. It only adds menu.rememberedVisit.
+  let recall;
+  const visitRecall = () => {
+    if (recall !== undefined) return recall;
+    const file = path.join(directory, 'visit-recall.json');
+    if (!fs.existsSync(file)) { recall = null; event({ type: 'visit-recall', present: false }); return recall; }
+    const text = fs.readFileSync(file, 'utf8');
+    const value = JSON.parse(text);
+    if (value.version !== VISIT_RECALL_VERSION || typeof value.memo !== 'string' || !Array.isArray(value.labelled))
+      throw fail('MAILBOX_VISIT_RECALL', `visit-recall.json is not a ${VISIT_RECALL_VERSION} record`);
+    recall = value;
+    event({ type: 'visit-recall', present: true, sha256: crypto.createHash('sha256').update(text).digest('hex'), labels: value.labelled.length });
+    return recall;
+  };
+  const withRecall = result => {
+    if (!result?.menu || typeof result.menu !== 'object') return result;
+    const current = visitRecall();
+    if (!current) return result;
+    const copy = structuredClone(result);
+    copy.menu.rememberedVisit = recallForMenu(current, copy.menu);
+    return copy;
+  };
   let interrupted;
   const signal = name => { interrupted ??= `signal:${name}`; };
   const onTerm = () => signal('SIGTERM'), onInt = () => signal('SIGINT');
@@ -161,7 +186,7 @@ async function serveMailbox({ directory, prepareArguments, service, pollInterval
           await confirmCompletion(); shouldClose = true;
         } else if (state.requestStatus.status === 'failed'
           || state.requestStatus.status === 'invalid' && !state.requestStatus.canRepair) shouldClose = true;
-        record = { operationId: op.operationId, digest: op.digest, ok: true, result };
+        record = { operationId: op.operationId, digest: op.digest, ok: true, result: withRecall(result) };
       } catch (error) {
         try { await requestStatus(); } catch { /* Keep the original transport failure. */ }
         record = { operationId: op.operationId, digest: op.digest, ok: false,

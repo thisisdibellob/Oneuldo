@@ -20,6 +20,9 @@
         "wayfinding.planHorizon=short-sequence",
         "wayfinding.thoughtForm=conditional-short",
         "wayfinding.landmarkMemory.retention=stable"
+      ],
+      "routeInstructions": [
+        "[들어가는 길]은 출발점 기준의 대략적인 위치와 방향으로 적을 수 있다. 예: \"출발점에서 북쪽 4 · 서쪽 2 걸음쯤 〈입구를 지나 매장 안으로〉\". 구역끼리 어떻게 이어지는지도 함께 기억할 수 있다."
       ]
     },
     "mild-intellectual-disability-adult": {
@@ -42,7 +45,11 @@
         "wayfinding.landmarkMemory.retention=decaying",
         "Courbois 외 2019: 지적장애 참여자는 길을 행동 순서로 묘사함, 랜드마크 지식은 양호",
         "Courbois 외 2013: 경로는 익혀도 전체 배치 통합은 어려움",
-        "research/intellectual-disability evidence-review P10·L01·L03·L04: 유지 저하와 제한적·개인차 있는 일반화"
+        "research/intellectual-disability evidence-review P10·L01·L03·L04: 유지 저하와 제한적·개인차 있는 일반화",
+        "Courbois 외 2019: 길을 행동 순서로 묘사 → [들어가는 길]을 순서로 기억"
+      ],
+      "routeInstructions": [
+        "[들어가는 길]은 걸은 순서대로 한 걸음씩 적는다. 예: \"북쪽으로 가서, 서쪽으로 끝까지, 〈입구를 지나 매장 안으로〉\". 출발점에서 몇 걸음인지 같은 수는 잘 기억하지 않는 편이고, 눈에 띈 이름과 도는 순서를 기억한다."
       ]
     }
   }

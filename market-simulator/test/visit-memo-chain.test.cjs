@@ -206,3 +206,63 @@ test('the chain CLI reports usage and refuses to overwrite a chain', async t => 
   assert.notEqual(again.status, 0);
   assert.match(again.stderr, /EEXIST/);
 });
+
+const V3_TEMPLATE = 'authoring-v5-h200-memo-v3';
+const V3_FIRST = ['[장보기 순서]', '목록 보기 → 냉장고 → 계산대', '[들어가는 길]', '- 북쪽으로 가서 서쪽 끝 〈입구를 지나 매장 안으로〉 (흐릿)',
+  '[장소와 길]', '- 〈냉장 식품〉 안쪽 왼편 (흐릿)'].join('\n');
+
+test('a v3 chain gives route instructions, writes the owner recall before begin and records labels', async t => {
+  const response = await prepared(t);
+  const w = workspace(t);
+  const chainFile = path.join(w.root, 'memo-chain.json');
+  const first = w.slot(response);
+  const chain = initChain(chainFile, path.join(first, 'owner', 'prepare-response.json'), { template: V3_TEMPLATE });
+  assert.equal(chain.template, V3_TEMPLATE);
+  assert.equal(chain.condition, 'memory');
+  const build = directory => writeActorInput(path.join(directory, 'owner', 'prepare-response.json'),
+    path.join(directory, 'actor-input.json'), { template: V3_TEMPLATE, visitMemoChainFile: chainFile });
+  assert.throws(() => w.build(first, chainFile), /uses authoring-v5-h200-memo-v3, not the requested authoring-v5-h200-memo-v2/);
+  build(first);
+  assert.ok(w.input(first).visitMemoProfile.instructions.some(line => line.startsWith('[들어가는 길]')), 'v3 adds the route instructions');
+  assert.equal(fs.existsSync(path.join(first, 'owner', 'visit-recall.json')), false, 'no recall without a previous memo');
+  const entry1 = recordVisit(chainFile, first, w.reply(first, V3_FIRST));
+  assert.equal(entry1.memoStatus, 'valid');
+  assert.equal(entry1.metrics.labels, 2);
+
+  const second = w.slot(response);
+  fs.mkdirSync(path.join(second, 'owner', 'responses'));
+  fs.writeFileSync(path.join(second, 'owner', 'responses', 'op-1.json'), '{}');
+  assert.throws(() => build(second), /before begin/);
+  fs.rmSync(path.join(second, 'owner', 'responses'), { recursive: true });
+  const summary = build(second);
+  const recall = JSON.parse(fs.readFileSync(path.join(second, 'owner', 'visit-recall.json'), 'utf8'));
+  assert.equal(recall.memo, V3_FIRST);
+  assert.deepEqual(recall.labelled.map(item => item.label), ['입구를 지나 매장 안으로', '냉장 식품']);
+  assert.equal(summary.visitMemoChain.recall.labels, 2);
+  assert.equal(w.input(second).previousVisit.version, 'previous-visit-memo-v3');
+  assert.equal(chainMetrics(chainFile)[0].labels, 2);
+});
+
+test('a no-memory control chain presents every visit as a first visit and still records the memos', async t => {
+  const response = await prepared(t);
+  const w = workspace(t);
+  const chainFile = path.join(w.root, 'control-chain.json');
+  const first = w.slot(response);
+  initChain(chainFile, path.join(first, 'owner', 'prepare-response.json'), { template: V3_TEMPLATE, condition: 'no-memory' });
+  assert.throws(() => initChain(path.join(w.root, 'x.json'), path.join(first, 'owner', 'prepare-response.json'), { condition: 'forgetful' }), /Unknown condition/);
+  const build = directory => writeActorInput(path.join(directory, 'owner', 'prepare-response.json'),
+    path.join(directory, 'actor-input.json'), { template: V3_TEMPLATE, visitMemoChainFile: chainFile });
+  build(first);
+  recordVisit(chainFile, first, w.reply(first, V3_FIRST));
+  const second = w.slot(response);
+  const summary = build(second);
+  const input = w.input(second);
+  assert.equal(input.visit.number, 1, 'the person is told this is a first visit');
+  assert.equal(Object.hasOwn(input, 'previousVisit'), false);
+  assert.equal(fs.existsSync(path.join(second, 'owner', 'visit-recall.json')), false);
+  assert.equal(summary.visitMemoChain.visitIndex, 2);
+  const entry2 = recordVisit(chainFile, second, w.reply(second, V3_FIRST));
+  assert.equal(entry2.visit, 2, 'the chain still counts the real visit');
+  assert.equal(entry2.inputMemoSha256, null);
+  assert.deepEqual(chainMetrics(chainFile).map(row => [row.visit, row.condition]), [[1, 'no-memory'], [2, 'no-memory']]);
+});

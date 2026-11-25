@@ -122,6 +122,8 @@ const INSTRUCTION_TEMPLATES = Object.freeze({
   'authoring-v5-h200-memo': path.join(__dirname, 'actor-instructions', 'authoring-v5-h200-memo.txt'),
   // authoring-v5-h200 plus a sectioned visit memo that the person rewrites on every visit (memo format v2).
   'authoring-v5-h200-memo-v2': path.join(__dirname, 'actor-instructions', 'authoring-v5-h200-memo-v2.txt'),
+  // memo v2 plus [들어가는 길], 〈label〉 tags and menu.rememberedVisit recognition (memo format v3).
+  'authoring-v5-h200-memo-v3': path.join(__dirname, 'actor-instructions', 'authoring-v5-h200-memo-v3.txt'),
 });
 const DEFAULT_INSTRUCTION_TEMPLATE = 'authoring-v3';
 const MAILBOX_CLI = path.join(__dirname, 'whole-trace-mailbox.cjs');
@@ -143,10 +145,11 @@ function writeActorInput(prepareResponseFile, outputFile, options = {}) {
   const format = options.instructions === false ? undefined : MEMO_FORMATS[options.template];
   let previousVisit = null;
   let visitMemoChain = null;
+  let recall = null;
   if (format?.sections && options.visitMemoChainFile === undefined)
     throw new Error(`${options.template} requires --visit-memo-chain so the visit number and the previous memo come from the recorded chain`);
   if (options.visitMemoChainFile !== undefined && !format?.sections)
-    throw new Error('A visit memo chain requires the authoring-v5-h200-memo-v2 instruction template');
+    throw new Error('A visit memo chain requires the authoring-v5-h200-memo-v2 or -v3 instruction template');
   if (options.previousVisitMemoFile !== undefined) {
     if (!format)
       throw new Error('A previous visit memo requires a -memo instruction template that tells the actor how to read it');
@@ -166,7 +169,10 @@ function writeActorInput(prepareResponseFile, outputFile, options = {}) {
     const storeKey = memo.storeKeyOf(prepareResponse);
     if (chain.storeKey !== storeKey)
       throw new Error(`Visit memo chain is for store ${chain.storeKey}, not the prepared store ${storeKey}; start a new chain for a different store`);
-    const profile = memo.visitMemoProfileOf(persona.id, persona.version);
+    const chainTemplate = chain.template ?? memo.CHAIN_TEMPLATE;
+    if (chainTemplate !== options.template)
+      throw new Error(`Visit memo chain uses ${chainTemplate}, not the requested ${options.template}`);
+    const profile = memo.visitMemoProfileOf(persona.id, persona.version, undefined, { routeInstructions: format.labels });
     const next = memo.nextVisitOf(chain, chainFile);
     actorInput.visit = { version: memo.CHAIN_VERSION, number: next.number, notice: memo.VISIT_NOTICE };
     actorInput.visitMemoProfile = profile.actorCopy;
@@ -175,10 +181,12 @@ function writeActorInput(prepareResponseFile, outputFile, options = {}) {
       actorInput.previousVisit = { version: format.version, notice: format.notice, memo: text };
       previousVisit = { version: format.version, fromVisit: next.previousMemo.visit, sha256: next.previousMemo.sha256,
         memoSha256: sha256(text), characters, sections };
+      // The owner shows this memo in every menu and marks lines whose 〈label〉 is on screen.
+      if (format.labels) recall = memo.buildVisitRecall(text, format);
     }
     if (next.otherStoreTips)
       actorInput.otherStoreTips = { version: memo.OTHER_STORE_TIPS_VERSION, notice: memo.OTHER_STORE_TIPS_NOTICE, tips: next.otherStoreTips.text };
-    visitMemoChain = { file: chainFile, sha256: chainSha256, storeKey, visitNumber: next.number,
+    visitMemoChain = { file: chainFile, sha256: chainSha256, storeKey, condition: chain.condition ?? 'memory', visitIndex: next.index, visitNumber: next.number,
       previousMemoSha256: next.previousMemo?.sha256 ?? null, otherStoreTips: next.otherStoreTips ? { fromMemoSha256: next.otherStoreTips.fromMemoSha256 } : null,
       profile: profile.provenance };
   }
@@ -200,6 +208,17 @@ function writeActorInput(prepareResponseFile, outputFile, options = {}) {
     if (fs.existsSync(instructions.file)) throw new Error(`Refusing to overwrite ${instructions.file}`);
   }
   fs.mkdirSync(slotDirectory, { recursive: true });
+  let recallFile = null;
+  if (recall) {
+    // The owner freezes this file at its first menu, so it must exist before any operation.
+    const owner = path.join(slotDirectory, 'owner');
+    const responses = path.join(owner, 'responses');
+    if (fs.existsSync(responses) && fs.readdirSync(responses).length > 0)
+      throw new Error('The owner has already answered operations; a visit recall must be in place before begin');
+    recallFile = path.join(owner, 'visit-recall.json');
+    fs.writeFileSync(recallFile, JSON.stringify(recall, null, 2) + '\n', { flag: 'wx' });
+    visitMemoChain.recall = { file: recallFile, sha256: sha256(fs.readFileSync(recallFile, 'utf8')), labels: recall.labelled.length };
+  }
   fs.writeFileSync(outputFile, outputText, { flag: 'wx' });
   if (instructions) fs.writeFileSync(instructions.file, instructions.text, { flag: 'wx' });
   return {
@@ -244,7 +263,7 @@ if (require.main === module) {
   }
   const [input, output] = positional;
   if (!input || !output) {
-    process.stderr.write('Usage: node market-simulator/whole-trace-actor-input.cjs <slot>/owner/prepare-response.json <slot>/actor-input.json [--template authoring-v3] [--no-instructions] [--previous-visit-memo <memo.txt> (authoring-v5-h200-memo)] [--visit-memo-chain <memo-chain.json> (required by authoring-v5-h200-memo-v2)]\nWrites <slot>/actor-input.json and <slot>/actor-instructions.txt (never overwrites) and prints a provenance summary.\n');
+    process.stderr.write('Usage: node market-simulator/whole-trace-actor-input.cjs <slot>/owner/prepare-response.json <slot>/actor-input.json [--template authoring-v3] [--no-instructions] [--previous-visit-memo <memo.txt> (authoring-v5-h200-memo)] [--visit-memo-chain <memo-chain.json> (required by authoring-v5-h200-memo-v2 and -v3)]\nWrites <slot>/actor-input.json and <slot>/actor-instructions.txt (never overwrites) and prints a provenance summary.\n');
     process.exitCode = 2;
   } else {
     try { process.stdout.write(JSON.stringify(writeActorInput(input, output, options), null, 2) + '\n'); }
