@@ -55,6 +55,8 @@ const MEMO_FORMATS = Object.freeze({
   'authoring-v5-h200-memo-v3': Object.freeze({ version: PREVIOUS_VISIT_V3_VERSION, maxCharacters: VISIT_MEMO_V3_MAX_CHARACTERS, notice: PREVIOUS_VISIT_V3_NOTICE, sections: VISIT_MEMO_V3_SECTIONS, labels: true }),
   // Same memo format as v3; the template adds the length check and the memo rewrite request.
   'authoring-v5-h200-memo-v3b': Object.freeze({ version: PREVIOUS_VISIT_V3_VERSION, maxCharacters: VISIT_MEMO_V3_MAX_CHARACTERS, notice: PREVIOUS_VISIT_V3_NOTICE, sections: VISIT_MEMO_V3_SECTIONS, labels: true, rewrites: 2 }),
+  // Same memo format as v3b; the template adds the visit plan (visit_plan tool and menu.visitPlan).
+  'authoring-v5-h200-memo-v4': Object.freeze({ version: PREVIOUS_VISIT_V3_VERSION, maxCharacters: VISIT_MEMO_V3_MAX_CHARACTERS, notice: PREVIOUS_VISIT_V3_NOTICE, sections: VISIT_MEMO_V3_SECTIONS, labels: true, rewrites: 2, plan: true }),
 });
 
 // When a finished visit's memo is missing or fails the shape check, the
@@ -159,6 +161,91 @@ function visitMemoMetrics(text, format = MEMO_FORMATS['authoring-v5-h200-memo-v2
   const { characters, sections, labels } = validateVisitMemo(text, format);
   return { characters, sections, sureMarks: (text.match(CERTAINTY_SURE) ?? []).length,
     vagueMarks: (text.match(CERTAINTY_VAGUE) ?? []).length, ...(labels && { labels: labels.length }) };
+}
+
+// Visit plan (memo v4). The person writes 1-5 steps for this visit through the
+// owner-only visit_plan tool and says which step they are on. A step may carry
+// the person's own remembered position of where it leads, in the same rough
+// start-relative steps as menu.spatialMemory.position. Each menu then shows the
+// current step, the rough direction from the person's current estimated position
+// to that remembered position, and which visible passages point that way or in a
+// direction the step's own words name. Code only does that arithmetic and string
+// matching on the person's own words and estimates; it never chooses an action,
+// and a wrong memory gives a wrong direction.
+const VISIT_PLAN_VERSION = 'visit-plan-v1';
+const VISIT_PLAN_MAX_STEPS = 5;
+const VISIT_PLAN_STEP_MAX_CHARACTERS = 120;
+const VISIT_PLAN_MAX_OFFSET = 60;
+const COMPASS = Object.freeze(['north', 'northeast', 'east', 'southeast', 'south', 'southwest', 'west', 'northwest']);
+const COMPASS_KO = Object.freeze({ north: '북쪽', northeast: '북동쪽', east: '동쪽', southeast: '남동쪽', south: '남쪽', southwest: '남서쪽', west: '서쪽', northwest: '북서쪽' });
+const VISIT_PLAN_NOTICE = 'visitPlan은 이번 방문에 내가 visit_plan으로 적은 계획과 지금 하고 있다고 말한 단계다. heading은 그 단계에 내가 적어 둔 기억 속 위치(출발점 기준 어림)와 지금 내 어림 위치(spatialMemory.position)로 계산한 대략의 방향이다. 기억이나 어림이 틀리면 방향도 틀린다. passagesTowardRemembered는 그 방향 ±45° 안을 가리키는 지금 보이는 통로, passagesNamedInStep은 내가 단계 문장에 쓴 방향 말(북쪽·남서쪽 등)과 같은 방향의 통로다. 이것은 내 계획에 맞춰 표시한 것일 뿐 추천이 아니며, 선택은 현재 메뉴에서 내가 한다. 통로의 "아직 안 가 본 곳"은 이번 방문 기준이다.';
+
+const isOffset = value => Number.isInteger(value) && Math.abs(value) <= VISIT_PLAN_MAX_OFFSET;
+
+/** Validates visit_plan arguments against the current plan and returns the new plan. Never repairs. */
+function nextVisitPlan(previous, args) {
+  if (!args || typeof args !== 'object' || Array.isArray(args)) throw new Error('visit_plan takes {steps?, currentStep}');
+  const unknown = Object.keys(args).filter(key => !['steps', 'currentStep'].includes(key));
+  if (unknown.length) throw new Error(`visit_plan does not take ${unknown.join(', ')}`);
+  let steps = previous?.steps ?? null;
+  if (args.steps !== undefined) {
+    if (!Array.isArray(args.steps) || args.steps.length < 1 || args.steps.length > VISIT_PLAN_MAX_STEPS)
+      throw new Error(`visit_plan steps must be 1 to ${VISIT_PLAN_MAX_STEPS} steps`);
+    steps = args.steps.map((step, index) => {
+      if (!step || typeof step !== 'object' || Array.isArray(step)) throw new Error(`step ${index + 1} must be {text, toward?}`);
+      const extra = Object.keys(step).filter(key => !['text', 'toward'].includes(key));
+      if (extra.length) throw new Error(`step ${index + 1} does not take ${extra.join(', ')}`);
+      if (typeof step.text !== 'string' || !step.text.trim() || Array.from(step.text.trim()).length > VISIT_PLAN_STEP_MAX_CHARACTERS)
+        throw new Error(`step ${index + 1} text must be 1 to ${VISIT_PLAN_STEP_MAX_CHARACTERS} characters`);
+      const out = { text: step.text.trim() };
+      if (step.toward !== undefined) {
+        const toward = step.toward;
+        if (!toward || typeof toward !== 'object' || Object.keys(toward).some(key => !['north', 'east'].includes(key))
+          || !isOffset(toward.north) || !isOffset(toward.east))
+          throw new Error(`step ${index + 1} toward must be {north, east} whole steps from the start within ±${VISIT_PLAN_MAX_OFFSET}`);
+        out.toward = { north: toward.north, east: toward.east };
+      }
+      return out;
+    });
+  }
+  if (!steps) throw new Error('The first visit_plan call must include steps');
+  if (!Number.isInteger(args.currentStep) || args.currentStep < 1 || args.currentStep > steps.length)
+    throw new Error(`currentStep must be a step number from 1 to ${steps.length}`);
+  return { version: VISIT_PLAN_VERSION, steps, currentStep: args.currentStep, revision: (previous?.revision ?? 0) + 1 };
+}
+
+/** Compass words the person wrote in a step, longest first so 북서쪽 is not read as 북쪽 and 서쪽. */
+function directionsNamedIn(text) {
+  const found = new Set();
+  let rest = text;
+  for (const direction of [...COMPASS].sort((a, b) => COMPASS_KO[b].length - COMPASS_KO[a].length)) {
+    if (rest.includes(COMPASS_KO[direction])) { found.add(direction); rest = rest.split(COMPASS_KO[direction]).join(' '); }
+  }
+  return COMPASS.filter(direction => found.has(direction));
+}
+
+function headingTo(position, toward) {
+  if (!toward || !Number.isFinite(position?.north) || !Number.isFinite(position?.east)) return null;
+  const north = toward.north - position.north, east = toward.east - position.east;
+  const steps = Math.round(Math.hypot(north, east));
+  if (steps <= 1) return { direction: null, roughSteps: steps, text: '내가 기억한 위치 근처(1걸음 안, 내 어림)' };
+  const index = ((Math.round(Math.atan2(east, north) / (Math.PI / 4)) % 8) + 8) % 8;
+  const direction = COMPASS[index];
+  return { direction, roughSteps: steps, text: `내가 기억한 위치는 지금 위치에서 ${COMPASS_KO[direction]} 약 ${steps}걸음(내 어림)` };
+}
+
+const near = (a, b) => { const d = Math.abs(COMPASS.indexOf(a) - COMPASS.indexOf(b)); return Math.min(d, 8 - d) <= 1; };
+
+function planForMenu(plan, menu) {
+  const step = plan.steps[plan.currentStep - 1];
+  const walks = (menu?.visibleWalkChoices ?? []).filter(choice => typeof choice?.choiceId === 'string' && COMPASS.includes(choice.direction));
+  const heading = headingTo(menu?.spatialMemory?.position, step.toward);
+  const named = directionsNamedIn(step.text);
+  return { version: VISIT_PLAN_VERSION, notice: VISIT_PLAN_NOTICE, revision: plan.revision, currentStep: plan.currentStep,
+    steps: plan.steps.map((item, index) => ({ number: index + 1, text: item.text, ...(item.toward && { toward: item.toward }) })),
+    current: { text: step.text, heading, directionsNamed: named,
+      passagesTowardRemembered: heading?.direction ? walks.filter(choice => near(choice.direction, heading.direction)).map(choice => choice.choiceId) : [],
+      passagesNamedInStep: walks.filter(choice => named.includes(choice.direction)).map(choice => choice.choiceId) } };
 }
 
 // Recognition: the memo is shown verbatim in every menu, and memo lines whose
@@ -284,7 +371,7 @@ function nextVisitOf(chain, chainFile) {
 }
 
 module.exports = {
-  sha256, MEMO_REWRITE_VERSION, memoRewritePrompt, PREVIOUS_VISIT_V3_VERSION, VISIT_MEMO_V3_MAX_CHARACTERS, VISIT_MEMO_V3_SECTIONS, memoFormatOf, memoLabelsOf,
+  sha256, VISIT_PLAN_VERSION, nextVisitPlan, directionsNamedIn, headingTo, planForMenu, MEMO_REWRITE_VERSION, memoRewritePrompt, PREVIOUS_VISIT_V3_VERSION, VISIT_MEMO_V3_MAX_CHARACTERS, VISIT_MEMO_V3_SECTIONS, memoFormatOf, memoLabelsOf,
   VISIT_RECALL_VERSION, buildVisitRecall, visibleNamesOf, recallForMenu, CHAIN_CONDITIONS, PREVIOUS_VISIT_VERSION, VISIT_MEMO_MAX_CHARACTERS, PREVIOUS_VISIT_NOTICE, PREVIOUS_VISIT_V2_VERSION,
   VISIT_MEMO_V2_MAX_CHARACTERS, VISIT_MEMO_V2_SECTIONS, PREVIOUS_VISIT_V2_NOTICE, MEMO_FORMATS, parseVisitMemoSections,
   validateVisitMemo, extractVisitMemo, visitMemoMetrics, VISIT_MEMO_PROFILES_FILE, visitMemoProfileOf, STORE_KEY_VERSION,

@@ -269,3 +269,14 @@ test('the v3b memo template differs from v3 only in the memo writing paragraph',
   assert.ok(v3b[16].startsWith(v3[16].slice(0, 200)));
   for (const phrase of ['count the memo\'s characters', 'rewrite only the memo']) assert.ok(v3b[16].includes(phrase), phrase);
 });
+
+test('the v4 memo template is v3b plus only the visit plan sentences in the reading paragraph', () => {
+  const lines = id => fs.readFileSync(INSTRUCTION_TEMPLATES[id], 'utf8').split('\n');
+  const v3b = lines('authoring-v5-h200-memo-v3b');
+  const v4 = lines('authoring-v5-h200-memo-v4');
+  assert.equal(v4.length, v3b.length);
+  assert.deepEqual(v3b.map((line, index) => line === v4[index] ? null : index).filter(index => index !== null), [12]);
+  assert.ok(v4[12].startsWith(v3b[12]), 'the v3b reading paragraph is kept verbatim');
+  for (const phrase of ['"tool":"visit_plan"', 'menu.visitPlan', 'passagesTowardRemembered', 'not recommendations', '아직 안 가 본 곳'])
+    assert.ok(v4[12].includes(phrase), phrase);
+});

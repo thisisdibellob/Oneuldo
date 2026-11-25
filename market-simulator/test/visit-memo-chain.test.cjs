@@ -10,7 +10,7 @@ const { createService } = require('../server.cjs');
 const { createMarketSession } = require('../../frontend/src/game/marketSession.ts');
 const { createMarketReplaySnapshot } = require('../../frontend/src/game/marketReplayTrace.ts');
 const { writeActorInput, buildActorInput } = require('../whole-trace-actor-input.cjs');
-const { initChain, checkReply, recordVisit, verifyRecall, chainMetrics } = require('../visit-memo-chain.cjs');
+const { initChain, checkReply, recordVisit, verifyRecall, memoUseOf, chainMetrics } = require('../visit-memo-chain.cjs');
 const memo = require('../visit-memo.cjs');
 
 const TEMPLATE = 'authoring-v5-h200-memo-v2';
@@ -364,4 +364,31 @@ test('verify-recall expects a recall only when the input builder wrote one', t =
   assert.match(verifyRecall(good).problems.join(';'), /1 of 3 menus lack rememberedVisit/);
   menuResponse(none, 'b.json', { rememberedVisit: { memo: 'm', recognized: [] } });
   assert.match(verifyRecall(none).problems.join(';'), /although no recall was expected/);
+});
+
+test('memo-use counts walks that followed the plan and decisions right after recognition, in operation order', t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'memo-use-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const owner = path.join(root, 'slot', 'owner');
+  for (const sub of ['commands', 'responses']) fs.mkdirSync(path.join(owner, sub), { recursive: true });
+  const ops = [];
+  const op = (id, tool, args, result, ok = true) => {
+    fs.writeFileSync(path.join(owner, 'commands', `${id}.json`), JSON.stringify({ operationId: id, tool, arguments: args }));
+    fs.writeFileSync(path.join(owner, 'responses', `${id}.json`), JSON.stringify(ok ? { ok, result } : { ok, error: {} }));
+    ops.push(id);
+  };
+  const planMenu = (toward, named, recognized = []) => ({ visitPlan: { current: { passagesTowardRemembered: toward, passagesNamedInStep: named } },
+    rememberedVisit: { recognized: recognized.map(label => ({ label, memoLine: label })) } });
+  const walk = choiceId => ({ decision: { choiceRef: { choiceId } } });
+  op('b', 'begin_whole_trace_authoring', {}, { menu: {} });
+  op('p', 'visit_plan', { steps: [{ text: '북쪽' }], currentStep: 1 }, { plan: { currentStep: 1 }, menu: planMenu(['walk/A'], ['walk/A', 'walk/B']) });
+  op('a1', 'append_whole_trace_decision', walk('walk/A'), { accepted: true, menu: planMenu(['walk/C'], [], ['1번 계산대']) });
+  op('a2', 'append_whole_trace_decision', walk('walk/D'), { accepted: false, menu: planMenu(['walk/C'], [], ['1번 계산대']) });
+  op('a3', 'append_whole_trace_decision', walk('walk/C'), { accepted: true, menu: planMenu([], []) });
+  op('x', 'append_whole_trace_decision', walk('walk/C'), null, false);
+  fs.writeFileSync(path.join(owner, 'events.jsonl'), ops.map(id => JSON.stringify({ type: 'operation', operationId: id })).join('\n') + '\n');
+  const use = memoUseOf(path.join(root, 'slot'));
+  assert.deepEqual([use.planCalls, use.planRevisionsWithSteps, use.acceptedDecisions, use.walks], [1, 1, 2, 2]);
+  assert.deepEqual([use.walksWithHeading, use.walksTowardHeading, use.walksWithNamedDirections, use.walksInNamedDirection], [2, 2, 1, 1]);
+  assert.deepEqual(use.decisionsAfterRecognition, [{ decisionNumber: 2, choiceId: 'walk/C', recognized: ['1번 계산대'] }]);
 });

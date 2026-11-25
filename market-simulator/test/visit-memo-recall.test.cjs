@@ -124,3 +124,66 @@ test('without a recall file the owner relays menus unchanged', async t => {
   const again = await f.call('whole_trace_authoring_menu');
   assert.equal(Object.hasOwn(again.menu, 'rememberedVisit'), false, 'a recall that appears after the first menu is never used');
 });
+
+test('visit plans are validated without repair and keep their steps across step changes', () => {
+  assert.throws(() => memo.nextVisitPlan(null, { currentStep: 1 }), /first visit_plan call must include steps/);
+  assert.throws(() => memo.nextVisitPlan(null, { steps: [], currentStep: 1 }), /1 to 5 steps/);
+  assert.throws(() => memo.nextVisitPlan(null, { steps: Array(6).fill({ text: 'a' }), currentStep: 1 }), /1 to 5 steps/);
+  assert.throws(() => memo.nextVisitPlan(null, { steps: [{ text: ' ' }], currentStep: 1 }), /1 to 120 characters/);
+  assert.throws(() => memo.nextVisitPlan(null, { steps: [{ text: 'a', toward: { north: 1.5, east: 0 } }], currentStep: 1 }), /whole steps/);
+  assert.throws(() => memo.nextVisitPlan(null, { steps: [{ text: 'a', toward: { north: 61, east: 0 } }], currentStep: 1 }), /±60/);
+  assert.throws(() => memo.nextVisitPlan(null, { steps: [{ text: 'a', choiceId: 'walk/W1' }], currentStep: 1 }), /does not take choiceId/);
+  assert.throws(() => memo.nextVisitPlan(null, { steps: [{ text: 'a' }], currentStep: 2 }), /from 1 to 1/);
+  assert.throws(() => memo.nextVisitPlan(null, { steps: [{ text: 'a' }], currentStep: 1, route: [] }), /does not take route/);
+  const first = memo.nextVisitPlan(null, { steps: [{ text: ' 입구로 ', toward: { north: 4, east: -2 } }, { text: '냉장 식품' }], currentStep: 1 });
+  assert.deepEqual(first, { version: 'visit-plan-v1', steps: [{ text: '입구로', toward: { north: 4, east: -2 } }, { text: '냉장 식품' }], currentStep: 1, revision: 1 });
+  const moved = memo.nextVisitPlan(first, { currentStep: 2 });
+  assert.deepEqual([moved.steps, moved.currentStep, moved.revision], [first.steps, 2, 2]);
+});
+
+test('the plan heading and named directions come only from the person\'s own estimates and words', () => {
+  assert.deepEqual(memo.directionsNamedIn('북서쪽으로 갔다가 남쪽, 다시 북서쪽'), ['south', 'northwest'], '북서쪽 is not read as 북쪽 and 서쪽');
+  assert.deepEqual(memo.directionsNamedIn('쭉 가서 왼쪽'), []);
+  assert.equal(memo.headingTo({ north: 0, east: 0 }, { north: 4, east: -2 }).direction, 'northwest');
+  assert.equal(memo.headingTo({ north: 4, east: -2 }, { north: 8, east: 4 }).direction, 'northeast');
+  assert.equal(memo.headingTo({ north: 3, east: 0 }, { north: 4, east: 0 }).direction, null, 'within one step is "near"');
+  assert.equal(memo.headingTo(undefined, { north: 4, east: 0 }), null, 'no estimated position, no heading');
+  assert.equal(memo.headingTo({ north: 0, east: 0 }, undefined), null, 'no remembered position, no heading');
+  const plan = memo.nextVisitPlan(null, { steps: [{ text: '북쪽으로 가서 서쪽 끝', toward: { north: 4, east: -2 } }, { text: '냉장 식품' }], currentStep: 1 });
+  const menu = { spatialMemory: { position: { north: 0, east: 0 } }, visibleWalkChoices: [
+    { choiceId: 'walk/N', direction: 'north' }, { choiceId: 'walk/NW', direction: 'northwest' },
+    { choiceId: 'walk/W', direction: 'west' }, { choiceId: 'walk/S', direction: 'south' }] };
+  const shown = memo.planForMenu(plan, menu);
+  assert.deepEqual(shown.current.passagesTowardRemembered, ['walk/N', 'walk/NW', 'walk/W']);
+  assert.deepEqual(shown.current.passagesNamedInStep, ['walk/N', 'walk/W']);
+  assert.equal(shown.steps.length, 2);
+  const second = memo.planForMenu(memo.nextVisitPlan(plan, { currentStep: 2 }), menu);
+  assert.deepEqual([second.current.heading, second.current.passagesTowardRemembered, second.current.passagesNamedInStep], [null, [], []]);
+});
+
+test('the owner answers visit_plan itself and adds menu.visitPlan to every later menu', async t => {
+  const f = await owner(t);
+  const failing = async (tool, args) => {
+    const file = path.join(f.directory, `bad-${Math.random().toString(36).slice(2)}.json`);
+    fs.writeFileSync(file, JSON.stringify({ operationId: path.basename(file, '.json'), tool, arguments: args }));
+    return runCli(['call', f.ownerDirectory, '--operation-file', file]).exited;
+  };
+  const early = await failing('visit_plan', { steps: [{ text: '입구로' }], currentStep: 1 });
+  assert.notEqual(early.code, 0, 'a plan needs a begun authoring session');
+  const begun = await f.call('begin_whole_trace_authoring', { maxRewritesPerDecision: 3 });
+  assert.equal(Object.hasOwn(begun.menu, 'visitPlan'), false);
+  const planned = await f.call('visit_plan', { steps: [{ text: '남쪽으로 가서 계산대', toward: { north: -3, east: 0 } }, { text: '냉장 식품' }], currentStep: 1 });
+  assert.equal(planned.plan.revision, 1);
+  assert.equal(planned.menu.visitPlan.current.text, '남쪽으로 가서 계산대');
+  assert.deepEqual(planned.menu.visitPlan.current.directionsNamed, ['south']);
+  const bad = await failing('visit_plan', { currentStep: 9 });
+  assert.notEqual(bad.code, 0);
+  const menu = await f.call('whole_trace_authoring_menu');
+  assert.equal(menu.menu.visitPlan.currentStep, 1, 'a rejected plan call leaves the plan unchanged');
+  const moved = await f.call('visit_plan', { currentStep: 2 });
+  assert.equal(moved.menu.visitPlan.current.text, '냉장 식품');
+  const events = fs.readFileSync(path.join(f.ownerDirectory, 'events.jsonl'), 'utf8').trim().split('\n').map(line => JSON.parse(line));
+  assert.deepEqual(events.filter(item => item.type === 'visit-plan').map(item => item.currentStep), [1, 2]);
+  const status = readMailboxStatus(f.ownerDirectory);
+  assert.equal(status.requestStatus.status, 'prepared', 'visit_plan never changes the request or the trace');
+});

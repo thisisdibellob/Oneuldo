@@ -175,6 +175,57 @@ function verifyRecall(slotDirectory) {
     recognizedMenus: menus.filter(record => record.result.menu.rememberedVisit?.recognized?.length).length, ok: problems.length === 0, problems };
 }
 
+/**
+ * How the visit used its memory, read from the owner's own records in operation
+ * order. For each accepted walk it notes whether the menu just before it marked
+ * passages toward the plan's remembered position or in a direction the current
+ * step names, and whether the choice was one of them; it also lists decisions
+ * taken right after a recognised memo line. It counts; it does not judge intent.
+ */
+function memoUseOf(slotDirectory) {
+  const owner = path.join(path.resolve(slotDirectory), 'owner');
+  const read = file => JSON.parse(fs.readFileSync(file, 'utf8'));
+  const order = fs.readFileSync(path.join(owner, 'events.jsonl'), 'utf8').trim().split('\n').filter(Boolean)
+    .map(line => JSON.parse(line)).filter(item => item.type === 'operation').map(item => item.operationId);
+  const use = { planCalls: 0, planRevisionsWithSteps: 0, finalPlan: null, acceptedDecisions: 0, walks: 0,
+    walksWithHeading: 0, walksTowardHeading: 0, walksWithNamedDirections: 0, walksInNamedDirection: 0,
+    decisionsAfterRecognition: [] };
+  let menu = null;
+  for (const operationId of order) {
+    const responseFile = path.join(owner, 'responses', `${operationId}.json`);
+    if (!fs.existsSync(responseFile)) continue;
+    const command = read(path.join(owner, 'commands', `${operationId}.json`));
+    const response = read(responseFile);
+    if (!response.ok) continue;
+    if (command.tool === 'visit_plan') {
+      use.planCalls += 1;
+      if (command.arguments.steps) use.planRevisionsWithSteps += 1;
+      use.finalPlan = response.result.plan;
+    }
+    if (command.tool === 'append_whole_trace_decision' && response.result?.accepted === true) {
+      use.acceptedDecisions += 1;
+      const choiceId = command.arguments.decision?.choiceRef?.choiceId;
+      const plan = menu?.visitPlan?.current;
+      if (typeof choiceId === 'string' && choiceId.startsWith('walk/')) {
+        use.walks += 1;
+        if (plan?.passagesTowardRemembered?.length) {
+          use.walksWithHeading += 1;
+          if (plan.passagesTowardRemembered.includes(choiceId)) use.walksTowardHeading += 1;
+        }
+        if (plan?.passagesNamedInStep?.length) {
+          use.walksWithNamedDirections += 1;
+          if (plan.passagesNamedInStep.includes(choiceId)) use.walksInNamedDirection += 1;
+        }
+      }
+      if (menu?.rememberedVisit?.recognized?.length)
+        use.decisionsAfterRecognition.push({ decisionNumber: use.acceptedDecisions, choiceId: choiceId ?? null,
+          recognized: menu.rememberedVisit.recognized.map(item => item.label) });
+    }
+    if (response.result?.menu) menu = response.result.menu;
+  }
+  return use;
+}
+
 /** One row per recorded visit, for comparing memo amount and form between personas. */
 function chainMetrics(chainFile) {
   const { chain } = memo.readChain(chainFile);
@@ -187,7 +238,7 @@ function chainMetrics(chainFile) {
     sectionLines: entry.metrics ? Object.fromEntries(entry.metrics.sections.map(section => [section.id, section.lines])) : null }));
 }
 
-module.exports = { initChain, checkReply, recordVisit, verifyRecall, chainMetrics };
+module.exports = { initChain, checkReply, recordVisit, verifyRecall, memoUseOf, chainMetrics };
 
 if (require.main === module) {
   const [command, ...args] = process.argv.slice(2);
@@ -206,6 +257,7 @@ if (require.main === module) {
     + '  node market-simulator/visit-memo-chain.cjs check <memo-chain.json> <actor-reply.txt>\n'
     + '  node market-simulator/visit-memo-chain.cjs record <memo-chain.json> <slot> <actor-final-reply.txt> [--rewrite-reply <reply.txt>]... [--no-visit]\n'
     + '  node market-simulator/visit-memo-chain.cjs verify-recall <slot>\n'
+    + '  node market-simulator/visit-memo-chain.cjs memo-use <slot>\n'
     + '  node market-simulator/visit-memo-chain.cjs metrics <memo-chain.json> [...]\n'
     + 'Use --no-visit only when the session stopped before any decision was accepted.\n';
   try {
@@ -214,6 +266,7 @@ if (require.main === module) {
     else if (command === 'check' && positional.length === 2) result = checkReply(positional[0], positional[1]);
     else if (command === 'record' && positional.length === 3) result = recordVisit(positional[0], positional[1], positional[2], options);
     else if (command === 'verify-recall' && positional.length === 1) result = verifyRecall(positional[0]);
+    else if (command === 'memo-use' && positional.length === 1) result = memoUseOf(positional[0]);
     else if (command === 'metrics' && positional.length >= 1) result = positional.flatMap(file => chainMetrics(file));
     else { process.stderr.write(usage); process.exitCode = 2; }
     if (result !== undefined) process.stdout.write(JSON.stringify(result, null, 2) + '\n');

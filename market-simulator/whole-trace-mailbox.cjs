@@ -6,10 +6,11 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { finishAndSubmit } = require('./whole-trace-delivery.cjs');
-const { VISIT_RECALL_VERSION, recallForMenu } = require('./visit-memo.cjs');
+const { VISIT_RECALL_VERSION, recallForMenu, nextVisitPlan, planForMenu } = require('./visit-memo.cjs');
 const ALLOWED = new Set(['begin_whole_trace_authoring', 'append_whole_trace_decision',
   'whole_trace_authoring_menu', 'finish_whole_trace_authoring', 'whole_trace_status',
-  'repair_whole_trace', 'finish_and_submit_whole_trace']);
+  'repair_whole_trace', 'finish_and_submit_whole_trace', 'visit_plan']);
+// visit_plan is answered by the owner itself and never reaches the simulator or the trace.
 const MAX_BYTES = 4 * 1024 * 1024;
 const now = () => new Date().toISOString();
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -129,14 +130,26 @@ async function serveMailbox({ directory, prepareArguments, service, pollInterval
     event({ type: 'visit-recall', present: true, sha256: crypto.createHash('sha256').update(text).digest('hex'), labels: value.labelled.length });
     return recall;
   };
+  // The person's own visit plan (visit_plan tool). Kept only in this owner and
+  // its records; each menu then carries menu.visitPlan.
+  let plan = null;
   const withRecall = result => {
     if (!result?.menu || typeof result.menu !== 'object') return result;
     const current = visitRecall();
-    if (!current) return result;
+    if (!current && !plan) return result;
     const copy = structuredClone(result);
-    copy.menu.rememberedVisit = recallForMenu(current, copy.menu);
+    if (current) copy.menu.rememberedVisit = recallForMenu(current, copy.menu);
+    if (plan) copy.menu.visitPlan = planForMenu(plan, copy.menu);
     return copy;
   };
+  async function visitPlan(args) {
+    const next = nextVisitPlan(plan, args);
+    // The menu is read before the plan changes, so a failed read leaves the plan as it was.
+    const current = await invokeTool('whole_trace_authoring_menu', { requestId: state.requestId });
+    plan = next;
+    event({ type: 'visit-plan', revision: plan.revision, currentStep: plan.currentStep, steps: plan.steps.length });
+    return { plan: structuredClone(plan), menu: current.menu };
+  }
   let interrupted;
   const signal = name => { interrupted ??= `signal:${name}`; };
   const onTerm = () => signal('SIGTERM'), onInt = () => signal('SIGINT');
@@ -177,7 +190,8 @@ async function serveMailbox({ directory, prepareArguments, service, pollInterval
         throw fail('MAILBOX_TAMPERED_COMMAND', 'Published operation identity changed');
       let record, shouldClose = false;
       try {
-        const result = op.tool === 'finish_and_submit_whole_trace'
+        const result = op.tool === 'visit_plan' ? await visitPlan(op.arguments)
+          : op.tool === 'finish_and_submit_whole_trace'
           ? await finishAndSubmit({ invokeTool, requestId: state.requestId, candidateFilePath: path.join(directory, 'candidate.json') })
           : await invokeTool(op.tool, { ...op.arguments, requestId: state.requestId });
         await requestStatus();
