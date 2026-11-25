@@ -259,3 +259,13 @@ test('the v3 memo template differs from the v2 memo template only in the two mem
   assert.deepEqual(changed, [12, 16]);
   for (const phrase of ['[들어가는 길]', 'menu.rememberedVisit', '〈 〉', 'at most 600 characters']) assert.ok(v3.join('\n').includes(phrase), phrase);
 });
+
+test('the v3b memo template differs from v3 only in the memo writing paragraph', () => {
+  const lines = id => fs.readFileSync(INSTRUCTION_TEMPLATES[id], 'utf8').split('\n');
+  const v3 = lines('authoring-v5-h200-memo-v3');
+  const v3b = lines('authoring-v5-h200-memo-v3b');
+  assert.equal(v3b.length, v3.length);
+  assert.deepEqual(v3.map((line, index) => line === v3b[index] ? null : index).filter(index => index !== null), [16]);
+  assert.ok(v3b[16].startsWith(v3[16].slice(0, 200)));
+  for (const phrase of ['count the memo\'s characters', 'rewrite only the memo']) assert.ok(v3b[16].includes(phrase), phrase);
+});

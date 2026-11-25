@@ -10,7 +10,7 @@ const { createService } = require('../server.cjs');
 const { createMarketSession } = require('../../frontend/src/game/marketSession.ts');
 const { createMarketReplaySnapshot } = require('../../frontend/src/game/marketReplayTrace.ts');
 const { writeActorInput, buildActorInput } = require('../whole-trace-actor-input.cjs');
-const { initChain, recordVisit, chainMetrics } = require('../visit-memo-chain.cjs');
+const { initChain, checkReply, recordVisit, verifyRecall, chainMetrics } = require('../visit-memo-chain.cjs');
 const memo = require('../visit-memo.cjs');
 
 const TEMPLATE = 'authoring-v5-h200-memo-v2';
@@ -265,4 +265,103 @@ test('a no-memory control chain presents every visit as a first visit and still 
   assert.equal(entry2.visit, 2, 'the chain still counts the real visit');
   assert.equal(entry2.inputMemoSha256, null);
   assert.deepEqual(chainMetrics(chainFile).map(row => [row.visit, row.condition]), [[1, 'no-memory'], [2, 'no-memory']]);
+});
+
+const V3B_TEMPLATE = 'authoring-v5-h200-memo-v3b';
+const tooLong = `[장보기 순서]\n${'가'.repeat(620)}`;
+
+test('a v3b chain asks for at most two memo rewrites and records every attempt verbatim', async t => {
+  const response = await prepared(t);
+  const w = workspace(t);
+  const chainFile = path.join(w.root, 'memo-chain.json');
+  const first = w.slot(response);
+  initChain(chainFile, path.join(first, 'owner', 'prepare-response.json'), { template: V3B_TEMPLATE });
+  writeActorInput(path.join(first, 'owner', 'prepare-response.json'), path.join(first, 'actor-input.json'),
+    { template: V3B_TEMPLATE, visitMemoChainFile: chainFile });
+  const finalReply = w.reply(first, tooLong);
+  const checked = checkReply(chainFile, finalReply);
+  assert.equal(checked.valid, false);
+  assert.equal(checked.rewritesAllowed, 2);
+  assert.match(checked.problem, /limit is 600/);
+  assert.match(checked.rewritePrompt, /600자 이하/);
+  assert.equal(checked.rewritePromptVersion, 'visit-memo-rewrite-v1');
+  const rewrite = path.join(first, 'actor-memo-rewrite-1.txt');
+  fs.writeFileSync(rewrite, `<visit-memo>\n${V3_FIRST}\n</visit-memo>\n`);
+  assert.equal(checkReply(chainFile, rewrite).valid, true);
+  assert.equal(checkReply(chainFile, rewrite).rewritePrompt, null);
+  assert.throws(() => recordVisit(chainFile, first, finalReply, { rewriteReplies: [rewrite, rewrite, rewrite] }), /allows 2 memo rewrites/);
+  assert.throws(() => recordVisit(chainFile, first, rewrite, { rewriteReplies: [rewrite] }), /already valid/);
+  const entry = recordVisit(chainFile, first, finalReply, { rewriteReplies: [rewrite] });
+  assert.equal(entry.memoStatus, 'valid');
+  assert.equal(entry.memoRewrites, 1);
+  assert.deepEqual(entry.memoAttempts.map(item => [item.kind, item.status]), [['final-reply', 'invalid'], ['memo-rewrite', 'valid']]);
+  assert.equal(fs.readFileSync(path.resolve(w.root, entry.memoAttempts[0].memoFile), 'utf8'), tooLong, 'the rejected memo is kept');
+  assert.equal(fs.readFileSync(path.resolve(w.root, entry.outputMemoFile), 'utf8'), V3_FIRST);
+  assert.equal(chainMetrics(chainFile)[0].memoRewrites, 1);
+
+  const second = w.slot(response);
+  writeActorInput(path.join(second, 'owner', 'prepare-response.json'), path.join(second, 'actor-input.json'),
+    { template: V3B_TEMPLATE, visitMemoChainFile: chainFile });
+  assert.equal(w.input(second).previousVisit.memo, V3_FIRST, 'the rewritten memo is handed to the next visit');
+});
+
+test('only v3b allows memo rewrites, and two failed rewrites leave the visit invalid', async t => {
+  const response = await prepared(t);
+  const w = workspace(t);
+  const v2Chain = path.join(w.root, 'v2.json');
+  const first = w.slot(response);
+  initChain(v2Chain, path.join(first, 'owner', 'prepare-response.json'));
+  w.build(first, v2Chain);
+  const reply = w.reply(first, tooLong);
+  assert.equal(checkReply(v2Chain, reply).rewritePrompt, null);
+  assert.throws(() => recordVisit(v2Chain, first, reply, { rewriteReplies: [reply] }), /allows 0 memo rewrites/);
+
+  const chainFile = path.join(w.root, 'v3b.json');
+  const slot = w.slot(response);
+  initChain(chainFile, path.join(slot, 'owner', 'prepare-response.json'), { template: V3B_TEMPLATE });
+  writeActorInput(path.join(slot, 'owner', 'prepare-response.json'), path.join(slot, 'actor-input.json'),
+    { template: V3B_TEMPLATE, visitMemoChainFile: chainFile });
+  const finalReply = w.reply(slot, tooLong);
+  const noMemo = path.join(slot, 'rewrite-1.txt');
+  fs.writeFileSync(noMemo, 'sorry\n');
+  const stillLong = path.join(slot, 'rewrite-2.txt');
+  fs.writeFileSync(stillLong, `<visit-memo>\n${tooLong}x\n</visit-memo>\n`);
+  const entry = recordVisit(chainFile, slot, finalReply, { rewriteReplies: [noMemo, stillLong] });
+  assert.equal(entry.memoStatus, 'invalid');
+  assert.deepEqual(entry.memoAttempts.map(item => item.status), ['invalid', 'missing', 'invalid']);
+  assert.throws(() => recordVisit(chainFile, slot, finalReply, { noVisit: true, rewriteReplies: [noMemo] }), /already recorded|no memo to rewrite/);
+});
+
+test('verify-recall expects a recall only when the input builder wrote one', t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'verify-recall-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const slot = name => {
+    const directory = path.join(root, name);
+    fs.mkdirSync(path.join(directory, 'owner', 'responses'), { recursive: true });
+    return directory;
+  };
+  const menuResponse = (directory, name, menu) => fs.writeFileSync(path.join(directory, 'owner', 'responses', name),
+    JSON.stringify({ ok: true, result: { menu } }));
+  const events = (directory, items) => fs.writeFileSync(path.join(directory, 'owner', 'events.jsonl'), items.map(item => JSON.stringify(item)).join('\n') + '\n');
+
+  const none = slot('none');
+  menuResponse(none, 'a.json', { kind: 'menu' });
+  events(none, [{ type: 'visit-recall', present: false }]);
+  assert.deepEqual([verifyRecall(none).ok, verifyRecall(none).recallExpected], [true, false],
+    'no recall after an invalid or missing previous memo is correct');
+
+  const good = slot('good');
+  const recallText = JSON.stringify({ version: 'visit-recall-v1', memo: 'm', labelled: [] });
+  fs.writeFileSync(path.join(good, 'owner', 'visit-recall.json'), recallText);
+  events(good, [{ type: 'visit-recall', present: true, sha256: memo.sha256(recallText) }]);
+  menuResponse(good, 'a.json', { rememberedVisit: { memo: 'm', recognized: [{ label: 'x', memoLine: 'y' }] } });
+  menuResponse(good, 'b.json', { rememberedVisit: { memo: 'm', recognized: [] } });
+  const verdict = verifyRecall(good);
+  assert.equal(verdict.ok, true, verdict.problems.join('; '));
+  assert.deepEqual([verdict.menus, verdict.menusWithRecall, verdict.recognizedMenus], [2, 2, 1]);
+
+  menuResponse(good, 'c.json', { kind: 'menu' });
+  assert.match(verifyRecall(good).problems.join(';'), /1 of 3 menus lack rememberedVisit/);
+  menuResponse(none, 'b.json', { rememberedVisit: { memo: 'm', recognized: [] } });
+  assert.match(verifyRecall(none).problems.join(';'), /although no recall was expected/);
 });

@@ -124,6 +124,8 @@ const INSTRUCTION_TEMPLATES = Object.freeze({
   'authoring-v5-h200-memo-v2': path.join(__dirname, 'actor-instructions', 'authoring-v5-h200-memo-v2.txt'),
   // memo v2 plus [들어가는 길], 〈label〉 tags and menu.rememberedVisit recognition (memo format v3).
   'authoring-v5-h200-memo-v3': path.join(__dirname, 'actor-instructions', 'authoring-v5-h200-memo-v3.txt'),
+  // memo v3 plus a length self-check and the supervisor's memo rewrite request (at most 2).
+  'authoring-v5-h200-memo-v3b': path.join(__dirname, 'actor-instructions', 'authoring-v5-h200-memo-v3b.txt'),
 });
 const DEFAULT_INSTRUCTION_TEMPLATE = 'authoring-v3';
 const MAILBOX_CLI = path.join(__dirname, 'whole-trace-mailbox.cjs');

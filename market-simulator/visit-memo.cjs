@@ -53,7 +53,24 @@ const MEMO_FORMATS = Object.freeze({
   'authoring-v5-h200-memo': Object.freeze({ version: PREVIOUS_VISIT_VERSION, maxCharacters: VISIT_MEMO_MAX_CHARACTERS, notice: PREVIOUS_VISIT_NOTICE, sections: null }),
   'authoring-v5-h200-memo-v2': Object.freeze({ version: PREVIOUS_VISIT_V2_VERSION, maxCharacters: VISIT_MEMO_V2_MAX_CHARACTERS, notice: PREVIOUS_VISIT_V2_NOTICE, sections: VISIT_MEMO_V2_SECTIONS, labels: false }),
   'authoring-v5-h200-memo-v3': Object.freeze({ version: PREVIOUS_VISIT_V3_VERSION, maxCharacters: VISIT_MEMO_V3_MAX_CHARACTERS, notice: PREVIOUS_VISIT_V3_NOTICE, sections: VISIT_MEMO_V3_SECTIONS, labels: true }),
+  // Same memo format as v3; the template adds the length check and the memo rewrite request.
+  'authoring-v5-h200-memo-v3b': Object.freeze({ version: PREVIOUS_VISIT_V3_VERSION, maxCharacters: VISIT_MEMO_V3_MAX_CHARACTERS, notice: PREVIOUS_VISIT_V3_NOTICE, sections: VISIT_MEMO_V3_SECTIONS, labels: true, rewrites: 2 }),
 });
+
+// When a finished visit's memo is missing or fails the shape check, the
+// supervisor may send this fixed request to the SAME actor session, at most
+// format.rewrites times. Only the memo is rewritten; the visit is over.
+const MEMO_REWRITE_VERSION = 'visit-memo-rewrite-v1';
+
+function memoRewritePrompt(problem, format) {
+  return [
+    `방문 메모가 기록되지 않았습니다. 이유: ${problem}`,
+    '장보기는 이미 끝났습니다. 행동을 다시 하거나 mailbox를 호출하거나 파일을 만들지 마세요.',
+    '방금 쓴 메모를 같은 규칙으로 다시 써서, 최종 답에 <visit-memo> 줄과 </visit-memo> 줄 사이에만 넣으세요.',
+    '이번 방문과 지난 메모에 이미 있던 것만 쓰고 새 정보를 더하지 마세요. 줄여야 하면 이 인물이 덜 중요하게 여기는 것부터 놓아 줍니다.',
+    `칸 머리글을 포함해 ${format.maxCharacters}자 이하, 칸 순서와 머리글은 지침 그대로, 〈 〉는 짝을 맞춥니다.`,
+  ].join('\n');
+}
 
 /** The memo format of a chain or template; throws for a template without sectioned memos. */
 function memoFormatOf(template) {
@@ -267,7 +284,7 @@ function nextVisitOf(chain, chainFile) {
 }
 
 module.exports = {
-  sha256, PREVIOUS_VISIT_V3_VERSION, VISIT_MEMO_V3_MAX_CHARACTERS, VISIT_MEMO_V3_SECTIONS, memoFormatOf, memoLabelsOf,
+  sha256, MEMO_REWRITE_VERSION, memoRewritePrompt, PREVIOUS_VISIT_V3_VERSION, VISIT_MEMO_V3_MAX_CHARACTERS, VISIT_MEMO_V3_SECTIONS, memoFormatOf, memoLabelsOf,
   VISIT_RECALL_VERSION, buildVisitRecall, visibleNamesOf, recallForMenu, CHAIN_CONDITIONS, PREVIOUS_VISIT_VERSION, VISIT_MEMO_MAX_CHARACTERS, PREVIOUS_VISIT_NOTICE, PREVIOUS_VISIT_V2_VERSION,
   VISIT_MEMO_V2_MAX_CHARACTERS, VISIT_MEMO_V2_SECTIONS, PREVIOUS_VISIT_V2_NOTICE, MEMO_FORMATS, parseVisitMemoSections,
   validateVisitMemo, extractVisitMemo, visitMemoMetrics, VISIT_MEMO_PROFILES_FILE, visitMemoProfileOf, STORE_KEY_VERSION,

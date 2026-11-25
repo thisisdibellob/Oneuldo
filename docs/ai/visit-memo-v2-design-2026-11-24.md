@@ -355,7 +355,48 @@ node market-simulator/whole-trace-actor-input.cjs <slot>/owner/prepare-response.
 node market-simulator/visit-memo-chain.cjs record <chain.json> <slot> <slot>/actor-final-reply.txt
 ```
 
-### 실험할 때 볼 것
+### 메모 v3b — 길어진 메모 다시 쓰기와 기억 전달 검사 (2026-11-25)
+
+### 왜 바꿨나
+
+메모 v3 기억 대 대조군 실험(`output/persona-memo-v3-ab-20261125-152718`)이 중간에 멈췄어요. 원인은 두 가지였어요.
+
+- **메모가 600자를 넘으면 통째로 버려졌어요.** 기억 조건 메모 9개 중 3개(726자, 648자, 771자)가 무효였어요. 〈이름〉과 `[들어가는 길]` 때문에 메모가 길어졌는데, 페르소나가 줄여 쓸 기회가 없었어요. 그래서 다음 방문이 직전 메모 대신 더 오래된 메모를 받거나, 메모를 아예 못 받았어요.
+- **중단 규칙이 잘못됐어요.** 감독 지시에 "기억 사슬 2·3회차에 메모가 안 붙으면 멈춘다"고 적었어요. 그런데 직전 메모가 무효라 메모가 붙지 않는 건 설계대로의 동작이에요. 이 경우를 빼지 않아서 실험이 멈췄어요.
+
+### 바꾼 것
+
+1. **지침 `authoring-v5-h200-memo-v3b`:** v3과 메모 쓰기 문단 하나만 달라요(테스트로 확인). 메모 형식은 v3과 같아요(`previous-visit-memo-v3`).
+   - 답하기 전에 칸 머리글을 포함해 글자 수를 세고, 600자를 넘으면 덜 중요한 것부터 놓아 주며 줄여요.
+   - 감독이 "메모가 기록되지 않았다"고 알리면 행동, mailbox 호출, 파일 만들기는 하지 않아요. 같은 규칙으로 메모만 다시 쓰고, 새 정보는 더하지 않아요.
+2. **메모 다시 쓰기 요청 (최대 2번):**
+   - `visit-memo-chain.cjs check <사슬> <답 파일>`이 메모가 기록될지 미리 확인해요. 기록되지 않으면 고정된 요청문(`visit-memo-rewrite-v1`)을 돌려줘요. 요청문에는 이유, 글자 수, 상한이 들어가요.
+   - 감독은 그 요청문을 **같은 루나 세션**에 그대로 보내요.
+   - `record ... --rewrite-reply <답 파일>`(최대 2번)로 기록해요. 순서대로 봐서 처음 유효한 메모를 그 방문의 메모로 써요. 원래 메모와 다시 쓴 메모는 모두 `memoAttempts`와 `memos/visit-<N>-<slot>-rewrite-<k>.txt`에 원문 그대로 남아요.
+   - 이미 유효한 메모 뒤에 다시 쓰기를 붙이거나, 2번을 넘기거나, v3b가 아닌 사슬에서 다시 쓰기를 쓰면 거부해요. 거부할 때는 파일을 하나도 남기지 않아요.
+   - 2번 다시 써도 기록되지 않으면 그 방문은 `invalid` 또는 `missing`으로 남아요. 다음 방문은 마지막 유효 메모를 받아요.
+3. **기억 전달 검사 `verify-recall <slot>`:**
+   - 입력 생성기가 `owner/visit-recall.json`을 만든 경우에만 메모가 붙어야 해요. 이 경우는 기억 사슬이면서 직전 유효 메모가 있을 때예요.
+   - 파일이 있으면 owner가 같은 파일(SHA-256)을 한 번 불러왔는지, 모든 메뉴에 `rememberedVisit`가 붙었는지 확인해요.
+   - 파일이 없으면 어떤 메뉴에도 붙지 않았는지 확인해요. 직전 메모가 무효나 누락이라 붙지 않은 것은 정상이에요.
+   - 결과로 `ok`, `problems`, 메뉴 수, 메모가 붙은 메뉴 수, `recognized`가 뜬 메뉴 수가 나와요. 감독은 "메모가 붙었는지"가 아니라 이 `ok`로 중단 여부를 정해요.
+4. **사슬 지표:** 방문마다 `memoRewrites`(다시 쓰기 횟수)가 들어가요. 다시 쓰기를 한 방문은 페르소나가 메모를 줄인 거라, 분석할 때 따로 표시해요.
+
+### 감독 순서 (방문마다)
+
+```bash
+# 1. owner 시작 → 2. 입력 생성(begin 전) → 3. 루나 플레이, 마지막 답을 <slot>/actor-final-reply.txt로 저장
+node market-simulator/visit-memo-chain.cjs check <chain> <slot>/actor-final-reply.txt
+#    valid:false이고 rewritePrompt가 있으면, 같은 루나 세션에 rewritePrompt를 그대로 보내고
+#    답을 <slot>/actor-memo-rewrite-1.txt로 저장 → 다시 check (최대 2번)
+node market-simulator/visit-memo-chain.cjs record <chain> <slot> <slot>/actor-final-reply.txt \
+  [--rewrite-reply <slot>/actor-memo-rewrite-1.txt] [--rewrite-reply <slot>/actor-memo-rewrite-2.txt]
+node market-simulator/visit-memo-chain.cjs verify-recall <slot>   # ok:false일 때만 멈추고 보고
+```
+
+결정이 하나도 수락되기 전에 기술적으로 실패한 방문은 다시 쓰기 없이 `--no-visit`으로 기록해요.
+
+## 실험할 때 볼 것
 
 - **조건:** 인물마다 기억 사슬(v3)과 대조군 사슬(v3, no-memory)을 같은 퀘스트·시드로 돌려요. 실행마다 흔들림이 크므로 조건마다 사슬을 3개 이상 둬요.
 - **주 지표:** 판매 구역에 처음 들어간 행동 번호, 계산대에 도착한 행동 번호, 성공 여부.
