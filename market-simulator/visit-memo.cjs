@@ -57,6 +57,9 @@ const MEMO_FORMATS = Object.freeze({
   'authoring-v5-h200-memo-v3b': Object.freeze({ version: PREVIOUS_VISIT_V3_VERSION, maxCharacters: VISIT_MEMO_V3_MAX_CHARACTERS, notice: PREVIOUS_VISIT_V3_NOTICE, sections: VISIT_MEMO_V3_SECTIONS, labels: true, rewrites: 2 }),
   // Same memo format as v3b; the template adds the visit plan (visit_plan tool and menu.visitPlan).
   'authoring-v5-h200-memo-v4': Object.freeze({ version: PREVIOUS_VISIT_V3_VERSION, maxCharacters: VISIT_MEMO_V3_MAX_CHARACTERS, notice: PREVIOUS_VISIT_V3_NOTICE, sections: VISIT_MEMO_V3_SECTIONS, labels: true, rewrites: 2, plan: true }),
+  // Same as v4; the template asks the memo to keep start-relative positions of needed places (the checkout
+  // included) and plan steps to carry the memo's direction words, names and positions.
+  'authoring-v5-h200-memo-v4b': Object.freeze({ version: PREVIOUS_VISIT_V3_VERSION, maxCharacters: VISIT_MEMO_V3_MAX_CHARACTERS, notice: PREVIOUS_VISIT_V3_NOTICE, sections: VISIT_MEMO_V3_SECTIONS, labels: true, rewrites: 2, plan: true }),
 });
 
 // When a finished visit's memo is missing or fails the shape check, the

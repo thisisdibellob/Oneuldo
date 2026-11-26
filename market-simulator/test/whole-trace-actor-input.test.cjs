@@ -280,3 +280,17 @@ test('the v4 memo template is v3b plus only the visit plan sentences in the read
   for (const phrase of ['"tool":"visit_plan"', 'menu.visitPlan', 'passagesTowardRemembered', 'not recommendations', '아직 안 가 본 곳'])
     assert.ok(v4[12].includes(phrase), phrase);
 });
+
+test('the v4b memo template is v4 plus only the place-position and plan-wording sentences', () => {
+  const lines = id => fs.readFileSync(INSTRUCTION_TEMPLATES[id], 'utf8').split('\n');
+  const v4 = lines('authoring-v5-h200-memo-v4');
+  const v4b = lines('authoring-v5-h200-memo-v4b');
+  assert.equal(v4b.length, v4.length);
+  assert.deepEqual(v4.map((line, index) => line === v4b[index] ? null : index).filter(index => index !== null), [12, 16]);
+  assert.ok(v4b[16].includes('〈1번 계산대〉"; a place reached but never placed'), 'the memo keeps the checkout position');
+  assert.ok(v4b[12].includes('"남서쪽 〈1번 계산대〉로 간다" rather than "계산대로 간다"'), 'plan steps reuse memo directions');
+  for (const index of [12, 16]) {
+    const added = v4b[index].length - v4[index].length;
+    assert.ok(added > 0 && v4b[index].replace(/ When a step uses something[^]*?first\. | For each place the person will need again[^]*?next time\./, ' ').length <= v4[index].length + 1);
+  }
+});

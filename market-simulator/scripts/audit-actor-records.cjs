@@ -220,7 +220,7 @@ function auditSlot(slot, code, allCodes) {
   const selfReport = exists(path.join(slot, 'actor-completion.json')) ? read(path.join(slot, 'actor-completion.json')) : null;
   const status = exists(path.join(slot, 'owner', 'status.json')) ? read(path.join(slot, 'owner', 'status.json')) : null;
   const projection = exists(path.join(slot, 'projection.json')) ? read(path.join(slot, 'projection.json')) : null;
-  const rewrites = rewriteChecks(ledger, ['authoring-v4', 'authoring-v4-h200', 'authoring-v5', 'authoring-v5-h200', 'authoring-v5-h200-memo', 'authoring-v5-h200-memo-v2', 'authoring-v5-h200-memo-v3', 'authoring-v5-h200-memo-v3b', 'authoring-v5-h200-memo-v4'].includes(projection?.actorInstructions?.templateId));
+  const rewrites = rewriteChecks(ledger, ['authoring-v4', 'authoring-v4-h200', 'authoring-v5', 'authoring-v5-h200', 'authoring-v5-h200-memo', 'authoring-v5-h200-memo-v2', 'authoring-v5-h200-memo-v3', 'authoring-v5-h200-memo-v3b', 'authoring-v5-h200-memo-v4', 'authoring-v5-h200-memo-v4b'].includes(projection?.actorInstructions?.templateId));
   const calls = callRecords(slot, cmds);
   const result = {
     owner: { state: status?.state ?? null, requestStatus: status?.requestStatus?.status ?? null,

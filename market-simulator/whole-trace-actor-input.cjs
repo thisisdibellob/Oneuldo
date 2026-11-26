@@ -128,6 +128,8 @@ const INSTRUCTION_TEMPLATES = Object.freeze({
   'authoring-v5-h200-memo-v3b': path.join(__dirname, 'actor-instructions', 'authoring-v5-h200-memo-v3b.txt'),
   // memo v3b plus the visit plan: visit_plan tool, menu.visitPlan heading and named-direction passages.
   'authoring-v5-h200-memo-v4': path.join(__dirname, 'actor-instructions', 'authoring-v5-h200-memo-v4.txt'),
+  // v4 plus: memo keeps positions of needed places (checkout included); plan steps reuse the memo's directions and names.
+  'authoring-v5-h200-memo-v4b': path.join(__dirname, 'actor-instructions', 'authoring-v5-h200-memo-v4b.txt'),
 });
 const DEFAULT_INSTRUCTION_TEMPLATE = 'authoring-v3';
 const MAILBOX_CLI = path.join(__dirname, 'whole-trace-mailbox.cjs');
