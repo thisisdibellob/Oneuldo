@@ -30,9 +30,12 @@ export function BrandHeader({ right }: { right?: ReactNode }) {
 export function StickyBrandHeader({
   horizontalPadding = 20,
   right,
+  backgroundColor,
 }: {
   horizontalPadding?: number;
   right?: ReactNode;
+  /** 화면 배경이 흰색이 아닐 때 헤더 바탕을 맞춘다(없으면 기존 흰색). */
+  backgroundColor?: string;
 }) {
   return (
     <View
@@ -40,6 +43,7 @@ export function StickyBrandHeader({
       style={[
         styles.stickyHeader,
         { marginHorizontal: -horizontalPadding, paddingHorizontal: horizontalPadding },
+        backgroundColor ? { backgroundColor } : null,
       ]}
     >
       <BrandHeader right={right} />

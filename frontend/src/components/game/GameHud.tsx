@@ -4,6 +4,7 @@ import { AccessibilityInfo, Animated, BackHandler, Easing, Image, Pressable, Scr
 import type { ImageSourcePropType } from 'react-native';
 
 import { icons } from '../../assets';
+import { HUD_WALLET_WON } from '../../game/hudWallet';
 import { createCalculatorState, pressCalculatorKey } from '../../game/calculator';
 import type {
   DailyQuestId,
@@ -82,6 +83,7 @@ const hudOutlineOffsets = [
 ];
 
 export function GameHud({
+  marketBudget,
   controlMode,
   dailyQuests,
   onControlModeChange,
@@ -128,6 +130,8 @@ export function GameHud({
   phoneRequest?: { key: number; action: PhoneAction } | null;
   onPhoneRequestHandled?: () => void;
   onVisitMinsu?: () => void;
+  /** 장보기 중일 때 코인 아래에 돈 아이콘과 함께 보여 줄 예산. */
+  marketBudget?: number;
 }) {
   const [menu, setMenu] = useState<MenuKey | null>(null);
   const [phoneAction, setPhoneAction] = useState<PhoneAction>(null);
@@ -268,11 +272,17 @@ export function GameHud({
     <View pointerEvents="box-none" testID="game-hud" style={[StyleSheet.absoluteFill, menu && styles.menuRoot]}>
       <View pointerEvents="none" testID="game-top-hud" style={styles.topHud}>
         <OutlinedHudText>11:45</OutlinedHudText>
-        <View accessible accessibilityLabel="현재 소지금 30,000원" style={styles.coinCounter}>
-          <OutlinedHudText>30,000</OutlinedHudText>
-          <Image resizeMode="contain" source={icons.gameCoin} style={styles.coinIcon} />
+        <View accessible accessibilityLabel={`현재 소지금 ${HUD_WALLET_WON.toLocaleString('ko-KR')}원`} style={styles.coinCounter}>
+          <OutlinedHudText>{HUD_WALLET_WON.toLocaleString('ko-KR')}</OutlinedHudText>
+          <Image resizeMode="contain" source={icons.gameCoinWon} style={styles.coinIcon} />
         </View>
       </View>
+      {marketBudget !== undefined ? <View accessible accessibilityLabel={`장보기 예산 ${marketBudget.toLocaleString('ko-KR')}원`}
+        pointerEvents="none" style={styles.budgetCounter} testID="game-market-budget">
+        <View style={styles.budgetTag}><Text style={styles.budgetTagText}>예산</Text></View>
+        <OutlinedHudText>{marketBudget.toLocaleString('ko-KR')}</OutlinedHudText>
+        <Image resizeMode="contain" source={icons.gameMoney} style={styles.coinIcon} />
+      </View> : null}
 
       <View pointerEvents="box-none" testID="game-toolbar" style={styles.toolbar}>
         {toolbarItems.map((item) => (
@@ -594,6 +604,9 @@ const styles = StyleSheet.create({
     lineHeight: 30,
   },
   coinCounter: { alignItems: 'center', flexDirection: 'row', gap: 2, marginTop: -11 },
+  budgetCounter: { alignItems: 'center', flexDirection: 'row', gap: 2, position: 'absolute', right: 20, top: 98, zIndex: 24 },
+  budgetTag: { backgroundColor: '#4C6758', borderColor: '#FFFFFF', borderRadius: 10, borderWidth: 2, marginRight: 4, paddingHorizontal: 8, paddingVertical: 1 },
+  budgetTagText: { color: '#FFFFFF', fontFamily: fonts.gameHud, fontSize: 15, lineHeight: 20 },
   hudTextOutline: {
     color: '#777777',
     fontFamily: fonts.gameHud,

@@ -14,6 +14,7 @@ import { PhoneAppIcon, type PhoneAppIconName } from './PhoneAppIcon';
 import { getShoppingErrandStatus, useShoppingErrand } from '../../game/shoppingErrandStore';
 import { dispatchPhishingAction, usePhishingSession } from '../../game/phishingStore';
 import { PhoneSafety } from './PhoneSafety';
+import { useUserProgress, XP_PER_LEVEL } from '../../progress/userProgress';
 
 export type PhoneAction = 'calculator' | 'settings' | 'contacts' | 'photos' | 'messages' | 'routes' | 'travel' | 'exit' | 'emergency' | null;
 export type PhoneContact = 'jiyoung' | 'minsu';
@@ -118,6 +119,7 @@ export function GamePhonePanel({ action, calculator, controlMode, onAction, onCa
           ) : (
             <View style={styles.home}>
               <View style={styles.clockWidget}><Text style={styles.clock}>11:45</Text></View>
+              <PhoneProgressWidget />
               <View style={styles.apps}>
                 <PhoneApp icon="phone" label="전화" onPress={() => onAction('contacts')} reduceMotion={reduceMotion} />
                 <PhoneApp icon="photos" label="사진" onPress={() => onAction('photos')} reduceMotion={reduceMotion} />
@@ -136,6 +138,25 @@ export function GamePhonePanel({ action, calculator, controlMode, onAction, onCa
       <PressScale accessibilityLabel={action ? '휴대폰 홈으로' : '휴대폰 닫기'} accessibilityRole="button" onPress={() => action ? onAction(null) : onClose()} scaleTo={1} style={styles.homeButton}><View style={styles.homeIndicator} /></PressScale>
     </View>
   );
+}
+
+/** 개인 레벨·연속 학습 위젯. 표시만 하며 게임 진행에는 관여하지 않는다. */
+function PhoneProgressWidget() {
+  const progress = useUserProgress();
+  return <View accessible accessibilityLabel={`레벨 ${progress.level}, 다음 레벨까지 ${progress.xpToNextLevel} XP, 연속 학습 ${progress.streak}일`}
+    style={styles.progressWidget} testID="phone-progress-widget">
+    <View style={styles.progressTop}>
+      <Text style={styles.progressLevel}>Lv.{progress.level}</Text>
+      <View style={styles.progressStreak}>
+        <Ionicons color={progress.streak > 0 ? '#E8735A' : '#B5BBAE'} name="flame" size={14} />
+        <Text style={styles.progressStreakText}>연속 {progress.streak}일</Text>
+      </View>
+    </View>
+    <View style={styles.progressTrack}>
+      <View style={[styles.progressFill, { width: `${(progress.levelXp / XP_PER_LEVEL) * 100}%` }]} />
+    </View>
+    <Text style={styles.progressMeta}>{progress.levelXp} / {XP_PER_LEVEL} XP</Text>
+  </View>;
 }
 
 function PhoneApp({ icon, label, onPress, reduceMotion, disabled = false }: {
@@ -166,7 +187,15 @@ const styles = StyleSheet.create({
   scroll: { flex: 1, minHeight: 0 },
   scrollContent: { flexGrow: 1 },
   home: { minHeight: 316, paddingHorizontal: 15, paddingBottom: 8 },
-  clockWidget: { alignItems: 'center', justifyContent: 'flex-start', minHeight: 72, marginBottom: 19, paddingTop: 0 },
+  clockWidget: { alignItems: 'center', justifyContent: 'flex-start', minHeight: 60, marginBottom: 8, paddingTop: 0 },
+  progressWidget: { backgroundColor: 'rgba(255,252,245,0.82)', borderColor: '#D8DFD0', borderRadius: 17, borderWidth: 1, marginBottom: 20, marginHorizontal: 6, paddingHorizontal: 14, paddingVertical: 10 },
+  progressTop: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
+  progressLevel: { color: '#405A46', fontFamily: fonts.laundryBold, fontSize: 18 },
+  progressStreak: { alignItems: 'center', flexDirection: 'row', gap: 3 },
+  progressStreakText: { color: '#5F6E5A', fontFamily: fonts.semibold, fontSize: 12 },
+  progressTrack: { backgroundColor: '#E4E8DC', borderRadius: 4, height: 7, marginTop: 7, overflow: 'hidden' },
+  progressFill: { backgroundColor: '#6F9A6E', borderRadius: 4, height: 7 },
+  progressMeta: { color: '#7A8171', fontFamily: fonts.medium, fontSize: 11, marginTop: 4, textAlign: 'right' },
   clock: { color: '#506952', fontFamily: fonts.laundryBold, fontSize: 43, lineHeight: 53 },
   apps: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-around', rowGap: 24 },
   app: { alignItems: 'center', width: '30%' },

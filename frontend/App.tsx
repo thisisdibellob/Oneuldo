@@ -136,6 +136,16 @@ export default function App() {
     }).start(() => setShowOnboarding(false));
   };
 
+  // 설정 > 내 계정 > 로그아웃: 계정 정보를 지우고 처음 화면으로 돌아간다.
+  const logout = () => {
+    entering.current = false;
+    setAccessToken(null);
+    setQuests([]);
+    setEntered(false);
+    setShowOnboarding(true);
+    entryProgress.setValue(0);
+  };
+
   const fontsReady = entered || marketLab || libraryPreview || busPreview || phishingPreview || cafePreview || laundryPreview ? allReady : startupReady;
   if (!fontsReady) {
     return (
@@ -161,6 +171,7 @@ export default function App() {
   const appContent = entered && !requiresMarketAgentLogin ? <AppShell
     accessToken={accessToken}
     aiVariation={aiVariation}
+    onLogout={logout}
     onRefreshQuests={() => {
       if (!accessToken) return;
       void getRecommendedQuests(accessToken).then(setQuests).catch((refreshError: unknown) => {

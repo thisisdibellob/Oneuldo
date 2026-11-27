@@ -11,6 +11,8 @@ export type ActivityRecord = Readonly<{
   id: string; kind: ActivityKind; sessionId: string; completedAt: number;
   title: string; place: string; summary: string;
   metrics: readonly ActivityMetric[]; facts: readonly string[]; favorite: boolean;
+  /** 목록 비교 결과가 있는 활동(장보기)만. 플레이어 화면·개인 기록용이며 AI 분석에 쓰이지 않는다. */
+  outcome?: 'success' | 'retry';
 }>;
 export type CompletedActivity = Omit<ActivityRecord, 'favorite'>;
 export type ActivityAlbumStorage = Pick<Storage, 'getItem' | 'setItem'>;
@@ -23,6 +25,8 @@ const validText = (value: unknown, max = 240): value is string => typeof value =
 const validCount = (value: unknown): value is number => Number.isSafeInteger(value) && (value as number) >= 0 && (value as number) <= 1_000_000_000;
 const validTime = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value) && value > 0 && value <= 8.64e15;
 const key = (kind: ActivityKind, sessionId: string) => `${kind}:${encodeURIComponent(sessionId)}`;
+/** Album record id for a single-record activity (bus, library, shopping, safety, cafe, laundry). */
+export const activityRecordId = key;
 function freezeRecord(record: ActivityRecord): ActivityRecord {
   return Object.freeze({ ...record, metrics: Object.freeze(record.metrics.map(metric => Object.freeze({ ...metric }))), facts: Object.freeze([...record.facts]) });
 }
@@ -34,7 +38,8 @@ function parseRecord(value: unknown): ActivityRecord | null {
     || !Array.isArray(row.metrics) || row.metrics.length > 8 || !row.metrics.every(metric => metric && validText(metric.label, 50) && validCount(metric.value) && validText(metric.unit, 12))
     || !Array.isArray(row.facts) || row.facts.length > 12 || !row.facts.every(fact => validText(fact))) return null;
   return freezeRecord({ id: row.id, kind: row.kind, sessionId: row.sessionId, completedAt: row.completedAt,
-    title: row.title, place: row.place, summary: row.summary, metrics: row.metrics, facts: row.facts, favorite: row.favorite });
+    title: row.title, place: row.place, summary: row.summary, metrics: row.metrics, facts: row.facts, favorite: row.favorite,
+    ...(row.outcome === 'success' || row.outcome === 'retry' ? { outcome: row.outcome } : {}) });
 }
 function browserStorage(): ActivityAlbumStorage | null {
   try { return typeof globalThis.localStorage === 'undefined' ? null : globalThis.localStorage; } catch { return null; }
@@ -124,14 +129,15 @@ export function makeCompletedLibraryActivity(session: LibrarySession, completedA
       ...(result.visitorsShelved ? [`손님 ${result.visitorsShelved}명의 책을 대신 꽂아 드렸어요.`] : []),
       ...(result.visitorsReferred ? [`손님 ${result.visitorsReferred}명을 사서에게 안내했어요.`] : [])] };
 }
-export type CompletedShoppingActivity = { sessionId: string; completedAt: number; itemCount: number; totalAmount: number; checkoutKind?: 'staff' | 'kiosk' };
+export type CompletedShoppingActivity = { sessionId: string; completedAt: number; itemCount: number; totalAmount: number; checkoutKind?: 'staff' | 'kiosk'; success?: boolean };
 export function makeCompletedShoppingActivity(input: CompletedShoppingActivity): CompletedActivity | null {
   if (!validText(input.sessionId, 200) || !validTime(input.completedAt) || !validCount(input.itemCount) || !validCount(input.totalAmount)) return null;
   const method = input.checkoutKind === 'kiosk' ? '무인 계산대' : input.checkoutKind === 'staff' ? '직원 계산대' : '계산대';
   return { id: key('shopping', input.sessionId), kind: 'shopping', sessionId: input.sessionId, completedAt: input.completedAt,
-    title: '장보기 완료', place: '하늘마트', summary: `${input.itemCount}개 · ${input.totalAmount.toLocaleString('ko-KR')}원`,
+    title: input.success === false ? '장보기 마침' : '장보기 완료', place: '하늘마트', summary: `${input.itemCount}개 · ${input.totalAmount.toLocaleString('ko-KR')}원`,
     metrics: [{ label: '구매한 물품', value: input.itemCount, unit: '개' }, { label: '결제한 금액', value: input.totalAmount, unit: '원' }],
-    facts: [`${method}에서 물품 ${input.itemCount}개의 결제를 마쳤어요.`] };
+    facts: [`${method}에서 물품 ${input.itemCount}개의 결제를 마쳤어요.`],
+    ...(input.success === undefined ? {} : { outcome: input.success ? 'success' as const : 'retry' as const }) };
 }
 export type CompletedDeliveryActivity = { sessionId: string; completedAt: number; recipient: string; itemCount: number; items?: string[] };
 export function makeCompletedDeliveryActivity(input: CompletedDeliveryActivity): CompletedActivity | null {

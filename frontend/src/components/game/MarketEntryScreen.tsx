@@ -1,6 +1,7 @@
 import { useContext, useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Image, Platform, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { PressScale } from '../PressScale';
 import { colors, fonts } from '../../theme';
 import { useMarketReducedMotion } from './MarketPanelTransition';
@@ -11,10 +12,12 @@ const entryAssets = {
 };
 
 /** GameEntry1 (569:4649): original 375×812 frame, with room to scroll on short screens. */
-export function MarketEntryScreen({ difficulty, requester, instructions, details, startLabel = '도전 시작', onDifficultyChange, onStart, onHistory, onSettings, onExit }: {
+export function MarketEntryScreen({ difficulty, requester, instructions, details, scenarioChip, startLabel = '도전 시작', onDifficultyChange, onStart, onHistory, onSettings, onExit }: {
   difficulty: 'family' | 'exact';
   instructions?: string;
   details?: React.ReactNode;
+  /** 긴 정보 박스 대신 쓰는 짧은 시나리오 버튼(예: "S02 공원 간식"). 누르면 상세 창을 연다. */
+  scenarioChip?: { label: string; onPress: () => void };
   startLabel?: string;
   requester?: string;
   onDifficultyChange: (difficulty: 'family' | 'exact') => void;
@@ -58,6 +61,11 @@ export function MarketEntryScreen({ difficulty, requester, instructions, details
     <View testID="market-entry-backdrop" pointerEvents="none" style={s.shade} />
     <ScrollView bounces={false} showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll}>
       <View style={[s.board, { width: Math.min(375, size.width), height: boardHeight }]}>
+        {scenarioChip ? <View style={s.chipSlot}><PressScale accessibilityRole="button" accessibilityLabel={`${scenarioChip.label}, 시나리오 자세히 보기`}
+          onPress={scenarioChip.onPress} scaleTo={reduced ? 1 : 0.97} style={s.chip} testID="market-scenario-chip">
+          <Text numberOfLines={1} style={s.chipText}>{scenarioChip.label}</Text>
+          <Ionicons color="#FFFFFF" name="chevron-forward" size={16} />
+        </PressScale></View> : null}
         {details ? <ScrollView nestedScrollEnabled style={{position:'absolute',left:24,right:24,top:24,maxHeight:180,backgroundColor:'#23352D99',borderRadius:18}} contentContainerStyle={{padding:12,gap:4,alignItems:'center'}}>{details}</ScrollView> : null}
         <Animated.View pointerEvents="none" style={[s.art, { top: baseline - 681, opacity: arrival, transform: [
           { translateY: float },
@@ -116,6 +124,9 @@ function EntryLabel({ text, title, muted }: { text: string; title?: boolean; mut
 }
 
 const s = StyleSheet.create({
+  chipSlot: { alignItems: 'center', left: 24, position: 'absolute', right: 24, top: 28, zIndex: 5 },
+  chip: { alignItems: 'center', backgroundColor: '#23352DB3', borderRadius: 20, flexDirection: 'row', gap: 4, maxWidth: '100%', paddingHorizontal: 16, paddingVertical: 9 },
+  chipText: { color: '#FFFFFF', flexShrink: 1, fontFamily: fonts.semibold, fontSize: 15 },
   root: { ...StyleSheet.absoluteFill },
   shade: { ...StyleSheet.absoluteFill, backgroundColor: settingsColors.backdrop },
   scroll: { flexGrow: 1, alignItems: 'center' },

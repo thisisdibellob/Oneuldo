@@ -157,7 +157,8 @@ it('게임 탭은 마을 한 곳으로 들어가며 정류장, 버스, 도서관
     quests={[]} questsLoading={false} questsError={null} />);
   await settle();
   fireEvent.press(screen.getByRole('tab', { name: '게임 탭' }));
-  expect(screen.getAllByRole('button')).toHaveLength(1);
+  // 게임으로 들어가는 버튼은 하나뿐이다('최근 기록 전체 보기'는 기록 창만 연다).
+  expect(screen.getAllByRole('button').filter((button) => button.props.accessibilityLabel !== '최근 기록 전체 보기')).toHaveLength(1);
   expect(screen.queryByRole('button', { name: '버스 타고 도서관 가기' })).toBeNull();
   expect(screen.queryByRole('button', { name: '도서관 업무만 시작' })).toBeNull();
   fireEvent.press(screen.getByRole('button', { name: '오늘도 마을 들어가기' }));

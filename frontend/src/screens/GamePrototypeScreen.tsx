@@ -1498,8 +1498,17 @@ export function GamePrototypeScreen({ accessToken = null, onExit, onOpenAnalysis
       recordCompletedShoppingActivity({ sessionId: episode.sessionId, completedAt: Number.isFinite(finishedAt) ? finishedAt : Date.now(),
         itemCount: items.reduce((count, [, quantity]) => count + quantity, 0),
         totalAmount: items.reduce((sum, [id, quantity]) => sum + (getMarketProduct(id)?.price ?? 0) * quantity, 0),
-        checkoutKind: episode.selectedKioskId ? 'kiosk' : 'staff' });
+        checkoutKind: episode.selectedKioskId ? 'kiosk' : 'staff', success: true });
     }
+  }, []);
+  // AI 검토로 넘기는 장보기: 계산을 마치면 끝까지 한 장보기로 활동 앨범에만 남긴다(달력·개인 레벨용).
+  const handleMarketShoppingFinished = useCallback((info: { sessionId: string; completedAt: number; cart: Record<string, number>; kiosk: boolean; success?: boolean }) => {
+    if (MARKET_REPLAY_ENABLED) return;
+    const items = Object.entries(info.cart);
+    recordCompletedShoppingActivity({ sessionId: info.sessionId, completedAt: info.completedAt,
+      itemCount: items.reduce((count, [, quantity]) => count + quantity, 0),
+      totalAmount: items.reduce((sum, [id, quantity]) => sum + (getMarketProduct(id)?.price ?? 0) * quantity, 0),
+      checkoutKind: info.kiosk ? 'kiosk' : 'staff', success: info.success });
   }, []);
   const handleErrandAction = useCallback((action: ShoppingErrandAction) => {
     const before = getShoppingErrand();
@@ -3083,6 +3092,7 @@ export function GamePrototypeScreen({ accessToken = null, onExit, onOpenAnalysis
       />
       {!cookingOpen && !phoneContact && !phoneCallPresent && (worldMap !== 'market' || !marketScenarioLocked) ? (
         <GameHud
+          marketBudget={worldMap === 'market' ? (errandMarketConfig ? errand?.approvedBudget : personalizedMarketMission?.budget) : undefined}
           controlMode={controlMode}
           dailyQuests={dailyQuests}
           phoneRequest={safetyPhoneRequest}
@@ -3141,6 +3151,8 @@ export function GamePrototypeScreen({ accessToken = null, onExit, onOpenAnalysis
           spendingLimit={errandMarketConfig ? errand?.approvedBudget : undefined}
           onBudgetRequest={errandMarketConfig ? (amount: number) => { dispatchShoppingErrand({ type: 'approve-budget', amount }); } : undefined}
           onEpisodeComplete={handleMarketEpisodeComplete}
+          onShoppingFinished={handleMarketShoppingFinished}
+          playerUi
           controlMode={controlMode}
           onControlModeChange={selectControlMode}
           environment={marketEnvironment}

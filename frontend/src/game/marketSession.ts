@@ -311,6 +311,16 @@ function isChoiceProduct(session: MarketSession, productId: string) {
     && !session.objectives.some(objective => matchesObjective(productId, objective));
 }
 
+/**
+ * Read-only list check shown to the player before AI analysis (AI 검토 장보기의 결과 화면).
+ * It records no event and changes no session state, so behaviour logs and AI analysis inputs stay identical.
+ * Substitutions approved by the requester and items reported unavailable are already reflected in the objectives.
+ */
+export function getMarketPurchaseVerdict(session: MarketSession): { success: boolean; details: string[] } {
+  const result = evaluate(session);
+  return { success: result.success, details: [...(result.details ?? [])] };
+}
+
 function evaluate(session: MarketSession): MarketFeedback {
   const details: string[] = [];
   const exception = session.learning.stockout;

@@ -189,8 +189,8 @@ describe('오늘도 앱', () => {
     fireEvent.press(screen.getByRole('button', { name: 'Google로 시작하기' }));
     fireEvent.press(screen.getByRole('tab', { name: '퀘스트 탭' }));
     expect(screen.getByText('추천 퀘스트')).toBeTruthy();
-    expect(screen.getByText('8월')).toBeTruthy();
-    expect(screen.getByText('상담 예약')).toBeTruthy();
+    expect(screen.getByText(`${new Date().getMonth() + 1}월`)).toBeTruthy();
+    expect(screen.getByText('오늘 마을에서 활동을 마치면 여기에 기록돼요.')).toBeTruthy();
   });
 
   it('민수와 일상 대화 후 의뢰를 받아 추천 대중교통 퀴즈를 완료한다', async () => {
@@ -790,7 +790,8 @@ describe('오늘도 앱', () => {
     fireEvent.press(await screen.findByRole('button', { name: '계산대에서 계산하기' }));
     fireEvent.press(screen.getByRole('button', { name: '구매 확정' }));
 
-    await waitFor(() => expect(screen.getByText('AI 수행 검토')).toBeTruthy());
+    // 2026-11-27: AI 분석 전 목록 비교 결과 카드(표시 전용)가 뜬다.
+    await waitFor(() => expect(screen.getByTestId('market-purchase-result')).toBeTruthy());
     expect(screen.queryByText('장보기에 성공했어요!')).toBeNull();
     fireEvent.press(screen.getByText('마을로 돌아가기'));
     await waitFor(() => expect(screen.queryByText('장보기 의뢰 완료')).toBeNull(), { timeout: 2000 });

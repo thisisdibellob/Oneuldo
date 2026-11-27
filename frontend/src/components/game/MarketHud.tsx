@@ -21,12 +21,18 @@ export type MarketHudProps = {
   replayListVisibilityRef?: { current: ((open: boolean) => void) | null };
   onContactRequester?: () => void;
   onListVisibilityChange?: (open: boolean) => void;
+  /**
+   * 사람이 플레이할 때의 간단한 HUD: 위쪽 긴 박스를 없애고(소지금·예산은 게임 HUD 오른쪽 위에 표시),
+   * 이용 방법·이동 방식·전화·포기 버튼은 보여 주지 않는다(포기는 따로 정할 예정). 페르소나 재생·에이전트는 기존 HUD를 그대로 쓴다.
+   */
+  compact?: boolean;
 };
 
 /** The shopping note is opened explicitly; the world HUD only keeps its buttons. */
 export function MarketHud({
   objectives, score, budget, topInset = 12, bottomSafeArea = 0, controlMode, onControlModeChange,
   onGiveUp, onOpenCart, onOpenHelp, replayListRef, replayListVisibilityRef, onContactRequester, onListVisibilityChange,
+  compact = false,
 }: MarketHudProps) {
   const list = useRef<ScrollView>(null);
   const viewport = useWindowDimensions();
@@ -52,7 +58,7 @@ export function MarketHud({
   useEffect(() => () => { if (replayListRef) replayListRef.current = null; }, [replayListRef]);
   useEffect(() => () => { if (replayListVisibilityRef) replayListVisibilityRef.current = null; }, [replayListVisibilityRef]);
   return <View pointerEvents="box-none" style={StyleSheet.absoluteFill} testID="market-hud">
-    <View pointerEvents="box-none" style={[s.anchor, { top: topInset }]} testID="market-hud-header">
+    {compact ? null : <View pointerEvents="box-none" style={[s.anchor, { top: topInset }]} testID="market-hud-header">
     <View style={s.card} testID="market-hud-card">
       <View style={s.header}>
         <Text style={s.title} numberOfLines={1}>하늘마트</Text>
@@ -75,7 +81,7 @@ export function MarketHud({
         </PressScale>
       </View>
     </View>
-    </View>
+    </View>}
       <View pointerEvents="box-none" testID="market-hud-actions" style={[s.noteRow, {
         left: actions.left, bottom: viewport.height - actions.bottom, width: actions.right - actions.left,
         height: actions.bottom - actions.top,

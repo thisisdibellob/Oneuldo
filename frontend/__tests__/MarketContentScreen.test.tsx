@@ -69,7 +69,9 @@ it('새 진열대에서도 규격·재고와 실제 선택을 보존하고 로�
     for(let i=0;i<8;i++)act(()=>{shelf.props.onDropProduct('milk');});
     expect(screen.UNSAFE_getByType(MarketShelfScene).props.cart.milk).toBe(5);
     await checkout();
-    expect(screen.getByText('AI 수행 검토')).toBeTruthy();
+    // 2026-11-27: AI 분석 접수와 별개로 목록 비교 결과 카드(표시 전용)를 보여 준다. 우유 5개는 목록과 달라 '장보기 완료!'.
+    expect(screen.getByTestId('market-purchase-result')).toBeTruthy();
+    expect(screen.getByText('장보기 완료!')).toBeTruthy();
     expect(screen.queryByText('장보기에 성공했어요!')).toBeNull();expect(screen.queryByText('이번 구매는 맞지 않았어요')).toBeNull();
     expect(onMissionComplete).not.toHaveBeenCalled();
     const events=jest.mocked(enqueueBehaviorEvents).mock.calls.flatMap(call=>call[1].map(row=>row.event));

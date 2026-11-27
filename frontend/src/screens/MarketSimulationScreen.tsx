@@ -1,4 +1,6 @@
 import { MarketRouteReview, MarketMiniMap } from '../components/game/MarketRouteReview';
+import { MarketPurchaseResult, type MarketResultKind } from '../components/game/MarketPurchaseResult';
+import { activityRecordId } from '../game/activityAlbum';
 import { GameActionButton, GameControlShortcut, GAME_ACTION_BUTTON_LAYOUT } from '../components/game/GameControls';
 import { MarketWorldGuidance, type MarketViewFrame } from '../components/game/MarketWorldGuidance';
 import { normalizeMarketTraining, marketTrainingInstruction, marketIncidentPlan, type MarketIncident } from '../game/marketTraining';
@@ -27,6 +29,7 @@ import {
   applyMarketAction,
   createMarketSession,
   exportMarketEpisode,
+  getMarketPurchaseVerdict,
   replaceMarketSessionTilemap,
   MarketAction,
   MarketSessionConfig
@@ -94,6 +97,10 @@ export type MarketSimulationScreenProps = {
   onEnvironmentChange?: (environment: MarketEnvironment, changes?: MarketSetupChanges) => void;
   onCashierCalled?: (availability: MarketCashierAvailability) => void;
   onEpisodeComplete?: (episode: ReturnType<typeof exportMarketEpisode>) => void;
+  /** AI 검토로 넘기는 장보기에서 계산을 마친 순간, 개인 활동 기록용으로만 알린다. AI 분석·로그·미션 흐름에는 영향이 없다. */
+  /** 게임 안 마트에서만 켜는 새 플레이어 화면(간단 HUD·시나리오 버튼·바로 시작·별점 없음). */
+  playerUi?: boolean;
+  onShoppingFinished?: (info: { sessionId: string; completedAt: number; cart: Record<string, number>; kiosk: boolean; success?: boolean }) => void;
   requesterName?: string;
   spendingLimit?: number;
   onBudgetRequest?: (amount: number) => void;
@@ -130,6 +137,8 @@ export function MarketSimulationScreen({
   onEnvironmentChange,
   onCashierCalled,
   onEpisodeComplete,
+  onShoppingFinished,
+  playerUi = false,
   requesterName = '지영',
   spendingLimit,
   onBudgetRequest,
@@ -153,10 +162,16 @@ export function MarketSimulationScreen({
   // Missions from the application always use AI assessment. The standalone marketLab
   // keeps the incoming deterministic research preview, never used as an AI verdict.
   const aiAssessment = !!mission;
+  /** 사람이 직접 플레이하는 경우. 에이전트·페르소나 재생은 화면 흐름을 바꾸지 않는다. */
+  const humanPlay = !agentControl && !replayUiRef;
+  /** 게임 안 마트의 새 플레이어 화면(간단 HUD·시나리오 버튼·바로 시작·별점 없음). 게임 화면이 켜고, 직접 렌더·재생·에이전트는 기존 화면. */
+  const playerUiOn = !!playerUi && humanPlay;
+  const [scenarioInfoOpen, setScenarioInfoOpen] = useState(false);
   const adaptiveAssessment = aiAssessment && !!mission.runtimePlan;
   const briefingPages = mission?.briefing.length ? mission.briefing : null;
   const lastBriefingStep = (briefingPages?.length ?? (aiAssessment?2:1)) - 1;
   const [review, setReview] = useState<string | null>(null);
+  const [purchaseVerdict, setPurchaseVerdict] = useState<{ kind: MarketResultKind; details: string[]; note?: string } | null>(null);
   const questClock = useRef(new MarketQuestClock(resolveMarketTimeLimitSeconds(mission?.timeLimitSeconds)));
   const [timing, setTiming] = useState<MarketQuestTiming>(() => questClock.current.snapshot());
   const [expiredTiming, setExpiredTiming] = useState<MarketQuestTiming | null>(null);
@@ -567,7 +582,7 @@ export function MarketSimulationScreen({
     questClock.current.freeze();
     questClock.current = new MarketQuestClock(resolveMarketTimeLimitSeconds(mission?.timeLimitSeconds));
     setTiming(questClock.current.snapshot());
-    setExpiredTiming(null); setReview(null); reviewing.current = false; reviewAccepted.current = false; reviewError.current = null;
+    setExpiredTiming(null); setReview(null); setPurchaseVerdict(null); reviewing.current = false; reviewAccepted.current = false; reviewError.current = null;
     completed.current = false; emitted.current = false; trackerFinalized.current = false; finalization.current = null;
     analysisRequest.current = null;
     const selectedMission=changes?.trainingTestTouched&&mission?{...mission,scenarioId:'CUSTOM',title:normalizeMarketTraining(config.training).task==='mother-request'?'어머니의 부탁':'직접 만든 장보기 테스트',objectives:config.objectives??mission.objectives,briefing:[marketTrainingInstruction(config.training)]}:mission;
@@ -589,6 +604,22 @@ export function MarketSimulationScreen({
     if (reviewing.current) return;
     reviewing.current = true;
     dispatch({type:'endTraining'},true);
+    // 계산을 마친 순간 '끝까지 한 장보기'로 개인 활동 기록에만 알린다. 로그인·AI 접수 성공과 무관하고,
+    // 에이전트·재생 실행은 제외한다. 이 알림은 AI 검토·행동 로그·미션 흐름에 아무것도 돌려주지 않는다.
+    if (!agentControl && !replayUiRef) {
+      const emptyCart = !Object.values(live.current.cart).some((quantity) => quantity > 0);
+      if (emptyCart) {
+        // 아무것도 담지 않고 계산만 한 경우: 화면·개인 기록에서는 '장보기 포기'로 보고 경험치·활동 기록을 남기지 않는다.
+        // AI 분석 접수와 행동 로그는 아래에서 그대로 진행된다.
+        setPurchaseVerdict({ kind: 'gave-up', details: [], note: '물건을 하나도 담지 않고 계산해서 포기로 기록했어요.' });
+      } else {
+        // 플레이어에게 보여 줄 간단한 목록 비교 결과. 이벤트를 남기지 않고 세션도 바꾸지 않는다.
+        let verdict: { success: boolean; details: string[] } | null = null;
+        try { verdict = getMarketPurchaseVerdict(live.current); } catch { verdict = null; }
+        setPurchaseVerdict(verdict ? { kind: verdict.success ? 'success' : 'complete', details: verdict.details } : null);
+        try { onShoppingFinished?.({ sessionId: live.current.id, completedAt: Date.now(), cart: { ...live.current.cart }, kiosk: !!scannedCart, success: verdict?.success }); } catch { /* record only */ }
+      }
+    }
     reviewAccepted.current = false;
     reviewError.current = null;
     setReview('기록을 전송하고 AI가 검토하고 있어요.');
@@ -651,14 +682,21 @@ export function MarketSimulationScreen({
     dispatch({type:'startTraining'});
     setBriefing(false);
   };
+  // 사람이 플레이할 때는 '다음' 없이 바로 시작한다. 실제로 본 안내 화면 한 장만 기록하고(꾸민 체류 시간을 남기지 않음),
+  // 나머지 안내 문구는 시나리오 상세 창에서 볼 수 있다. 에이전트·페르소나 재생은 기존 단계별 진행을 그대로 쓴다.
+  const startNow = () => {
+    tracker.current?.briefingAdvanced(briefingStep, Date.now() - briefingShownAt.current);
+    agentUi.current = { ...agentUi.current, briefing: false, briefingText: null };
+    start();
+  };
+  const briefingRuleText = `다 골랐다면 출구 옆 계산대로 가요. 계산하지 않은 물건을 담고 입구·출구·측면 출입문의 빨간 경보기를 지나 매장 밖으로 나가면 ${session.config.alarmPenaltyPoints}점이 줄어요. 원하면 다시 해보거나 언제든 그만둘 수 있어요.`;
   const advanceBriefing = () => {
     tracker.current?.briefingAdvanced(briefingStep, Date.now() - briefingShownAt.current);
     briefingShownAt.current = Date.now();
     if (briefingStep < lastBriefingStep) {
       const nextStep = briefingStep + 1;
       agentUi.current = { ...agentUi.current, briefingStep: nextStep,
-        briefingText: briefingPages?.[nextStep] ?? (nextStep === 0 ? briefingText
-          : `다 골랐다면 출구 옆 계산대로 가요. 계산하지 않은 물건을 담고 입구·출구·측면 출입문의 빨간 경보기를 지나 매장 밖으로 나가면 ${session.config.alarmPenaltyPoints}점이 줄어요. 원하면 다시 해보거나 언제든 그만둘 수 있어요.`) };
+        briefingText: briefingPages?.[nextStep] ?? (nextStep === 0 ? briefingText : briefingRuleText) };
       setBriefingStep(nextStep);
     } else {
       agentUi.current = { ...agentUi.current, briefing: false, briefingText: null };
@@ -933,6 +971,41 @@ export function MarketSimulationScreen({
     onPress={giveUp}
   />;
 
+  // 게임 안 플레이어 화면에서는 별점을 없앴으므로 결과가 뜨는 즉시 '평가 건너뛰기'와 같은 처리를 한다(기존 완료 신호 유지).
+  // 에이전트·페르소나 재생은 기존 계약대로 skipRating 단계를 직접 보낸다.
+  const autoSkipRating = playerUiOn && isFinished && !expiredTiming && !ratingDone;
+  useEffect(() => {
+    if (autoSkipRating) finishRating(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoSkipRating]);
+  // 별점(기존 화면 전용)과 마트 나가기. 게임 안 플레이어 화면에서는 2026-11-27 사용자 요청으로 별점을 보여 주지 않는다.
+  const ratingControls = !ratingDone ? (playerUiOn ? null : <>
+            <Text style={s.body}>오늘 장보기는 어땠나요? 평가를 건너뛰어도 괜찮아요.</Text>
+            <Stars title="난이도" hint="1 쉬웠어요 · 5 어려웠어요" value={difficultyRating} onChange={setDifficultyRating} />
+            <Stars title="흥미" hint="1 재미없었어요 · 5 재미있었어요" value={interestRating} onChange={setInterestRating} />
+            <Button text="별점 남기기" disabled={!difficultyRating || !interestRating} onPress={() => finishRating(true)} />
+            <Button text="평가 건너뛰기" quiet onPress={() => finishRating(false)} />
+          </>)
+          : <>
+            {!playerUiOn ? <Text style={s.body}>
+              {session.ratings
+                ? '난이도 ' + session.ratings.difficulty + '점 · 흥미 ' + session.ratings.interest + '점'
+                : '평가를 건너뛰었어요.'}
+            </Text> : null}
+            <Button
+              text="게임 기록 저장"
+              quiet
+              onPress={() => {
+                void exportData().catch(() => setExportMessage('저장하지 못했어요. 다시 눌러 주세요.'));
+              }}
+            />
+            {exportMessage
+              ? <Text accessibilityLiveRegion="polite" style={s.small}>
+                {exportMessage}
+              </Text>
+              : null}
+            <Button text="마트 나가기" onPress={leave} />
+          </>;
   return <View pointerEvents={agentControl ? 'none' : embedded ? 'box-none' : 'auto'} style={embedded ? s.embeddedRoot : s.root}>
     {!embedded
       ? <MarketMap
@@ -960,6 +1033,7 @@ export function MarketSimulationScreen({
     </> : null}
     {!externalMenuOpen && !layoutEditing && !mapOpen && !briefing && session.phase === 'shopping' && !shelf && !cartOpen && !helpOpen && !staffMessage && !requesterOpen
       ? <MarketHud
+        compact={playerUiOn}
         replayListRef={__DEV__ && replayUiRef ? replayList : undefined}
         replayListVisibilityRef={__DEV__ && replayUiRef ? replayListVisibility : undefined}
         onListVisibilityChange={open => {
@@ -1029,7 +1103,13 @@ export function MarketSimulationScreen({
       <Button text="다시 연습하기" disabled={reviewing.current} onPress={() => { void restartExpiredQuest(); }} />
       <Button text="마트 나가기" quiet onPress={leave} />
     </>, '시간 종료') : null}
-    {!expiredTiming && review !== null ? modal('AI 수행 검토', <><MarketRouteReview environment={session.environment} trajectory={route}/><Text style={s.body}>{review}</Text>
+    {!expiredTiming && review !== null && purchaseVerdict ? <MarketPurchaseResult kind={purchaseVerdict.kind} details={purchaseVerdict.details} note={purchaseVerdict.note}
+      cart={session.cart} budget={mission?.budget} analysisStatus={review} xpRecordId={activityRecordId('shopping', session.id)}>
+      <Button text="마을로 돌아가기" onPress={leave} />
+      {onOpenAnalysis ? <Button text="분석 탭에서 자세히 보기" quiet onPress={() => { void leave().then(onOpenAnalysis); }} /> : null}
+      {reviewError.current ? <Button text="분석 접수 다시 시도" quiet disabled={reviewing.current} onPress={() => { void submitForReview(); }} /> : null}
+    </MarketPurchaseResult> : null}
+    {!expiredTiming && review !== null && !purchaseVerdict ? modal('AI 수행 검토', <><MarketRouteReview environment={session.environment} trajectory={route}/><Text style={s.body}>{review}</Text>
       {reviewError.current ? <Button text="분석 접수 다시 시도" disabled={reviewing.current} onPress={() => { void submitForReview(); }} /> : null}
       {onOpenAnalysis ? <Button text="분석 탭에서 확인" onPress={() => { void leave().then(onOpenAnalysis); }} /> : null}
       <Button text="마을로 돌아가기" onPress={leave} /></>) : null}
@@ -1041,19 +1121,34 @@ export function MarketSimulationScreen({
     }} /> : null}
     {review === null && briefing && !settings && !historyOpen && !layoutEditing ? <MarketEntryScreen
       difficulty={session.config.difficulty}
-      details={mission ? <>
+      details={mission && playerUiOn ? undefined : mission ? <>
         <Text style={s.entryDetail}>{mission.title}</Text>
         <Text style={s.entryDetail}>예산 {price(mission.budget)}</Text>
         <Text testID="market-time-limit-briefing" style={s.entryDetail}>제한 시간 {formatMarketTime(resolveMarketTimeLimitSeconds(mission.timeLimitSeconds)*1000)} · 시작 후부터 측정해요</Text>
         {session.objectives.map(o=><View key={o.id} style={{flexDirection:'row',gap:8,flexWrap:'wrap',justifyContent:'center'}}><Text style={s.entryDetail}>{o.label}</Text><Text style={s.entryDetail}>{o.quantity}{o.quantityUnit??'개'}</Text></View>)}
         {session.learning.choiceTask ? <Text style={s.entryDetail}>{session.learning.choiceTask.label} · {price(session.learning.choiceTask.budget)} 이내</Text> : null}
       </> : undefined}
+      scenarioChip={mission && playerUiOn ? { label: `${mission.scenarioId ? mission.scenarioId + ' ' : ''}${mission.title}`, onPress: () => setScenarioInfoOpen(true) } : undefined}
       requester={spendingLimit === undefined ? undefined : requesterName+'의 부탁 · 예산 '+price(spendingLimit)}
       instructions={mission ? briefingText : marketTrainingInstruction(session.config.training)}
-      startLabel={aiAssessment && briefingStep < lastBriefingStep ? '다음' : '도전 시작'}
-      onDifficultyChange={selectDifficulty} onStart={aiAssessment ? advanceBriefing : start}
+      startLabel={aiAssessment && !playerUiOn && briefingStep < lastBriefingStep ? '다음' : '도전 시작'}
+      onDifficultyChange={selectDifficulty} onStart={aiAssessment ? (playerUiOn ? startNow : advanceBriefing) : start}
       onHistory={() => setHistoryOpen(true)} onSettings={spendingLimit === undefined ? () => setSettings(true) : undefined} onExit={() => { void leave(); }}
     /> : null}
+    {scenarioInfoOpen && mission && briefing ? modal(mission.title, <>
+      <View style={s.requirements}>
+        <Text style={s.body}>예산 {price(mission.budget)}</Text>
+        <Text testID="market-time-limit-briefing" style={s.small}>제한 시간 {formatMarketTime(resolveMarketTimeLimitSeconds(mission.timeLimitSeconds)*1000)} · 시작 후부터 측정해요</Text>
+      </View>
+      <View style={s.requirements}>
+        <Text style={s.body}>사야 할 물건</Text>
+        {session.objectives.map(o => <View key={o.id} style={s.row}><Text style={s.body}>{o.label}</Text><Text style={s.quantity}>{o.quantity}{o.quantityUnit ?? '개'}</Text></View>)}
+        {session.learning.choiceTask ? <Text style={s.small}>{session.learning.choiceTask.label} · {price(session.learning.choiceTask.budget)} 이내</Text> : null}
+      </View>
+      {(briefingPages ?? [mission.description ?? '목록을 보고 필요한 물건을 골라 보세요. 물건의 이름과 종류를 천천히 살펴봐요.', '다 골랐다면 계산대로 가서 계산해요. 언제든 그만둘 수 있어요.'])
+        .filter(Boolean).map((page, index) => <Text key={index} style={s.body}>{page}</Text>)}
+      <Button text="닫기" onPress={() => setScenarioInfoOpen(false)} />
+    </>, mission.scenarioId ? `시나리오 ${mission.scenarioId}` : '시나리오', () => setScenarioInfoOpen(false)) : null}
     {mapOpen ? modal('매장 안 지도', <><MarketMiniMap environment={session.environment} player={position.current}/><Button text="지도 닫기" onPress={()=>{dispatch({type:'closeView'});setMapOpen(false)}}/></>, undefined, ()=>{dispatch({type:'closeView'});setMapOpen(false)}) : null}
     {settings
       ? <MarketSetupPanel
@@ -1216,7 +1311,9 @@ export function MarketSimulationScreen({
         {quit}
       </>, session.attempts + '번째 시도 결과')
       : null}
-    {isFinished && !expiredTiming
+    {isFinished && !expiredTiming && aiAssessment && session.outcome === 'gave-up' && !agentControl && !replayUiRef
+      ? <MarketPurchaseResult kind="gave-up" cart={session.cart} budget={mission?.budget}>{ratingControls}</MarketPurchaseResult>
+      : isFinished && !expiredTiming
       ? modal(aiAssessment ? '장보기를 마쳤어요' : session.outcome === 'success' ? '장보기에 성공했어요!' : '장보기를 마쳤어요', <>
         <View style={s.resultBadge}>
           <Ionicons
@@ -1236,52 +1333,7 @@ export function MarketSimulationScreen({
           </>}
         </View>
         <MarketRouteReview environment={session.environment} trajectory={route}/>
-        {!ratingDone
-          ? <>
-            <Text style={s.body}>오늘 장보기는 어땠나요? 평가를 건너뛰어도 괜찮아요.</Text>
-            <Stars
-              title="난이도"
-              hint="1 쉬웠어요 · 5 어려웠어요"
-              value={difficultyRating}
-              onChange={setDifficultyRating}
-            />
-            <Stars
-              title="흥미"
-              hint="1 재미없었어요 · 5 재미있었어요"
-              value={interestRating}
-              onChange={setInterestRating}
-            />
-            <Button
-              text="별점 남기기"
-              disabled={!difficultyRating || !interestRating}
-              onPress={() => finishRating(true)}
-            />
-            <Button
-              text="평가 건너뛰기"
-              quiet
-              onPress={() => finishRating(false)}
-            />
-          </>
-          : <>
-            <Text style={s.body}>
-              {session.ratings
-                ? '난이도 ' + session.ratings.difficulty + '점 · 흥미 ' + session.ratings.interest + '점'
-                : '평가를 건너뛰었어요.'}
-            </Text>
-            <Button
-              text="게임 기록 저장"
-              quiet
-              onPress={() => {
-                void exportData().catch(() => setExportMessage('저장하지 못했어요. 다시 눌러 주세요.'));
-              }}
-            />
-            {exportMessage
-              ? <Text accessibilityLiveRegion="polite" style={s.small}>
-                {exportMessage}
-              </Text>
-              : null}
-            <Button text="마트 나가기" onPress={leave} />
-          </>}
+        {ratingControls}
       </>, '최종 결과')
       : null}
     </MarketPanelTransition>

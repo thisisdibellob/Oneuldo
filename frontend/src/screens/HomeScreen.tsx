@@ -10,9 +10,11 @@ import {
 
 import { icons, images } from '../assets';
 import { QuestSummary } from '../api/quest';
+import { Ionicons } from '@expo/vector-icons';
 import { PressScale } from '../components/PressScale';
 import { StickyBrandHeader } from '../components/ui';
 import { colors, fonts } from '../theme';
+import { useUserProgress } from '../progress/userProgress';
 
 const todoItems = ['떡볶이 먹기', '레몬즙 구매', '청년미래적금 넣기', '신나게 춤추기', '4시에 친구 만나기', '삼겹살 구매하기'];
 const questItems = ['혼자 버스 타기', '마트에서 장보기', '카페에서 주문하기', '도움 요청 연습', '용돈 계획 세우기', '오늘의 대화 연습'];
@@ -38,6 +40,7 @@ type HomeScreenProps = {
 };
 
 export function HomeScreen({ practices, loading, error, onQuest }: HomeScreenProps) {
+  const progress = useUserProgress();
   const [listType, setListType] = useState<'todo' | 'quest'>('todo');
   const [todoChecked, setTodoChecked] = useState<boolean[]>(Array(6).fill(false));
   const [questChecked, setQuestChecked] = useState<boolean[]>(Array(6).fill(false));
@@ -53,8 +56,17 @@ export function HomeScreen({ practices, loading, error, onQuest }: HomeScreenPro
   return (
     <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} stickyHeaderIndices={[0]}>
       <StickyBrandHeader horizontalPadding={20} />
-      <Text style={styles.streak}>연속 학습 117일!</Text>
-      <Text style={styles.greeting}>진욱님,{'\n'}오늘도 함께 해 볼까요?</Text>
+      <Text style={styles.streak}>
+        Lv.{progress.level} · {progress.streak > 0 ? `연속 학습 ${progress.streak}일!` : '오늘 활동하면 연속 학습이 시작돼요'}
+      </Text>
+      <View style={styles.greetingRow}>
+        <Text style={styles.greeting}>진욱님,{'\n'}오늘도 함께 해 볼까요?</Text>
+        {/* 퀘스트 탭과 같은 연속 학습 불꽃 표시 */}
+        <View accessibilityLabel={`연속 학습 ${progress.streak}일`} style={styles.streakBadge} testID="home-streak">
+          <Ionicons color={progress.streak > 0 ? '#FF6C64' : '#CCCCCC'} name="flame" size={20} />
+          <Text style={styles.streakBadgeText}>{progress.streak}</Text>
+        </View>
+      </View>
 
       <View style={styles.listArea}>
         <View style={styles.listCard}>
@@ -85,7 +97,14 @@ export function HomeScreen({ practices, loading, error, onQuest }: HomeScreenPro
 
       <Text style={styles.sectionTitle}>오늘의 연습</Text>
       {loading ? <Text style={styles.practiceStatus}>연습을 불러오는 중이에요.</Text> : null}
-      {!loading && error ? <Text style={styles.practiceError}>{error}</Text> : null}
+      {!loading && error ? (
+        <ScrollView contentContainerStyle={styles.horizontalContent} horizontal showsHorizontalScrollIndicator={false} style={styles.edgeScroll}>
+          <View accessible accessibilityLabel="연습을 불러올 수 없어요" style={styles.unavailableCard} testID="practice-unavailable">
+            <Ionicons color="#8A8A8A" name="alert-circle-outline" size={30} />
+            <Text style={styles.unavailableText}>불러올 수 없어요.</Text>
+          </View>
+        </ScrollView>
+      ) : null}
       {!loading && !error ? (
         <ScrollView contentContainerStyle={styles.horizontalContent} horizontal showsHorizontalScrollIndicator={false} style={styles.edgeScroll}>
           {practices.map((quest) => <PracticeCard key={quest.id} onPress={onQuest} quest={quest} />)}
@@ -129,7 +148,11 @@ function PracticeCard({
 const styles = StyleSheet.create({
   content: { alignSelf: 'center', maxWidth: 720, paddingHorizontal: 20, width: '100%' },
   streak: { color: colors.mint, fontFamily: fonts.semibold, fontSize: 12, marginTop: 12 },
-  greeting: { color: colors.ink, fontFamily: fonts.laundryBold, fontSize: 24, letterSpacing: -0.8, lineHeight: 32, marginTop: 4 },
+  greetingRow: { alignItems: 'flex-start', flexDirection: 'row', justifyContent: 'space-between' },
+  greeting: { color: colors.ink, flex: 1, fontFamily: fonts.laundryBold, fontSize: 24, letterSpacing: -0.8, lineHeight: 32, marginTop: 4 },
+  // 퀘스트 탭 연속 학습 표시(QuestScreen streak/streakText)와 같은 모양
+  streakBadge: { alignItems: 'center', flexDirection: 'row', gap: 3, marginLeft: 12, marginTop: 6 },
+  streakBadgeText: { color: colors.ink, fontFamily: fonts.laundry, fontSize: 20 },
   listArea: { marginTop: 27, paddingTop: 20, position: 'relative' },
   listCard: { backgroundColor: colors.white, borderColor: '#EEEEEE', borderRadius: 20, borderWidth: 1.5, minHeight: 166, paddingBottom: 13, paddingHorizontal: 20, paddingTop: 47, shadowColor: '#000', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.05, shadowRadius: 12, elevation: 2 },
   segment: { alignSelf: 'center', backgroundColor: colors.white, borderColor: '#EEEEEE', borderRadius: 100, borderWidth: 2, flexDirection: 'row', height: 48, overflow: 'hidden', padding: 4, position: 'absolute', top: 0, width: 245, zIndex: 3 },
@@ -153,6 +176,8 @@ const styles = StyleSheet.create({
   practiceXp: { color: '#555555', fontFamily: fonts.handwriting, fontSize: 13, lineHeight: 16, marginTop: 3 },
   practiceStatus: { color: '#777777', fontFamily: fonts.regular, fontSize: 14, paddingVertical: 24 },
   practiceError: { color: '#D24A4A', fontFamily: fonts.medium, fontSize: 14, paddingVertical: 24 },
+  unavailableCard: { alignItems: 'center', backgroundColor: '#F2F2F2', borderRadius: 20, gap: 8, height: 180, justifyContent: 'center', paddingTop: 16, width: 140 },
+  unavailableText: { color: '#8A8A8A', fontFamily: fonts.semibold, fontSize: 14 },
   newsCard: { height: 224, width: 140 },
   newsImage: { borderRadius: 20, height: 144, width: 140 },
   newsTitle: { color: '#222222', fontFamily: fonts.bold, fontSize: 16, letterSpacing: -0.4, lineHeight: 20, marginLeft: 4, marginTop: 10 },
