@@ -212,9 +212,14 @@ export function createWholeTraceSourceAuthoringCursor(bundle: WholeTraceBundle) 
       const dialogue = catalog.staffDialogue;
       if (dialogue && staffLocationHelp) return describe('staff', [...common, ...catalog.common.staff, dialogue.backToStaffChoiceId,
         ...dialogue.askLocationChoiceIds], `${stationLabel} 직원 대화: 물건 위치 묻기`);
+      // The app's staff dialogue has one cashier button that recruits the first staffed-kind
+      // counter, and only when every staffed-kind counter is empty. Offer exactly that one
+      // request (the transition append supports) instead of one per empty counter.
+      const staffedCounters = checkouts.filter(checkout => checkout.kind !== 'kiosk');
+      const allEmpty = staffedCounters.every(checkout => !state.cashierAvailability[checkout.id as keyof typeof state.cashierAvailability]);
       return describe('staff', [...common, ...catalog.common.staff, ...(dialogue ? [dialogue.openLocationHelpChoiceId] : []), ...staff.choiceIds.filter(id => {
         const entry = entries.get(id);
-        return entry?.action.type === 'requestCashier' && state.cashierAvailability[entry.action.checkoutId as keyof typeof state.cashierAvailability] === false;
+        return entry?.action.type === 'requestCashier' && allEmpty && entry.action.checkoutId === staffedCounters[0]?.id;
       })], `${stationLabel} 직원 대화 열림`);
     }
     const states = catalog.navigation.filter(state => state.navigationStateId === current.navigationStateId);

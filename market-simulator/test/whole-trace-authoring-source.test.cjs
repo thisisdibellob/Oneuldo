@@ -224,12 +224,16 @@ test('first cashier request changes the exact navigation state; ambiguous legacy
   const { bundle, staff } = sourceGraphFixture({ cashierCount: 0 }), cursor = createWholeTraceSourceAuthoringCursor(bundle);
   cursor.append(draft(`open/${staff}`));
   const initial = cursor.snapshot();
-  assert.throws(() => cursor.append(draft('requestCashier/checkout-2')), errorCode('AUTHORING_UNSUPPORTED_TRANSITION', /differing app\/compiler/));
+  // Like the app's single cashier button, the menu offers only the first staffed-kind counter.
+  const offered = cursor.menu().choiceIds.filter(id => id.startsWith('requestCashier/'));
+  assert.deepEqual(offered, ['requestCashier/checkout']);
+  assert.throws(() => cursor.append(draft('requestCashier/checkout-2')), errorCode('AUTHORING_CHOICE_NOT_AVAILABLE'));
   assert.deepEqual(cursor.snapshot(), initial);
   const request = cursor.append(draft('requestCashier/checkout'));
   assert.equal(request.choiceRef.source.navigationStateId, 'cashiers-00');
   assert.equal(cursor.snapshot().expectedSource.navigationStateId, 'cashiers-10');
-  assert.throws(() => cursor.append(draft('requestCashier/checkout-2')), errorCode('AUTHORING_UNSUPPORTED_TRANSITION'));
+  assert.equal(cursor.menu().choiceIds.some(id => id.startsWith('requestCashier/')), false);
+  assert.throws(() => cursor.append(draft('requestCashier/checkout-2')), errorCode('AUTHORING_CHOICE_NOT_AVAILABLE'));
   assert.throws(() => cursor.append(draft('requestCashier/checkout')), errorCode('AUTHORING_CHOICE_NOT_AVAILABLE'));
   cursor.append(draft('control/closeStation'));
   assert.equal(cursor.snapshot().expectedSource.navigationStateId, 'cashiers-10');
