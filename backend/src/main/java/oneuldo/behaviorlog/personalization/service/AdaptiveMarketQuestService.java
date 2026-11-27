@@ -15,7 +15,7 @@ import tools.jackson.databind.node.ObjectNode;
 @Service
 @RequiredArgsConstructor
 public class AdaptiveMarketQuestService {
-    public static final String VERSION="market-ai-quest-v93-without-played-action-facts";
+    public static final String VERSION="market-ai-quest-v94-program-practice-settings";
     static final String DELIVERY_CONSISTENCY=" Numeric coordinates and English category IDs are not learner-facing guidance. Use Korean shelf labels and relative location. Employees answer location questions in text; no physical escort or automatic navigation exists. Past behavior/movementObservation contain past facts only; expected effects and condition changes belong to evaluationFocus/changeReasons.  After a completed play with no SHELF_OPENED, GUIDED_PRACTICE must not increase the selected target categories referenceRoutePx versus the latest actual layout. Choose concrete navigation help and a suitable existing slot; do not equate first array position with easier access. This reference is not measured player travel. Apply requiredAiDesign.path/value exactly: it was chosen by this same application AI for this task. Explain it without claiming an observed effect. Guided practice briefing must give the concrete goal, the next executable action/location help, and how to check the result; do not hide the steps only in changeReasons or evaluationFocus. Help view also displays this briefing. Use actualLayoutReference for shelf positions; array index is not route order.  Match every product size in briefing/description to the chosen catalog SKU, including equivalent mL/L units. Actual configured budget must match explanations saying it is retained. Budget headroom alone is not new practice; change the observed task/support condition meaningfully. Help openings do not demonstrate dependence or dependence reduction, and cart openings do not prove added-then-removed products. No target arrows, automatic shortage alerts or automatic help opening are implemented. Existing staff help and text guidance remain available.";
     private final MarketDifficultyRecommendationService recommendations;
     private final AiUserProfileService profiles;
@@ -68,7 +68,8 @@ public class AdaptiveMarketQuestService {
         }
         source.set("outputSchema",outputSchema);
         source.put("requiredDifficulty",rec.recommendedDifficulty());source.put("requiredItemCount",rec.adjustments().itemCount());
-        String key=oneuldo.ai.service.AiRequestFingerprint.of(mapper,member,modelIdentity,VERSION,source,2600,0.2,GENERATION_SYSTEM,DELIVERY_CONSISTENCY,OBSERVATION_SYSTEM,reviewSystem(),REPAIR_SYSTEM,"adaptive-depth-observation-v6-existing-synthesis",SharedSourceObservations.VERSION);
+        String key=oneuldo.ai.service.AiRequestFingerprint.of(mapper,member,modelIdentity,VERSION,source,2600,0.2,GENERATION_SYSTEM,DELIVERY_CONSISTENCY,OBSERVATION_SYSTEM,reviewSystem(),REPAIR_SYSTEM,"adaptive-depth-observation-v6-existing-synthesis",SharedSourceObservations.VERSION,
+            AdaptiveQuestPracticeSettings.SYSTEM,AdaptiveQuestPracticeSettings.GENERATION_RULE,AdaptiveQuestPracticeSettings.REVIEW_RULE);
         var cached=audit.findReusable(member,key);
         if(cached.isPresent() && VERSION.equals(cached.get().promptVersion()) && cached.get().quest()!=null && cached.get().quest().runtimePlan()!=null)return cached.get();
         var wire=source.deepCopy();
@@ -149,13 +150,35 @@ public class AdaptiveMarketQuestService {
                 }
                 wire.set("requiredAiDesign",design);
             }
+            // The AI names the latest play's difficulties with fixed codes; the program sets checkout/entrance practice from them.
+            progress.accept("NAMING_DIFFICULTIES");
+            AdaptiveQuestPracticeSettings practice=null;
+            {
+                String codePrompt=mapper.writeValueAsString(AdaptiveQuestPracticeSettings.input(mapper,evidence,readableActions(evidence),observed));
+                var allowedIds=new HashSet<String>();for(var event:evidence.path("sourceEventDetails"))allowedIds.add(event.path("id").asString());
+                for(int attempt=0;attempt<AdaptiveQuestPracticeSettings.MAX_ATTEMPTS;attempt++) {
+                    var response=call(AdaptiveQuestPracticeSettings.SYSTEM,codePrompt,AdaptiveQuestPracticeSettings.OUTPUT_TOKENS,0.2);
+                    JsonNode answer=null;List<Map<String,Object>> found;
+                    try{answer=mapper.readTree(response.text());found=AdaptiveQuestPracticeSettings.violations(answer,allowedIds);}
+                    catch(RuntimeException unreadable){found=List.of(Map.of("path","/","code","JSON_OBJECT_REQUIRED"));}
+                    if(found.isEmpty()) {
+                        practice=AdaptiveQuestPracticeSettings.decide(answer,AdaptiveQuestProgression.latestMission(evidence),locked);
+                        attempts.add(new MarketAiQuestGeneration.Attempt(attempts.size()+1,response.text(),null,Map.of("stage","DIFFICULTY_CODES","submittedPrompt",codePrompt,"systemPrompt",AdaptiveQuestPracticeSettings.SYSTEM,"programPracticeSettings",practice.describe(mapper))));
+                        break;
+                    }
+                    attempts.add(new MarketAiQuestGeneration.Attempt(attempts.size()+1,response.text(),"INVALID_DIFFICULTY_CODES",Map.of("stage","DIFFICULTY_CODES","submittedPrompt",codePrompt,"systemPrompt",AdaptiveQuestPracticeSettings.SYSTEM,"violations",found)));
+                    if(attempt==AdaptiveQuestPracticeSettings.MAX_ATTEMPTS-1)throw AdaptiveQuestContract.problem("/runtimePlan/environment","INVALID_DIFFICULTY_CODES");
+                    codePrompt+=AdaptiveQuestPracticeSettings.retryFeedback(found,response.text());
+                }
+                wire.set("programPracticeSettings",practice.describe(mapper));
+            }
             packed=mapper.writeValueAsString(AdaptiveQuestTransport.encodeGeneration(mapper,wire));
             int deliveryRepairs=0;var budget=new AdaptiveQuestBudget();
             // One generation and at most two targeted repairs; never restart raw observations.
             for(int round=1;round<=3;round++) {
                 progress.accept(round==1?"GENERATING":"REPAIRING");
                 String system=(round==1?GENERATION_SYSTEM:REPAIR_SYSTEM)+DELIVERY_CONSISTENCY+" Required objective count is exactly "+rec.adjustments().itemCount()+" and difficulty exactly "+rec.recommendedDifficulty()+". Example/schema values are not default decisions. Make explicit choices from source and constraints.";
-                system+=AdaptiveQuestBudget.RULE;
+                system+=AdaptiveQuestBudget.RULE+AdaptiveQuestPracticeSettings.GENERATION_RULE;
                 if(!locked.isEmpty())system+=" REQUIRED USER SETTINGS (exact JSON pointer values): "+locked+". These override previous practice choices. Explain their actual application without claiming they were previously observed.";
                 if(round>1)system+=" Return a patches array with EXACTLY these paths: "+mapper.writeValueAsString(repairPaths(candidate,issues))+". No other path is accepted.";
                 String prompt=round==1?packed:repairPrompt(packed,candidate,issues);
@@ -177,6 +200,11 @@ public class AdaptiveMarketQuestService {
                     if(AdaptiveQuestDesign.apply(design,candidate))
                         attempts.add(new MarketAiQuestGeneration.Attempt(attempts.size()+1,null,null,Map.of("stage","DESIGN_VALUE_APPLIED","path",design.path("path").asString(),"compiledBy","exact-AI-choice-only")));
                     AdaptiveQuestDesign.requireApplied(design,candidate);
+                    if(practice.apply(candidate))
+                        attempts.add(new MarketAiQuestGeneration.Attempt(attempts.size()+1,null,null,Map.of("stage","PRACTICE_SETTINGS_APPLIED","settings",practice.describe(mapper),"compiledBy","program-rule-from-ai-difficulty-codes")));
+                    practice.requireApplied(candidate);
+                    var wording=AdaptiveQuestCountWording.normalize(candidate);
+                    if(!wording.isEmpty())attempts.add(new MarketAiQuestGeneration.Attempt(attempts.size()+1,null,null,Map.of("stage","COUNT_WORDING_NORMALIZED","changes",wording,"compiledBy","count-sized-product-wording-only")));
                     draft=contract.validate(candidate,rec.recommendedDifficulty(),rec.adjustments().itemCount(),context,evidence);
                     AdaptiveQuestDesign.verifyAccessClaim(mapper,evidence,candidate);
                     var deliveryIssues=AdaptiveQuestDeliveryText.issues(mapper,evidence,candidate);
@@ -191,6 +219,8 @@ public class AdaptiveMarketQuestService {
                         candidate=applyRepair(candidate,AdaptiveQuestDeliveryText.asPatch(mapper,AdaptiveQuestDeliveryText.parseResponse(mapper,textResult.text())),textPaths);
                         AdaptiveQuestDeliveryText.keepNonTextChoices(beforeText,candidate);
                         dropUnknownCitations(candidate,AdaptiveQuestEvidence.ids(evidence,false));
+                        var repairedWording=AdaptiveQuestCountWording.normalize(candidate);
+                        if(!repairedWording.isEmpty())attempts.add(new MarketAiQuestGeneration.Attempt(attempts.size()+1,null,null,Map.of("stage","COUNT_WORDING_NORMALIZED","changes",repairedWording,"compiledBy","count-sized-product-wording-only")));
                         draft=contract.validate(candidate,rec.recommendedDifficulty(),rec.adjustments().itemCount(),context,evidence);
                     }
                     AdaptiveQuestDeliveryText.requireValid(mapper,evidence,candidate);
@@ -240,14 +270,16 @@ public class AdaptiveMarketQuestService {
                 }
                 attempts.add(new MarketAiQuestGeneration.Attempt(attempts.size()+1,raw,null,Map.of("stage",round==1?"GENERATION":"PATCH_REPAIR","submittedPrompt",prompt,"systemPrompt",system)));
                 progress.accept("REVIEWING");
-                String reviewPrompt=reviewPrompt(source,evidence,candidate,draft,packed);
-                String reviewSystem=reviewSystem();
+                // The program line goes on only now, after the model's own text passed every check (outside the model's line limit).
+                var delivered=practice.withLine(candidate);var deliveredDraft=practice.withLine(draft);
+                String reviewPrompt=reviewPrompt(source,evidence,delivered,deliveredDraft,packed);
+                String reviewSystem=reviewSystem()+AdaptiveQuestPracticeSettings.REVIEW_RULE;
                 int reviewOutput=REVIEW_OUTPUT_TOKENS;
                 int reviewRequired=QwenTokenCounter.inputTokens(reviewSystem,reviewPrompt)+reviewOutput+32;
                 if(reviewRequired>tokenBudget)throw new oneuldo.ai.exception.AiInputLimitException("ADAPTIVE_SOURCE_EXCEEDS_LIMIT",reviewRequired,tokenBudget);
                 var review=client.supportsSourceSchemas()?client.completeStructured(reviewSystem,reviewPrompt,reviewOutput,0.0,SourceOutputSchemas.questReview(AdaptiveQuestEvidence.ids(evidence,false))):call(reviewSystem,reviewPrompt,reviewOutput,0.0);
                 try {
-                    issues=validateReview(mapper.readTree(review.text()),candidate,evidence);
+                    issues=withinCandidate(validateReview(mapper.readTree(review.text()),delivered,evidence),candidate);
                     var progressionIssues=AdaptiveQuestProgression.reviewIssues(mapper,evidence,candidate,mapper.readTree(review.text()));
                     if(!progressionIssues.isEmpty()) {
                         var combined=new ArrayList<>(issues);combined.addAll(progressionIssues);issues=combined;
@@ -259,8 +291,8 @@ public class AdaptiveMarketQuestService {
                 }
                 attempts.add(new MarketAiQuestGeneration.Attempt(attempts.size()+1,review.text(),issues.isEmpty()?null:"ADAPTIVE_REVIEW_REPAIR",Map.of("issues",issues,"submittedPrompt",reviewPrompt,"systemPrompt",reviewSystem)));
                 if(issues.isEmpty()) {
-                    var result=MarketAiQuestResponse.from(id,profile.sourceAnalysisId(),profile.profileId(),"AI",model,elapsed(started),rec.personalizationMode(),VERSION,draft);
-                    audit.record(member,profile.sourceDatasetId(),result,draft,attempts,null,key);return result;
+                    var result=MarketAiQuestResponse.from(id,profile.sourceAnalysisId(),profile.profileId(),"AI",model,elapsed(started),rec.personalizationMode(),VERSION,deliveredDraft);
+                    audit.record(member,profile.sourceDatasetId(),result,deliveredDraft,attempts,null,key);return result;
                 }
                 draft=null;
             }
@@ -303,6 +335,19 @@ public class AdaptiveMarketQuestService {
         return response;
     }
     static boolean requiresObservationSynthesis(JsonNode observed) { return observed.path("parts").size()>2; }
+    /**
+     * The review saw the briefing with the program line; the repair edits the model's candidate without it.
+     * An issue on a briefing line the candidate does not hold (the program line) is pointed at /briefing.
+     */
+    static List<Map<String,Object>> withinCandidate(List<Map<String,Object>> issues,JsonNode candidate) {
+        var result=new ArrayList<Map<String,Object>>();
+        for(var issue:issues) {
+            String path=String.valueOf(issue.get("path"));
+            if(path.startsWith("/briefing/")&&candidate.at(path).isMissingNode()){var moved=new LinkedHashMap<>(issue);moved.put("path","/briefing");result.add(moved);}
+            else result.add(issue);
+        }
+        return result;
+    }
     /**
      * An id that names no supplied event cannot support a statement. It is removed only while the same list keeps
      * at least one real event; a list left with none stays as written and is rejected by the contract as before.
