@@ -18,6 +18,27 @@ export const WHOLE_TRACE_CANDIDATE_VERSION = '7' as const;
 
 export const WHOLE_TRACE_POLICY_VERSION = 'whole-trace-v3' as const;
 export const WHOLE_TRACE_MODEL = 'gpt-6-luna' as const;
+/**
+ * Actor identities a whole-trace request may name. Luna (low) is the default and the only identity the persistent
+ * learner and trial paths accept. A Claude actor is its own experiment: its bundle, input hash and trace carry the
+ * Claude model, never the Luna label. Claude's reasoning effort is whatever its harness sets, recorded as `default`.
+ */
+export const WHOLE_TRACE_ACTOR_IDENTITIES = {
+  'gpt-6-luna': { reasoningEffort: 'low' },
+  'claude-sonnet-5-5': { reasoningEffort: 'default' },
+} as const;
+export type WholeTraceActorModel = keyof typeof WHOLE_TRACE_ACTOR_IDENTITIES;
+export type WholeTraceReasoningEffort = typeof WHOLE_TRACE_ACTOR_IDENTITIES[WholeTraceActorModel]['reasoningEffort'];
+export function wholeTraceActorIdentity(actorModel?: unknown): { model: WholeTraceActorModel; reasoningEffort: WholeTraceReasoningEffort } {
+  const model = actorModel === undefined ? WHOLE_TRACE_MODEL : actorModel;
+  if (typeof model !== 'string' || !Object.hasOwn(WHOLE_TRACE_ACTOR_IDENTITIES, model))
+    throw new Error(`actorModel must be one of ${Object.keys(WHOLE_TRACE_ACTOR_IDENTITIES).join(', ')}`);
+  return { model: model as WholeTraceActorModel, reasoningEffort: WHOLE_TRACE_ACTOR_IDENTITIES[model as WholeTraceActorModel].reasoningEffort };
+}
+export function isWholeTraceActorIdentity(model: unknown, reasoningEffort: unknown): boolean {
+  return typeof model === 'string' && Object.hasOwn(WHOLE_TRACE_ACTOR_IDENTITIES, model)
+    && WHOLE_TRACE_ACTOR_IDENTITIES[model as WholeTraceActorModel].reasoningEffort === reasoningEffort;
+}
 export const WHOLE_TRACE_ACTION_LIMIT = 100;
 /** Explicit accepted-decision observation horizons. 100 is the default; 200 is an opt-in experiment setting. */
 export const WHOLE_TRACE_ACTION_HORIZONS = [100, 200] as const;
@@ -81,7 +102,7 @@ export type WholeTraceBundle = {
   /** wayfinding-v1: boundaries, actor spatial memory, own notes and give-up eligibility. */
   wayfindingVersion?: WholeTraceWayfindingVersion;
   bundleVersion: typeof WHOLE_TRACE_BUNDLE_VERSION; requestId: string; inputHash: string; policyVersion: typeof WHOLE_TRACE_POLICY_VERSION;
-  model: typeof WHOLE_TRACE_MODEL; reasoningEffort: 'low'; observationScope: 'whole-world'; actorKnowledgeScope: 'observed-and-remembered';
+  model: WholeTraceActorModel; reasoningEffort: WholeTraceReasoningEffort; observationScope: 'whole-world'; actorKnowledgeScope: 'observed-and-remembered';
   snapshotId: string; seed: string | number; persona: Pick<Persona, 'id' | 'version' | 'name' | 'description' | 'character'> & { behavior: WholeTracePersonaInput;
     wayfinding?: { profile: WayfindingProfile; instructions: string } };
   /** Optional in saved bundle 8 files predating the additive authoring guidance. */
@@ -106,7 +127,9 @@ export type WholeTraceSettings = Pick<TraceOptions, 'personaId' | 'seed' | 'snap
   choiceOrderVersion?: WholeTraceChoiceOrderVersion; authoringExampleVersion?: WholeTraceAuthoringExampleVersion;
   wayfindingVersion?: WholeTraceWayfindingVersion;
   /** Opt-in accepted-decision observation horizon. Absent means the default 100. */
-  actionHorizon?: WholeTraceActionHorizon };
+  actionHorizon?: WholeTraceActionHorizon;
+  /** Opt-in actor identity. Absent means Luna and leaves archived input hashes unchanged. */
+  actorModel?: WholeTraceActorModel };
 /** give-up-last-v1 lists control/giveUp after every other currently available choice. Availability is unchanged. */
 export const WHOLE_TRACE_CHOICE_ORDER_VERSIONS = ['give-up-last-v1'] as const;
 export type WholeTraceChoiceOrderVersion = typeof WHOLE_TRACE_CHOICE_ORDER_VERSIONS[number];

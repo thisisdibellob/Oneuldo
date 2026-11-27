@@ -22,7 +22,7 @@ import { validWholeTraceMovementFeedback, wholeTraceHasAnchorMovementFeedback, W
 
 const WHOLE_TRACE_FOCUS_INSTRUCTIONS = `매 단계 focusedGoalId와 focusedProductId를 별도로 기록한다. focusedGoalId는 지금 처리하는 실제 읽은 목표 한 개이고 heldGoalIds에 포함되어야 한다. focusedProductId는 이번 방문에서 실제 선반이나 장바구니에 표시된 상품 중 지금 살피거나 고르는 한 개다. 집중 대상이 없으면 null을 쓰며 heldGoalIds의 첫 항목을 집중 목표로 복사하지 않는다. 목록을 읽기 전에는 집중 목표가 null이고 상품을 보기 전에는 집중 상품도 null이다. 관심 상품을 살필 때 focusedGoalId는 null일 수 있지만 아직 끝내지 않은 구매 목표는 taskMemory.openGoalIds와 heldGoalIds에 계속 남는다. 상품을 실제로 살피기 시작하면 실제 표시된 focusedProductId와 그 관심에 따른 행동을 연결한다. 담거나 돌려놓는 상품과 현재 집중 상품이 다르면 그 불일치를 그대로 기록하며 정답 상품으로 바꾸지 않는다.
 한 상품을 처리한 뒤 다음 항목으로 넘어갈 때는 선택한 개인의 실제 확인 습관을 이어간다. 선택한 프로필이 다음 항목에서 목록을 다시 확인하는 습관을 가진 경우(지민)는 이유에 목록 cue를 쓰는 것으로 대신하지 않고 실제 readList 행동으로 표현한다. 다른 개인에게 지민의 습관을 추가하지 않는다. 집중 목표를 바꾼 뒤 목록을 읽고 다음 상품을 담는 순서도 가능하다. 새 표지·처음 여는 선반·여러 목표와 수량 조건·실제로 눈에 들어온 관심 상품에 따라 현재 집중, 불확실성, 확인이나 스스로 회상하는 선택을 연결한다. 변화의 계기를 알려진 triggerCueRefs와 짧은 행동 설명으로 남긴다. 간편식품 표지를 본 것과 카레 종류를 실제로 본 것은 다르다. 낯섦이나 관심을 이유에만 쓰고 상태와 행동을 매번 동일하게 복사하지 않는다. 상황이 단순하거나 익숙하면 안정적으로 수행할 수 있으며 관심 전환·망각·망설임 횟수를 채우지 않는다.`;
-import { WHOLE_TRACE_BUNDLE_VERSION, WHOLE_TRACE_MODEL, WHOLE_TRACE_POLICY_VERSION, WHOLE_TRACE_CHOICE_ORDER_VERSIONS, WHOLE_TRACE_AUTHORING_EXAMPLE_VERSIONS, wholeTraceActionHorizon, type WholeTraceBundle, type WholeTraceNavigation, type WholeTraceSettings } from './wholeTraceContracts';
+import { WHOLE_TRACE_BUNDLE_VERSION, WHOLE_TRACE_POLICY_VERSION, wholeTraceActorIdentity, WHOLE_TRACE_CHOICE_ORDER_VERSIONS, WHOLE_TRACE_AUTHORING_EXAMPLE_VERSIONS, wholeTraceActionHorizon, type WholeTraceBundle, type WholeTraceNavigation, type WholeTraceSettings } from './wholeTraceContracts';
 import { WHOLE_TRACE_WAYFINDING_V2_VERSION, WHOLE_TRACE_WAYFINDING_V3_VERSION, WHOLE_TRACE_WAYFINDING_V4_VERSION, WAYFINDING_COMMON_INSTRUCTIONS, WAYFINDING_COMMON_INSTRUCTIONS_V2,
   WAYFINDING_COMMON_INSTRUCTIONS_V3, WAYFINDING_COMMON_INSTRUCTIONS_V4, renderWayfindingInstructionsV4, isWholeTraceWayfindingVersion, renderWayfindingInstructions, renderWayfindingInstructionsV2,
   renderWayfindingInstructionsV3, wayfindingProfileOf } from './wholeTraceWayfinding';
@@ -86,7 +86,8 @@ export function buildWholeTraceBundle(settings: WholeTraceSettings, requestId: s
     throw new Error('movementFeedbackVersion requires recent-movement-v1 with directional-v2, or recent-movement-anchor-v1/recent-movement-anchor-capacity-v1 with omitted movementVersion and anchor-visible-structures-v1');
   if (settings.wayfindingVersion !== undefined && (!isWholeTraceWayfindingVersion(settings.wayfindingVersion) || !observationVersion))
     throw new Error('wayfindingVersion wayfinding-v1/v2 requires a new unbound anchor request with anchor-visible-structures-v1');
-  const guard = new TraceGuard(snapshot, persona.id, persona.version, WHOLE_TRACE_MODEL, true, true,
+  const actor = wholeTraceActorIdentity(settings.actorModel);
+  const guard = new TraceGuard(snapshot, persona.id, persona.version, actor.model, true, true,
     false, false, false, false, true, false, observationVersion, false, settings.wayfindingVersion);
   const raw = guard.observe(), initialObservation = guard.observeActor();
   const presentation = structuredClone(snapshot.presentation ?? DEFAULT_REPLAY_PRESENTATION);
@@ -131,7 +132,7 @@ export function buildWholeTraceBundle(settings: WholeTraceSettings, requestId: s
     choiceCatalog: undefined as unknown as WholeTraceBundle['choiceCatalog'],
     initialChoiceFrame: undefined as unknown as WholeTraceBundle['initialChoiceFrame'],
     bundleVersion: WHOLE_TRACE_BUNDLE_VERSION, requestId, inputHash, policyVersion: WHOLE_TRACE_POLICY_VERSION,
-    model: WHOLE_TRACE_MODEL, reasoningEffort: 'low', observationScope: 'whole-world', actorKnowledgeScope: 'observed-and-remembered', snapshotId: snapshot.snapshotId,
+    model: actor.model, reasoningEffort: actor.reasoningEffort, observationScope: 'whole-world', actorKnowledgeScope: 'observed-and-remembered', snapshotId: snapshot.snapshotId,
     seed: settings.seed, persona: { id: persona.id, version: persona.version, name: persona.name,
       description: persona.description, character: structuredClone(persona.character), behavior: buildWholeTracePersonaInput(persona) },
     authoringGuide: buildWholeTraceAuthoringGuide({ requestId, inputHash, snapshotId: snapshot.snapshotId,

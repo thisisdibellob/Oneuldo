@@ -5,7 +5,7 @@ import { performance } from 'node:perf_hooks';
 import { canonicalMarketReplayJson, marketReplayTraceId } from '../../../frontend/src/game/marketReplayTrace';
 import { buildWholeTraceBundle, wholeTraceInputHash } from './wholeTraceBundle';
 import { compileWholeTraceCandidate, WholeTraceCompileError } from './wholeTraceCompiler';
-import { WHOLE_TRACE_MODEL, WHOLE_TRACE_POLICY_VERSION, validateWholeTraceCandidate,
+import { WHOLE_TRACE_POLICY_VERSION, wholeTraceActorIdentity, validateWholeTraceCandidate,
   wholeTraceTerminalIntent, type WholeTraceBundle, type WholeTraceCandidate, type WholeTraceSettings,
   type WholeTraceValidation, type WholeTraceWireDecision, wholeTraceActionHorizon } from './wholeTraceContracts';
 import { validateTrace } from '../traceValidation';
@@ -69,9 +69,10 @@ export class WholeTraceSession {
     if (input.maxActions !== undefined && (!Number.isInteger(input.maxActions) || input.maxActions < 1 || input.maxActions > horizon)) throw new Error(`Whole mode maxActions must be 1..${horizon}`);
     if (input.timingProfile !== undefined && input.timingProfile !== 'original') throw new Error('Whole-trace-v3 preserves actor judgment timing; timingProfile must be original');
     if (input.timeBudgetMs !== undefined && (!Number.isInteger(input.timeBudgetMs) || input.timeBudgetMs < 1000 || input.timeBudgetMs > 3600000)) throw new Error('timeBudgetMs must be 1000..3600000');
-    if (input.llm?.model !== undefined && input.llm.model !== WHOLE_TRACE_MODEL) throw new Error('Whole trace actor must be the native Luna session');
+    const actor = wholeTraceActorIdentity(input.actorModel);
+    if (input.llm?.model !== undefined && input.llm.model !== actor.model) throw new Error(`Whole trace actor must be the prepared ${actor.model} session`);
     this.settings = structuredClone({ ...input, maxActions: input.maxActions ?? horizon, maxRepairs: input.maxRepairs ?? 0,
-      timingProfile: input.timingProfile ?? 'original', llm: { ...input.llm, model: WHOLE_TRACE_MODEL, maxCalls: input.llm?.maxCalls ?? 100 } });
+      timingProfile: input.timingProfile ?? 'original', llm: { ...input.llm, model: actor.model, maxCalls: input.llm?.maxCalls ?? 100 } });
     this.bundle = buildWholeTraceBundle(this.settings, this.requestId);
     this.inputHash = wholeTraceInputHash(this.settings, this.bundle.observationVersion);
     this.outputPath = resolve(input.outputPath ?? join(__dirname, '../..', 'output', `trace-${this.requestId}.json`));
@@ -87,7 +88,7 @@ export class WholeTraceSession {
   status() {
     return { requestId: this.requestId, status: this.state, attempts: this.attempts,
       canRepair: this.state === 'invalid' && this.attempts < 1 + (this.settings.maxRepairs ?? 0),
-      model: WHOLE_TRACE_MODEL, reasoningEffort: 'low', policyVersion: WHOLE_TRACE_POLICY_VERSION,
+      model: this.bundle.model, reasoningEffort: this.bundle.reasoningEffort, policyVersion: WHOLE_TRACE_POLICY_VERSION,
       inputHash: this.inputHash, diagnosticDirectory: this.diagnosticDirectory,
       ...(this.authoring ? { authoring: this.authoring.metrics() } : {}),
       ...(this.lastResult ? { result: structuredClone(this.lastResult) } : {}) };

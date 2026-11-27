@@ -79,7 +79,7 @@ export type MarketReplayTrace = {
     /** Opt-in whole-trace-v3 observation horizon; absent means 100. */
     wholeTraceActionHorizon?: 200;
     movementPolicy?: MarketReplayMovementPolicy;
-    reasoningEffort?: 'low';
+    reasoningEffort?: 'low' | 'default';
     feedback?: { observationScope: 'current-screen'; contextDelivery: 'stateless-http' | 'external-frame'; decisions: number } & (
       | { version: '1'; memory: 'actor-authored' }
       | { version: '2'; memory: 'actor-authored-with-recent-experience'; experienceContract: 'bounded-observed-experience-v1'; intentContract: 'persistent-intent-v1' }
@@ -209,6 +209,8 @@ function validateSchema(value: unknown, schema: any, path: string, errors: strin
     if (schema.exclusiveMaximum !== undefined && value >= schema.exclusiveMaximum) errors.push(`${path}: outside exclusive upper bound`);
   } else if (type === 'boolean' && typeof value !== 'boolean') errors.push(`${path}: expected boolean`);
 }
+/** Whole-trace actor identities (model, reasoning effort). A Claude actor is recorded as itself, never as Luna. */
+const WHOLE_TRACE_ACTOR_IDENTITIES: ReadonlyArray<readonly [string, string]> = [['gpt-6-luna', 'low'], ['claude-sonnet-5-5', 'default']];
 export function validateMarketReplayTrace(value: unknown, snapshot?: MarketReplaySnapshot): MarketReplayValidation {
   const errors: string[] = [];
   try { validateSchema(value, traceSchema, 'trace', errors); }
@@ -228,8 +230,8 @@ export function validateMarketReplayTrace(value: unknown, snapshot?: MarketRepla
   if (wholeTrace || wholeMetadata) {
     if (!wholeTrace || generation?.planningMode !== 'whole-trace' || generation?.observationScope !== 'whole-world'
       || trace.generationPolicy !== 'llm' || trace.traceSchemaVersion !== '2' || trace.policyVersion !== '6'
-      || generation?.model !== 'gpt-6-luna' || generation?.reasoningEffort !== 'low') {
-      errors.push('Whole-trace planning requires the whole-trace-v1, v2 or v3 Luna low policy, schema 2, policy 6 and explicit whole-world scope.');
+      || !WHOLE_TRACE_ACTOR_IDENTITIES.some(([model, effort]) => generation?.model === model && generation?.reasoningEffort === effort)) {
+      errors.push('Whole-trace planning requires the whole-trace-v1, v2 or v3 policy with a declared actor identity (Luna low or Claude default), schema 2, policy 6 and explicit whole-world scope.');
     }
     if (generation?.actorPolicyVersion === 'whole-trace-v2' && generation.actorKnowledgeScope !== 'observed-and-remembered')
       errors.push('Whole-trace-v2 requires explicit observed-and-remembered actor knowledge scope.');

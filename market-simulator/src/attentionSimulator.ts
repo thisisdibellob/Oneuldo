@@ -13,6 +13,7 @@ import { buildFeedbackActorFrame, feedbackChoiceMatchesDecision, emptyFeedbackBe
 import { FeedbackMovementPolicy } from './feedbackMovementPolicy';
 import { FeedbackExperience } from './feedbackExperience';
 import { wholeTraceHasAnchorMovementFeedback } from './wholeTrace/wholeTraceMovementFeedback';
+import { isWholeTraceActorIdentity } from './wholeTrace/wholeTraceContracts';
 import { IncrementalCognition } from './incrementalCognition';
 import { navigationGeometryKey } from './confirmedSpatialMemory';
 import type { ActorObservation, ActorPersona, AttentionExperience, Decision, Persona, TraceEntry, TraceOptions } from './types';
@@ -74,10 +75,10 @@ export async function generateAttentionTrace(options: TraceOptions, persona: Act
   const planningSubmissions = options.planningSubmissions === undefined ? 1 : options.planningSubmissions;
   const repairSubmissions = options.repairSubmissions === undefined ? 0 : options.repairSubmissions;
   if (hasWholeOptions && (!wholeTrace || options.actorPolicyVersion !== 'whole-trace-v3' || mode !== 'llm'
-    || model !== 'gpt-6-luna' || options.reasoningEffort !== 'low' || options.tracePolicyVersion !== '6'
+    || !isWholeTraceActorIdentity(model, options.reasoningEffort) || options.tracePolicyVersion !== '6'
     || !options.actorDecisionProvider || !Number.isSafeInteger(planningSubmissions) || planningSubmissions < 1
     || !Number.isSafeInteger(repairSubmissions) || repairSubmissions < 0 || repairSubmissions >= planningSubmissions)) {
-    throw new Error('Whole-trace planning requires the Luna low whole-trace-v3 policy, schema policy 6, a local decision provider and valid submission counts');
+    throw new Error('Whole-trace planning requires a whole-trace-v3 actor identity (Luna low or a declared separate actor), schema policy 6, a local decision provider and valid submission counts');
   }
   const layoutKey = marketReplayFingerprint(options.snapshot.environment);
   const supplied = options.attentionExperience;

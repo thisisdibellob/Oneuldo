@@ -168,7 +168,7 @@ export type AttentionExperience = {
 export type TraceOptions = {
   personaId: string; seed: string | number; snapshot: MarketReplaySnapshot;
   mode?: 'stochastic' | 'llm'; maxActions?: number; timeBudgetMs?: number;
-  tracePolicyVersion?: '5' | '6'; actorPolicyVersion?: 'episodic-choice-v9' | 'episodic-choice-v10' | 'episodic-choice-v11' | 'feedback-choice-v1' | 'feedback-choice-v2' | 'feedback-choice-v3' | 'feedback-choice-v4' | 'feedback-choice-v5' | 'feedback-choice-v6' | 'feedback-choice-v7' | 'feedback-choice-v8' | 'feedback-choice-v9' | 'feedback-choice-v10' | 'feedback-choice-v11' | 'feedback-choice-v12' | 'feedback-choice-v13' | 'whole-trace-v1' | 'whole-trace-v2' | 'whole-trace-v3'; reasoningEffort?: 'low';
+  tracePolicyVersion?: '5' | '6'; actorPolicyVersion?: 'episodic-choice-v9' | 'episodic-choice-v10' | 'episodic-choice-v11' | 'feedback-choice-v1' | 'feedback-choice-v2' | 'feedback-choice-v3' | 'feedback-choice-v4' | 'feedback-choice-v5' | 'feedback-choice-v6' | 'feedback-choice-v7' | 'feedback-choice-v8' | 'feedback-choice-v9' | 'feedback-choice-v10' | 'feedback-choice-v11' | 'feedback-choice-v12' | 'feedback-choice-v13' | 'whole-trace-v1' | 'whole-trace-v2' | 'whole-trace-v3'; reasoningEffort?: 'low' | 'default';
   feedbackMovement?: import('./feedbackMovementPolicy').FeedbackMovementPolicyOptions;
   /** Explicit whole-trace opt-in; absence preserves the original anchor-only contract. */
   wholeTraceMovementVersion?: 'directional-v1' | 'directional-v2';

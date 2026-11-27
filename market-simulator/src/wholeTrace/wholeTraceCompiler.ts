@@ -2,7 +2,7 @@ import { extendedActorChoices as actorChoices } from '../actorChoices';
 import { canonicalMarketReplayJson } from '../../../frontend/src/game/marketReplayTrace';
 import { generateTrace } from '../simulator';
 import { wholeTraceInputHash, wholeTraceSpatialMemoryCapacity } from './wholeTraceBundle';
-import { WHOLE_TRACE_BUNDLE_VERSION, WHOLE_TRACE_MODEL, WHOLE_TRACE_POLICY_VERSION, validateWholeTraceCandidate,
+import { WHOLE_TRACE_BUNDLE_VERSION, WHOLE_TRACE_POLICY_VERSION, wholeTraceActorIdentity, validateWholeTraceCandidate,
   validateWholeTraceCandidatePrefix, wholeTraceTerminalIntent,
   type WholeTraceBundle, type WholeTraceCandidate, type WholeTraceDecision, type WholeTraceSettings,
   type WholeTraceValidation, type WholeTraceValidationIssue } from './wholeTraceContracts';
@@ -132,8 +132,9 @@ async function executeWholeTraceCandidate(settings: WholeTraceSettings, bundle: 
   if (bundle.observationVersion !== undefined && (bundle.observationVersion !== 'anchor-visible-structures-v1'
     || bundle.movementVersion !== undefined || settings.trialBinding))
     throw new WholeTraceCompileError({ valid: false, code: 'PREPARED_INPUT_MISMATCH', errors: ['Unsupported prepared observation contract'] });
+  const actor = wholeTraceActorIdentity(settings.actorModel);
   if (bundle.bundleVersion !== WHOLE_TRACE_BUNDLE_VERSION || bundle.inputHash !== wholeTraceInputHash(settings, bundle.observationVersion) || bundle.snapshotId !== settings.snapshot.snapshotId
-    || bundle.persona.id !== settings.personaId || bundle.model !== WHOLE_TRACE_MODEL || bundle.policyVersion !== WHOLE_TRACE_POLICY_VERSION
+    || bundle.persona.id !== settings.personaId || bundle.model !== actor.model || bundle.reasoningEffort !== actor.reasoningEffort || bundle.policyVersion !== WHOLE_TRACE_POLICY_VERSION
     || bundle.movementVersion !== settings.movementVersion || bundle.movementFeedbackVersion !== settings.movementFeedbackVersion
     || bundle.movementValidationVersion !== settings.movementValidationVersion)
     throw new WholeTraceCompileError({ valid: false, code: 'PREPARED_INPUT_MISMATCH', errors: ['Candidate input differs from the prepared bundle'] });
@@ -266,10 +267,10 @@ async function executeWholeTraceCandidate(settings: WholeTraceSettings, bundle: 
       ...(anchorFeedback ? { wholeTraceMovementFeedbackVersion: bundle.movementFeedbackVersion } : {}),
       ...(bundle.wayfindingVersion ? { wholeTraceWayfindingVersion: bundle.wayfindingVersion } : {}),
       ...(bundle.generationLimits.acceptedActionHorizon === 200 ? { wholeTraceActionHorizon: 200 as const } : {}),
-      actorPolicyVersion: WHOLE_TRACE_POLICY_VERSION, reasoningEffort: 'low',
+      actorPolicyVersion: WHOLE_TRACE_POLICY_VERSION, reasoningEffort: actor.reasoningEffort,
       planningSubmissions: submissions, repairSubmissions: submissions - 1,
       maxActions: settings.maxActions ?? bundle.generationLimits.acceptedActionHorizon ?? 100,
-      llm: { ...settings.llm, model: WHOLE_TRACE_MODEL, maxCalls: settings.llm?.maxCalls ?? 100 },
+      llm: { ...settings.llm, model: actor.model, maxCalls: settings.llm?.maxCalls ?? 100 },
       actorDecisionProvider: async o => {
         rawBefore = structuredClone(o);
         o = safeObservation(o);

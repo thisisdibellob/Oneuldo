@@ -664,7 +664,8 @@
         },
         "reasoningEffort": {
           "enum": [
-            "low"
+            "low",
+            "default"
           ]
         },
         "sourceTraceId": {
