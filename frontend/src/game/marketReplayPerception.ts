@@ -322,6 +322,50 @@ export type WholeReplayWaypointGraph = {
   /** IDs are sorted for serialization, never ranked by desirability or route cost. */
   nodes: { waypointId: string; allowedWaypointIds: string[]; nearbyStations: WholeReplayNearbyStation[] }[];
 };
+/**
+ * The 80px grid can land inside the furniture on both sides of a narrow gap the
+ * app lets the player walk through (between two horizontal shelf pairs, or a
+ * shelf and a wall in the aisles layout). Without an anchor in it the replay
+ * graph has no passage there at all. Add the gap's centre line, sampled on the
+ * grid along the gap. Every point still passes the usual blocked, visibility,
+ * arrival and segment guards; nothing is ranked or chosen for the actor.
+ */
+function replayPassagePoints(environment: MarketEnvironment): Point[] {
+  // The classic grid already reaches every station by the same shortest walk with
+  // or without these points, and its bundles, menus and input hashes are pinned
+  // byte-for-byte by regression fixtures. Keep it unchanged.
+  if ((environment.config.layoutId ?? 'classic') === 'classic') return [];
+  const grid = REPLAY_ANCHOR_SPACING, clearance = MARKET_ENVIRONMENT_PLAYER_RADIUS + REPLAY_ARRIVAL_MARGIN;
+  const shelves = Object.values(environment.shelves) as { x: number; y: number; width: number; height: number }[];
+  const rects = [...shelves, ...environment.walls];
+  const points: Point[] = [];
+  for (const shelf of shelves) {
+    for (const axis of ['x', 'y'] as const) {
+      const size = axis === 'x' ? 'width' : 'height', cross = axis === 'x' ? 'y' : 'x', crossSize = axis === 'x' ? 'height' : 'width';
+      for (const side of [-1, 1]) {
+        const edge = side < 0 ? shelf[axis] : shelf[axis] + shelf[size];
+        const facing = rects.filter(r => r !== shelf && r[cross] < shelf[cross] + shelf[crossSize] && r[cross] + r[crossSize] > shelf[cross])
+          .map(r => side < 0 ? r[axis] + r[size] : r[axis]).filter(e => side < 0 ? e <= edge : e >= edge);
+        if (!facing.length) continue;
+        const other = side < 0 ? Math.max(...facing) : Math.min(...facing);
+        const [low, high] = side < 0 ? [other, edge] : [edge, other];
+        // Too narrow for the player, or a grid line already runs through the free part.
+        if (high - low < 2 * clearance || Math.ceil((low + clearance) / grid) * grid <= high - clearance) continue;
+        const middle = Math.round((low + high) / 2);
+        for (let along = Math.max(grid, Math.ceil((shelf[cross] - grid) / grid) * grid);
+          along <= shelf[cross] + shelf[crossSize] + grid; along += grid) {
+          points.push(axis === 'x' ? { x: middle, y: along } : { x: along, y: middle });
+        }
+      }
+    }
+  }
+  // A shelf's own standing point can fall between grid rows (corner layout), so no
+  // grid anchor is ever near enough to open it. Offer that point too.
+  for (const station of environment.stationDetails) {
+    if (station.kind === 'shelf') points.push({ x: Math.round(station.point.x), y: Math.round(station.point.y) });
+  }
+  return points;
+}
 function anchorId(environment: MarketEnvironment, point: Point): string {
   let hash = 2166136261;
   for (const char of `${environment.seed}:${environment.config.layoutId ?? 'classic'}:${point.x}:${point.y}`) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619);
@@ -340,6 +384,7 @@ export function wholeReplayWaypointCatalog(environment: MarketEnvironment, cashi
       points.push({ x: station.point.x + dx, y: station.point.y + dy });
     }
   }
+  points.push(...replayPassagePoints(environment));
   const seen = new Set<string>();
   return points.filter(point => {
     const id = anchorId(environment, point);
@@ -380,6 +425,8 @@ function localAnchors(environment: MarketEnvironment, position: Point, p: Replay
       }
     }
   }
+  // Narrow walkable gaps the grid misses; add() applies the same distance and guards.
+  for (const point of replayPassagePoints(environment)) add(point);
   return result;
 }
 /** Only a one-hop neighbourhood is public. IDs contain no coordinates or category names. */
