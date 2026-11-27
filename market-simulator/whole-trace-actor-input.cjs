@@ -112,6 +112,12 @@ const INSTRUCTION_TEMPLATES = Object.freeze({
   // Identical to authoring-v3 except the explicit 200-decision horizon (prepare actionHorizon:200).
   'authoring-v4': path.join(__dirname, 'actor-instructions', 'authoring-v4.txt'),
   'authoring-v4-h200': path.join(__dirname, 'actor-instructions', 'authoring-v4-h200.txt'),
+  // authoring-v4 plus one paragraph: read memory-in.md before the first decision, write memory-note.md after delivery
+  // and report the actor's own model ID. For learning experiments that carry a person's memory between trips.
+  'authoring-v4-memory': path.join(__dirname, 'actor-instructions', 'authoring-v4-memory.txt'),
+  // authoring-v4-memory with the memory note limited to 2 lines and 60 characters (half the size of the notes
+  // actually written under the 5-line/300-character limit: median 123 characters) and its own label.
+  'authoring-v4-memory-half': path.join(__dirname, 'actor-instructions', 'authoring-v4-memory-half.txt'),
   'authoring-v3-h200': path.join(__dirname, 'actor-instructions', 'authoring-v3-h200.txt'),
 });
 const DEFAULT_INSTRUCTION_TEMPLATE = 'authoring-v3';
