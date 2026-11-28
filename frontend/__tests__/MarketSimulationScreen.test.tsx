@@ -46,7 +46,7 @@ function setup(config: Partial<MarketSessionConfig> = {}, cashierCount: 0 | 1 | 
   const screen = render(element());
   const setExternalMenuOpen = (open: boolean) => { externalMenuOpen = open; screen.rerender(element()); };
   const start = async () => {
-    fireEvent.press(screen.getByRole('button', { name: '다음' }));
+    while(screen.queryByRole('button',{name:'다음'})) fireEvent.press(screen.getByRole('button',{name:'다음'}));
     fireEvent.press(screen.getByRole('button', { name: '장보기 시작' }));
     await finishTransition();
   };
@@ -80,11 +80,33 @@ function setup(config: Partial<MarketSessionConfig> = {}, cashierCount: 0 | 1 | 
 describe('마트 장보기의 최종 결정과 재시도', () => {
   beforeEach(() => { jest.useFakeTimers(); });
   afterEach(() => { jest.useRealTimers(); });
+  it('시작 화면에서 모드를 고른 뒤 한 번 눌러 시작하고 모드별 안내를 확인한다', async () => {
+    const game = setup();
+    try {
+      expect(game.screen.getByRole('header', { name: '장 보기' })).toBeTruthy();
+      fireEvent.press(game.screen.getByRole('radio', { name: '연습 모드' }));
+      expect(game.screen.getByRole('radio', { name: '연습 모드' }).props.accessibilityState.checked).toBe(true);
+      await game.start();
+      expect(game.screen.queryByTestId('market-entry-screen')).toBeNull();
+      expect(game.screen.getByTestId('market-hud')).toBeTruthy();
+      fireEvent.press(game.screen.getByRole('button', { name: '이용 방법' }));
+      expect(game.screen.getByText('종류가 같으면 괜찮아요. 예: 우유는 맛과 지방 함량에 관계없이 골라요.')).toBeTruthy();
+    } finally { game.screen.unmount(); }
+  });
+  it('시작 전 그만두기는 실패 기록을 만들지 않고 마트에서 나간다', () => {
+    const game = setup();
+    try {
+      fireEvent.press(game.screen.getByRole('button', { name: '장보기 시작 화면 닫기' }));
+      expect(game.onExit).toHaveBeenCalledTimes(1);
+      expect(game.onEpisodeComplete).not.toHaveBeenCalled();
+      expect(game.screen.queryByText('실패 (포기)')).toBeNull();
+    } finally { game.screen.unmount(); }
+  });
   it('민수 부탁의 승인 예산보다 큰 결제를 막고 전화에서 예산을 확인한다', async () => {
     const onBudgetRequest = jest.fn();
     const game = setup({}, 2, { requesterName: '민수', spendingLimit: 4000, onBudgetRequest });
     try {
-      expect(game.screen.queryByRole('button', { name: '연습 환경 설정' })).toBeNull();
+      expect(game.screen.queryByRole('button', { name: '마트 설정' })).toBeNull();
       await game.start();
       await game.station('fresh'); game.add('milk', 2); await game.closeShelf();
       await game.station('checkout');
@@ -138,7 +160,7 @@ describe('마트 장보기의 최종 결정과 재시도', () => {
     const game = setup({}, 0, { controlMode: 'joystick', onControlModeChange: jest.fn() });
     try {
       await game.start();
-      expect(StyleSheet.flatten(game.screen.getByTestId('market-hud').props.style)).toMatchObject({
+      expect(StyleSheet.flatten(game.screen.getByTestId('market-hud-header').props.style)).toMatchObject({
         top: 112, left: 0, right: 0, alignItems: 'center',
       });
       expect(game.screen.queryByRole('button', { name: '터치 이동으로 변경' })).toBeNull();
@@ -215,7 +237,7 @@ describe('마트 장보기의 최종 결정과 재시도', () => {
     const game = setup({}, 2, { hudTopInset: 148 });
     try {
       await game.start();
-      expect(StyleSheet.flatten(game.screen.getByTestId('market-hud').props.style).top).toBe(148);
+      expect(StyleSheet.flatten(game.screen.getByTestId('market-hud-header').props.style).top).toBe(148);
     } finally { game.screen.unmount(); }
   });
 
@@ -370,12 +392,19 @@ describe('마트 장보기의 최종 결정과 재시도', () => {
   });
   it('사야 할 개수와 담은 개수를 분리하고 구매 확정 전에는 정오를 알리지 않는다', async () => {
     const game = setup(); await game.start();
-    expect(within(game.screen.getByTestId('market-shopping-list')).getByText('2개')).toBeTruthy();
+    expect(game.screen.queryByTestId('market-shopping-list-expanded')).toBeNull();
+    fireEvent.press(game.screen.getByRole('button', { name: '구매 목록 전체 보기' }));
+    expect(game.onLockChange).toHaveBeenLastCalledWith(true);
+    expect(within(game.screen.getByTestId('market-shopping-list-expanded')).getByText('2개')).toBeTruthy();
+    fireEvent.press(game.screen.getByRole('button', { name: '구매 목록 닫기' }));
+    expect(game.onLockChange).toHaveBeenLastCalledWith(false);
     await game.station('fresh');
     fireEvent.press(game.screen.getAllByRole('button', { name: /^흰 우유 900mL [0-9,]+원 담기$/ })[0]);
     await game.closeShelf();
-    expect(within(game.screen.getByTestId('market-shopping-list')).getByText('2개')).toBeTruthy();
-    expect(within(game.screen.getByTestId('market-shopping-list')).queryByText(/1\s*\/\s*2/)).toBeNull();
+    fireEvent.press(game.screen.getByRole('button', { name: '구매 목록 전체 보기' }));
+    expect(within(game.screen.getByTestId('market-shopping-list-expanded')).getByText('2개')).toBeTruthy();
+    expect(within(game.screen.getByTestId('market-shopping-list-expanded')).queryByText(/1\s*\/\s*2/)).toBeNull();
+    fireEvent.press(game.screen.getByRole('button', { name: '구매 목록 닫기' }));
     fireEvent.press(game.screen.getByRole('button', { name: '장바구니 열기' }));
     const cart = within(game.screen.getByTestId('market-cart-contents'));
     expect(cart.getByText('1개')).toBeTruthy(); expect(cart.queryByText('2개')).toBeNull();
@@ -784,8 +813,9 @@ describe('직원에게 묻고 의뢰인과 상의하는 장보기', () => {
       fireEvent.press(replacement); finishStaffLine(game.screen);
       expect(game.screen.getByText(/목록에도 바꿔 적었어/)).toBeTruthy();
       fireEvent.press(game.screen.getByRole('button', { name: '통화 마치기' })); await finishTransition();
-      expect(within(game.screen.getByTestId('market-shopping-list')).getByText(name)).toBeTruthy();
-      expect(within(game.screen.getByTestId('market-shopping-list')).queryByText('흰 우유')).toBeNull();
+      fireEvent.press(game.screen.getByRole('button', { name: '구매 목록 전체 보기' }));
+      expect(within(game.screen.getByTestId('market-shopping-list-expanded')).getByText(name)).toBeTruthy();
+      expect(within(game.screen.getByTestId('market-shopping-list-expanded')).queryByText('흰 우유')).toBeNull();
     } finally { game.screen.unmount(); }
   });
 
@@ -801,7 +831,8 @@ describe('직원에게 묻고 의뢰인과 상의하는 장보기', () => {
       fireEvent.press(game.screen.getByRole('button', { name: '재고가 없어서 부탁한 상품을 사지 못했어요.' })); finishStaffLine(game.screen);
       expect(game.screen.getByText(/못 산 이유를 잘 들었어/)).toBeTruthy();
       fireEvent.press(game.screen.getByRole('button', { name: '통화 마치기' })); await finishTransition();
-      const list = within(game.screen.getByTestId('market-shopping-list'));
+      fireEvent.press(game.screen.getByRole('button', { name: '구매 목록 전체 보기' }));
+      const list = within(game.screen.getByTestId('market-shopping-list-expanded'));
       expect(list.queryByText('흰 우유')).toBeNull();
       expect(list.getByText('사과')).toBeTruthy();
     } finally { game.screen.unmount(); }
@@ -810,8 +841,11 @@ describe('직원에게 묻고 의뢰인과 상의하는 장보기', () => {
   it('빈 장바구니로 출구를 역진입해도 감점하고 공사 시 안쪽 입구를 안내한다', async () => {
     const game = setup({ environment: { entranceConstruction: true }, wrongWayPenaltyPoints: 10 });
     try {
-      expect(game.screen.getByText('바깥 입구는 공사 중이에요. 안쪽 입구를 이용해 주세요.')).toBeTruthy();
       await game.start();
+      fireEvent.press(game.screen.getByRole('button', { name: '이용 방법' }));
+      expect(game.screen.getByText(/바깥 입구는 공사 중이에요. 안쪽 입구를 이용해 주세요./)).toBeTruthy();
+      fireEvent.press(game.screen.getByRole('button', { name: '알겠어요' }));
+      await finishTransition();
       const gate = game.environment.alarmGates.find(item => item.id === 'exit')!;
       const outside = { x: gate.gate.x + gate.gate.width / 2, y: gate.gate.y + gate.gate.height / 2 };
       outside[gate.axis] = getMarketWrongWayRearm(gate) + gate.outward * 10;

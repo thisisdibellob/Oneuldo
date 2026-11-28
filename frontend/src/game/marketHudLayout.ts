@@ -1,4 +1,4 @@
-/** Geometry shared by MarketHud's styles and the replay's world occlusion. */
+/** Geometry shared by MarketHud's styles and the replay's conservative occlusion. */
 export const MARKET_HUD_LAYOUT = {
   horizontalPadding: 12,
   maxWidth: 420,
@@ -21,11 +21,13 @@ export const MARKET_HUD_LAYOUT = {
   cartGap: 2,
   cartLabelFontSize: 11,
   cartLabelLineHeight: 15,
-  /** Longest note-row button label: "전체 목록" (5 incl. space) beside "장바구니" (4). */
+  /** Longest note-row button label: "목록 보기" (5 incl. space) beside "장바구니" (4). */
   cartLabelMaxCharacters: 5,
 } as const;
 
 export type MarketHudRect = { left: number; top: number; right: number; bottom: number };
+/** Reserve a lower centre row on phones while retaining the map/action pairing. */
+export const getMarketHudControlLift = (width: number) => width < 640 ? 56 : 0;
 
 export function getMarketHudTopInset(safeAreaTop = 0, embedded = true): number {
   return embedded
@@ -33,11 +35,28 @@ export function getMarketHudTopInset(safeAreaTop = 0, embedded = true): number {
     : Math.max(12, safeAreaTop);
 }
 
+/** Above the bag/diary/phone/settings toolbar (24px bottom + 76px icons).
+ * On phones the surrounding movement controls lift above this row. */
+export function getMarketHudActionsRect(presentation: {
+  viewport: { width: number; height: number }; fontScale?: number; safeArea?: { top: number; bottom: number };
+}): MarketHudRect {
+  const { width, height } = presentation.viewport, scale = presentation.fontScale ?? 1;
+  const rowWidth = Math.max(96, Math.min(260, width - 24));
+  const buttonWidth = (rowWidth - 8) / 2;
+  const lines = Math.ceil(5 / Math.max(1, Math.floor(buttonWidth / (MARKET_HUD_LAYOUT.cartLabelFontSize * scale))));
+  const rowHeight = Math.max(52, 26 + lines * MARKET_HUD_LAYOUT.cartLabelLineHeight * scale);
+  const bottomInset = 112 + Math.max(0, (presentation.safeArea?.bottom ?? 0) - 24);
+  const left = (width - rowWidth) / 2, bottom = height - bottomInset;
+  return { left, top: bottom - rowHeight, right: left + rowWidth, bottom };
+}
+
 /**
  * Embedded shopping HUD, in the same viewport coordinates as the world camera.
- * Names can occupy two lines; ReplayPresentation has no measured text layout,
- * so reserve that full height even when every name fits on one line. At scale 1
- * this bounds the actual 108..115px card with a 115px rectangle. At larger font
+ * The note itself now opens in a modal. Keep the previous conservative name-row
+ * height bound to preserve camera framing for recorded replay presentations.
+ * The visible top header is now 44px and borderless; retain the previous 115px
+ * upper reserve for camera/recorded-replay continuity. Lower controls have a
+ * separate actual rectangle. At larger font
  * scales also reserve wrapping for the longest note-row button label and production
  * quantities (1..99 plus at most two unit characters). Pretendard's digits and
  * Korean glyphs fit within one em; use that upper bound, not estimated text

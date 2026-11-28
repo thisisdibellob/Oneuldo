@@ -21,10 +21,17 @@ const escapedRoot = __dirname.split(/[\\/]/)
   .map(segment => segment.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
   .join('[\\\\/]');
 const exportOutput = new RegExp('^(?:' + escapedRoot + '[\\\\/])?dist(?:[\\\\/]|$)');
+const escapedWorkspace = workspaceRoot.split(/[\\/]/)
+  .map(segment => segment.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+  .join('[\\\\/]');
+// Reports, generated art originals, and isolated browser profiles are not app
+// modules. Watching their frequent writes can starve Metro on Windows.
+const localArtifacts = new RegExp('^(?:' + escapedWorkspace + '[\\\\/])?(?:output|tmp|\\.codex-tmp)(?:[\\\\/]|$)');
 const existingBlockList = config.resolver.blockList;
 config.resolver.blockList = [
   ...(Array.isArray(existingBlockList) ? existingBlockList : existingBlockList ? [existingBlockList] : []),
   exportOutput,
+  localArtifacts,
 ];
 
 module.exports = config;

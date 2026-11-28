@@ -7,7 +7,7 @@ jest.mock('../src/api/behaviorAnalysis', () => ({
   startLatestAnalysisJob: jest.fn(),
   getCurrentAnalysisJob: jest.fn(),
 }));
-jest.mock('../src/components/ui', () => ({ BrandHeader: () => null }));
+jest.mock('../src/components/ui', () => ({ BrandHeader: () => null, StickyBrandHeader: () => null }));
 jest.mock('../src/components/PressScale', () => ({
   PressScale: jest.requireActual('react-native').Pressable,
 }));

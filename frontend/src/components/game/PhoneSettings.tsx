@@ -14,10 +14,11 @@ const wallpaperChoices = [
   { label: '라벤더', color: '#E9E2EE' },
 ] as const;
 
-export function PhoneSettings({ controlMode, onControlModeChange, reduceMotion }: {
+export function PhoneSettings({ controlMode, onControlModeChange, reduceMotion, onEditMarketLayout }: {
   controlMode: 'joystick' | 'touch';
   onControlModeChange: (mode: 'joystick' | 'touch') => void;
   reduceMotion: boolean;
+  onEditMarketLayout?: () => void;
 }) {
   const { preferences, updatePreferences } = useGamePreferences();
   const pressScale = reduceMotion ? 1 : 0.98;
@@ -60,6 +61,12 @@ export function PhoneSettings({ controlMode, onControlModeChange, reduceMotion }
     <View style={styles.section}>
       <Text style={styles.heading}>마트 인테리어</Text>
       <MarketThemeSelector reduceMotion={reduceMotion} />
+      {onEditMarketLayout ? <PressScale accessibilityRole="button" accessibilityLabel="마트 설정"
+        onPress={onEditMarketLayout} scaleTo={pressScale} style={styles.layoutButton}>
+        <Ionicons name="grid-outline" size={21} color="#4F6854" />
+        <Text style={styles.layoutButtonText}>마트 설정</Text>
+        <Ionicons name="chevron-forward" size={18} color="#7C8B75" />
+      </PressScale> : null}
     </View>
     <View style={styles.section}>
       <Text style={styles.heading}>소리</Text>
@@ -112,6 +119,8 @@ const styles = StyleSheet.create({
   runOption: { flexDirection: 'row', alignItems: 'center', gap: 9, minHeight: 44, paddingHorizontal: 9, borderRadius: 12 },
   runOptionSelected: { backgroundColor: '#E1E9D9' },
   runOptionText: { fontFamily: fonts.medium, fontSize: 14, color: '#455C4B' },
+  layoutButton: { flexDirection: 'row', alignItems: 'center', gap: 9, minHeight: 48, paddingHorizontal: 12, marginTop: 10, borderRadius: 12, backgroundColor: '#E8EDDF' },
+  layoutButtonText: { flex: 1, fontFamily: fonts.semibold, fontSize: 14, color: '#455C4B' },
   wallpapers: { flexDirection: 'row', justifyContent: 'space-between', gap: 3 },
   swatch: { alignItems: 'center', justifyContent: 'center', borderColor: '#D9D8CA', borderWidth: 1, borderRadius: 14, height: 44, flex: 1, maxWidth: 44 },
   swatchSelected: { borderColor: '#6C8B6E', borderWidth: 2 },

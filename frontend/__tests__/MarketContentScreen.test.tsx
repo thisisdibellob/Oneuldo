@@ -26,7 +26,7 @@ it('추천 안내가 규격을 생략해도 브리핑과 HUD에서 규격과 예
     expect(screen.getByText('흰 우유 900mL')).toBeTruthy();
     expect(screen.getByText('생수 500mL')).toBeTruthy();
     expect(screen.getByText('예산 7,000원')).toBeTruthy();
-    fireEvent.press(screen.getByText('장보기 시작'));
+    fireEvent.press(screen.getByRole('button', {name:'장보기 시작'}));
     await act(async () => { jest.advanceTimersByTime(300); await Promise.resolve(); });
     expect(screen.getByText('흰 우유 900mL')).toBeTruthy();
     expect(screen.getByText('생수 500mL')).toBeTruthy();
@@ -46,7 +46,7 @@ async function setup(scenario: 'S01'|'S02', station: 'fresh'|'produce', override
     initialConfig={{seed:environment.seed,stockPerProduct:5,inventoryProductIds:{[station]:inventory}}}
     playerPositionRef={position} interactionRequest={interaction} onExit={jest.fn()} onMissionComplete={onMissionComplete} />;
   const screen=render(element());
-  fireEvent.press(screen.getByText('다음'));fireEvent.press(screen.getByText('장보기 시작'));
+  fireEvent.press(screen.getByText('다음'));fireEvent.press(screen.getByRole('button', {name:'장보기 시작'}));
   await act(async()=>{jest.advanceTimersByTime(300);await Promise.resolve();});
   const checkout=async()=>{
     fireEvent.press(screen.getAllByRole('button',{name:'진열대 닫기'})[0]);
@@ -69,7 +69,9 @@ it('새 진열대에서도 규격·재고와 실제 선택을 보존하고 로�
     for(let i=0;i<8;i++)act(()=>{shelf.props.onDropProduct('milk');});
     expect(screen.UNSAFE_getByType(MarketShelfScene).props.cart.milk).toBe(5);
     await checkout();
-    expect(screen.getByText('AI 수행 검토')).toBeTruthy();
+    // 2026-11-27: AI 분석 접수와 별개로 목록 비교 결과 카드(표시 전용)를 보여 준다. 우유 5개는 목록과 달라 '장보기 완료!'.
+    expect(screen.getByTestId('market-purchase-result')).toBeTruthy();
+    expect(screen.getByText('장보기 완료!')).toBeTruthy();
     expect(screen.queryByText('장보기에 성공했어요!')).toBeNull();expect(screen.queryByText('이번 구매는 맞지 않았어요')).toBeNull();
     expect(onMissionComplete).not.toHaveBeenCalled();
     const events=jest.mocked(enqueueBehaviorEvents).mock.calls.flatMap(call=>call[1].map(row=>row.event));
@@ -107,11 +109,11 @@ it('AI가 작성한 여러 단계 안내와 계산대 안내를 생략하지 않
   try {
     for (const line of mission.briefing.slice(0, 2)) {
       expect(screen.getByText(line)).toBeTruthy();
-      expect(screen.queryByText('장보기 시작')).toBeNull();
+      expect(screen.queryByRole('button', {name:'장보기 시작'})).toBeNull();
       fireEvent.press(screen.getByText('다음'));
     }
     expect(screen.getByText(mission.briefing[2])).toBeTruthy();
-    fireEvent.press(screen.getByText('장보기 시작'));
+    fireEvent.press(screen.getByRole('button', {name:'장보기 시작'}));
     await act(async () => { jest.advanceTimersByTime(300); await Promise.resolve(); });
     for (const line of mission.checkoutDialogue) expect(screen.getByText(line)).toBeTruthy();
   } finally { screen.unmount(); }

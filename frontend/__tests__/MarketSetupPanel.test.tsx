@@ -4,10 +4,38 @@ import { createMarketSession, parseMarketSessionConfig } from '../src/game/marke
 
 jest.mock('expo-font', () => ({ isLoaded: () => true, loadAsync: () => Promise.resolve() }));
 
+it('감점을 비활성화하면 0으로 적용하고 다시 활성화하면 입력했던 점수를 복원한다', () => {
+  const config = createMarketSession({ cashierRequestPenaltyPoints: 7 }).config;
+  const onApply = jest.fn();
+  const screen = render(<MarketSetupPanel config={config} onApply={onApply} onClose={jest.fn()} />);
+  fireEvent.press(screen.getByRole('button', { name: '상황 설정' }));
+  fireEvent.press(screen.getByRole('button', { name: '계산원 확인 감점 비활성화' }));
+  expect(screen.getByLabelText('계산원 확인 감점').props).toMatchObject({ value: '0', editable: false });
+  fireEvent.press(screen.getByRole('button', { name: '설정 적용' }));
+  expect(onApply.mock.calls[0][0].cashierRequestPenaltyPoints).toBe(0);
+  fireEvent.press(screen.getByRole('button', { name: '계산원 확인 감점 활성화' }));
+  expect(screen.getByLabelText('계산원 확인 감점').props.value).toBe('7');
+  fireEvent.press(screen.getByRole('button', { name: '설정 적용' }));
+  expect(onApply.mock.calls[1][0].cashierRequestPenaltyPoints).toBe(7);
+});
+
+it('계산원 화살표는 랜덤과 0~2명 사이를 순환하고 전체 설정에 저장한다', () => {
+  const onApply = jest.fn();
+  const screen = render(<MarketSetupPanel config={createMarketSession().config} onApply={onApply} onClose={jest.fn()} />);
+  fireEvent.press(screen.getByRole('button', { name: '구조 및 배치' }));
+  fireEvent.press(screen.getByRole('button', { name: '계산원 늘리기' }));
+  fireEvent.press(screen.getByRole('button', { name: '설정 적용' }));
+  expect(onApply.mock.calls[0][0].environment.cashierCount).toBe(0);
+  fireEvent.press(screen.getByRole('button', { name: '계산원 줄이기' }));
+  fireEvent.press(screen.getByRole('button', { name: '설정 적용' }));
+  expect(onApply.mock.calls[1][0].environment.cashierCount).toBe('random');
+});
+
 it('기본 배치를 유지하고 가로 통로 배치 선택을 설정과 JSON 왕복에 기록한다', () => {
   const config = createMarketSession({ seed: 'layout-ui-contract' }).config;
   const onApply = jest.fn();
   const screen = render(<MarketSetupPanel config={config} onApply={onApply} onClose={jest.fn()} />);
+  fireEvent.press(screen.getByRole('button', { name: '구조 및 배치' }));
   expect(screen.getByRole('button', { name: '기본 배치' }).props.accessibilityState.selected).toBe(true);
   fireEvent.press(screen.getByRole('button', { name: '가로 통로 배치' }));
   expect(screen.getByRole('button', { name: '가로 통로 배치' }).props.accessibilityState.selected).toBe(true);
@@ -18,7 +46,7 @@ it('기본 배치를 유지하고 가로 통로 배치 선택을 설정과 JSON 
   const imported = parseMarketSessionConfig(JSON.stringify(applied));
   expect(imported.environment.layoutId).toBe('aisles');
   expect(createMarketSession(imported).environment.shelves.household.orientation).toBe('horizontal');
-  expect(screen.getByText(/서로 다른 12종/)).toBeTruthy();
+  fireEvent.press(screen.getByRole('button', { name: '상황 설정' }));
 });
 
 it('이전 JSON에서 빠진 layoutId는 기본 배치로 가져오며 모르는 배치는 거부한다', () => {
@@ -32,6 +60,7 @@ it('모퉁이 지점과 입구 공사 조건을 함께 저장하고 예전 설�
   const config = createMarketSession().config;
   const onApply = jest.fn();
   const screen = render(<MarketSetupPanel config={config} onApply={onApply} onClose={jest.fn()} />);
+  fireEvent.press(screen.getByRole('button', { name: '구조 및 배치' }));
   fireEvent.press(screen.getByRole('button', { name: '모퉁이 지점' }));
   fireEvent.press(screen.getByRole('button', { name: '입구 공사 중' }));
   fireEvent.press(screen.getByRole('button', { name: '설정 적용' }));
@@ -59,6 +88,7 @@ it('계산원 확인 감점을 별도로 적용하고 JSON 왕복에서 유지�
   const config = createMarketSession().config;
   const onApply = jest.fn();
   const screen = render(<MarketSetupPanel config={config} onApply={onApply} onClose={jest.fn()} />);
+  fireEvent.press(screen.getByRole('button', { name: '상황 설정' }));
   expect(screen.getByLabelText('계산원 확인 감점').props.value).toBe('10');
   fireEvent.changeText(screen.getByLabelText('계산원 확인 감점'), '7');
   fireEvent.press(screen.getByRole('button', { name: '설정 적용' }));
@@ -71,8 +101,10 @@ it('계산원 확인 감점을 별도로 적용하고 JSON 왕복에서 유지�
 
 it('셀프 계산 줄과 학습 조건을 저장하고 예산 입력 중 빈 값은 화면을 깨뜨리지 않는다', () => {
   const onApply = jest.fn();
-  const screen = render(<MarketSetupPanel config={createMarketSession({ learning: {} }).config} onApply={onApply} onClose={jest.fn()} />);
-  fireEvent.press(screen.getByRole('button', { name: '1번 줄을 셀프 계산대' }));
+  const screen = render(<MarketSetupPanel config={createMarketSession({learning:{}}).config} onApply={onApply} onClose={jest.fn()} />);
+  fireEvent.press(screen.getByRole('button', { name: '구조 및 배치' }));
+  fireEvent.press(screen.getByRole('button', { name: '1번 줄 무인 계산대' }));
+  fireEvent.press(screen.getByRole('button', { name: '상황 설정' }));
   fireEvent.press(screen.getByRole('button', { name: '원래 상품만 구매' }));
   fireEvent.changeText(screen.getByLabelText('선택 상품 예산'), '');
   fireEvent.press(screen.getByRole('button', { name: '설정 적용' }));
@@ -92,6 +124,8 @@ it.each([
   const config = createMarketSession({ learning: { stockoutEnabled: false, budgetChoiceEnabled: false } }).config;
   const onApply = jest.fn();
   const screen = render(<MarketSetupPanel config={config} onApply={onApply} onClose={jest.fn()} />);
+  fireEvent.press(screen.getByRole('button', { name: '상황 설정' }));
+  fireEvent.press(screen.getByRole('button', { name: '추가 연습 조건' }));
   fireEvent.press(screen.getByRole('button', { name: label }));
   expect(screen.getByRole('button', { name: label }).props.accessibilityState.selected).toBe(true);
   fireEvent.press(screen.getByRole('button', { name: '설정 적용' }));
@@ -106,15 +140,16 @@ it('AI 매대 순서를 기본 위치로 표시하지 않고 계산원 변경과
   const config = createMarketSession({ seed: 'ai-shelf-setup', environment: { shelfOrder: order } }).config;
   const onApply = jest.fn();
   const screen = render(<MarketSetupPanel config={config} onApply={onApply} onClose={jest.fn()} />);
-  expect(screen.getByRole('button', { name: '기본 위치' }).props.accessibilityState.selected).toBe(false);
+  fireEvent.press(screen.getByRole('button',{name:'구조 및 배치'}));
+  expect(screen.getByRole('button', { name: '정해진 위치' }).props.accessibilityState.selected).toBe(false);
   expect(screen.getByRole('button', { name: '매번 섞기' }).props.accessibilityState.selected).toBe(false);
-  fireEvent.press(screen.getByRole('button', { name: '0명' }));
+  fireEvent.press(screen.getByRole('button', { name: '계산원 늘리기' }));
   fireEvent.press(screen.getByRole('button', { name: '설정 적용' }));
   expect(onApply.mock.calls[0][0].environment).toMatchObject({ shelfOrder: order, cashierCount: 0 });
   expect(onApply.mock.calls[0][1]).toEqual(expect.objectContaining({ shelfOrderTouched: false, changedConfigPaths: expect.any(Array) }));
-  fireEvent.press(screen.getByRole('button', { name: '기본 위치' }));
+  fireEvent.press(screen.getByRole('button', { name: '정해진 위치' }));
   fireEvent.press(screen.getByRole('button', { name: '설정 적용' }));
-  expect(screen.getByRole('button', { name: '기본 위치' }).props.accessibilityState.selected).toBe(true);
+  expect(screen.getByRole('button', { name: '정해진 위치' }).props.accessibilityState.selected).toBe(true);
   expect(onApply.mock.calls[1][1]).toEqual(expect.objectContaining({ shelfOrderTouched: true, changedConfigPaths: expect.arrayContaining(["environment.shelfOrder"]) }));
 });
 
@@ -123,11 +158,13 @@ it('JSON에서 다른 환경만 고친 경우와 매대 순서를 고친 경우�
   const config = createMarketSession({ environment: { shelfOrder: order } }).config;
   const onApply = jest.fn();
   const screen = render(<MarketSetupPanel config={config} onApply={onApply} onClose={jest.fn()} />);
-  fireEvent.press(screen.getByRole('button', { name: '연구용 상세 설정 · JSON 가져오기' }));
-  fireEvent.changeText(screen.getByLabelText('장보기 설정 JSON'), JSON.stringify({ ...config, environment: { ...config.environment, cashierCount: 0 } }));
+  fireEvent.press(screen.getByRole('button', { name: '세이브 · 로드' }));
+  fireEvent.changeText(screen.getByLabelText('마트 설정 가져오기 JSON'), JSON.stringify({ ...config, environment: { ...config.environment, cashierCount: 0 } }));
+  fireEvent.press(screen.getByRole('button',{name:'붙여 넣은 설정 불러오기'}));
   fireEvent.press(screen.getByRole('button', { name: '설정 적용' }));
   expect(onApply.mock.calls[0][1]).toEqual(expect.objectContaining({ shelfOrderTouched: false, changedConfigPaths: expect.any(Array) }));
-  fireEvent.changeText(screen.getByLabelText('장보기 설정 JSON'), JSON.stringify({ ...config, environment: { ...config.environment, shelfOrder: 'random' } }));
+  fireEvent.changeText(screen.getByLabelText('마트 설정 가져오기 JSON'), JSON.stringify({ ...config, environment: { ...config.environment, shelfOrder: 'random' } }));
+  fireEvent.press(screen.getByRole('button',{name:'붙여 넣은 설정 불러오기'}));
   fireEvent.press(screen.getByRole('button', { name: '설정 적용' }));
   expect(onApply.mock.calls[1][1]).toEqual(expect.objectContaining({ shelfOrderTouched: true, changedConfigPaths: expect.arrayContaining(["environment.shelfOrder"]) }));
 });

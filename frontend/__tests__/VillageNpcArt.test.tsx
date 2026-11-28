@@ -81,6 +81,22 @@ it('마을 정류장에는 기사 NPC를 세워두지 않는다', async () => {
   screen.unmount();
 });
 
+it('카페 입구는 터치 이동과 가까운 상호작용 표시를 기존 포털 방식으로 연결한다', async () => {
+  const onPortalPress = jest.fn();
+  const screen = render(<ExpandedVillageLayer {...props} nearbyPortalId="cafe" onPortalPress={onPortalPress} />);
+  await act(async () => { await Promise.resolve(); });
+  expect(screen.getByTestId('cafe-proximity-cloud')).toBeTruthy();
+  const event = { stopPropagation: jest.fn() };
+  fireEvent.press(screen.getByRole('button', { name: '카페 들어가기' }), event);
+  expect(event.stopPropagation).toHaveBeenCalledTimes(1);
+  expect(onPortalPress).toHaveBeenCalledWith(event, 'cafe');
+  screen.rerender(<ExpandedVillageLayer {...props} controlMode="joystick" onPortalPress={onPortalPress} />);
+  fireEvent.press(screen.getByTestId('village-cafe-portal'), event);
+  expect(onPortalPress).toHaveBeenCalledTimes(1);
+  expect(screen.queryByTestId('cafe-proximity-cloud')).toBeNull();
+  screen.unmount();
+});
+
 it.each(['minsu', 'jiyoung', 'sujin'])('%s 배포 PNG도 플레이어 캔버스 규격을 사용한다', id => {
   const directory = id === 'sujin' ? 'sujin-v1' : 'chibi-v1';
   const png = readFileSync(join(__dirname, `../assets/images/game/characters/village/${directory}/${id}-front.png`));

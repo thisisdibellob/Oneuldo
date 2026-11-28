@@ -33,18 +33,17 @@ test('browser agent controller uses the visible briefing and bounded shared acti
     const initial = controller!.observe() as any;
     expect(initial.observation.screen.visiblePanel.type).toBe('briefing');
     await act(async () => { await controller!.execute({ sessionId: 'browser-agent-session', actionId: 'brief-1', expectedRevision: 0, action: { type: 'continueBriefing' } }); });
-    await act(async () => { await controller!.execute({ sessionId: 'browser-agent-session', actionId: 'brief-2', expectedRevision: 1, action: { type: 'continueBriefing' } }); });
     const beforeMove = controller!.observe() as any;
     const y = beforeMove.observation.screen.player.position.y;
     let moved: any;
     await act(async () => { moved = await controller!.execute({
-        sessionId: 'browser-agent-session', actionId: 'move-1', expectedRevision: 2,
+        sessionId: 'browser-agent-session', actionId: 'move-1', expectedRevision: 1,
         action: { type: 'move', dx: 0, dy: -12 },
       });
     });
     expect(moved.accepted).toBe(true);
     expect(moved.observation.screen.player.position.y).toBe(y - 12);
-    await expect(controller!.execute({ sessionId: 'browser-agent-session', actionId: 'stale', expectedRevision: 2, action: { type: 'move', dx: 1, dy: 0 } }))
+    await expect(controller!.execute({ sessionId: 'browser-agent-session', actionId: 'stale', expectedRevision: 1, action: { type: 'move', dx: 1, dy: 0 } }))
       .rejects.toMatchObject({ code: 'STALE_REVISION' });
     let stopped: any;
     await act(async () => { stopped = await controller!.stop('test stopped'); });

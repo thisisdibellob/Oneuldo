@@ -62,17 +62,24 @@ export async function playMarketTrace(trace: MarketReplayTrace, getUi: () => Rep
           motion, step.target.anchorId, presentation!, step.movement, signal, report, step.timeoutMs); return;
       case 'moveDirection':
         await moveDirection(motion, step.direction, step.durationMs, presentation!, step.movement, signal, report, step.timeoutMs); return;
-      case 'readList':
+      case 'readList': {
         if (ui().read().briefing || ui().read().phase !== 'shopping' || ui().read().shelf || ui().read().cartOpen || ui().read().helpOpen || ui().read().staffOpen || motion.read().locked) {
-          throw new Error('Shopping list is not visible on the world HUD');
+          throw new Error('Shopping list button is not available on the world HUD');
         }
         if (!ui().scrollList) throw new Error('Shopping list reading input is unavailable');
-        for (const fraction of [0, .25, .5, .75, 1]) {
-          assertReplayActive(signal); checkPresentation();
-          ui().scrollList!(fraction);
-          await replayDelay(step.durationMs / 5, signal);
-        }
+        const listUi = ui();
+        try {
+          listUi.viewShoppingList?.(true);
+          if (listUi.viewShoppingList) await replayDelay(100, signal);
+          for (const fraction of [0, .25, .5, .75, 1]) {
+            assertReplayActive(signal); checkPresentation();
+            listUi.scrollList!(fraction);
+            await replayDelay(step.durationMs / 5, signal);
+          }
+        } finally { listUi.viewShoppingList?.(false); }
+        if (listUi.viewShoppingList) await replayUntil(() => !motion.read().locked, signal);
         return;
+      }
       case 'pause': case 'lookAround': await replayDelay(step.durationMs, signal); return;
       case 'openShelf':
         await interact(step.stationId, signal);

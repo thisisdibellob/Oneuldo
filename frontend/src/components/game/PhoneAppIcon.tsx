@@ -3,13 +3,14 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { StyleSheet, Text, View } from 'react-native';
 import { fonts } from '../../theme';
 
-export type PhoneAppIconName = 'phone' | 'calculator' | 'bus' | 'travel' | 'settings' | 'wallet' | 'emergency' | 'exit' | 'photos';
+export type PhoneAppIconName = 'phone' | 'calculator' | 'bus' | 'travel' | 'settings' | 'wallet' | 'emergency' | 'exit' | 'photos' | 'messages';
 const palettes: Record<PhoneAppIconName, readonly [string, string]> = {
   phone: ['#9AC79B', '#668F70'], calculator: ['#718177', '#40584C'], bus: ['#93B7BC', '#648A9E'],
   travel: ['#F2E9CA', '#DDDEBD'], settings: ['#E1E5DE', '#B7C1B4'], wallet: ['#BEAC8F', '#8C836D'],
   emergency: ['#E5C898', '#C69C64'], exit: ['#DFAF99', '#B88574'], photos: ['#FFFFFB', '#F0F0E4'],
+  messages: ['#AFCEA0', '#7EAA78'],
 };
-const ordinaryIcons = { phone: 'call', bus: 'bus', settings: 'settings', wallet: 'wallet', emergency: 'shield-checkmark', exit: 'log-out' } as const;
+const ordinaryIcons = { phone: 'call', bus: 'bus', settings: 'settings', wallet: 'wallet', emergency: 'shield-checkmark', exit: 'log-out', messages: 'chatbubbles' } as const;
 
 /** Layered, quiet app illustrations that stay crisp without downloading icon bitmaps. */
 export function PhoneAppIcon({ name }: { name: PhoneAppIconName }) {

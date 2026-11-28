@@ -5,7 +5,7 @@ import { MARKET_RETAIL_PRODUCT_BOUNDS, MARKET_RETAIL_STOCK } from '../../game/ma
 import { MARKET_SHELF_ART_BOTTOM, MARKET_SHELF_ART_HEIGHT, MARKET_SHELF_ART_WIDTH, MARKET_SHELF_SCALE, MARKET_SHELF_UNIT_WIDTH } from '../../game/marketFixtureLayout';
 import type { MarketCategoryId } from '../../game/scenarios';
 import { fonts } from '../../theme';
-import { useGamePreferences } from '../../game/gamePreferences';
+import { useMarketInteriorTheme } from './MarketThemePreviewContext';
 import { cozyMarketArt } from '../../game/marketInteriorThemeArt';
 
 const gondola = require('../../../assets/images/game/market/interior/retail-v4/gondola-empty.png');
@@ -17,7 +17,7 @@ const shelfSize = (value: number) => value * MARKET_SHELF_SCALE;
 
 /** A shared furniture family with category-specific facings; the two fixtures still open one inventory. */
 export const MarketRetailShelf = memo(function MarketRetailShelf({ categoryId, variant }: { categoryId: MarketCategoryId; variant: number }) {
-  const illustrated = useGamePreferences().preferences.marketInteriorTheme === 'cozy';
+  const illustrated = useMarketInteriorTheme() === 'cozy';
   const produce = categoryId === 'produce';
   const cold = categoryId === 'fresh';
   const goods = MARKET_RETAIL_STOCK[categoryId][variant];

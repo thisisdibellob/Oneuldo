@@ -1,6 +1,6 @@
 import { act, fireEvent, render } from '@testing-library/react-native';
 import { PanResponder, StyleSheet } from 'react-native';
-import { GameControls } from '../src/components/game/GameControls';
+import { GameControls, GameControlShortcut } from '../src/components/game/GameControls';
 import { resetGamePreferencesForTests, updateGamePreferences } from '../src/game/gamePreferences';
 
 jest.mock('expo-font', () => ({ isLoaded: () => true, loadAsync: () => Promise.resolve() }));
@@ -19,6 +19,21 @@ beforeEach(() => {
 afterEach(() => jest.restoreAllMocks());
 const grant = (x: number, y: number) => act(() => handlers.onPanResponderGrant!({ nativeEvent: { locationX: x, locationY: y } } as never, {} as never));
 const move = (dx: number, dy: number) => act(() => handlers.onPanResponderMove!({} as never, { dx, dy } as never));
+
+it('the smaller map circle sits to the left of the action with the same vertical centre', () => {
+  const callbacks = props(), onMap = jest.fn();
+  const screen = render(<><GameControls {...callbacks} /><GameControlShortcut label="지도" accessibilityLabel="매장 지도" onPress={onMap} /></>);
+  const main = StyleSheet.flatten(screen.getByRole('button', { name: '대화' }).props.style);
+  const map = StyleSheet.flatten(screen.getByRole('button', { name: '매장 지도' }).props.style);
+  expect(map.width).toBeLessThan(main.width!);
+  expect(map.borderRadius).toBe(map.width! / 2);
+  expect(map.right).toBeGreaterThan(23 + Number(main.width));
+  expect(Number(map.bottom) + Number(map.height) / 2).toBe(126 + Number(main.height) / 2);
+  expect(screen.getByText('지도')).toBeTruthy();
+  fireEvent.press(screen.getByRole('button', { name: '매장 지도' }));
+  expect(onMap).toHaveBeenCalledTimes(1);
+  expect(callbacks.action.onPress).not.toHaveBeenCalled();
+});
 
 it('the stick starts at the first touch within its larger hit area and releases all movement', () => {
   const callbacks = props(); const screen = render(<GameControls {...callbacks} />);

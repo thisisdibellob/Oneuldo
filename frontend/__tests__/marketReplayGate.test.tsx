@@ -74,7 +74,6 @@ test.each([false, true])('normal market inputs keep working and no shelf replay 
     onExit={jest.fn()} {...props} />;
   const screen = render(element());
   try {
-    fireEvent.press(screen.getByRole('button', { name: '다음' }));
     fireEvent.press(screen.getByRole('button', { name: '장보기 시작' }));
     await transition();
     player.current = { ...session.environment.stations.fresh };

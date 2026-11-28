@@ -1,0 +1,125 @@
+{
+  "version": 2,
+  "tool": "built-in image_gen",
+  "playerReference": "frontend/assets/images/game/characters/player/chibi-user-v3/chr_player_chibi_front_idle_f00.png",
+  "canvas": {
+    "width": 256,
+    "height": 384,
+    "opaqueHeight": 344
+  },
+  "processing": "Transparent trim and uniform resize only; alpha retained. Original v1 files retained.",
+  "entries": [
+    {
+      "id": "employee-male-01",
+      "original": "employee-male-01-v1.png",
+      "file": "employee-male-01-chibi-v2.png",
+      "sha256": "e2c20ada41426f52c13ff105919c9313cfa0e8589669c73a05b18b24bd8d13a4",
+      "prompt": "Use case: style-transfer. Asset type: a single transparent front-facing NPC sprite for an existing cozy 2D Korean life-training game. Edit image 2, the male grocery-store employee, to match the exact art language and body proportions of the playable character in image 1. Image 1 is the authoritative style reference: compact roughly 2.5-head-tall SD/chibi body, large round head, simple dark oval eyes, very small nose/mouth, warm dark brown softly irregular outlines, matte muted colors, minimal simple cel shading, readable silhouette. Keep the employee identity from image 2: short parted dark-brown hair, light cream shirt with rolled sleeves, muted sage-green long apron with a small blank light name tag, charcoal trousers, cream sneakers. Redraw the anatomy rather than compressing a tall body. Short arms and legs, wider comfortable head and body like the player, neutral relaxed standing stance, arms down, both feet aligned to the same floor plane. Adult employee appearance remains distinct from a child. Front view with the same tiny overhead visibility as the player. One character only, centered, full hair and shoes visible, transparent background, ample even clear margin. No props, no shopping bag, no environment, no ground shadow, no text, no captions, no grid. Clean game-ready illustration at a 2:3 portrait composition. Preserve the handmade slightly warm brown line quality of the player, not anime realism, not glossy 3D, not pixel art."
+    },
+    {
+      "id": "employee-male-02",
+      "original": "employee-male-02-v1.png",
+      "file": "employee-male-02-chibi-v2.png",
+      "sha256": "c49f81da66365d5bc710b772e0663d2aebbf0dc823b1c0e06834c0e1186b2467",
+      "prompt": "Use case: style-transfer. Asset type: one transparent front-facing game NPC sprite. Redraw the person in image 2 in the SAME compact SD/chibi illustration style and proportions as the playable character in image 1. Image 3 is a freshly adapted employee for consistency. Use image 1 as the primary authority: broad large round head, roughly 2.4-head-tall body, warm brown clean outlined shapes, simple dark oval eyes, tiny nose/mouth, short comfortable arms and legs, matte muted flat colors and minimal cel shading. Keep the identity, age, hairstyle, clothing colors and accessories of image 2 as described below. Full-body straight-on relaxed idle pose, arms down and feet on a shared flat baseline. One person only, centered in a 2:3 portrait composition with clear transparent margin. Real alpha transparency outside a clean silhouette. Absolutely NO cast shadow, drop shadow, surrounding glow, halo, vignette, blur, floor, room, objects, captions, letters or background paint. Not realistic anime, not 3D, not pixel art. Adult male employee with short charcoal hair, thin round brown glasses, rolled-sleeve light dusty-blue button shirt, sage-green apron with a small blank cream tag, muted olive trousers and brown low shoes."
+    },
+    {
+      "id": "employee-female-01",
+      "original": "employee-female-01-v1.png",
+      "file": "employee-female-01-chibi-v2.png",
+      "sha256": "bb7a5f135e68f7682b9d72efae3f1a556931b8509d62b9b8d35157228c12a2df",
+      "prompt": "Use case: style-transfer. Asset type: one transparent front-facing game NPC sprite. Redraw the person in image 2 in the SAME compact SD/chibi illustration style and proportions as the playable character in image 1. Image 3 is a freshly adapted employee for consistency. Use image 1 as the primary authority: broad large round head, roughly 2.4-head-tall body, warm brown clean outlined shapes, simple dark oval eyes, tiny nose/mouth, short comfortable arms and legs, matte muted flat colors and minimal cel shading. Keep the identity, age, hairstyle, clothing colors and accessories of image 2 as described below. Full-body straight-on relaxed idle pose, arms down and feet on a shared flat baseline. One person only, centered in a 2:3 portrait composition with clear transparent margin. Real alpha transparency outside a clean silhouette. Absolutely NO cast shadow, drop shadow, surrounding glow, halo, vignette, blur, floor, room, objects, captions, letters or background paint. Not realistic anime, not 3D, not pixel art. Adult female employee with dark-brown hair in a low ponytail and soft bangs, cream collared shirt with rolled sleeves, sage-green apron with a small blank tag, charcoal trousers, sage/cream sneakers."
+    },
+    {
+      "id": "employee-female-02",
+      "original": "employee-female-02-v1.png",
+      "file": "employee-female-02-chibi-v2.png",
+      "sha256": "260a623ce7d5aa696c9493891b63159802649c89bc24d154824b48ef33a34ab9",
+      "prompt": "Use case: style-transfer. Asset type: one transparent front-facing game NPC sprite. Redraw the person in image 2 in the SAME compact SD/chibi illustration style and proportions as the playable character in image 1. Image 3 is a freshly adapted employee for consistency. Use image 1 as the primary authority: broad large round head, roughly 2.4-head-tall body, warm brown clean outlined shapes, simple dark oval eyes, tiny nose/mouth, short comfortable arms and legs, matte muted flat colors and minimal cel shading. Keep the identity, age, hairstyle, clothing colors and accessories of image 2 as described below. Full-body straight-on relaxed idle pose, arms down and feet on a shared flat baseline. One person only, centered in a 2:3 portrait composition with clear transparent margin. Real alpha transparency outside a clean silhouette. Absolutely NO cast shadow, drop shadow, surrounding glow, halo, vignette, blur, floor, room, objects, captions, letters or background paint. Not realistic anime, not 3D, not pixel art. Adult female employee with chin-length dark-brown bob and thin round brown glasses, light beige collared shirt, sage-green apron and blank cream tag, muted navy trousers, cream sneakers."
+    },
+    {
+      "id": "customer-adult-male-01",
+      "original": "customer-adult-male-01-v1.png",
+      "file": "customer-adult-male-01-chibi-v2.png",
+      "sha256": "f2fb45b08192b2f4b7274b5810f9e86cbbba661452b31d4e7bcc94eb1ee47c9d",
+      "prompt": "Use case: style-transfer. Asset type: one transparent front-facing game NPC sprite. Redraw the person in image 2 in the SAME compact SD/chibi illustration style and proportions as the playable character in image 1. Image 3 is a freshly adapted employee for consistency. Use image 1 as the primary authority: broad large round head, roughly 2.4-head-tall body, warm brown clean outlined shapes, simple dark oval eyes, tiny nose/mouth, short comfortable arms and legs, matte muted flat colors and minimal cel shading. Keep the identity, age, hairstyle, clothing colors and accessories of image 2 as described below. Full-body straight-on relaxed idle pose, arms down and feet on a shared flat baseline. One person only, centered in a 2:3 portrait composition with clear transparent margin. Real alpha transparency outside a clean silhouette. Absolutely NO cast shadow, drop shadow, surrounding glow, halo, vignette, blur, floor, room, objects, captions, letters or background paint. Not realistic anime, not 3D, not pixel art. Adult male customer: short dark charcoal hair, open dusty-blue overshirt over a cream T-shirt, beige trousers and cream low sneakers. Empty hands, no bag."
+    },
+    {
+      "id": "customer-adult-male-02",
+      "original": "customer-adult-male-02-v1.png",
+      "file": "customer-adult-male-02-chibi-v2.png",
+      "sha256": "60b2d72347241671b5fa0b05164ec4fe6d440ea103c40cae7003040d313017ea",
+      "prompt": "Use case: style-transfer. Asset type: one transparent front-facing game NPC sprite. Redraw the person in image 2 in the SAME compact SD/chibi illustration style and proportions as the playable character in image 1. Image 3 is a freshly adapted employee for consistency. Use image 1 as the primary authority: broad large round head, roughly 2.4-head-tall body, warm brown clean outlined shapes, simple dark oval eyes, tiny nose/mouth, short comfortable arms and legs, matte muted flat colors and minimal cel shading. Keep the identity, age, hairstyle, clothing colors and accessories of image 2 as described below. Full-body straight-on relaxed idle pose, arms down and feet on a shared flat baseline. One person only, centered in a 2:3 portrait composition with clear transparent margin. Real alpha transparency outside a clean silhouette. Absolutely NO cast shadow, drop shadow, surrounding glow, halo, vignette, blur, floor, room, objects, captions, letters or background paint. Not realistic anime, not 3D, not pixel art. Adult male customer: short warm brown hair, thin brown glasses, muted burnt-orange crewneck knit sweater, charcoal-olive trousers and brown shoes. Empty hands."
+    },
+    {
+      "id": "customer-adult-female-01",
+      "original": "customer-adult-female-01-v1.png",
+      "file": "customer-adult-female-01-chibi-v2.png",
+      "sha256": "5d613af7b01864e93ddd8b15ec58b0a606d7ea218cb240b4df77ad94d77608b8",
+      "prompt": "Use case: style-transfer. Asset type: one transparent front-facing game NPC sprite. Redraw the person in image 2 in the SAME compact SD/chibi illustration style and proportions as the playable character in image 1. Image 3 is a freshly adapted employee for consistency. Use image 1 as the primary authority: broad large round head, roughly 2.4-head-tall body, warm brown clean outlined shapes, simple dark oval eyes, tiny nose/mouth, short comfortable arms and legs, matte muted flat colors and minimal cel shading. Keep the identity, age, hairstyle, clothing colors and accessories of image 2 as described below. Full-body straight-on relaxed idle pose, arms down and feet on a shared flat baseline. One person only, centered in a 2:3 portrait composition with clear transparent margin. Real alpha transparency outside a clean silhouette. Absolutely NO cast shadow, drop shadow, surrounding glow, halo, vignette, blur, floor, room, objects, captions, letters or background paint. Not realistic anime, not 3D, not pixel art. Adult female customer: shoulder-length warm dark brown straight hair and bangs, soft lavender cardigan over a cream top, muted blue jeans and cream sneakers. Empty hands."
+    },
+    {
+      "id": "customer-adult-female-02",
+      "original": "customer-adult-female-02-v1.png",
+      "file": "customer-adult-female-02-chibi-v2.png",
+      "sha256": "6ad10df3ee3d904d4c37b50e989fb09033ae2160a0f6a7f2513c83fefed6a366",
+      "prompt": "Use case: style-transfer. Asset type: one transparent front-facing game NPC sprite. Redraw the person in image 2 in the SAME compact SD/chibi illustration style and proportions as the playable character in image 1. Image 3 is a freshly adapted employee for consistency. Use image 1 as the primary authority: broad large round head, roughly 2.4-head-tall body, warm brown clean outlined shapes, simple dark oval eyes, tiny nose/mouth, short comfortable arms and legs, matte muted flat colors and minimal cel shading. Keep the identity, age, hairstyle, clothing colors and accessories of image 2 as described below. Full-body straight-on relaxed idle pose, arms down and feet on a shared flat baseline. One person only, centered in a 2:3 portrait composition with clear transparent margin. Real alpha transparency outside a clean silhouette. Absolutely NO cast shadow, drop shadow, surrounding glow, halo, vignette, blur, floor, room, objects, captions, letters or background paint. Not realistic anime, not 3D, not pixel art. Adult female customer: short softly waved dark-brown bob with a side part, muted mustard collared blouse with loose sleeves, charcoal high-waist trousers and beige slip-on shoes. Empty hands."
+    },
+    {
+      "id": "customer-senior-male-01",
+      "original": "customer-senior-male-01-v1.png",
+      "file": "customer-senior-male-01-chibi-v2.png",
+      "sha256": "98bac02de672a669465afeee3a0edba563390d9e9c25cda18ae560c2ec3b930e",
+      "prompt": "Use case: style-transfer. Asset type: one transparent front-facing game NPC sprite. Redraw the person in image 2 in the SAME compact SD/chibi illustration style and proportions as the playable character in image 1. Image 3 is a freshly adapted employee for consistency. Use image 1 as the primary authority: broad large round head, roughly 2.4-head-tall body, warm brown clean outlined shapes, simple dark oval eyes, tiny nose/mouth, short comfortable arms and legs, matte muted flat colors and minimal cel shading. Keep the identity, age, hairstyle, clothing colors and accessories of image 2 as described below. Full-body straight-on relaxed idle pose, arms down and feet on a shared flat baseline. One person only, centered in a 2:3 portrait composition with clear transparent margin. Real alpha transparency outside a clean silhouette. Absolutely NO cast shadow, drop shadow, surrounding glow, halo, vignette, blur, floor, room, objects, captions, letters or background paint. Not realistic anime, not 3D, not pixel art. Senior male customer: short softly waved light gray hair, thin round brown glasses, sage-green cardigan over cream collared shirt, brown trousers and dark brown comfortable shoes. Convey an older adult with just a few subtle face creases, not a youthful face painted with gray hair. Still use the player's simple dark oval eyes and compact chibi anatomy."
+    },
+    {
+      "id": "customer-senior-male-02",
+      "original": "customer-senior-male-02-v1.png",
+      "file": "customer-senior-male-02-chibi-v2.png",
+      "sha256": "63d3cf8378d5847db23d8d0fab507e3eb7bcb27c62e89d5b39eca58219c201ec",
+      "prompt": "Use case: style-transfer. Asset type: one transparent front-facing game NPC sprite. Redraw the person in image 2 in the SAME compact SD/chibi illustration style and proportions as the playable character in image 1. Image 3 is a freshly adapted employee for consistency. Use image 1 as the primary authority: broad large round head, roughly 2.4-head-tall body, warm brown clean outlined shapes, simple dark oval eyes, tiny nose/mouth, short comfortable arms and legs, matte muted flat colors and minimal cel shading. Keep the identity, age, hairstyle, clothing colors and accessories of image 2 as described below. Full-body straight-on relaxed idle pose, arms down and feet on a shared flat baseline. One person only, centered in a 2:3 portrait composition with clear transparent margin. Real alpha transparency outside a clean silhouette. Absolutely NO cast shadow, drop shadow, surrounding glow, halo, vignette, blur, floor, room, objects, captions, letters or background paint. Not realistic anime, not 3D, not pixel art. Senior male customer: receding light-gray hair with a balding crown, light dusty-blue collared shirt under beige knitted sweater vest, muted gray trousers and brown comfortable shoes. A few very gentle age creases, warm expression. Do not add glasses."
+    },
+    {
+      "id": "customer-senior-female-01",
+      "original": "customer-senior-female-01-v1.png",
+      "file": "customer-senior-female-01-chibi-v2.png",
+      "sha256": "ad12316de13ff2659fe3b1d6e53924b11846d32d519a7d75e4e68c6225ed55ae",
+      "prompt": "Use case: style-transfer. Asset type: one transparent front-facing game NPC sprite. Redraw the person in image 2 in the SAME compact SD/chibi illustration style and proportions as the playable character in image 1. Image 3 is a freshly adapted employee for consistency. Use image 1 as the primary authority: broad large round head, roughly 2.4-head-tall body, warm brown clean outlined shapes, simple dark oval eyes, tiny nose/mouth, short comfortable arms and legs, matte muted flat colors and minimal cel shading. Keep the identity, age, hairstyle, clothing colors and accessories of image 2 as described below. Full-body straight-on relaxed idle pose, arms down and feet on a shared flat baseline. One person only, centered in a 2:3 portrait composition with clear transparent margin. Real alpha transparency outside a clean silhouette. Absolutely NO cast shadow, drop shadow, surrounding glow, halo, vignette, blur, floor, room, objects, captions, letters or background paint. Not realistic anime, not 3D, not pixel art. Senior female customer: short soft curly gray hair, thin round brown glasses, muted dusty-rose cardigan over a cream blouse, brown trousers and cream comfortable shoes. A few gentle age creases, simple warm face, not realistic portrait shading."
+    },
+    {
+      "id": "customer-senior-female-02",
+      "original": "customer-senior-female-02-v1.png",
+      "file": "customer-senior-female-02-chibi-v2.png",
+      "sha256": "57c08a84e47ae0a5fb2011115d347b2e6de2e8926cc6ea00b7a845431cf39a07",
+      "prompt": "Use case: style-transfer. Asset type: one transparent front-facing game NPC sprite. Redraw the person in image 2 in the SAME compact SD/chibi illustration style and proportions as the playable character in image 1. Image 3 is a freshly adapted employee for consistency. Use image 1 as the primary authority: broad large round head, roughly 2.4-head-tall body, warm brown clean outlined shapes, simple dark oval eyes, tiny nose/mouth, short comfortable arms and legs, matte muted flat colors and minimal cel shading. Keep the identity, age, hairstyle, clothing colors and accessories of image 2 as described below. Full-body straight-on relaxed idle pose, arms down and feet on a shared flat baseline. One person only, centered in a 2:3 portrait composition with clear transparent margin. Real alpha transparency outside a clean silhouette. Absolutely NO cast shadow, drop shadow, surrounding glow, halo, vignette, blur, floor, room, objects, captions, letters or background paint. Not realistic anime, not 3D, not pixel art. Senior female customer: short side-parted silver-gray bob, muted teal collared blouse, brown trousers and cream walking shoes. Gentle older-adult facial details and warm expression. No added glasses or jewelry."
+    },
+    {
+      "id": "customer-child-male-01",
+      "original": "customer-child-male-01-v1.png",
+      "file": "customer-child-male-01-chibi-v2.png",
+      "sha256": "acadeb431fb949c8bde51c3d4af3a1ac7b5a138cdc4e9f30c65e467e2c954563",
+      "prompt": "Use case: style-transfer. Asset type: one transparent front-facing game NPC sprite. Redraw the person in image 2 in the SAME compact SD/chibi illustration style and proportions as the playable character in image 1. Image 3 is a freshly adapted employee for consistency. Use image 1 as the primary authority: broad large round head, roughly 2.4-head-tall body, warm brown clean outlined shapes, simple dark oval eyes, tiny nose/mouth, short comfortable arms and legs, matte muted flat colors and minimal cel shading. Keep the identity, age, hairstyle, clothing colors and accessories of image 2 as described below. Full-body straight-on relaxed idle pose, arms down and feet on a shared flat baseline. One person only, centered in a 2:3 portrait composition with clear transparent margin. Real alpha transparency outside a clean silhouette. Absolutely NO cast shadow, drop shadow, surrounding glow, halo, vignette, blur, floor, room, objects, captions, letters or background paint. Not realistic anime, not 3D, not pixel art. Young boy customer, clearly a child: short tousled warm dark-brown hair, muted golden-yellow sweatshirt, navy knee-length shorts, cream socks and cream/blue sneakers. Slightly rounder and shorter than adult NPCs but coherent with the player's chibi proportions. Empty hands."
+    },
+    {
+      "id": "customer-child-male-02",
+      "original": "customer-child-male-02-v1.png",
+      "file": "customer-child-male-02-chibi-v2.png",
+      "sha256": "c633c4a9e0e5571f3f64eafcdf745fb68e903ae8f79757166fd677d623f5ddee",
+      "prompt": "Use case: style-transfer. Asset type: one transparent front-facing game NPC sprite. Redraw the person in image 2 in the SAME compact SD/chibi illustration style and proportions as the playable character in image 1. Image 3 is a freshly adapted employee for consistency. Use image 1 as the primary authority: broad large round head, roughly 2.4-head-tall body, warm brown clean outlined shapes, simple dark oval eyes, tiny nose/mouth, short comfortable arms and legs, matte muted flat colors and minimal cel shading. Keep the identity, age, hairstyle, clothing colors and accessories of image 2 as described below. Full-body straight-on relaxed idle pose, arms down and feet on a shared flat baseline. One person only, centered in a 2:3 portrait composition with clear transparent margin. Real alpha transparency outside a clean silhouette. Absolutely NO cast shadow, drop shadow, surrounding glow, halo, vignette, blur, floor, room, objects, captions, letters or background paint. Not realistic anime, not 3D, not pixel art. Young boy customer, clearly a child: short dark-brown hair, thin round brown glasses, dusty-blue zip hoodie open over cream T-shirt, muted olive/gray trousers and sage/cream sneakers. Short compact child body. Empty hands."
+    },
+    {
+      "id": "customer-child-female-01",
+      "original": "customer-child-female-01-v1.png",
+      "file": "customer-child-female-01-chibi-v2.png",
+      "sha256": "e7445247ae4fb5a40739a1e51b4d92479f7a34412c4bc8dcd9d25cd7c920766c",
+      "prompt": "Use case: style-transfer. Asset type: one transparent front-facing game NPC sprite. Redraw the person in image 2 in the SAME compact SD/chibi illustration style and proportions as the playable character in image 1. Image 3 is a freshly adapted employee for consistency. Use image 1 as the primary authority: broad large round head, roughly 2.4-head-tall body, warm brown clean outlined shapes, simple dark oval eyes, tiny nose/mouth, short comfortable arms and legs, matte muted flat colors and minimal cel shading. Keep the identity, age, hairstyle, clothing colors and accessories of image 2 as described below. Full-body straight-on relaxed idle pose, arms down and feet on a shared flat baseline. One person only, centered in a 2:3 portrait composition with clear transparent margin. Real alpha transparency outside a clean silhouette. Absolutely NO cast shadow, drop shadow, surrounding glow, halo, vignette, blur, floor, room, objects, captions, letters or background paint. Not realistic anime, not 3D, not pixel art. Young girl customer, clearly a child: chin-length dark-brown bob with a tiny simple salmon hair clip on her left side, muted salmon-pink sweatshirt, beige trousers and cream sneakers. Slightly rounder and shorter child body. Empty hands."
+    },
+    {
+      "id": "customer-child-female-02",
+      "original": "customer-child-female-02-v1.png",
+      "file": "customer-child-female-02-chibi-v2.png",
+      "sha256": "60fe2df0fbf2a8dd4a679b62ccd584b361bc20e35edd5baf7ef19d940a6ceec3",
+      "prompt": "Use case: style-transfer. Asset type: one transparent front-facing game NPC sprite. Redraw the person in image 2 in the SAME compact SD/chibi illustration style and proportions as the playable character in image 1. Image 3 is a freshly adapted employee for consistency. Use image 1 as the primary authority: broad large round head, roughly 2.4-head-tall body, warm brown clean outlined shapes, simple dark oval eyes, tiny nose/mouth, short comfortable arms and legs, matte muted flat colors and minimal cel shading. Keep the identity, age, hairstyle, clothing colors and accessories of image 2 as described below. Full-body straight-on relaxed idle pose, arms down and feet on a shared flat baseline. One person only, centered in a 2:3 portrait composition with clear transparent margin. Real alpha transparency outside a clean silhouette. Absolutely NO cast shadow, drop shadow, surrounding glow, halo, vignette, blur, floor, room, objects, captions, letters or background paint. Not realistic anime, not 3D, not pixel art. Young girl customer, clearly a child: dark-brown hair in a low side ponytail with soft bangs, soft lavender sweatshirt, muted blue jeans and cream sneakers. Slightly rounder and shorter child body. Empty hands, no added accessories."
+    }
+  ]
+}

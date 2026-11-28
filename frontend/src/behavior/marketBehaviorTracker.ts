@@ -274,7 +274,7 @@ export class MarketBehaviorTracker {
     this.scheduleIdle();
   }
 
-  shelfOpened(station: Exclude<MarketTelemetryStation, 'checkout'>) {
+  shelfOpened(station: Exclude<MarketTelemetryStation, 'checkout'>, position?: { x: number; y: number }) {
     this.movementDetector.markShelfOpened(station);
     const target = this.targetZoneIds().has(station);
     this.track({
@@ -282,6 +282,7 @@ export class MarketBehaviorTracker {
       microActionId: `OPEN_SHELF_${station}`,
       payload: {
         stationId: station,
+        ...(position ? { x: position.x, y: position.y } : {}),
         marketContent: { displayedProducts: this.products.filter((product) => product.categoryId === station).map(
           ({ id, name, detail, price, salesUnit, attributes, initialStock }) => ({
             id, name, detail, price, salesUnit, attributes, remainingStock: initialStock - (this.latestCart[id] ?? 0),
@@ -296,6 +297,7 @@ export class MarketBehaviorTracker {
     station: Exclude<MarketTelemetryStation, 'checkout'>,
     cart: MarketCart,
     openedAt: number,
+    position?: { x: number; y: number },
   ) {
     const targetItems = this.mission.objectives
       .filter(({ productId }) => this.product(productId)?.categoryId === station);
@@ -308,6 +310,7 @@ export class MarketBehaviorTracker {
       payload: {
         durationMs: Math.max(0, Date.now() - openedAt),
         stationId: station,
+        ...(position ? { x: position.x, y: position.y } : {}),
       },
       priority: hasRemainingTarget ? 'high' : 'normal',
     });
@@ -340,7 +343,7 @@ export class MarketBehaviorTracker {
     });
   }
 
-  quantityChanged(productId: string, before: number, after: number, cartAfter: MarketCart) {
+  quantityChanged(productId: string, before: number, after: number, cartAfter: MarketCart, position?: { x: number; y: number }) {
     const objective = this.mission.objectives.find((item) => getObjectiveProductIds(item).includes(productId));
     const selectedForObjective = objective ? getObjectiveQuantity(cartAfter, objective) : after;
     const beforeForObjective = selectedForObjective - after + before;
@@ -351,6 +354,7 @@ export class MarketBehaviorTracker {
       payload: {
         cartTotalAmount: getMarketCartTotal(cartAfter, this.products),
         itemId: productId,
+        ...(position ? { x: position.x, y: position.y } : {}),
         marketContent: { item: this.product(productId), purchaseUnit: this.product(productId)?.salesUnit },
         quantityAfter: after,
         quantityBefore: before,

@@ -2,7 +2,7 @@ import type { MarketAction, MarketSessionConfig } from '../game/marketSession';
 
 export const MARKET_AGENT_PROTOCOL_VERSION = 2;
 
-export type MarketAgentAction = Exclude<MarketAction, { type: 'setPosition' }> | { type: 'continueBriefing' };
+export type MarketAgentAction = Exclude<MarketAction, { type: 'setPosition' | 'startTraining' | 'trainingTick' | 'endTraining' }> | { type: 'continueBriefing' };
 
 export type MarketAgentStartInput = {
   agentModel: string;

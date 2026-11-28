@@ -65,6 +65,18 @@ describe('shared atlas file loading', () => {
     expect(download).toHaveBeenCalledTimes(3);
   });
 
+  it('serves a newly requested direction ahead of background warmup without adding network slots', async () => {
+    const requests = [deferred(), deferred(), deferred(), deferred()];
+    const download = jest.fn((source: ImageSourcePropType) => requests[Number(source) - 1].promise);
+    const cache = createAvatarAtlasCache(download);
+    cache.subscribe(1, jest.fn()); cache.subscribe(2, jest.fn());
+    cache.subscribe(3, jest.fn(), 'background');
+    cache.subscribe(4, jest.fn());
+    await flush(); expect(download.mock.calls.map(call => call[0])).toEqual([1, 2]);
+    requests[0].resolve({ uri: 'one' }); await flush();
+    expect(download.mock.calls.map(call => call[0])).toEqual([1, 2, 4]);
+  });
+
   it('retries a real failure once after its cooldown without a render-driven request loop', async () => {
     const download = jest.fn().mockRejectedValue(new Error('offline'));
     const cache = createAvatarAtlasCache(download), result = jest.fn();

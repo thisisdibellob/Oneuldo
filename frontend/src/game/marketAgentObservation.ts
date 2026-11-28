@@ -1,5 +1,6 @@
 import { isNearMarketStation } from './marketEnvironment';
 import { getMarketObservation, type MarketSession } from './marketSession';
+import { marketTrainingInstruction } from './marketTraining';
 
 export type MarketAgentUiState = {
   briefing: boolean;
@@ -43,6 +44,7 @@ function availableActions(engine: ReturnType<typeof getMarketObservation>, ui: M
   if (engine.view !== 'world') actions.unshift({ type: 'closeView' });
   else actions.unshift({ type: 'viewCart' }, { type: 'viewHelp' });
   if (engine.view === 'world' && !engine.activeStation && engine.phase === 'shopping') {
+    if(engine.training.task==='shelf-finder') actions.unshift({type:'finishShelfTask'});
     actions.unshift({ type: 'move', tool: 'market_move', parameters: { dx: '유한한 수', dy: '유한한 수', maximumDistance: 32 } });
     const near = engine.environment.stationDetails.filter(station => station.available !== false
       && isNearMarketStation(engine.environment, station.id, engine.playerPosition, undefined, engine.cashierAvailability));
@@ -55,6 +57,8 @@ function availableActions(engine: ReturnType<typeof getMarketObservation>, ui: M
     if (engine.cart) actions.unshift({ type: 'remove', productIds: Object.keys(engine.cart), quantity: '1~99 정수' });
   }
   if (engine.activeStation?.startsWith('staff:')) {
+    actions.unshift({type:'askLocation',objectiveIds:engine.objectives.map(o=>o.id)});
+    if(engine.learning.stockout)actions.unshift({type:'checkStock',productId:engine.learning.stockout.requestedProductId});
     actions.unshift({ type: 'requestCashier', checkoutIds: ['checkout', 'checkout-2'] });
     if (engine.cart) actions.unshift({ type: 'requestReturn', productIds: Object.keys(engine.cart), quantity: '1~99 정수' });
   }
@@ -86,7 +90,7 @@ export function buildMarketAgentObservation(
     limits: { maxSteps, remainingSteps: Math.max(0, maxSteps - stepCount) },
     screen: {
       screenId: 'MARKET_SIMULATION', title: '마트에서 장보기', phase: engine.phase, visibleView: engine.view,
-      mission: { objectives: engine.objectives, instruction: ui.briefingText ?? '목록에 맞는 상품과 수량을 골라 계산하세요. 필요하면 직원에게 도움을 요청할 수 있습니다.' },
+      mission: { objectives: engine.objectives, instruction: ui.briefingText ?? marketTrainingInstruction(engine.training), training:engine.training },
       hud: { score: engine.score, penaltyPoints: engine.penaltyPoints, alarmCount: engine.alarmCount, paid: engine.paid, attempts: engine.attempts },
       player: { position: engine.playerPosition },
       world: {
@@ -97,6 +101,7 @@ export function buildMarketAgentObservation(
         walls: engine.environment.walls, obstacles: engine.environment.obstacles, entrance: engine.environment.entrance,
         commonDoor: engine.environment.commonDoor, alarmGates: engine.environment.alarmGates,
         constructionZones: engine.environment.constructionZones,
+        visibleIncidents: engine.visibleIncidents,
       },
       visiblePanel: {
         type: explicitPanel ?? (engine.phase === 'feedback' ? 'feedback' : engine.phase === 'checkout' ? 'checkout'
@@ -106,6 +111,7 @@ export function buildMarketAgentObservation(
         cashierAvailability: engine.cashierAvailability, selectedCheckoutId: engine.selectedCheckoutId,
         feedback: engine.feedback, outcome: engine.outcome, ratings: engine.ratings, ratingSkipped: engine.ratingSkipped,
         staffReturnHelp: ui.staffReturnHelp, staffResponse: ui.staffResponse, reviewMessage: ui.reviewMessage,
+        staffLearningFeedback:engine.staffLearningFeedback,
         lastActionError: engine.lastActionError,
       },
     },

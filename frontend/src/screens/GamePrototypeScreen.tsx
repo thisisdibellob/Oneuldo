@@ -1,3 +1,7 @@
+import type { MarketViewFrame } from '../components/game/MarketWorldGuidance';
+import { getMarketHudControlLift } from '../game/marketHudLayout';
+import { useLayoutEffect } from 'react';
+import { cameraBoundActorTransform } from '../game/cameraBoundActor';
 import { DIALOGUE_CHARACTER_DELAY, DIALOGUE_CLEAR_VOLUME, isSilentGamePreview } from '../game/dialogueFeedback';
 import { useDialogueAudio } from '../components/game/useDialogueAudio';
 import { useGamePreferences } from '../game/gamePreferences';
@@ -83,6 +87,11 @@ import { getMarketRenderDepth, getNearestMarketStation, getMarketStationApproach
 import { applyMarketEnvironmentPlan, getMarketEnvironmentContext } from '../game/marketEnvironmentPlan';
 import {
   BUS_STOP_POINT,
+  CAFE_ENTRANCE_POINT,
+  CAFE_RETURN_POINT,
+  LAUNDRY_ENTRANCE_POINT,
+  LAUNDRY_RETURN_POINT,
+  HOME_LAUNDRY_POINT,
   HOME_EXIT_POINT,
   HOME_FRIDGE_POINT,
   HOME_PLAYER_POINT,
@@ -141,6 +150,11 @@ import { resolveMarketMovement } from '../game/marketMovement';
 import { MARKET_DIRECTIONAL_MOVE_SPEED, type ReplayDirectionalInput } from '../game/marketDirectionalInput';
 import type { ReplayPresentation } from '../game/marketReplayPerception';
 import { LibrarySimulationScreen } from './LibrarySimulationScreen';
+import { LaundrySimulationScreen } from './LaundrySimulationScreen';
+import { createLaundrySession, getLaundryObjective } from '../game/laundrySession';
+import { getLaundryDraft, keepLaundryDraft, useLaundryDraft } from '../game/laundryStore';
+import { CafeSimulationScreen } from './CafeSimulationScreen';
+import { getCafeDraft, keepCafeDraft } from '../game/cafeStore';
 import { BusSimulationScreen } from './BusSimulationScreen';
 import { DayJourneyPanel } from '../components/game/DayJourneyPanel';
 import { DAY_JOURNEY_GUIDANCE, clearDayBusDraft, dayJourneyStep, dispatchDayJourney, getDayJourney, getDayLibraryDraft, getDayBusDraft, keepDayLibraryDraft, keepDayBusDraft, useDayJourney } from '../game/dayJourney';
@@ -151,7 +165,9 @@ import { getShoppingErrandMarketConfig, type ShoppingErrandAction } from '../gam
 import { dispatchShoppingErrand, getShoppingErrand, offerShoppingErrand, useShoppingErrand } from '../game/shoppingErrandStore';
 import type { MarketSessionConfig } from '../game/marketSession';
 import type { MarketStoredEpisode } from '../game/marketEpisodeStore';
-import { recordCompletedBusActivity, recordCompletedLibraryActivity, recordCompletedShoppingActivity, recordCompletedDeliveryActivity } from '../game/activityAlbum';
+import { recordCompletedBusActivity, recordCompletedCafeActivity, recordCompletedLaundryActivity, recordCompletedLibraryActivity, recordCompletedShoppingActivity, recordCompletedDeliveryActivity } from '../game/activityAlbum';
+import { dispatchPhishingAction, getPhishingSession, usePhishingSession } from '../game/phishingStore';
+import { getPhishingGoal, PHISHING_SCENARIOS } from '../game/phishingSession';
 
 // Add ?muteAudio=1 to developer preview URLs for silent interaction checks.
 const MARKET_REPLAY_ENABLED = __DEV__ && Platform.OS === 'web' && typeof window !== 'undefined'
@@ -189,7 +205,7 @@ const WEB_MOVEMENT_KEYS: Record<string, Point> = {
 };
 
 type DailyConversationChoice = 'fun' | 'tired';
-type NpcInteractionChoice = 'npc-cashier' | 'npc-quest' | 'npc-talk' | 'npc-errand';
+type NpcInteractionChoice = 'npc-cashier' | 'npc-quest' | 'npc-talk' | 'npc-errand' | 'npc-safety';
 type DialogueChoice = DailyConversationChoice | NpcInteractionChoice;
 type DialogueStep =
   | { kind: 'line'; text: string }
@@ -244,7 +260,7 @@ type VillageGamePortalId = VillagePortalId;
 type PendingPortal = VillageGamePortalId | null;
 
 function getVillagePortalPoint(portal: VillageGamePortalId): Point {
-  return portal === 'market' ? MARKET_ENTRANCE_POINT : HOUSE_ENTRANCE_POINT;
+  return portal === 'market' ? MARKET_ENTRANCE_POINT : portal === 'cafe' ? CAFE_ENTRANCE_POINT : portal === 'laundry' ? LAUNDRY_ENTRANCE_POINT : HOUSE_ENTRANCE_POINT;
 }
 type DialogueMode = 'minsu-quest' | 'npc-greeting' | 'small-talk' | null;
 type InfoPanel = { body: string; title: string } | null;
@@ -517,7 +533,7 @@ type GamePrototypeScreenProps = {
   accessToken?: string | null;
   onExit: () => void;
   onOpenAnalysis?: () => void;
-  initialActivity?: 'day' | 'bus' | 'market' | 'errand';
+  initialActivity?: 'day' | 'bus' | 'market' | 'errand' | 'phishing' | 'cafe' | 'laundry';
   /** Development placement only; normal play always starts in the shared village. */
   previewLocation?: GamePreviewLocation;
 };
@@ -531,6 +547,19 @@ export function GamePrototypeScreen({ accessToken = null, onExit, onOpenAnalysis
     safeArea: { top: replayInsets?.top ?? 0, bottom: replayInsets?.bottom ?? 0 } };
   const journey = useDayJourney();
   const errand = useShoppingErrand();
+  const safetySession = usePhishingSession();
+  const safetyPhoneRequestKey = useRef(1);
+  const [safetyPhoneRequest, setSafetyPhoneRequest] = useState<{ key: number; action: 'messages' } | null>(initialActivity === 'phishing' ? { key: 1, action: 'messages' } : null);
+  const [visitingMinsu, setVisitingMinsu] = useState(false);
+  const openSafetyPhone = useCallback(() => setSafetyPhoneRequest({ key: ++safetyPhoneRequestKey.current, action: 'messages' }), []);
+  const consumeSafetyPhoneRequest = useCallback(() => setSafetyPhoneRequest(null), []);
+  const visitMinsuForSafety = useCallback(() => {
+    dispatchPhishingAction({ type: 'STOP' });
+    setVisitingMinsu(true);
+  }, []);
+  useEffect(() => {
+    if (!safetySession || safetySession.verification || safetySession.status === 'completed') setVisitingMinsu(false);
+  }, [safetySession]);
   const [errandPanelOpen, setErrandPanelOpen] = useState(initialActivity === 'errand' && !!getShoppingErrand());
   const [errandMarketConfig, setErrandMarketConfig] = useState<Partial<MarketSessionConfig> | undefined>();
   const openErrandPanel = useCallback(() => setErrandPanelOpen(true), []);
@@ -549,11 +578,12 @@ export function GamePrototypeScreen({ accessToken = null, onExit, onOpenAnalysis
     keepAudioSessionActive: true,
   });
   const viewportNode = useRef<View | null>(null);
-  const camera = useRef(new Animated.ValueXY()).current;
+  const marketViewFrame = useRef<MarketViewFrame|null>(null);
+  const camera = useRef(new Animated.ValueXY({x:-initialPlayerPoint.x,y:-initialPlayerPoint.y}, { useNativeDriver: Platform.OS !== 'web' })).current;
   const playerCameraOffset = useRef(new Animated.ValueXY()).current;
-  const marketPlayerPosition = useRef(new Animated.ValueXY(initialPlayerPoint)).current;
+  const viewportCenterAnimation = useRef(new Animated.ValueXY()).current;
+  const [actorTransform] = useState(() => cameraBoundActorTransform(camera, viewportCenterAnimation, playerCameraOffset));
   const marketPlayerDepth = useRef(new Animated.Value(getMarketRenderDepth(initialPlayerPoint.y))).current;
-  const villagePlayerPosition = useRef(new Animated.ValueXY(initialPlayerPoint)).current;
   const villagePlayerDepth = useRef(new Animated.Value(getVillageRenderDepth(initialPlayerPoint.y))).current;
   const cameraCenter = useRef<Point>({ ...initialPlayerPoint });
   const worldZoom = useRef(new Animated.Value(WORLD_ZOOM_MIN)).current;
@@ -645,6 +675,9 @@ export function GamePrototypeScreen({ accessToken = null, onExit, onOpenAnalysis
   const [cookingOpen, setCookingOpen] = useState(false);
   const [cashierOpen, setCashierOpen] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState((__DEV__ && previewLocation === 'library') || (resumeDayLocation && getDayJourney().stage === 'working'));
+  const [cafeOpen, setCafeOpen] = useState(initialActivity === 'cafe');
+  const [laundryLocation, setLaundryLocation] = useState<'home' | 'laundromat' | null>(initialActivity === 'laundry' ? 'home' : null);
+  const laundryDraft = useLaundryDraft();
   const [busOpen, setBusOpen] = useState(resumeDayLocation && (getDayJourney().stage === 'returning' || !!getDayBusDraft()));
   const [busEntryPoint, setBusEntryPoint] = useState<'village-stop' | 'library-exterior'>(resumeDayLocation && getDayJourney().stage === 'returning' ? 'library-exterior' : 'village-stop');
   const [busDestinationOpen, setBusDestinationOpen] = useState(false);
@@ -766,6 +799,7 @@ export function GamePrototypeScreen({ accessToken = null, onExit, onOpenAnalysis
     cookingOpen ||
     cashierOpen ||
     libraryOpen ||
+    cafeOpen || laundryLocation !== null ||
     busOpen ||
     busDestinationOpen ||
     busDestinationPresent ||
@@ -912,17 +946,16 @@ export function GamePrototypeScreen({ accessToken = null, onExit, onOpenAnalysis
           ...marketCameraMetrics.current }, marketEnvironmentRef.current.world)
         : getWorldCameraFrame(point, viewport.current, worldZoomCurrentRef.current);
       cameraCenter.current = frame.center;
+      marketViewFrame.current={...viewport.current,center:{...frame.center},zoom:worldZoomCurrentRef.current};
       camera.setValue(frame.translation);
       playerCameraOffset.setValue(frame.playerOffset);
       if (worldMapRef.current === 'market') {
-        marketPlayerPosition.setValue(point);
         marketPlayerDepth.setValue(getMarketRenderDepth(point.y));
       } else if (worldMapRef.current === 'village') {
-        villagePlayerPosition.setValue(point);
         villagePlayerDepth.setValue(getVillageRenderDepth(point.y));
       }
     },
-    [camera, playerCameraOffset, marketPlayerPosition, marketPlayerDepth, villagePlayerPosition, villagePlayerDepth],
+    [camera, playerCameraOffset, marketPlayerDepth, villagePlayerDepth],
   );
 
   useEffect(() => {
@@ -976,6 +1009,7 @@ export function GamePrototypeScreen({ accessToken = null, onExit, onOpenAnalysis
       setBusStop(false);
       const stations: Array<[HomeStationId, Point]> = [
         ['fridge', HOME_FRIDGE_POINT],
+        ['laundry', HOME_LAUNDRY_POINT],
         ['exit', HOME_EXIT_POINT],
       ];
       let closest: NearbyHomeStation = null;
@@ -1008,6 +1042,8 @@ export function GamePrototypeScreen({ accessToken = null, onExit, onOpenAnalysis
     setNpc(closestNpc);
 
     const portalDistances: Array<[VillageGamePortalId, number]> = [
+      ['laundry', Math.hypot(point.x - LAUNDRY_ENTRANCE_POINT.x, point.y - LAUNDRY_ENTRANCE_POINT.y)],
+      ['cafe', Math.hypot(point.x - CAFE_ENTRANCE_POINT.x, point.y - CAFE_ENTRANCE_POINT.y)],
       [
         'market',
         Math.hypot(point.x - MARKET_ENTRANCE_POINT.x, point.y - MARKET_ENTRANCE_POINT.y),
@@ -1146,6 +1182,78 @@ export function GamePrototypeScreen({ accessToken = null, onExit, onOpenAnalysis
     setCookingOpen(false);
   }, [stopMovement]);
 
+  const handleVisitCafe = useCallback(() => {
+    prepareMapTransition();
+    setHudMenuOpen(false);
+    setPhoneContact(null);
+    setDayPanelOpen(false);
+    setErrandPanelOpen(false);
+    controlsLockedRef.current = true;
+    setCafeOpen(true);
+  }, [prepareMapTransition]);
+
+  const handleEnterCafe = useCallback(() => {
+    if (nearbyPortalIdRef.current !== 'cafe') return;
+    handleVisitCafe();
+  }, [handleVisitCafe]);
+
+  const handleLeaveCafe = useCallback(() => {
+    prepareMapTransition();
+    setCafeOpen(false);
+    worldMapRef.current = 'village';
+    setWorldMap('village');
+    playerPoint.current = { ...CAFE_RETURN_POINT };
+    updateCamera(playerPoint.current);
+    updateNpcProximity(playerPoint.current);
+  }, [prepareMapTransition, updateCamera, updateNpcProximity]);
+
+
+  const handleHomeLaundry = useCallback(() => {
+    prepareMapTransition();
+    setHudMenuOpen(false); setPhoneContact(null); setDayPanelOpen(false); setErrandPanelOpen(false);
+    if (!getLaundryDraft()) keepLaundryDraft(createLaundrySession());
+    setLaundryLocation('home');
+  }, [prepareMapTransition]);
+
+  const handleEnterLaundry = useCallback(() => {
+    if (nearbyPortalIdRef.current !== 'laundry') return;
+    const draft = getLaundryDraft();
+    if (!draft || draft.phase === 'packing' || draft.phase === 'finished') {
+      prepareMapTransition();
+      setInfoPanel({ title: '동네 빨래방', body: '우리 집의 빨래 바구니에서 빨래를 챙겨 오세요.' });
+      return;
+    }
+    prepareMapTransition();
+    setHudMenuOpen(false); setDayPanelOpen(false); setErrandPanelOpen(false);
+    setLaundryLocation('laundromat');
+  }, [prepareMapTransition]);
+
+  const handleLeaveLaundry = useCallback(() => {
+    prepareMapTransition();
+    setLaundryLocation(null);
+    worldMapRef.current = 'village'; setWorldMap('village');
+    playerPoint.current = { ...(laundryLocation === 'home' ? HOUSE_RETURN_POINT : LAUNDRY_RETURN_POINT) };
+    updateCamera(playerPoint.current); updateNpcProximity(playerPoint.current);
+  }, [laundryLocation, prepareMapTransition, updateCamera, updateNpcProximity]);
+
+  const handleLaundryQuest = useCallback(() => {
+    prepareMapTransition();
+    setHudMenuOpen(false); setDayPanelOpen(false); setErrandPanelOpen(false);
+    const draft = getLaundryDraft();
+    if (!draft || draft.phase === 'packing' || draft.phase === 'finished') {
+      worldMapRef.current = 'home'; setWorldMap('home');
+      playerPoint.current = { ...HOME_PLAYER_POINT };
+      updateCamera(playerPoint.current); updateNpcProximity(playerPoint.current);
+      handleHomeLaundry();
+    } else if (worldMapRef.current === 'home' && draft.phase === 'returning') {
+      handleHomeLaundry();
+    } else {
+      setInfoPanel({ title: draft.phase === 'returning' ? '우리 집으로' : '동네 빨래방', body: draft.phase === 'returning'
+        ? '마을 오른쪽 아래 우리 집으로 돌아가 옷장에 빨래를 정리해요.'
+        : '마을 왼쪽 아래, 마을회관 바로 위의 동네 빨래방으로 가요.' });
+    }
+  }, [prepareMapTransition, handleHomeLaundry, updateCamera, updateNpcProximity]);
+
   const handleEnterMarket = useCallback(() => {
     if (nearbyPortalIdRef.current !== 'market') return;
     prepareMapTransition();
@@ -1174,11 +1282,12 @@ export function GamePrototypeScreen({ accessToken = null, onExit, onOpenAnalysis
     setMarketCashierCalled({});
     setMarketScenarioLocked(true);
     worldMapRef.current = 'market';
+    // Commit the map's camera and scale together, before its first visible frame.
+    outsideMarketZoomRef.current = worldZoomTargetRef.current;
     setWorldMap('market');
     playerPoint.current = { ...environment.spawn };
-    updateCamera(playerPoint.current);
     updateNpcProximity(playerPoint.current);
-  }, [prepareMapTransition, updateCamera, updateNpcProximity]);
+  }, [prepareMapTransition, updateNpcProximity]);
 
   const publishMarketEnvironment = useCallback((environment: MarketEnvironment) => {
     marketEnvironmentRef.current = environment;
@@ -1203,7 +1312,7 @@ export function GamePrototypeScreen({ accessToken = null, onExit, onOpenAnalysis
       ...(shelfOrderTouched ? { shelfOrder: environment.config.shelfOrder } : {}),
     };
     publishMarketEnvironment(environment);
-    if ((categoryPlacementChanged || Object.keys(changes?.lockedSettings??{}).length>0) && accessToken && worldMapRef.current === 'market') {
+    if (!changes?.trainingTestTouched && (categoryPlacementChanged || Object.keys(changes?.lockedSettings??{}).length>0) && accessToken && worldMapRef.current === 'market') {
       stopMovement();
       marketAiRequestSequence.current += 1;
       setMarketAiStatus('loading');
@@ -1332,6 +1441,8 @@ export function GamePrototypeScreen({ accessToken = null, onExit, onOpenAnalysis
 
   const handleTravel = useCallback((destination: PhoneTravelDestination) => {
     prepareMapTransition();
+    setCafeOpen(false);
+    setLaundryLocation(null);
     clearDayBusDraft();
     setHudMenuOpen(false);
     setPhoneContact(null);
@@ -1387,8 +1498,17 @@ export function GamePrototypeScreen({ accessToken = null, onExit, onOpenAnalysis
       recordCompletedShoppingActivity({ sessionId: episode.sessionId, completedAt: Number.isFinite(finishedAt) ? finishedAt : Date.now(),
         itemCount: items.reduce((count, [, quantity]) => count + quantity, 0),
         totalAmount: items.reduce((sum, [id, quantity]) => sum + (getMarketProduct(id)?.price ?? 0) * quantity, 0),
-        checkoutKind: episode.selectedKioskId ? 'kiosk' : 'staff' });
+        checkoutKind: episode.selectedKioskId ? 'kiosk' : 'staff', success: true });
     }
+  }, []);
+  // AI 검토로 넘기는 장보기: 계산을 마치면 끝까지 한 장보기로 활동 앨범에만 남긴다(달력·개인 레벨용).
+  const handleMarketShoppingFinished = useCallback((info: { sessionId: string; completedAt: number; cart: Record<string, number>; kiosk: boolean; success?: boolean }) => {
+    if (MARKET_REPLAY_ENABLED) return;
+    const items = Object.entries(info.cart);
+    recordCompletedShoppingActivity({ sessionId: info.sessionId, completedAt: info.completedAt,
+      itemCount: items.reduce((count, [, quantity]) => count + quantity, 0),
+      totalAmount: items.reduce((sum, [id, quantity]) => sum + (getMarketProduct(id)?.price ?? 0) * quantity, 0),
+      checkoutKind: info.kiosk ? 'kiosk' : 'staff', success: info.success });
   }, []);
   const handleErrandAction = useCallback((action: ShoppingErrandAction) => {
     const before = getShoppingErrand();
@@ -1521,6 +1641,8 @@ export function GamePrototypeScreen({ accessToken = null, onExit, onOpenAnalysis
 
           if (npcToOpen) startNpcGreetingRef.current(npcToOpen);
           if (portalToUse === 'market') handleEnterMarket();
+          if (portalToUse === 'cafe') handleEnterCafe();
+          if (portalToUse === 'laundry') handleEnterLaundry();
           if (portalToUse === 'home') handleEnterHome();
           if (marketStationToUse) {
             setMarketInteractionRequest((currentRequest) => ({
@@ -1529,6 +1651,7 @@ export function GamePrototypeScreen({ accessToken = null, onExit, onOpenAnalysis
             }));
           }
           if (homeStationToUse === 'exit') handleLeaveHome();
+          if (homeStationToUse === 'laundry') handleHomeLaundry();
           if (homeStationToUse === 'fridge') {
             openFridgeMenu();
           }
@@ -1584,6 +1707,9 @@ export function GamePrototypeScreen({ accessToken = null, onExit, onOpenAnalysis
     },
     [
       handleEnterHome,
+      handleEnterCafe,
+      handleEnterLaundry,
+      handleHomeLaundry,
       handleEnterBus,
       handleEnterMarket,
       handleLeaveHome,
@@ -1903,13 +2029,23 @@ export function GamePrototypeScreen({ accessToken = null, onExit, onOpenAnalysis
     };
   }, [worldZoom, updateCamera]);
 
+  useLayoutEffect(() => {
+    if (worldMap !== 'market') return;
+    worldZoom.stopAnimation();
+    worldZoomTargetRef.current = MARKET_DEFAULT_ZOOM;
+    worldZoomCurrentRef.current = MARKET_DEFAULT_ZOOM;
+    worldZoom.setValue(MARKET_DEFAULT_ZOOM);
+    updateCamera(playerPoint.current);
+  }, [worldMap, updateCamera, worldZoom]);
+
   useEffect(() => {
     const previousMap = previousZoomMapRef.current;
     previousZoomMapRef.current = worldMap;
     if (previousMap === worldMap) return;
     if (worldMap !== 'market' && previousMap !== 'market') return;
-    if (worldMap === 'market') outsideMarketZoomRef.current = worldZoomTargetRef.current;
-    const target = worldMap === 'market' ? MARKET_DEFAULT_ZOOM : outsideMarketZoomRef.current;
+    // Entering was already placed synchronously by handleEnterMarket.
+    if (worldMap === 'market') return;
+    const target = outsideMarketZoomRef.current;
     worldZoomTargetRef.current = target;
     worldZoom.stopAnimation();
     Animated.timing(worldZoom, {
@@ -2130,6 +2266,7 @@ export function GamePrototypeScreen({ accessToken = null, onExit, onOpenAnalysis
 
   const handleViewportLayout = (event: LayoutChangeEvent) => {
     viewport.current = event.nativeEvent.layout;
+    viewportCenterAnimation.setValue({ x: viewport.current.width / 2, y: viewport.current.height / 2 });
     viewportNode.current?.measureInWindow((x, y) => {
       viewportOrigin.current = { x, y };
     });
@@ -2218,6 +2355,11 @@ export function GamePrototypeScreen({ accessToken = null, onExit, onOpenAnalysis
       options.push({ id: 'npc-cashier', label: '계산 알바 연습' });
     }
     if (npcId === 'minsu') options.unshift({ id: 'npc-errand', label: getShoppingErrand()?.phase === 'ready' ? '부탁한 물건 전달하기' : '퇴근길 장보기 부탁' });
+    const safety = getPhishingSession();
+    if (safety?.status === 'active') {
+      if (npcId === 'minsu' && safety.scenarioId.startsWith('friend-') && !safety.verification) options.unshift({ id: 'npc-safety', label: '이 연락 네가 보냈어?' });
+      if (npcId === 'jiyoung') options.unshift({ id: 'npc-safety', label: '수상한 연락, 같이 봐 줄래?' });
+    }
     startDialogue(
       npcId,
       [
@@ -2372,6 +2514,8 @@ export function GamePrototypeScreen({ accessToken = null, onExit, onOpenAnalysis
     ) return;
     if (nearbyPortalIdRef.current === portalId) {
       if (portalId === 'market') handleEnterMarket();
+      else if (portalId === 'cafe') handleEnterCafe();
+      else if (portalId === 'laundry') handleEnterLaundry();
       else handleEnterHome();
       return;
     }
@@ -2394,13 +2538,15 @@ export function GamePrototypeScreen({ accessToken = null, onExit, onOpenAnalysis
     if (homeStationNearbyRef.current === station) {
       if (station === 'exit') {
         handleLeaveHome();
+      } else if (station === 'laundry') {
+        handleHomeLaundry();
       } else {
         openFridgeMenu();
       }
       return;
     }
 
-    const stationPoint = station === 'exit' ? HOME_EXIT_POINT : HOME_FRIDGE_POINT;
+    const stationPoint = station === 'exit' ? HOME_EXIT_POINT : station === 'laundry' ? HOME_LAUNDRY_POINT : HOME_FRIDGE_POINT;
     const current = playerPoint.current;
     const dx = current.x - stationPoint.x;
     const dy = current.y - stationPoint.y;
@@ -2475,6 +2621,8 @@ export function GamePrototypeScreen({ accessToken = null, onExit, onOpenAnalysis
     if (worldMapRef.current === 'home') {
       if (homeStationNearbyRef.current === 'exit') {
         handleLeaveHome();
+      } else if (homeStationNearbyRef.current === 'laundry') {
+        handleHomeLaundry();
       } else if (homeStationNearbyRef.current === 'fridge') {
         openFridgeMenu();
       }
@@ -2516,6 +2664,14 @@ export function GamePrototypeScreen({ accessToken = null, onExit, onOpenAnalysis
     }
     if (nearbyPortalIdRef.current === 'market') {
       handleEnterMarket();
+      return;
+    }
+    if (nearbyPortalIdRef.current === 'laundry') {
+      handleEnterLaundry();
+      return;
+    }
+    if (nearbyPortalIdRef.current === 'cafe') {
+      handleEnterCafe();
       return;
     }
     if (nearbyPortalIdRef.current === 'home') {
@@ -2573,6 +2729,21 @@ export function GamePrototypeScreen({ accessToken = null, onExit, onOpenAnalysis
     }
 
     if (currentDialogueStep.purpose === 'npc-action') {
+      if (choice === 'npc-safety' && nearbyNpcIdRef.current === dialogueNpcId) {
+        const safety = getPhishingSession();
+        if (safety?.status !== 'active') return;
+        const scenario = PHISHING_SCENARIOS[safety.scenarioId];
+        if (dialogueNpcId === 'minsu' && safety.scenarioId.startsWith('friend-')) {
+          dispatchPhishingAction({ type: 'STOP' });
+          dispatchPhishingAction({ type: 'VERIFY', method: 'in-person' });
+          setVisitingMinsu(false);
+          startDialogue('minsu', [{ kind: 'line', text: scenario.verificationText.replace(/^민수:\s*/, '') }], 'small-talk');
+        } else if (dialogueNpcId === 'jiyoung') {
+          dispatchPhishingAction({ type: 'ASK_HELP' });
+          startDialogue('jiyoung', [{ kind: 'line', text: scenario.helpText.replace(/^지영:\s*/, '') }], 'small-talk');
+        }
+        return;
+      }
       if (choice === 'npc-errand' && dialogueNpcId === 'minsu' && nearbyNpcIdRef.current === 'minsu') {
         stopMovement();
         setDialogueIndex(null); setDialogueMode(null); setSelectedDailyChoice(null);
@@ -2644,7 +2815,8 @@ export function GamePrototypeScreen({ accessToken = null, onExit, onOpenAnalysis
             ? `${marketStationCategory.label} 살펴보기`
             : '가까이 가면 상호작용할 수 있어요'
       : worldMap === 'home'
-        ? nearbyHomeStation === 'fridge'
+        ? nearbyHomeStation === 'laundry' ? '빨래 바구니와 옷장 열기'
+          : nearbyHomeStation === 'fridge'
           ? '냉장고 열기'
           : nearbyHomeStation === 'exit'
             ? '집에서 마을로 나가기'
@@ -2655,6 +2827,9 @@ export function GamePrototypeScreen({ accessToken = null, onExit, onOpenAnalysis
             ? `${nearbyNpcName}와 대화 또는 의뢰 선택하기`
           : nearbyPortalId === 'market'
             ? '하늘마트 들어가기'
+            : nearbyPortalId === 'laundry' ? '동네 빨래방 들어가기'
+            : nearbyPortalId === 'cafe'
+              ? '카페 들어가기'
             : nearbyPortalId === 'home'
               ? '집으로 들어가기'
               : busStopNearby
@@ -2668,7 +2843,8 @@ export function GamePrototypeScreen({ accessToken = null, onExit, onOpenAnalysis
           ? 'exit-outline'
           : 'search'
       : worldMap === 'home'
-        ? nearbyHomeStation === 'fridge'
+        ? nearbyHomeStation === 'laundry' ? 'shirt'
+          : nearbyHomeStation === 'fridge'
           ? 'snow-outline'
           : 'exit-outline'
         : activeBusStopInteraction
@@ -2677,6 +2853,9 @@ export function GamePrototypeScreen({ accessToken = null, onExit, onOpenAnalysis
             ? 'chatbubbles'
           : nearbyPortalId === 'market'
             ? 'storefront'
+            : nearbyPortalId === 'laundry' ? 'shirt'
+            : nearbyPortalId === 'cafe'
+              ? 'cafe'
             : nearbyPortalId === 'home'
               ? 'home'
               : 'bus';
@@ -2692,7 +2871,8 @@ export function GamePrototypeScreen({ accessToken = null, onExit, onOpenAnalysis
             ? '보기'
             : '행동'
       : worldMap === 'home'
-        ? nearbyHomeStation === 'fridge'
+        ? nearbyHomeStation === 'laundry' ? '정리'
+          : nearbyHomeStation === 'fridge'
           ? '열기'
           : nearbyHomeStation === 'exit'
             ? '나가기'
@@ -2718,13 +2898,24 @@ export function GamePrototypeScreen({ accessToken = null, onExit, onOpenAnalysis
   const backgroundAudio = <GameBackgroundMusic player={backgroundMusic} audioModeReady={audioModeReady}
     muted={DEVELOPMENT_AUDIO_MUTED} musicVolume={preferences.musicVolume}
     ducked={dialoguePanelMounted || quizPanelMounted} />;
-  const dayPanel = dayPanelOpen ? <DayJourneyPanel journey={journey} onOpenErrand={errand ? () => { setDayPanelOpen(false); setErrandPanelOpen(true); } : undefined} canStart={!busOpen && !libraryOpen && worldMap === 'village'} onClose={() => setDayPanelOpen(false)} onStart={() => {
+  const dayPanel = dayPanelOpen ? <DayJourneyPanel journey={journey} onOpenErrand={errand ? () => { setDayPanelOpen(false); setErrandPanelOpen(true); } : undefined} canStart={!busOpen && !libraryOpen && !cafeOpen && !laundryLocation && worldMap === 'village'} onClose={() => setDayPanelOpen(false)} onStart={() => {
     dispatchDayJourney({ type: 'start', at: Date.now() }); setDayPanelOpen(false);
   }} /> : null;
-  const errandPanel = errandPanelOpen && errand ? <ShoppingErrandPanel errand={errand} onAction={handleErrandAction} onClose={() => setErrandPanelOpen(false)} canDeliver={!busOpen && !libraryOpen && worldMap === 'village' && nearbyNpcId === 'minsu'} /> : null;
+  const errandPanel = errandPanelOpen && errand ? <ShoppingErrandPanel errand={errand} onAction={handleErrandAction} onClose={() => setErrandPanelOpen(false)} canDeliver={!busOpen && !libraryOpen && !cafeOpen && !laundryLocation && worldMap === 'village' && nearbyNpcId === 'minsu'} /> : null;
 
   if (cashierOpen) {
     return <>{backgroundAudio}<CashierSimulationScreen onExit={() => setCashierOpen(false)} /></>;
+  }
+  if (laundryLocation) {
+    return <>{backgroundAudio}<LaundrySimulationScreen location={laundryLocation} onExit={handleLeaveLaundry} onReturnHome={handleLeaveLaundry}
+      initialSession={getLaundryDraft() ?? undefined} onSessionChange={keepLaundryDraft} onLaundryComplete={recordCompletedLaundryActivity}
+      controlMode={controlMode} onControlModeChange={selectControlMode} onTravel={handleTravel} /></>;
+  }
+  if (cafeOpen) {
+    return <>{backgroundAudio}<CafeSimulationScreen onExit={handleLeaveCafe}
+      initialSession={getCafeDraft() ?? undefined} onSessionChange={keepCafeDraft}
+      onShiftComplete={recordCompletedCafeActivity}
+      controlMode={controlMode} onControlModeChange={selectControlMode} onTravel={handleTravel} /></>;
   }
   if (libraryOpen) {
     return <>{backgroundAudio}<LibrarySimulationScreen onExit={handleLeaveLibrary}
@@ -2772,7 +2963,6 @@ export function GamePrototypeScreen({ accessToken = null, onExit, onOpenAnalysis
         style={styles.touchSurface}
       >
       <StatusBar hidden />
-
       <Animated.View
         pointerEvents="box-none"
         style={[styles.zoomScene, { transform: [{ scale: worldZoom }] }]}
@@ -2802,11 +2992,12 @@ export function GamePrototypeScreen({ accessToken = null, onExit, onOpenAnalysis
                 <Animated.View accessibilityLabel="내 캐릭터" pointerEvents="none"
                   testID="village-world-player"
                   style={[styles.player, { left: 0, top: 0, zIndex: villagePlayerDepth,
-                    transform: villagePlayerPosition.getTranslateTransform() }]}>
+                    transform: actorTransform }]}>
                   <DirectionalAvatar facing={playerAvatarPose.facing} manifest={freshPlayerAvatar}
                     motion={playerAvatarPose.motion} walkCycle={playerWalkCycle} reduceMotion={reduceMotionEnabled} scale={PLAYER_ART_SCALE} />
                 </Animated.View>
               </ExpandedVillageLayer>
+              {visitingMinsu && !safetySession?.verification ? <View pointerEvents="none" style={{ position: 'absolute', left: VILLAGE_NPC_BY_ID.minsu.point.x - 68, top: VILLAGE_NPC_BY_ID.minsu.point.y - 162, width: 136, zIndex: 9000, alignItems: 'center' }}><View style={{ backgroundColor: '#FCF8EA', borderRadius: 18, paddingVertical: 9, paddingHorizontal: 14, flexDirection: 'row', gap: 7, alignItems: 'center' }}><Ionicons name="chatbubble-ellipses" size={19} color="#668271" /><Text style={{ color: '#4B6252', fontFamily: fonts.bold, fontSize: 17 }}>연락 확인</Text></View><Ionicons name="caret-down" size={18} color="#FCF8EA" style={{ marginTop: -5 }} /></View> : null}
               <PressScale
                 accessibilityHint={
                   controlMode === 'touch'
@@ -2852,7 +3043,7 @@ export function GamePrototypeScreen({ accessToken = null, onExit, onOpenAnalysis
           {worldMap === 'market' ? <Animated.View accessibilityLabel="내 캐릭터" pointerEvents="none"
             testID="market-world-player"
             style={[styles.player, { left: 0, top: 0, zIndex: marketPlayerDepth,
-              transform: marketPlayerPosition.getTranslateTransform() }]}>
+              transform: actorTransform }]}>
             <DirectionalAvatar facing={playerAvatarPose.facing} manifest={freshPlayerAvatar}
               motion={playerAvatarPose.motion} walkCycle={playerWalkCycle} reduceMotion={reduceMotionEnabled} scale={PLAYER_ART_SCALE} />
           </Animated.View> : null}
@@ -2871,8 +3062,19 @@ export function GamePrototypeScreen({ accessToken = null, onExit, onOpenAnalysis
         </Animated.View> : null}
       </Animated.View>
 
-
+      {laundryDraft && laundryDraft.phase !== 'finished' && worldMap !== 'market' && !hudMenuOpen && !controlsLockedRef.current ? (
+        <View pointerEvents="none" style={{ position: 'absolute', top: 88, left: 16, right: 16, alignItems: 'center' }}>
+          <View style={{ maxWidth: 410, borderRadius: 18, paddingVertical: 12, paddingHorizontal: 18, backgroundColor: '#FFFBEFF2', flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <Ionicons name="shirt-outline" size={24} color="#708A79" />
+            <View style={{ flexShrink: 1 }}>
+              <Text style={{ fontFamily: fonts.bold, fontSize: 17, color: '#53665B' }}>{getLaundryObjective(laundryDraft)}</Text>
+              <Text style={{ fontFamily: fonts.medium, fontSize: 14, color: '#7C8779', marginTop: 3 }}>{laundryDraft.phase === 'returning' ? worldMap === 'home' ? '옷장 옆 바구니에서 정리해요' : '오른쪽 아래 우리 집' : laundryDraft.phase === 'packing' ? '우리 집의 빨래 바구니' : '왼쪽 아래, 마을회관 위 빨래방'}</Text>
+            </View>
+          </View>
+        </View>
+      ) : null}
       <GameControls
+        bottomOffset={worldMap === 'market' ? getMarketHudControlLift(replayWindow.width) : 0}
         controlMode={controlMode}
         locked={!gameControlsVisible}
         action={{ label: interactionActionText, accessibilityLabel: interactionLabel,
@@ -2890,14 +3092,24 @@ export function GamePrototypeScreen({ accessToken = null, onExit, onOpenAnalysis
       />
       {!cookingOpen && !phoneContact && !phoneCallPresent && (worldMap !== 'market' || !marketScenarioLocked) ? (
         <GameHud
+          marketBudget={worldMap === 'market' ? (errandMarketConfig ? errand?.approvedBudget : personalizedMarketMission?.budget) : undefined}
           controlMode={controlMode}
           dailyQuests={dailyQuests}
+          phoneRequest={safetyPhoneRequest}
+          onPhoneRequestHandled={consumeSafetyPhoneRequest}
+          onVisitMinsu={worldMap === 'village' ? visitMinsuForSafety : undefined}
           onOpenJourney={openDayPanel}
           onOpenErrand={errand ? openErrandPanel : undefined}
+          onOpenCafe={worldMap === 'village' ? handleVisitCafe : undefined}
+          onOpenLaundry={worldMap !== 'market' ? handleLaundryQuest : undefined}
           onControlModeChange={selectControlMode}
           onEmergencyExit={handleEmergencyExit}
           onExit={handleExit}
           onMenuVisibilityChange={handleHudMenuVisibilityChange}
+          onEditMarketLayout={worldMap === 'market' ? () => {
+            stopMovement();
+            setMarketInteractionRequest(current => ({ id: (current?.id ?? 0) + 1, station: 'edit-layout' }));
+          } : undefined}
           onTravel={handleTravel}
           busRouteContext={{ currentStop: 'village', direction: 'outbound', destination: 'library' }}
           onCallContact={contact => {
@@ -2929,6 +3141,7 @@ export function GamePrototypeScreen({ accessToken = null, onExit, onOpenAnalysis
 
       {worldMap === 'market' && marketAiRequestToken === accessToken && (marketAiStatus === 'ready' || marketAiStatus === 'baseline') ? (
         <MarketSimulationScreen
+          viewFrameRef={marketViewFrame}
           replayUiRef={__DEV__ && MARKET_REPLAY_ENABLED ? replayUi : undefined}
           replayPresentation={__DEV__ && MARKET_REPLAY_ENABLED ? replayPresentation : undefined}
           accessToken={accessToken}
@@ -2938,6 +3151,8 @@ export function GamePrototypeScreen({ accessToken = null, onExit, onOpenAnalysis
           spendingLimit={errandMarketConfig ? errand?.approvedBudget : undefined}
           onBudgetRequest={errandMarketConfig ? (amount: number) => { dispatchShoppingErrand({ type: 'approve-budget', amount }); } : undefined}
           onEpisodeComplete={handleMarketEpisodeComplete}
+          onShoppingFinished={handleMarketShoppingFinished}
+          playerUi
           controlMode={controlMode}
           onControlModeChange={selectControlMode}
           environment={marketEnvironment}
@@ -3563,7 +3778,13 @@ export function GamePrototypeScreen({ accessToken = null, onExit, onOpenAnalysis
       <MarketPanelTransition visible={phoneContact !== null} transitionKey={`phone-call-${phoneContact}`} onPresenceChange={setPhoneCallPresent}>
         {phoneContact ? <GameContactCall key={phoneContact} contact={phoneContact} inMarket={worldMap === 'market'} onOpenErrand={errand ? () => { closePhoneCall(); setErrandPanelOpen(true); } : undefined} onClose={closePhoneCall} /> : null}
       </MarketPanelTransition>
-      {journey.stage !== 'available' && journey.stage !== 'completed' && worldMap !== 'market' && !controlsLockedRef.current ? <View pointerEvents="box-none" style={styles.dayJourneyAnchor}>
+      {safetySession?.status === 'active' && worldMap === 'village' && !controlsLockedRef.current ? <View pointerEvents="box-none" style={styles.dayJourneyAnchor}>
+        <PressScale accessibilityRole="button" accessibilityLabel="연락 확인 이어하기" onPress={openSafetyPhone} style={styles.dayJourneyCard}>
+          <Ionicons name="chatbubbles" color="#6B8467" size={23} />
+          <View style={{ flex: 1 }}><Text style={styles.dayJourneyTitle}>{PHISHING_SCENARIOS[safetySession.scenarioId].title}</Text><Text style={styles.dayJourneyHint}>{visitingMinsu ? '광장의 민수에게 가까이 가서 말 걸기' : getPhishingGoal(safetySession)}</Text></View>
+          <Ionicons name="phone-portrait-outline" color="#7C8C74" size={21} />
+        </PressScale>
+      </View> : journey.stage !== 'available' && journey.stage !== 'completed' && worldMap !== 'market' && !controlsLockedRef.current ? <View pointerEvents="box-none" style={styles.dayJourneyAnchor}>
         <PressScale accessibilityRole="button" accessibilityLabel="도서관 다녀오기 일정 열기" onPress={openDayPanel} style={styles.dayJourneyCard}>
           <Ionicons name={journey.stage === 'home' ? 'home' : 'book'} color="#6B8467" size={23} />
           <View style={{ flex: 1 }}><Text style={styles.dayJourneyTitle}>도서관 다녀오기 · {dayJourneyStep(journey.stage)}/4</Text><Text style={styles.dayJourneyHint}>{DAY_JOURNEY_GUIDANCE[journey.stage]}</Text></View>

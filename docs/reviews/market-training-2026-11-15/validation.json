@@ -1,0 +1,72 @@
+{
+  "checkedAt": "2026-11-14T22:57:19.291Z",
+  "branch": "feat/8-장보기-게임-구체화",
+  "baseCommit": "ff000c07ff46061d69bdeebd54c902d1140daf08",
+  "previousUiCommit": "38a41b9ce23916b991b83e9181b2687913753649",
+  "developUnchanged": true,
+  "originDevelopUnchanged": true,
+  "protectedPathsUnchanged": true,
+  "unmergedFiles": "",
+  "commitCreated": false,
+  "pushed": false,
+  "typecheck": "passed",
+  "webBuild": "passed",
+  "frozenDependencyInstall": "passed after rebuilding local generated dependency folders",
+  "tests": {
+    "suites": 170,
+    "tests": 1667,
+    "failed": 0,
+    "log": "output/market-training-2026-11-15/release-tests.log"
+  },
+  "frozenCollectorReferenceSha256": "4f709dd6116f0823a53e8a8f957c87d16d3e4724bd7b2a2f86abe11b4398f90c",
+  "browser": {
+    "errors": [],
+    "crowd": 0,
+    "trajectory": {
+      "distance": 284.98290000000156,
+      "points": 17,
+      "markers": 13,
+      "durationSeconds": 23.082
+    },
+    "checks": [
+      "entry style",
+      "custom conditions saved and selected",
+      "optional map opened and closed",
+      "keyboard movement recorded",
+      "route SVG and episode JSON downloaded",
+      "time position controls",
+      "no page errors"
+    ]
+  },
+  "server": {
+    "web": "http://localhost:8081/",
+    "expoMobileTested": false
+  },
+  "expoCompatibility": {
+    "sdk": 57,
+    "patchUpdateRecommendations": 14,
+    "automaticSdkUpdate": false
+  },
+  "archive": {
+    "state": "not-archived",
+    "reason": "The repository archive tool failed on Windows: os.O_DIRECTORY is unavailable. WSL is not installed. Local originals retained.",
+    "log": "output/market-training-2026-11-15/archive.log"
+  },
+  "cleanup": {
+    "state": "blocked-by-automatic-approval-review",
+    "action": "remove generated .expo/node_modules-before-training-20261115 backup",
+    "statedReason": "blocked by policy",
+    "freeDiskBytesObserved": 263241728,
+    "losslessCompression": {
+      "files": 2468,
+      "batchesFailed": 0,
+      "filesDeleted": 0,
+      "sharedHardlinksAndReparsePointsSkipped": true
+    }
+  },
+  "limits": [
+    "Browser/automated functional checks only; no new persona study or clinical/user effect claim.",
+    "Crowd is a visual distraction, not moving crowd AI or a navigation blocker.",
+    "Backend code and persistent server result viewer were not changed."
+  ]
+}

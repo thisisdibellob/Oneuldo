@@ -7,9 +7,10 @@ import {
 import { marketCategories } from '../src/game/scenarios';
 import { createMarketEnvironment, getMarketRenderDepth, isMarketEnvironmentBlocked, MARKET_LAYOUT_OPTIONS, type MarketEnvironment } from '../src/game/marketEnvironment';
 import { MARKET_WORLD_HEIGHT, MARKET_WORLD_WIDTH } from '../src/game/prototypeWorld';
-import { MARKET_PERSON_HEIGHT, MARKET_PERSON_WIDTH, getMarketPersonCollider } from '../src/game/marketPersonLayout';
+import { MARKET_PERSON_HEIGHT, MARKET_PERSON_WIDTH, getMarketPersonCollider, getMarketPersonGeometry } from '../src/game/marketPersonLayout';
 import { getMarketPersonAppearance, MARKET_CUSTOMER_APPEARANCES, MARKET_EMPLOYEE_APPEARANCES } from '../src/game/marketPeople';
 import { marketPeopleArt } from '../src/game/marketPeopleArt';
+import { getMarketCategoryMarkerRect, getMarketShelfUnitRects, MARKET_SHELF_ART_BOTTOM, MARKET_SHELF_ART_HEIGHT, MARKET_SHELF_SCALE } from '../src/game/marketFixtureLayout';
 
 jest.mock('expo-font', () => ({ isLoaded: () => true, loadAsync: () => Promise.resolve() }));
 
@@ -107,7 +108,9 @@ it('두 세로 계산대는 각 번호와 계산원을 따로 표시하며 같�
     counter={counter} index={index} active={false} cashierPresent={index === 1} />)}</View>);
   expect(screen.getAllByTestId('market-cashier')).toHaveLength(1);
   expect(screen.getByText('계산 가능')).toBeTruthy();
-  expect(screen.getByText('직원 호출')).toBeTruthy();
+  expect(screen.queryByText('직원 호출')).toBeNull();
+  expect(screen.queryByTestId('market-checkout-status-1')).toBeNull();
+  expect(screen.getByLabelText('1번 계산대')).toBeTruthy();
 });
 
 it('키오스크 충돌 폭을 넓혀도 이미지 크기와 줄 중심은 유지한다', () => {
@@ -166,6 +169,8 @@ it('16개 인물은 각 PNG를 표시하고 어린이 크기와 선택 강조가
       const root = screen.getByTestId(`market-person-${person.id}`);
       const style = StyleSheet.flatten(picture.props.style);
       const frame = StyleSheet.flatten(root.props.style);
+      expect(screen.queryByText(person.label)).toBeNull();
+      expect(screen.queryByTestId(`market-staff-talk-${person.id}`)).toBeNull();
       expect(picture.props.source).toEqual(marketPeopleArt[variant.id]);
       expect(style.bottom).toBe(0);
       expect(style.left + style.width / 2).toBe(MARKET_PERSON_WIDTH / 2);
@@ -176,8 +181,10 @@ it('16개 인물은 각 PNG를 표시하고 어린이 크기와 선택 강조가
       expect(StyleSheet.flatten(screen.getByTestId(`market-person-art-${person.id}`).props.style)).toEqual(style);
       expect(StyleSheet.flatten(screen.getByTestId(`market-person-${person.id}`).props.style)).toEqual(frame);
       if (kind === 'employee') {
-        expect(screen.getByText(person.label).props.numberOfLines).toBe(1);
-        expect(StyleSheet.flatten(screen.getByText(person.label).props.style).flexShrink).toBe(0);
+        expect(screen.queryByText(person.label)).toBeNull();
+        expect(screen.getByTestId(`market-staff-talk-${person.id}`)).toBeTruthy();
+        const bubble = StyleSheet.flatten(screen.getByTestId(`market-staff-talk-${person.id}`).props.style);
+        expect(bubble.bottom).toBeGreaterThan(getMarketPersonGeometry(kind, appearance).visibleHeight);
       }
       screen.unmount();
     });
@@ -348,7 +355,7 @@ it('모퉁이 지점의 계산대 번호·상태 표지는 진열대 표지와 �
     const placement = environment.shelves[category.id];
     const label = flatten(`market-aisle-marker-${category.id}`);
     return { x: placement.x + (placement.width - label.width) / 2,
-      y: placement.y + placement.height - label.bottom - label.height, width: label.width, height: label.height };
+      y: placement.y + label.top, width: label.width, height: label.height };
   });
   const overlaps = (a: { x: number; y: number; width: number; height: number }, b: typeof a) =>
     a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
@@ -371,4 +378,17 @@ it('모퉁이 지점의 계산대 번호·상태 표지는 진열대 표지와 �
     expect(StyleSheet.flatten(screen.getByText(String(index + 1)).props.style).fontSize).toBe(18);
   });
   screen.unmount();
+});
+
+it.each(MARKET_LAYOUT_OPTIONS)('$label의 코너 이름표는 가로·세로 매대의 가장 위쪽 그림 위에 떠 있다', ({ id: layoutId }) => {
+  const environment = createMarketEnvironment({ layoutId });
+  for (const category of marketCategories) {
+    const placement = environment.shelves[category.id];
+    const sign = getMarketCategoryMarkerRect(placement, category.id);
+    const unit = getMarketShelfUnitRects(placement)[0];
+    const artworkHeight = category.id === 'produce' ? 172 * MARKET_SHELF_SCALE : MARKET_SHELF_ART_HEIGHT;
+    const artTop = unit.y + unit.height - MARKET_SHELF_ART_BOTTOM - artworkHeight;
+    expect(sign.x + sign.width / 2).toBeCloseTo(placement.x + placement.width / 2);
+    expect(artTop - (sign.y + sign.height)).toBeCloseTo(10);
+  }
 });

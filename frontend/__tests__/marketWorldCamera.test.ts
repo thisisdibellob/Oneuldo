@@ -1,4 +1,5 @@
 import { getMarketHudOcclusionRect } from '../src/game/marketHudLayout';
+import { getMarketCategoryMarkerRect } from '../src/game/marketFixtureLayout';
 import { createMarketSession } from '../src/game/marketSession';
 import { visibleStations, type ReplayPresentation } from '../src/game/marketReplayPerception';
 import { getMarketWorldCameraFrame } from '../src/game/marketWorldCamera';
@@ -64,7 +65,8 @@ test('compact composition still hides shelf signs behind the unchanged HUD', () 
     frame.center, p.viewport, p.zoom);
   environment.stationDetails = environment.stationDetails.filter(station => station.id === 'fresh');
   const shelf = environment.shelves.fresh;
-  environment.shelves.fresh = { ...shelf, x: marker.x - shelf.width / 2, y: marker.y - shelf.height - 10 };
+  const sign = getMarketCategoryMarkerRect({ ...shelf, x: 0, y: 0 }, 'fresh');
+  environment.shelves.fresh = { ...shelf, x: marker.x - shelf.width / 2, y: marker.y - sign.y - sign.height / 2 };
   expect(visibleStations(environment, player, p).some(station => station.id === 'fresh')).toBe(false);
   // This changes the displayed sign's world position, without changing the mask.
   environment.shelves.fresh.y += (hud.bottom + 20 - (hud.top + hud.bottom) / 2) / p.zoom;

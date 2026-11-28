@@ -1,5 +1,5 @@
 import { fireEvent, render, within } from '@testing-library/react-native';
-import { StyleSheet } from 'react-native';
+import { Modal, StyleSheet } from 'react-native';
 import { MarketHud, type MarketHudProps } from '../src/components/game/MarketHud';
 
 jest.mock('expo-font', () => ({ isLoaded: () => true, loadAsync: () => Promise.resolve() }));
@@ -14,18 +14,28 @@ function props(overrides: Partial<MarketHudProps> = {}): MarketHudProps {
   return { objectives, score: 90, onGiveUp: jest.fn(), onOpenCart: jest.fn(), onOpenHelp: jest.fn(), ...overrides };
 }
 
-it('메모에는 구매할 개수만 표시하며 장바구니를 열기 전에는 진행 비율을 노출하지 않는다', () => {
-  const screen = render(<MarketHud {...props()} />);
+it('목록은 처음에는 숨기고 버튼으로 연 뒤 닫아도 요구 수량을 유지한다', () => {
+  const onListVisibilityChange = jest.fn();
+  const screen = render(<MarketHud {...props({ onListVisibilityChange })} />);
   try {
-    const note = within(screen.getByTestId('market-shopping-list'));
+    expect(screen.queryByText('저지방 우유')).toBeNull();
+    expect(screen.queryByTestId('market-shopping-list')).toBeNull();
+    expect(onListVisibilityChange).not.toHaveBeenCalled();
+    fireEvent.press(screen.getByRole('button', { name: '구매 목록 전체 보기' }));
+    const note = within(screen.getByTestId('market-shopping-list-expanded'));
     expect(note.getByText('저지방 우유')).toBeTruthy();
     expect(note.getByText('2개')).toBeTruthy();
     expect(note.getByText('AAA 건전지')).toBeTruthy();
     expect(note.getByText('1개')).toBeTruthy();
-    expect(screen.getByLabelText('현재 점수 90점')).toBeTruthy();
     expect(note.queryByText(/\d+\s*\/\s*\d+/)).toBeNull();
     expect(note.queryByText(/담은|부족|완료|정답/)).toBeNull();
-    expect(note.queryAllByRole('button')).toHaveLength(0);
+    expect(onListVisibilityChange).toHaveBeenLastCalledWith(true);
+    fireEvent.press(note.getByRole('button', { name: '구매 목록 닫기' }));
+    expect(screen.queryByText('저지방 우유')).toBeNull();
+    expect(onListVisibilityChange).toHaveBeenLastCalledWith(false);
+    expect(screen.getByLabelText('현재 점수 90점')).toBeTruthy();
+    fireEvent.press(screen.getByRole('button', { name: '구매 목록 전체 보기' }));
+    expect(within(screen.getByTestId('market-shopping-list-expanded')).getByText('2개')).toBeTruthy();
   } finally { screen.unmount(); }
 });
 
@@ -40,14 +50,16 @@ it('44px 이상 도움·장바구니·종료 버튼이 각각 요청한 동작�
     ] as const) {
       const button = screen.getByRole('button', { name: label });
       const style = StyleSheet.flatten(button.props.style);
-      expect(style.width).toBeGreaterThanOrEqual(44);
+      expect(style.width ?? style.minWidth).toBeGreaterThanOrEqual(44);
       expect(style.minHeight).toBeGreaterThanOrEqual(44);
       fireEvent.press(button);
       expect(callback).toHaveBeenCalledTimes(1);
     }
-    const anchor = StyleSheet.flatten(screen.getByTestId('market-hud').props.style);
+    const anchor = StyleSheet.flatten(screen.getByTestId('market-hud-header').props.style);
     expect(anchor).toMatchObject({ left: 0, right: 0, paddingHorizontal: 12, alignItems: 'center' });
     expect(StyleSheet.flatten(screen.getByTestId('market-hud-card').props.style)).toMatchObject({ width: '100%', maxWidth: 420 });
+    expect(StyleSheet.flatten(screen.getByTestId('market-hud-card').props.style).borderWidth).toBe(0);
+    expect(screen.getByTestId('market-hud-actions')).toBeTruthy();
   } finally { screen.unmount(); }
 });
 
@@ -61,7 +73,7 @@ it('공통 HUD에서도 터치·조이스틱 이동을 왕복 전환하고 안�
     screen.rerender(<MarketHud {...common} controlMode="touch" />);
     fireEvent.press(screen.getByRole('button', { name: '조이스틱 이동으로 변경' }));
     expect(onControlModeChange).toHaveBeenLastCalledWith('joystick');
-    expect(StyleSheet.flatten(screen.getByTestId('market-hud').props.style).top).toBe(47);
+    expect(StyleSheet.flatten(screen.getByTestId('market-hud-header').props.style).top).toBe(47);
   } finally { screen.unmount(); }
 });
 
@@ -75,7 +87,9 @@ it('전체 목록에서 뒤쪽 네 번째 목표의 긴 규격과 구매 단위�
     expect(screen.queryByTestId('market-shopping-list-expanded')).toBeNull();
     fireEvent.press(screen.getByRole('button', { name: '구매 목록 전체 보기' }));
     const list = within(screen.getByTestId('market-shopping-list-expanded'));
-    expect(list.getByText('사야 할 물품 4종')).toBeTruthy();
+    expect(list.getByText('사야 할 물품')).toBeTruthy();
+    expect(list.queryByText(/물품.*종/)).toBeNull();
+    expect(StyleSheet.flatten(list.getByText('생수 · 500mL 페트병').parent!.props.style).borderBottomWidth).toBeUndefined();
     expect(list.getByText('생수 · 500mL 페트병').props.numberOfLines).toBeUndefined();
     expect(list.getByText('3병')).toBeTruthy();
     expect(onListVisibilityChange).toHaveBeenLastCalledWith(true);
@@ -84,4 +98,16 @@ it('전체 목록에서 뒤쪽 네 번째 목표의 긴 규격과 구매 단위�
     expect(screen.queryByTestId('market-shopping-list-expanded')).toBeNull();
     expect(onListVisibilityChange).toHaveBeenLastCalledWith(false);
   } finally { screen.unmount(); }
+});
+
+it('Android 뒤로 가기와 열린 목록에서 화면을 떠나는 경우도 닫기 상태를 전달한다', () => {
+  const onListVisibilityChange = jest.fn();
+  const screen = render(<MarketHud {...props({ onListVisibilityChange })} />);
+  fireEvent.press(screen.getByRole('button', { name: '구매 목록 전체 보기' }));
+  fireEvent(screen.UNSAFE_getByType(Modal), 'requestClose');
+  expect(screen.queryByTestId('market-shopping-list-expanded')).toBeNull();
+  expect(onListVisibilityChange.mock.calls).toEqual([[true], [false]]);
+  fireEvent.press(screen.getByRole('button', { name: '구매 목록 전체 보기' }));
+  screen.unmount();
+  expect(onListVisibilityChange.mock.calls).toEqual([[true], [false], [true], [false]]);
 });

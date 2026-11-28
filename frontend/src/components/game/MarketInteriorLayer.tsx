@@ -8,11 +8,11 @@ import { MarketPersonIllustration } from './MarketPersonIllustration';
 import { MarketArchitectureLayer } from './MarketArchitectureLayer';
 import {
   MARKET_SHELF_UNIT_HEIGHT, MARKET_SHELF_UNIT_STEP, MARKET_SHELF_UNIT_WIDTH, MARKET_SHELF_SCALE,
-  MARKET_SHELF_VERTICAL_STEP, getMarketShelfUnitRects,
+  MARKET_SHELF_VERTICAL_STEP, getMarketShelfUnitRects, getMarketCategoryMarkerRect,
 } from '../../game/marketFixtureLayout';
 import { getMarketRenderDepth, type MarketConstructionZone, type MarketKioskPlacement, type MarketCheckoutPlacement, type MarketEnvironment, type MarketPerson, type MarketShelfPlacement } from '../../game/marketEnvironment';
 import {
-  MARKET_PERSON_HEIGHT, getMarketPersonCollider,
+  MARKET_PERSON_HEIGHT, getMarketPersonCollider, getMarketPersonGeometry,
   MARKET_PERSON_WIDTH,
 } from '../../game/marketPersonLayout';
 import {
@@ -23,7 +23,7 @@ import {
 } from '../../game/prototypeWorld';
 import { marketCategories, type MarketCategory, type MarketCategoryId } from '../../game/scenarios';
 import { fonts } from '../../theme';
-import { useGamePreferences } from '../../game/gamePreferences';
+import { useMarketInteriorTheme } from './MarketThemePreviewContext';
 import { COZY_MARKET_PALETTE as cozy } from '../../game/marketInteriorThemes';
 import { cozyMarketArt } from '../../game/marketInteriorThemeArt';
 
@@ -57,8 +57,10 @@ export function MarketCategoryFixture({
 }
 
 function MarketCategoryMarker({ category, active }: { category: MarketCategory; active: boolean }) {
-  const illustrated = useGamePreferences().preferences.marketInteriorTheme === 'cozy';
+  const illustrated = useMarketInteriorTheme() === 'cozy';
+  const marker = getMarketCategoryMarkerRect({ x: 0, y: 0, width: 92 }, category.id);
   return (<View testID={`market-aisle-marker-${category.id}`} style={[styles.categorySign,
+    { top: marker.y, width: marker.width, height: marker.height },
     illustrated && { backgroundColor: cozy.cream, borderColor: '#C2AD8F', borderLeftColor: cozy.peach, borderRadius: 6 }, active && styles.categorySignActive]}>
         <Text numberOfLines={1} style={[styles.categoryName, illustrated && { color: cozy.ink }]}>{category.label}</Text>
         {active ? <Ionicons color="#587565" name="chevron-forward" size={11} /> : null}
@@ -113,7 +115,7 @@ export function MarketShelfTarget({ placement, categoryId, active, highlighted =
 export function MarketCheckoutFixture({ active, cashierPresent = true, counter, index = 0 }: {
   active: boolean; cashierPresent?: boolean; counter?: MarketCheckoutPlacement; index?: number;
 }) {
-  const illustrated = useGamePreferences().preferences.marketInteriorTheme === 'cozy';
+  const illustrated = useMarketInteriorTheme() === 'cozy';
   const rect = counter?.rect ?? MARKET_CHECKOUT_RECT;
   const cashierPoint = counter?.cashierPoint ?? MARKET_CASHIER_POINT;
   const appearance = counter?.cashierAppearance ?? (index === 0 ? 0 : 2);
@@ -150,10 +152,10 @@ export function MarketCheckoutFixture({ active, cashierPresent = true, counter, 
           <Text numberOfLines={1} style={[styles.counterName, illustrated && { color: cozy.ink }]}>{index + 1}</Text>
         </View>
       </View>
-      <View testID={`market-checkout-status-${index + 1}`} style={[styles.counterStatus, { left: (rect.width - 64) / 2 }]}>
-        <View style={[styles.statusDot, !cashierPresent && styles.statusDotWaiting]} />
-        <Text numberOfLines={1} style={styles.counterStatusText}>{cashierPresent ? '계산 가능' : '직원 호출'}</Text>
-      </View>
+      {cashierPresent ? <View testID={`market-checkout-status-${index + 1}`} style={[styles.counterStatus, { left: (rect.width - 64) / 2 }]}>
+        <View style={styles.statusDot} />
+        <Text numberOfLines={1} style={styles.counterStatusText}>계산 가능</Text>
+      </View> : null}
     </View>
   );
 }
@@ -161,14 +163,16 @@ export function MarketCheckoutFixture({ active, cashierPresent = true, counter, 
 /** Preserve the floor anchor while labels stay readable in one line. */
 export function MarketPersonFixture({ person, active = false }: { person: MarketPerson; active?: boolean }) {
   const employee = person.kind === 'employee';
+  const geometry = getMarketPersonGeometry(person.kind, person.appearance);
   return (
     <View pointerEvents="none" style={styles.personContent} testID={`market-person-${person.id}`}>
       <MarketPersonIllustration kind={person.kind} appearance={person.appearance} active={active}
         testID={`market-person-art-${person.id}`} />
-      {employee ? <View testID={`market-staff-badge-${person.id}`} style={[styles.personLabel, active && styles.personLabelActive]}>
-        <View style={styles.staffBadgeStripe} />
-        <Text numberOfLines={1} style={styles.personLabelText}>{person.label}</Text>
-        {active ? <Ionicons name="chatbubble-ellipses-outline" color="#587565" size={11} /> : null}
+      {employee && active ? <View testID={`market-staff-talk-${person.id}`} style={{position:'absolute',bottom:geometry.visibleHeight+6,left:'50%',marginLeft:-16,width:32,height:28,borderRadius:12,backgroundColor:'rgba(0,0,0,0.7)',alignItems:'center',justifyContent:'center'}}>
+        <View style={{width:18,height:13,borderRadius:4,borderWidth:1.5,borderColor:'#FFFFFF',flexDirection:'row',alignItems:'center',justifyContent:'center',gap:2}}>
+          {[0,1,2].map(i=><View key={i} style={{width:2,height:2,borderRadius:1,backgroundColor:'#FFFFFF'}}/>)}
+          <View style={{position:'absolute',bottom:-3,left:3,width:5,height:5,borderLeftWidth:1.5,borderBottomWidth:1.5,borderColor:'#FFFFFF',backgroundColor:'#151515',transform:[{rotate:'-30deg'}]}}/>
+        </View>
       </View> : null}
     </View>
   );
@@ -190,7 +194,7 @@ export function MarketKioskFixture({ kiosk, active = false }: { kiosk: MarketKio
 
 /** Decorative objects have no action targets. The working kiosks belong to checkout lanes. */
 export function MarketEnvironmentObjects({ environment }: { environment: MarketEnvironment }) {
-  const illustrated = useGamePreferences().preferences.marketInteriorTheme === 'cozy';
+  const illustrated = useMarketInteriorTheme() === 'cozy';
   return <>
     {environment.objects.filter(object => object.kind !== 'kiosk').map((object) => {
       const { rect } = object;
@@ -350,7 +354,7 @@ const styles = StyleSheet.create({
   categorySign: {
     alignItems: 'center', alignSelf: 'center', backgroundColor: '#F7F4EC',
     borderColor: '#D8D4C7', borderLeftColor: '#C48B57', borderWidth: 1, borderLeftWidth: 3,
-    borderRadius: 3, bottom: -22, flexDirection: 'row', gap: 5, height: 24, minWidth: 62, maxWidth: 92,
+    borderRadius: 5, flexDirection: 'row', gap: 5, height: 24, minWidth: 62, maxWidth: 92,
     justifyContent: 'center', paddingHorizontal: 9, position: 'absolute',
   },
   categorySignActive: { borderColor: '#8DAB95', borderLeftColor: '#587565', backgroundColor: '#F0F5ED' },
@@ -396,7 +400,6 @@ const styles = StyleSheet.create({
   counterName: { color: '#304B54', fontFamily: fonts.cafe24Ssurround, fontSize: 18, lineHeight: 23 },
   counterStatus: { position: 'absolute', top: -66, width: 64, height: 15, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3, backgroundColor: '#F7F4EC', borderRadius: 3 },
   statusDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: '#587565' },
-  statusDotWaiting: { backgroundColor: '#C48B57' },
   counterStatusText: { color: '#5E746A', fontFamily: fonts.medium, fontSize: 8, lineHeight: 11 },
   exitMat: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center', opacity: 0.82 },
   exitMatActive: { opacity: 1 },

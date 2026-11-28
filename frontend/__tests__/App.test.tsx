@@ -189,8 +189,8 @@ describe('오늘도 앱', () => {
     fireEvent.press(screen.getByRole('button', { name: 'Google로 시작하기' }));
     fireEvent.press(screen.getByRole('tab', { name: '퀘스트 탭' }));
     expect(screen.getByText('추천 퀘스트')).toBeTruthy();
-    expect(screen.getByText('8월')).toBeTruthy();
-    expect(screen.getByText('상담 예약')).toBeTruthy();
+    expect(screen.getByText(`${new Date().getMonth() + 1}월`)).toBeTruthy();
+    expect(screen.getByText('오늘 마을에서 활동을 마치면 여기에 기록돼요.')).toBeTruthy();
   });
 
   it('민수와 일상 대화 후 의뢰를 받아 추천 대중교통 퀴즈를 완료한다', async () => {
@@ -211,7 +211,7 @@ describe('오늘도 앱', () => {
     expect(screen.getByTestId('village-market-bus-stop')).toBeTruthy();
     expect(screen.getByText('주민센터')).toBeTruthy();
     expect(screen.getByTestId('village-decoration-park-bench')).toBeTruthy();
-    ['학교', '식당', '지하철역', '편의점', '노래방', 'PC방', '카페', '은행', '부동산', '마을회관'].forEach(
+    ['학교', '식당', '지하철역', '편의점', '노래방', 'PC방', '카페', '은행', '동네 빨래방', '마을회관'].forEach(
       (landmark) => expect(screen.getByText(landmark)).toBeTruthy(),
     );
     expect(screen.getByTestId('expanded-village-layer')).toBeTruthy();
@@ -424,6 +424,9 @@ describe('오늘도 앱', () => {
     moveOnMap(home, 'moveLeft', 11);
     moveOnMap(home, 'moveUp', 3);
     fireEvent.press(screen.getByRole('button', { name: '냉장고로 이동해 열기' }));
+    for(let frame=0;frame<80&&!screen.queryByLabelText('냉장고에서 할 일 선택');frame++){
+      await act(async()=>{jest.advanceTimersByTime(500);await Promise.resolve();});
+    }
     expect(screen.getByLabelText('냉장고에서 할 일 선택')).toBeTruthy();
     expect(screen.getByRole('button', { name: '냉장고 살펴보기' })).toBeTruthy();
     fireEvent.press(screen.getByRole('button', { name: '바나나 요거트 컵 요리 시작' }));
@@ -608,14 +611,14 @@ describe('오늘도 앱', () => {
     fireEvent.press(screen.getByRole('button', { name: '휴대폰 닫기' }));
     await act(async () => { jest.advanceTimersByTime(220); await Promise.resolve(); });
     fireEvent.press(screen.getByRole('button', { name: '하늘마트로 이동해 들어가기' }));
-    for (let frame = 0; frame < 80 && !screen.queryByText('마트에서 장보기'); frame++) {
+    for (let frame = 0; frame < 80 && !screen.queryByRole('header', { name: '장 보기' }); frame++) {
       await act(async () => { jest.advanceTimersByTime(500); await Promise.resolve(); });
     }
 
-    expect(screen.getByText('마트에서 장보기')).toBeTruthy();
-    fireEvent.press(screen.getByRole('button', { name: '연습 환경 설정' }));
-    fireEvent.press(screen.getByRole('button', { name: '연구용 상세 설정 · JSON 가져오기' }));
-    fireEvent.changeText(screen.getByLabelText('장보기 설정 JSON'), JSON.stringify({
+    expect(screen.getByRole('header', { name: '장 보기' })).toBeTruthy();
+    fireEvent.press(screen.getByRole('button', { name: '마트 설정' }));
+    fireEvent.press(screen.getByRole('button', { name: '세이브 · 로드' }));
+    fireEvent.changeText(screen.getByLabelText('마트 설정 가져오기 JSON'), JSON.stringify({
       seed: 'app-smoke-fixed-layout',
       learning: { stockoutEnabled: false, budgetChoiceEnabled: false },
       environment: {
@@ -624,9 +627,11 @@ describe('오늘도 앱', () => {
         cashierCount: 2, pillarCount: 0, chairCount: 0, kioskPresent: false,
       },
     }));
+    fireEvent.press(screen.getByRole('button', { name: '붙여 넣은 설정 불러오기' }));
     fireEvent.press(screen.getByRole('button', { name: '설정 적용' }));
-    fireEvent.press(screen.getByText('다음'));
-    fireEvent.press(screen.getByText('장보기 시작'));
+    await act(async()=>{jest.advanceTimersByTime(350);await Promise.resolve();});
+    while(screen.queryByRole('button',{name:'다음'}))fireEvent.press(screen.getByRole('button',{name:'다음'}));
+    fireEvent.press(screen.getByRole('button', { name: '장보기 시작' }));
     // Movement remains locked while the briefing's last frame fades out.
     await act(async () => { jest.advanceTimersByTime(300); await Promise.resolve(); });
     await waitFor(() => expect(screen.queryByTestId('market-panel-transition', { includeHiddenElements: true })).toBeNull());
@@ -785,7 +790,8 @@ describe('오늘도 앱', () => {
     fireEvent.press(await screen.findByRole('button', { name: '계산대에서 계산하기' }));
     fireEvent.press(screen.getByRole('button', { name: '구매 확정' }));
 
-    await waitFor(() => expect(screen.getByText('AI 수행 검토')).toBeTruthy());
+    // 2026-11-27: AI 분석 전 목록 비교 결과 카드(표시 전용)가 뜬다.
+    await waitFor(() => expect(screen.getByTestId('market-purchase-result')).toBeTruthy());
     expect(screen.queryByText('장보기에 성공했어요!')).toBeNull();
     fireEvent.press(screen.getByText('마을로 돌아가기'));
     await waitFor(() => expect(screen.queryByText('장보기 의뢰 완료')).toBeNull(), { timeout: 2000 });

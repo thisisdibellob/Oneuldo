@@ -79,8 +79,10 @@ it('설정 화면에서 계산원만 바꾸면 매대 미선택 정보를 부모
   const onEnvironmentChange = jest.fn();
   const view = render(<MarketSimulationScreen embedded mission={mission} environment={environment} onExit={jest.fn()} onEnvironmentChange={onEnvironmentChange} />);
   try {
-    fireEvent.press(view.getByRole('button', { name: '연습 환경 설정' }));
-    fireEvent.press(view.getByRole('button', { name: '0명' }));
+    fireEvent.press(view.getByRole('button', { name: '마트 설정' }));
+    fireEvent.press(view.getByRole('button', { name: '구조 및 배치' }));
+    // The seeded initial count is explicit; cycle the same stepper until it reads zero.
+    for(let i=0;i<4&&!view.queryByLabelText('계산원 수 0');i++)fireEvent.press(view.getByRole('button',{name:'계산원 늘리기'}));
     fireEvent.press(view.getByRole('button', { name: '설정 적용' }));
     expect(onEnvironmentChange).toHaveBeenCalledWith(expect.objectContaining({ config: expect.objectContaining({ cashierCount: 0,
       shelfOrder: mission.environmentPlan.shelfOrder }) }), expect.objectContaining({ shelfOrderTouched: false,

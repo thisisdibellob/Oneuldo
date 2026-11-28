@@ -24,12 +24,25 @@ function assertBoundary(filePath, expected) {
   assert.equal(isBlocked(filePath.replaceAll('\\', '/')), expected, 'Watcher POSIX path: ' + filePath);
 }
 
-test('ignores only the project export root in absolute and watcher-relative forms', () => {
+test('ignores the project export root in absolute and watcher-relative forms', () => {
   for (const prefix of ['', rootPosix + '/', rootWindows + '\\']) {
     for (const suffix of ['dist', 'dist/', 'dist/assets/index.js', 'dist\\assets\\images\\future-export.png']) {
       assertBoundary(prefix + suffix, true);
     }
   }
+});
+
+test('ignores local report/art/browser-profile output without hiding runtime source', () => {
+  const workspacePosix = path.dirname(projectRoot).replaceAll('\\', '/');
+  const workspaceWindows = workspacePosix.replaceAll('/', '\\');
+  for (const prefix of ['', workspacePosix + '/', workspaceWindows + '\\']) {
+    for (const relative of ['output/npc-check/source-raw/image.png', 'output/chrome/Default/History', 'tmp/check.log', '.codex-tmp/check.js']) {
+      assertBoundary(prefix + relative, true);
+      assertBoundary(prefix + relative.replaceAll('/', '\\'), true);
+    }
+  }
+  assertBoundary('src/output/ordinary-source.ts', false);
+  assertBoundary(workspacePosix + '/shared/market/product-families.json', false);
 });
 
 test('keeps runtime artwork, app source and dependency dist folders available', () => {

@@ -1,0 +1,178 @@
+[
+  {
+    "id": "employee-male-01",
+    "kind": "employee",
+    "appearance": 0,
+    "collider": {
+      "x": -11.968253968253968,
+      "y": -10.864285714285714,
+      "width": 24.142857142857142,
+      "height": 14.485714285714284
+    }
+  },
+  {
+    "id": "employee-male-02",
+    "kind": "employee",
+    "appearance": 1,
+    "collider": {
+      "x": -12.999999999999998,
+      "y": -11.978571428571428,
+      "width": 26.619047619047617,
+      "height": 15.97142857142857
+    }
+  },
+  {
+    "id": "employee-female-01",
+    "kind": "employee",
+    "appearance": 2,
+    "collider": {
+      "x": -10.523809523809524,
+      "y": -9.935714285714285,
+      "width": 22.07936507936508,
+      "height": 13.247619047619047
+    }
+  },
+  {
+    "id": "employee-female-02",
+    "kind": "employee",
+    "appearance": 3,
+    "collider": {
+      "x": -10.73015873015873,
+      "y": -10.028571428571428,
+      "width": 22.285714285714285,
+      "height": 13.37142857142857
+    }
+  },
+  {
+    "id": "customer-adult-male-01",
+    "kind": "customer",
+    "appearance": 0,
+    "collider": {
+      "x": -13.825396825396824,
+      "y": -12.535714285714285,
+      "width": 27.857142857142854,
+      "height": 16.71428571428571
+    }
+  },
+  {
+    "id": "customer-adult-male-02",
+    "kind": "customer",
+    "appearance": 1,
+    "collider": {
+      "x": -13.206349206349206,
+      "y": -11.978571428571428,
+      "width": 26.619047619047617,
+      "height": 15.97142857142857
+    }
+  },
+  {
+    "id": "customer-adult-female-01",
+    "kind": "customer",
+    "appearance": 2,
+    "collider": {
+      "x": -11.142857142857142,
+      "y": -10.214285714285712,
+      "width": 22.698412698412696,
+      "height": 13.619047619047617
+    }
+  },
+  {
+    "id": "customer-adult-female-02",
+    "kind": "customer",
+    "appearance": 3,
+    "collider": {
+      "x": -10.11111111111111,
+      "y": -9.471428571428572,
+      "width": 21.047619047619047,
+      "height": 12.628571428571428
+    }
+  },
+  {
+    "id": "customer-senior-male-01",
+    "kind": "customer",
+    "appearance": 4,
+    "collider": {
+      "x": -12.793650793650793,
+      "y": -11.514285714285712,
+      "width": 25.587301587301585,
+      "height": 15.352380952380951
+    }
+  },
+  {
+    "id": "customer-senior-male-02",
+    "kind": "customer",
+    "appearance": 5,
+    "collider": {
+      "x": -12.174603174603174,
+      "y": -11.235714285714286,
+      "width": 24.96825396825397,
+      "height": 14.980952380952381
+    }
+  },
+  {
+    "id": "customer-senior-female-01",
+    "kind": "customer",
+    "appearance": 6,
+    "collider": {
+      "x": -11.555555555555555,
+      "y": -10.585714285714284,
+      "width": 23.523809523809522,
+      "height": 14.114285714285712
+    }
+  },
+  {
+    "id": "customer-senior-female-02",
+    "kind": "customer",
+    "appearance": 7,
+    "collider": {
+      "x": -12.174603174603174,
+      "y": -11.049999999999997,
+      "width": 24.555555555555554,
+      "height": 14.73333333333333
+    }
+  },
+  {
+    "id": "customer-child-male-01",
+    "kind": "customer",
+    "appearance": 8,
+    "collider": {
+      "x": -9.723174603174602,
+      "y": -8.750857142857141,
+      "width": 19.446349206349204,
+      "height": 11.667809523809522
+    }
+  },
+  {
+    "id": "customer-child-male-02",
+    "kind": "customer",
+    "appearance": 9,
+    "collider": {
+      "x": -9.879999999999999,
+      "y": -8.962571428571428,
+      "width": 19.916825396825395,
+      "height": 11.950095238095237
+    }
+  },
+  {
+    "id": "customer-child-female-01",
+    "kind": "customer",
+    "appearance": 10,
+    "collider": {
+      "x": -8.154920634920634,
+      "y": -7.33942857142857,
+      "width": 16.309841269841268,
+      "height": 9.78590476190476
+    }
+  },
+  {
+    "id": "customer-child-female-02",
+    "kind": "customer",
+    "appearance": 11,
+    "collider": {
+      "x": -9.095873015873016,
+      "y": -8.186285714285713,
+      "width": 18.19174603174603,
+      "height": 10.915047619047618
+    }
+  }
+]
