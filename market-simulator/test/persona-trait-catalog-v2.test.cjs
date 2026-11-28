@@ -45,7 +45,7 @@ test('v1 authored hashes remain exact and schema version selects the matching va
     'mild-intellectual-disability-adult':'traits-2-80fbd739bd14',
     'careful-checker':'traits-2-8899934fa60e',
     'quick-decider':'traits-2-e8893d3d7947',
-    'neutral-adult-control':'traits-2-760045507aeb',
+    'neutral-adult-control':'traits-2-71293f9dd027',
   };
   for (const [basePersonaId, expected] of Object.entries(versions)) {
     const value = resolve(definition({checking:'low'}, {id:'v1-regression',basePersonaId,presetId:'deliberate-checker'}), 'persona-traits-v1');

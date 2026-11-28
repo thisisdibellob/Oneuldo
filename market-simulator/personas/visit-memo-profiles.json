@@ -1,0 +1,56 @@
+{
+  "version": "visit-memo-profile-v1",
+  "notice": "방문 메모(previous-visit-memo-v2)를 쓸 때 이 인물이 기억하는 방식이다. 칸 구조와 고쳐 쓰기 규칙은 모든 인물이 같고, 아래는 어떤 형태와 확신으로 기억하는지만 다르다. 기억하는 양을 정하는 숫자 상한은 두지 않았다(1차 비교 뒤 결정). 합성 설계값이며 실측 기억 능력이 아니다. 설계: docs/ai/visit-memo-v2-design-2026-11-24.md",
+  "profiles": {
+    "neutral-adult-control": {
+      "personaVersion": "4",
+      "placeForm": "area-layout",
+      "planForm": "conditional-short",
+      "generalTips": "may-generalize",
+      "confidence": "once-confirmed",
+      "instructions": [
+        "장소는 구역과 배치로 기억한다. 예: \"안쪽 오른쪽 벽이 냉장 구역\". 여러 장소를 하나의 대략적인 배치로 묶어 기억할 수 있다.",
+        "[다음엔]은 조건이 있는 짧은 계획으로 쓴다. 예: \"우유를 담았는데 계산대가 안 보이면 안쪽 왼편부터 본다\".",
+        "겪은 일에서 다른 마트에도 통할 만한 요령을 떠올려 [어느 마트에서나]에 적을 수 있다.",
+        "한 번 직접 보고 확인한 장소는 (확실)로 적을 수 있다. 가지 않은 곳도 비교적 오래 기억하지만 흐려질 수 있다."
+      ],
+      "basedOn": [
+        "wayfinding.memoryForm=area-coverage",
+        "wayfinding.cueLevel=layout-schema",
+        "wayfinding.planHorizon=short-sequence",
+        "wayfinding.thoughtForm=conditional-short",
+        "wayfinding.landmarkMemory.retention=stable"
+      ],
+      "routeInstructions": [
+        "[들어가는 길]은 출발점 기준의 대략적인 위치와 방향으로 적을 수 있다. 예: \"출발점에서 북쪽 4 · 서쪽 2 걸음쯤 〈입구를 지나 매장 안으로〉\". 구역끼리 어떻게 이어지는지도 함께 기억할 수 있다."
+      ]
+    },
+    "mild-intellectual-disability-adult": {
+      "personaVersion": "6",
+      "placeForm": "route-sequence",
+      "planForm": "next-step",
+      "generalTips": "situation-bound",
+      "confidence": "repetition-needed",
+      "instructions": [
+        "장소는 자기가 움직인 순서로 기억한다. 예: \"들어가서 오른쪽으로, 벽 따라 끝까지 가면 우유\". 눈에 띈 랜드마크는 기억하지만 마트 전체 배치로 묶어 그리지는 않는 편이다.",
+        "[다음엔]은 바로 다음 한 걸음을 한 문장으로 쓴다. 예: \"우유를 담으면 왼쪽으로 간다\".",
+        "기억은 구체적인 장면과 상품 표기에 묶여 있다. 다른 마트에도 통할 일반 요령은 드물게만 떠올린다.",
+        "한 번 본 장소는 보통 (흐릿)으로 남고, 여러 번 겪어 맞았던 것이 (확실)이 된다. 이번에 가지 않은 곳은 빨리 흐려지거나 잊힐 수 있다."
+      ],
+      "basedOn": [
+        "wayfinding.memoryForm=route-sequence",
+        "wayfinding.cueLevel=landmark",
+        "wayfinding.planHorizon=next-step",
+        "wayfinding.thoughtForm=one-sentence-concrete",
+        "wayfinding.landmarkMemory.retention=decaying",
+        "Courbois 외 2019: 지적장애 참여자는 길을 행동 순서로 묘사함, 랜드마크 지식은 양호",
+        "Courbois 외 2013: 경로는 익혀도 전체 배치 통합은 어려움",
+        "research/intellectual-disability evidence-review P10·L01·L03·L04: 유지 저하와 제한적·개인차 있는 일반화",
+        "Courbois 외 2019: 길을 행동 순서로 묘사 → [들어가는 길]을 순서로 기억"
+      ],
+      "routeInstructions": [
+        "[들어가는 길]은 걸은 순서대로 한 걸음씩 적는다. 예: \"북쪽으로 가서, 서쪽으로 끝까지, 〈입구를 지나 매장 안으로〉\". 출발점에서 몇 걸음인지 같은 수는 잘 기억하지 않는 편이고, 눈에 띈 이름과 도는 순서를 기억한다."
+      ]
+    }
+  }
+}

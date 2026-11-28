@@ -198,7 +198,9 @@ export function buildWholeTraceBundle(settings: WholeTraceSettings, requestId: s
     const v3 = v4 || settings.wayfindingVersion === WHOLE_TRACE_WAYFINDING_V3_VERSION;
     const v2 = v3 || settings.wayfindingVersion === WHOLE_TRACE_WAYFINDING_V2_VERSION;
     const profile = wayfindingProfileOf(persona, settings.wayfindingVersion);
-    const personaSection = v4 ? renderWayfindingInstructionsV4(profile) : v3 ? renderWayfindingInstructionsV3(profile) : v2 ? renderWayfindingInstructionsV2(profile) : renderWayfindingInstructions(profile);
+    let personaSection = v4 ? renderWayfindingInstructionsV4(profile) : v3 ? renderWayfindingInstructionsV3(profile) : v2 ? renderWayfindingInstructionsV2(profile) : renderWayfindingInstructions(profile);
+    if (v4 && persona.id === 'neutral-adult-control' && persona.version === '4')
+      personaSection += '\n- 방향이 헷갈리거나 아직 아무것도 보이지 않는다는 이유만으로 그만두지 않는다.';
     bundle.persona.wayfinding = { profile, instructions: personaSection };
     bundle.instructions += `\n${v4 ? WAYFINDING_COMMON_INSTRUCTIONS_V4 : v3 ? WAYFINDING_COMMON_INSTRUCTIONS_V3 : v2 ? WAYFINDING_COMMON_INSTRUCTIONS_V2 : WAYFINDING_COMMON_INSTRUCTIONS}\n${personaSection}`;
     bundle.actionContract.wayfinding = 'wayfinding-v1: currentObservation.observation.boundaries lists what the world view draws in each of 8 directions (wall, fixture, covered by the list note = not a wall, open floor to the screen edge). menu.spatialMemory is built only from your own accepted observations and walks (rough steps, explored extent, landmarks, walls, recovery tried, giveUp availability); walk choices carry visitedTimes. actorState.thought {noticed?,hypothesis?,plan?,next?} (each <=200 chars, at least one) is your free-form judgment, returned verbatim as menu.ownNotes; it is a belief, never a cue or knowledge source. control/giveUp appears in shopping only when spatialMemory.giveUp.available is true; a giveUp decision requires actorState.thought.plan. No action, route or product is chosen or recommended by the system.';

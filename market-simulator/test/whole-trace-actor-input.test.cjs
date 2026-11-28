@@ -10,7 +10,7 @@ const { createService } = require('../server.cjs');
 const { createMarketSession } = require('../../frontend/src/game/marketSession.ts');
 const { createMarketReplaySnapshot } = require('../../frontend/src/game/marketReplayTrace.ts');
 const crypto = require('node:crypto');
-const { buildActorInput, renderActorInstructions, REPLACEMENTS, OMITTED_BUNDLE_KEYS, INSTRUCTION_TEMPLATES } = require('../whole-trace-actor-input.cjs');
+const { buildActorInput, renderActorInstructions, REPLACEMENTS, OMITTED_BUNDLE_KEYS, INSTRUCTION_TEMPLATES, extractVisitMemo, validateVisitMemo, MEMO_FORMATS } = require('../whole-trace-actor-input.cjs');
 
 async function prepared(t, extra = {}) {
   const service = createService();
@@ -140,4 +140,157 @@ test('authoring-v3 is v2 plus only the relative-direction sentences', () => {
   assert.match(added, /relative to where the person stands now/);
   assert.match(added, /may lie in a different direction or be out of view/);
   assert.doesNotMatch(added, /checkout|south|exit/i);
+});
+
+
+test('v5 adds slot-local transport and literal-only authoring reminders without changing the v4 policy', () => {
+  for (const suffix of ['', '-h200']) {
+    const rendered = renderActorInstructions(`authoring-v5${suffix}`, '/experiment/slot');
+    assert.match(rendered.text, /--operation-file \/experiment\/slot\/operations\//);
+    assert.match(rendered.text, /never use \/tmp, \/private\/tmp/);
+    assert.match(rendered.text, /Put choiceId inside choiceRef/);
+    assert.match(rendered.text, /must never select a choiceId/);
+    assert.match(rendered.text, /choiceUnavailableRewrite/);
+    assert.match(rendered.text, /Preserve the first draft delayMs on every rewrite/);
+  }
+});
+
+test('authoring-v5-h200-memo is v5-h200 plus only the previous-visit and visit-memo paragraphs', () => {
+  const v5 = fs.readFileSync(INSTRUCTION_TEMPLATES['authoring-v5-h200'], 'utf8');
+  const memo = fs.readFileSync(INSTRUCTION_TEMPLATES['authoring-v5-h200-memo'], 'utf8');
+  const anchor = 'For final delivery call finish_and_submit_whole_trace with {}.';
+  const [head, tail] = v5.split(anchor);
+  const [memoHead, memoTail] = memo.split(anchor);
+  assert.ok(memoHead.startsWith(head));
+  assert.match(memoHead.slice(head.length), /^If actor-input\.json has a top-level previousVisit field/);
+  assert.ok(memoTail.startsWith(tail.trimEnd()));
+  assert.match(memoTail.slice(tail.trimEnd().length), /^\n\nAfter final delivery, write the person's visit memo:.*at most 300 characters/s);
+  assert.doesNotMatch(renderActorInstructions('authoring-v5-h200-memo', '/experiment/slot').text, /__[A-Z_]+__/);
+});
+
+test('visit memo extraction takes the last tagged memo verbatim and never repairs it', () => {
+  assert.equal(extractVisitMemo('done\n<visit-memo>\n우유는 들어가서 왼쪽 냉장 매대.\n</visit-memo>\n'), '우유는 들어가서 왼쪽 냉장 매대.');
+  assert.equal(extractVisitMemo('<visit-memo>a</visit-memo> then <visit-memo>b</visit-memo>'), 'b');
+  assert.equal(extractVisitMemo('<visit-memo></visit-memo>'), '');
+  assert.equal(extractVisitMemo('no memo here'), null);
+  assert.throws(() => validateVisitMemo(''), /empty/);
+  assert.throws(() => validateVisitMemo('가'.repeat(301)), /301 characters/);
+  assert.equal(validateVisitMemo(' 가'.repeat(150)).characters, 299);
+});
+
+test('a previous visit memo is carried verbatim into the actor copy only with a memo template', async t => {
+  const response = await prepared(t, { actionHorizon: 200 });
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'actor-input-memo-'));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  fs.mkdirSync(path.join(directory, 'owner'));
+  const source = path.join(directory, 'owner', 'prepare-response.json');
+  const output = path.join(directory, 'actor-input.json');
+  const memoFile = path.join(directory, 'memo.txt');
+  const memo = '들어가서 왼쪽으로 가면 냉장 매대에 우유가 있었다. 계산대는 출구 옆.';
+  fs.writeFileSync(source, JSON.stringify(response));
+  fs.writeFileSync(memoFile, `${memo}\n`);
+  const cli = path.resolve(__dirname, '../whole-trace-actor-input.cjs');
+  const refused = spawnSync(process.execPath, [cli, source, output, '--template', 'authoring-v5-h200', '--previous-visit-memo', memoFile], { encoding: 'utf8' });
+  assert.notEqual(refused.status, 0);
+  assert.match(refused.stderr, /-memo instruction template/);
+  assert.equal(fs.existsSync(output), false);
+  const written = spawnSync(process.execPath, [cli, source, output, '--template', 'authoring-v5-h200-memo', '--previous-visit-memo', memoFile], { encoding: 'utf8' });
+  assert.equal(written.status, 0, written.stderr);
+  const summary = JSON.parse(written.stdout);
+  const actorInput = JSON.parse(fs.readFileSync(output, 'utf8'));
+  assert.equal(actorInput.previousVisit.memo, memo);
+  assert.equal(actorInput.previousVisit.version, 'previous-visit-memo-v1');
+  assert.equal(actorInput.bundle.inputHash, response.bundle.inputHash, 'the prepared bundle identity is unchanged');
+  assert.equal(text(actorInput.bundle), text(buildActorInput(response).bundle), 'the memo is not merged into the bundle');
+  assert.equal(summary.previousVisit.characters, Array.from(memo).length);
+  assert.equal(summary.previousVisit.memoSha256, crypto.createHash('sha256').update(memo).digest('hex'));
+  assert.equal(summary.actorInstructions.templateId, 'authoring-v5-h200-memo');
+  const firstVisit = fs.mkdtempSync(path.join(os.tmpdir(), 'actor-input-first-'));
+  t.after(() => fs.rmSync(firstVisit, { recursive: true, force: true }));
+  fs.mkdirSync(path.join(firstVisit, 'owner'));
+  fs.writeFileSync(path.join(firstVisit, 'owner', 'prepare-response.json'), JSON.stringify(response));
+  const plain = spawnSync(process.execPath, [cli, path.join(firstVisit, 'owner', 'prepare-response.json'), path.join(firstVisit, 'actor-input.json'), '--template', 'authoring-v5-h200-memo'], { encoding: 'utf8' });
+  assert.equal(plain.status, 0, plain.stderr);
+  assert.equal(JSON.parse(plain.stdout).previousVisit, null);
+  assert.equal(Object.hasOwn(JSON.parse(fs.readFileSync(path.join(firstVisit, 'actor-input.json'), 'utf8')), 'previousVisit'), false);
+});
+
+const MEMO_V2 = MEMO_FORMATS['authoring-v5-h200-memo-v2'];
+const sectionedMemo = [
+  '[장보기 순서]', '목록 보고 → 오른쪽 안쪽 냉장고 → 계산대',
+  '[기억나는 장면]', '- 과일만 보였다 → 왼쪽으로 갔다 → 벽이 나와 헤맸다. 답답했다.',
+  '[장소와 길]', '- 우유: 입구에서 오른쪽 벽 끝 냉장고 (확실)', '- 계산대: 입구 근처 (흐릿)',
+  '[다음엔]', '- 과일이 보이면 오른쪽 벽 쪽으로 간다.',
+].join('\n');
+
+test('a v2 visit memo is validated by shape only and empty or omitted sections are allowed', () => {
+  const result = validateVisitMemo(`\n${sectionedMemo}\n`, MEMO_V2);
+  assert.equal(result.text, sectionedMemo, 'the memo is carried verbatim apart from outer whitespace');
+  assert.deepEqual(result.sections.map(section => [section.id, section.items]),
+    [['routine', 0], ['scenes', 1], ['places', 2], ['nextTime', 1]]);
+  assert.deepEqual(validateVisitMemo('[장소와 길]\n- 우유는 냉장고 (흐릿)\n[다음엔]', MEMO_V2).sections.map(section => section.id), ['places', 'nextTime']);
+  assert.throws(() => validateVisitMemo('우유는 냉장고', MEMO_V2), /no section headers/);
+  assert.throws(() => validateVisitMemo('메모\n[장소와 길]\n- 우유', MEMO_V2), /before the first section header/);
+  assert.throws(() => validateVisitMemo('[장소와 길]\n[다음엔]', MEMO_V2), /no content/);
+  assert.throws(() => validateVisitMemo('[기분]\n좋았다', MEMO_V2), /unknown section header/);
+  assert.throws(() => validateVisitMemo('[다음엔]\n- a\n[장소와 길]\n- b', MEMO_V2), /out of order/);
+  assert.throws(() => validateVisitMemo('[다음엔]\n- a\n[다음엔]\n- b', MEMO_V2), /repeats section/);
+  assert.throws(() => validateVisitMemo('[기억나는 장면]\n- a\n- b\n- c\n- d', MEMO_V2), /limit is 3/);
+  assert.throws(() => validateVisitMemo('[다음엔]\n- a\n- b\n- c', MEMO_V2), /limit is 2/);
+  assert.throws(() => validateVisitMemo(`[장보기 순서]\n${'가'.repeat(500)}`, MEMO_V2), /limit is 500/);
+  assert.equal(validateVisitMemo(`[장보기 순서]\n${'가'.repeat(400)}`, MEMO_V2).characters, 409, 'v2 allows more than the v1 limit of 300');
+});
+
+test('the v2 memo template differs from the v1 memo template only in the two memo paragraphs', () => {
+  const lines = file => fs.readFileSync(INSTRUCTION_TEMPLATES[file], 'utf8').split('\n');
+  const v1 = lines('authoring-v5-h200-memo');
+  const v2 = lines('authoring-v5-h200-memo-v2');
+  assert.equal(v2.length, v1.length);
+  const changed = v1.map((line, index) => line === v2[index] ? null : index).filter(index => index !== null);
+  assert.deepEqual(changed.map(index => v1[index].slice(0, 30)), ['If actor-input.json has a top-', 'After final delivery, write th']);
+});
+
+test('the v3 memo template differs from the v2 memo template only in the two memo paragraphs', () => {
+  const lines = id => fs.readFileSync(INSTRUCTION_TEMPLATES[id], 'utf8').split('\n');
+  const v2 = lines('authoring-v5-h200-memo-v2');
+  const v3 = lines('authoring-v5-h200-memo-v3');
+  assert.equal(v3.length, v2.length);
+  const changed = v2.map((line, index) => line === v3[index] ? null : index).filter(index => index !== null);
+  assert.deepEqual(changed, [12, 16]);
+  for (const phrase of ['[들어가는 길]', 'menu.rememberedVisit', '〈 〉', 'at most 600 characters']) assert.ok(v3.join('\n').includes(phrase), phrase);
+});
+
+test('the v3b memo template differs from v3 only in the memo writing paragraph', () => {
+  const lines = id => fs.readFileSync(INSTRUCTION_TEMPLATES[id], 'utf8').split('\n');
+  const v3 = lines('authoring-v5-h200-memo-v3');
+  const v3b = lines('authoring-v5-h200-memo-v3b');
+  assert.equal(v3b.length, v3.length);
+  assert.deepEqual(v3.map((line, index) => line === v3b[index] ? null : index).filter(index => index !== null), [16]);
+  assert.ok(v3b[16].startsWith(v3[16].slice(0, 200)));
+  for (const phrase of ['count the memo\'s characters', 'rewrite only the memo']) assert.ok(v3b[16].includes(phrase), phrase);
+});
+
+test('the v4 memo template is v3b plus only the visit plan sentences in the reading paragraph', () => {
+  const lines = id => fs.readFileSync(INSTRUCTION_TEMPLATES[id], 'utf8').split('\n');
+  const v3b = lines('authoring-v5-h200-memo-v3b');
+  const v4 = lines('authoring-v5-h200-memo-v4');
+  assert.equal(v4.length, v3b.length);
+  assert.deepEqual(v3b.map((line, index) => line === v4[index] ? null : index).filter(index => index !== null), [12]);
+  assert.ok(v4[12].startsWith(v3b[12]), 'the v3b reading paragraph is kept verbatim');
+  for (const phrase of ['"tool":"visit_plan"', 'menu.visitPlan', 'passagesTowardRemembered', 'not recommendations', '아직 안 가 본 곳'])
+    assert.ok(v4[12].includes(phrase), phrase);
+});
+
+test('the v4b memo template is v4 plus only the place-position and plan-wording sentences', () => {
+  const lines = id => fs.readFileSync(INSTRUCTION_TEMPLATES[id], 'utf8').split('\n');
+  const v4 = lines('authoring-v5-h200-memo-v4');
+  const v4b = lines('authoring-v5-h200-memo-v4b');
+  assert.equal(v4b.length, v4.length);
+  assert.deepEqual(v4.map((line, index) => line === v4b[index] ? null : index).filter(index => index !== null), [12, 16]);
+  assert.ok(v4b[16].includes('〈1번 계산대〉"; a place reached but never placed'), 'the memo keeps the checkout position');
+  assert.ok(v4b[12].includes('"남서쪽 〈1번 계산대〉로 간다" rather than "계산대로 간다"'), 'plan steps reuse memo directions');
+  for (const index of [12, 16]) {
+    const added = v4b[index].length - v4[index].length;
+    assert.ok(added > 0 && v4b[index].replace(/ When a step uses something[^]*?first\. | For each place the person will need again[^]*?next time\./, ' ').length <= v4[index].length + 1);
+  }
 });

@@ -6,9 +6,11 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { finishAndSubmit } = require('./whole-trace-delivery.cjs');
+const { VISIT_RECALL_VERSION, recallForMenu, nextVisitPlan, planForMenu } = require('./visit-memo.cjs');
 const ALLOWED = new Set(['begin_whole_trace_authoring', 'append_whole_trace_decision',
   'whole_trace_authoring_menu', 'finish_whole_trace_authoring', 'whole_trace_status',
-  'repair_whole_trace', 'finish_and_submit_whole_trace']);
+  'repair_whole_trace', 'finish_and_submit_whole_trace', 'visit_plan']);
+// visit_plan is answered by the owner itself and never reaches the simulator or the trace.
 const MAX_BYTES = 4 * 1024 * 1024;
 const now = () => new Date().toISOString();
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -99,16 +101,55 @@ function abortMailbox(directory, reason) {
   publishNew(path.join(directory, 'supervisor-abort.json'), { reason, requestedAt: now() });
   return { requested: true, requestId: status.requestId };
 }
-async function serveMailbox({ directory, prepareArguments, service, pollIntervalMs = 25 }) {
+async function serveMailbox({ directory, prepareArguments, service, pollIntervalMs = 25, operationRoot }) {
   directory = path.resolve(directory);
+  // Optional transport containment; no change to prepared inputs or the default owner.
+  const permittedOperationRoot = operationRoot === undefined ? undefined : fs.realpathSync(path.resolve(operationRoot));
   fs.mkdirSync(directory, { mode: 0o700 }); // Never reuse an old owner or its results.
   for (const sub of ['commands', 'responses']) fs.mkdirSync(path.join(directory, sub), { mode: 0o700 });
   service ??= require('./server.cjs').createService();
   const invokeTool = (tool, args) => service.invokeTool(tool, args);
   const state = { version: 1, ownerId: crypto.randomUUID(), pid: process.pid, state: 'starting',
-    createdAt: now(), updatedAt: now(), requestId: null, requestStatus: null, completionVerified: false };
+    createdAt: now(), updatedAt: now(), requestId: null, requestStatus: null, completionVerified: false,
+    ...(permittedOperationRoot ? { operationRoot: permittedOperationRoot } : {}) };
   const persist = () => { state.updatedAt = now(); replaceStatus(path.join(directory, 'status.json'), state); };
   const event = value => fs.appendFileSync(path.join(directory, 'events.jsonl'), JSON.stringify({ time: now(), ...value }) + '\n', { mode: 0o600 });
+  // Optional persona-authored visit recall (visit-recall.json, written by
+  // whole-trace-actor-input before the actor begins). Frozen at the first menu:
+  // a file that appears later is never used. It only adds menu.rememberedVisit.
+  let recall;
+  const visitRecall = () => {
+    if (recall !== undefined) return recall;
+    const file = path.join(directory, 'visit-recall.json');
+    if (!fs.existsSync(file)) { recall = null; event({ type: 'visit-recall', present: false }); return recall; }
+    const text = fs.readFileSync(file, 'utf8');
+    const value = JSON.parse(text);
+    if (value.version !== VISIT_RECALL_VERSION || typeof value.memo !== 'string' || !Array.isArray(value.labelled))
+      throw fail('MAILBOX_VISIT_RECALL', `visit-recall.json is not a ${VISIT_RECALL_VERSION} record`);
+    recall = value;
+    event({ type: 'visit-recall', present: true, sha256: crypto.createHash('sha256').update(text).digest('hex'), labels: value.labelled.length });
+    return recall;
+  };
+  // The person's own visit plan (visit_plan tool). Kept only in this owner and
+  // its records; each menu then carries menu.visitPlan.
+  let plan = null;
+  const withRecall = result => {
+    if (!result?.menu || typeof result.menu !== 'object') return result;
+    const current = visitRecall();
+    if (!current && !plan) return result;
+    const copy = structuredClone(result);
+    if (current) copy.menu.rememberedVisit = recallForMenu(current, copy.menu);
+    if (plan) copy.menu.visitPlan = planForMenu(plan, copy.menu);
+    return copy;
+  };
+  async function visitPlan(args) {
+    const next = nextVisitPlan(plan, args);
+    // The menu is read before the plan changes, so a failed read leaves the plan as it was.
+    const current = await invokeTool('whole_trace_authoring_menu', { requestId: state.requestId });
+    plan = next;
+    event({ type: 'visit-plan', revision: plan.revision, currentStep: plan.currentStep, steps: plan.steps.length });
+    return { plan: structuredClone(plan), menu: current.menu };
+  }
   let interrupted;
   const signal = name => { interrupted ??= `signal:${name}`; };
   const onTerm = () => signal('SIGTERM'), onInt = () => signal('SIGINT');
@@ -149,7 +190,8 @@ async function serveMailbox({ directory, prepareArguments, service, pollInterval
         throw fail('MAILBOX_TAMPERED_COMMAND', 'Published operation identity changed');
       let record, shouldClose = false;
       try {
-        const result = op.tool === 'finish_and_submit_whole_trace'
+        const result = op.tool === 'visit_plan' ? await visitPlan(op.arguments)
+          : op.tool === 'finish_and_submit_whole_trace'
           ? await finishAndSubmit({ invokeTool, requestId: state.requestId, candidateFilePath: path.join(directory, 'candidate.json') })
           : await invokeTool(op.tool, { ...op.arguments, requestId: state.requestId });
         await requestStatus();
@@ -158,7 +200,7 @@ async function serveMailbox({ directory, prepareArguments, service, pollInterval
           await confirmCompletion(); shouldClose = true;
         } else if (state.requestStatus.status === 'failed'
           || state.requestStatus.status === 'invalid' && !state.requestStatus.canRepair) shouldClose = true;
-        record = { operationId: op.operationId, digest: op.digest, ok: true, result };
+        record = { operationId: op.operationId, digest: op.digest, ok: true, result: withRecall(result) };
       } catch (error) {
         try { await requestStatus(); } catch { /* Keep the original transport failure. */ }
         record = { operationId: op.operationId, digest: op.digest, ok: false,
@@ -198,7 +240,14 @@ async function recordedCall(directory, inputFile) {
   publishNew(path.join(receipt, 'started.json'), { startedAt, inputFile: path.resolve(inputFile), pid: process.pid });
   let stdout = '', stderr = '', exitCode = 0, operationId = null;
   try {
-    const bytes = fs.readFileSync(path.resolve(inputFile));
+    const status = readMailboxStatus(directory);
+    const resolvedInput = fs.realpathSync(path.resolve(inputFile));
+    if (status.operationRoot) {
+      const relative = path.relative(status.operationRoot, resolvedInput);
+      if (relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative))
+        throw fail('MAILBOX_OPERATION_OUTSIDE_SLOT', `Save a new operation file inside ${status.operationRoot}; external paths and symlink escapes are not accepted`);
+    }
+    const bytes = fs.readFileSync(resolvedInput);
     fs.writeFileSync(path.join(receipt, 'input.json'), bytes, { flag: 'wx', mode: 0o600 });
     if (bytes.length > MAX_BYTES) throw fail('MAILBOX_SIZE', 'JSON exceeds 4 MiB');
     const input = JSON.parse(bytes.toString('utf8'));
@@ -218,13 +267,14 @@ async function recordedCall(directory, inputFile) {
 
 async function main() {
   const [command, directory, flag, input, ...extra] = process.argv.slice(2);
-  if (!directory || extra.length) throw fail('MAILBOX_USAGE', 'serve DIR --prepare-file FILE | call DIR --operation-file FILE | status DIR | abort DIR --reason TEXT');
+  const hasOperationRoot = command === 'serve' && extra.length === 2 && extra[0] === '--operation-root' && extra[1];
+  if (!directory || extra.length && !hasOperationRoot) throw fail('MAILBOX_USAGE', 'serve DIR --prepare-file FILE [--operation-root DIR] | call DIR --operation-file FILE | status DIR | abort DIR --reason TEXT');
   let result;
   if (command === 'serve' && flag === '--prepare-file' && input) {
     const prepared = readJson(path.resolve(input));
     if (prepared.tool !== 'prepare_whole_trace' || !prepared.arguments || Object.keys(prepared).some(key => !['tool', 'arguments'].includes(key)))
       throw fail('MAILBOX_PREPARE', 'Prepare file must be {tool:"prepare_whole_trace",arguments:<unchanged readiness arguments>}');
-    result = await serveMailbox({ directory, prepareArguments: prepared.arguments });
+    result = await serveMailbox({ directory, prepareArguments: prepared.arguments, ...(hasOperationRoot ? { operationRoot: extra[1] } : {}) });
   } else if (command === 'call' && flag === '--operation-file' && input) return recordedCall(directory, input);
   else if (command === 'status' && !flag) result = readMailboxStatus(directory);
   else if (command === 'abort' && flag === '--reason' && input) result = abortMailbox(directory, input);
